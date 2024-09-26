@@ -93,7 +93,7 @@
                     <input type="hidden" name="peca_index[]" value="${pecaCount}"> <!-- Campo oculto com o índice real -->
                     <div class="col-md-8">
                         <label for="peca_${pecaCount}" class="form-label">Peça ${pecaCount+1}</label>
-                        <select name="peca_${pecaCount}" id="peca_${pecaCount}" class="form-select select2" required onchange="atualizarMP(${pecaCount})">
+                        <select name="peca_${pecaCount}" id="peca_${pecaCount}" class="form-select select2" required>
                             {% for peca in pecas %}
                                 <option value="{{ peca.id }}" data-mp="{{ peca.materia_prima }}">{{ peca.codigo }} - {{ peca.descricao }}</option>
                             {% endfor %}
