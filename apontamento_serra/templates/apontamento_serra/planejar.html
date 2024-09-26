@@ -67,7 +67,7 @@
             <button type="button" id="addPecaBtn" class="btn btn-secondary mt-3">Adicionar Mais Peças</button>
 
             <!-- Botão de salvar -->
-            <button type="submit" class="btn btn-primary mt-3">Salvar Planejamento</button>
+            <button type="submit" id="submitBtn" class="btn btn-primary mt-3">Salvar Planejamento</button>
 
         </form>
     </div>
@@ -78,6 +78,18 @@
     <!-- Incluir JS do Select2 -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     
+    <script>
+        document.getElementById('planejamentoForm').addEventListener('submit', function() {
+            // Desabilitar o botão de submit
+            document.getElementById('submitBtn').disabled = true;
+    
+            // Alterar o texto do botão para indicar que está processando
+            document.getElementById('submitBtn').innerText = 'Salvando...';
+    
+            // Submeter o formulário
+        });
+    </script>
+
     <script>
         $(`#peca_0`).select2();
         $(`#mp_usada`).select2();

@@ -76,7 +76,7 @@
                                                     <h5 class="modal-title" id="modalLabel{{ ordem.id }}_{{ peca_planejada.id }}">Iniciar Apontamento para {{ peca_planejada.peca.descricao }}</h5>
                                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                 </div>
-                                                <form method="post" action="{% url 'apontamento_usinagem:iniciar_apontamento' ordem.id %}">
+                                                <form id="formIniciarOrdem" method="post" action="{% url 'apontamento_usinagem:iniciar_apontamento' ordem.id %}">
                                                     <div class="modal-body">
                                                         {% csrf_token %}
                                                         <div class="mb-3">
@@ -91,7 +91,7 @@
                                                     </div>
                                                     <div class="modal-footer">
                                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                        <button type="submit" class="btn btn-primary">Iniciar</button>
+                                                        <button id="btnIniciarOrdem" type="submit" class="btn btn-primary">Iniciar</button>
                                                     </div>
                                                 </form>
                                             </div>
@@ -151,7 +151,7 @@
                                                     <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Finalizar {{ ordem.planejamento.peca.codigo}} - {{ ordem.planejamento.peca.descricao}}</h5>
                                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                 </div>
-                                                <form method="post" action="{% url 'apontamento_usinagem:finalizar_apontamento' ordem.id %}">
+                                                <form id="formFinalizarOrdem" method="post" action="{% url 'apontamento_usinagem:finalizar_apontamento' ordem.id %}">
                                                     <div class="modal-body">
                                                         {% csrf_token %}
                                                         <div class="mb-3">
@@ -177,7 +177,7 @@
                                                         </div>
                                                     </div>
                                                     <div class="modal-footer">
-                                                        <button type="submit" class="btn btn-primary">Salvar</button>
+                                                        <button id="btnFinalizarOrdem" type="submit" class="btn btn-primary">Salvar</button>
                                                     </div>
                                                 </form>
                                             </div>
@@ -192,7 +192,7 @@
                                                     <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Interromper {{ ordem.planejamento.peca.codigo}} - {{ ordem.planejamento.peca.descricao}}</h5>
                                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                 </div>
-                                                <form method="post" action="{% url 'apontamento_usinagem:interromper_apontamento' ordem.id %}">
+                                                <form id="formInterromperOrdem" method="post" action="{% url 'apontamento_usinagem:interromper_apontamento' ordem.id %}">
                                                     <div class="modal-body">
                                                         {% csrf_token %}
                                                         <div class="mb-3">
@@ -205,7 +205,7 @@
                                                         </div>
                                                     </div>
                                                     <div class="modal-footer">
-                                                        <button type="submit" class="btn btn-primary">Salvar</button>
+                                                        <button id="btnInterromperOrdem" type="submit" class="btn btn-primary">Salvar</button>
                                                     </div>
                                                 </form>
                                             </div>
@@ -256,6 +256,42 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.getElementById('formInterromperOrdem').addEventListener('submit', function() {
+            // Desabilitar o botão de submit
+            document.getElementById('btnInterromperOrdem').disabled = true;
+    
+            // Alterar o texto do botão para indicar que está processando
+            document.getElementById('btnInterromperOrdem').innerText = 'Interrompendo...';
+    
+            // Submeter o formulário
+        });
+    </script>
+
+    <script>
+        document.getElementById('formFinalizarOrdem').addEventListener('submit', function() {
+            // Desabilitar o botão de submit
+            document.getElementById('btnFinalizarOrdem').disabled = true;
+    
+            // Alterar o texto do botão para indicar que está processando
+            document.getElementById('btnFinalizarOrdem').innerText = 'Finalizando...';
+    
+            // Submeter o formulário
+        });
+    </script>
+
+    <script>
+        document.getElementById('formIniciarOrdem').addEventListener('submit', function() {
+            // Desabilitar o botão de submit
+            document.getElementById('btnIniciarOrdem').disabled = true;
+    
+            // Alterar o texto do botão para indicar que está processando
+            document.getElementById('btnIniciarOrdem').innerText = 'Iniciando...';
+    
+            // Submeter o formulário
+        });
+    </script>
 
     <!-- Filtros e scripts -->
     <script>

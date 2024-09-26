@@ -50,13 +50,17 @@ def planejar(request):
                 peca_id = request.POST.get(f'peca_{index}')
                 quantidade = request.POST.get(f'quantidade_{index}')
                 data_planejada = request.POST.get(f'data_planejada_{index}')
-                maquina = request.POST.get(f'maquina_{index}')
+                maquina = request.POST.get(f'maquina_{index}', None)
                 setor = 'usinagem'
 
                 # Criar o planejamento para cada peça
                 peca = Pecas.objects.get(id=peca_id)
-                maquina = Maquina.objects.get(id=maquina)
-
+                
+                if maquina:
+                    maquina = Maquina.objects.get(id=maquina)
+                else:
+                    maquina = None
+                
                 planejamento=Planejamento.objects.create(
                     data_planejada=data_planejada,
                     tipo_planejamento='planejamento',

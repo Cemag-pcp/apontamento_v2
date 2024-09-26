@@ -43,7 +43,6 @@ def lista_ordens(request):
     }
     return render(request, 'apontamento_serra/lista_ordens.html', context)
 
-
 def finalizar_apontamento(request, apontamento_id):
     # Busca o apontamento
     apontamento = get_object_or_404(Apontamento, pk=apontamento_id)
