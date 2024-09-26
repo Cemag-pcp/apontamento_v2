@@ -15,72 +15,99 @@
         
         <!-- Seção de Ordens Planejadas -->
         <h2>Planejadas</h2>
-        <table class="table table-striped table-bordered">
-            <thead class="table-dark">
-                <tr>
-                    <th>Data planejamento</th>
-                    <th>Qt. Planejada</th>
-                    <th>Peça</th>
-                    <th>Máquina</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if ordens_planejadas %}
-                    {% for ordem in ordens_planejadas %}
-                        {% for peca_planejada in ordem.pecas_planejadas.all %}
-                            <tr>
-                                <td>{{ ordem.data_planejada|date:"d/m/Y" }}</td>
-                                <td>{{ peca_planejada.quantidade_planejada }}</td>
-                                <td>{{ peca_planejada.peca.codigo }} - {{ peca_planejada.peca.descricao }}</td>
-                                <td>{{ ordem.maquina.nome }}</td>
-                                <td>
-                                    <!-- Botão para abrir o modal de iniciar apontamento -->
-                                    <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalIniciar{{ ordem.id }}_{{ peca_planejada.id }}">
-                                        Iniciar
-                                    </button>
-                                    <a href="{% url 'apontamento_usinagem:editar_planejamento' ordem.id %}" class="badge btn btn-success">Editar</a>
-                                </td>
-                            </tr>
-                            <!-- Modal para iniciar o apontamento -->
-                            <div class="modal fade" id="modalIniciar{{ ordem.id }}_{{ peca_planejada.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}_{{ peca_planejada.id }}" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="modalLabel{{ ordem.id }}_{{ peca_planejada.id }}">Iniciar Apontamento para {{ peca_planejada.peca.descricao }}</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <form method="post" action="{% url 'apontamento_usinagem:iniciar_apontamento' ordem.id %}">
-                                            <div class="modal-body">
-                                                {% csrf_token %}
-                                                <div class="mb-3">
-                                                    <label for="operador" class="form-label">Selecione o Operador</label>
-                                                    <select name="operador" class="form-select" required>
-                                                        {% for operador in operadores %}
-                                                            <option value="{{ operador.id }}">{{ operador.matricula }} - {{ operador.nome }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
-                                                <input type="hidden" name="peca_planejada_id" value="{{ peca_planejada.id }}">
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                <button type="submit" class="btn btn-primary">Iniciar</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
+        <div class="container">
+            <!-- Filtros -->
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="filtroOrdem" class="form-label">Filtrar por Ordem</label>
+                    <input type="text" id="filtroOrdem" class="form-control" placeholder="Digite o número da ordem">
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroData" class="form-label">Filtrar por Data</label>
+                    <input type="date" id="filtroData" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroMaquina" class="form-label">Filtrar por Máquina</label>
+                    <select class="form-control" id="filtroMaquina">
+                            <option value="">Todas</option>
+                        {% for maquina in maquinas %}
+                            <option value="{{maquina.nome}}">{{maquina.nome}}</option>
                         {% endfor %}
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="6">Nenhuma ordem planejada no momento.</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
-
+                    </select>
+                </div>
+            </div>
+        
+            <!-- Tabela com overflow-y -->
+            <div style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-striped table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Ordem</th>
+                            <th>Data planejamento</th>
+                            <th>Qt. Planejada</th>
+                            <th>Peça</th>
+                            <th>Máquina</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordensTable">
+                        {% if ordens_planejadas %}
+                            {% for ordem in ordens_planejadas %}
+                                {% for peca_planejada in ordem.pecas_planejadas.all %}
+                                    <tr>
+                                        <td>#{{ ordem.pk }}</td>
+                                        <td>{{ ordem.data_planejada|date:"d/m/Y" }}</td>
+                                        <td>{{ peca_planejada.quantidade_planejada }}</td>
+                                        <td>{{ peca_planejada.peca.codigo }} - {{ peca_planejada.peca.descricao }}</td>
+                                        <td>{{ ordem.maquina.nome }}</td>
+                                        <td>
+                                            <!-- Botão para abrir o modal de iniciar apontamento -->
+                                            <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalIniciar{{ ordem.id }}_{{ peca_planejada.id }}">
+                                                Iniciar
+                                            </button>
+                                            <a href="{% url 'apontamento_usinagem:editar_planejamento' ordem.id %}" class="badge btn btn-success">Editar</a>
+                                        </td>
+                                    </tr>
+                                    <!-- Modal para iniciar o apontamento -->
+                                    <div class="modal fade" id="modalIniciar{{ ordem.id }}_{{ peca_planejada.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}_{{ peca_planejada.id }}" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="modalLabel{{ ordem.id }}_{{ peca_planejada.id }}">Iniciar Apontamento para {{ peca_planejada.peca.descricao }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <form method="post" action="{% url 'apontamento_usinagem:iniciar_apontamento' ordem.id %}">
+                                                    <div class="modal-body">
+                                                        {% csrf_token %}
+                                                        <div class="mb-3">
+                                                            <label for="operador" class="form-label">Selecione o Operador</label>
+                                                            <select name="operador" class="form-select" required>
+                                                                {% for operador in operadores %}
+                                                                    <option value="{{ operador.id }}">{{ operador.matricula }} - {{ operador.nome }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+                                                        <input type="hidden" name="peca_planejada_id" value="{{ peca_planejada.id }}">
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                        <button type="submit" class="btn btn-primary">Iniciar</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6">Nenhuma ordem planejada no momento.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
         <!-- Seção de Ordens em Processo e Interrompidas (Divididas em duas colunas) -->
         <div class="row">
             <!-- Coluna para Ordens em Processo -->
@@ -101,10 +128,12 @@
                                                     </small>
                                                 </a>
                                             </div>
-
                                             <div class="card-body">
-                                                <p><strong>Qt. Planejada:</strong> {{ ordem.planejamento.pecas_planejadas.first.quantidade_planejada }}</p>
-                                                <p><strong>Data de Início:</strong> {{ ordem.data_inicio|date:"d/m/Y H:i" }}</p>
+                                                <p><strong>Planejada:</strong> {{ ordem.planejamento.pecas_planejadas.first.quantidade_planejada }}</p>
+                                                <p><strong>Início:</strong> {{ ordem.data_inicio|date:"d/m/Y H:i" }}</p>
+                                                <p><strong>Máquina:</strong> {% if ordem.planejamento.maquina.nome %}{{ordem.planejamento.maquina.nome}}{% else %}-{% endif %}</p>
+                                                <input type="hidden" value="{{ordem.planejamento.maquina.nome}}" id="maquina_processo_{{ ordem.id }}">
+                                                <p><strong>Operador:</strong> {{ ordem.operador }}</p>
                                                 <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalFinalizar{{ ordem.id }}">
                                                     Finalizar
                                                 </button>
@@ -211,8 +240,8 @@
                                                 </a>
                                             </div>
                                             <div class="card-body">
-                                                <p><strong>Motivo Interrupção:</strong> {{ ordem.motivo_interrupcao }}</p>
-                                                <p><strong>Data de Interrupção:</strong> {{ ordem.data_interrupcao|date:"d/m/Y H:i" }}</p>
+                                                <p><strong>Motivo:</strong> {{ ordem.motivo_interrupcao }}</p>
+                                                <p><strong>Ínicio:</strong> {{ ordem.data_interrupcao|date:"d/m/Y H:i" }}</p>
                                                 <a href="{% url 'apontamento_usinagem:retornar_apontamento' ordem.id %}" class="badge btn btn-success">Retornar</a>
                                             </div>
                                         </div>
@@ -227,6 +256,55 @@
             </div>
         </div>
     </div>
+
+    <!-- Filtros e scripts -->
+    <script>
+        // Filtro por Ordem
+        document.getElementById('filtroOrdem').addEventListener('input', function() {
+            filterTable();
+        });
+
+        // Filtro por Data
+        document.getElementById('filtroData').addEventListener('input', function() {
+            filterTable();
+        });
+
+        // Filtro por Máquina
+        document.getElementById('filtroMaquina').addEventListener('input', function() {
+            filterTable();
+        });
+
+        function filterTable() {
+            const filtroOrdem = document.getElementById('filtroOrdem').value.toLowerCase();
+            const filtroData = document.getElementById('filtroData').value;
+            const filtroMaquina = document.getElementById('filtroMaquina').value.toLowerCase();
+
+            const tabela = document.getElementById('ordensTable');
+            const linhas = tabela.getElementsByTagName('tr');
+
+            for (let i = 0; i < linhas.length; i++) {
+                const ordem = linhas[i].getElementsByTagName('td')[0].innerText.toLowerCase();
+                const data = linhas[i].getElementsByTagName('td')[1].innerText;
+                const maquina = linhas[i].getElementsByTagName('td')[4].innerText.toLowerCase();
+
+                let mostrar = true;
+
+                if (filtroOrdem && !ordem.includes(filtroOrdem)) {
+                    mostrar = false;
+                }
+
+                if (filtroData && data !== filtroData.split("-").reverse().join("/")) {
+                    mostrar = false;
+                }
+
+                if (filtroMaquina && !maquina.includes(filtroMaquina)) {
+                    mostrar = false;
+                }
+
+                linhas[i].style.display = mostrar ? '' : 'none';
+            }
+        }
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

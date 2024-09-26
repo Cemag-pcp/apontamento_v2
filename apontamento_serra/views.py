@@ -1,6 +1,4 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.utils import timezone
-from django.http import HttpResponse
 from django.db.models import Q, Max,OuterRef,Subquery
 
 from cadastro.models import Operador, MotivoInterrupcao, Maquina, Pecas
@@ -9,8 +7,7 @@ from apontamento.models import Apontamento, Planejamento, Interrupcao, Planejame
 
 def lista_ordens(request):
     # Filtrar as ordens pelo status
-    ordens_planejadas = Planejamento.objects.filter(~Q(status_andamento='iniciada'))
-    ordens_planejadas = ordens_planejadas.filter(setor='serra')
+    ordens_planejadas = Planejamento.objects.filter(status_andamento='aguardando_iniciar', setor='serra')
 
     # Use 'planejamento_peca' para se referir corretamente ao campo ForeignKey no Apontamento
     ordens_em_processo = Apontamento.objects.filter(
@@ -45,6 +42,7 @@ def lista_ordens(request):
         'maquinas': maquinas,
     }
     return render(request, 'apontamento_serra/lista_ordens.html', context)
+
 
 def finalizar_apontamento(request, apontamento_id):
     # Busca o apontamento
