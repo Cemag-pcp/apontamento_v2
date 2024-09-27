@@ -1,2 +1,4 @@
 db.sqlite3
 env_apontamento
+*.pyc
+__pycache__/
