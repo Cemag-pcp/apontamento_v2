@@ -91,7 +91,7 @@ def finalizar_apontamento(request, apontamento_id):
 
 def planejar(request):
 
-    pecas = Pecas.objects.all()
+    pecas = Pecas.objects.filter(setor='serra')
     mp = Pecas.objects.values('materia_prima').distinct()
 
     if request.method == 'POST':
@@ -131,7 +131,7 @@ def planejar(request):
 
 def editar_planejamento(request, planejamento_id):
     planejamento = get_object_or_404(Planejamento, id=planejamento_id)
-    pecas = Pecas.objects.all()
+    pecas = Pecas.objects.filter(setor='serra')
     maquinas = Maquina.objects.filter(setor='serra')
     mp = Pecas.objects.values('materia_prima').distinct()
 

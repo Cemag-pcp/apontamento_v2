@@ -6,6 +6,7 @@ from cadastro.models import Pecas
 import csv
 
 class Command(BaseCommand):
+    
     # """
     # Forma de rodar:
     # python manage.py cadastrar_pecas C:\Users\pcp2\sistema_apontamento_2\pecas_new.csv
@@ -33,14 +34,17 @@ class Command(BaseCommand):
                 codigo = row['codigo']
                 descricao = row['descricao']
                 materia_prima = row['materia_prima']
+                setor = row['setor']
 
                 try:
                     # Cria a peça, e verifica duplicidade no código
                     peca, created = Pecas.objects.get_or_create(
                         codigo=codigo,
+                        setor=setor,
                         defaults={
                             'descricao': descricao,
                             'materia_prima': materia_prima,
+
                         }
                     )
                     if created:

@@ -77,8 +77,7 @@ def planejar(request):
                 
         return redirect('apontamento_usinagem:lista_ordens')  # Redireciona após o sucesso
 
-    # Caso seja um GET, renderiza a página
-    pecas = Pecas.objects.all()  # Pegar todas as peças disponíveis para o select
+    pecas = Pecas.objects.filter(setor='usinagem')
     context = {
         'pecas': pecas,
         'maquinas':maquinas
@@ -138,7 +137,7 @@ def finalizar_apontamento(request, apontamento_id):
 
 def editar_planejamento(request, planejamento_id):
     planejamento = get_object_or_404(Planejamento, id=planejamento_id)
-    pecas = Pecas.objects.all()
+    pecas = Pecas.objects.filter(setor='usinagem')
     maquinas = Maquina.objects.filter(setor='usinagem')
 
     if request.method == 'POST':

@@ -17,23 +17,25 @@
             <!-- Contêiner para as peças -->
             <div id="pecasContainer">
                 <div class="row g-3">
-                    <div class="col-md-3">
-                        <label for="peca_0" class="form-label">Peça</label>
+                    <div class="col-md-6">
+                        <label for="peca_0" class="form-label">Peça 1</label>
                         <select name="peca_0" id="peca_0" class="form-select select2" required>
                             {% for peca in pecas %}
                                 <option value="{{ peca.id }}">{{ peca.codigo }} - {{ peca.descricao }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-6">
                         <label for="quantidade_0" class="form-label">Quantidade Planejada</label>
                         <input type="number" name="quantidade_0" id="quantidade_0" class="form-control" min="1" required>
                     </div>
-                    <div class="col-md-3">
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
                         <label for="data_planejada_0" class="form-label">Data Planejada</label>
                         <input type="date" name="data_planejada_0" id="data_planejada_0" class="form-control" required>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-6">
                         <label for="maquina_0" class="form-label">Máquina</label>
                         <select class="form-control" name="maquina_0" id="maquina_0">
                             <option value="">-----------</option>
@@ -84,7 +86,7 @@
                 const newFields = `
                     <div class="row g-3 mt-2" id="pecaRow_${pecaCount}">
                         <div class="col-md-3">
-                            <label for="peca_${pecaCount}" class="form-label">Peça</label>
+                            <label for="peca_${pecaCount}" class="form-label">Peça ${pecaCount+1}</label>
                             <select name="peca_${pecaCount}" id="peca_${pecaCount}" class="form-select select2" required>
                                 {% for peca in pecas %}
                                     <option value="{{ peca.id }}">{{ peca.codigo }} - {{ peca.descricao }}</option>

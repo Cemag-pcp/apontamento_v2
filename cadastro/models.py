@@ -2,16 +2,24 @@ from django.db import models
 
 class Pecas(models.Model):
 
-    codigo = models.CharField(max_length=20)
-    descricao = models.CharField(max_length=100)
+    SETOR_CHOICE = (('usinagem','Usinagem'),
+                ('serra','Serra'),
+                ('estamparia','Estamparia'),
+                ('corte','Corte'),
+                ('montagem','Montagem'),
+                ('pintura','Pintura')
+    )
+
+    codigo = models.CharField(max_length=20)                                    
+    descricao = models.CharField(max_length=255)
     materia_prima = models.CharField(max_length=100, blank=True, null=True)
     comprimento = models.FloatField(blank=True, null=True)
+    setor = models.CharField(max_length=20, choices=SETOR_CHOICE)               
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['codigo'], name='unique_codigo')
+            models.UniqueConstraint(fields=['codigo','setor'], name='unique_codigo_setor')
         ]
-
 
     def __str__(self):
         return f'{self.codigo} - {self.descricao}'
