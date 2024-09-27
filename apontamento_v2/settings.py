@@ -81,27 +81,27 @@ WSGI_APPLICATION = 'apontamento_v2.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres',
-        'PASSWORD': '15512332',
-        'HOST': 'database-1.cdcogkfzajf0.us-east-1.rds.amazonaws.com',
-        'PORT': '5432',
-        'OPTIONS': {
-            'options': '-c search_path=apontamento_v2',
-        },
-
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'postgres',
+#         'USER': 'postgres',
+#         'PASSWORD': '15512332',
+#         'HOST': 'database-1.cdcogkfzajf0.us-east-1.rds.amazonaws.com',
+#         'PORT': '5432',
+#         'OPTIONS': {
+#             'options': '-c search_path=apontamento_v2',
+#         },
+
+#     }
+# }
 
 
 # Password validation
