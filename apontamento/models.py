@@ -33,6 +33,8 @@ class Planejamento(models.Model):
     quantidade_vara = models.PositiveIntegerField(blank=True, null=True)
     mp_usada = models.CharField(max_length=200, blank=True, null=True)
     setor = models.CharField(max_length=20, choices=SETOR_CHOICE)
+    processo = models.ForeignKey(Processo, on_delete=models.CASCADE)
+    peca_processo_maquina = models.ForeignKey(PecaMaquina, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return f'Planejamento para {self.data_planejada} no setor {self.setor}'
