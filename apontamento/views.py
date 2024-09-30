@@ -42,6 +42,7 @@ def interromper_apontamento(request, apontamento_id):
 
     if request.method == 'POST':
         motivo_id = request.POST.get('motivo_interrupcao')
+        print(motivo_id)
         motivo_object = get_object_or_404(MotivoInterrupcao, pk=motivo_id)
 
         apontamento.motivo_interrupcao = motivo_object

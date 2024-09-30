@@ -36,8 +36,6 @@ class Pecas(models.Model):
     descricao = models.CharField(max_length=255)
     materia_prima = models.CharField(max_length=100, blank=True, null=True)
     comprimento = models.FloatField(blank=True, null=True)
-    processos = models.ManyToManyField(Processo, related_name='pecas')
-    maquinas = models.ManyToManyField(Maquina, related_name='maquinas')
 
     class Meta:
         constraints = [

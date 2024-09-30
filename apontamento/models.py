@@ -26,18 +26,15 @@ class Planejamento(models.Model):
     )
 
     data_planejada = models.DateField()
-    maquina = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='planejamento_maquina', blank=True, null=True)
+    # maquina = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='planejamento_maquina', blank=True, null=True)
     tipo_planejamento = models.CharField(max_length=20, choices=TIPO_CHOICES, default='planejamento')
     status_andamento = models.CharField(max_length=20, choices=STATUS_ANDAMENTO_CHOICES, default='aguardando_iniciar')
     tamanho_vara = models.CharField(max_length=20, null=True, blank=True)
     quantidade_vara = models.PositiveIntegerField(blank=True, null=True)
     mp_usada = models.CharField(max_length=200, blank=True, null=True)
-    setor = models.CharField(max_length=20, choices=SETOR_CHOICE)
-    processo = models.ForeignKey(Processo, on_delete=models.CASCADE)
-    peca_processo_maquina = models.ForeignKey(PecaMaquina, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
-        return f'Planejamento para {self.data_planejada} no setor {self.setor}'
+        return f'Planejamento para {self.data_planejada}'
 
 class PlanejamentoPeca(models.Model):
     planejamento = models.ForeignKey(Planejamento, on_delete=models.CASCADE, related_name='pecas_planejadas')
@@ -64,18 +61,20 @@ class Apontamento(models.Model):
     observacao = models.TextField(blank=True, null=True)
     operador = models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='apontamento_operador')
     
-    # Campos para rastrear os tempos
     data_inicio = models.DateTimeField(blank=True, null=True)
     data_finalizacao = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f'Apontamento de {self.planejamento} em {self.data_apontamento}'
 
-    def iniciar(self):
-        """Método para iniciar a ordem."""
-        self.status = 'iniciado'
-        self.data_inicio = timezone.now()
+    def finalizar(self):
+        """Método para finalizar a ordem e planejar o próximo processo."""
+        self.status = 'finalizado'
+        self.data_finalizacao = timezone.now()
         self.save()
+
+        # Planejar o próximo processo e máquina automaticamente
+        self.planejar_proximo_processo()
 
     def interromper(self, motivo_interrupcao):
         """Método para interromper a ordem e registrar o motivo."""
@@ -109,12 +108,36 @@ class Apontamento(models.Model):
         self.data_finalizacao = timezone.now()
         self.save()
 
-    # def finalizar_parcial(self, quantidade_produzida):
-    #     """Método para registrar uma finalização parcial."""
-    #     self.quantidade_produzida += quantidade_produzida
-    #     self.quantidade_restante = self.planejamento.quantidade_planejada - self.quantidade_produzida
-    #     self.status = 'parcial'
-    #     self.save()
+    # def planejar_proximo_processo(self):
+    #     """Método para planejar o próximo processo e máquina."""
+    #     # Obter o processo atual da peça a partir do planejamento
+    #     peca_planejada_atual = self.planejamento.pecas_planejadas.first()
+    #     peca_processo_atual = PecaProcesso.objects.filter(
+    #         peca=peca_planejada_atual.peca,
+    #         processo__nome=self.planejamento.maquina.setor
+    #     ).first()
+
+    #     if peca_processo_atual:
+    #         # Encontrar o próximo processo na ordem
+    #         proximo_processo = PecaProcesso.objects.filter(
+    #             peca=peca_processo_atual.peca,
+    #             ordem__gt=peca_processo_atual.ordem
+    #         ).order_by('ordem').first()
+
+    #         if proximo_processo:
+    #             # Encontrar a máquina associada ao próximo processo
+    #             maquina_proxima = PecaMaquina.objects.filter(
+    #                 peca_processo=proximo_processo
+    #             ).order_by('ordem').first().maquina
+
+    #             # Criar um novo planejamento para o próximo processo
+    #             Planejamento.objects.create(
+    #                 data_planejada=timezone.now(),
+    #                 maquina=maquina_proxima,
+    #                 setor=maquina_proxima.setor,
+    #                 tipo_planejamento='planejamento',
+    #                 status_andamento='aguardando_iniciar'
+    #             )
 
 class Interrupcao(models.Model):
     apontamento = models.ForeignKey(Apontamento, on_delete=models.CASCADE, related_name='interrupcoes')
