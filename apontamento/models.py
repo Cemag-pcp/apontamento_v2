@@ -4,14 +4,6 @@ from django.utils import timezone
 from cadastro.models import *
 
 class Planejamento(models.Model):
-    SETOR_CHOICE = (
-        ('usinagem', 'Usinagem'),
-        ('serra', 'Serra'),
-        ('estamparia', 'Estamparia'),
-        ('corte', 'Corte'),
-        ('montagem', 'Montagem'),
-        ('pintura', 'Pintura')
-    )
 
     TIPO_CHOICES = (
         ('planejamento', 'Planejamento'),
@@ -26,26 +18,26 @@ class Planejamento(models.Model):
     )
 
     data_planejada = models.DateField()
-    # maquina = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='planejamento_maquina', blank=True, null=True)
     tipo_planejamento = models.CharField(max_length=20, choices=TIPO_CHOICES, default='planejamento')
     status_andamento = models.CharField(max_length=20, choices=STATUS_ANDAMENTO_CHOICES, default='aguardando_iniciar')
     tamanho_vara = models.CharField(max_length=20, null=True, blank=True)
-    quantidade_vara = models.PositiveIntegerField(blank=True, null=True)
+    quantidade_vara = models.CharField(max_length=20,blank=True, null=True)
     mp_usada = models.CharField(max_length=200, blank=True, null=True)
+    setor = models.ForeignKey(Setor, on_delete=models.CASCADE, related_name='planejamento_setor')
 
     def __str__(self):
         return f'Planejamento para {self.data_planejada}'
 
 class PlanejamentoPeca(models.Model):
     planejamento = models.ForeignKey(Planejamento, on_delete=models.CASCADE, related_name='pecas_planejadas')
-    peca = models.ForeignKey(Pecas, on_delete=models.CASCADE, related_name='planejamento_peca')
+    peca = models.ForeignKey(PecaProcesso, on_delete=models.CASCADE, related_name='planejamento_peca')
     quantidade_planejada = models.PositiveIntegerField()
     quantidade_produzida = models.PositiveIntegerField(default=0)
     quantidade_morta = models.PositiveIntegerField(default=0)
+    ordem = models.IntegerField(default=1)
 
     def __str__(self):
         return f'{self.peca} - {self.quantidade_planejada}'
-
 
 class Apontamento(models.Model):
     STATUS_CHOICES = (
@@ -108,37 +100,6 @@ class Apontamento(models.Model):
         self.data_finalizacao = timezone.now()
         self.save()
 
-    # def planejar_proximo_processo(self):
-    #     """Método para planejar o próximo processo e máquina."""
-    #     # Obter o processo atual da peça a partir do planejamento
-    #     peca_planejada_atual = self.planejamento.pecas_planejadas.first()
-    #     peca_processo_atual = PecaProcesso.objects.filter(
-    #         peca=peca_planejada_atual.peca,
-    #         processo__nome=self.planejamento.maquina.setor
-    #     ).first()
-
-    #     if peca_processo_atual:
-    #         # Encontrar o próximo processo na ordem
-    #         proximo_processo = PecaProcesso.objects.filter(
-    #             peca=peca_processo_atual.peca,
-    #             ordem__gt=peca_processo_atual.ordem
-    #         ).order_by('ordem').first()
-
-    #         if proximo_processo:
-    #             # Encontrar a máquina associada ao próximo processo
-    #             maquina_proxima = PecaMaquina.objects.filter(
-    #                 peca_processo=proximo_processo
-    #             ).order_by('ordem').first().maquina
-
-    #             # Criar um novo planejamento para o próximo processo
-    #             Planejamento.objects.create(
-    #                 data_planejada=timezone.now(),
-    #                 maquina=maquina_proxima,
-    #                 setor=maquina_proxima.setor,
-    #                 tipo_planejamento='planejamento',
-    #                 status_andamento='aguardando_iniciar'
-    #             )
-
 class Interrupcao(models.Model):
     apontamento = models.ForeignKey(Apontamento, on_delete=models.CASCADE, related_name='interrupcoes')
     motivo = models.ForeignKey(MotivoInterrupcao, on_delete=models.CASCADE)
@@ -147,3 +108,23 @@ class Interrupcao(models.Model):
 
     def __str__(self):
         return f'Interrupção: {self.motivo} em {self.data_interrupcao}'
+
+class OrdemPadrao(models.Model):
+
+    numero_ordem = models.PositiveIntegerField(unique=True, editable=False)
+    descricao = models.TextField(blank=True, null=True)
+    pecas = models.ManyToManyField(PecaProcesso, related_name='ordens_padroes')
+    data_criacao = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Ordem {self.numero_ordem}'
+
+    def save(self, *args, **kwargs):
+        if not self.numero_ordem:
+            # Se o número da ordem ainda não foi gerado, criar o próximo número sequencial
+            ultima_ordem = OrdemPadrao.objects.all().order_by('numero_ordem').last()
+            if ultima_ordem:
+                self.numero_ordem = ultima_ordem.numero_ordem + 1
+            else:
+                self.numero_ordem = 1  # Se for a primeira ordem, começar em 1
+        super(OrdemPadrao, self).save(*args, **kwargs)

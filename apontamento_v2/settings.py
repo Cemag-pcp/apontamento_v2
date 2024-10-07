@@ -62,7 +62,7 @@ ROOT_URLCONF = 'apontamento_v2.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -81,27 +81,27 @@ WSGI_APPLICATION = 'apontamento_v2.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'postgres',
-#         'USER': 'postgres',
-#         'PASSWORD': '15512332',
-#         'HOST': 'database-1.cdcogkfzajf0.us-east-1.rds.amazonaws.com',
-#         'PORT': '5432',
-#         'OPTIONS': {
-#             'options': '-c search_path=apontamento_v2',
-#         },
-
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'postgres',
+        'USER': 'postgres',
+        'PASSWORD': '15512332',
+        'HOST': 'database-1.cdcogkfzajf0.us-east-1.rds.amazonaws.com',
+        'PORT': '5432',
+        'OPTIONS': {
+            'options': '-c search_path=apontamento_v2',
+        },
+
+    }
+}
 
 
 # Password validation
@@ -139,6 +139,14 @@ USE_TZ = False
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static/'),
+    os.path.join(BASE_DIR, 'apontamento/static'),
+    os.path.join(BASE_DIR, 'apontamento_serra/static'),
+    os.path.join(BASE_DIR, 'apontamento_usinagem/static'),
+    os.path.join(BASE_DIR, 'cadastro/static'),
+
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

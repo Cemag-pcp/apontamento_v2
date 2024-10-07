@@ -1,147 +1,190 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planejar Peças</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
-    <!-- Incluir CSS do Select2 -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <!-- FontAwesome para o ícone da lixeira -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container">
-        <h2>Adicionar Peças ao Planejamento</h2>
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container d-flex justify-content-center">
+    <div class="col-lg-8 col-md-10 col-sm-12">
+        <h2 class="text-center my-4">Planejar produção</h2>
         <form id="planejamentoForm" method="post" action="{% url 'apontamento_serra:planejar' %}">
             {% csrf_token %}
 
-            <!-- Inputs preenchidos apenas uma vez -->
             <div class="row mb-3">
-                <div class="col-md-4">
+                <div class="col-sm-4">
                     <label for="tamanho_planejado_vara" class="form-label">Tamanho planejado da vara</label>
-                    <input type="number" name="tamanho_planejado_vara" id="tamanho_planejado_vara" class="form-control" required>
+                    <input type="text" name="tamanho_planejado_vara" class="form-control">
                 </div>
-                <div class="col-md-4">
-                    <label for="qt_planejada_vara" class="form-label">Qt. planejada de varas</label>
-                    <input type="number" name="qt_planejada_vara" id="qt_planejada_vara" class="form-control" required>
+                <div class="col-sm-4">
+                    <label for="qt_planejada_vara" class="form-label">Qt. plan. de varas</label>
+                    <input type="text" name="qt_planejada_vara" class="form-control">
                 </div>
-                <div class="col-md-4">
+                <div class="col-sm-4">
                     <label for="data_planejada" class="form-label">Data Planejada</label>
-                    <input type="date" name="data_planejada" id="data_planejada" class="form-control" required>
+                    <input type="date" name="data_planejada" value="{{ planejamento.data_planejada|date:'Y-m-d' }}" class="form-control" required>
                 </div>
             </div>
-            <div class="row mb-3">
-                <div class="col-sm-12">
-                    <label for="mp_usada" class="form-label">MP</label>
-                    <select name="mp_usada" id="mp_usada" class="form-select select2" required>
-                        {% for mp in mps %}
-                            <option value="{{ mp.materia_prima }}">{{ mp.materia_prima }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
+
             <hr>
             <!-- Contêiner para as peças -->
             <div id="pecasContainer">
-                <div class="row g-3" id="pecaRow_0">
-                    <input type="hidden" name="peca_index[]" value="0"> <!-- Campo oculto com o índice real -->
-                    <div class="col-md-8">
+                <div class="row mb-3">
+                    <div class="col-sm-5" id="pecaRow_0">
+                        <input type="hidden" name="peca_index[]" value="0"> <!-- Campo oculto com o índice real -->
                         <label for="peca_0" class="form-label">Peça 1</label>
                         <select name="peca_0" id="peca_0" class="form-select select2" required>
                             {% for peca in pecas %}
-                                <option value="{{ peca.id }}" data-mp="{{ peca.materia_prima }}">{{ peca.codigo }} - {{ peca.descricao }}</option>
+                                <option value="{{ peca.peca.id }}" data-mp="{{ peca.peca.materia_prima }}">{{ peca.peca.codigo }} - {{ peca.peca.descricao }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <label for="quantidade_0" class="form-label">Quantidade Planejada</label>
+                    <div class="col-sm-5">
+                        <label for="mp_usada" class="form-label">MP</label>
+                        <select name="mp_usada_peca_0" id="mp_usada_peca_0" class="form-select select2" required>
+                            {% for mp in mps %}
+                                <option value="{{ mp.materia_prima }}">{{ mp.materia_prima }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-sm-2">
+                        <label for="quantidade_0" class="form-label">Qt. Plan.</label>
                         <input type="number" name="quantidade_0" id="quantidade_0" class="form-control" min="1" required>
                     </div>
                 </div>
             </div>
             <hr>
+
             <input type="hidden" name="pecaCount" id="pecaCount" value="1">
 
             <!-- Botão para adicionar mais peças -->
-            <button type="button" id="addPecaBtn" class="btn btn-secondary mt-3">Adicionar Mais Peças</button>
+            <div class="text-home">
+                <button type="button" id="addPecaBtn" class="btn btn-secondary mt-3">Adicionar Mais Peças</button>
+            </div>
 
             <!-- Botão de salvar -->
-            <button type="submit" id="submitBtn" class="btn btn-primary mt-3">Salvar Planejamento</button>
+            <div class="text-end mb-3">
+                <button type="submit" id="submitBtn" class="btn btn-primary mt-3">Salvar Planejamento</button>
+                <label id="textDangerSubmit" style="color:red; display:block;"><small>Todas as Mps precisam ser iguais! <i class="fas fa-exclamation-triangle"></i></small></label>
+            </div>
 
         </form>
     </div>
+</div>
 
-    <!-- Incluir jQuery (necessário para Select2) -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    
-    <!-- Incluir JS do Select2 -->
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    
-    <script>
-        document.getElementById('planejamentoForm').addEventListener('submit', function() {
-            // Desabilitar o botão de submit
-            document.getElementById('submitBtn').disabled = true;
-    
-            // Alterar o texto do botão para indicar que está processando
-            document.getElementById('submitBtn').innerText = 'Salvando...';
-    
-            // Submeter o formulário
-        });
-    </script>
+<script>
+    document.getElementById('planejamentoForm').addEventListener('submit', function() {
+        // Desabilitar o botão de submit
+        document.getElementById('submitBtn').disabled = true;
 
-    <script>
-        $(`#peca_0`).select2();
-        $(`#mp_usada`).select2();
+        // Alterar o texto do botão para indicar que está processando
+        document.getElementById('submitBtn').innerText = 'Salvando...';
 
-        let pecaCount = 1;  // Para contar quantas peças foram adicionadas
+        // Submeter o formulário
+    });
+</script>
 
-        document.getElementById('addPecaBtn').addEventListener('click', function() {
-            const pecasContainer = document.getElementById('pecasContainer');
+<script>
+    $(`#peca_0`).select2();
+    $(`#mp_usada_peca_0`).select2();
 
-            // Criar novo conjunto de campos para adicionar outra peça
-            const newFields = `
-                <div class="row g-3 mt-2" id="pecaRow_${pecaCount}">
-                    <input type="hidden" name="peca_index[]" value="${pecaCount}"> <!-- Campo oculto com o índice real -->
-                    <div class="col-md-8">
-                        <label for="peca_${pecaCount}" class="form-label">Peça ${pecaCount+1}</label>
-                        <select name="peca_${pecaCount}" id="peca_${pecaCount}" class="form-select select2" required>
-                            {% for peca in pecas %}
-                                <option value="{{ peca.id }}" data-mp="{{ peca.materia_prima }}">{{ peca.codigo }} - {{ peca.descricao }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="quantidade_${pecaCount}" class="form-label">Quantidade Planejada</label>
-                        <input type="number" name="quantidade_${pecaCount}" id="quantidade_${pecaCount}" class="form-control" min="1" required>
-                    </div>
-                    <div class="col-md-1 d-flex align-items-end justify-content-end">
-                        <button type="button" class="btn btn-danger btn-remove" onclick="removePeca(${pecaCount})">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
+    // Função para verificar se todas as matérias-primas são iguais
+    function verificarMateriasPrimasIguais() {
+        // Seleciona todos os campos de matérias-primas
+        const mpFields = document.querySelectorAll('[id^="mp_usada_peca_"]');
+        
+        // Verifica se todos os campos têm o mesmo valor
+        let primeiraMP = mpFields[0].value;
+        let todasIguais = true;
 
-            // Adicionar os novos campos ao contêiner
-            pecasContainer.insertAdjacentHTML('beforeend', newFields);
-
-            // Atualizar o campo oculto com o novo número de peças
-            pecaCount++;
-            document.getElementById('pecaCount').value = pecaCount;  // Atualiza o valor do campo oculto
-
-            // Reaplicar Select2 ao novo select
-            $(`#peca_${pecaCount-1}`).select2();
+        mpFields.forEach(function(mpField) {
+            if (mpField.value !== primeiraMP) {
+                todasIguais = false;
+            }
         });
 
-        // Função para remover a peça
-        function removePeca(index) {
-            document.getElementById(`pecaRow_${index}`).remove();
+        // Habilita ou desabilita o botão com base na comparação
+        const salvarBtn = document.getElementById('submitBtn');
+        const textDanger = document.getElementById('textDangerSubmit');
+
+        if (todasIguais) {
+            salvarBtn.disabled = false;
+            textDanger.style.display = 'none';  // Esconde o aviso
+        } else {
+            salvarBtn.disabled = true;
+            textDanger.style.display = 'block';  // Esconde o aviso
+
         }
+    }
 
-    </script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Executar a verificação inicial
+        verificarMateriasPrimasIguais();
 
-    <!-- JS do Bootstrap -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+        // Adicionar eventos de mudança aos campos de matéria-prima
+        $('[id^="mp_usada_peca_"]').on('change', function() {
+            verificarMateriasPrimasIguais();
+        });
+    });
+
+    var pecaCount = 1;  // Para contar quantas peças foram adicionadas
+
+    document.getElementById('addPecaBtn').addEventListener('click', function() {
+        const pecasContainer = document.getElementById('pecasContainer');
+
+        // Criar novo conjunto de campos para adicionar outra peça
+        const newFields = `
+            <div class="row g-3 mb-2" id="pecaRow_${pecaCount}">
+                <div class="col-md-6">
+                    <input type="hidden" name="peca_index[]" value="${pecaCount}">
+                    <label for="peca_${pecaCount}" class="form-label">Peça ${pecaCount+1}</label>
+                    <select name="peca_${pecaCount}" id="peca_${pecaCount}" class="form-control select2" required>
+                        {% for peca in pecas %}
+                            <option value="{{ peca.peca.id }}">{{ peca.peca.codigo }} - {{ peca.peca.descricao }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-4">
+                    <label for="mp_usada_${pecaCount}" class="form-label">MP</label>
+                    <select name="mp_usada_peca_${pecaCount}" id="mp_usada_peca_${pecaCount}" class="form-select select2" required>
+                        {% for mp in mps %}
+                            <option value="{{ mp.materia_prima }}">{{ mp.materia_prima }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="quantidade_${pecaCount}" class="form-label d-flex justify-content-between align-items-center">
+                        Qt. Plan.
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="removePeca('${pecaCount}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </label>
+                    <input type="number" name="quantidade_${pecaCount}" class="form-control" min="1" required>
+                </div>
+            </div>
+        `;
+
+        // Adicionar os novos campos ao contêiner
+        pecasContainer.insertAdjacentHTML('beforeend', newFields);
+
+        // Reaplicar Select2 ao novo select
+        $(`#peca_${pecaCount}`).select2();
+        $(`#mp_usada_peca_${pecaCount}`).select2();
+
+        // Adicionar evento de mudança ao novo campo Select2 de matéria-prima
+        $(`#mp_usada_peca_${pecaCount}`).on('change', function() {
+            verificarMateriasPrimasIguais();
+        });
+
+        // Executar a verificação inicial após adicionar nova peça
+        verificarMateriasPrimasIguais();
+
+        // Incrementa o contador
+        pecaCount++;
+        document.getElementById('pecaCount').value = pecaCount;
+
+    });
+
+    // Função para remover a peça
+    function removePeca(index) {
+        document.getElementById(`pecaRow_${index}`).remove();
+    }
+</script>
+
+{% endblock %}

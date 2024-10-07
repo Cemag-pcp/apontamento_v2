@@ -1,23 +1,25 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.db.models import Q, Max,OuterRef,Subquery
+from django.db.models import OuterRef,Subquery
+from django.utils.dateparse import parse_date  # Import para formatar a data corretamente
 
 from cadastro.models import *
 from apontamento.models import *
 # from .forms import PlanejamentoForm
 
 def lista_ordens(request):
-    # Filtrar as peças que têm o processo "Serra"
-    peca_processos_serra = PecaProcesso.objects.filter(processo__nome='Serra')
+    # Filtrar os processos relacionados ao setor "Serra"
+    peca_processos_serra = PecaProcesso.objects.filter(processo__nome='serra')
+    peca_processos_serra_ids = peca_processos_serra.values_list('id', flat=True)
 
-    # Filtrar os planejamentos associados às peças que estão no processo "Serra"
+    # Filtrar os planejamentos pendentes associados às peças que estão no processo "Serra"
     ordens_planejadas = Planejamento.objects.filter(
-        pecas_planejadas__peca__in=[pp.peca for pp in peca_processos_serra],
+        pecas_planejadas__peca__in=peca_processos_serra_ids,
         status_andamento='aguardando_iniciar'
     ).distinct().prefetch_related('pecas_planejadas')
 
     # Filtrar os apontamentos que estão em processo no setor "Serra"
     ordens_em_processo = Apontamento.objects.filter(
-        planejamento__pecas_planejadas__peca__in=[pp.peca for pp in peca_processos_serra],
+        planejamento__pecas_planejadas__peca__in=peca_processos_serra_ids,
         status='iniciado'
     ).distinct().select_related('planejamento')
 
@@ -28,7 +30,7 @@ def lista_ordens(request):
 
     # Filtrar os apontamentos interrompidos e adicionar o motivo da interrupção e a data
     ordens_interrompidas = Apontamento.objects.filter(
-        planejamento__pecas_planejadas__peca__in=[pp.peca for pp in peca_processos_serra],
+        planejamento__pecas_planejadas__peca__in=peca_processos_serra_ids,
         status='interrompido'
     ).distinct().annotate(
         motivo_interrupcao=Subquery(ultima_interrupcao.values('motivo__nome')[:1]),
@@ -38,7 +40,9 @@ def lista_ordens(request):
     # Obter todos os operadores, motivos de interrupção e máquinas do setor de serra
     operadores = Operador.objects.all()
     motivos = MotivoInterrupcao.objects.all()
-    maquinas = Maquina.objects.filter(setor='serra')
+    maquinas = Maquina.objects.filter(setor__nome='serra')
+
+    ordens_padrao = OrdemPadrao.objects.all()
 
     context = {
         'ordens_planejadas': ordens_planejadas,
@@ -47,13 +51,48 @@ def lista_ordens(request):
         'operadores': operadores,
         'motivos': motivos,
         'maquinas': maquinas,
+        'ordens_padrao': ordens_padrao,
+        'pecas':peca_processos_serra.filter(ordem=1).distinct()
     }
+
     return render(request, 'apontamento_serra/lista_ordens.html', context)
 
 def finalizar_apontamento(request, apontamento_id):
     # Busca o apontamento
     apontamento = get_object_or_404(Apontamento, pk=apontamento_id)
 
+    # Busca as peças relacionadas ao planejamento do apontamento
+    planejamento_pecas = PlanejamentoPeca.objects.filter(planejamento=apontamento.planejamento)
+
+    if planejamento_pecas.exists():
+        # Iterar sobre todas as peças do planejamento
+        for planejamento_peca in planejamento_pecas:
+
+            # Verifica se a peça possui um próximo processo
+            proximo_processo = PecaProcesso.objects.filter(
+                peca=planejamento_peca.peca.peca,  # Acessa o modelo 'Pecas' através de 'PecaProcesso'
+                ordem__gt=planejamento_peca.ordem  # Verifica o próximo na ordem
+            ).order_by('ordem').first()
+
+            # Se houver próximo processo, abrir um novo planejamento e incrementar a ordem
+            if proximo_processo:
+                nova_ordem = planejamento_peca.ordem + 1
+
+                # Criar um novo planejamento para o próximo processo
+                planejamento_novo = Planejamento.objects.create(
+                    data_planejada=timezone.now(),
+                    setor=proximo_processo.processo
+                )
+
+                # Criar PlanejamentoPeca com a nova ordem
+                PlanejamentoPeca.objects.create(
+                    planejamento=planejamento_novo,
+                    peca=proximo_processo,
+                    quantidade_planejada=planejamento_peca.quantidade_planejada,
+                    ordem=nova_ordem  # Incrementa a ordem
+                )
+
+    # Se for uma requisição POST, atualizar os detalhes do apontamento
     if request.method == 'POST':
         # Pega o ID da máquina e outras informações do POST
         maquina_id = request.POST.get('maquina')
@@ -63,7 +102,7 @@ def finalizar_apontamento(request, apontamento_id):
         maquina_object = get_object_or_404(Maquina, pk=maquina_id)
 
         # Obtém o planejamento associado ao apontamento
-        planejamento = apontamento.planejamento  # Instância do Planejamento associada
+        planejamento = apontamento.planejamento
 
         # Atualiza o campo máquina e outros detalhes no planejamento
         planejamento.maquina = maquina_object
@@ -82,74 +121,50 @@ def finalizar_apontamento(request, apontamento_id):
                 quantidade_produzida = int(quantidade_produzida)
                 quantidade_morta = int(quantidade_morta)
 
-                # Atualiza o objeto PlanejamentoPeca com os valores produzidos e mortas
+                # Atualiza o objeto PlanejamentoPeca com os valores produzidos e mortos
                 peca_planejada.quantidade_produzida = quantidade_produzida
                 peca_planejada.quantidade_morta = quantidade_morta
                 peca_planejada.save()
 
-            # Planeja o próximo processo para o apontamento
-            planejar_proximo_processo(peca_planejada)
+                # Verifica se a peça foi finalizada
+                # Se houver um próximo processo, criar novo planejamento
+                if proximo_processo:
+                    planejamento_novo = Planejamento.objects.create(
+                        data_planejada=timezone.now(),
+                        setor=proximo_processo.processo
+                    )
+                    # Criar PlanejamentoPeca com a nova ordem
+                    PlanejamentoPeca.objects.create(
+                        planejamento=planejamento_novo,
+                        peca=proximo_processo,
+                        quantidade_planejada=quantidade_produzida,
+                        ordem=nova_ordem  # Incrementa a ordem
+                    )
 
-        # Finaliza o apontamento (atualiza o status e data de finalização)
-        apontamento.finalizar()
+    # Finaliza o apontamento (atualiza o status e data de finalização)
+    apontamento.status = 'finalizado'
+    apontamento.data_finalizacao = timezone.now()
+    apontamento.save()
 
-        # Redireciona para a lista de ordens
-        return redirect('apontamento_serra:lista_ordens')
-
-    # Se não for um POST, redireciona para a lista de ordens
+    # Redireciona para a lista de ordens
     return redirect('apontamento_serra:lista_ordens')
-
-def planejar_proximo_processo(peca_planejada):
-    """
-    Função para planejar o próximo processo de uma peça planejada de acordo com a ordem dos processos.
-    """
-
-    # Obter todos os processos associados à peça, ordenados pela ordem
-    peca_processos = PecaProcesso.objects.filter(peca=peca_planejada.peca).order_by('ordem')
-
-    # Verificar se existem processos para essa peça
-    if not peca_processos.exists():
-        print(f"Não há processos definidos para a peça {peca_planejada.peca.codigo}")
-        return
-
-    # Identificar o processo atual: o último processo finalizado no planejamento atual
-    processo_atual = peca_processos.filter(ordem=peca_planejada.planejamento.apontamento_planejamento.last().planejamento.ordem).first()
-
-    if not processo_atual:
-        print(f"Nenhum processo atual encontrado para a peça {peca_planejada.peca.codigo}")
-        return
-
-    # Agora que temos o processo atual, vamos procurar o próximo na sequência
-    proximo_processo = peca_processos.filter(ordem__gt=processo_atual.ordem).first()
-
-    if proximo_processo:
-        # Criar um novo planejamento para o próximo processo
-        Planejamento.objects.create(
-            data_planejada=timezone.now(),
-            tipo_planejamento='planejamento',
-            status_andamento='aguardando_iniciar'
-        )
-        print(f"Planejado próximo processo: {proximo_processo.processo.nome} para a peça {peca_planejada.peca.codigo}.")
-    else:
-        print(f"Não há próximo processo disponível para a peça {peca_planejada.peca.codigo}.")
-
 
 def planejar(request):
 
-    pecas = Pecas.objects.filter(setor='serra')
+    pecas = PecaProcesso.objects.filter(processo__nome='serra', ordem=1)
     mp = Pecas.objects.values('materia_prima').distinct()
 
     if request.method == 'POST':
         # Criar o planejamento
         tamanho_planejado_vara = request.POST.get('tamanho_planejado_vara')
         qt_planejada_vara = request.POST.get('qt_planejada_vara')
-        data_planejada = request.POST.get('data_planejada')
-        mp_usada = request.POST.get('mp_usada')
+        data_planejada = parse_date(request.POST.get('data_planejada'))
+        mp_usada = request.POST.get('mp_usada_peca_0')
         setor = 'serra'
 
         planejamento = Planejamento.objects.create(
             data_planejada=data_planejada,
-            setor=setor,
+            setor=get_object_or_404(Setor, nome=setor),
             tamanho_vara=tamanho_planejado_vara,
             quantidade_vara=qt_planejada_vara,
             mp_usada=mp_usada,
@@ -162,31 +177,40 @@ def planejar(request):
         for index in peca_indices:
             peca_id = request.POST.get(f'peca_{index}')
             quantidade = request.POST.get(f'quantidade_{index}')
+
             if peca_id and quantidade:
-                peca = Pecas.objects.get(id=peca_id)
-                PlanejamentoPeca.objects.create(
-                    planejamento=planejamento,
-                    peca=peca,
-                    quantidade_planejada=quantidade
-                )
+                # Busca a peça no modelo Pecas
+                peca = get_object_or_404(Pecas, id=peca_id)
+                print(peca)
+
+                # Busca o PecaProcesso correspondente à peça
+                peca_processo = PecaProcesso.objects.filter(peca=peca).first()  # Se há um processo associado
+
+                if peca_processo:
+                    PlanejamentoPeca.objects.create(
+                        planejamento=planejamento,
+                        peca=peca_processo,
+                        quantidade_planejada=quantidade
+                    )
 
         return redirect('apontamento_serra:lista_ordens')
 
-    return render(request, 'apontamento_serra/planejar.html', {'pecas': pecas, 'mps': mp, })
+    return render(request, 'apontamento_serra/planejar.html', {'pecas': pecas,
+                                                                'mps': mp, })
 
 def editar_planejamento(request, planejamento_id):
     planejamento = get_object_or_404(Planejamento, id=planejamento_id)
-    pecas = Pecas.objects.filter(setor='serra')
-    maquinas = Maquina.objects.filter(setor='serra')
+    # pecas = Pecas.objects.filter(setor__nome='serra')
+    pecas = PecaProcesso.objects.filter(processo__nome='serra', ordem=1)
+
+    maquinas = Maquina.objects.filter(setor__nome='serra')
     mp = Pecas.objects.values('materia_prima').distinct()
 
     if request.method == 'POST':
         # Atualiza os dados do planejamento
-        mp_usada = request.POST.get('mp_usada')
-
         planejamento.data_planejada = request.POST.get('data_planejada')
         planejamento.tamanho_vara = request.POST.get('tamanho_vara')
-        planejamento.mp_usada = request.POST.get('mp_usada')
+        planejamento.mp_usada = request.POST.get('mp_usada_peca_0')
         planejamento.quantidade_vara = request.POST.get('qt_planejada_vara')
         planejamento.save()
 
@@ -201,10 +225,16 @@ def editar_planejamento(request, planejamento_id):
             quantidade_planejada = request.POST.get(f'quantidade_{i}')
 
             if peca_id and quantidade_planejada:
-                peca = Pecas.objects.get(id=peca_id)
+
+                # Busca a peça no modelo Pecas
+                peca = get_object_or_404(Pecas, id=peca_id)
+
+                # Busca o PecaProcesso correspondente à peça
+                peca_processo = PecaProcesso.objects.filter(peca=peca).first()  # Se há um processo associado
+
                 PlanejamentoPeca.objects.create(
                     planejamento=planejamento,
-                    peca=peca,
+                    peca=peca_processo,
                     quantidade_planejada=quantidade_planejada,
                 )
 
@@ -215,4 +245,73 @@ def editar_planejamento(request, planejamento_id):
         'pecas': pecas,
         'maquinas': maquinas,
         'mps':mp
+    })
+
+def escolher_ordem_padrao(request, pk):
+    planejamento = get_object_or_404(OrdemPadrao, id=pk)
+    pecas = Pecas.objects.filter(setor__nome='serra')
+    maquinas = Maquina.objects.filter(setor__nome='serra')
+    mp = Pecas.objects.values('materia_prima').distinct()
+
+    if request.method == 'POST':
+        
+        planejamento = Planejamento.objects.create(
+            data_planejada=request.POST.get('data_planejada'),
+            setor=get_object_or_404(Setor, nome='serra'),
+            tamanho_vara=request.POST.get('tamanho_vara'),
+            quantidade_vara=request.POST.get('qt_planejada_vara'),
+            mp_usada=request.POST.get('mp_usada_peca_0'),
+        )
+
+        pecaCount = int(request.POST.get('pecaCount'))
+
+        # Remove peças antigas relacionadas ao planejamento
+        PlanejamentoPeca.objects.filter(planejamento=planejamento).delete()
+
+        # Itera sobre as novas peças adicionadas no formulário
+        for i in range(pecaCount):  # Usar o número de peças dinamicamente gerado
+            peca_id = request.POST.get(f'peca_{i}')
+            quantidade_planejada = request.POST.get(f'quantidade_{i}')
+
+            if peca_id and quantidade_planejada:
+
+                # Busca a peça no modelo Pecas
+                peca = get_object_or_404(Pecas, id=peca_id)
+
+                # Busca o PecaProcesso correspondente à peça
+                peca_processo = PecaProcesso.objects.filter(peca=peca).first()  # Se há um processo associado
+
+                PlanejamentoPeca.objects.create(
+                    planejamento=planejamento,
+                    peca=peca_processo,
+                    quantidade_planejada=quantidade_planejada,
+                )
+
+        return redirect('apontamento_serra:lista_ordens')
+
+    return render(request, 'apontamento_serra/editar_planejamento.html', {
+        'planejamento': planejamento,
+        'pecas': pecas,
+        'maquinas': maquinas,
+        'mps':mp,
+        'ordem_padrao':True
+    })
+
+def planejar_ordem_padrao(request):
+    # Obtém todas as peças para preencher o dropdown no template
+    pecas = PecaProcesso.objects.all()
+
+    # Inicialmente, traz todas as ordens padrão
+    ordens_padrao = OrdemPadrao.objects.all()
+
+    # Verificar se há um filtro de peça no request (vários IDs)
+    pecas_selecionadas = request.GET.getlist('pecaOrdemPadrao')  # Obtém uma lista de peças do GET
+    if pecas_selecionadas:
+        # Se uma ou mais peças foram selecionadas, filtrar as ordens padrão que possuem essas peças
+        ordens_padrao = ordens_padrao.filter(pecas__id__in=pecas_selecionadas).distinct()
+
+    # Renderiza o template passando as peças e as ordens filtradas
+    return render(request, 'apontamento_serra/lista_ordens.html', {
+        'pecas': pecas,
+        'ordens_padrao': ordens_padrao,
     })

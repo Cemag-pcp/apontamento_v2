@@ -12,6 +12,9 @@ urlpatterns = [
     path('retornar/<int:apontamento_id>/', retornar_apontamento, name='retornar_apontamento'),
     path('finalizar_parcial/<int:apontamento_id>/', finalizar_parcial_apontamento, name='finalizar_parcial_apontamento'),
     path('editar_planejamento/<int:planejamento_id>/', views.editar_planejamento, name='editar_planejamento'),
+    path('escolher_ordem_padrao/<int:pk>/', views.escolher_ordem_padrao, name='escolher_ordem_padrao'),
+
+    path('filtrar_ordem_padrao/', views.planejar_ordem_padrao, name='planejar_ordem_padrao'),
 
     path('lista_ordens/', views.lista_ordens, name='lista_ordens'),
     path('planejar/', views.planejar, name='planejar'),
