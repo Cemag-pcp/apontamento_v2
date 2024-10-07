@@ -22,5 +22,7 @@ urlpatterns = [
     path('apontamento/', include('apontamento.urls')),
     path('serra/', include('apontamento_serra.urls')),
     path('usinagem/', include('apontamento_usinagem.urls')),
+    path('cadastro/', include('cadastro.urls')),
+    
 
 ]
