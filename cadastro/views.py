@@ -18,9 +18,9 @@ import csv
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from .forms import UploadCSVForm
-from .models import Pecas, Setor
+from .models import Pecas, Setor, PecaProcesso, Maquina
 
-def upload_csv(request):
+def importar_peca(request):
     if request.method == 'POST':
         form = UploadCSVForm(request.POST, request.FILES)
         if form.is_valid():
@@ -71,3 +71,96 @@ def upload_csv(request):
 
     return render(request, 'cadastro_massa/peca_massa.html', {'form': form})
 
+def importar_peca_processo_csv(request):
+    if request.method == 'POST':
+        form = UploadCSVForm(request.POST, request.FILES)
+        
+        if form.is_valid():
+            csv_file = request.FILES['file']
+            if not csv_file.name.endswith('.csv'):
+                messages.error(request, 'Por favor, faça o upload de um arquivo CSV.')
+                return redirect('importar_peca_processo_csv')
+
+            decoded_file = csv_file.read().decode('utf-8').splitlines()
+            reader = csv.DictReader(decoded_file)
+
+            for row in reader:
+                codigo_peca = row['codigo']
+                nome_processo = row['nome_processo']
+                nome_maquina = row['nome_maquina']
+                ordem = row['ordem']
+
+                # Buscar a peça, processo e máquina com base nos dados do CSV
+                try:
+                    peca = Pecas.objects.get(codigo=codigo_peca)
+                    processo = Setor.objects.get(nome=nome_processo)
+                    maquina = Maquina.objects.get(nome=nome_maquina)
+
+                    # Criar ou atualizar o registro em PecaProcesso
+                    PecaProcesso.objects.update_or_create(
+                        peca=peca,
+                        processo=processo,
+                        maquina=maquina,
+                        ordem=ordem,
+                        defaults={
+                            'peca': peca,
+                            'processo': processo,
+                            'maquina': maquina,
+                            'ordem': ordem,
+                        }
+                    )
+                except Pecas.DoesNotExist:
+                    messages.error(request, f"Peça com código {codigo_peca} não encontrada.")
+                except Setor.DoesNotExist:
+                    messages.error(request, f"Setor com nome {nome_processo} não encontrado.")
+                except Maquina.DoesNotExist:
+                    messages.error(request, f"Máquina com nome {nome_maquina} não encontrada.")
+            
+            messages.success(request, 'CSV importado com sucesso!')
+            return redirect('importar_peca_processo_csv')
+    else:
+        form = UploadCSVForm()
+
+    return render(request, 'cadastro_massa/peca_processo_massa.html', {'form': form})
+
+def atualizar_materia_prima(request):
+    if request.method == 'POST':
+        form = UploadCSVForm(request.POST, request.FILES)
+        
+        if form.is_valid():
+            # Pegar o arquivo CSV enviado
+            csv_file = request.FILES['file']
+            
+            if not csv_file.name.endswith('.csv'):
+                messages.error(request, 'Por favor, envie um arquivo CSV.')
+                return redirect('atualizar_materia_prima')
+
+            try:
+                # Decodificar o arquivo CSV
+                decoded_file = csv_file.read().decode('utf-8').splitlines()
+                reader = csv.DictReader(decoded_file)
+
+                # Processar cada linha do CSV
+                for row in reader:
+                    codigo = row['codigo']
+                    nova_materia_prima = row['materia_prima']
+                    
+                    try:
+                        # Tentar buscar a peça pelo código e atualizar a matéria-prima
+                        peca = Pecas.objects.get(codigo=codigo)
+                        peca.materia_prima = nova_materia_prima
+                        peca.save()
+                    except Pecas.DoesNotExist:
+                        messages.warning(request, f'Peça com código {codigo} não encontrada.')
+
+                messages.success(request, 'Matéria-prima atualizada com sucesso!')
+                return redirect('atualizar_materia_prima')
+            
+            except Exception as e:
+                messages.error(request, f'Houve um erro ao processar o arquivo: {e}')
+                return redirect('atualizar_materia_prima')
+    
+    else:
+        form = UploadCSVForm()
+
+    return render(request, 'cadastro_massa/atualizar_mp_massa.html', {'form': form})

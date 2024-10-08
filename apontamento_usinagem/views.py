@@ -12,14 +12,14 @@ def lista_ordens(request):
     ordens_planejadas = Planejamento.objects.filter(
         status_andamento='aguardando_iniciar', 
         setor__nome='usinagem'
-    )
+    ).select_related('setor').prefetch_related('pecas_planejadas')
 
     # Filtrar as ordens em processo no setor "Usinagem"
     ordens_em_processo = Apontamento.objects.filter(
         status='iniciado', 
         planejamento__setor__nome='usinagem'
-    )
-    
+    ).select_related('planejamento')
+
     # Subquery para pegar a última interrupção (baseada na data de interrupção) para cada apontamento
     ultima_interrupcao = Interrupcao.objects.filter(
         apontamento=OuterRef('pk')
@@ -32,7 +32,7 @@ def lista_ordens(request):
     ).annotate(
         motivo_interrupcao=Subquery(ultima_interrupcao.values('motivo__nome')[:1]),
         data_interrupcao=Subquery(ultima_interrupcao.values('data_interrupcao')[:1])
-    )
+    ).select_related('planejamento')
 
     # Obter todos os operadores, motivos de interrupção e máquinas do setor de usinagem
     operadores = Operador.objects.all()
@@ -47,7 +47,7 @@ def lista_ordens(request):
         'motivos': motivos,
         'maquinas': maquinas,
     }
-    
+
     return render(request, 'apontamento_usinagem/lista_ordens.html', context)
 
 def planejar(request):
@@ -83,7 +83,7 @@ def planejar(request):
                 
         return redirect('apontamento_usinagem:lista_ordens')  # Redireciona após o sucesso
 
-    pecas = PecaProcesso.objects.filter(processo__nome='usinagem', ordem=1)
+    pecas = PecaProcesso.objects.filter(processo__nome='usinagem', ordem=1).select_related('peca', 'processo')
 
     context = {
         'pecas': pecas,
