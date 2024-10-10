@@ -70,11 +70,6 @@ def datatable_ordens(request):
     })
 
 def carregar_ordens_planejadas(request):
-    # peca_processos_serra = PecaProcesso.objects.filter(
-    #     processo__nome='serra'
-    # ).select_related('peca', 'processo', 'maquina').distinct()
-
-    # peca_ids_serra = list(peca_processos_serra.values_list('peca__id', flat=True))
 
     ordens_planejadas = Planejamento.objects.filter(
         setor__nome='serra',

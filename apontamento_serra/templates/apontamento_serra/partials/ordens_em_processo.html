@@ -13,7 +13,8 @@
                             </a>
                         </div>
                         <div class="card-body">
-                            <p><strong>Data de Início:</strong> {{ ordem.apontamento_planejamento.first.data_inicio|date:"d/m/Y H:i" }}</p>
+                            <p><strong>Início:</strong> {{ ordem.apontamento_planejamento.first.data_inicio|date:"d/m/Y H:i" }}</p>
+                            <p><strong>Operador:</strong> {{ ordem.apontamento_planejamento.first.operador.nome }}</p>
                             <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalFinalizar{{ ordem.id }}">
                                 Finalizar
                             </button>
