@@ -15,6 +15,17 @@
                         <div class="card-body">
                             <p><strong>Início:</strong> {{ ordem.apontamento_planejamento.first.data_inicio|date:"d/m/Y H:i" }}</p>
                             <p><strong>Operador:</strong> {{ ordem.apontamento_planejamento.first.operador.nome }}</p>
+                            <p><strong>Peças:</strong>
+                                {% with ordem.pecas_planejadas.all as pecas %}
+                                    <span title="{% for peca_planejada in pecas %}{{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                                        {% for peca_planejada in pecas %}
+                                            <a href="https://drive.google.com/drive/u/0/search?q={{ peca_planejada.peca.peca.codigo }}" target="_blank">
+                                                {{ peca_planejada.peca.peca.codigo }}{% if not forloop.last %}, {% endif %}
+                                            </a>
+                                        {% endfor %}
+                                    </span>
+                                {% endwith %}
+                            </p>
                             <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalFinalizar{{ ordem.id }}">
                                 Finalizar
                             </button>

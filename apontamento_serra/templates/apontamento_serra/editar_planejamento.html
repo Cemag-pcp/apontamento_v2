@@ -210,6 +210,8 @@
     document.getElementById('addPecaBtn').addEventListener('click', function() {
         const pecasContainer = document.getElementById('pecasContainer');
         
+        
+
         const newFields = `
             <div class="row g-3 mb-2" id="pecaRow_${pecaCount}">
                 <div class="col-md-6">
@@ -259,6 +261,9 @@
         // Incrementa o contador
         pecaCount++;
         document.getElementById('pecaCount').value = pecaCount;
+
+        $('.select2').select2();
+        
     });
 
     // Manipular o formulário de planejamento
