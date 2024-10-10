@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div class="container">
+<div>
     
     {% if ordem_padrao %}
         <h1 class="my-4">Ordem padrão</h1>
-        <form method="post" action="{% url 'apontamento_serra:escolher_ordem_padrao' planejamento.id %}">
+        <form id="formEditarOrdemPadrao" method="post" action="{% url 'apontamento_serra:escolher_ordem_padrao' planejamento.id %}">
     {% else %}
         <h1 class="my-4">Editar Planejamento</h1>
-        <form method="post" action="{% url 'apontamento_serra:editar_planejamento' planejamento.id %}">
+        <form id="formEditarPlan" method="post" action="{% url 'apontamento_serra:editar_planejamento' planejamento.id %}">
     {% endif %}
 
         {% csrf_token %}
@@ -121,8 +121,14 @@
 
         <div class="mt-4">
             <div class="form-label text-end">
-                <button type="submit" class="btn btn-success" id="salvarPlanejamentoBtn" disabled>Salvar Planejamento</button>
-                <label id="textDangerSubmit" style="color:red; display:block;"><small>Todas as Mps precisam ser iguais! <i class="fas fa-exclamation-triangle"></i></small></label>
+                {% if ordem_padrao %}
+                    <button type="submit" class="btn btn-success" id="salvarOrdemBtn">Salvar</button>
+                {% else %}
+                    <button type="submit" class="btn btn-success" id="salvarPlanejamentoBtn">Salvar</button>
+                {% endif %}
+                <label id="textDangerSubmit" style="color:red; display:block;">
+                    <small>Todas as Mps precisam ser iguais! <i class="fas fa-exclamation-triangle"></i></small>
+                </label>
             </div>
         </div>
     </form>
@@ -145,17 +151,37 @@
         });
 
         // Habilita ou desabilita o botão com base na comparação
-        const salvarBtn = document.getElementById('salvarPlanejamentoBtn');
+        var ordemPadrao = {{ ordem_padrao|yesno:"true,false" }};
+
+        const salvarBtnPlan = document.getElementById('salvarPlanejamentoBtn');
+        const salvarBtnOrdem = document.getElementById('salvarOrdemBtn');
+
         const textDanger = document.getElementById('textDangerSubmit');
 
-        if (todasIguais) {
-            salvarBtn.disabled = false;
-            textDanger.style.display = 'none';  // Esconde o aviso
+        if (ordemPadrao) {
+
+            if (todasIguais) {
+                salvarBtnOrdem.disabled = false;
+                textDanger.style.display = 'none';  // Esconde o aviso
+            } else {
+                salvarBtnOrdem.disabled = true;
+                textDanger.style.display = 'block';  // Esconde o aviso
+
+            }
+
         } else {
-            salvarBtn.disabled = true;
-            textDanger.style.display = 'block';  // Esconde o aviso
+
+            if (todasIguais) {
+                salvarBtnPlan.disabled = false;
+                textDanger.style.display = 'none';  // Esconde o aviso
+            } else {
+                salvarBtnPlan.disabled = true;
+                textDanger.style.display = 'block';  // Esconde o aviso
+
+            }
 
         }
+        
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -235,11 +261,44 @@
         document.getElementById('pecaCount').value = pecaCount;
     });
 
+    // Manipular o formulário de planejamento
+    const formPlan = document.getElementById('formEditarPlan');
+    const salvarPlanBtn = document.getElementById('salvarPlanejamentoBtn');
+    if (formPlan && salvarPlanBtn) {
+        formPlan.addEventListener('submit', function() {
+            // Desabilitar o botão de submit
+            salvarPlanBtn.disabled = true;
+
+            // Alterar o texto do botão para indicar que está processando
+            salvarPlanBtn.innerText = 'Salvando...';
+        });
+
+        // Habilitar o botão, caso precise ser habilitado
+        salvarPlanBtn.disabled = false;
+    }
+
+    // Manipular o formulário de ordem padrão
+    const formOrdemPadrao = document.getElementById('formEditarOrdemPadrao');
+    const salvarOrdemBtn = document.getElementById('salvarOrdemBtn');
+    if (formOrdemPadrao && salvarOrdemBtn) {
+        formOrdemPadrao.addEventListener('submit', function() {
+            // Desabilitar o botão de submit
+            salvarOrdemBtn.disabled = true;
+
+            // Alterar o texto do botão para indicar que está processando
+            salvarOrdemBtn.innerText = 'Salvando...';
+        });
+
+        // Habilitar o botão, caso precise ser habilitado
+        salvarOrdemBtn.disabled = false;
+    }
+
     // Função para remover peça
     function removePeca(index) {
         document.getElementById('pecaRow_' + index).remove();
         verificarMateriasPrimasIguais();  // Verificar novamente após remover uma peça
     }
+
 </script>
 
 {% endblock %}

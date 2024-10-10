@@ -59,19 +59,23 @@ class Apontamento(models.Model):
     def __str__(self):
         return f'Apontamento de {self.planejamento} em {self.data_apontamento}'
 
-    def finalizar(self):
-        """Método para finalizar a ordem e planejar o próximo processo."""
-        self.status = 'finalizado'
-        self.data_finalizacao = timezone.now()
-        self.save()
+    # def finalizar(self):
+    #     """Método para finalizar a ordem e planejar o próximo processo."""
+    #     self.status = 'finalizado'
+    #     self.data_finalizacao = timezone.now()
+    #     self.save()
 
-        # Planejar o próximo processo e máquina automaticamente
-        self.planejar_proximo_processo()
+    #     # Planejar o próximo processo e máquina automaticamente
+    #     self.planejar_proximo_processo()
 
     def interromper(self, motivo_interrupcao):
         """Método para interromper a ordem e registrar o motivo."""
         self.status = 'interrompido'
         self.save()
+
+        # Atualizar o status do planejamento para "finalizada"
+        self.planejamento.status_andamento = 'interrompida'
+        self.planejamento.save(update_fields=['status_andamento'])
 
         # Cria um novo registro de interrupção
         Interrupcao.objects.create(
@@ -94,11 +98,19 @@ class Apontamento(models.Model):
         self.status = 'iniciado'
         self.save()
 
+        # Atualizar o status do planejamento para "finalizada"
+        self.planejamento.status_andamento = 'iniciada'
+        self.planejamento.save(update_fields=['status_andamento'])
+
     def finalizar(self):
         """Método para finalizar a ordem."""
         self.status = 'finalizado'
         self.data_finalizacao = timezone.now()
         self.save()
+
+        # Atualizar o status do planejamento para "finalizada"
+        self.planejamento.status_andamento = 'finalizada'
+        self.planejamento.save(update_fields=['status_andamento'])
 
 class Interrupcao(models.Model):
     apontamento = models.ForeignKey(Apontamento, on_delete=models.CASCADE, related_name='interrupcoes')

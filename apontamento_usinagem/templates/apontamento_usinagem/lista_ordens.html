@@ -2,7 +2,7 @@
 
 {% block content %}
 
-<div class="container">
+<div>
     <h1 class="my-4 text-center">Apontamento Usinagem</h1>
     <div class="text-end">
         <a class="btn badge btn-primary" href="{% url 'apontamento_usinagem:planejar' %}">
@@ -12,7 +12,7 @@
     
     <!-- Seção de Ordens Planejadas -->
     <h2>Planejadas</h2>
-    <div class="container">
+    <div>
         <!-- Filtros -->
         <div class="row mb-3">
             <div class="col-md-4">
@@ -33,248 +33,338 @@
                 </select>
             </div>
         </div>
-    
-        <!-- Tabela com overflow-y -->
-        <div style="max-height: 400px; overflow-y: auto;">
-            <table class="table table-striped table-bordered">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Ordem</th>
-                        <th>Data planejamento</th>
-                        <th>Qt. Planejada</th>
-                        <th>Peça</th>
-                        <th>Máquina</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="ordensTable">
-                    {% if ordens_planejadas %}
-                        {% for ordem in ordens_planejadas %}
-                            {% for peca_planejada in ordem.pecas_planejadas.all %}
-                                <tr>
-                                    <td>#{{ ordem.pk }}</td>
-                                    <td>{{ ordem.data_planejada|date:"d/m/Y" }}</td>
-                                    <td>{{ peca_planejada.quantidade_planejada }}</td>
-                                    <td>{{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao }}</td>
-                                    <td>{{ peca_planejada.peca.maquina.nome }}</td>
-                                    <td>
-                                        <!-- Botão para abrir o modal de iniciar apontamento -->
-                                        <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalIniciar{{ ordem.id }}_{{ peca_planejada.id }}">
-                                            Iniciar
-                                        </button>
-                                        <a href="{% url 'apontamento_usinagem:editar_planejamento' ordem.id %}" class="badge btn btn-success">Editar</a>
-                                    </td>
-                                </tr>
-                                <!-- Modal para iniciar o apontamento -->
-                                <div class="modal fade" id="modalIniciar{{ ordem.id }}_{{ peca_planejada.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}_{{ peca_planejada.id }}" aria-hidden="true">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title" id="modalLabel{{ ordem.id }}_{{ peca_planejada.id }}">Iniciar Apontamento para {{ peca_planejada.peca.descricao }}</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                            </div>
-                                            <form id="formIniciarOrdem" method="post" action="{% url 'apontamento_usinagem:iniciar_apontamento' ordem.id %}">
-                                                <div class="modal-body">
-                                                    {% csrf_token %}
-                                                    <div class="mb-3">
-                                                        <label for="operador" class="form-label">Selecione o Operador</label>
-                                                        <select name="operador" class="form-select" required>
-                                                            {% for operador in operadores %}
-                                                                <option value="{{ operador.id }}">{{ operador.matricula }} - {{ operador.nome }}</option>
-                                                            {% endfor %}
-                                                        </select>
-                                                    </div>
-                                                    <input type="hidden" name="peca_planejada_id" value="{{ peca_planejada.id }}">
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                    <button id="btnIniciarOrdem" type="submit" class="btn btn-primary">Iniciar</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="6">Nenhuma ordem planejada no momento.</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+
+        <div id="ordens_planejadas_container">Carregando ordens planejadas...</div>
+
+    </div>
+
+    <!-- Modal de carregamento -->
+    <div class="modal fade" id="modalLoading" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p>Processando, por favor aguarde...</p>
+                </div>
+            </div>
         </div>
     </div>
+    
     <!-- Seção de Ordens em Processo e Interrompidas (Divididas em duas colunas) -->
     <div class="row">
-        <!-- Coluna para Ordens em Processo -->
         <div class="col-md-6">
             <h2>Processo</h2>
             <div class="card" style="max-height: 600px; overflow-y: auto;">
-                <div class="card-body">
-                    {% if ordens_em_processo %}
-                        <div class="row">
-                            <!-- Loop para exibir duas ordens por linha -->
-                            {% for ordem in ordens_em_processo %}
-                                {% for peca_planejada in ordem.planejamento.pecas_planejadas.all %}
-                                    <div class="col-sm-6">
-                                        <div class="card mb-3">
-                                            <div class="card-header d-flex justify-content-between align-items-center" title="{{ordem.planejamento.peca.descricao}}">
-                                                <a href="https://drive.google.com/drive/u/0/search?q={{ peca_planejada.peca.peca.codigo }}" target="_blank">
-                                                    <small>
-                                                        <span>{{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao|truncatechars:17 }}</span>
-                                                    </small>
-                                                </a>
-                                            </div>
-                                            <div class="card-body">
-                                                <p><strong>Planejada:</strong> {{ ordem.planejamento.pecas_planejadas.first.quantidade_planejada }}</p>
-                                                <p><strong>Início:</strong> {{ ordem.data_inicio|date:"d/m/Y H:i" }}</p>
-                                                <p><strong>Máquina:</strong> {% if peca_planejada.peca.maquina %}{{peca_planejada.peca.maquina.nome}}{% else %}-{% endif %}</p>
-                                                <input type="hidden" value="{{ordem.planejamento.maquina.nome}}" id="maquina_processo_{{ ordem.id }}">
-                                                <p><strong>Operador:</strong> {{ ordem.operador }}</p>
-                                                <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalFinalizar{{ ordem.id }}">
-                                                    Finalizar
-                                                </button>
-                                                <button type="button" class="badge btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalInterromper{{ ordem.id }}">
-                                                    Interromper
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- Modal para finalizar -->
-                                    <div class="modal fade" id="modalFinalizar{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Finalizar</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <form id="formFinalizarOrdem" method="post" action="{% url 'apontamento_usinagem:finalizar_apontamento' ordem.id %}">
-                                                    <div class="modal-body">
-                                                        {% csrf_token %}
-                                                        <div class="mb-3">
-                                                            <label for="">Quantidade</label>
-                                                            <input class="form-control" type="number" name="quantidade_produzida" required>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button id="btnFinalizarOrdem" type="submit" class="btn btn-primary">Salvar</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- Modal para interromper -->
-                                    <div class="modal fade" id="modalInterromper{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Interromper</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <form id="formInterromperOrdem" method="post" action="{% url 'apontamento_usinagem:interromper_apontamento' ordem.id %}">
-                                                    <div class="modal-body">
-                                                        {% csrf_token %}
-                                                        <div class="mb-3">
-                                                            <label for="motivo_interrupcao" class="form-label">Selecione o motivo</label>
-                                                            <select name="motivo_interrupcao" class="form-select" required>
-                                                                {% for motivo in motivos %}
-                                                                    <option value="{{ motivo.id }}">{{ motivo.nome }}</option>
-                                                                {% endfor %}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button id="btnInterromperOrdem" type="submit" class="btn btn-primary">Salvar</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p>Nenhuma ordem em processo no momento.</p>
-                    {% endif %}
-                </div>
+                <div id="ordens_em_processo_container">Carregando ordens em processo...</div>
             </div>
-        </div>
-        
-
-        <!-- Coluna para Ordens Interrompidas -->
+        </div>       
         <div class="col-md-6">
             <h2>Interrompidas</h2>
             <div class="card" style="max-height: 600px; overflow-y: auto;">
-                <div class="card-body">
-                    {% if ordens_interrompidas %}
-                        <div class="row">
-                            <!-- Loop para exibir duas ordens por linha -->
-                            {% for ordem in ordens_interrompidas %}
-                                {% for peca_planejada in ordem.planejamento.pecas_planejadas.all %}
-                                    <div class="col-sm-6">
-                                        <div class="card mb-3">
-                                            <div class="card-header d-flex justify-content-between align-items-center" title="{{ordem.planejamento.peca.descricao}}">
-                                                <a href="https://drive.google.com/drive/u/0/search?q={{ peca_planejada.peca.peca.codigo }}" target="_blank">
-                                                    <small>
-                                                        <span>{{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao|truncatechars:17 }}</span>
-                                                    </small>
-                                                </a>
-                                            </div>
-                                            <div class="card-body">
-                                                <p><strong>Motivo:</strong> {{ ordem.motivo_interrupcao }}</p>
-                                                <p><strong>Início:</strong> {{ ordem.data_interrupcao|date:"d/m/Y H:i" }}</p>
-                                                <a href="{% url 'apontamento_usinagem:retornar_apontamento' ordem.id %}" class="badge btn btn-success">Retornar</a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p>Nenhuma ordem interrompida no momento.</p>
-                    {% endif %}
-                </div>
+                <div id="ordens_interrompidas_container">Carregando ordens interrompidas...</div>
             </div>
-        </div>
+        </div>         
     </div>
 </div>
 
-{% block scripts %}
-
 <script>
-    document.getElementById('formInterromperOrdem').addEventListener('submit', function() {
-        // Desabilitar o botão de submit
-        document.getElementById('btnInterromperOrdem').disabled = true;
+    document.addEventListener("DOMContentLoaded", function() {
 
-        // Alterar o texto do botão para indicar que está processando
-        document.getElementById('btnInterromperOrdem').innerText = 'Interrompendo...';
+        // Função para carregar seções usando fetch e atualizar os containers
+        function loadSection(url, containerId, ...callbacks) {  // Aceita múltiplos callbacks usando o operador rest
+            fetch(url)
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById(containerId).innerHTML = html;
 
-        // Submeter o formulário
-    });
-</script>
+                    // Executa todos os callbacks (se houver) após o carregamento da seção
+                    callbacks.forEach(callback => {
+                        if (typeof callback === 'function') {
+                            callback();
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error("Erro ao carregar seção:", error);
+                });
+        }
 
-<script>
-    document.getElementById('formFinalizarOrdem').addEventListener('submit', function() {
-        // Desabilitar o botão de submit
-        document.getElementById('btnFinalizarOrdem').disabled = true;
+        // Função para adicionar event listeners aos formulários de iniciar ordem
+        function attachIniciarOrdemEventListeners() {
+            const forms = document.querySelectorAll('.formIniciarOrdem');
+            forms.forEach(function(form) {
+                form.addEventListener('submit', function(event) {
+                    event.preventDefault(); // Impede o envio tradicional do formulário
+                    
+                    // Mostrar o modal de carregamento
+                    const modalLoading = new bootstrap.Modal(document.getElementById('modalLoading'));
+                    modalLoading.show();
 
-        // Alterar o texto do botão para indicar que está processando
-        document.getElementById('btnFinalizarOrdem').innerText = 'Finalizando...';
+                    // Obter a URL de envio
+                    const url = form.getAttribute('action');
+                    const modalId = form.dataset.modalId;
 
-        // Submeter o formulário
-    });
-</script>
+                    // Criar um objeto FormData para capturar os dados do formulário
+                    const formData = new FormData(form);
 
-<script>
-    document.getElementById('formIniciarOrdem').addEventListener('submit', function() {
-        // Desabilitar o botão de submit
-        document.getElementById('btnIniciarOrdem').disabled = true;
+                    // Enviar a requisição AJAX
+                    fetch(url, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            throw new Error('Erro ao iniciar a ordem.');
+                        }
+                    })
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Atualizar as seções necessárias
+                            loadSection("/usinagem/carregar-ordens-planejadas/", "ordens_planejadas_container", attachIniciarOrdemEventListeners);
+                            loadSection("/usinagem/carregar-ordens-em-processo/", "ordens_em_processo_container", attachFinalizarOrdemEventListeners, attachInterromperOrdemEventListeners);
+                            
+                            // Ocultar o modal de carregamento e mostrar uma mensagem de sucesso
+                            modalLoading.hide();
+                            
+                            // Mostrar o popup de sucesso
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso',
+                                text: 'Ordem iniciada com sucesso!',
+                                confirmButtonText: 'OK'
+                            });
+                        
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                        alert('Ocorreu um erro ao iniciar a ordem. Tente novamente.');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Ocorreu um erro ao iniciar a ordem. Tente novamente.',
+                            confirmButtonText: 'OK'
+                        });
+                    });
+                });
+            });
+        }
 
-        // Alterar o texto do botão para indicar que está processando
-        document.getElementById('btnIniciarOrdem').innerText = 'Iniciando...';
+        // Função para adicionar event listeners aos formulários de finalizar ordem
+        function attachFinalizarOrdemEventListeners() {
+            const forms = document.querySelectorAll('.formFinalizarOrdem');
+            forms.forEach(function(form) {
+                form.addEventListener('submit', function(event) {
+                    event.preventDefault(); // Impede o envio tradicional do formulário
+                    
+                    // Mostrar o modal de carregamento
+                    const modalLoading = new bootstrap.Modal(document.getElementById('modalLoading'));
+                    modalLoading.show();
+                    
+                    // Obter a URL de envio
+                    const url = form.getAttribute('action');
+                    const modalId = form.dataset.modalId;
 
-        // Submeter o formulário
+                    // Criar um objeto FormData para capturar os dados do formulário
+                    const formData = new FormData(form);
+
+                    // Enviar a requisição AJAX
+                    fetch(url, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            throw new Error('Erro ao finalizar a ordem.');
+                        }
+                    })
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Atualizar a seção das ordens em processo
+                            loadSection("/usinagem/carregar-ordens-planejadas/", "ordens_planejadas_container", attachIniciarOrdemEventListeners);
+                            loadSection("/usinagem/carregar-ordens-em-processo/", "ordens_em_processo_container", attachFinalizarOrdemEventListeners, attachInterromperOrdemEventListeners);
+
+                            // Ocultar o modal de carregamento e mostrar uma mensagem de sucesso
+                            modalLoading.hide();
+
+                            // Mostrar o popup de sucesso
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso',
+                                text: 'Ordem finalizada com sucesso!',
+                                confirmButtonText: 'OK'
+                            });
+
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                        alert('Ocorreu um erro ao finalizar a ordem. Tente novamente.');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Ocorreu um erro ao finalizar a ordem. Tente novamente.',
+                            confirmButtonText: 'OK'
+                        });
+                    });
+                });
+            });
+        }
+
+        // Função para adicionar event listeners aos formulários de finalizar ordem
+        function attachRetornarOrdemEventListeners() {
+            const forms = document.querySelectorAll('.formRetornarOrdem');
+            forms.forEach(function(form) {
+                form.addEventListener('submit', function(event) {
+                    event.preventDefault(); // Impede o envio tradicional do formulário
+
+                    // Mostrar o modal de carregamento
+                    const modalLoading = new bootstrap.Modal(document.getElementById('modalLoading'));
+                    modalLoading.show();
+
+                    // Obter a URL de envio
+                    const url = form.getAttribute('action');
+                    const modalId = form.dataset.modalId;
+
+                    // Criar um objeto FormData para capturar os dados do formulário
+                    const formData = new FormData(form);
+
+                    // Enviar a requisição AJAX
+                    fetch(url, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            throw new Error('Erro ao retornar a ordem.');
+                        }
+                    })
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Atualizar a seção das ordens interrompidas
+                            loadSection("/usinagem/carregar-ordens-interrompidas/", "ordens_interrompidas_container", attachFinalizarOrdemEventListeners);
+                            loadSection("/usinagem/carregar-ordens-em-processo/", "ordens_em_processo_container", attachFinalizarOrdemEventListeners, attachInterromperOrdemEventListeners);
+                            
+                            // Ocultar o modal de carregamento e mostrar uma mensagem de sucesso
+                            modalLoading.hide();
+                            
+                            // Mostrar o popup de sucesso
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso',
+                                text: 'Ordem retornada com sucesso!',
+                                confirmButtonText: 'OK'
+                            });
+
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                        alert('Ocorreu um erro ao retornar a ordem. Tente novamente.');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Ocorreu um erro ao retornar a ordem. Tente novamente.',
+                            confirmButtonText: 'OK'
+                        });
+
+                    });
+                });
+            });
+        }
+
+        // Função para adicionar event listeners aos formulários de finalizar ordem
+        function attachInterromperOrdemEventListeners() {
+            const forms = document.querySelectorAll('.formInterromperOrdem');
+            forms.forEach(function(form) {
+                form.addEventListener('submit', function(event) {
+                    event.preventDefault(); // Impede o envio tradicional do formulário
+                    
+                    // Mostrar o modal de carregamento
+                    const modalLoading = new bootstrap.Modal(document.getElementById('modalLoading'));
+                    modalLoading.show();
+
+                    // Obter a URL de envio
+                    const url = form.getAttribute('action');
+                    const modalId = form.dataset.modalId;
+
+                    // // Criar um objeto FormData para capturar os dados do formulário
+                    const formData = new FormData(form);
+
+                    // Enviar a requisição AJAX
+                    fetch(url, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            throw new Error('Erro ao interromper a ordem.');
+                        }
+                    })
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Atualizar a seção das ordens em processo
+                            loadSection("/usinagem/carregar-ordens-em-processo/", "ordens_em_processo_container", attachFinalizarOrdemEventListeners, attachInterromperOrdemEventListeners);
+                            loadSection("/usinagem/carregar-ordens-interrompidas/", "ordens_interrompidas_container", attachRetornarOrdemEventListeners);
+                            
+                            // Ocultar o modal de carregamento e mostrar uma mensagem de sucesso
+                            modalLoading.hide();
+                            
+                            // Mostrar o popup de sucesso
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Sucesso',
+                                text: 'Ordem interrompida com sucesso!',
+                                confirmButtonText: 'OK'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                        alert('Ocorreu um erro ao interromper a ordem. Tente novamente.');
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Ocorreu um erro ao iniciar a ordem. Tente novamente.',
+                            confirmButtonText: 'OK'
+                        });
+                    });
+                });
+            });
+        }
+
+        Promise.all([
+            loadSection("/usinagem/carregar-ordens-planejadas/", "ordens_planejadas_container", attachIniciarOrdemEventListeners),
+            loadSection("/usinagem/carregar-ordens-em-processo/", "ordens_em_processo_container", attachFinalizarOrdemEventListeners, attachInterromperOrdemEventListeners),
+            loadSection("/usinagem/carregar-ordens-interrompidas/", "ordens_interrompidas_container", attachRetornarOrdemEventListeners)
+        ]).then(() => {
+            console.log("Todas as seções foram carregadas com sucesso.");
+        }).catch(error => {
+            console.error("Erro ao carregar as seções:", error);
+        });
+
     });
 </script>
 
@@ -326,7 +416,5 @@
         }
     }
 </script>
-
-{% endblock %}
 
 {% endblock %}

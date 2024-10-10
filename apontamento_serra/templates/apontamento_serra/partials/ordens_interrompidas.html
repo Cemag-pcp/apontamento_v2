@@ -1,0 +1,93 @@
+<div class="card-body">
+    {% if ordens_interrompidas %}
+        <div class="row">
+            <!-- Loop para exibir duas ordens por linha -->
+            {% for ordem in ordens_interrompidas %}
+                <div class="col-sm-6">
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center" title="{{ordem.planejamento.peca.descricao}}">
+                            <a href="#" data-bs-toggle="modal" data-bs-target="#modalVerPecas{{ ordem.id }}">
+                                <small>
+                                    <span>#{{ ordem.planejamento.pk }}</span>
+                                </small>
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Motivo Interrupção:</strong> {{ ordem.motivo_interrupcao }}</p>
+                            <p><strong>Data de Interrupção:</strong> {{ ordem.data_interrupcao|date:"d/m/Y H:i" }}</p>
+                            <button type="button" class="badge btn btn-success" data-bs-toggle="modal" data-bs-target="#modalRetornar{{ ordem.id }}">
+                                Retornar
+                            </button>
+
+                            <div class="modal fade" id="modalRetornar{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Retornar apontamento</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form class="formRetornarOrdem" data-ordem-id="{{ ordem.id }}" data-modal-id="modalRetornar{{ ordem.id }}" method="post" action="{% url 'apontamento_serra:retornar_apontamento' ordem.id %}">
+                                            <div class="modal-body">
+                                                {% csrf_token %}
+                                                <div class="mb-3">
+                                                    Confirmar retorno de apontamento para: 
+                                                    <ul class="list-group">
+                                                        {% for peca_planejada in ordem.planejamento.pecas_planejadas.all %}
+                                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                                <a href="https://drive.google.com/drive/u/0/search?q={{ peca_planejada.peca.peca.codigo }}" target="_blank">
+                                                                    {{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao }}
+                                                                    <span class="badge bg-primary rounded-pill">{{ peca_planejada.quantidade_planejada }}</span>
+                                                                </a>
+                                                            </li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="submit" id="btnRetornarOrdem" data-bs-dismiss="modal" class="btn btn-primary">Retornar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Modal para ver peças -->
+                <div class="modal fade" id="modalVerPecas{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Detalhes</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form>
+                                <div class="modal-body">
+                                    {% csrf_token %}
+
+                                    <!-- Loop para mostrar as peças planejadas e suas quantidades -->
+                                    <div class="mb-3">
+                                        <label for="">Peças Planejadas</label>
+                                        <ul class="list-group">
+                                            {% for peca_planejada in ordem.planejamento.pecas_planejadas.all %}
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <a href="https://drive.google.com/drive/u/0/search?q={{ peca_planejada.peca.peca.codigo }}" target="_blank">
+                                                        {{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao }}
+                                                        <span class="badge bg-primary rounded-pill">{{ peca_planejada.quantidade_planejada }}</span>
+                                                    </a>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Nenhuma ordem interrompida no momento.</p>
+    {% endif %}
+</div>

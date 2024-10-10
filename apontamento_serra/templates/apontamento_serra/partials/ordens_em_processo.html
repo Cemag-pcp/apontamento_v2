@@ -1,0 +1,163 @@
+<div class="card-body">
+    {% if ordens_em_processo %}
+        <div class="row">
+            <!-- Loop para exibir duas ordens por linha -->
+            {% for ordem in ordens_em_processo %}
+                <div class="col-sm-6">
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center" title="{{ordem.planejamento.peca.descricao}}">
+                            <a href="#" data-bs-toggle="modal" data-bs-target="#modalVerPecas{{ ordem.id }}">
+                                <small>
+                                    <span>#{{ ordem.pk }}</span>
+                                </small>
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Data de Início:</strong> {{ ordem.apontamento_planejamento.first.data_inicio|date:"d/m/Y H:i" }}</p>
+                            <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalFinalizar{{ ordem.id }}">
+                                Finalizar
+                            </button>
+                            <button type="button" class="badge btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalInterromper{{ ordem.id }}">
+                                Interromper
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal para finalizar -->
+                <div class="modal fade" id="modalFinalizar{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Finalizar #{{ ordem.pk }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form class="formFinalizarOrdem" data-ordem-id="{{ ordem.id }}" data-modal-id="modalFinalizar{{ ordem.id }}" method="post" action="{% url 'apontamento_serra:finalizar_apontamento' ordem.id %}">
+                                <div class="modal-body">
+                                    {% csrf_token %}
+
+                                    <!-- Loop para mostrar as peças planejadas e suas quantidades -->
+                                    <div class="mb-3">
+                                        <label for="">Peças Planejadas</label>
+                                        <ul class="list-group">
+                                            {% for peca_planejada in ordem.pecas_planejadas.all %}
+                                                <li class="list-group-item">
+                                                    <div class="row">
+                                                        <div class="col-md-4">
+                                                            <a href="https://drive.google.com/drive/u/0/search?q={{ peca_planejada.peca.peca.codigo }}" target="_blank">
+                                                                <small>
+                                                                    <span>{{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao }}</span>
+                                                                </small>
+                                                            </a>
+                                                        </div>
+                                                        <div class="col-sm-4">
+                                                            <label for="quantidade_produzida_{{ peca_planejada.id }}">Planejada: {{ peca_planejada.quantidade_planejada }}</label>
+                                                            <input type="number" class="form-control" name="quantidade_produzida_{{ peca_planejada.id }}" placeholder="Produzida" required>
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <label for="quantidade_morta_{{ peca_planejada.id }}">Mortas</label>
+                                                            <input type="number" class="form-control" name="quantidade_morta_{{ peca_planejada.id }}" placeholder="Mortas" required>
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="maquina" class="form-label">Selecione a máquina</label>
+                                        <select name="maquina" class="form-select" required>
+                                            {% for maquina in maquinas %}
+                                                <option value="{{ maquina.id }}">{{ maquina.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col-sm-6">
+                                            <label for="tamanho_vara">Confirme o tamanho da vara</label>
+                                            <input class="form-control" type="number" name="tamanho_vara" value="{{ ordem.planejamento.tamanho_vara }}" required>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label for="quantidade_vara">Quantidade de varas</label>
+                                            <input class="form-control" type="number" name="quantidade_vara" value="{{ ordem.planejamento.quantidade_vara }}" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button id="btnFinalizarOrdem" data-bs-dismiss="modal" type="submit" class="btn btn-primary">Finalizar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal para interromper -->
+                <div class="modal fade" id="modalInterromper{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Interromper #{{ ordem.pk }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form class="formInterromperOrdem" data-ordem-id="{{ ordem.id }}" data-modal-id="modalInterromper{{ ordem.id }}" method="post" action="{% url 'apontamento_serra:interromper_apontamento' ordem.id %}">
+                                <div class="modal-body">
+                                    {% csrf_token %}
+                                    <div class="mb-3">
+                                        <label for="motivo_interrupcao" class="form-label">Selecione o motivo</label>
+                                        <select name="motivo_interrupcao" class="form-select" required>
+                                            {% for motivo in motivos %}
+                                                <option value="{{ motivo.id }}">{{ motivo.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button id="btnInterromperOrdem" data-bs-dismiss="modal" type="submit" class="btn btn-primary">Interromper</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal para ver peças -->
+                <div class="modal fade" id="modalVerPecas{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Detalhes</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form>
+                                <div class="modal-body">
+                                    {% csrf_token %}
+
+                                    <!-- Loop para mostrar as peças planejadas e suas quantidades -->
+                                    <div class="mb-3">
+                                        <label for="">Peças Planejadas</label>
+                                        <ul class="list-group">
+                                            {% for peca_planejada in ordem.pecas_planejadas.all %}
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <a href="https://drive.google.com/drive/u/0/search?q={{ peca_planejada.peca.peca.codigo }}" target="_blank">
+                                                        {{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao }}
+                                                        <span class="badge bg-primary rounded-pill">{{ peca_planejada.quantidade_planejada }}</span>
+                                                    </a>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Nenhuma ordem em processo no momento.</p>
+    {% endif %}
+</div>
+
+
+<!-- JavaScript -->

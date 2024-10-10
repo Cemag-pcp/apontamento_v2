@@ -1,0 +1,87 @@
+<div class="card-body">
+    {% if ordens_em_processo %}
+        <div class="row">
+            <!-- Loop para exibir duas ordens por linha -->
+            {% for ordem in ordens_em_processo %}
+                {% for peca_planejada in ordem.pecas_planejadas.all %}
+                    <div class="col-sm-6">
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center" title="{{ordem.planejamento.peca.descricao}}">
+                                <a href="https://drive.google.com/drive/u/0/search?q={{ peca_planejada.peca.peca.codigo }}" target="_blank">
+                                    <small>
+                                        <span>{{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao|truncatechars:17 }}</span>
+                                    </small>
+                                </a>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Planejada:</strong> {{ ordem.pecas_planejadas.first.quantidade_planejada }}</p>
+                                <p><strong>Início:</strong> {{ ordem.apontamento_planejamento.first.data_inicio|date:"d/m/Y H:i" }}</p>
+                                <p><strong>Máquina:</strong> {% if peca_planejada.peca.maquina %}{{peca_planejada.peca.maquina.nome}}{% else %}-{% endif %}</p>
+                                <input type="hidden" value="{{ordem.planejamento.maquina.nome}}" id="maquina_processo_{{ ordem.id }}">
+                                <p><strong>Operador:</strong> {{ ordem.apontamento_planejamento.first.operador.nome }}</p>
+                                <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalFinalizar{{ ordem.id }}">
+                                    Finalizar
+                                </button>
+                                <button type="button" class="badge btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalInterromper{{ ordem.id }}">
+                                    Interromper
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Modal para finalizar -->
+                    <div class="modal fade" id="modalFinalizar{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Finalizar</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <form class="formFinalizarOrdem" data-ordem-id="{{ ordem.id }}" data-modal-id="modalFinalizar{{ ordem.id }}" method="post" action="{% url 'apontamento_usinagem:finalizar_apontamento' ordem.id %}">
+                                    <div class="modal-body">
+                                        {% csrf_token %}
+                                        <div class="mb-3">
+                                            <label for="">Quantidade</label>
+                                            <input class="form-control" type="number" name="quantidade_produzida" required>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button id="btnFinalizarOrdem" type="submit" data-bs-dismiss="modal" class="btn btn-primary">Salvar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Modal para interromper -->
+                    <div class="modal fade" id="modalInterromper{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Interromper</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <form class="formInterromperOrdem" data-ordem-id="{{ ordem.id }}" data-modal-id="modalInterromper{{ ordem.id }}" method="post" action="{% url 'apontamento_usinagem:interromper_apontamento' ordem.id %}">
+                                    <div class="modal-body">
+                                        {% csrf_token %}
+                                        <div class="mb-3">
+                                            <label for="motivo_interrupcao" class="form-label">Selecione o motivo</label>
+                                            <select name="motivo_interrupcao" class="form-select" required>
+                                                {% for motivo in motivos %}
+                                                    <option value="{{ motivo.id }}">{{ motivo.nome }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button id="btnInterromperOrdem" data-bs-dismiss="modal" type="submit" class="btn btn-primary">Interromper</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Nenhuma ordem em processo no momento.</p>
+    {% endif %}
+</div>

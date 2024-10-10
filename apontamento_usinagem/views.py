@@ -2,25 +2,51 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.http import HttpResponse
 from django.db.models import Q, Max,OuterRef,Subquery
+from django.http import JsonResponse
 
 from cadastro.models import *
 from apontamento.models import *
 # from .forms import PlanejamentoForm
 
 def lista_ordens(request):
-    # Filtrar as ordens planejadas pelo status e setor "Usinagem"
+
+    maquinas = Maquina.objects.filter(setor__nome='usinagem')
+
+    context = {
+        'maquinas': maquinas,
+    }
+
+    return render(request, 'apontamento_usinagem/lista_ordens.html', context)
+
+def carregar_ordens_planejadas(request):
+    
     ordens_planejadas = Planejamento.objects.filter(
         status_andamento='aguardando_iniciar', 
         setor__nome='usinagem'
     ).select_related('setor').prefetch_related('pecas_planejadas')
+    operadores = Operador.objects.all()
 
-    # Filtrar as ordens em processo no setor "Usinagem"
-    ordens_em_processo = Apontamento.objects.filter(
-        status='iniciado', 
-        planejamento__setor__nome='usinagem'
-    ).select_related('planejamento')
+    return render(request, 'apontamento_usinagem/partials/ordens_planejadas.html', {'ordens_planejadas': ordens_planejadas, 'operadores': operadores})
 
-    # Subquery para pegar a última interrupção (baseada na data de interrupção) para cada apontamento
+def carregar_ordens_em_processo(request):
+
+    ordens_em_processo = Planejamento.objects.filter(
+        setor__nome='usinagem',
+        status_andamento='iniciada'
+    ).prefetch_related('pecas_planejadas__peca')
+
+    # Carregar máquinas e motivos de interrupção
+    maquinas = Maquina.objects.filter(setor__nome='usinagem')
+    motivos = MotivoInterrupcao.objects.all()
+
+    return render(request, 'apontamento_usinagem/partials/ordens_em_processo.html', {
+        'ordens_em_processo': ordens_em_processo,
+        'maquinas': maquinas,
+        'motivos': motivos
+    })
+
+def carregar_ordens_interrompidas(request):
+
     ultima_interrupcao = Interrupcao.objects.filter(
         apontamento=OuterRef('pk')
     ).order_by('-data_interrupcao')
@@ -34,21 +60,7 @@ def lista_ordens(request):
         data_interrupcao=Subquery(ultima_interrupcao.values('data_interrupcao')[:1])
     ).select_related('planejamento')
 
-    # Obter todos os operadores, motivos de interrupção e máquinas do setor de usinagem
-    operadores = Operador.objects.all()
-    motivos = MotivoInterrupcao.objects.all()
-    maquinas = Maquina.objects.filter(setor__nome='usinagem')
-
-    context = {
-        'ordens_planejadas': ordens_planejadas,
-        'ordens_em_processo': ordens_em_processo,
-        'ordens_interrompidas': ordens_interrompidas,
-        'operadores': operadores,
-        'motivos': motivos,
-        'maquinas': maquinas,
-    }
-
-    return render(request, 'apontamento_usinagem/lista_ordens.html', context)
+    return render(request, 'apontamento_usinagem/partials/ordens_interrompidas.html', {'ordens_interrompidas': ordens_interrompidas})
 
 def planejar(request):
 
@@ -90,9 +102,9 @@ def planejar(request):
     }
     return render(request, 'apontamento_usinagem/planejar.html', context)
 
-def finalizar_apontamento(request, apontamento_id):
+def finalizar_apontamento(request, planejamento_id):
     # Busca o apontamento
-    apontamento = get_object_or_404(Apontamento, pk=apontamento_id)
+    apontamento = get_object_or_404(Apontamento, planejamento=planejamento_id)
 
     # Pega os dados enviados pelo formulário (POST)
     quantidade_produzida = request.POST.get('quantidade_produzida')
@@ -143,7 +155,7 @@ def finalizar_apontamento(request, apontamento_id):
         )
 
     # Redireciona para a lista de ordens
-    return redirect('apontamento_usinagem:lista_ordens')
+    return JsonResponse({'status': 'success', 'message': 'Apontamento finalizado com sucesso.'})
 
 def editar_planejamento(request, planejamento_id):
     planejamento = get_object_or_404(Planejamento, id=planejamento_id)
@@ -161,8 +173,6 @@ def editar_planejamento(request, planejamento_id):
             peca_id = request.POST.get(f'peca_{i}')
             quantidade_planejada = request.POST.get(f'quantidade_{i}')
             data_planejada = request.POST.get(f'data_planejada_{i}')
-
-            print(peca_id)
 
             if peca_id and quantidade_planejada and data_planejada:
                 peca = get_object_or_404(Pecas, id=peca_id)

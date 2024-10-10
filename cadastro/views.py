@@ -19,6 +19,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from .forms import UploadCSVForm
 from .models import Pecas, Setor, PecaProcesso, Maquina
+from apontamento.models import OrdemPadrao
 
 def importar_peca(request):
     if request.method == 'POST':
@@ -164,3 +165,58 @@ def atualizar_materia_prima(request):
         form = UploadCSVForm()
 
     return render(request, 'cadastro_massa/atualizar_mp_massa.html', {'form': form})
+
+def importar_ordem(request):
+    if request.method == 'POST':
+        form = UploadCSVForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                # Abrir o arquivo CSV
+                csv_file = request.FILES['file']
+                # Verificar se o arquivo é CSV
+                if not csv_file.name.endswith('.csv'):
+                    messages.error(request, 'Por favor, faça o upload de um arquivo CSV.')
+                    return redirect('importar_ordem')
+
+                # Ler o conteúdo do CSV
+                decoded_file = csv_file.read().decode('utf-8').splitlines()
+                reader = csv.reader(decoded_file, delimiter=',')
+
+                for row in reader:
+                    numero_ordem = int(row[0])
+                    codigo_peca = row[1]
+
+                    # Obter a peça existente pelo código
+                    try:
+                        peca = Pecas.objects.get(codigo=codigo_peca)
+                    except Pecas.DoesNotExist:
+                        messages.error(request, f'A peça com o código {codigo_peca} não foi encontrada.')
+                        continue
+
+                    try:
+                        peca_processo = PecaProcesso.objects.get(peca=peca, ordem=1)
+                    except PecaProcesso.DoesNotExist:
+                        messages.error(request, f'Nenhum processo encontrado para a peça {codigo_peca}.')
+                        continue
+
+                    # Criar ou obter a ordem
+                    ordem, _ = OrdemPadrao.objects.get_or_create(
+                        numero_ordem=numero_ordem
+                    )
+
+                    # Associar a peça à ordem
+                    ordem.pecas.add(peca_processo)
+
+                messages.success(request, 'CSV carregado e processado com sucesso!')
+                return redirect('importar_ordem')
+
+            except Exception as e:
+                messages.error(request, f'Houve um erro no processamento: {str(e)}')
+                return redirect('importar_ordem')
+
+    else:
+        form = UploadCSVForm()
+
+    return render(request, 'cadastro_massa/ordem_massa.html', {'form': form})
+
+

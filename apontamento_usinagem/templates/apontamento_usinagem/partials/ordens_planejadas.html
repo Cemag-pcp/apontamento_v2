@@ -1,0 +1,69 @@
+<div style="max-height: 400px; overflow-y: auto;">
+    <table class="table table-striped table-bordered">
+        <thead class="table-dark">
+            <tr>
+                <th>Ordem</th>
+                <th>Data planejamento</th>
+                <th>Qt. Planejada</th>
+                <th>Peça</th>
+                <th>Máquina</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="ordensTable">
+            {% if ordens_planejadas %}
+                {% for ordem in ordens_planejadas %}
+                    {% for peca_planejada in ordem.pecas_planejadas.all %}
+                        <tr>
+                            <td>#{{ ordem.pk }}</td>
+                            <td>{{ ordem.data_planejada|date:"d/m/Y" }}</td>
+                            <td>{{ peca_planejada.quantidade_planejada }}</td>
+                            <td>{{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao }}</td>
+                            <td>{{ peca_planejada.peca.maquina.nome }}</td>
+                            <td>
+                                <!-- Botão para abrir o modal de iniciar apontamento -->
+                                <button type="button" class="badge btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalIniciar{{ ordem.id }}">
+                                    Iniciar
+                                </button>
+                                <a href="{% url 'apontamento_usinagem:editar_planejamento' ordem.id %}" class="badge btn btn-success">Editar</a>
+                                <!-- Modal para iniciar o apontamento -->
+                                <div class="modal fade" id="modalIniciar{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Iniciar Apontamento para {{ ordem.pecas_planejadas.all.0.peca.descricao }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <form class="formIniciarOrdem" data-ordem-id="{{ ordem.id }}" data-modal-id="modalIniciar{{ ordem.id }}" method="post" action="{% url 'apontamento_usinagem:iniciar_apontamento' ordem.id %}">
+                                                <div class="modal-body">
+                                                    {% csrf_token %}
+                                                    <div class="mb-3">
+                                                        <label for="operador" class="form-label">Selecione o Operador</label>
+                                                        <select name="operador" class="form-select" required>
+                                                            {% for operador in operadores %}
+                                                                <option value="{{ operador.id }}">{{ operador.matricula }} - {{ operador.nome }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="submit" id="btnIniciarOrdem" data-bs-dismiss="modal" class="btn btn-primary">Iniciar</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="6">Nenhuma ordem planejada no momento.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+

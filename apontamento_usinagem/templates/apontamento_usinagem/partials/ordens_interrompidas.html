@@ -1,0 +1,53 @@
+<div class="card-body">
+    {% if ordens_interrompidas %}
+        <div class="row">
+            <!-- Loop para exibir duas ordens por linha -->
+            {% for ordem in ordens_interrompidas %}
+                {% for peca_planejada in ordem.planejamento.pecas_planejadas.all %}
+                    <div class="col-sm-6">
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center" title="{{ordem.planejamento.peca.descricao}}">
+                                <a href="https://drive.google.com/drive/u/0/search?q={{ peca_planejada.peca.peca.codigo }}" target="_blank">
+                                    <small>
+                                        <span>{{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao|truncatechars:17 }}</span>
+                                    </small>
+                                </a>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Motivo:</strong> {{ ordem.motivo_interrupcao }}</p>
+                                <p><strong>Início:</strong> {{ ordem.data_interrupcao|date:"d/m/Y H:i" }}</p>
+                                <button type="button" class="badge btn btn-success" data-bs-toggle="modal" data-bs-target="#modalRetornar{{ ordem.id }}">
+                                    Retornar
+                                </button>
+                                <div class="modal fade" id="modalRetornar{{ ordem.id }}" tabindex="-1" aria-labelledby="modalLabel{{ ordem.id }}" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalLabel{{ ordem.id }}">Retornar apontamento</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <form class="formRetornarOrdem" data-ordem-id="{{ ordem.id }}" data-modal-id="modalRetornar{{ ordem.id }}" method="post" action="{% url 'apontamento_usinagem:retornar_apontamento' ordem.id %}">
+                                                <div class="modal-body">
+                                                {% csrf_token %}
+                                                <div class="mb-3">
+                                                    Confirmar retorno de apontamento para: 
+                                                    <strong>{{ peca_planejada.peca.peca.codigo }} - {{ peca_planejada.peca.peca.descricao }}</strong>
+                                                </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="submit" id="btnRetornarOrdem" data-bs-dismiss="modal" class="btn btn-primary">Retornar</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Nenhuma ordem interrompida no momento.</p>
+    {% endif %}
+</div>
