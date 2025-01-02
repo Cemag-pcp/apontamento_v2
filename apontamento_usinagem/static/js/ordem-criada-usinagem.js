@@ -410,9 +410,16 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
     // Define as máquinas para cada grupo
     const maquinasPorGrupo = {
         usinagem: [
-            { value: 'furadeira', label: 'Furadeira' },
+            { value: 'furadeira_1', label: 'Furadeira 1'},
+            { value: 'furadeira_2', label: 'Furadeira 2'},
+            { value: 'furadeira_3', label: 'Furadeira 3'},
+            { value: 'furadeira_4', label: 'Furadeira 4'},
+            { value: 'furadeira_5', label: 'Furadeira 5'},
+            { value: 'furadeira_6', label: 'Furadeira 6'},
+            { value: 'furadeira_7', label: 'Furadeira 7'},
             { value: 'centro_de_usinagem', label: 'Centro de usinagem' },
-            { value: 'torno', label: 'Torno' },
+            { value: 'torno_1', label: 'Torno 1' },
+            { value: 'torno_2', label: 'Torno 2' },
             { value: 'chanfradeira', label: 'Chanfradeira' },
         ]
     };
