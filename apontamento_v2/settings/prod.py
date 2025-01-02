@@ -5,6 +5,10 @@ import os
 # Configurações específicas de produção
 DEBUG = False
 ALLOWED_HOSTS = ['apontamentousinagem.onrender.com']
+CSRF_TRUSTED_ORIGINS = [
+    'https://apontamentousinagem.onrender.com',
+    'http://127.0.0.1',
+]
 
 # Banco de dados para produção
 DATABASES = {
