@@ -3,7 +3,7 @@ from .base import *
 import os
 
 # Configurações específicas de produção
-DEBUG = True
+DEBUG = False
 ALLOWED_HOSTS = ['apontamentousinagem.onrender.com']
 
 # Banco de dados para produção
