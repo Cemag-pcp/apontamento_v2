@@ -4,8 +4,10 @@ from .base import *
 DEBUG = env.bool('DEBUG', default=True)
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost','80ca-177-19-132-134.ngrok-free.app']
 CSRF_TRUSTED_ORIGINS = [
-    'https://80ca-177-19-132-134.ngrok-free.app',
+    'https://apontamentousinagem.onrender.com',
+    'http://127.0.0.1',
 ]
+
 # Banco de dados para desenvolvimento
 # DATABASES = {
 #     'default': {
@@ -28,6 +30,9 @@ DATABASES = {
     }
 }
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Configurações adicionais para desenvolvimento (opcional)
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+# STATIC_URL = '/static/'
+# STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
