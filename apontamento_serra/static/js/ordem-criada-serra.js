@@ -562,6 +562,7 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
         serra: [
             { value: 'serra_1', label: 'Serra 1' },
             { value: 'serra_2', label: 'Serra 2' },
+            { value: 'serra_3', label: 'Serra 3' },
         ],
     };
 
