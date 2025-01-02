@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Gerenciamento de Processo</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+    <!-- Título Principal -->
+    <div class="text-center mb-5">
+        <h1 class="display-5">Apontamento de Serra</h1>
+        <p class="text-muted">Gerencie e acompanhe os processos de serra.</p>
+    </div>
+
+    <!-- Container para Planejamento -->
+    <div id="containerPlanejar" class="mb-5">
+        <!-- Botões para abrir modais -->
+        <div class="d-flex justify-content-end gap-3 mb-4">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSerra">
+                Planejar Serra
+            </button>
+            <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#modalImportarOpSerra">
+                Importar Ordens
+            </button>
+        </div>
+
+        <!-- Painel de Ordens Criadas -->
+        <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
+        <!-- Formulário de Filtro -->
+        <form id="filtro-form" class="mb-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <input type="text" id="filtro-ordem" class="form-control" placeholder="Filtrar por Ordem">
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="filtro-status" id="filtro-status">
+                        <option value="">Escolha o status</option>
+                        <option value="aguardando_iniciar">Aguardando iniciar</option>
+                        <option value="iniciada">Iniciada</option>
+                        <option value="interrompida">Interrompida</option>
+                        <option value="finalizada">Finalizada</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select id="filtro-mp" class="form-select" name="filtro-mp">
+                        <option value="" disabled selected>Selecione a MP</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </div>
+        </form>
+
+        <div class="border rounded p-4 bg-light">
+            <!-- Container de Ordens -->
+            <div style="max-height: 650px; overflow-y: auto; overflow-x: hidden;">
+                <div id="ordens-container" class="row g-4">
+                    <!-- Os cards serão adicionados dinamicamente aqui -->
+                </div>
+                <button class="btn btn-primary mt-3 w-100" id="loadMore" style="display: none;">Carregar mais</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container para Acompanhamento -->
+    <div class="mb-5">
+        <div class="row gy-4">
+            <div class="col-md-6">
+                <h4 class="text-center text-secondary">Processos em Andamento</h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="row row-cols-2 g-3 containerProcesso">
+                        <!-- Os cards são adicionados aqui dinamicamente -->
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h4 class="text-center text-secondary">Processos Interrompidos</h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="row row-cols-2 g-3 containerInterrompido">
+                        <!-- Os cards são adicionados aqui dinamicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Criar OP Serra -->
+<div class="modal fade" id="modalSerra" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalSerraLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalSerraLabel">Criar OP Serra</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="opSerraForm" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" id="tipoMaquina" value="serra">
+                    <div class="row mb-3 align-items-center">
+                        
+                        <!-- MP -->
+                        <div class="col-sm-4">
+                            <label for="mpEscolhida" class="form-label">MP:</label>
+                            <select id="mpEscolhida" class="form-select" name="mpEscolhida" required>
+                                <option value="" disabled selected>Selecione a MP</option>
+                            </select>
+                            <small class="form-text text-muted">obrigatório</small>
+                        </div>
+
+                        <!-- Tamanho da Vara -->
+                        <div class="col-sm-4">
+                            <label for="tamanhoVara" class="form-label">Tamanho da Vara:</label>
+                            <input type="number" id="tamanhoVara" class="form-control" name="tamanhoVara" placeholder="Digite o tamanho">
+                            <small class="form-text text-muted">opcional</small>
+                        </div>
+                    
+                        <!-- Quantidade -->
+                        <div class="col-sm-4">
+                            <label for="quantidade" class="form-label">Quantidade:</label>
+                            <input type="number" id="quantidade" class="form-control" name="quantidade" placeholder="Digite a quantidade">
+                            <small class="form-text text-muted">opcional</small>
+                        </div>
+
+                    </div>
+                    
+                    <div class="row mb-3 align-items-center">
+                        <!-- data programação -->
+                        <div class="col-md-6">
+                            <label for="dataProgramacao" class="form-label">Data da Programação:</label>
+                            <input type="date" class="form-control" id="dataProgramacao" name="dataProgramacao" required>
+                        </div>
+                        <!-- Retalho -->
+                        <div class="col-md-4 d-flex align-items-center">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="retalho" name="retalho">
+                                <label class="form-check-label ms-2" for="retalho">Retalho</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição:</label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <!-- Input escondido que mantém o índice -->
+                        <input type="hidden" id="indexCont" value="1">
+                        
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <label for="pecaEscolhida_0" class="form-label">Peça:</label>
+                                <select id="pecaEscolhida_0" class="form-select" name="pecaEscolhida_0" style="width: 100%;" required>
+                                    <option value="" disabled selected>Selecione a Peça</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-4">
+                                <label for="quantidade_0" class="form-label">Quantidade</label>
+                                <input class="form-control" type="number" id="quantidade_0" name="quantidade_0" required>
+                            </div>
+                        </div>
+
+                        <div id="containerPecas" class="mb-3">
+                        </div>
+                    
+                        <!-- Botão para adicionar novas peças -->
+                        <button id="addPeca" class="btn btn-primary" type="button">Adicionar Peça</button>
+                    </div>
+                    <div class="text-end">
+                        <button class="btn btn-success" id="confirmButton">Confirmar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal importar OP Serra -->
+<div class="modal fade" id="modalImportarOpSerra" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalImportarOpSerraLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalImportarOpSerraLabel">Importar Ordens Serra</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formImportarOrdemSerra" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" id="tipoMaquina" name="tipoMaquina" value="serra">
+
+                    <!-- Campo de upload de arquivo -->
+                    <div class="mb-3">
+                        <label for="arquivoOrdens" class="form-label">Selecione o arquivo para importar</label>
+                        <input class="form-control" type="file" id="arquivoOrdens" name="arquivoOrdens" accept=".csv, .xlsx, .xls" required>
+                        <small class="form-text text-muted">Formatos aceitos: .xlsx</small>
+                    </div>
+
+                    <!-- Botão de confirmar -->
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-success" id="confirmButton">Confirmar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para exibir as peças -->
+<div class="modal fade" id="modalPecas" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPecasLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalPecasLabel">Peças da Ordem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modalPecasContent">
+                    <!-- As peças serão carregadas dinamicamente aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal iniciar ordem -->
+<div class="modal fade" id="modalIniciar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalIniciarLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalIniciarLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formIniciarOrdemCorte">
+                    <div class="mb-3">
+                        <input type="hidden" id="grupoMaquina">
+                        <label for="escolhaMaquina" class="form-label">Qual máquina?</label>
+                        <select class="form-control" id="escolhaMaquinaIniciarOrdem" name="escolhaMaquinaIniciarOrdem" required>
+                            <option value="">------</option>
+                            <!-- Opções serão preenchidas dinamicamente pelo JavaScript -->
+                        </select>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Iniciar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal interromper ordem -->
+<div class="modal fade" id="modalInterromper" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInterromperLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalInterromperLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formInterromperOrdemCorte">
+                    <div class="mb-3">
+                        <label for="escolhaMotivo" class="form-label">Qual motivo?</label>
+                        <select class="form-control" id="motivoInterrupcao" name="motivoInterrupcao" required>
+                            <option value="">------</option>
+                            {% for motivo in motivos %}
+                            <option value="{{motivo.nome}}">{{motivo.nome}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Interromper</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal finalizar ordem -->
+<div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalFinalizarLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formFinalizarOrdemCorte">
+                    
+                    <div id="bodyPecasFinalizar">
+                        <!-- Informações da Chapa -->
+
+                        <!-- Peças -->
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <h6 class="text-center mt-3">Observação</h6>
+                            <textarea class="form-control" name="obsFinalizar" id="obsFinalizar" placeholder="Algum comentário"></textarea>
+                        </div>   
+                        <div class="col-sm-6">
+                            <h6 class="text-center mt-3">Operador</h6>
+                            <select class="form-control" name="operadorFinalizar" id="operadorFinalizar" required>
+                                <option value="">---------</option>
+                                {% for operador in operadores %}
+                                <option value="{{ operador.id }}">{{ operador.matricula }} - {{ operador.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>   
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Finalizar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal retornar ordem -->
+<div class="modal fade" id="modalRetornar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalRetornarLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalRetornarLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formRetornarProducao">
+                    <div class="mb-3">
+                        <input type="hidden" id="grupoMaquina">
+                        <button type="submit" class="btn btn-primary">Sim</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Não</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/ordem-criada-serra.js' %}"></script>
+{% endblock %}
+

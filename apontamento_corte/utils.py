@@ -1,0 +1,194 @@
+import pandas as pd
+from datetime import date
+
+def tratamento_planilha_plasma(df):
+
+    df = df.dropna(how='all')
+
+    tamanho_chapa = df[df.columns[16:17]][9:10].replace('×', 'x')
+    qt_chapa = df[df.columns[2:3]][9:10]
+
+    nome_coluna_1 = df[df.columns[0]].name
+    aproveitamento_df = df['Unnamed: 16'][4:5]
+
+    df = df[17:df.shape[0]-2]
+
+    df = df[[nome_coluna_1, 'Unnamed: 19', 'Unnamed: 20',
+             'Unnamed: 27', 'Unnamed: 32', 'Unnamed: 35']]
+    df = df.dropna(how='all')
+
+    espessura_df = df[df.columns[2:3]][2:3]
+
+    df = df[[nome_coluna_1, 'Unnamed: 19',
+             'Unnamed: 27', 'Unnamed: 32', 'Unnamed: 35']]
+
+    df = df[2:]
+
+    # quantidade de chapa
+
+    qt_chapa_list = qt_chapa.values.tolist()
+
+    # tamanho da chapa
+
+    tamanho_chapa_list = tamanho_chapa.values.tolist()
+
+    # aproveitamento
+
+    aproveitamento_list = aproveitamento_df.values.tolist()
+
+    # espessura
+
+    espessura_list = espessura_df.values.tolist()
+
+    # cabeçalho da tabela
+
+    cabecalho_df = pd.DataFrame({'Peças': ['Peças'], 'Quantidade': ['Quantidade'],
+                                 'Tamanho chapa': ['Tamanho chapa'],
+                                 'Peso': ['Peso'], 'Tempo': ['Tempo']})
+    cabecalho_list = cabecalho_df.values.tolist()
+
+    lista = df.values.tolist()
+
+    # Criando colunas na tabela para guardar no bando de dados
+
+    try:
+        df = df.loc[:df[df['Unnamed: 19'].isnull()].index[0]-1]
+    except:
+        pass
+
+    df['Unnamed: 19'] = df['Unnamed: 19'].astype(int)
+    df['espessura'] = espessura_list[0][0]
+    df['aproveitamento'] = aproveitamento_list[0]
+    df['tamanho da chapa'] = tamanho_chapa_list[0][0]
+    df['qt. chapas'] = int(qt_chapa_list[0][0])
+    df['op'] = 1
+
+    # reordenar colunas
+
+    cols = df.columns.tolist()
+    cols = cols[-1:] + cols[:-1]
+    df = df[cols]
+
+    df['data criada'] = date.today().strftime('%d/%m/%Y')
+    df['Máquina'] = 'Plasma'
+    df['op_espelho'] = ''
+    # df['opp'] = 'opp'
+
+    df = df.rename(columns={
+        'Máquina': 'maquina',
+        'ProNest 2021': 'peca',
+        'Unnamed: 19': 'qtd_planejada',
+        'Unnamed: 27': 'tamanho_peca',
+        'Unnamed: 32': 'peso_peca',
+        'Unnamed: 35': 'tempo_estimado_peca',
+        'data criada': 'data_criada',
+        'tamanho da chapa':'tamanho_da_chapa',
+        'qt. chapas':"qt_chapa",
+
+    })
+
+    propriedades = [{
+        'descricao_mp':espessura_list[0][0] + " - " +tamanho_chapa_list[0][0],
+        'tamanho':tamanho_chapa_list[0][0],
+        'espessura':espessura_list[0][0],
+        'quantidade':qt_chapa_list[0][0],
+        'aproveitamento':aproveitamento_list[0],
+    }]
+
+    return df, propriedades
+
+def tratamento_planilha_laser2(df,df2):
+
+    tamanho_chapa = df['Unnamed: 2'][6].replace(".",",").replace("*","×") + " mm"
+    qt_chapa = df['Unnamed: 3'][6:len(df)-1].sum()
+    aproveitamento_df = df['Unnamed: 5'][6:len(df)-1].mean()
+    espessura_df = str(df['Unnamed: 2'][2]).replace(".",",") + " mm"
+
+    df2.columns = df2.iloc[0]
+    df2 = df2[1:].reset_index(drop=True)
+    df2 = df2[['Part name','Amount:','Part size (mm*mm)']]
+
+    df2['espessura'] = espessura_df
+    df2['aproveitamento'] = aproveitamento_df
+    df2['tamanho da chapa'] = tamanho_chapa
+    df2['qt. chapas'] = qt_chapa
+    # df2['op'] = n_op
+    df2['Peso'] = ''
+    df2['Tempo'] = ''
+
+    # reordenar colunas
+    df2 = df2[['Part name','Amount:','espessura','aproveitamento','tamanho da chapa', 'qt. chapas']]
+    df2.columns = ['peca', 'qtd_planejada','espessura', 'aproveitamento', 'tamanho_da_chapa', 'qt_chapas']
+
+    df2['data criada'] = date.today().strftime('%d/%m/%Y')
+    df2['Máquina'] = 'Laser JYF'
+    df2['op_espelho'] = ''
+    df2['opp'] = 'opp'
+
+    propriedades = [{
+        'descricao_mp':espessura_df + " - " + tamanho_chapa,
+        'tamanho':tamanho_chapa,
+        'espessura':espessura_df,
+        'quantidade':qt_chapa,
+        'aproveitamento':aproveitamento_df,
+    }]
+
+    return df2, propriedades
+
+def tratamento_planilha_laser1(df,df2,comprimento,largura,espessura):
+
+    df = df.dropna(how='all')            
+    df2 = df2.dropna(how='all')            
+
+    qt_chapas = df2[df2.columns[2:3]][3:4]
+    qt_chapas_list = qt_chapas.values.tolist()[0][0]
+
+    try:
+        aprov1 = df2[df2.columns[4:5]][7:8] 
+        aprov2 = df2[df2.columns[4:5]][9:10]
+        aprov_list = str(1 - ( float(aprov2.values.tolist()[0][0]) / float(aprov1.values.tolist()[0][0]) ) )
+    except:
+        aprov1 = df2[df2.columns[2:3]][7:8] 
+        aprov2 = df2[df2.columns[2:3]][9:10]
+        aprov_list = str(1 - ( float(aprov2.values.tolist()[0][0]) / float(aprov1.values.tolist()[0][0]) ) ) 
+
+    df = df[['Unnamed: 1','Unnamed: 4']]
+    df = df.rename(columns={'Unnamed: 1':'Descrição',
+                            'Unnamed: 4': 'Quantidade'})
+    df = df.dropna(how='all')
+    
+    df = df[10:len(df)-1]
+    
+    df = df.reset_index(drop=True)
+    
+    # df['op'] = n_op
+
+    cols = df.columns.tolist()
+    cols = cols[-1:] + cols[:-1]
+    df = df[cols]
+
+    # df['tamanho da peça'] = ''
+    # df['peso'] = ''
+    # df['tempo'] = ''
+    #espessura = '14'
+    df['espessura'] = espessura
+    df['aproveitamento'] = aprov_list
+    #tamanho_chapa = '2800,00 x 1500,00 mm'
+    df['tamanho_da_chapa'] = f"{comprimento} x {largura} mm "
+    df['qt_chapas'] = qt_chapas_list
+    # df['data criada'] = date.today().strftime('%d/%m/%Y')
+    # df['Máquina'] = 'Laser'
+    # df['op_espelho'] = ''
+    # df['opp'] = 'opp'
+
+    df.columns = ['qtd_planejada','peca','espessura','aproveitamento','tamanho_da_chapa','qt_chapas']
+
+    propriedades = [{
+        'descricao_mp': espessura + " - " + f"{comprimento} x {largura} mm ",
+        'tamanho':f"{comprimento} x {largura} mm ",
+        'espessura':espessura,
+        'quantidade':qt_chapas_list,
+        'aproveitamento':aprov_list,
+    }]
+
+    return df, propriedades

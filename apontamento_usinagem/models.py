@@ -1,0 +1,14 @@
+from django.db import models
+from django.utils.timezone import now
+
+from cadastro.models import Pecas
+from core.models import Ordem
+
+class PecasOrdem(models.Model):
+
+    ordem=models.ForeignKey(Ordem, on_delete=models.CASCADE, related_name='ordem_pecas_usinagem')
+    peca=models.ForeignKey(Pecas, on_delete=models.CASCADE, related_name='pecas_ordem_usinagem')
+    qtd_planejada=models.FloatField()
+    qtd_morta=models.FloatField(default=0)
+    qtd_boa=models.FloatField(default=0)
+

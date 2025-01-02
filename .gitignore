@@ -1,0 +1,5 @@
+env_apontamento
+*.pyc
+__pycache__/
+.env
+antigo
