@@ -54,6 +54,7 @@ def get_pecas_ordem(request, pk_ordem, name_maquina):
         # Propriedades da ordem
         propriedade = ordem.propriedade
         propriedades = {
+            'id_mp': propriedade.mp_codigo.codigo if propriedade else None,
             'descricao_mp': propriedade.mp_codigo.codigo + " - " + propriedade.mp_codigo.descricao if propriedade else None,
             'quantidade': propriedade.quantidade if propriedade else None,
             'tamanho': propriedade.tamanho if propriedade else None,
@@ -137,17 +138,17 @@ def atualizar_status_ordem(request):
                     ordem.operador_final=get_object_or_404(Operador, pk=operador_final)
                     ordem.obs_operador=obs_final
 
+                    mp_final = body.get('mp_final')
+
+                    if ordem.propriedade.mp_codigo.codigo != mp_final:
+                        ordem.propriedade.nova_mp = get_object_or_404(Mp, codigo=mp_final)
+                        ordem.propriedade.save()
+
                     # Verifica se a quantidade de chapas mudaram
                     if int(qtd_varas) != ordem.propriedade.quantidade:
                         ordem.propriedade.quantidade = int(qtd_varas)
                         ordem.propriedade.tamanho = tamanho_vara
                         ordem.propriedade.save()
-                    
-                    # Verifica se a mp mudou
-                    # if int(qtd_varas) != ordem.propriedade.quantidade:
-                    #     ordem.propriedade.quantidade = int(qtd_varas)
-                    #     ordem.propriedade.tamanho = tamanho_vara
-                    #     ordem.propriedade.save()
                     
                     for peca in pecas_geral:
                         peca_id = peca.get('peca')
@@ -189,6 +190,7 @@ def get_ordens_criadas(request):
     filtro_ordem = request.GET.get('ordem', '').strip()
     status_atual = request.GET.get('status', '').strip()
     filtro_mp = request.GET.get('mp', '').strip()
+    filtro_peca = request.GET.get('peca', '').strip()
 
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
@@ -202,6 +204,8 @@ def get_ordens_criadas(request):
         ordens_queryset = ordens_queryset.filter(status_atual=status_atual)
     if filtro_mp:
         ordens_queryset = ordens_queryset.filter(propriedade__mp_codigo__codigo=filtro_mp)
+    if filtro_peca:
+        ordens_queryset = ordens_queryset.filter(ordem_pecas_serra__peca__codigo=filtro_peca)
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -234,7 +238,7 @@ def get_ordens_criadas(request):
             'pecas': [
                 {
                     'peca_id': peca_ordem.peca.id,
-                    'peca_nome': peca_ordem.peca.codigo + '-' + peca_ordem.peca.descricao if peca_ordem.peca.descricao else 'Sem descrição',
+                    'peca_nome': peca_ordem.peca.codigo + '-' + peca_ordem.peca.descricao if peca_ordem.peca.descricao else peca_ordem.peca.codigo + " - " + 'Sem descrição',
                     'quantidade': peca_ordem.qtd_planejada,
                     'qtd_morta': peca_ordem.qtd_morta
                 }
@@ -282,7 +286,7 @@ def get_ordens_iniciadas(request):
         pecas_data = [
             {
                 'peca_id': peca_ordem.peca.id,
-                'peca_nome': peca_ordem.peca.codigo + " - " + peca_ordem.peca.descricao,
+                'peca_nome': peca_ordem.peca.codigo + " - " + peca_ordem.peca.descricao if peca_ordem.peca.descricao else peca_ordem.peca.codigo + " - " + 'Sem descrição',
                 'quantidade': peca_ordem.qtd_planejada,
                 'qtd_morta': peca_ordem.qtd_morta
             }
@@ -339,7 +343,7 @@ def get_ordens_interrompidas(request):
         for peca_ordem in ordem.ordem_pecas_serra.all():
             pecas_data.append({
                 'peca_id': peca_ordem.peca.id,
-                'peca_nome': peca_ordem.peca.codigo + " - " + peca_ordem.peca.descricao,
+                'peca_nome': peca_ordem.peca.codigo + " - " + peca_ordem.peca.descricao if peca_ordem.peca.descricao else peca_ordem.peca.codigo + " - " + 'Sem descrição',
                 'quantidade': peca_ordem.qtd_planejada,
                 'qtd_morta': peca_ordem.qtd_morta,
             })
