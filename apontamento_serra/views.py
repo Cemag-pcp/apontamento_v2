@@ -234,7 +234,7 @@ def get_ordens_criadas(request):
             'pecas': [
                 {
                     'peca_id': peca_ordem.peca.id,
-                    'peca_nome': peca_ordem.peca.codigo + '-' + peca_ordem.peca.descricao,
+                    'peca_nome': peca_ordem.peca.codigo + '-' + peca_ordem.peca.descricao if peca_ordem.peca.descricao else 'Sem descrição',
                     'quantidade': peca_ordem.qtd_planejada,
                     'qtd_morta': peca_ordem.qtd_morta
                 }
