@@ -5,7 +5,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&status=${filtros.status || ''}&mp=${filtros.mp || ''}`)
+        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&status=${filtros.status || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -340,11 +340,13 @@ function resetarCardsInicial(filtros = {}) {
     const filtroOrdem = document.getElementById('filtro-ordem');
     const filtroMp = document.getElementById('filtro-mp');
     const filtroStatus = document.getElementById('filtro-status');
+    const filtroPeca = document.getElementById('filtro-peca');
 
     const currentFiltros = {
         ordem: filtros.ordem || filtroOrdem.value.trim(),
         mp: filtros.mp || filtroMp.value.trim(),
         status: filtros.status || filtroStatus.value.trim(),
+        peca: filtros.status || filtroPeca.value.trim(),
     };
 
     // Função principal para buscar e renderizar ordens
@@ -698,7 +700,15 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                     </thead>
                     <tbody>
                         <tr>
-                            <td>${data.propriedades.descricao_mp || 'N/A'}</td>
+                            <td style="text-align: center; padding: 5px;">
+                                <select 
+                                    id="selectMpSerraAlterar"
+                                    class="form-select form-select-sm select2-materia-prima"
+                                    style="width: 100%; max-width: 150px; font-size: 0.85rem; padding: 0.2rem 0.5rem; height: auto;"
+                                    required>
+                                    <option value="${data.propriedades.id_mp}" selected>${data.propriedades.descricao_mp || 'Selecione'}</option>
+                                </select>
+                            </td>
                             <td>
                                 <input 
                                     type="number" 
@@ -725,6 +735,37 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                 </table>
             `;
             document.getElementById('bodyPecasFinalizar').insertAdjacentHTML('beforeend', propriedadesHTML);
+
+            $('#selectMpSerraAlterar').select2({
+                theme: 'bootstrap-5', // Tema específico para Bootstrap 5
+                ajax: {
+                    url: 'api/get-mp/',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return {
+                            search: params.term || '',
+                            page: params.page || 1,
+                            per_page: 10
+                        };
+                    },
+                    processResults: function (data, params) {
+                        params.page = params.page || 1;
+                        return {
+                            results: data.results.map(item => ({
+                                id: item.id,
+                                text: item.text
+                            })),
+                            pagination: {
+                                more: data.pagination.more
+                            }
+                        };
+                    },
+                    cache: true
+                },
+                minimumInputLength: 0,
+                dropdownParent: $('#modalFinalizar'),
+            });
 
             // Renderiza peças
             if (data.pecas && data.pecas.length > 0) {
@@ -812,10 +853,6 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
         
             const qtdRealizada = parseInt(qtdRealizadaElement.value) || 0;
         
-            console.log('Peca ID:', pecaId);
-            console.log('Mortas:', mortas);
-            console.log('Quantidade Realizada:', qtdRealizada);
-        
             return {
                 peca: pecaId,
                 mortas: mortas,
@@ -827,7 +864,8 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
         const tamanhoVara = document.getElementById('tamanhoVaraInput').value;
         const operadorFinal = document.getElementById('operadorFinalizar').value;
         const obsFinalizar = document.getElementById('obsFinalizar').value;
-
+        const mp_final = document.getElementById('selectMpSerraAlterar').value;
+        
         // Faz o fetch para finalizar a ordem
         fetch(`api/ordens/atualizar-status/`, {
             method: 'PATCH',
@@ -837,10 +875,10 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                 status: 'finalizada',
                 pecas_mortas: pecasMortas,
                 qtd_vara: qtdVaras,
-                // qtdRealizada: qtdRealizada,
                 tamanho_vara: tamanhoVara,
                 operador_final: operadorFinal,
-                obs_finalizar: obsFinalizar
+                obs_finalizar: obsFinalizar,
+                mp_final: mp_final
             }),
             headers: {
                 'Content-Type': 'application/json',
@@ -1237,7 +1275,6 @@ document.addEventListener('DOMContentLoaded', () => {
         addPeca();
     });
 
-    // Inicializa o select2 para o primeiro elemento
     $('#mpEscolhida').select2({
         placeholder: 'Selecione a mp',
         width: '100%',
@@ -1304,13 +1341,46 @@ document.addEventListener('DOMContentLoaded', () => {
         dropdownParent: $('#containerPecas'), // Use o contêiner correto como pai do dropdown
     });
 
-    // Inicializa o select2 para o primeiro elemento
     $('#filtro-mp').select2({
         placeholder: 'Selecione a mp',
         width: '100%',
         theme: 'bootstrap-5', // Tema específico para Bootstrap 5
+        allowClear: true, // Habilita o botão "clear" no campo
         ajax: {
             url: 'api/get-mp/',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return {
+                    search: params.term || '',
+                    page: params.page || 1,
+                    per_page: 10
+                };
+            },
+            processResults: function (data, params) {
+                params.page = params.page || 1;
+                return {
+                    results: data.results.map(item => ({
+                        id: item.id,
+                        text: item.text
+                    })),
+                    pagination: {
+                        more: data.pagination.more
+                    }
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 0,
+    });
+
+    $('#filtro-peca').select2({
+        placeholder: 'Selecione a peça',
+        width: '100%',
+        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
+        allowClear: true, // Habilita o botão "clear" no campo
+        ajax: {
+            url: 'api/get-peca/',
             dataType: 'json',
             delay: 250,
             data: function (params) {
