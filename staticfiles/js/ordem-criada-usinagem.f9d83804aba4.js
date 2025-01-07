@@ -71,7 +71,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                             <div class="card-body">
                                 <h5 class="card-title d-flex justify-content-between align-items-center">
                                     <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca.codigo}" target="_blank" rel="noopener noreferrer">
-                                        ${ordem.peca.codigo} - ${truncateText(ordem.peca.descricao, 10)}
+                                        ${ordem.peca.codigo} - ${ordem.peca.descricao}
                                     </a>
                                     ${statusBadge}
                                 </h5>
@@ -144,13 +144,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
             });
     });
 };
-
-function truncateText(text, maxLength) {
-    if (text.length > maxLength) {
-        return text.substring(0, maxLength) + '...';
-    }
-    return text;
-}
 
 function carregarOrdensIniciadas(container) {
     fetch('api/ordens-iniciadas/?page=1&limit=10')
