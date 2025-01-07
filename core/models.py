@@ -33,6 +33,7 @@ class Ordem(models.Model):
         ('torno_1', 'Torno 1'),
         ('torno_2', 'Torno 2'),
         ('chanfradeira', 'Chanfradeira'),
+        ('maq_solda', 'Máquina de solda'),
     )
 
     GRUPO_MAQUINA_CHOICES = (
@@ -42,6 +43,7 @@ class Ordem(models.Model):
         ('prensa', 'Prensa'),
         ('usinagem', 'Usinagem'),
         ('serra', 'Serra'),
+        ('prod_esp', 'Prod. Especiais')
     )
 
     ordem = models.IntegerField()

@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     'apontamento_serra',
     'apontamento_usinagem',
     'apontamento_corte',
+    'apontamento_prod_especiais',
+
 ]
 
 MIDDLEWARE = [
@@ -87,6 +89,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'apontamento_serra/static'),
     os.path.join(BASE_DIR, 'apontamento_usinagem/static'),
     os.path.join(BASE_DIR, 'apontamento_corte/static'),
+    os.path.join(BASE_DIR, 'apontamento_prod_especiais/static'),
 
     os.path.join(BASE_DIR, 'cadastro/static'),
 ]
