@@ -144,10 +144,12 @@ def atualizar_status_ordem(request):
                         ordem.propriedade.nova_mp = get_object_or_404(Mp, codigo=mp_final)
                         ordem.propriedade.save()
 
+                    ordem.propriedade.tamanho = tamanho_vara
+                    ordem.propriedade.save()
+
                     # Verifica se a quantidade de chapas mudaram
                     if int(qtd_varas) != ordem.propriedade.quantidade:
                         ordem.propriedade.quantidade = int(qtd_varas)
-                        ordem.propriedade.tamanho = tamanho_vara
                         ordem.propriedade.save()
                     
                     for peca in pecas_geral:

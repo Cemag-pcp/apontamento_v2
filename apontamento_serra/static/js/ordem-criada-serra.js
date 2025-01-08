@@ -723,6 +723,8 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                             <td>
                                 <input 
                                     type="number" 
+                                    min="1" 
+                                    step="0.01" 
                                     class="form-control form-control-sm" 
                                     id="propQtd" 
                                     name="propQtd"
