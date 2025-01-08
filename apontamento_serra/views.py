@@ -624,3 +624,18 @@ def api_apontamentos_peca(request):
             })
 
     return JsonResponse(resultado, safe=False)
+
+def api_apontamentos_mp(request):
+    propriedades_ordens = (
+        PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra')
+        .select_related('ordem', 'mp_codigo')  # Para otimizar consultas relacionadas
+        .order_by('ordem__ordem')  # Ordena pelo campo `ordem` da tabela `Ordem`
+        .values(
+            'ordem__ordem',  # Campo `ordem` da tabela `Ordem`
+            'tamanho',  # Campo `tamanho` da tabela `PropriedadesOrdem`
+            'quantidade',  # Campo `quantidade` da tabela `PropriedadesOrdem`
+            codigo_mp=F('mp_codigo__codigo'),  # Campo `codigo` da tabela `CadastroMP`
+            mp_descricao=F('mp_codigo__descricao')  # Alias alterado para evitar conflito
+        )
+    )
+    return JsonResponse(list(propriedades_ordens), safe=False)

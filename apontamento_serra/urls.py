@@ -18,5 +18,6 @@ urlpatterns = [
     path('api/importar-ordens-serra/', views.importar_ordens_serra, name='importar_ordens_serra'),
 
     path('api/apontamentos-peca/serra', views.api_apontamentos_peca, name='api_apontamentos_peca'),
+    path('api/apontamentos-mp/serra', views.api_apontamentos_mp, name='api_apontamentos_mp'),
 
 ]
