@@ -343,4 +343,30 @@ def planejar_ordem_usinagem(request):
         return JsonResponse({
             'message': 'Status atualizado com sucesso.',
         })
- 
+
+def api_apontamentos_peca(request):
+    ordens = (
+        Ordem.objects.filter(status_atual='finalizada', grupo_maquina='usinagem')
+        .select_related('operador_final')  # Para otimizar a relação com operador_final
+        .prefetch_related('ordem_pecas_usinagem__peca')  # Ajustado para usar o related_name correto
+        .order_by('ordem')
+    )
+
+    # Constrói o resultado manualmente
+    resultado = []
+    for ordem in ordens:
+        for apontamento in ordem.ordem_pecas_usinagem.all():  # Use o related_name correto
+            resultado.append({
+                "ordem": ordem.ordem,
+                "codigo_peca": apontamento.peca.codigo,
+                "descricao_peca": apontamento.peca.descricao,
+                "qtd_boa": apontamento.qtd_boa,
+                "qtd_morta": apontamento.qtd_morta,
+                "qtd_planejada": apontamento.qtd_planejada,
+                "obs_plano": ordem.obs,
+                "maquina": ordem.get_maquina_display(),
+                "obs_operador": ordem.obs_operador,
+                "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
+            })
+
+    return JsonResponse(resultado, safe=False)
