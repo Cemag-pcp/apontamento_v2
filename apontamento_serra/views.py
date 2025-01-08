@@ -10,7 +10,7 @@ from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import localtime
 from django.db.models import F, Value, CharField, Func, Q
-from django.db.models.functions import Concat
+from django.db.models.functions import Coalesce, Concat
 
 from .models import PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,Ordem
@@ -628,14 +628,26 @@ def api_apontamentos_peca(request):
 def api_apontamentos_mp(request):
     propriedades_ordens = (
         PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra')
-        .select_related('ordem', 'mp_codigo')  # Para otimizar consultas relacionadas
+        .select_related('ordem', 'mp_codigo', 'nova_mp')  # Otimiza consultas relacionadas
         .order_by('ordem__ordem')  # Ordena pelo campo `ordem` da tabela `Ordem`
+        .annotate(
+            descricao_original=Concat(  # Concatena código e descrição originais
+                F('mp_codigo__codigo'),
+                Value(' - '),
+                F('mp_codigo__descricao')
+            ),
+            descricao_nova=Concat(  # Concatena código e descrição da nova matéria-prima, se houver
+                F('nova_mp__codigo'),
+                Value(' - '),
+                F('nova_mp__descricao')
+            )
+        )
         .values(
             'ordem__ordem',  # Campo `ordem` da tabela `Ordem`
             'tamanho',  # Campo `tamanho` da tabela `PropriedadesOrdem`
             'quantidade',  # Campo `quantidade` da tabela `PropriedadesOrdem`
-            codigo_mp=F('mp_codigo__codigo'),  # Campo `codigo` da tabela `CadastroMP`
-            mp_descricao=F('mp_codigo__descricao')  # Alias alterado para evitar conflito
+            'descricao_original',  # Concatenação do código e descrição original
+            'descricao_nova',  # Concatenação do código e descrição da nova matéria-prima
         )
     )
     return JsonResponse(list(propriedades_ordens), safe=False)
