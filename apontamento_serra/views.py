@@ -7,9 +7,10 @@ from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now
-from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import localtime
+from django.db.models import F, Value, CharField, Func, Q
+from django.db.models.functions import Concat
 
 from .models import PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,Ordem
@@ -507,7 +508,7 @@ def importar_ordens_serra(request):
                 for row in sheet.iter_rows(min_row=2, values_only=True):  # Ignora a linha de cabeçalho
                     os = row[0]
                     codigo = row[1]
-                    quantidade = row[2]
+                    # quantidade = row[2]
                     comprimento = row[3]
                     conjunto = row[4]
                     qtd_planejada = row[5]
@@ -529,7 +530,7 @@ def importar_ordens_serra(request):
 
                     ordens[os]['pecas'].append({
                         'codigo': codigo,
-                        'quantidade': quantidade,
+                        'quantidade': qtd_planejada,
                         'comprimento': comprimento,
                         'perca': perca
                     })
@@ -597,5 +598,29 @@ def importar_ordens_serra(request):
 
     return JsonResponse({'status': 'error', 'message': 'Método não permitido.'}, status=405)
 
+def api_apontamentos_peca(request):
+    ordens = (
+        Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra')
+        .select_related('operador_final')  # Para otimizar a relação com operador_final
+        .prefetch_related('ordem_pecas_serra__peca')  # Ajustado para usar o related_name correto
+        .order_by('ordem')
+    )
 
+    # Constrói o resultado manualmente
+    resultado = []
+    for ordem in ordens:
+        for apontamento in ordem.ordem_pecas_serra.all():  # Use o related_name correto
+            resultado.append({
+                "ordem": ordem.ordem,
+                "codigo_peca": apontamento.peca.codigo,
+                "descricao_peca": apontamento.peca.descricao,
+                "qtd_boa": apontamento.qtd_boa,
+                "qtd_morta": apontamento.qtd_morta,
+                "qtd_planejada": apontamento.qtd_planejada,
+                "obs_plano": ordem.obs,
+                "maquina": ordem.get_maquina_display(),
+                "obs_operador": ordem.obs_operador,
+                "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
+            })
 
+    return JsonResponse(resultado, safe=False)
