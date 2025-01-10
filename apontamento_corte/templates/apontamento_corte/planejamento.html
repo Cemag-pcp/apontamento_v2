@@ -354,18 +354,29 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form>
+                <form id="formDuplicarOP">
                     <div class="mb-3">
-                        <label for="opExistente" class="form-label">OP Existente:</label>
-                        <select class="form-select" id="opExistente" required>
-                            <option value="">Selecione uma OP</option>
-                            <option value="op1">OP 1</option>
-                            <option value="op2">OP 2</option>
-                            <!-- Adicione mais opções conforme necessário -->
+                        <label for="filtroPecas" class="form-label">Peças</label>
+                        <select id="filtroPecas" class="form-select" multiple>
+                            <!-- As opções serão carregadas dinamicamente -->
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">Duplicar</button>
+                    <div class="mb-3">
+                        <label for="filtroMaquina" class="form-label">Máquina</label>
+                        <select id="filtroMaquina" class="form-select">
+                            <option value="">Selecione uma máquina</option>
+                            <option value="laser_1">Laser 1</option>
+                            <option value="laser_2">Laser 2 (JFY)</option>
+                            <option value="plasma_1">Plasma 1</option>
+                            <option value="plasma_2">Plasma 2</option>
+                            <option value="prensa">Prensa</option>
+                        </select>
+                    </div>
                 </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnDuplicarOP">Duplicar OP</button>
             </div>
         </div>
     </div>

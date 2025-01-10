@@ -6,7 +6,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
-from django.utils.timezone import now
+from django.utils.timezone import now,localtime
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem
@@ -75,7 +75,7 @@ def get_ordens_criadas(request):
     limit = int(request.GET.get('limit', 10))
 
     # Filtra as ordens com base nos parâmetros
-    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).order_by('-status_prioridade')
+    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).order_by('status_prioridade')
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem__icontains=filtro_ordem)
@@ -94,7 +94,7 @@ def get_ordens_criadas(request):
         'id':ordem.pk,  
         'ordem': ordem.ordem,
         'grupo_maquina': ordem.get_grupo_maquina_display(),
-        'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
+        'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
         'obs': ordem.obs,
         'status_atual': ordem.status_atual,
         'propriedade': {
@@ -217,6 +217,7 @@ def get_ordens_iniciadas(request):
         'obs': ordem.obs,
         'status_atual': ordem.status_atual,
         'maquina': ordem.get_maquina_display(),
+        'ultima_atualizacao': ordem.ultima_atualizacao,
         'propriedade': {
             'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
             'espessura': ordem.propriedade.espessura if ordem.propriedade else None,
@@ -276,6 +277,41 @@ def get_ordens_interrompidas(request):
         'total_pages': paginator.num_pages,
         'total_ordens': paginator.count
     })
+
+# def get_pecas(request):
+
+#     """
+#     Retorna uma lista paginada de peças, com suporte a busca por código ou descrição.
+#     """
+    
+#     # Obtém os parâmetros da requisição
+#     search = request.GET.get('search', '').strip()  # Termo de busca
+#     page = int(request.GET.get('page', 1))  # Página atual (padrão é 1)
+#     per_page = int(request.GET.get('per_page', 10))  # Itens por página (padrão é 10)
+
+#     # Filtra as peças com base no termo de busca (opcional)
+#     pecas_query = Pecas.objects.all()
+#     if search:
+#         pecas_query = pecas_query.filter(
+#             Q(codigo__icontains=search) | Q(descricao__icontains=search)
+#         ).order_by('codigo')
+
+#     # Paginação
+#     paginator = Paginator(pecas_query, per_page)
+#     pecas_page = paginator.get_page(page)
+
+#     # Monta os resultados paginados no formato esperado pelo Select2
+#     data = {
+#         'results': [
+#             {'id': peca.nome, 'text': f"{peca.nome}"} for peca in pecas_page
+#         ],
+#         'pagination': {
+#             'more': pecas_page.has_next()  # Se há mais páginas
+#         },
+#     }
+
+#     return JsonResponse(data)
+
 
 
 class ProcessarArquivoView(View):

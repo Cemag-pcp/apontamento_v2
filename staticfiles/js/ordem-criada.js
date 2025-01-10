@@ -170,6 +170,27 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     });
 };
 
+function iniciarContador(ordemId, dataCriacao) {
+    const contador = document.getElementById(`contador-${ordemId}`);
+    const dataInicial = new Date(dataCriacao); // Converte a data de criação para objeto Date
+
+    function atualizarContador() {
+        const agora = new Date();
+        const diferenca = Math.floor((agora - dataInicial) / 1000); // Diferença em segundos
+
+        const dias = Math.floor(diferenca / 86400);
+        const horas = Math.floor((diferenca % 86400) / 3600);
+        const minutos = Math.floor((diferenca % 3600) / 60);
+        const segundos = diferenca % 60;
+
+        contador.textContent = `${dias}d ${horas}h ${minutos}m ${segundos}s`;
+    }
+
+    // Atualiza o contador a cada segundo
+    atualizarContador();
+    setInterval(atualizarContador, 1000);
+}
+
 function carregarOrdensIniciadas(container) {
     fetch('api/ordens-iniciadas/?page=1&limit=10')
         .then(response => response.json())
@@ -209,8 +230,9 @@ function carregarOrdensIniciadas(container) {
 
                 card.innerHTML = `
                 <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-primary text-white">
-                        <h6 class="card-title mb-0">${ordem.ordem} - ${ordem.maquina}</h6>
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                        <span class="badge badge-pill badge-warning" id="contador-${ordem.ordem}" style="font-size: 0.65rem;">Carregando...</span>
                     </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
@@ -256,6 +278,8 @@ function carregarOrdensIniciadas(container) {
                 }
 
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
@@ -288,7 +312,7 @@ function carregarOrdensInterrompidas(container) {
                 card.innerHTML = `
                 <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
                     <div class="card-header bg-danger text-white">
-                        <h6 class="card-title mb-0">${ordem.ordem} - ${ordem.maquina}</h6>
+                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
                         <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
                     </div>
                     <div class="card-body bg-light">
@@ -486,7 +510,6 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             carregarOrdensInterrompidas(containerInterrompido);
 
             // Recarrega os dados chamando a função de carregamento
-            document.getElementById('ordens-container')='';
             resetarCardsInicial();
 
         })
@@ -592,6 +615,9 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 // Atualiza a interface
                 const containerIniciado = document.querySelector('.containerProcesso');
                 carregarOrdensIniciadas(containerIniciado);
+
+                resetarCardsInicial(); 
+
             })
             .catch((error) => {
                 Swal.fire({
@@ -823,7 +849,6 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
             const containerIniciado = document.querySelector('.containerProcesso');
             carregarOrdensIniciadas(containerIniciado);
             
-            document.getElementById('ordens-container')='';
             resetarCardsInicial();
                         
             modal.hide();
@@ -902,7 +927,6 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
             const containerInterrompido = document.querySelector('.containerInterrompido');
             carregarOrdensInterrompidas(containerInterrompido);
 
-            document.getElementById('ordens-container')='';
             resetarCardsInicial();
 
         })
@@ -971,6 +995,24 @@ function resetarCardsInicial(filtros = {}) {
         fetchOrdens(); // Carrega a próxima página ao clicar no botão
     };
 }
+
+function carregarPecasDuplicar() {
+    fetch('api/pecas/') // Substitua pela URL correta da API para obter as peças
+        .then(response => response.json())
+        .then(data => {
+            const filtroPecas = document.getElementById('filtroPecas');
+            filtroPecas.innerHTML = ''; // Limpa as opções anteriores
+
+            data.forEach(peca => {
+                const option = document.createElement('option');
+                option.value = peca.id;
+                option.textContent = `${peca.codigo} - ${peca.descricao}`;
+                filtroPecas.appendChild(option);
+            });
+        })
+        .catch(error => console.error('Erro ao carregar peças:', error));
+}
+
 
 document.addEventListener('DOMContentLoaded', () => {
 

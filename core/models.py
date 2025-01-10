@@ -61,6 +61,7 @@ class Ordem(models.Model):
     operador_final = models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador', blank=True, null=True)
     obs_operador = models.TextField(blank=True, null=True)
     data_programacao = models.DateField(blank=True, null=True)
+    ultima_atualizacao = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [

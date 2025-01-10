@@ -318,6 +318,7 @@ def get_ordens_iniciadas(request):
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'maquina': ordem.get_maquina_display(),
+            'ultima_atualizacao': ordem.ultima_atualizacao,
             'propriedade': {
                 'descricao_mp': propriedade.mp_codigo.codigo + " - " + propriedade.mp_codigo.descricao if propriedade else None,
                 'quantidade': propriedade.quantidade if propriedade else None,
@@ -386,6 +387,7 @@ def get_ordens_interrompidas(request):
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'maquina': ordem.get_maquina_display(),
+            'ultima_atualizacao': ordem.ultima_atualizacao,
             'motivo_interrupcao': ultimo_processo_interrompido.motivo_interrupcao.nome if ultimo_processo_interrompido and ultimo_processo_interrompido.motivo_interrupcao else None,
             'propriedade': {
                 'descricao_mp': propriedade.mp_codigo.codigo + " - " + propriedade.mp_codigo.descricao if propriedade else None,

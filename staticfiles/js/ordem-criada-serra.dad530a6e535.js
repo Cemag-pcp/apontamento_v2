@@ -174,6 +174,27 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     });
 };
 
+function iniciarContador(ordemId, dataCriacao) {
+    const contador = document.getElementById(`contador-${ordemId}`);
+    const dataInicial = new Date(dataCriacao); // Converte a data de criação para objeto Date
+
+    function atualizarContador() {
+        const agora = new Date();
+        const diferenca = Math.floor((agora - dataInicial) / 1000); // Diferença em segundos
+
+        const dias = Math.floor(diferenca / 86400);
+        const horas = Math.floor((diferenca % 86400) / 3600);
+        const minutos = Math.floor((diferenca % 3600) / 60);
+        const segundos = diferenca % 60;
+
+        contador.textContent = `${dias}d ${horas}h ${minutos}m ${segundos}s`;
+    }
+
+    // Atualiza o contador a cada segundo
+    atualizarContador();
+    setInterval(atualizarContador, 1000);
+}
+
 function carregarOrdensIniciadas(container, filtros={}) {
     fetch(`api/ordens-iniciadas/?page=1&limit=10&ordem=${filtros.ordem || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
 
@@ -213,8 +234,9 @@ function carregarOrdensIniciadas(container, filtros={}) {
 
                 card.innerHTML = `
                 <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-primary text-white">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                        <span class="badge badge-pill badge-warning" id="contador-${ordem.ordem}" style="font-size: 0.65rem;">Carregando...</span>
                     </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
@@ -276,6 +298,9 @@ function carregarOrdensIniciadas(container, filtros={}) {
                 }
 
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao);
+
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
@@ -307,9 +332,12 @@ function carregarOrdensInterrompidas(container, filtros={}) {
 
                 card.innerHTML = `
                 <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-danger text-white">
-                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
-                        <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
+                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                            <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
+                        </div>
+                        <span class="badge badge-pill badge-warning" id="contador-${ordem.ordem}" style="font-size: 0.65rem;">Carregando...</span>
                     </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
@@ -365,6 +393,9 @@ function carregarOrdensInterrompidas(container, filtros={}) {
                 }
 
                 container.appendChild(card); // Adiciona o card ao container
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao);
+
             });
         })
         .catch(error => {
