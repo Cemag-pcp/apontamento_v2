@@ -35,6 +35,9 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                             case 'interrompida':
                                 statusBadge = '<span class="badge rounded-pill bg-danger badge-small ms-2">Interrompida</span>';
                                 break;
+                            case 'agua_prox_proc':
+                                statusBadge = '<span class="badge rounded-pill bg-primary badge-small ms-2">Próximo processo</span>';
+                                break;
                             default:
                                 statusBadge = '<span class="badge rounded-pill bg-dark badge-small ms-2">Desconhecido</span>';
                         }
@@ -44,12 +47,19 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
 
                         if (ordem.status_atual === 'iniciada') {
                             botaoAcao = `
-                                <button class="btn btn-danger btn-sm btn-interromper me-2" title="Interromper">
+                                <button class="btn btn-danger btn-sm btn-interromper" title="Interromper">
                                     <i class="fa fa-stop"></i>
                                 </button>
                                 <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
                                     <i class="fa fa-check"></i>
                                 </button>
+                                <button class="btn btn-primary btn-sm btn-proximo-processo" title="Passar para o próximo processo">
+                                    <i class="fa fa-arrow-right"></i>
+                                </button>  
+                                <button class="btn btn-info btn-sm btn-finalizar-parcial" title="Finalizar parcial">
+                                    <i class="fa fa-hourglass-half"></i>
+                                </button>
+
                             `;
                         } else if (ordem.status_atual === 'aguardando_iniciar') {
                             botaoAcao = `
@@ -63,8 +73,14 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                     <i class="fa fa-redo"></i>
                                 </button>
                             `;
+                        } else if (ordem.status_atual === 'agua_prox_proc') {
+                            botaoAcao = `
+                                <button class="btn btn-warning btn-sm btn-iniciar-proximo-processo" title="Iniciar próximo processo">
+                                    <i class="fa fa-play"></i>
+                                </button>
+                            `;
                         }
-
+                    
                         // Monta o card com os botões dinâmicos
                         card.innerHTML = `
                         <div class="card shadow-sm bg-light text-dark">
@@ -88,6 +104,9 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonInterromper = card.querySelector('.btn-interromper');
                         const buttonFinalizar = card.querySelector('.btn-finalizar');
                         const buttonRetornar = card.querySelector('.btn-retornar');
+                        const buttonProxProcesso = card.querySelector('.btn-iniciar-proximo-processo');
+                        const buttonMandarProxProcesso = card.querySelector('.btn-proximo-processo')
+                        const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
 
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
@@ -114,6 +133,27 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
                                 mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                            });
+                        }
+
+                        // Adiciona evento ao botão para iniciar proximo processo
+                        if (buttonProxProcesso) {
+                            buttonProxProcesso.addEventListener('click', () => {
+                                mostrarModalIniciarProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                            });
+                        }
+
+                        // Adiciona evento ao botão para enviar para proximo processo
+                        if (buttonMandarProxProcesso) {
+                            buttonMandarProxProcesso.addEventListener('click', () => {
+                                mostrarModalProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                            });
+                        }
+
+                        // Adiciona evento ao botão para enviar para proximo processo
+                        if (buttonFinalizarParcial) {
+                            buttonFinalizarParcial.addEventListener('click', () => {
+                                mostrarModalFinalizarParcial(ordem.ordem, ordem.grupo_maquina);
                             });
                         }
 
@@ -145,8 +185,8 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     });
 };
 
-function carregarOrdensIniciadas(container) {
-    fetch('api/ordens-iniciadas/?page=1&limit=10')
+function carregarOrdensIniciadas(container, filtros = {}) {
+    fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
             container.innerHTML = ''; // Limpa o container
@@ -158,41 +198,39 @@ function carregarOrdensIniciadas(container) {
                 // Defina os botões dinamicamente com base no status
                 let botaoAcao = '';
 
-                if (ordem.status_atual === 'iniciada') {
-                    botaoAcao = `
-                        <button class="btn btn-danger btn-sm btn-interromper me-2" title="Interromper">
-                            <i class="fa fa-stop"></i>
-                        </button>
-                        <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
-                            <i class="fa fa-check"></i>
-                        </button>
-                    `;
-                } else if (ordem.status_atual === 'aguardando_iniciar') {
-                    botaoAcao = `
-                        <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
-                            <i class="fa fa-play"></i>
-                        </button>
-                    `;
-                } else if (ordem.status_atual === 'interrompida') {
-                    botaoAcao = `
-                        <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
-                            <i class="fa fa-redo"></i>
-                        </button>
-                    `;
-                }
+                botaoAcao = `
+                    <button class="btn btn-danger btn-sm btn-interromper" title="Interromper">
+                        <i class="fa fa-stop"></i>
+                    </button>
+                    <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
+                        <i class="fa fa-check"></i>
+                    </button>
+                    <button class="btn btn-primary btn-sm btn-proximo-processo" title="Passar para o próximo processo">
+                        <i class="fa fa-arrow-right"></i>
+                    </button>      
+                    <button class="btn btn-info btn-sm btn-finalizar-parcial" title="Finalizar parcial">
+                        <i class="fa fa-hourglass-half"></i>
+                    </button>
+                `;
+
+                // Calcula informações consolidadas das peças
+                const totalQtdBoa = ordem.pecas.reduce((acc, peca) => acc + (peca.qtd_boa || 0), 0);
+                const totalQtdPlanejada = ordem.pecas.reduce((acc, peca) => acc + (peca.qtd_planejada || 0), 0);
+                const pecaInfo = ordem.pecas[0]; // Assume que deseja exibir apenas a primeira peça para detalhes
 
                 card.innerHTML = `
                 <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
                     <div class="card-header bg-primary text-white">
                         <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                        <small class="text-white">Planejada: ${totalQtdPlanejada || 0} Realizada: ${totalQtdBoa}</small>
                     </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
                             <strong>Observação:</strong> ${ordem.obs || 'Sem observações'}
                         </p>
                         <p class="card-text mb-0 small">
-                            <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca.codigo}" target="_blank" rel="noopener noreferrer">
-                                ${ordem.peca.codigo} - ${ordem.peca.descricao}
+                            <a href="https://drive.google.com/drive/u/0/search?q=${pecaInfo.codigo}" target="_blank" rel="noopener noreferrer">
+                                ${pecaInfo.codigo} - ${pecaInfo.descricao}
                             </a>
                         </p>
                     </div>
@@ -206,6 +244,8 @@ function carregarOrdensIniciadas(container) {
 
                 const buttonInterromper = card.querySelector('.btn-interromper');
                 const buttonFinalizar = card.querySelector('.btn-finalizar');
+                const buttonProxProcesso = card.querySelector('.btn-proximo-processo');
+                const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
 
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
@@ -221,15 +261,27 @@ function carregarOrdensIniciadas(container) {
                     });
                 }
 
+                if (buttonProxProcesso) {
+                    buttonProxProcesso.addEventListener('click', () => {
+                        mostrarModalProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                    });
+                }
+
+                if (buttonFinalizarParcial) {
+                    buttonFinalizarParcial.addEventListener('click', () => {
+                        mostrarModalFinalizarParcial(ordem.ordem, ordem.grupo_maquina);
+                    });
+                }
+
                 container.appendChild(card);
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
 }
 
-function carregarOrdensInterrompidas(container) {
+function carregarOrdensInterrompidas(container, filtros = {}) {
     // Fetch para buscar ordens interrompidas
-    fetch('api/ordens-interrompidas/?page=1&limit=10')
+    fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar as ordens interrompidas.');
@@ -238,6 +290,7 @@ function carregarOrdensInterrompidas(container) {
         })
         .then(data => {
             container.innerHTML = ''; // Limpa o container
+            console.log(data);
             data.ordens.forEach(ordem => {
                 // Cria o card
                 const card = document.createElement('div');
@@ -252,7 +305,7 @@ function carregarOrdensInterrompidas(container) {
             
                 // Botões de ação
                 const botaoAcao = `
-                    <button class="btn btn-warning btn-sm btn-retornar me-2" title="Retornar">
+                    <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
                         <i class="fa fa-undo"></i>
                     </button>
                 `;
@@ -262,7 +315,7 @@ function carregarOrdensInterrompidas(container) {
                     <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
                         <div class="card-header bg-danger text-white">
                             <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
-                            <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
+                            <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small> 
                         </div>
                         <div class="card-body bg-light">
                             <p class="card-text mb-2 small">
@@ -297,6 +350,67 @@ function carregarOrdensInterrompidas(container) {
         });
 }
 
+function carregarOrdensAgProProcesso(container, filtros = {}) {
+    fetch(`api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+        .then(response => response.json())
+        .then(data => {
+            container.innerHTML = ''; // Limpa o container
+            data.ordens.forEach(ordem => {
+
+                const card = document.createElement('div');
+                card.dataset.ordemId = ordem.ordem;
+
+                // Defina os botões dinamicamente com base no status
+                let botaoAcao = '';
+
+                botaoAcao = `
+                    <button class="btn btn-warning btn-sm btn-iniciar-proximo-processo" title="Iniciar próximo processo">
+                        <i class="fa fa-play"></i>
+                    </button>
+                `;
+
+                card.innerHTML = `
+                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
+                    <div class="card-header bg-warning text-white">
+                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                        <small class="text-white">
+                            Planejada: ${ordem.totais.qtd_planejada || 0} 
+                            Realizada: ${ordem.totais.qtd_boa || 0} 
+                        </small>
+                    </div>
+                    <div class="card-body bg-light">
+                        <p class="card-text mb-2 small">
+                            <strong>Observação:</strong> ${ordem.obs || 'Sem observações'}
+                        </p>
+                        <p class="card-text mb-0 small">
+                            <a href="https://drive.google.com/drive/u/0/search?q=${ordem.pecas[0].codigo}" target="_blank" rel="noopener noreferrer">
+                                ${ordem.pecas[0].codigo} - ${ordem.pecas[0].descricao}
+                            </a>
+                        </p>
+                    </div>
+
+                    <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
+                        <div class="d-flex gap-2">
+                            ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
+                        </div>
+                    </div>
+                </div>`;
+
+                const buttonProxProcesso = card.querySelector('.btn-iniciar-proximo-processo');
+
+                // Adiciona evento ao botão para iniciar proximo processo
+                if (buttonProxProcesso) {
+                    buttonProxProcesso.addEventListener('click', () => {
+                        mostrarModalIniciarProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                    });
+                }
+
+                container.appendChild(card);
+            });
+        })
+        .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
+}
+
 function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
@@ -312,8 +426,12 @@ function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
         case 'finalizada':
             mostrarModalFinalizar(ordemId, grupoMaquina);
             break;
+        case 'agua_prox_proc':
+            mostrarModalIniciarProxProcesso(ordemId, grupoMaquina);
+            break;
+
         default:
-            alert('Status desconhecido.');
+        alert('Status desconhecido.');
     }
 }
 
@@ -429,6 +547,8 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
         console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
     }
 
+    
+
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formIniciarOrdemCorte');
     const clonedForm = formIniciar.cloneNode(true);
@@ -499,6 +619,392 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
     });
 }
 
+// Modal para "Parcial"
+function mostrarModalFinalizarParcial(ordemId, grupoMaquina) {
+    const modal = new bootstrap.Modal(document.getElementById('modalFinalizarParcial'));
+    const modalTitle = document.getElementById('modalFinalizarParcialLabel');
+    const formFinalizar = document.getElementById('formFinalizarParcial');
+
+    // Remove event listeners antigos para evitar duplicidade
+    const clonedForm = formFinalizar.cloneNode(true);
+    formFinalizar.parentNode.replaceChild(clonedForm, formFinalizar);
+
+    // Configura título do modal
+    modalTitle.innerHTML = `Finalizar Ordem ${ordemId}`;
+    document.getElementById('bodyPecasFinalizarParcial').innerHTML = '<p class="text-center text-muted">Carregando informações...</p>';
+
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações da ordem...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // Fetch para buscar informações da ordem
+    fetch(`api/ordens-criadas/${ordemId}/${grupoMaquina.toLowerCase()}/pecas/`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao buscar informações da API');
+            }
+            return response.json();
+        })
+        .then(data => {
+            Swal.close(); // Fecha o SweetAlert de carregamento
+            document.getElementById('bodyPecasFinalizarParcial').innerHTML = `
+            <div class="row mb-3">
+                <div class="col-sm-6">
+                    <label for="qtRealizada">Qt. peças boas</label>
+                    <input type="number" id="qtRealizada" name="qtRealizada" min=1 class="form-control" required>
+                </div>    
+                <div class="col-sm-6">
+                    <label for="qtMortas">Qt. mortas</label>
+                    <input type="number" id="qtMortas" name="qtMortas" min=0 class="form-control">
+                </div>    
+            </div> 
+            `;
+
+            // Exibe o modal
+            modal.show();
+
+            // Adiciona o evento de submissão no formulário clonado
+            clonedForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+
+                // Validação do formulário
+                if (!clonedForm.checkValidity()) {
+                    clonedForm.reportValidity(); // Exibe mensagens de erro padrão
+                    return;
+                }
+
+                Swal.fire({
+                    title: 'Finalizando...',
+                    text: 'Por favor, aguarde...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                const qtRealizada = document.getElementById('qtRealizada').value;
+                const qtMortas = document.getElementById('qtMortas').value || 0;
+                const operadorFinal = document.getElementById('operadorFinalizarParcial').value;
+
+                // Faz o fetch para finalizar a ordem
+                fetch(`api/ordens/atualizar-status/`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        ordem_id: ordemId,
+                        grupo_maquina: grupoMaquina,
+                        status: 'finalizada_parcial',
+                        qt_realizada: qtRealizada,
+                        qt_mortas: qtMortas,
+                        operador_final: operadorFinal,
+                    }),
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                })
+                .then(async (response) => {
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Erro ao finalizar a ordem.');
+                    }
+                    return data;
+                })
+                .then(() => {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso',
+                        text: 'Ordem finalizada com sucesso.',
+                    });
+
+                    // Atualiza a interface
+                    const containerIniciado = document.querySelector('.containerProcesso');
+                    carregarOrdensIniciadas(containerIniciado);
+
+                    // Atualiza a interface
+                    const containerInterrompido = document.querySelector('.containerInterrompido');
+                    carregarOrdensInterrompidas(containerInterrompido);
+
+                    // Recarrega os dados chamando a função de carregamento
+                    document.getElementById('ordens-container').innerHTML = '';
+                    resetarCardsInicial();
+
+                    modal.hide();
+                })
+                .catch((error) => {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: error.message,
+                    });
+                });
+            });
+        })
+        .catch(error => {
+            Swal.close(); // Fecha o SweetAlert de carregamento
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Erro ao buscar as informações da ordem.',
+            });
+        });
+}
+
+// Modal para mandar para mandar para "Proximo processo"
+function mostrarModalProxProcesso(ordemId, grupoMaquina) {
+    const modal = new bootstrap.Modal(document.getElementById('modalProxProcesso'));
+    const modalTitle = document.getElementById('modalProxProcessoLabel');
+    const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
+
+    const colQtdProxProcesso = document.getElementById('colQtdProxProcesso');
+
+    colQtdProxProcesso.style.display = 'block';
+    
+    const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
+    const qtdProxProcesso = document.getElementById('qtdProxProcesso');
+    qtdProxProcesso.required = true;
+    
+    // Limpa opções antigas no select
+    escolhaMaquina.innerHTML = `<option value="">------</option>`;
+
+    // Define as máquinas para cada grupo
+    const maquinasPorGrupo = {
+        usinagem: [
+            { value: 'furar', label: 'Furar'},
+            { value: 'centro_de_usinagem', label: 'Centro de usinagem' },
+            { value: 'tornear', label: 'Tornear' },
+            { value: 'chanfrar', label: 'Chanfrar' },
+        ]
+    };
+
+    // Preenche o select com base no grupo de máquinas
+    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
+        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
+            const option = document.createElement('option');
+            option.value = maquina.value;
+            option.textContent = maquina.label;
+            escolhaMaquina.appendChild(option);
+        });
+    } else {
+        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
+    }
+
+    modalTitle.innerHTML = `Próximo processo para a ordem: ${ordemId}`;
+    labelModalMaquinaProxProcesso.innerHTML = 'Escolha o próximo processo'
+    modal.show();
+    
+    // Remove listeners antigos e adiciona novo no formulário
+    const formIniciar = document.getElementById('formProxProcesso');
+    const clonedForm = formIniciar.cloneNode(true);
+    formIniciar.parentNode.replaceChild(clonedForm, formIniciar);
+
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(clonedForm);
+        const maquinaName = formData.get('escolhaMaquinaProxProcesso');
+        const qtdProxProcesso = formData.get('qtdProxProcesso');
+
+        // Exibe SweetAlert de carregamento
+        Swal.fire({
+            title: 'Mudando processo...',
+            text: 'Por favor, aguarde.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            },
+        });
+
+        fetch(`api/ordens/atualizar-status/`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                ordem_id: ordemId,
+                grupo_maquina: grupoMaquina,
+                status: 'agua_prox_proc',
+                maquina_nome: maquinaName,
+                qtd_prox_processo: qtdProxProcesso,
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken(), // Inclui o CSRF Token no cabeçalho
+            },
+        })
+            .then(async (response) => {
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao iniciar a ordem.');
+                }
+
+                return data; // Retorna os dados para o próximo `.then`
+            })
+            .then(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: 'Processo alterado com sucesso.',
+                });
+
+                modal.hide();
+
+                // Atualiza a interface
+                const containerIniciado = document.querySelector('.containerProcesso');
+                carregarOrdensIniciadas(containerIniciado);
+
+                // Atualiza a interface
+                const containerProxProcesso = document.querySelector('.containerProxProcesso')
+                carregarOrdensAgProProcesso(containerProxProcesso);
+            
+                // Recarrega os dados chamando a função de carregamento
+                document.getElementById('ordens-container').innerHTML = '';
+                resetarCardsInicial();
+            })
+            .catch((error) => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message,
+                });
+            });
+    });
+}
+
+// Modal para para "Iniciar próximo processo"
+function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
+    const modal = new bootstrap.Modal(document.getElementById('modalProxProcesso'));
+    const modalTitle = document.getElementById('modalProxProcessoLabel');
+    const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
+
+    const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
+    const qtdProxProcesso = document.getElementById('qtdProxProcesso');
+    const colQtdProxProcesso = document.getElementById('colQtdProxProcesso');
+
+    colQtdProxProcesso.style.display = 'none';
+    qtdProxProcesso.required = false;
+
+    // Limpa opções antigas no select
+    escolhaMaquina.innerHTML = `<option value="">------</option>`;
+
+    // Define as máquinas para cada grupo
+    const maquinasPorGrupo = {
+        usinagem: [
+            { value: 'furadeira_1', label: 'Furadeira 1'},
+            { value: 'furadeira_2', label: 'Furadeira 2'},
+            { value: 'furadeira_3', label: 'Furadeira 3'},
+            { value: 'furadeira_4', label: 'Furadeira 4'},
+            { value: 'furadeira_5', label: 'Furadeira 5'},
+            { value: 'furadeira_6', label: 'Furadeira 6'},
+            { value: 'furadeira_7', label: 'Furadeira 7'},
+            { value: 'centro_de_usinagem', label: 'Centro de usinagem' },
+            { value: 'torno_1', label: 'Torno 1' },
+            { value: 'torno_2', label: 'Torno 2' },
+            { value: 'chanfradeira', label: 'Chanfradeira' },
+        ]
+    };
+
+    // Preenche o select com base no grupo de máquinas
+    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
+        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
+            const option = document.createElement('option');
+            option.value = maquina.value;
+            option.textContent = maquina.label;
+            escolhaMaquina.appendChild(option);
+        });
+    } else {
+        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
+    }
+
+    modalTitle.innerHTML = `Iniciar próximo processo para a ordem: ${ordemId}`;
+    labelModalMaquinaProxProcesso.innerHTML = 'Em qual máquina será iniciado?'
+    modal.show();
+    
+    // Remove listeners antigos e adiciona novo no formulário
+    const formIniciar = document.getElementById('formProxProcesso');
+    const clonedForm = formIniciar.cloneNode(true);
+    formIniciar.parentNode.replaceChild(clonedForm, formIniciar);
+
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(clonedForm);
+        const maquinaName = formData.get('escolhaMaquinaProxProcesso');
+
+        // Exibe SweetAlert de carregamento
+        Swal.fire({
+            title: 'Mudando processo...',
+            text: 'Por favor, aguarde.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            },
+        });
+
+        fetch(`api/ordens/atualizar-status/`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                ordem_id: ordemId,
+                grupo_maquina: grupoMaquina,
+                status: 'iniciada',
+                maquina_nome: maquinaName,
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken(), // Inclui o CSRF Token no cabeçalho
+            },
+        })
+            .then(async (response) => {
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao iniciar a ordem.');
+                }
+
+                return data; // Retorna os dados para o próximo `.then`
+            })
+            .then(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: 'Processo alterado com sucesso.',
+                });
+
+                modal.hide();
+
+                // Atualiza a interface
+                const containerIniciado = document.querySelector('.containerProcesso');
+                carregarOrdensIniciadas(containerIniciado);
+
+                // Atualiza a interface
+                const containerProxProcesso = document.querySelector('.containerProxProcesso')
+                carregarOrdensAgProProcesso(containerProxProcesso);
+
+                // Recarrega os dados chamando a função de carregamento
+                document.getElementById('ordens-container').innerHTML = '';
+                resetarCardsInicial();
+
+                colQtdProxProcesso.style.display = 'block';
+                qtdProxProcesso.required = true;
+            
+            })
+            .catch((error) => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message,
+                });
+
+                colQtdProxProcesso.style.display = 'block';
+                qtdProxProcesso.required = true;
+
+            });
+    });
+}
+
+// Modal para "Finalizar"
 function mostrarModalFinalizar(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     const modalTitle = document.getElementById('modalFinalizarLabel');
@@ -851,6 +1357,19 @@ function filtro() {
 
         // Recarrega os resultados com os novos filtros
         resetarCardsInicial(filtros);
+
+        // Filtrar ordens em andamento
+        const containerIniciado = document.querySelector('.containerProcesso');
+        carregarOrdensIniciadas(containerIniciado, filtros);
+
+        // Filtrar ordens interrompidas
+        const containerInterrompido = document.querySelector('.containerInterrompido');
+        carregarOrdensInterrompidas(containerInterrompido, filtros);
+
+        // Filtrar ordens aguardando prox processo
+        const containerProxProcesso = document.querySelector('.containerProxProcesso');
+        carregarOrdensAgProProcesso(containerProxProcesso, filtros);
+
     });
 }
 
@@ -895,6 +1414,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const containerInterrompido = document.querySelector('.containerInterrompido');
     carregarOrdensInterrompidas(containerInterrompido);
+
+    const containerProxProcesso = document.querySelector('.containerProxProcesso')
+    carregarOrdensAgProProcesso(containerProxProcesso);
 
     filtro();
 

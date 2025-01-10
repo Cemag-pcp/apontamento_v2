@@ -2,19 +2,11 @@ from .base import *
 
 # Configurações específicas de desenvolvimento
 DEBUG = env.bool('DEBUG', default=True)
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost','80ca-177-19-132-134.ngrok-free.app']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost','af3b-177-19-132-134.ngrok-free.app']
 CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
     'http://127.0.0.1',
 ]
-
-# Banco de dados para desenvolvimento
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
 
 DATABASES = {
     'default': {

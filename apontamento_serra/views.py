@@ -651,3 +651,6 @@ def api_apontamentos_mp(request):
         )
     )
     return JsonResponse(list(propriedades_ordens), safe=False)
+
+# def definir_proximo_processo(request):
+

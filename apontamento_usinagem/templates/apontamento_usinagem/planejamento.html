@@ -10,7 +10,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div>
 
     <!-- Título Principal -->
     <div class="text-center mb-5">
@@ -45,6 +45,7 @@
                         <option value="iniciada">Iniciada</option>
                         <option value="interrompida">Interrompida</option>
                         <option value="finalizada">Finalizada</option>
+                        <option value="agua_prox_proc">Próximo processo</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -55,7 +56,7 @@
 
         <div class="border rounded p-4 bg-light">
             <!-- Container de Ordens -->
-            <div style="max-height: 650px; overflow-y: auto; overflow-x: hidden;">
+            <div style="max-height: 650px; min-height: 250px; overflow-y: auto; overflow-x: hidden;">
                 <div id="ordens-container" class="row g-4">
                     <!-- Os cards serão adicionados dinamicamente aqui -->
                 </div>
@@ -67,18 +68,26 @@
     <!-- Container para Acompanhamento -->
     <div class="mb-5">
         <div class="row gy-4">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <h4 class="text-center text-secondary">Processos em Andamento</h4>
                 <div class="border rounded p-3 bg-light">
-                    <div class="row row-cols-2 g-3 containerProcesso">
+                    <div class="row row-cols-2 g-3 containerProcesso" style="max-height: 400px; overflow-y: auto;">
                         <!-- Os cards são adicionados aqui dinamicamente -->
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <h4 class="text-center text-secondary">Processos Interrompidos</h4>
                 <div class="border rounded p-3 bg-light">
-                    <div class="row row-cols-2 g-3 containerInterrompido">
+                    <div class="row row-cols-2 g-3 containerInterrompido" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Os cards são adicionados aqui dinamicamente -->
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h4 class="text-center text-secondary">Próximo processo</h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="row row-cols-2 g-3 containerProxProcesso" style="max-height: 400px; overflow-y: auto;">
                         <!-- Os cards são adicionados aqui dinamicamente -->
                     </div>
                 </div>
@@ -89,7 +98,7 @@
 </div>
 
 <!-- Modal Criar OP Usinagem -->
-<div class="modal fade" id="modalUsinagem" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalUsinagemLabel" aria-hidden="true">
+<div class="modal fade" id="modalUsinagem" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalUsinagemLabel">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -139,7 +148,7 @@
 </div>
 
 <!-- Modal para exibir as peças -->
-<div class="modal fade" id="modalPecas" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPecasLabel" aria-hidden="true">
+<div class="modal fade" id="modalPecas" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPecasLabel">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -156,7 +165,7 @@
 </div>
 
 <!-- Modal iniciar ordem -->
-<div class="modal fade" id="modalIniciar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalIniciarLabel" aria-hidden="true">
+<div class="modal fade" id="modalIniciar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalIniciarLabel">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -185,8 +194,44 @@
     </div>
 </div>
 
+<!-- Modal proximo processo -->
+<div class="modal fade" id="modalProxProcesso" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalProxProcessoLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalProxProcessoLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formProxProcesso">
+                    <div class="row mb-3">
+                        <input type="hidden" id="grupoMaquina">
+                        <div class="col-sm-6">
+                            <label id="labelModalMaquinaProxProcesso" for="escolhaMaquinaProxProcesso" class="form-label"></label>
+                            <select class="form-control" id="escolhaMaquinaProxProcesso" name="escolhaMaquinaProxProcesso" required>
+                                <!-- Opções serão preenchidas dinamicamente pelo JavaScript -->
+                            </select>
+                        </div>
+
+                        <div id="colQtdProxProcesso" class="col-sm-6">
+                            <label for="qtdProxProcesso" class="form-label">Quantidade</label>
+                            <input class="form-control" type="number" id="qtdProxProcesso" name="qtdProxProcesso" required>
+                        </div>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal interromper ordem -->
-<div class="modal fade" id="modalInterromper" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInterromperLabel" aria-hidden="true">
+<div class="modal fade" id="modalInterromper" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInterromperLabel">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -217,7 +262,7 @@
 </div>
 
 <!-- Modal finalizar ordem -->
-<div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
+<div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarLabel">
     <div class="modal-dialog modal-md">
         <div class="modal-content">
             <div class="modal-header">
@@ -257,8 +302,45 @@
     </div>
 </div>
 
+<!-- Modal finalizar ordem -->
+<div class="modal fade" id="modalFinalizarParcial" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarParcialLabel">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalFinalizarParcialLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formFinalizarParcial">
+                    
+                    <div id="bodyPecasFinalizarParcial">
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <h6 class="text-center mt-3">Operador</h6>
+                            <select class="form-control" name="operadorFinalizarParcial" id="operadorFinalizarParcial" required>
+                                <option value="">---------</option>
+                                {% for operador in operadores %}
+                                <option value="{{ operador.id }}">{{ operador.matricula }} - {{ operador.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>   
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Finalizar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal retornar ordem -->
-<div class="modal fade" id="modalRetornar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalRetornarLabel" aria-hidden="true">
+<div class="modal fade" id="modalRetornar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalRetornarLabel">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header">

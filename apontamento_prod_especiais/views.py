@@ -11,7 +11,7 @@ from django.db.models import Q,Prefetch
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso
-from cadastro.models import MotivoInterrupcao, Conjuntos, Operador
+from cadastro.models import MotivoInterrupcao, Conjuntos, Operador, Setor, Pecas
 
 import pandas as pd
 import os
@@ -292,15 +292,23 @@ def get_ordens_interrompidas(request):
 
 def get_pecas(request):
     """
-    Retorna uma lista paginada de peças, com suporte a busca por código ou descrição.
+    Retorna uma lista paginada de peças do setor `prod_esp`, com suporte a busca por código ou descrição.
     """
     # Obtém os parâmetros da requisição
     search = request.GET.get('search', '').strip()  # Termo de busca
     page = int(request.GET.get('page', 1))  # Página atual (padrão é 1)
     per_page = int(request.GET.get('per_page', 10))  # Itens por página (padrão é 10)
 
-    # Filtra as peças com base no termo de busca (opcional)
-    pecas_query = Conjuntos.objects.all()
+    # Busca o setor `prod_esp`
+    try:
+        setor_prod_esp = Setor.objects.get(nome='prod_esp')
+    except Setor.DoesNotExist:
+        return JsonResponse({'results': [], 'pagination': {'more': False}})
+
+    # Filtra as peças que pertencem ao setor `prod_esp`
+    pecas_query = Pecas.objects.filter(setor=setor_prod_esp)
+
+    # Aplica o filtro de busca, se fornecido
     if search:
         pecas_query = pecas_query.filter(
             Q(codigo__icontains=search) | Q(descricao__icontains=search)
@@ -343,4 +351,3 @@ def planejar_ordem_prod_esp(request):
         return JsonResponse({
             'message': 'Status atualizado com sucesso.',
         })
-

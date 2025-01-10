@@ -8,33 +8,38 @@ STATUS_ANDAMENTO_CHOICES = (
     ('aguardando_iniciar', 'Aguardando iniciar'),
     ('iniciada', 'Iniciada'),
     ('finalizada','Finalizada'),
-    ('interrompida', 'Interrompida')
+    ('interrompida', 'Interrompida'),
+    ('agua_prox_proc','Aguardando prox processo')
+)
+
+MAQUINA_CHOICES = (
+    ('laser_1', 'Laser 1'),
+    ('laser_2', 'Laser 2 (JFY)'),
+    ('plasma_1', 'Plasma 1'),
+    ('plasma_2', 'Plasma 2'),
+    ('prensa', 'Prensa'),
+    ('furadeira_1', 'Furadeira 1'),
+    ('furadeira_2', 'Furadeira 2'),
+    ('furadeira_3', 'Furadeira 3'),
+    ('furadeira_4', 'Furadeira 4'),
+    ('furadeira_5', 'Furadeira 5'),
+    ('furadeira_6', 'Furadeira 6'),
+    ('furadeira_7', 'Furadeira 7'),
+    ('centro_de_usinagem', 'Centro de usinagem'),
+    ('serra_1','Serra 1'),
+    ('serra_2','Serra 2'),
+    ('serra_3','Serra 3'),
+    ('torno_1', 'Torno 1'),
+    ('torno_2', 'Torno 2'),
+    ('chanfradeira', 'Chanfradeira'),
+    ('maq_solda', 'Máquina de solda'),
+    ('furar', 'Furar'),
+    ('chanfrar','Chanfrar'),
+    ('tornear',' Tornear'),
+    
 )
 
 class Ordem(models.Model):
-
-    MAQUINA_CHOICES = (
-        ('laser_1', 'Laser 1'),
-        ('laser_2', 'Laser 2 (JFY)'),
-        ('plasma_1', 'Plasma 1'),
-        ('plasma_2', 'Plasma 2'),
-        ('prensa', 'Prensa'),
-        ('furadeira_1', 'Furadeira 1'),
-        ('furadeira_2', 'Furadeira 2'),
-        ('furadeira_3', 'Furadeira 3'),
-        ('furadeira_4', 'Furadeira 4'),
-        ('furadeira_5', 'Furadeira 5'),
-        ('furadeira_6', 'Furadeira 6'),
-        ('furadeira_7', 'Furadeira 7'),
-        ('centro_de_usinagem', 'Centro de usinagem'),
-        ('serra_1','Serra 1'),
-        ('serra_2','Serra 2'),
-        ('serra_3','Serra 3'),
-        ('torno_1', 'Torno 1'),
-        ('torno_2', 'Torno 2'),
-        ('chanfradeira', 'Chanfradeira'),
-        ('maq_solda', 'Máquina de solda'),
-    )
 
     GRUPO_MAQUINA_CHOICES = (
         ('laser_1', 'Laser 1'),
@@ -100,6 +105,7 @@ class OrdemProcesso(models.Model):
     data_inicio = models.DateTimeField(default=now)  # Armazena quando o status foi definido
     data_fim = models.DateTimeField(null=True, blank=True)  # Armazena quando o status foi finalizado
     motivo_interrupcao = models.ForeignKey(MotivoInterrupcao, on_delete=models.CASCADE, null=True, blank=True)
+    maquina = models.CharField(max_length=30, null=True, blank=True)
 
     def finalizar_atual(self):
         """
@@ -125,4 +131,5 @@ class OrdemProcesso(models.Model):
             data_inicio=now()
         )
         return novo_processo
+
 
