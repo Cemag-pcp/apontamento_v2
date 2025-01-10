@@ -6,7 +6,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
-from django.utils.timezone import now
+from django.utils.timezone import now,localtime
 from django.db.models import Q,Prefetch
 
 from .models import Ordem,PecasOrdem
@@ -101,7 +101,7 @@ def get_ordens_criadas(request):
             'id': ordem.pk,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
-            'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
+            'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'peca': {
@@ -482,7 +482,7 @@ def api_apontamentos_peca(request):
         Ordem.objects.filter(status_atual='finalizada', grupo_maquina='usinagem')
         .select_related('operador_final')  # Para otimizar a relação com operador_final
         .prefetch_related('ordem_pecas_usinagem__peca')  # Ajustado para usar o related_name correto
-        .order_by('ordem')
+        .order_by('ordem_pecas_usinagem__data')
     )
 
     # Constrói o resultado manualmente
@@ -500,6 +500,7 @@ def api_apontamentos_peca(request):
                 "maquina": ordem.get_maquina_display(),
                 "obs_operador": ordem.obs_operador,
                 "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
+                "data": localtime(apontamento.data).strftime('%d/%m/%Y %H:%M'),
             })
 
     return JsonResponse(resultado, safe=False)
