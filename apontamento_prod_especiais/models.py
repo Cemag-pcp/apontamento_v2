@@ -11,4 +11,6 @@ class PecasOrdem(models.Model):
     qtd_planejada=models.FloatField()
     qtd_morta=models.FloatField(default=0)
     qtd_boa=models.FloatField(default=0)
+    data = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+
 

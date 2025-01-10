@@ -241,7 +241,8 @@ def get_ordens_criadas(request):
             'pecas': [
                 {
                     'peca_id': peca_ordem.peca.id,
-                    'peca_nome': peca_ordem.peca.codigo + '-' + peca_ordem.peca.descricao if peca_ordem.peca.descricao else peca_ordem.peca.codigo + " - " + 'Sem descrição',
+                    'peca_codigo': peca_ordem.peca.codigo,
+                    'peca_nome': peca_ordem.peca.descricao if peca_ordem.peca.descricao else 'Sem descrição',
                     'quantidade': peca_ordem.qtd_planejada,
                     'qtd_morta': peca_ordem.qtd_morta
                 }
@@ -269,6 +270,18 @@ def get_ordens_iniciadas(request):
     # Paginação
     page = int(request.GET.get('page', 1))  # Obtém o número da página
     limit = int(request.GET.get('limit', 10))  # Define o limite padrão por página
+
+    filtro_ordem = request.GET.get('ordem', '').strip()
+    filtro_mp = request.GET.get('mp', '').strip()
+    filtro_peca = request.GET.get('peca', '').strip()
+
+    if filtro_ordem:
+        ordens_queryset = ordens_queryset.filter(ordem__icontains=filtro_ordem)
+    if filtro_mp:
+        ordens_queryset = ordens_queryset.filter(propriedade__mp_codigo__codigo=filtro_mp)
+    if filtro_peca:
+        ordens_queryset = ordens_queryset.filter(ordem_pecas_serra__peca__codigo=filtro_peca)
+
     paginator = Paginator(ordens_queryset, limit)  # Aplica a paginação
 
     try:
@@ -289,7 +302,8 @@ def get_ordens_iniciadas(request):
         pecas_data = [
             {
                 'peca_id': peca_ordem.peca.id,
-                'peca_nome': peca_ordem.peca.codigo + " - " + peca_ordem.peca.descricao if peca_ordem.peca.descricao else peca_ordem.peca.codigo + " - " + 'Sem descrição',
+                'peca_codigo': peca_ordem.peca.codigo,
+                'peca_nome': peca_ordem.peca.descricao if peca_ordem.peca.descricao else 'Sem descrição',
                 'quantidade': peca_ordem.qtd_planejada,
                 'qtd_morta': peca_ordem.qtd_morta
             }
@@ -329,6 +343,18 @@ def get_ordens_interrompidas(request):
     # Paginação (opcional)
     page = request.GET.get('page', 1)  # Obtém o número da página
     limit = request.GET.get('limit', 10)  # Define o limite padrão por página
+
+    filtro_ordem = request.GET.get('ordem', '').strip()
+    filtro_mp = request.GET.get('mp', '').strip()
+    filtro_peca = request.GET.get('peca', '').strip()
+
+    if filtro_ordem:
+        ordens_queryset = ordens_queryset.filter(ordem__icontains=filtro_ordem)
+    if filtro_mp:
+        ordens_queryset = ordens_queryset.filter(propriedade__mp_codigo__codigo=filtro_mp)
+    if filtro_peca:
+        ordens_queryset = ordens_queryset.filter(ordem_pecas_serra__peca__codigo=filtro_peca)
+
     paginator = Paginator(ordens_queryset, limit)  # Aplica a paginação
     ordens_page = paginator.get_page(page)  # Obtém a página atual
 
@@ -346,7 +372,8 @@ def get_ordens_interrompidas(request):
         for peca_ordem in ordem.ordem_pecas_serra.all():
             pecas_data.append({
                 'peca_id': peca_ordem.peca.id,
-                'peca_nome': peca_ordem.peca.codigo + " - " + peca_ordem.peca.descricao if peca_ordem.peca.descricao else peca_ordem.peca.codigo + " - " + 'Sem descrição',
+                'peca_codigo': peca_ordem.peca.codigo,
+                'peca_nome': peca_ordem.peca.descricao if peca_ordem.peca.descricao else 'Sem descrição',
                 'quantidade': peca_ordem.qtd_planejada,
                 'qtd_morta': peca_ordem.qtd_morta,
             })

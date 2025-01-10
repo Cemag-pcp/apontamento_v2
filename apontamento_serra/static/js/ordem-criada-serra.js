@@ -10,7 +10,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
             .then(data => {
                 const ordens = data.ordens;
                 if (ordens.length > 0) {
-
+                    console.log(ordens);
                     ordens.forEach(ordem => {
                         const card = document.createElement('div');
                         card.classList.add('col-md-4'); // Adiciona a classe de coluna
@@ -78,6 +78,22 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                     <li><strong>MP:</strong> ${ordem.propriedade?.descricao_mp || 'N/A'}</li>
                                     <li><strong>Quantidade:</strong> ${ordem.propriedade?.quantidade || 'N/A'}</li>
                                     <li><strong>Retalho:</strong> ${ordem.propriedade?.retalho || 'Não'}</li>
+                                    <li style="font-size: 0.75rem;">
+                                        <strong>Peças:</strong> 
+                                        ${ordem.pecas.map(peca => {
+                                            const descricao = peca.peca_nome || 'Sem descrição'; // Usa "Sem descrição" se a descrição estiver ausente
+                                            const descricaoTruncada = descricao.length > 10 
+                                                ? descricao.substring(0, 10) + '...' 
+                                                : descricao;
+                                            return `
+                                                <span title="${descricao}">
+                                                    <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
+                                                        ${peca.peca_codigo} - ${descricaoTruncada}
+                                                    </a>
+                                                </span>
+                                            `;
+                                        }).join(', ')}
+                                    </li>
                                 </ul>
                             </div>
                             <div class="card-footer text-end" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
@@ -158,8 +174,9 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     });
 };
 
-function carregarOrdensIniciadas(container) {
-    fetch('api/ordens-iniciadas/?page=1&limit=10')
+function carregarOrdensIniciadas(container, filtros={}) {
+    fetch(`api/ordens-iniciadas/?page=1&limit=10&ordem=${filtros.ordem || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
+
         .then(response => response.json())
         .then(data => {
             container.innerHTML = ''; // Limpa o container
@@ -206,6 +223,22 @@ function carregarOrdensIniciadas(container) {
                         <p class="card-text mb-0 small">
                             <strong>Descrição MP:</strong> ${ordem.propriedade?.descricao_mp || 'Sem descrição'}
                         </p>
+                        <p class="card-text mb-0 small" style="font-size: 0.75rem;">
+                            <strong>Peças:</strong> 
+                            ${ordem.pecas.map(peca => {
+                                const descricao = peca.peca_nome || 'Sem descrição'; // Usa "Sem descrição" se a descrição estiver ausente
+                                const descricaoTruncada = descricao.length > 10 
+                                    ? descricao.substring(0, 10) + '...' 
+                                    : descricao;
+                                return `
+                                    <span title="${descricao}">
+                                        <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
+                                            ${peca.peca_codigo} - ${descricaoTruncada}
+                                        </a>
+                                    </span>
+                                `;
+                            }).join(', ')}
+                        </p>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
                         <button class="btn btn-outline-primary btn-sm btn-ver-peca" title="Ver Peças">
@@ -248,9 +281,9 @@ function carregarOrdensIniciadas(container) {
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
 }
 
-function carregarOrdensInterrompidas(container) {
+function carregarOrdensInterrompidas(container, filtros={}) {
     // Fetch para buscar ordens interrompidas
-    fetch('api/ordens-interrompidas/?page=1&limit=10')
+    fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar as ordens interrompidas.');
@@ -284,6 +317,22 @@ function carregarOrdensInterrompidas(container) {
                         </p>
                         <p class="card-text mb-2 small">
                             <strong>Descrição MP:</strong> ${ordem.propriedade?.descricao_mp || 'Sem descrição'}
+                        </p>
+                        <p class="card-text mb-0 small" style="font-size: 0.75rem;">
+                            <strong>Peças:</strong> 
+                            ${ordem.pecas.map(peca => {
+                                const descricao = peca.peca_nome || 'Sem descrição'; // Usa "Sem descrição" se a descrição estiver ausente
+                                const descricaoTruncada = descricao.length > 10 
+                                    ? descricao.substring(0, 10) + '...' 
+                                    : descricao;
+                                return `
+                                    <span title="${descricao}">
+                                        <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
+                                            ${peca.peca_codigo} - ${descricaoTruncada}
+                                        </a>
+                                    </span>
+                                `;
+                            }).join(', ')}
                         </p>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
@@ -1177,6 +1226,15 @@ function filtro() {
 
         // Recarrega os resultados com os novos filtros
         resetarCardsInicial(filtros);
+
+        // Filtrar ordens em andamento
+        const containerIniciado = document.querySelector('.containerProcesso');
+        carregarOrdensIniciadas(containerIniciado, filtros);
+
+        // Filtrar ordens interrompidas
+        const containerInterrompido = document.querySelector('.containerInterrompido');
+        carregarOrdensInterrompidas(containerInterrompido, filtros);
+
     });
 }
 

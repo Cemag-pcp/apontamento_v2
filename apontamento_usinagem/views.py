@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now,localtime
-from django.db.models import Q,Prefetch
+from django.db.models import Q,Prefetch,Count
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso
@@ -478,30 +478,28 @@ def planejar_ordem_usinagem(request):
         })
 
 def api_apontamentos_peca(request):
-    ordens = (
-        Ordem.objects.filter(status_atual='finalizada', grupo_maquina='usinagem')
-        .select_related('operador_final')  # Para otimizar a relação com operador_final
-        .prefetch_related('ordem_pecas_usinagem__peca')  # Ajustado para usar o related_name correto
-        .order_by('ordem_pecas_usinagem__data')
+
+    pecas_ordenadas = (
+        PecasOrdem.objects.filter(operador__isnull=False, ordem__grupo_maquina='usinagem')
+        .select_related('ordem', 'peca', 'operador')  # Carrega os relacionamentos necessários
+        .order_by('-data')  # Ordena por data decrescente
     )
 
-    # Constrói o resultado manualmente
     resultado = []
-    for ordem in ordens:
-        for apontamento in ordem.ordem_pecas_usinagem.all():  # Use o related_name correto
-            resultado.append({
-                "ordem": ordem.ordem,
-                "codigo_peca": apontamento.peca.codigo,
-                "descricao_peca": apontamento.peca.descricao,
-                "qtd_boa": apontamento.qtd_boa,
-                "qtd_morta": apontamento.qtd_morta,
-                "qtd_planejada": apontamento.qtd_planejada,
-                "obs_plano": ordem.obs,
-                "maquina": ordem.get_maquina_display(),
-                "obs_operador": ordem.obs_operador,
-                "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
-                "data": localtime(apontamento.data).strftime('%d/%m/%Y %H:%M'),
-            })
+    for apontamento in pecas_ordenadas:
+        resultado.append({
+            "ordem": apontamento.ordem.ordem,
+            "codigo_peca": apontamento.peca.codigo,
+            "descricao_peca": apontamento.peca.descricao or "Sem descrição",
+            "qtd_boa": apontamento.qtd_boa,
+            "qtd_morta": apontamento.qtd_morta,
+            "qtd_planejada": apontamento.qtd_planejada,
+            "obs_plano": apontamento.ordem.obs or "Sem observações",
+            "maquina": apontamento.ordem.get_maquina_display(),
+            "obs_operador": apontamento.ordem.obs_operador or "Sem observações",
+            "operador": f"{apontamento.operador.matricula} - {apontamento.operador.nome}",
+            "data": localtime(apontamento.data).strftime('%d/%m/%Y %H:%M'),
+        })
 
     return JsonResponse(resultado, safe=False)
 
