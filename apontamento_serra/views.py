@@ -632,6 +632,7 @@ def api_apontamentos_peca(request):
         Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra')
         .select_related('operador_final')  # Para otimizar a relação com operador_final
         .prefetch_related('ordem_pecas_serra__peca')  # Ajustado para usar o related_name correto
+        .distinct()  # Evitar duplicatas
         .order_by('ordem_pecas_serra__data')
     )
 
