@@ -670,8 +670,8 @@ def api_apontamentos_mp(request):
                 F('nova_mp__codigo'),
                 Value(' - '),
                 F('nova_mp__descricao')
-            )
-        
+            ),
+            data_formatada=F('ordem__ordem_pecas_serra__data')  # Adiciona o campo bruto para ser formatado posteriormente
         )
         .distinct()
         .values(
@@ -680,9 +680,19 @@ def api_apontamentos_mp(request):
             'quantidade',  # Campo `quantidade` da tabela `PropriedadesOrdem`
             'descricao_original',  # Concatenação do código e descrição original
             'descricao_nova',  # Concatenação do código e descrição da nova matéria-prima
-            localtime('ordem__ordem_pecas_serra__data').strftime('%d/%m/%Y %H:%M')
+            'data_formatada',  # Inclui o campo data sem formatação para ser processado
         )
     )
+
+    # Formata o campo `data_formatada` para o formato desejado
+    propriedades_ordens = [
+        {
+            **item,
+            'data_formatada': localtime(item['data_formatada']).strftime('%d/%m/%Y %H:%M')
+        }
+        for item in propriedades_ordens
+    ]
+
     return JsonResponse(list(propriedades_ordens), safe=False)
 
 # def definir_proximo_processo(request):
