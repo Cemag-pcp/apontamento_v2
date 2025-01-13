@@ -659,7 +659,7 @@ def api_apontamentos_mp(request):
     propriedades_ordens = (
         PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra')
         .select_related('ordem', 'mp_codigo', 'nova_mp')  # Otimiza consultas relacionadas
-        .order_by('ordem__ordem')  # Ordena pelo campo `ordem` da tabela `Ordem`
+        .order_by('ordem__ordem_pecas_serra__data')  # Ordena pelo campo `ordem` da tabela `Ordem`
         .annotate(
             descricao_original=Concat(  # Concatena código e descrição originais
                 F('mp_codigo__codigo'),
@@ -671,13 +671,16 @@ def api_apontamentos_mp(request):
                 Value(' - '),
                 F('nova_mp__descricao')
             )
+        
         )
+        .distinct()
         .values(
             'ordem__ordem',  # Campo `ordem` da tabela `Ordem`
             'tamanho',  # Campo `tamanho` da tabela `PropriedadesOrdem`
             'quantidade',  # Campo `quantidade` da tabela `PropriedadesOrdem`
             'descricao_original',  # Concatenação do código e descrição original
             'descricao_nova',  # Concatenação do código e descrição da nova matéria-prima
+            'ordem__ordem_pecas_serra__data'
         )
     )
     return JsonResponse(list(propriedades_ordens), safe=False)
