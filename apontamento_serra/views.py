@@ -650,7 +650,7 @@ def api_apontamentos_peca(request):
                 "maquina": ordem.get_maquina_display(),
                 "obs_operador": ordem.obs_operador,
                 "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
-                "data_final": apontamento.data
+                "data_final": localtime(apontamento.data).strftime('%d/%m/%Y %H:%M')
             })
 
     return JsonResponse(resultado, safe=False)
@@ -680,7 +680,7 @@ def api_apontamentos_mp(request):
             'quantidade',  # Campo `quantidade` da tabela `PropriedadesOrdem`
             'descricao_original',  # Concatenação do código e descrição original
             'descricao_nova',  # Concatenação do código e descrição da nova matéria-prima
-            'ordem__ordem_pecas_serra__data'
+            localtime('ordem__ordem_pecas_serra__data').strftime('%d/%m/%Y %H:%M')
         )
     )
     return JsonResponse(list(propriedades_ordens), safe=False)
