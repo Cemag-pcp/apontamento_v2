@@ -1013,6 +1013,42 @@ function carregarPecasDuplicar() {
         .catch(error => console.error('Erro ao carregar peças:', error));
 }
 
+function filtro() {
+    const form = document.getElementById('formFiltrarOrdem');
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault(); // Evita comportamento padrão do formulário
+
+        // Captura os valores atualizados dos filtros
+        const filtroPecas= document.getElementById('filtroPecas')
+        const filtroMaquina= document.getElementById('filtroMaquina').value
+
+        const pecasSelecionadas = Array.from(filtroPecas.selectedOptions).map((opt) => opt.value);
+
+        fetch(`api/duplicador-ordem/filtrar/?pecas=${pecasSelecionadas.join(",")}&maquina=${filtroMaquina}`)
+        .then((response) => response.json())
+        .then((data) => {
+
+            resultadoFiltro.innerHTML = "";
+            data.ordens.forEach((ordem) => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${ordem.id}</td>
+                    <td>${ordem.peca}</td>
+                    <td>${ordem.quantidade}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm btn-duplicar" data-id="${ordem.id}">Duplicar</button>
+                    </td>
+                `;
+                resultadoFiltro.appendChild(row);
+            });
+        })
+        .catch((error) => console.error("Erro ao filtrar ordens:", error));
+
+
+    });
+}
+
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -1023,5 +1059,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const containerInterrompido = document.querySelector('.containerInterrompido');
     carregarOrdensInterrompidas(containerInterrompido);
+
+    filtro();
 
 });

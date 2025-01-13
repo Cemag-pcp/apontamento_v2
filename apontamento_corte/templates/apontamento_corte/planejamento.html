@@ -346,41 +346,60 @@
 </div>
 
 <!-- Modal Duplicar OP -->
+<!-- Modal Duplicar OP -->
 <div class="modal fade" id="modalDuplicar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalDuplicarLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalDuplicarLabel">Duplicar OP</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="formDuplicarOP">
-                    <div class="mb-3">
-                        <label for="filtroPecas" class="form-label">Peças</label>
-                        <select id="filtroPecas" class="form-select" multiple>
-                            <!-- As opções serão carregadas dinamicamente -->
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="filtroMaquina" class="form-label">Máquina</label>
-                        <select id="filtroMaquina" class="form-select">
-                            <option value="">Selecione uma máquina</option>
-                            <option value="laser_1">Laser 1</option>
-                            <option value="laser_2">Laser 2 (JFY)</option>
-                            <option value="plasma_1">Plasma 1</option>
-                            <option value="plasma_2">Plasma 2</option>
-                            <option value="prensa">Prensa</option>
-                        </select>
+                <!-- Formulário de Filtros -->
+                <form id="formFiltrarOrdem">
+                    <div class="row mb-3">
+                        <div class="col-sm-4">
+                            <label for="filtroPecas" class="form-label">Peças</label>
+                            <select id="filtroPecas" class="form-select" multiple>
+                                <!-- As opções serão carregadas dinamicamente -->
+                            </select>
+                        </div>
+                        <div class="col-sm-4">
+                            <label for="filtroMaquina" class="form-label">Máquina</label>
+                            <select id="filtroMaquina" class="form-select">
+                                <option value="">Selecione uma máquina</option>
+                                <option value="laser_1">Laser 1</option>
+                                <option value="laser_2">Laser 2 (JFY)</option>
+                                <option value="plasma_1">Plasma 1</option>
+                                <option value="plasma_2">Plasma 2</option>
+                                <option value="prensa">Prensa</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                        </div>
                     </div>
                 </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnDuplicarOP">Duplicar OP</button>
+                <hr>
+                <!-- Tabela de Resultados -->
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Peça</th>
+                            <th>Quantidade</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultadoFiltro">
+                        <!-- Resultados do filtro serão carregados aqui -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
+
 
 <!-- Modal para exibir as peças -->
 <div class="modal fade" id="modalPecas" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPecasLabel" inert>
