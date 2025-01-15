@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Gerenciamento de Processo</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+{% endblock %}
+
+{% block content %}
+<div>
+
+    <!-- Título Principal -->
+    <div class="text-center mb-5">
+        <h1 class="display-5">Apontamento de Estamparia</h1>
+        <p class="text-muted">Gerencie e acompanhe os processos de estamparia.</p>
+    </div>
+
+    <!-- Container para Planejamento -->
+    <div id="containerPlanejar" class="mb-5">
+        <!-- Botões para abrir modais -->
+        <div class="d-flex justify-content-end gap-3 mb-4">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalEstamparia">
+                Planejar
+            </button>
+        </div>
+
+        <!-- Painel de Ordens Criadas -->
+        <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
+        <!-- Formulário de Filtro -->
+        <form id="filtro-form" class="mb-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <input type="text" id="filtro-ordem" class="form-control" placeholder="Filtrar por Ordem">
+                </div>
+                <div class="col-md-3">
+                    <input type="text" id="filtro-peca" class="form-control" placeholder="Filtrar por Peça">
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="filtro-status" id="filtro-status">
+                        <option value="">Escolha o status</option>
+                        <option value="aguardando_iniciar">Aguardando iniciar</option>
+                        <option value="iniciada">Iniciada</option>
+                        <option value="interrompida">Interrompida</option>
+                        <option value="finalizada">Finalizada</option>
+                        <option value="agua_prox_proc">Próximo processo</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </div>
+        </form>
+
+        <div class="border rounded p-4 bg-light">
+            <!-- Container de Ordens -->
+            <div style="max-height: 650px; min-height: 250px; overflow-y: auto; overflow-x: hidden;">
+                <div id="ordens-container" class="row g-4">
+                    <!-- Os cards serão adicionados dinamicamente aqui -->
+                </div>
+                <button class="btn btn-primary mt-3 w-100" id="loadMore" style="display: none;">Carregar mais</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container para Acompanhamento -->
+    <div class="mb-5">
+        <div class="row gy-4">
+            <div class="col-md-4">
+                <h4 class="text-center text-secondary">Processos em Andamento</h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="row row-cols-2 g-3 containerProcesso" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Os cards são adicionados aqui dinamicamente -->
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h4 class="text-center text-secondary">Processos Interrompidos</h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="row row-cols-2 g-3 containerInterrompido" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Os cards são adicionados aqui dinamicamente -->
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h4 class="text-center text-secondary">Próximo processo</h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="row row-cols-2 g-3 containerProxProcesso" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Os cards são adicionados aqui dinamicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal Criar OP Estamparia -->
+<div class="modal fade" id="modalEstamparia" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalEstampariaLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEstampariaLabel">Criar OP</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="opEstampariaForm" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="row mb-3 align-items-center">
+                        <!-- Data da Programação -->
+                        <div class="col-md-6">
+                            <label for="dataProgramacao" class="form-label">Data da Programação:</label>
+                            <input type="date" class="form-control" id="dataProgramacao" name="dataProgramacao" required>
+                        </div>
+
+                        <!-- Peça -->
+                        <div class="col-md-6">
+                            <label for="pecaSelect" class="form-label">Peça:</label>
+                            <select id="pecaSelect" class="form-select" name="pecaSelect" style="width: 100%;" required>
+                                <option value="" disabled selected>Selecione a peça</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3 align-items-center">
+                        <!-- Quantidade Planejada -->
+                        <div class="col-md-6">
+                            <label for="qtdPlanejada" class="form-label">Quantidade Planejada:</label>
+                            <input type="number" class="form-control" id="qtdPlanejada" name="qtdPlanejada" min="1" placeholder="Digite a quantidade" required>
+                        </div>
+                        
+                        <!-- Observações -->
+                        <div class="col-md-6">
+                            <label for="observacoes" class="form-label">Observações:</label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="text-end">
+                        <button class="btn btn-success" id="confirmButton">Planejar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para exibir as peças -->
+<div class="modal fade" id="modalPecas" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPecasLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalPecasLabel">Peças da Ordem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modalPecasContent">
+                    <!-- As peças serão carregadas dinamicamente aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para perguntar se irá iniciar a ordem após planejamento -->
+<div class="modal fade" id="modalIniciarAposPlanejar" aria-labelledby="modalIniciarAposPlanejarLabel" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title" id="modalIniciarAposPlanejarLabel">Modal 1</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            Deseja iniciar a ordem agora?
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary btn-iniciar-planejar" data-bs-dismiss="modal">Sim</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Não</button>
+            
+        </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal iniciar ordem -->
+<div class="modal fade" id="modalIniciar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalIniciarLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalIniciarLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formIniciarOrdemCorte">
+                    <div class="mb-3">
+                        <input type="hidden" id="grupoMaquina">
+                        <label for="escolhaMaquina" class="form-label">Qual máquina?</label>
+                        <select class="form-control" id="escolhaMaquinaIniciarOrdem" name="escolhaMaquinaIniciarOrdem" required>
+                            <option value="">------</option>
+                            <!-- Opções serão preenchidas dinamicamente pelo JavaScript -->
+                        </select>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Iniciar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal proximo processo -->
+<div class="modal fade" id="modalProxProcesso" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalProxProcessoLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalProxProcessoLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formProxProcesso">
+                    <div class="row mb-3">
+                        <input type="hidden" id="grupoMaquina">
+                        <div class="col-sm-6">
+                            <label id="labelModalMaquinaProxProcesso" for="escolhaMaquinaProxProcesso" class="form-label"></label>
+                            <select class="form-control" id="escolhaMaquinaProxProcesso" name="escolhaMaquinaProxProcesso" required>
+                                <!-- Opções serão preenchidas dinamicamente pelo JavaScript -->
+                            </select>
+                        </div>
+
+                        <div id="colQtdProxProcesso" class="col-sm-6">
+                            <label for="qtdProxProcesso" class="form-label">Quantidade</label>
+                            <input class="form-control" type="number" id="qtdProxProcesso" name="qtdProxProcesso" required>
+                        </div>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal interromper ordem -->
+<div class="modal fade" id="modalInterromper" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInterromperLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalInterromperLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formInterromperOrdemCorte">
+                    <div class="mb-3">
+                        <label for="escolhaMotivo" class="form-label">Qual motivo?</label>
+                        <select class="form-control" id="motivoInterrupcao" name="motivoInterrupcao" required>
+                            <option value="">------</option>
+                            {% for motivo in motivos %}
+                            <option value="{{motivo.nome}}">{{motivo.nome}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Interromper</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal finalizar ordem -->
+<div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarLabel">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalFinalizarLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formFinalizarOrdemEstamparia">
+                    
+                    <div id="bodyPecasFinalizar">
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <h6 class="text-center mt-3">Observação</h6>
+                            <textarea class="form-control" name="obsFinalizar" id="obsFinalizar" placeholder="Algum comentário"></textarea>
+                        </div>   
+                        <div class="col-sm-6">
+                            <h6 class="text-center mt-3">Operador</h6>
+                            <select class="form-control" name="operadorFinalizar" id="operadorFinalizar" required>
+                                <option value="">---------</option>
+                                {% for operador in operadores %}
+                                <option value="{{ operador.id }}">{{ operador.matricula }} - {{ operador.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>   
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Finalizar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal finalizar ordem -->
+<div class="modal fade" id="modalFinalizarParcial" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarParcialLabel">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalFinalizarParcialLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formFinalizarParcial">
+                    
+                    <div id="bodyPecasFinalizarParcial">
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <h6 class="text-center mt-3">Operador</h6>
+                            <select class="form-control" name="operadorFinalizarParcial" id="operadorFinalizarParcial" required>
+                                <option value="">---------</option>
+                                {% for operador in operadores %}
+                                <option value="{{ operador.id }}">{{ operador.matricula }} - {{ operador.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>   
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Finalizar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal retornar ordem -->
+<div class="modal fade" id="modalRetornar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalRetornarLabel">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalRetornarLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formRetornarProducao">
+                    <div class="mb-3">
+                        <input type="hidden" id="grupoMaquina">
+                        <button type="submit" class="btn btn-primary">Sim</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Não</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/planejar-estamparia.js' %}"></script>
+<script type="module" src="{% static 'js/ordem-criada-estamparia.js' %}"></script>
+{% endblock %}
+
