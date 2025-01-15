@@ -36,7 +36,12 @@ MAQUINA_CHOICES = (
     ('furar', 'Furar'),
     ('chanfrar','Chanfrar'),
     ('tornear',' Tornear'),
-    
+    ('viradeira_1','Viradeira 1'),
+    ('viradeira_2','Viradeira 2'),
+    ('viradeira_3','Viradeira 3'),
+    ('viradeira_4','Viradeira 4'),
+    ('viradeira_5','Viradeira 5'),
+    ('prensa','Prensa'),
 )
 
 class Ordem(models.Model):
@@ -48,7 +53,8 @@ class Ordem(models.Model):
         ('prensa', 'Prensa'),
         ('usinagem', 'Usinagem'),
         ('serra', 'Serra'),
-        ('prod_esp', 'Prod. Especiais')
+        ('prod_esp', 'Prod. Especiais'),
+        ('estamparia', 'Estamparia')
     )
 
     ordem = models.IntegerField()

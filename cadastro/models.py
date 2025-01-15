@@ -43,6 +43,7 @@ class MotivoInterrupcao(models.Model):
     
     nome = models.CharField(max_length=20, unique=True)
     setor = models.ManyToManyField(Setor, related_name='motivo_setor')
+    visivel = models.BooleanField(default=True)
 
     def __str__(self):
         return self.nome

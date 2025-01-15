@@ -25,6 +25,7 @@ urlpatterns = [
     path('serra/', include('apontamento_serra.urls')),
     path('usinagem/', include('apontamento_usinagem.urls')),
     path('corte/', include('apontamento_corte.urls')),
-    path('prod-esp/', include('apontamento_prod_especiais.urls'))
+    path('prod-esp/', include('apontamento_prod_especiais.urls')),
+    path('estamparia/', include('apontamento_estamparia.urls')),
 
 ]

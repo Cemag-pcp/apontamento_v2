@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'apontamento_usinagem',
     'apontamento_corte',
     'apontamento_prod_especiais',
+    'apontamento_estamparia',
 
 ]
 
