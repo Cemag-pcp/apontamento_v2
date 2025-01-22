@@ -630,6 +630,7 @@ def importar_ordens_serra(request):
 def api_apontamentos_peca(request):
     ordens = (
         Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra')
+        .exclude(Q(ordem_pecas_serra__peca__codigo='GRAU') | Q(ordem_pecas_serra__peca__codigo='RECORTE'))  # Exclui GRAU e RECORTE
         .select_related('operador_final')  # Para otimizar a relação com operador_final
         .prefetch_related('ordem_pecas_serra__peca')  # Ajustado para usar o related_name correto
         .distinct()  # Evitar duplicatas
@@ -664,6 +665,7 @@ def api_apontamentos_peca(request):
 def api_apontamentos_mp(request):
     propriedades_ordens = (
         PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra')
+        .exclude(Q(mp_codigo__codigo='GRAU') | Q(mp_codigo__codigo='RECORTE'))  # Exclui GRAU e RECORTE
         .select_related('ordem', 'mp_codigo', 'nova_mp')  # Otimiza consultas relacionadas
         .order_by('ordem__ordem_pecas_serra__data')  # Ordena pelo campo `ordem` da tabela `Ordem`
         .annotate(
@@ -700,6 +702,4 @@ def api_apontamentos_mp(request):
     ]
 
     return JsonResponse(list(propriedades_ordens), safe=False)
-
-# def definir_proximo_processo(request):
 
