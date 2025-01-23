@@ -57,7 +57,7 @@ class Ordem(models.Model):
         ('estamparia', 'Estamparia')
     )
 
-    ordem = models.IntegerField()
+    ordem = models.IntegerField(blank=True, null=True)
     data_criacao = models.DateTimeField(default=now, editable=False)
     obs = models.TextField(null=True, blank=True)
     grupo_maquina = models.CharField(max_length=20, choices=GRUPO_MAQUINA_CHOICES, blank=True, null=True)
@@ -68,6 +68,20 @@ class Ordem(models.Model):
     obs_operador = models.TextField(blank=True, null=True)
     data_programacao = models.DateField(blank=True, null=True)
     ultima_atualizacao = models.DateTimeField(auto_now=True)
+    excluida = models.BooleanField(default=False) # Opção para exclusão de ordens
+    
+    #Para ordens duplicadas
+    ordem_duplicada = models.TextField(blank=True, null=True) # Armazena a identificação da ordem duplicada (Ex.: "dup#1","dup#2"...)
+    motivo_exclusao = models.ForeignKey(MotivoInterrupcao, on_delete=models.CASCADE, null=True, blank=True) # Caso exclua a ordem, é necessário informar o motivo
+    ordem_pai = models.ForeignKey(
+        'self',  # Referencia a própria tabela
+        on_delete=models.SET_NULL,  # Define como `NULL` se a ordem pai for excluída
+        null=True,  # Permite valores nulos para ordens que não têm "pai"
+        blank=True,
+        related_name='ordens_filhas',  # Permite acessar as duplicatas a partir da ordem original
+        verbose_name='Ordem Pai'
+    )
+    duplicada = models.BooleanField(default=False) # Opção para ordens duplicadas
 
     class Meta:
         constraints = [
@@ -75,8 +89,17 @@ class Ordem(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+
+        if not self.pk and self.duplicada:
+            # Gera uma identificação única para a duplicata
+            if self.ordem_pai:
+                duplicatas_existentes = Ordem.objects.filter(ordem_pai=self.ordem_pai).count()
+                self.ordem_duplicada = f"dup#{self.ordem_pai.ordem}.{duplicatas_existentes + 1}"
+            else:
+                self.ordem_duplicada = "dup#1"  # Caso não tenha um pai definido (fallback)
+
         # Incrementa automaticamente apenas para os grupos diferentes de "Laser" e "Plasma"
-        if not self.pk and self.grupo_maquina not in ['laser_1','laser_2','plasma']:
+        elif not self.pk and self.grupo_maquina not in ['laser_1','laser_2','plasma']:
             # Busca o maior número de ordem dentro do mesmo grupo de máquina
             ultimo_numero = Ordem.objects.filter(grupo_maquina=self.grupo_maquina).aggregate(
                 Max('ordem')
@@ -138,5 +161,3 @@ class OrdemProcesso(models.Model):
             data_inicio=now()
         )
         return novo_processo
-
-

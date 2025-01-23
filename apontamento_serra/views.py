@@ -22,6 +22,7 @@ import tempfile
 import re
 import json
 import openpyxl
+from operator import itemgetter
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
@@ -667,7 +668,7 @@ def api_apontamentos_mp(request):
         PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra')
         .exclude(Q(mp_codigo__codigo='GRAU') | Q(mp_codigo__codigo='RECORTE'))  # Exclui GRAU e RECORTE
         .select_related('ordem', 'mp_codigo', 'nova_mp')  # Otimiza consultas relacionadas
-        .order_by('ordem__ordem_pecas_serra__data')  # Ordena pelo campo `ordem` da tabela `Ordem`
+        # .order_by('ordem__ordem_pecas_serra__data')  # Ordena pelo campo `data` da tabela `Ordem`
         .annotate(
             descricao_original=Concat(  # Concatena código e descrição originais
                 F('mp_codigo__codigo'),
@@ -681,7 +682,8 @@ def api_apontamentos_mp(request):
             ),
             data_formatada=F('ordem__ordem_pecas_serra__data')  # Adiciona o campo bruto para ser formatado posteriormente
         )
-        .distinct()
+        .distinct('ordem__ordem')  # Garante linhas únicas por ordem
+        # .order_by('ordem__ordem', '-ordem__ordem_pecas_serra__data')  # Ordena primeiro por ordem, depois por data decrescente
         .values(
             'ordem__ordem',  # Campo `ordem` da tabela `Ordem`
             'tamanho',  # Campo `tamanho` da tabela `PropriedadesOrdem`
@@ -700,6 +702,8 @@ def api_apontamentos_mp(request):
         }
         for item in propriedades_ordens
     ]
+
+    propriedades_ordens = sorted(propriedades_ordens, key=itemgetter('data_formatada'))
 
     return JsonResponse(list(propriedades_ordens), safe=False)
 

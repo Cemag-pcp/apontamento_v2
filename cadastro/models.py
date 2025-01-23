@@ -81,3 +81,11 @@ class Conjuntos(models.Model):
     codigo = models.CharField(max_length=10, unique=True)
     descricao = models.CharField(max_length=200, blank=True, null=True)
     # carretas que vai esse conjunto (campo ManyToMany)
+
+class MotivoExclusao(models.Model):
+
+    nome = models.CharField(max_length=20, unique=True)
+    setor = models.ManyToManyField(Setor, related_name='motivo_exclusao_setor')
+
+    def __str__(self):
+        return self.nome

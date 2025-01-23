@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now,localtime
-from django.db.models import Q
+from django.db.models import Count, Q
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem
@@ -19,6 +19,7 @@ import os
 import tempfile
 import re
 import json
+from urllib.parse import unquote
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
@@ -93,7 +94,7 @@ def get_ordens_criadas(request):
     # Monta os dados
     data = [{
         'id':ordem.pk,  
-        'ordem': ordem.ordem,
+        'ordem': ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
         'grupo_maquina': ordem.get_grupo_maquina_display(),
         'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
         'obs': ordem.obs,
@@ -336,6 +337,177 @@ def filtrar_ordens(request):
 
     return JsonResponse({"ordens": resultados})
 
+def get_ordens_criadas_duplicar_ordem(request):
+    # Captura os parâmetros de filtro
+    pecas = request.GET.get('pecas', '')  # Recebe como string
+    pecas = [unquote(p) for p in pecas.split(';')] if pecas else []  # Divide pelo ponto e vírgula e decodifica
+    
+    maquina = unquote(request.GET.get('maquina', ''))
+    ordem = unquote(request.GET.get('ordem', ''))
+
+    page = int(request.GET.get('page', 1))
+    limit = int(request.GET.get('limit', 10))
+    draw = int(request.GET.get('draw', 1))  # Captura o parâmetro draw
+
+    # Filtra as ordens com base nos parâmetros
+    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2'], duplicada=False).order_by('status_prioridade')
+
+    if pecas:
+        ordens_queryset = ordens_queryset.annotate(
+            pecas_em_comum=Count(
+                'ordem_pecas_corte',
+                filter=Q(ordem_pecas_corte__peca__in=pecas) & Q(ordem_pecas_corte__qtd_planejada__gt=0)  # Quantidade maior que 0
+            )
+        ).filter(
+            pecas_em_comum=len(pecas)  # Garante que todas as peças selecionadas estão presentes
+        )
+    if maquina:
+        ordens_queryset = ordens_queryset.filter(grupo_maquina__icontains=maquina)
+    if ordem:
+        ordens_queryset = ordens_queryset.filter(ordem=ordem)
+
+    records_total = Ordem.objects.filter(
+        grupo_maquina__in=['plasma', 'laser_1', 'laser_2']
+    ).count()
+
+    records_filtered = ordens_queryset.count()
+
+    # Paginação
+    paginator = Paginator(ordens_queryset, limit)
+    try:
+        ordens_page = paginator.page(page)
+    except EmptyPage:
+        return JsonResponse({'draw': draw, 'recordsTotal': records_total, 'recordsFiltered': records_filtered, 'data': []})
+
+    # Monta os dados
+    data = [{
+        'id':ordem.pk,  
+        'ordem': ordem.ordem,
+        'grupo_maquina': ordem.get_grupo_maquina_display(),
+        'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
+        'obs': ordem.obs,
+        'status_atual': ordem.status_atual,
+        'propriedade': {
+            'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
+            'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
+            'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
+            'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+            'retalho': 'Sim' if ordem.propriedade.retalho else None,
+        }
+    } for ordem in ordens_page]
+
+    return JsonResponse({
+        'draw': draw,
+        'recordsTotal': records_total,
+        'recordsFiltered': records_filtered,
+        'data': data
+    })
+
+def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
+    try:
+        # Busca a ordem com os relacionamentos necessários
+        ordem = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').get(pk=pk_ordem)
+
+        # Propriedades da ordem
+        propriedades = {
+            'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
+            'espessura': ordem.propriedade.espessura if ordem.propriedade else None,
+            'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
+            'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
+            'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+        }
+
+        # Peças relacionadas à ordem
+        pecas = [
+            {'peca': peca.peca, 'quantidade': peca.qtd_planejada}
+            for peca in ordem.ordem_pecas_corte.all()
+            if peca.qtd_planejada > 0
+        ]
+
+        return JsonResponse({'pecas': pecas, 'propriedades': propriedades})
+
+    except Ordem.DoesNotExist:
+        return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)    
+
+def gerar_op_duplicada(request, pk_ordem):
+    """
+    Duplicar uma ordem existente com suas propriedades e criar uma nova entrada na base.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    # Carrega os dados do JSON
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    # Valida os campos necessários
+    obs_duplicar = data.get('obs_duplicar')
+    data_programacao = data.get('dataProgramacao')
+    qtd_chapa = data.get('qtdChapa')
+    pecas = data.get('pecas', [])
+
+    if not qtd_chapa or not pecas:
+        return JsonResponse({'error': 'Campos obrigatórios ausentes (qtdChapa ou pecas)'}, status=400)
+
+    try:
+        qtd_chapa = float(qtd_chapa)  # Converte qtdChapa para float
+    except ValueError:
+        return JsonResponse({'error': 'Quantidade de chapas inválida'}, status=400)
+
+    try:
+        # Busca a ordem original
+        ordem_original = Ordem.objects.get(pk=pk_ordem)
+
+        with transaction.atomic():
+            # Cria a nova ordem como duplicada
+            nova_ordem = Ordem.objects.create(
+                ordem_pai=ordem_original,
+                duplicada=True,
+                grupo_maquina=ordem_original.grupo_maquina,
+                maquina=ordem_original.maquina if ordem_original.maquina in ['laser_1', 'laser_2'] else None,
+                obs=obs_duplicar,
+                status_atual='aguardando_iniciar',
+                data_programacao=data_programacao
+            )
+
+            # Duplica as propriedades associadas
+            if hasattr(ordem_original, 'propriedade'):
+                propriedade_original = ordem_original.propriedade
+                PropriedadesOrdem.objects.create(
+                    ordem=nova_ordem,  # Associa a nova ordem
+                    descricao_mp=propriedade_original.descricao_mp,
+                    espessura=propriedade_original.espessura,
+                    quantidade=qtd_chapa,
+                    aproveitamento=propriedade_original.aproveitamento,
+                    tipo_chapa=propriedade_original.tipo_chapa,
+                    retalho=propriedade_original.retalho,
+                )
+
+            # Criar peças para ordem duplicada
+            for peca in pecas:
+                PecasOrdem.objects.create(
+                    ordem=nova_ordem,
+                    peca=peca['peca'],
+                    qtd_planejada=peca['qtd_planejada']
+                )
+
+        return JsonResponse({'message': 'Ordem duplicada com sucesso', 'nova_ordem_id': nova_ordem.pk}, status=201)
+
+    except Ordem.DoesNotExist:
+        return JsonResponse({'error': 'Ordem original não encontrada'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro ao duplicar ordem: {str(e)}'}, status=500)
+
+def duplicar_op(request):
+
+    return render(request, 'apontamento_corte/duplicar-op.html')
+
+
 class ProcessarArquivoView(View):
     def post(self, request):
         
@@ -346,6 +518,7 @@ class ProcessarArquivoView(View):
         # Verifica se o arquivo foi enviado
         uploaded_file = request.FILES.get('file')
         tipo_maquina = request.POST.get('tipoMaquina')
+        print(tipo_maquina)
 
         if not uploaded_file:
             return JsonResponse({'error': 'Nenhum arquivo enviado.'}, status=400)
