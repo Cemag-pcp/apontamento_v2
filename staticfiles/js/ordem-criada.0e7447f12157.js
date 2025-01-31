@@ -1,20 +1,37 @@
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
+    const spinner = document.getElementById('loading'); // Referência ao spinner
+
+    const showSpinner = () => {
+        if (spinner) {
+            spinner.style.display = 'flex'; // Exibe o spinner
+        } else {
+            console.warn('Spinner não encontrado no DOM.');
+        }
+    };
+
+    const hideSpinner = () => {
+        if (spinner) {
+            spinner.style.display = 'none'; // Oculta o spinner
+        } else {
+            console.warn('Spinner não encontrado no DOM.');
+        }
+    };
+
     return new Promise((resolve, reject) => { // Retorna uma Promise
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&status=${filtros.status || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
+        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&maquina=${filtros.maquina || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
                 if (ordens.length > 0) {
-                    console.log(ordens);
+
                     ordens.forEach(ordem => {
                         const card = document.createElement('div');
                         card.classList.add('col-md-4'); // Adiciona a classe de coluna
-
                         card.dataset.ordemId = ordem.ordem; // Adiciona o ID da ordem para referência
                         card.dataset.grupoMaquina = ordem.grupo_maquina || ''; // Adiciona o grupo máquina
                         card.dataset.obs = ordem.obs || ''; // Adiciona observações
@@ -69,31 +86,17 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         <div class="card shadow-sm bg-light text-dark">
                             <div class="card-body">
                                 <h5 class="card-title d-flex justify-content-between align-items-center">
-                                    #${ordem.ordem}
+                                    ${ordem.ordem} - ${ordem.grupo_maquina}
                                     ${statusBadge}
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">Criado em: ${ordem.data_criacao}</p>
                                 <p class="mb-2">${ordem.obs || '<span class="text-muted">Sem observações</span>'}</p>
                                 <ul class="list-unstyled mb-0" style="font-size: 0.85rem;">
-                                    <li><strong>MP:</strong> ${ordem.propriedade?.descricao_mp || 'N/A'}</li>
-                                    <li><strong>Quantidade:</strong> ${ordem.propriedade?.quantidade || 'N/A'}</li>
-                                    <li><strong>Retalho:</strong> ${ordem.propriedade?.retalho || 'Não'}</li>
-                                    <li style="font-size: 0.75rem;">
-                                        <strong>Peças:</strong> 
-                                        ${ordem.pecas.map(peca => {
-                                            const descricao = peca.peca_nome || 'Sem descrição'; // Usa "Sem descrição" se a descrição estiver ausente
-                                            const descricaoTruncada = descricao.length > 10 
-                                                ? descricao.substring(0, 10) + '...' 
-                                                : descricao;
-                                            return `
-                                                <span title="${descricao}">
-                                                    <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
-                                                        ${peca.peca_codigo} - ${descricaoTruncada}
-                                                    </a>
-                                                </span>
-                                            `;
-                                        }).join(', ')}
-                                    </li>
+                                    <li><strong>MP:</strong> ${ordem.propriedade.descricao_mp || 'N/A'}</li>
+                                    <li><strong>Quantidade:</strong> ${ordem.propriedade.quantidade || 'N/A'}</li>
+                                    <li><strong>Tipo Chapa:</strong> ${ordem.propriedade.tipo_chapa || 'N/A'}</li>
+                                    <li><strong>Aproveitamento:</strong> ${ordem.propriedade.aproveitamento || 'N/A'}</li>
+                                    <li><strong>Retalho:</strong> ${ordem.propriedade.retalho || 'Não'}</li>
                                 </ul>
                             </div>
                             <div class="card-footer text-end" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
@@ -150,14 +153,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         container.appendChild(card);
                     });
 
-                    // Esconde o botão "Carregar Mais" caso `has_next` seja false
-                    const loadMoreButton = document.getElementById('loadMore');
-                    if (!data.has_next) {
-                        loadMoreButton.style.display = 'none'; // Esconde o botão
-                    } else {
-                        loadMoreButton.style.display = 'block'; // Mostra o botão caso ainda haja dados
-                    }
-
                     resolve(data); // Retorna os dados carregados
                 } else {
                     resolve(data); // Retorna mesmo se não houver dados
@@ -170,6 +165,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
             })
             .finally(() => {
                 isLoading = false; // Libera a flag em qualquer caso
+                hideSpinner(); // Oculta o spinner após o carregamento
             });
     });
 };
@@ -195,12 +191,12 @@ function iniciarContador(ordemId, dataCriacao) {
     setInterval(atualizarContador, 1000);
 }
 
-function carregarOrdensIniciadas(container, filtros={}) {
-    fetch(`api/ordens-iniciadas/?page=1&limit=10&ordem=${filtros.ordem || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
-
+function carregarOrdensIniciadas(container) {
+    fetch('api/ordens-iniciadas/?page=1&limit=10')
         .then(response => response.json())
         .then(data => {
             container.innerHTML = ''; // Limpa o container
+
             data.ordens.forEach(ordem => {
 
                 const card = document.createElement('div');
@@ -243,23 +239,7 @@ function carregarOrdensIniciadas(container, filtros={}) {
                             <strong>Observação:</strong> ${ordem.obs || 'Sem observações'}
                         </p>
                         <p class="card-text mb-0 small">
-                            <strong>Descrição MP:</strong> ${ordem.propriedade?.descricao_mp || 'Sem descrição'}
-                        </p>
-                        <p class="card-text mb-0 small" style="font-size: 0.75rem;">
-                            <strong>Peças:</strong> 
-                            ${ordem.pecas.map(peca => {
-                                const descricao = peca.peca_nome || 'Sem descrição'; // Usa "Sem descrição" se a descrição estiver ausente
-                                const descricaoTruncada = descricao.length > 10 
-                                    ? descricao.substring(0, 10) + '...' 
-                                    : descricao;
-                                return `
-                                    <span title="${descricao}">
-                                        <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
-                                            ${peca.peca_codigo} - ${descricaoTruncada}
-                                        </a>
-                                    </span>
-                                `;
-                            }).join(', ')}
+                            <strong>Descrição MP:</strong> ${ordem.propriedade.descricao_mp || 'Sem descrição'}
                         </p>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
@@ -271,7 +251,7 @@ function carregarOrdensIniciadas(container, filtros={}) {
                         </div>
                     </div>
                 </div>`;
-            
+
                 const buttonVerPeca = card.querySelector('.btn-ver-peca');
                 const buttonInterromper = card.querySelector('.btn-interromper');
                 const buttonFinalizar = card.querySelector('.btn-finalizar');
@@ -299,16 +279,15 @@ function carregarOrdensIniciadas(container, filtros={}) {
 
                 container.appendChild(card);
 
-                iniciarContador(ordem.ordem, ordem.ultima_atualizacao);
-
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
 }
 
-function carregarOrdensInterrompidas(container, filtros={}) {
+function carregarOrdensInterrompidas(container) {
     // Fetch para buscar ordens interrompidas
-    fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
+    fetch('api/ordens-interrompidas/?page=1&limit=10')
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar as ordens interrompidas.');
@@ -332,35 +311,16 @@ function carregarOrdensInterrompidas(container, filtros={}) {
 
                 card.innerHTML = `
                 <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
-                            <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
-                        </div>
-                        <span class="badge badge-pill badge-warning" id="contador-${ordem.ordem}" style="font-size: 0.65rem;">Carregando...</span>
+                    <div class="card-header bg-danger text-white">
+                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                        <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
                     </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
                             <strong>Observação:</strong> ${ordem.obs || 'N/A'}
                         </p>
                         <p class="card-text mb-2 small">
-                            <strong>Descrição MP:</strong> ${ordem.propriedade?.descricao_mp || 'Sem descrição'}
-                        </p>
-                        <p class="card-text mb-0 small" style="font-size: 0.75rem;">
-                            <strong>Peças:</strong> 
-                            ${ordem.pecas.map(peca => {
-                                const descricao = peca.peca_nome || 'Sem descrição'; // Usa "Sem descrição" se a descrição estiver ausente
-                                const descricaoTruncada = descricao.length > 10 
-                                    ? descricao.substring(0, 10) + '...' 
-                                    : descricao;
-                                return `
-                                    <span title="${descricao}">
-                                        <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
-                                            ${peca.peca_codigo} - ${descricaoTruncada}
-                                        </a>
-                                    </span>
-                                `;
-                            }).join(', ')}
+                            <strong>Descrição MP:</strong> ${ordem.propriedade.descricao_mp || 'Sem descrição'}
                         </p>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
@@ -372,7 +332,6 @@ function carregarOrdensInterrompidas(container, filtros={}) {
                         </div>
                     </div>
                 </div>`;
-            
 
                 // Adiciona eventos aos botões
                 const buttonVerPeca = card.querySelector('.btn-ver-peca');
@@ -393,9 +352,6 @@ function carregarOrdensInterrompidas(container, filtros={}) {
                 }
 
                 container.appendChild(card); // Adiciona o card ao container
-
-                iniciarContador(ordem.ordem, ordem.ultima_atualizacao);
-
             });
         })
         .catch(error => {
@@ -406,65 +362,6 @@ function carregarOrdensInterrompidas(container, filtros={}) {
 
 function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
-}
-
-function resetarCardsInicial(filtros = {}) {
-    const container = document.getElementById('ordens-container');
-    const loadMoreButton = document.getElementById('loadMore');
-    let page = 1; // Página inicial
-    const limit = 10; // Quantidade de ordens por página
-    let isLoading = false; // Flag para evitar chamadas simultâneas
-    let hasMoreData = true; // Flag para interromper chamadas quando não houver mais dados
-
-    // Atualiza os filtros com os valores enviados
-    const filtroOrdem = document.getElementById('filtro-ordem');
-    const filtroMp = document.getElementById('filtro-mp');
-    const filtroStatus = document.getElementById('filtro-status');
-    const filtroPeca = document.getElementById('filtro-peca');
-
-    const currentFiltros = {
-        ordem: filtros.ordem || filtroOrdem.value.trim(),
-        mp: filtros.mp || filtroMp.value.trim(),
-        status: filtros.status || filtroStatus.value.trim(),
-        peca: filtros.status || filtroPeca.value.trim(),
-    };
-
-    // Função principal para buscar e renderizar ordens
-    const fetchOrdens = () => {
-        if (isLoading || !hasMoreData) return;
-        isLoading = true;
-
-        loadOrdens(container, page, limit, currentFiltros)
-            .then((data) => {
-                if (data.ordens.length === 0) {
-                    hasMoreData = false;
-                    loadMoreButton.style.display = 'none'; // Esconde o botão quando não há mais dados
-                    if (page === 1) {
-                        container.innerHTML = '<p class="text-muted">Nenhuma ordem encontrada.</p>';
-                    } else {
-                        container.insertAdjacentHTML('beforeend', '<p class="text-muted">Nenhuma ordem adicional encontrada.</p>');
-                    }
-                } else {
-                    loadMoreButton.style.display = 'block'; // Garante que o botão seja exibido quando houver mais dados
-                    page++; // Incrementa a página para o próximo carregamento
-                }
-            })
-            .catch((error) => {
-                console.error('Erro ao carregar ordens:', error);
-            })
-            .finally(() => {
-                isLoading = false;
-            });
-    };
-
-    // Carrega a primeira página automaticamente
-    container.innerHTML = ''; // Limpa o container antes de carregar novos resultados
-    fetchOrdens();
-
-    // Configurar o botão "Carregar Mais"
-    loadMoreButton.onclick = () => {
-        fetchOrdens(); // Carrega a próxima página ao clicar no botão
-    };
 }
 
 // Função para exibir as peças no modal
@@ -482,7 +379,8 @@ function mostrarPecas(ordemId, maquinaName) {
     });
 
     // Converte o nome da máquina para minúsculas
-    const maquinaNameLower = maquinaName.toLowerCase();
+    const maquinaNameLower = maquinaName.toLowerCase().replace(" ","_").replace(" (jfy)","");
+    document.getElementById('modalPecas').removeAttribute('inert');
 
     // Fetch para buscar peças
     fetch(`api/ordens-criadas/${ordemId}/${maquinaNameLower}/pecas/`)
@@ -510,11 +408,7 @@ function mostrarPecas(ordemId, maquinaName) {
                         <tbody>
                             ${data.pecas.map(peca => `
                                 <tr>
-                                    <td>
-                                    <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
-                                        ${peca.peca_nome}
-                                    </a>
-                                    </td>
+                                    <td>${peca.peca}</td>
                                     <td>${peca.quantidade}</td>
                                 </tr>
                             `).join('')}
@@ -616,7 +510,6 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             carregarOrdensInterrompidas(containerInterrompido);
 
             // Recarrega os dados chamando a função de carregamento
-            document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
 
         })
@@ -636,15 +529,22 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
     modalTitle.innerHTML = `Iniciar Ordem ${ordemId}`;
     modal.show();
 
+    grupoMaquina = grupoMaquina.toLowerCase().replace(" ","_").replace(" (jfy)","");
+
     // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = `<option value="">------</option>`;
+    escolhaMaquina.innerHTML = ``;
 
     // Define as máquinas para cada grupo
     const maquinasPorGrupo = {
-        serra: [
-            { value: 'serra_1', label: 'Serra 1' },
-            { value: 'serra_2', label: 'Serra 2' },
-            { value: 'serra_3', label: 'Serra 3' },
+        laser_1: [
+            { value: 'laser_1', label: 'Laser 1' },
+        ],
+        laser_2: [
+            {value: 'laser_2', label: 'Laser 2 (JFY)'},
+        ],
+        plasma: [
+            { value: 'plasma_1', label: 'Plasma 1' },
+            { value: 'plasma_2', label: 'Plasma 2' },
         ],
     };
 
@@ -715,10 +615,8 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 // Atualiza a interface
                 const containerIniciado = document.querySelector('.containerProcesso');
                 carregarOrdensIniciadas(containerIniciado);
-                
-                // Recarrega os dados chamando a função de carregamento
-                document.getElementById('ordens-container').innerHTML = '';
-                resetarCardsInicial();
+
+                resetarCardsInicial(); 
 
             })
             .catch((error) => {
@@ -765,89 +663,42 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
         .then(data => {
             Swal.close(); // Fecha o SweetAlert de carregamento
             document.getElementById('bodyPecasFinalizar').innerHTML = '';
-            const tamanho = parseFloat(data.propriedades.tamanho) || 0; // Garante que `tamanho` será numérico ou `0`
 
             // Renderiza propriedades
             const propriedadesHTML = `
-                <h6 class="text-center mt-3">Informações da matéria-prima</h6>
+                <h6 class="text-center mt-3">Informações da Chapa</h6>
                 <table class="table table-bordered table-sm text-center">
                     <thead>
                         <tr class="table-light">
                             <th>Descrição</th>
-                            <th>Tamanho</th>
-                            <th>Quantidade</th>
+                            <th>Espessura</th>
+                            <th>Quantidade de Chapas</th>
+                            <th>Tipo Chapa</th>
+                            <th>Aproveitamento</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="text-align: center; padding: 5px;">
-                                <select 
-                                    id="selectMpSerraAlterar"
-                                    class="form-select form-select-sm select2-materia-prima"
-                                    style="width: 100%; max-width: 150px; font-size: 0.85rem; padding: 0.2rem 0.5rem; height: auto;"
-                                    required>
-                                    <option value="${data.propriedades.id_mp}" selected>${data.propriedades.descricao_mp || 'Selecione'}</option>
-                                </select>
-                            </td>
+                            <td>${data.propriedades.descricao_mp || 'N/A'}</td>
+                            <td>${data.propriedades.espessura || 'N/A'}</td>
                             <td>
                                 <input 
                                     type="number" 
                                     min="1" 
-                                    step="0.01" 
-                                    class="form-control form-control-sm" 
-                                    id="tamanhoVaraInput" 
-                                    name="tamanhoVaraInput"
-                                    value=${tamanho}
-                                    style="width: 100px; text-align: center;" required>
-                            </td>
-                            <td>
-                                <input 
-                                    type="number" 
-                                    min="1" 
-                                    step="0.01" 
+                                    max="20" 
                                     class="form-control form-control-sm" 
                                     id="propQtd" 
-                                    name="propQtd"
-                                    data-qtd-vara="${data.propriedades.quantidade}" 
+                                    data-qtd-chapa="${data.propriedades.quantidade}" 
                                     value="${data.propriedades.quantidade}" 
-                                    style="width: 100px; text-align: center;" required>
+                                    style="width: 100px; text-align: center;">
                             </td>
+                            <td>${data.propriedades.tipo_chapa || 'N/A'}</td>
+                            <td>${data.propriedades.aproveitamento || 'N/A'}</td>
                         </tr>
                     </tbody>
                 </table>
             `;
             document.getElementById('bodyPecasFinalizar').insertAdjacentHTML('beforeend', propriedadesHTML);
-
-            $('#selectMpSerraAlterar').select2({
-                theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-                ajax: {
-                    url: 'api/get-mp/',
-                    dataType: 'json',
-                    delay: 250,
-                    data: function (params) {
-                        return {
-                            search: params.term || '',
-                            page: params.page || 1,
-                            per_page: 10
-                        };
-                    },
-                    processResults: function (data, params) {
-                        params.page = params.page || 1;
-                        return {
-                            results: data.results.map(item => ({
-                                id: item.id,
-                                text: item.text
-                            })),
-                            pagination: {
-                                more: data.pagination.more
-                            }
-                        };
-                    },
-                    cache: true
-                },
-                minimumInputLength: 0,
-                dropdownParent: $('#modalFinalizar'),
-            });
 
             // Renderiza peças
             if (data.pecas && data.pecas.length > 0) {
@@ -857,30 +708,24 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                         <thead>
                             <tr class="table-light">
                                 <th>Peça</th>
-                                <th>Qt. peças boas</th>
+                                <th>Quantidade Inicial</th>
                                 <th>Mortas</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${data.pecas.map((peca, index) => `
                                 <tr>
-                                    <td>${peca.peca_nome}</td>
-                                    <td>
-                                        <input 
-                                            type="number" 
-                                            id="qtdRealizada_${peca.peca_id}"
-                                            data-peca-index="${index}"
-                                            data-peca-id="${peca.peca_id}"
-                                            class="form-control form-control-sm peca-quantidade" 
-                                            value="${peca.quantidade}" 
-                                            style="width: 100px; text-align: center;" required>
+                                    <td>${peca.peca}</td>
+                                    <td class="peca-quantidade" data-peca-id="${peca.peca}"  data-peca-index="${index}" data-quantidade-inicial="${peca.quantidade}">
+                                        ${peca.quantidade}
                                     </td>
                                     <td>
                                         <input 
                                             type="number" 
                                             class="form-control form-control-sm input-mortas" 
-                                            data-peca-id="${peca.peca_id}" 
+                                            data-peca-id="${peca.peca}" 
                                             min="0" 
+                                            max="${peca.quantidade}" 
                                             placeholder="Mortas"
                                             style="width: 100px; text-align: center;">
                                     </td>
@@ -891,15 +736,38 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                 `;
                 document.getElementById('bodyPecasFinalizar').insertAdjacentHTML('beforeend', pecasHTML);
 
+                // Atualiza as quantidades de peças ao alterar a quantidade de chapas
+                const propQtdInput = document.getElementById('propQtd');
+                propQtdInput.addEventListener('change', () => {
+                    const novaQtdChapas = parseInt(propQtdInput.value, 10);
+                    const qtdInicialChapas = parseInt(propQtdInput.dataset.qtdChapa, 10);
+
+                    if (novaQtdChapas && novaQtdChapas > 0) {
+                        document.querySelectorAll('.peca-quantidade').forEach(cell => {
+                            const qtdInicial = parseInt(cell.dataset.quantidadeInicial, 10); // Quantidade inicial de peças
+                            const novaQtdPecas = (qtdInicial / qtdInicialChapas) * novaQtdChapas; // Recalcula a nova quantidade de peças
+                    
+                            cell.textContent = Math.floor(novaQtdPecas); // Atualiza o texto na célula
+                    
+                            // Atualiza o atributo 'max' do input correspondente
+                            const pecaId = cell.dataset.pecaId; // Obtém o identificador único da peça
+                            const mortasInput = document.querySelector(`input[data-peca-id="${pecaId}"]`); // Seleciona o input correto
+                    
+                            if (mortasInput) {
+                                mortasInput.setAttribute('max', Math.floor(novaQtdPecas)); // Define o novo valor máximo
+                            }
+                        });
+                    }
+                });
             } else {
                 document.getElementById('bodyPecasFinalizar').innerHTML += '<p class="text-center text-muted">Não há peças cadastradas para esta ordem.</p>';
             }
 
             modal.show();
-
+        
             if (!formFinalizar.checkValidity()) {
-                formFinalizar.reportValidity(); // Exibe as mensagens de erro nativas do navegador
-                return; // Interrompe a submissão se o formulário for inválido
+                formFinalizar.reportValidity(); // Exibe as mensagens de erro padrão do navegador
+                return;
             }
         
         })
@@ -924,30 +792,28 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                 Swal.showLoading();
             }
         });
-
+        const obsFinal = document.getElementById('obsFinalizarCorte').value;
+        const operadorFinal=document.getElementById('operadorFinal').value;
         const inputsMortas = document.querySelectorAll('.input-mortas');
         const pecasMortas = Array.from(inputsMortas).map(input => {
             const pecaId = input.dataset.pecaId;
             const mortas = parseInt(input.value) || 0;
         
-            const qtdRealizadaElement = document.querySelector(`[data-peca-id="${pecaId}"]`).closest('tr')
-                .querySelector('.peca-quantidade');
-        
-            const qtdRealizada = parseInt(qtdRealizadaElement.value) || 0;
+            // Captura a quantidade planejada usando um atributo ou elemento relacionado
+            const quantidadePlanejada = parseInt(
+                document.querySelector(`[data-peca-id="${pecaId}"]`).closest('tr')
+                    .querySelector('.peca-quantidade').textContent
+            ) || 0;
         
             return {
                 peca: pecaId,
                 mortas: mortas,
-                planejadas: qtdRealizada
+                planejadas: quantidadePlanejada // Adiciona a quantidade planejada
             };
         });
-                
-        const qtdVaras = document.getElementById('propQtd').value;
-        const tamanhoVara = document.getElementById('tamanhoVaraInput').value;
-        const operadorFinal = document.getElementById('operadorFinalizar').value;
-        const obsFinalizar = document.getElementById('obsFinalizar').value;
-        const mp_final = document.getElementById('selectMpSerraAlterar').value;
-        
+
+        const qtdChapas = document.getElementById('propQtd').value;
+
         // Faz o fetch para finalizar a ordem
         fetch(`api/ordens/atualizar-status/`, {
             method: 'PATCH',
@@ -956,11 +822,9 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                 grupo_maquina: grupoMaquina,
                 status: 'finalizada',
                 pecas_mortas: pecasMortas,
-                qtd_vara: qtdVaras,
-                tamanho_vara: tamanhoVara,
-                operador_final: operadorFinal,
-                obs_finalizar: obsFinalizar,
-                mp_final: mp_final
+                qtdChapas: qtdChapas,
+                operadorFinal: operadorFinal,
+                obsFinal: obsFinal
             }),
             headers: {
                 'Content-Type': 'application/json',
@@ -985,8 +849,6 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
             const containerIniciado = document.querySelector('.containerProcesso');
             carregarOrdensIniciadas(containerIniciado);
             
-            // Recarrega os dados chamando a função de carregamento
-            document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
                         
             modal.hide();
@@ -1065,8 +927,6 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
             const containerInterrompido = document.querySelector('.containerInterrompido');
             carregarOrdensInterrompidas(containerInterrompido);
 
-            // Recarrega os dados chamando a função de carregamento
-            document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
 
         })
@@ -1081,426 +941,125 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
     });
 }
 
-function addPeca() {
-    const containerPecas = document.getElementById('containerPecas');
-    const indexInput = document.getElementById('indexCont'); // Input escondido que mantém o índice
-    const index = parseInt(indexInput.value, 10); // Obtém o índice atual como número inteiro
+function resetarCardsInicial(filtros = {}) {
+    const container = document.getElementById('ordens-container');
+    const loadMoreButton = document.getElementById('loadMore');
+    let page = 1; // Página inicial
+    const limit = 10; // Quantidade de ordens por página
+    let isLoading = false; // Flag para evitar chamadas simultâneas
+    let hasMoreData = true; // Flag para interromper chamadas quando não houver mais dados
 
-    // Cria um novo grupo de inputs
-    const newPecaRow = document.createElement('div');
-    newPecaRow.classList.add('row');
+    // Atualiza os filtros com os valores enviados
+    const filtroOrdem = document.getElementById('filtro-ordem');
+    const filtroMaquina = document.getElementById('filtro-maquina');
 
-    // Define o conteúdo HTML para o novo grupo de inputs
-    newPecaRow.innerHTML = `
-        <div class="col-sm-6">
-            <label for="pecaEscolhida_${index}" class="form-label">Peça:</label>
-            <select id="pecaEscolhida_${index}" class="form-select" name="pecaEscolhida_${index}" required>
-                <option value="" disabled selected>Selecione a Peça</option>
-            </select>
-        </div>
-        <div class="col-sm-4">
-            <label for="quantidade_${index}" class="form-label">Quantidade</label>
-            <input class="form-control" type="number" id="quantidade_${index}" name="quantidade_${index}" required>
-        </div>
-        <div class="col-auto d-flex align-items-center">
-            <button class="btn btn-danger btn-sm btn-delete" type="button">
-                <i class="fa fa-trash"></i>
-            </button>
-        </div>
-    `;
+    const currentFiltros = {
+        ordem: filtros.ordem || filtroOrdem.value.trim(),
+        maquina: filtros.maquina || filtroMaquina.value.trim(),
+    };
 
-    // Adiciona a nova linha ao final do contêiner
-    containerPecas.appendChild(newPecaRow);
+    // Função principal para buscar e renderizar ordens
+    const fetchOrdens = () => {
+        if (isLoading || !hasMoreData) return;
+        isLoading = true;
 
-    // Incrementa o índice e atualiza o valor no input escondido
-    indexInput.value = index + 1;
-
-    // Inicializa o Select2 para o select recém-criado
-    $(`#pecaEscolhida_${index}`).select2({
-        placeholder: 'Selecione a Peça',
-        width: '100%',
-        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-        ajax: {
-            url: 'api/get-peca/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
+        loadOrdens(container, page, limit, currentFiltros)
+            .then((data) => {
+                if (data.ordens.length === 0) {
+                    hasMoreData = false;
+                    loadMoreButton.style.display = 'none'; // Esconde o botão quando não há mais dados
+                    if (page === 1) {
+                        container.innerHTML = '<p class="text-muted">Nenhuma ordem encontrada.</p>';
+                    } else {
+                        container.insertAdjacentHTML('beforeend', '<p class="text-muted">Nenhuma ordem adicional encontrada.</p>');
                     }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-        dropdownParent: $('#containerPecas'), // Use o contêiner correto como pai do dropdown
-    });
+                } else {
+                    loadMoreButton.style.display = 'block'; // Garante que o botão seja exibido quando houver mais dados
+                    page++; // Incrementa a página para o próximo carregamento
+                }
+            })
+            .catch((error) => {
+                console.error('Erro ao carregar ordens:', error);
+            })
+            .finally(() => {
+                isLoading = false;
+            });
+    };
 
-    // Adiciona o evento de exclusão à linha
-    const deleteButton = newPecaRow.querySelector('.btn-delete');
-    deleteButton.addEventListener('click', function () {
-        // Remove a linha correspondente
-        newPecaRow.remove();
-    });
+    // Carrega a primeira página automaticamente
+    container.innerHTML = ''; // Limpa o container antes de carregar novos resultados
+    fetchOrdens();
+
+    // Configurar o botão "Carregar Mais"
+    loadMoreButton.onclick = () => {
+        fetchOrdens(); // Carrega a próxima página ao clicar no botão
+    };
 }
 
-function criarOrdem() {
-    const form = document.getElementById('opSerraForm');
-
-    form.addEventListener('submit', (event) => {
-        event.preventDefault(); // Impede o envio padrão do formulário
-
-        const formData = new FormData(form); // Captura os dados do formulário
-
-        // Inicializa os dados principais do formulário
-        const data = {
-            mp: formData.get('mpEscolhida'),
-            retalho: formData.get('retalho') || false, // Checkbox retorna 'on', converte para booleano
-            descricao: formData.get('descricao') || '',
-            tamanhoVara: formData.get('tamanhoVara' || ''),
-            quantidade: formData.get('quantidade' || 0),
-            pecas: [], // Array para armazenar peças e quantidades
-            dataProgramacao: formData.get('dataProgramacao')
-        };
-        
-        // Exibe SweetAlert de carregamento
-        Swal.fire({
-            title: 'Criando Ordem...',
-            text: 'Por favor, aguarde.',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            },
-        });
-
-        // Itera sobre o FormData para capturar as peças e quantidades
-        for (let [key, value] of formData.entries()) {
-            if (key.startsWith('pecaEscolhida_')) {
-                const index = key.split('_')[1]; // Extrai o índice do campo
-                const quantidade = formData.get(`quantidade_${index}`); // Busca a quantidade correspondente
-
-                if (quantidade) {
-                    data.pecas.push({
-                        peca: value, // ID da peça
-                        quantidade: parseInt(quantidade, 10) // Quantidade como número
-                    });
-                }
-            }
-        }
-
-        // Envia os dados usando fetch
-        fetch('api/criar-ordem/', {
-            method: 'POST', // Método HTTP
-            body: JSON.stringify(data), // Converte os dados para JSON
-            headers: {
-                'Content-Type': 'application/json', // Indica o envio de JSON
-                'X-CSRFToken': formData.get('csrfmiddlewaretoken') // Adiciona o token CSRF
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Erro ao enviar o formulário');
-            }
-            return response.json(); // Supondo que o servidor responda com JSON
-        })
+function carregarPecasDuplicar() {
+    fetch('api/pecas/') // Substitua pela URL correta da API para obter as peças
+        .then(response => response.json())
         .then(data => {
-            // Manipule a resposta do servidor
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso',
-                text: 'Ordem criada com sucesso.',
+            const filtroPecas = document.getElementById('filtroPecas');
+            filtroPecas.innerHTML = ''; // Limpa as opções anteriores
+
+            data.forEach(peca => {
+                const option = document.createElement('option');
+                option.value = peca.id;
+                option.textContent = `${peca.codigo} - ${peca.descricao}`;
+                filtroPecas.appendChild(option);
             });
-
-            // Recarrega os dados chamando a função de carregamento
-            document.getElementById('ordens-container').innerHTML = '';
-            resetarCardsInicial();
-
-            form.reset()
-
         })
-        .catch(error => {
-            // Tratamento de erro
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro',
-                text: error.message,
-            });
-        });
-    });
+        .catch(error => console.error('Erro ao carregar peças:', error));
 }
 
 function filtro() {
-    const form = document.getElementById('filtro-form');
+    const form = document.getElementById('formFiltrarOrdem');
 
     form.addEventListener('submit', (event) => {
         event.preventDefault(); // Evita comportamento padrão do formulário
 
         // Captura os valores atualizados dos filtros
-        const filtros = {
-            ordem: document.getElementById('filtro-ordem').value.trim(),
-            mp: document.getElementById('filtro-mp').value.trim(),
-            status: document.getElementById('filtro-status').value.trim(),
-        };
+        const filtroPecas= document.getElementById('filtroPecas')
+        const filtroMaquina= document.getElementById('filtroMaquina').value
 
-        // Recarrega os resultados com os novos filtros
-        resetarCardsInicial(filtros);
+        const pecasSelecionadas = Array.from(filtroPecas.selectedOptions).map((opt) => opt.value);
 
-        // Filtrar ordens em andamento
-        const containerIniciado = document.querySelector('.containerProcesso');
-        carregarOrdensIniciadas(containerIniciado, filtros);
+        fetch(`api/duplicador-ordem/filtrar/?pecas=${pecasSelecionadas.join(",")}&maquina=${filtroMaquina}`)
+        .then((response) => response.json())
+        .then((data) => {
 
-        // Filtrar ordens interrompidas
-        const containerInterrompido = document.querySelector('.containerInterrompido');
-        carregarOrdensInterrompidas(containerInterrompido, filtros);
+            resultadoFiltro.innerHTML = "";
+            data.ordens.forEach((ordem) => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${ordem.id}</td>
+                    <td>${ordem.peca}</td>
+                    <td>${ordem.quantidade}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm btn-duplicar" data-id="${ordem.id}">Duplicar</button>
+                    </td>
+                `;
+                resultadoFiltro.appendChild(row);
+            });
+        })
+        .catch((error) => console.error("Erro ao filtrar ordens:", error));
+
 
     });
 }
 
-function importarOrdensSerra() {
-    const form = document.getElementById('formImportarOrdemSerra');
-    
-    form.addEventListener('submit', (event) => {
-        event.preventDefault(); // Evita o comportamento padrão do formulário
-
-        const file = document.getElementById('arquivoOrdens').files[0]; // Captura o arquivo selecionado
-
-        if (!file) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Atenção!',
-                text: 'Por favor, selecione um arquivo antes de enviar.',
-            });
-            return;
-        }
-
-        const formData = new FormData(); // Cria o objeto FormData
-        formData.append('arquivoOrdens', file); // Adiciona o arquivo ao FormData
-
-        // Inclui o token CSRF no cabeçalho (caso o Django esteja configurado para exigir CSRF)
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-        // Exibe um SweetAlert de carregamento
-        Swal.fire({
-            title: 'Enviando...',
-            text: 'Por favor, aguarde enquanto o arquivo é enviado.',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-
-        // Faz a requisição para o backend
-        fetch('api/importar-ordens-serra/', {
-            method: 'POST',
-            body: formData, // Envia o FormData com o arquivo
-            headers: {
-                'X-CSRFToken': csrfToken // Adiciona o token CSRF
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            Swal.close(); // Fecha o SweetAlert de carregamento
-
-            if (data.status === 'success') {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Sucesso!',
-                    text: 'Arquivo importado com sucesso!',
-                });
-
-                // Atualiza a interface
-                const containerIniciado = document.querySelector('.containerProcesso');
-                carregarOrdensIniciadas(containerIniciado);
-                
-                // Recarrega os dados chamando a função de carregamento
-                document.getElementById('ordens-container').innerHTML = '';
-                resetarCardsInicial();
-
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro!',
-                    text: `Erro ao importar arquivo: ${data.message}`,
-                });
-            }
-        })
-        .catch(error => {
-            Swal.close(); // Fecha o SweetAlert de carregamento
-            console.error('Erro ao enviar o arquivo:', error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro!',
-                text: 'Ocorreu um erro ao enviar o arquivo.',
-            });
-        });
-    });
-}
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    resetarCardsInicial();
+    resetarCardsInicial(); 
 
-    // Inicializa o carregamento de ordens iniciadas
     const containerIniciado = document.querySelector('.containerProcesso');
     carregarOrdensIniciadas(containerIniciado);
 
-    // Inicializa o carregamento de ordens interrompidas
     const containerInterrompido = document.querySelector('.containerInterrompido');
     carregarOrdensInterrompidas(containerInterrompido);
 
-    // Adiciona nova peça ao clicar no botão "Add"
-    document.getElementById("addPeca").addEventListener("click", function () {
-        addPeca();
-    });
-
-    $('#mpEscolhida').select2({
-        placeholder: 'Selecione a mp',
-        width: '100%',
-        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-        ajax: {
-            url: 'api/get-mp/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
-                    }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-        dropdownParent: $('#modalSerra'),
-    });
-
-    $('#pecaEscolhida_0').select2({
-        placeholder: 'Selecione a Peça',
-        width: '100%',
-        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-        ajax: {
-            url: 'api/get-peca/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
-                    }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-        dropdownParent: $('#containerPecas'), // Use o contêiner correto como pai do dropdown
-    });
-
-    $('#filtro-mp').select2({
-        placeholder: 'Selecione a mp',
-        width: '100%',
-        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-        allowClear: true, // Habilita o botão "clear" no campo
-        ajax: {
-            url: 'api/get-mp/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
-                    }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-    });
-
-    $('#filtro-peca').select2({
-        placeholder: 'Selecione a peça',
-        width: '100%',
-        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-        allowClear: true, // Habilita o botão "clear" no campo
-        ajax: {
-            url: 'api/get-peca/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
-                    }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-    });
-
-    criarOrdem();
     filtro();
-    importarOrdensSerra();
- 
-});
 
+});

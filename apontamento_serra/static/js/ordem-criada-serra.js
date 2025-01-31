@@ -206,7 +206,7 @@ function iniciarContador(ordemId, dataCriacao) {
     setInterval(atualizarContador, 1000);
 }
 
-function carregarOrdensIniciadas(container, filtros={}) {
+export function carregarOrdensIniciadas(container, filtros={}) {
     fetch(`api/ordens-iniciadas/?page=1&limit=10&ordem=${filtros.ordem || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
 
         .then(response => response.json())
@@ -317,7 +317,7 @@ function carregarOrdensIniciadas(container, filtros={}) {
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
 }
 
-function carregarOrdensInterrompidas(container, filtros={}) {
+export function carregarOrdensInterrompidas(container, filtros={}) {
     // Fetch para buscar ordens interrompidas
     fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
@@ -1434,158 +1434,74 @@ function importarOrdensSerra() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        resetarCardsInicial();
 
-    resetarCardsInicial();
+        // Inicializa carregamento de ordens simultaneamente
+        const containerIniciado = document.querySelector('.containerProcesso');
+        const containerInterrompido = document.querySelector('.containerInterrompido');
 
-    // Inicializa o carregamento de ordens iniciadas
-    const containerIniciado = document.querySelector('.containerProcesso');
-    carregarOrdensIniciadas(containerIniciado);
+        if (containerIniciado) carregarOrdensIniciadas(containerIniciado);
+        if (containerInterrompido) carregarOrdensInterrompidas(containerInterrompido);
 
-    // Inicializa o carregamento de ordens interrompidas
-    const containerInterrompido = document.querySelector('.containerInterrompido');
-    carregarOrdensInterrompidas(containerInterrompido);
+        // Adiciona evento ao botão "Add" se ele existir
+        const addPecaBtn = document.getElementById("addPeca");
+        if (addPecaBtn) {
+            addPecaBtn.addEventListener("click", addPeca);
+        }
 
-    // Adiciona nova peça ao clicar no botão "Add"
-    document.getElementById("addPeca").addEventListener("click", function () {
-        addPeca();
-    });
+        // Configuração do Select2 para diferentes campos
+        configurarSelect2('#mpEscolhida', 'api/get-mp/', '#modalSerra');
+        configurarSelect2('#pecaEscolhida_0', 'api/get-peca/', '#containerPecas');
+        configurarSelect2('#filtro-mp', 'api/get-mp/', null, true);
+        configurarSelect2('#filtro-peca', 'api/get-peca/', null, true);
 
-    $('#mpEscolhida').select2({
-        placeholder: 'Selecione a mp',
-        width: '100%',
-        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-        ajax: {
-            url: 'api/get-mp/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
-                    }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-        dropdownParent: $('#modalSerra'),
-    });
-
-    $('#pecaEscolhida_0').select2({
-        placeholder: 'Selecione a Peça',
-        width: '100%',
-        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-        ajax: {
-            url: 'api/get-peca/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
-                    }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-        dropdownParent: $('#containerPecas'), // Use o contêiner correto como pai do dropdown
-    });
-
-    $('#filtro-mp').select2({
-        placeholder: 'Selecione a mp',
-        width: '100%',
-        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-        allowClear: true, // Habilita o botão "clear" no campo
-        ajax: {
-            url: 'api/get-mp/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
-                    }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-    });
-
-    $('#filtro-peca').select2({
-        placeholder: 'Selecione a peça',
-        width: '100%',
-        theme: 'bootstrap-5', // Tema específico para Bootstrap 5
-        allowClear: true, // Habilita o botão "clear" no campo
-        ajax: {
-            url: 'api/get-peca/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
-                    }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-    });
-
-    criarOrdem();
-    filtro();
-    importarOrdensSerra();
- 
+        // Executa outras funções de inicialização
+        criarOrdem();
+        filtro();
+        importarOrdensSerra();
+    } catch (error) {
+        console.error("Erro ao carregar a página:", error);
+    }
 });
+
+/**
+ * Configura o Select2 de forma reutilizável
+ * @param {string} selector - Seletor do elemento
+ * @param {string} url - URL da API
+ * @param {string|null} parent - Seletor do contêiner pai (se aplicável)
+ * @param {boolean} [allowClear=false] - Habilitar botão de limpar
+ */
+function configurarSelect2(selector, url, parent = null, allowClear = false) {
+    const element = document.querySelector(selector);
+    if (!element) return; // Evita erros se o elemento não existir
+
+    $(selector).select2({
+        placeholder: 'Selecione uma opção',
+        width: '100%',
+        theme: 'bootstrap-5',
+        allowClear: allowClear,
+        ajax: {
+            url: url,
+            dataType: 'json',
+            delay: 250,
+            data: (params) => ({
+                search: params.term || '',
+                page: params.page || 1,
+                per_page: 10
+            }),
+            processResults: (data, params) => ({
+                results: data.results.map(item => ({
+                    id: item.id,
+                    text: item.text
+                })),
+                pagination: { more: data.pagination?.more || false }
+            }),
+            cache: true
+        },
+        minimumInputLength: 0,
+        dropdownParent: parent ? $(parent) : undefined
+    });
+}
 
