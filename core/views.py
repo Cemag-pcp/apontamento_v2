@@ -3,11 +3,13 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login
 
 from .models import Ordem
 from cadastro.models import MotivoExclusao
 
 import json
+import time
 
 @login_required  # Garante que apenas usuários autenticados possam acessar a view
 def excluir_ordem(request):
@@ -46,13 +48,23 @@ def excluir_ordem(request):
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
 
 class CustomLoginView(LoginView):
-    template_name = 'login/login.html'  # Nome do template de login
+    template_name = 'login/login.html'
 
-    def dispatch(self, request, *args, **kwargs):
-        # Se o usuário já estiver autenticado, redireciona para a página inicial ou outra página
-        if request.user.is_authenticated:
-            return redirect('home')  # Redireciona para o nome da URL 'home'
-        return super().dispatch(request, *args, **kwargs)
+    def form_valid(self, form):
+        start_time = time.time()
+
+        user = authenticate(
+            self.request,
+            username=form.cleaned_data["username"],
+            password=form.cleaned_data["password"]
+        )
+        if user:
+            login(self.request, user)
+
+        end_time = time.time()
+        print(f"Tempo de login: {end_time - start_time:.2f} segundos")  # Log de tempo de login
+
+        return super().form_valid(form)
 
 def home(request):
     return render(request, 'home/home.html')  

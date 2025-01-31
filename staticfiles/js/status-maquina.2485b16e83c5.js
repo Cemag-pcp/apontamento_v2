@@ -1,19 +1,31 @@
+import { carregarOrdensIniciadas } from './ordem-criada-serra.js';
+import { carregarOrdensInterrompidas} from './ordem-criada-serra.js';
+
 document.addEventListener('DOMContentLoaded', function () {
-
-    // Atualiza a cada 10 segundos
+    // Atualiza automaticamente ao carregar a página
     fetchStatusMaquinas();
-    setInterval(fetchStatusMaquinas, 10000);
-
     fetchUltimasPecasProduzidas();
-    setInterval(fetchUltimasPecasProduzidas, 10000);
-
     fetchContagemStatusOrdens();
-    setInterval(fetchContagemStatusOrdens, 10000);
 
-    document.getElementById('btnPararMaquina').addEventListener('click', () => {
-        mostrarModalPararMaquina(); // Chama a função ao clicar no botão
+    // Adiciona eventos de clique para atualizar manualmente
+    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
+        console.log("Atualizando Status de Máquinas...");
+        fetchStatusMaquinas(); // Chama a função existente
     });
 
+    document.getElementById('refresh-pecas').addEventListener('click', function () {
+        console.log("Atualizando Últimas Peças Produzidas...");
+        fetchUltimasPecasProduzidas(); // Chama a função existente
+    });
+
+    document.getElementById('refresh-ordens').addEventListener('click', function () {
+        console.log("Atualizando Status de Ordens...");
+        fetchContagemStatusOrdens(); // Chama a função existente
+    });
+
+    document.getElementById('btnPararMaquina').addEventListener('click', () => {
+        mostrarModalPararMaquina(); // Chama a função já existente
+    });
 });
 
 function fetchStatusMaquinas() {
@@ -263,6 +275,12 @@ async function mostrarModalPararMaquina() {
                 });
             }
             fetchStatusMaquinas();
+
+            const container = document.querySelector('.containerProcesso');
+            carregarOrdensIniciadas(container);
+
+            const containerInterrompido = document.querySelector('.containerInterrompido');
+            carregarOrdensInterrompidas(containerInterrompido);
 
             return response.json();
         })

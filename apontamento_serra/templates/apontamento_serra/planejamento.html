@@ -24,58 +24,64 @@
         <div class="row gx-4">
             <!-- Coluna 1: Status de Máquina -->
             <div class="col-md-4">
-                <h4 class="text-center text-secondary">Status de Máquina</h4>
+                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
+                    Status de Máquina
+                    <button class="btn btn-sm" id="refresh-status-maquinas">
+                        🔄
+                    </button>
+                </h4>
                 <div class="border rounded p-3 bg-light" style="height: 300px; max-height: 300px;">
-                    <!-- Duas colunas dentro do container -->
                     <div class="row h-100">
-                        <!-- Coluna do Indicador -->
                         <div class="col-md-6 text-center d-flex flex-column align-items-center justify-content-center">
                             <div class="display-4 text-primary">75%</div>
                             <p class="text-muted">Máquinas em operação</p>
                         </div>
-                        <!-- Coluna da Lista -->
                         <div class="col-md-6">
-                            <ul class="list-unstyled">
-                            </ul>
+                            <ul class="list-unstyled"></ul>
                         </div>
                     </div>
-                    <!-- Rodapé com os círculos coloridos na horizontal -->
                     <div class="border-top pt-2 mt-3">
                         <div class="d-flex justify-content-around text-muted" style="font-size: 0.9rem;">
                             <div class="d-flex align-items-center">
-                                <span class="me-2" style="width: 15px; height: 15px; background-color: red; border-radius: 50%; display: inline-block;"></span>
+                                <span class="me-2 bg-danger rounded-circle" style="width: 15px; height: 15px; display: inline-block;"></span>
                                 <span>Parada</span>
                             </div>
                             <div class="d-flex align-items-center">
-                                <span class="me-2" style="width: 15px; height: 15px; background-color: yellow; border-radius: 50%; display: inline-block;"></span>
+                                <span class="me-2 bg-warning rounded-circle" style="width: 15px; height: 15px; display: inline-block;"></span>
                                 <span>Em Produção</span>
                             </div>
                             <div class="d-flex align-items-center">
-                                <span class="me-2" style="width: 15px; height: 15px; background-color: green; border-radius: 50%; display: inline-block;"></span>
+                                <span class="me-2 bg-success rounded-circle" style="width: 15px; height: 15px; display: inline-block;"></span>
                                 <span>Livre</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
+    
             <!-- Coluna 2: Últimas peças produzidas -->
             <div class="col-md-4">
-                <h4 class="text-center text-secondary">Últimas peças produzidas</h4>
+                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
+                    Últimas peças produzidas
+                    <button class="btn btn-sm" id="refresh-pecas">
+                        🔄
+                    </button>
+                </h4>
                 <div class="border rounded p-3 bg-light" style="height: 300px; max-height: 300px; overflow-y: auto;">
-                    <!-- Lista estilizada com ícones -->
-                    <ul class="list-group">
-                    </ul>
+                    <ul class="list-group"></ul>
                 </div>
             </div>
-
+    
             <!-- Coluna 3: Status de Ordens -->
             <div class="col-md-4">
-                <h4 class="text-center text-secondary">Status de Ordens</h4>
+                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
+                    Status de Ordens
+                    <button class="btn btn-sm" id="refresh-ordens">
+                        🔄
+                    </button>
+                </h4>
                 <div class="border rounded p-3 bg-light" style="height: 300px; max-height: 300px; overflow-y: auto;">
-                    <ul id="status-ordens-list" class="list-unstyled">
-                        
-                    </ul>
+                    <ul id="status-ordens-list" class="list-unstyled"></ul>
                 </div>
             </div>
         </div>

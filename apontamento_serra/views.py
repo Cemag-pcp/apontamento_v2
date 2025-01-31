@@ -133,14 +133,15 @@ def atualizar_status_ordem(request):
                 ordem.status_atual = status
                 
                 if status == 'iniciada':
-                    # Pode ser que a ordem tenha sido reestartada, então não precisao atualizar a máquina
-                    try:
-                        ordem.maquina = body['maquina_nome']
-                    except:
-                        # Verifica se a máquina ja está parada e retorna ela
-                        if MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True).exists():
-                            MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True).update(data_fim=now())
-                        pass
+                    # Pode ser que a ordem tenha sido reiniciada, então não precisa atualizar a máquina
+                    maquina_nome = body.get('maquina_nome')  # Usa get() para evitar KeyError
+                    if maquina_nome:
+                        ordem.maquina = maquina_nome
+                    else:
+                        # Verifica e finaliza a parada da máquina se necessário
+                        maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
+                        if maquinas_paradas.exists():
+                            maquinas_paradas.update(data_fim=now())
                     ordem.status_prioridade = 1
                 elif status == 'finalizada':
                     
@@ -745,11 +746,20 @@ def get_status_maquinas(request):
         ).exists()
 
         if em_producao and paradas.exists():
+            print("aqui 1")
             status = 'Parada'
         elif interrompida and paradas.exists():
+            print("aqui 2")
+
+            status = 'Parada'
+        elif paradas.exists():
+            print("aqui 3")
+
             status = 'Parada'
         elif interrompida:
-            status = 'Em produção'
+            print("aqui 4")
+
+            status = 'Parada'
         elif em_producao:
             status = 'Em produção'
         else: 
@@ -851,9 +861,13 @@ def parar_maquina(request):
                 )
 
                 # Verifica se existe alguma ordem em processo associada à máquina
-                ordem_em_processo = OrdemProcesso.objects.filter(data_fim__isnull=True, status='iniciada', ordem__maquina=maquina, ordem__grupo_maquina='serra').first()
+                ordem_em_processo = OrdemProcesso.objects.filter(data_fim__isnull=True, status='iniciada').first()
 
                 if ordem_em_processo:
+
+                    ordem_em_processo.data_fim=now()
+                    ordem_em_processo.save()
+
                     # Cria um novo processo com status "interrompido"
                     novo_processo = OrdemProcesso.objects.create(
                         ordem=ordem_em_processo.ordem,
@@ -864,9 +878,9 @@ def parar_maquina(request):
                     novo_processo.save()
 
                     # Atualiza a ordem associada
-                    ordem = ordem_em_processo.ordem
-                    ordem.status_prioridade = 2
-                    ordem.status_atual = 'interrompida'
+                    ordem=ordem_em_processo.ordem
+                    ordem.status_prioridade=2
+                    ordem.status_atual='interrompida'
                     ordem.save()
 
                 return JsonResponse({'success': 'Máquina parada com sucesso.'}, status=201)
