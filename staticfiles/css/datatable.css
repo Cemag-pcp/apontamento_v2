@@ -1,0 +1,104 @@
+/* Cabeçalho da tabela */
+#ordens-table thead {
+    background-color: #a2d2ff; /* Azul pastel */
+    color: #333; /* Cor do texto em tom mais escuro */
+    font-weight: bold;
+    text-align: center;
+    border-bottom: 2px solid #74c0fc; /* Borda para destaque */
+}
+
+/* Centralizar texto do cabeçalho */
+#ordens-table thead th {
+    text-align: center; /* Centraliza o texto no cabeçalho */
+    vertical-align: middle; /* Alinha verticalmente no centro */
+    padding: 12px; /* Espaço interno maior */
+}
+
+/* Corpo da tabela - Estilo de linhas */
+#ordens-table tbody tr {
+    background-color: #f8f9fa; /* Cinza muito claro */
+    transition: background-color 0.3s ease; /* Efeito suave no hover */
+}
+
+/* Linha ao passar o mouse */
+#ordens-table tbody tr:hover {
+    background-color: #d4edda; /* Verde pastel claro */
+}
+
+/* Estrutura geral da tabela */
+#ordens-table {
+    border: 1px solid #dee2e6; /* Cinza suave */
+    border-radius: 8px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* Sombra para dar profundidade */
+    overflow: hidden;
+    font-family: "Arial", sans-serif; /* Fonte elegante e limpa */
+    font-size: 14px;
+}
+
+/* Células da tabela */
+#ordens-table td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 12px; /* Mais espaço interno */
+    color: #495057; /* Cinza escuro */
+}
+
+/* Rodapé da tabela (opcional) */
+#ordens-table tfoot {
+    background-color: #e9ecef; /* Cinza pastel */
+    font-weight: bold;
+    text-align: center;
+    color: #333;
+    border-top: 2px solid #74c0fc; /* Linha de separação */
+}
+
+/* Controles de Paginação */
+.dataTables_paginate {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 15px;
+}
+
+/* Botões de paginação */
+.dataTables_paginate .paginate_button {
+    background-color: #f8f9fa; /* Fundo padrão */
+    border: 1px solid #dee2e6; /* Borda sutil */
+    border-radius: 4px;
+    padding: 6px 12px;
+    color: #495057; /* Cor do texto */
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.dataTables_paginate .paginate_button:hover {
+    background-color: #d4edda; /* Verde pastel claro no hover */
+    border-color: #b7e4c7; /* Borda verde clara */
+    color: #333; /* Texto mais escuro */
+}
+
+/* Botão ativo */
+.dataTables_paginate .paginate_button.current {
+    background-color: #74c0fc; /* Azul pastel para o botão ativo */
+    color: white;
+    font-weight: bold;
+    border-color: #74c0fc;
+}
+
+/* Desabilitar botões (primeiro/último) */
+.dataTables_paginate .paginate_button.disabled {
+    background-color: #e9ecef; /* Cinza pastel claro */
+    color: #adb5bd; /* Cinza claro */
+    cursor: not-allowed;
+    border: 1px solid #dee2e6;
+}
+
+/* Informações e controle de paginação */
+.dataTables_info {
+    text-align: center;
+    color: #495057;
+    margin-top: 10px;
+    font-style: italic;
+    font-size: 14px;
+}

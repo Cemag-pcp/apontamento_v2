@@ -25,7 +25,7 @@ document.getElementById('fileUpload').addEventListener('change', async (event) =
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
 
-    formData.append('tipoMaquinaPlasma', 'plasma');
+    formData.append('tipoMaquina', 'plasma');
 
     // Obter o token CSRF do formulário
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
