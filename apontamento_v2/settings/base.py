@@ -38,6 +38,11 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.common.BrokenLinkEmailsMiddleware',
+
+    # middleware personalizado para perfis de usuário
+    'core.middleware.SetorAccessMiddleware', 
+
+
 ]
 
 ROOT_URLCONF = 'apontamento_v2.urls'
@@ -94,3 +99,6 @@ STATICFILES_DIRS = [
 
     os.path.join(BASE_DIR, 'cadastro/static'),
 ]
+
+LOGIN_REDIRECT_URL = '/core'  
+LOGOUT_REDIRECT_URL = '/core/login/'  

@@ -9,12 +9,13 @@ from django.views.decorators.http import require_GET
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import localtime
-from django.db.models import F, Value, CharField, Func, Q
+from django.db.models import F, Value, CharField, Func, Q, Prefetch, Count
 from django.db.models.functions import Coalesce, Concat
+from django.contrib.auth.decorators import login_required
 
 from .models import PecasOrdem
-from core.models import OrdemProcesso,PropriedadesOrdem,Ordem
-from cadastro.models import MotivoInterrupcao, Mp, Pecas, Operador, Setor
+from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada
+from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operador, Setor, MotivoMaquinaParada
 
 import pandas as pd
 import os
@@ -23,6 +24,7 @@ import re
 import json
 import openpyxl
 from operator import itemgetter
+from datetime import timedelta
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
@@ -36,15 +38,21 @@ def extrair_numeracao(nome_arquivo):
         return match.group(1)
     return None
 
+@login_required
 def planejamento(request):
 
-    motivos = MotivoInterrupcao.objects.filter(setor__nome='serra')
+    motivos = MotivoInterrupcao.objects.filter(setor__nome='serra', visivel=True)
     operadores = Operador.objects.filter(setor__nome='serra')
+    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='serra')
+    motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='serra')
 
     return render(request, 'apontamento_serra/planejamento.html', {
                                                                     'motivos': motivos,
-                                                                    'operadores':operadores})
+                                                                    'operadores':operadores,
+                                                                    'motivos_maquina_parada':motivos_maquina_parada,
+                                                                    'motivos_exclusao': motivos_exclusao})
 
+@login_required
 def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:
         # Busca a ordem com os relacionamentos necessários
@@ -85,6 +93,7 @@ def get_pecas_ordem(request, pk_ordem, name_maquina):
         # Captura erros genéricos
         return JsonResponse({'error': str(e)}, status=500)
 
+@login_required
 def atualizar_status_ordem(request):
     if request.method == 'PATCH':
         try:
@@ -124,10 +133,13 @@ def atualizar_status_ordem(request):
                 ordem.status_atual = status
                 
                 if status == 'iniciada':
-                    # Pode ser que a ordem tenha sido reestarada, então não precisao atualizar a máquina
+                    # Pode ser que a ordem tenha sido reestartada, então não precisao atualizar a máquina
                     try:
                         ordem.maquina = body['maquina_nome']
                     except:
+                        # Verifica se a máquina ja está parada e retorna ela
+                        if MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True).exists():
+                            MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True).update(data_fim=now())
                         pass
                     ordem.status_prioridade = 1
                 elif status == 'finalizada':
@@ -200,7 +212,7 @@ def get_ordens_criadas(request):
     limit = int(request.GET.get('limit', 10))
 
     # Filtra as ordens com base nos parâmetros
-    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_serra', 'propriedade').filter(grupo_maquina='serra').order_by('status_prioridade','-data_criacao')
+    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_serra', 'propriedade').filter(grupo_maquina='serra', excluida=False).order_by('status_prioridade','-data_criacao')
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem__icontains=filtro_ordem)
@@ -630,7 +642,7 @@ def importar_ordens_serra(request):
 
 def api_apontamentos_peca(request):
     ordens = (
-        Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra')
+        Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra', excluida=False)
         .exclude(Q(ordem_pecas_serra__peca__codigo='GRAU') | Q(ordem_pecas_serra__peca__codigo='RECORTE'))  # Exclui GRAU e RECORTE
         .select_related('operador_final')  # Para otimizar a relação com operador_final
         .prefetch_related('ordem_pecas_serra__peca')  # Ajustado para usar o related_name correto
@@ -665,7 +677,7 @@ def api_apontamentos_peca(request):
 
 def api_apontamentos_mp(request):
     propriedades_ordens = (
-        PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra')
+        PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra', ordem__excluida=False)
         .exclude(Q(mp_codigo__codigo='GRAU') | Q(mp_codigo__codigo='RECORTE'))  # Exclui GRAU e RECORTE
         .select_related('ordem', 'mp_codigo', 'nova_mp')  # Otimiza consultas relacionadas
         # .order_by('ordem__ordem_pecas_serra__data')  # Ordena pelo campo `data` da tabela `Ordem`
@@ -707,3 +719,163 @@ def api_apontamentos_mp(request):
 
     return JsonResponse(list(propriedades_ordens), safe=False)
 
+def get_status_maquinas(request):
+    # Obtemos todas as máquinas disponíveis
+    maquinas = [('serra_1', 'Serra 1'), ('serra_2','Serra 2'), ('serra_3', 'Serra 3')]
+
+    status_data = []
+    for maquina in maquinas:
+        # Verifica se ja tem uma parada ativa dessa máquina
+        paradas = MaquinaParada.objects.filter(
+            maquina=maquina[0],
+            data_fim__isnull=True
+        )
+
+        # Verifica o último status
+        em_producao = OrdemProcesso.objects.filter(
+            ordem__maquina=maquina[0],
+            status='iniciada',
+            data_fim__isnull=True
+        ).exists()
+
+        interrompida = OrdemProcesso.objects.filter(
+            ordem__maquina=maquina[0],
+            status='interrompida',
+            data_fim__isnull=True
+        ).exists()
+
+        if em_producao and paradas.exists():
+            status = 'Parada'
+        elif interrompida and paradas.exists():
+            status = 'Parada'
+        elif interrompida:
+            status = 'Em produção'
+        elif em_producao:
+            status = 'Em produção'
+        else: 
+            status = 'Livre'
+
+        status_data.append({
+            'maquina': maquina[1],
+            'status': status,
+            'motivo_parada': paradas.last().motivo.nome if paradas.exists() else None
+        })
+
+    return JsonResponse({'status': status_data})
+
+def get_ultimas_pecas_produzidas(request):
+    # Filtra as ordens finalizadas e carrega as peças associadas
+    ultimas_ordens = Ordem.objects.filter(status_atual='finalizada').prefetch_related(
+        Prefetch('ordem_pecas_serra__peca', queryset=Pecas.objects.all())
+    ).order_by('-ultima_atualizacao')[:10]  # Ordena pelas mais recentes e limita a 10
+
+    # Prepara a lista de peças para o retorno JSON
+    pecas = []
+    for ordem in ultimas_ordens:
+        for ordem_peca_serra in ordem.ordem_pecas_serra.all():
+            peca = ordem_peca_serra.peca
+            pecas.append({
+                'nome': f'{peca.codigo} - {peca.descricao[:30] + "..." if peca.descricao and len(peca.descricao) > 30 else (peca.descricao if peca.descricao else "Sem descrição")}',
+                'quantidade': ordem_peca_serra.qtd_boa,
+                'data_producao': ordem.ultima_atualizacao.strftime('%Y-%m-%d %H:%M:%S'),
+            })
+
+    # Retorna os dados como JSON
+    return JsonResponse({'pecas': pecas})
+
+def get_contagem_status_ordem(request):
+    # Consulta os dados agrupados por status
+    contagem_status = Ordem.objects.filter(grupo_maquina='serra').values('status_atual').annotate(total=Count('id')).order_by('status_atual')
+
+    # Total de ordens
+    total_ordens = sum(item['total'] for item in contagem_status)
+
+    # Calcula as porcentagens e prepara os dados para o frontend
+    status_data = []
+    for item in contagem_status:
+        porcentagem = (item['total'] / total_ordens * 100) if total_ordens > 0 else 0
+        status_data.append({
+            'status': item['status_atual'],
+            'total': item['total'],
+            'porcentagem': round(porcentagem, 2)  # Trunca a porcentagem para 2 casas decimais
+        })
+
+    return JsonResponse({'status_contagem': status_data})
+
+def get_maquinas_disponiveis(request):
+    maquinas = [('serra_1', 'Serra 1'), ('serra_2', 'Serra 2'), ('serra_3', 'Serra 3')]
+
+    # Obtem todas as máquinas que estão ativas em `OrdemProcesso` ou `MaquinaParada`
+    maquinas_em_processo = OrdemProcesso.objects.filter(data_fim__isnull=True).values_list('maquina', flat=True).exclude(status='iniciada')
+    maquinas_paradas = MaquinaParada.objects.filter(data_fim__isnull=True).values_list('maquina', flat=True)
+
+    # Converte os resultados para conjuntos para evitar duplicação
+    maquinas_ocupadas = set(maquinas_em_processo).union(set(maquinas_paradas))
+
+    # Filtra as máquinas disponíveis com alias e nome
+    maquinas_disponiveis = [
+        {'alias': maquina[0], 'nome': maquina[1]}
+        for maquina in maquinas
+        if maquina[0] not in maquinas_ocupadas
+    ]
+
+    return JsonResponse({'maquinas_disponiveis': maquinas_disponiveis})
+
+def parar_maquina(request):
+    if request.method == 'PATCH':
+        try:
+            with transaction.atomic():
+                # Decodifica o corpo da requisição
+                data = json.loads(request.body)
+                maquina = data.get('maquina')
+                motivo = data.get('motivo')
+
+                # Validação básica de dados
+                if not maquina or not motivo:
+                    return JsonResponse({'error': 'Dados inválidos: maquina ou motivo ausente.'}, status=400)
+
+                # Verifica se a máquina ja está parada
+                if MaquinaParada.objects.filter(maquina=maquina, data_fim__isnull=True).exists():
+                    return JsonResponse({'error': 'Máquina já está parada.'}, status=400)
+
+                # Busca o motivo específico no banco de dados
+                try:
+                    motivo_instance = MotivoMaquinaParada.objects.get(nome=motivo, setor__nome='serra')
+                except MotivoMaquinaParada.DoesNotExist:
+                    return JsonResponse({'error': 'Motivo não encontrado para o setor especificado.'}, status=404)
+
+                # Cria o registro de máquina parada
+                MaquinaParada.objects.create(
+                    maquina=maquina,
+                    motivo=motivo_instance
+                )
+
+                # Verifica se existe alguma ordem em processo associada à máquina
+                ordem_em_processo = OrdemProcesso.objects.filter(data_fim__isnull=True, status='iniciada', ordem__maquina=maquina, ordem__grupo_maquina='serra').first()
+
+                if ordem_em_processo:
+                    # Cria um novo processo com status "interrompido"
+                    novo_processo = OrdemProcesso.objects.create(
+                        ordem=ordem_em_processo.ordem,
+                        status='interrompida',
+                        data_inicio=now(),
+                        motivo_interrupcao=MotivoInterrupcao.objects.get(nome='Máquina parada')
+                    )
+                    novo_processo.save()
+
+                    # Atualiza a ordem associada
+                    ordem = ordem_em_processo.ordem
+                    ordem.status_prioridade = 2
+                    ordem.status_atual = 'interrompida'
+                    ordem.save()
+
+                return JsonResponse({'success': 'Máquina parada com sucesso.'}, status=201)
+
+        except MotivoInterrupcao.DoesNotExist:
+            return JsonResponse({'error': 'Motivo de interrupção não encontrado.'}, status=404)
+        except Exception as e:
+            print(f"Erro: {str(e)}")
+            return JsonResponse({'error': 'Erro interno no servidor.'}, status=500)
+        
+    # Resposta padrão para métodos não permitidos
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)

@@ -128,8 +128,14 @@
                         </div>
                     </div>
                     <div class="sb-sidenav-footer">
-                        <!-- <div class="small">Logged in as:</div>
-                        Start Bootstrap -->
+                        <div class="small">
+                            <!-- Exibe o tipo de acesso do usuário -->
+                            Logado: <strong>{{ request.user.username }}</strong> 
+                            <br>
+                            Acesso: <strong>{{ request.user.profile.tipo_acesso|title }}</strong>
+                        </div>
+                        <!-- Botão de Logout -->
+                        <a href="{% url 'core:logout' %}" class="btn btn-danger btn-sm mt-2 w-100">Sair</a>
                     </div>
                 </nav>
             </div>

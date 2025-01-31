@@ -7,6 +7,7 @@
 
 {% block links %}
     <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -18,10 +19,75 @@
         <p class="text-muted">Gerencie e acompanhe os processos de serra.</p>
     </div>
 
+    <!-- Container para Status de Máquina -->
+    <div class="mb-5">
+        <div class="row gx-4">
+            <!-- Coluna 1: Status de Máquina -->
+            <div class="col-md-4">
+                <h4 class="text-center text-secondary">Status de Máquina</h4>
+                <div class="border rounded p-3 bg-light" style="height: 300px; max-height: 300px;">
+                    <!-- Duas colunas dentro do container -->
+                    <div class="row h-100">
+                        <!-- Coluna do Indicador -->
+                        <div class="col-md-6 text-center d-flex flex-column align-items-center justify-content-center">
+                            <div class="display-4 text-primary">75%</div>
+                            <p class="text-muted">Máquinas em operação</p>
+                        </div>
+                        <!-- Coluna da Lista -->
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                            </ul>
+                        </div>
+                    </div>
+                    <!-- Rodapé com os círculos coloridos na horizontal -->
+                    <div class="border-top pt-2 mt-3">
+                        <div class="d-flex justify-content-around text-muted" style="font-size: 0.9rem;">
+                            <div class="d-flex align-items-center">
+                                <span class="me-2" style="width: 15px; height: 15px; background-color: red; border-radius: 50%; display: inline-block;"></span>
+                                <span>Parada</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="me-2" style="width: 15px; height: 15px; background-color: yellow; border-radius: 50%; display: inline-block;"></span>
+                                <span>Em Produção</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="me-2" style="width: 15px; height: 15px; background-color: green; border-radius: 50%; display: inline-block;"></span>
+                                <span>Livre</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna 2: Últimas peças produzidas -->
+            <div class="col-md-4">
+                <h4 class="text-center text-secondary">Últimas peças produzidas</h4>
+                <div class="border rounded p-3 bg-light" style="height: 300px; max-height: 300px; overflow-y: auto;">
+                    <!-- Lista estilizada com ícones -->
+                    <ul class="list-group">
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Coluna 3: Status de Ordens -->
+            <div class="col-md-4">
+                <h4 class="text-center text-secondary">Status de Ordens</h4>
+                <div class="border rounded p-3 bg-light" style="height: 300px; max-height: 300px; overflow-y: auto;">
+                    <ul id="status-ordens-list" class="list-unstyled">
+                        
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Container para Planejamento -->
     <div id="containerPlanejar" class="mb-5">
         <!-- Botões para abrir modais -->
         <div class="d-flex justify-content-end gap-3 mb-4">
+            <button type="button" class="btn btn-primary" id="btnPararMaquina">
+                Parada de máquina
+            </button>
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSerra">
                 Planejar Serra
             </button>
@@ -295,6 +361,37 @@
     </div>
 </div>
 
+<!-- Modal interromper ordem -->
+<div class="modal fade" id="modalExcluir" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalExcluirLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalExcluirLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formExcluir">
+                    <div class="mb-3">
+                        <label for="escolhaMotivo" class="form-label">Qual motivo?</label>
+                        <select class="form-control" id="motivoExclusao" name="motivoExclusao" required>
+                            <option value="">------</option>
+                            {% for motivo in motivos_exclusao %}
+                            <option value="{{motivo.id}}">{{motivo.nome}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Excluir</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal finalizar ordem -->
 <div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -360,9 +457,47 @@
     </div>
 </div>
 
+<!-- Modal parar maquina -->
+<div class="modal fade" id="modalPararMaquina" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPararMaquinaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalPararMaquinaLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formPararMaquina">
+                    <div class="mb-3">
+                        <label for="escolhaMaquina" class="form-label">Qual máquina?</label>
+                        <select class="form-control" id="escolhaMaquinaParada" name="escolhaMaquinaParada" required>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="escolhaMotivo" class="form-label">Qual motivo?</label>
+                        <select class="form-control" id="motivoParadaMaquina" name="motivoParadaMaquina" required>
+                            <option value="">------</option>
+                            {% for motivo in motivos_maquina_parada %}
+                            <option value="{{motivo.nome}}">{{motivo.nome}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Parar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script type="module" src="{% static 'js/ordem-criada-serra.js' %}"></script>
+<script type="module" src="{% static 'js/status-maquina.js' %}"></script>
 {% endblock %}
 

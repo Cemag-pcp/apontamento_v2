@@ -1,8 +1,9 @@
 from django.db import models
 from django.utils.timezone import now
 from django.db.models import Max
+from django.contrib.auth.models import User
 
-from cadastro.models import MotivoInterrupcao,Mp,Operador
+from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao
 
 STATUS_ANDAMENTO_CHOICES = (
     ('aguardando_iniciar', 'Aguardando iniciar'),
@@ -69,10 +70,10 @@ class Ordem(models.Model):
     data_programacao = models.DateField(blank=True, null=True)
     ultima_atualizacao = models.DateTimeField(auto_now=True)
     excluida = models.BooleanField(default=False) # Opção para exclusão de ordens
+    motivo_exclusao = models.ForeignKey(MotivoExclusao, on_delete=models.CASCADE, null=True, blank=True) # Caso exclua a ordem, é necessário informar o motivo
     
     #Para ordens duplicadas
     ordem_duplicada = models.TextField(blank=True, null=True) # Armazena a identificação da ordem duplicada (Ex.: "dup#1","dup#2"...)
-    motivo_exclusao = models.ForeignKey(MotivoInterrupcao, on_delete=models.CASCADE, null=True, blank=True) # Caso exclua a ordem, é necessário informar o motivo
     ordem_pai = models.ForeignKey(
         'self',  # Referencia a própria tabela
         on_delete=models.SET_NULL,  # Define como `NULL` se a ordem pai for excluída
@@ -161,3 +162,32 @@ class OrdemProcesso(models.Model):
             data_inicio=now()
         )
         return novo_processo
+
+class MaquinaParada(models.Model):
+
+    maquina = models.CharField(max_length=30, choices=MAQUINA_CHOICES)
+    data_inicio = models.DateTimeField(default=now)
+    data_fim = models.DateTimeField(null=True, blank=True)
+    motivo = models.ForeignKey(MotivoMaquinaParada, on_delete=models.CASCADE, null=True, blank=True)
+
+class Profile(models.Model):
+    ACESSO_CHOICES = [
+        ('operador', 'Operador'),
+        ('supervisor', 'Supervisor'),
+        ('pcp', 'PCP'),
+    ]
+
+    SETOR_CHOICES = [
+        ('estamparia', 'Estamparia'),
+        ('serra', 'Serra'),
+        ('usinagem', 'Usinagem'),
+        ('corte','Corte'),
+        
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    tipo_acesso = models.CharField(max_length=20, choices=ACESSO_CHOICES)
+    setores_permitidos = models.JSONField(default=list)  # Lista de setores permitidos
+
+    def __str__(self):
+        return f"{self.user.username} - {self.tipo_acesso}"

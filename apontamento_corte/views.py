@@ -35,7 +35,7 @@ def extrair_numeracao(nome_arquivo):
 
 def planejamento(request):
 
-    motivos = MotivoInterrupcao.objects.filter(setor__nome='corte')
+    motivos = MotivoInterrupcao.objects.filter(setor__nome='corte', visivel=True)
     operadores = Operador.objects.filter(setor__nome='corte')
     espessuras = Espessura.objects.all()
 
@@ -601,6 +601,7 @@ class SalvarArquivoView(View):
             ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='AllPartsList')
 
             excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2)
+            print(propriedades)
         elif tipo_maquina=='laser_1':
 
             comprimento = request.POST.get('comprimento')
@@ -632,7 +633,7 @@ class SalvarArquivoView(View):
                     descricao_mp=prop['descricao_mp'],
                     espessura=prop['espessura'],
                     quantidade=prop['quantidade'],
-                    aproveitamento=prop['aproveitamento'][:9],
+                    aproveitamento=str(prop['aproveitamento'])[:9],
                     tipo_chapa=tipo_chapa,
                     retalho=retalho
                 )

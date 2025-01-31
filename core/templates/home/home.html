@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="text-center mb-4">Sistema de Planejamento de Produção 2.0</h1>
+    
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        <!-- Atalho: Usinagem -->
+        <div class="col">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Usinagem</h5>
+                    <p class="card-text">Gerencie as ordens no setor de usinagem.</p>
+                    <a href="{% url 'usinagem:planejamento' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Atalho: Serra -->
+        <div class="col">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Serra</h5>
+                    <p class="card-text">Gerencie as ordens no setor de serra.</p>
+                    <a href="{% url 'serra:planejamento' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Atalho: Prod Especiais -->
+        <div class="col">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Prod Especiais</h5>
+                    <p class="card-text">Gerencie as ordens de produtos especiais.</p>
+                    <a href="{% url 'prod_esp:planejamento' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Atalho: Corte -->
+        <div class="col">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Corte</h5>
+                    <p class="card-text">Gerencie as ordens no setor de corte.</p>
+                    <a href="{% url 'corte:planejamento' %}" class="btn btn-primary">Acessar</a>
+                    <a href="{% url 'corte:duplicar_op' %}" class="btn btn-secondary mt-2">Duplicar OP</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Atalho: Estamparia -->
+        <div class="col">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Estamparia</h5>
+                    <p class="card-text">Gerencie as ordens no setor de estamparia.</p>
+                    <a href="{% url 'estamparia:planejamento' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
