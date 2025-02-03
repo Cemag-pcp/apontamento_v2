@@ -36,6 +36,16 @@ df['data_criacao'] = pd.to_datetime(df['data_criacao'], format='%d/%m/%Y', error
 df['data_programacao'] = pd.to_datetime(df['data_programacao'], format='%d/%m/%Y', errors='coerce')
 df['ordem'] = df['ordem'].apply(lambda x: str(x).replace(' JFY','').replace('L','').replace('.',''))
 df = df.drop(df[df.ordem == '09l1'].index)
+df = df.drop(df[df.ordem == '1577 7'].index)
+df = df.drop(df[df.ordem == ' 1577 8'].index)
+df = df.drop(df[df.ordem == '543 1'].index)
+df = df.drop(df[df.ordem == '536 1'].index)
+df = df.drop(df[df.ordem == '1229-'].index)
+df = df.drop(df[df.ordem == '93l1'].index)
+df = df.drop(df[df.ordem == 'None'].index)
+df = df.drop(df[df.ordem == '53l1'].index)
+df.drop_duplicates(subset='ordem', keep='first', inplace=True)
+
 df['ordem'] = df['ordem'].astype(int)
 
 
@@ -61,9 +71,7 @@ from core.models import Ordem, Operador  # Importe os modelos necessários
 from django.utils.timezone import now  # Para trabalhar com data e hora
 
 def importar_ordens(df_carga_ordem):
-    ordens_a_criar = []
-
-    for _, row in df_carga_ordem.iterrows():
+    for index, row in df_carga_ordem.iterrows():
         # Buscar operador_final pelo campo operador_final_matricula
         operador = None
         if pd.notna(row['operador_final_matricula']):
@@ -80,9 +88,11 @@ def importar_ordens(df_carga_ordem):
             data_programacao=row['data_programacao'] if pd.notna(row['data_programacao']) else None
         )
 
-        ordens_a_criar.append(ordem)
+        # Salva a instância individualmente
+        ordem.save()
 
-    # Inserção em massa para melhor desempenho
-    Ordem.objects.bulk_create(ordens_a_criar)
+        # Exibe no console a ordem inserida
+        print(f"✅ Ordem Inserida: {ordem.ordem} | Máquina: {ordem.maquina} | Status: {ordem.status_atual}")
 
+# Chamada da função com o DataFrame
 importar_ordens(df_carga_ordem)
