@@ -714,18 +714,19 @@ def api_apontamentos_mp(request):
         )
     )
 
+    propriedades_ordens = sorted(propriedades_ordens, key=lambda x: x['data_formatada'] or '')
+
     # Formata o campo `data_formatada` para o formato desejado
     propriedades_ordens = [
         {
             **item,
-            'data_formatada': localtime(item['data_formatada']).strftime('%d/%m/%Y %H:%M')
+            'data_formatada': localtime(item['data_formatada']).strftime('%d/%m/%Y %H:%M') if item['data_formatada'] else None
         }
         for item in propriedades_ordens
     ]
 
-    propriedades_ordens = sorted(propriedades_ordens, key=itemgetter('data_formatada'))
 
-    return JsonResponse(list(propriedades_ordens), safe=False)
+    return JsonResponse(propriedades_ordens, safe=False)
 
 def get_status_maquinas(request):
     # Obtemos todas as máquinas disponíveis
