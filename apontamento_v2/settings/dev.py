@@ -2,10 +2,11 @@ from .base import *
 
 # Configurações específicas de desenvolvimento
 DEBUG = env.bool('DEBUG', default=True)
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost','af3b-177-19-132-134.ngrok-free.app']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost','3fd3-177-19-132-134.ngrok-free.app']
 CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
     'http://127.0.0.1',
+    'https://3fd3-177-19-132-134.ngrok-free.app'
 ]
 
 DATABASES = {
