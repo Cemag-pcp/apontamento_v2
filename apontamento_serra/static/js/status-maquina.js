@@ -23,9 +23,9 @@ document.addEventListener('DOMContentLoaded', function () {
         fetchContagemStatusOrdens(); // Chama a função existente
     });
 
-    document.getElementById('btnPararMaquina').addEventListener('click', () => {
-        mostrarModalPararMaquina(); // Chama a função já existente
-    });
+    // document.getElementById('btnPararMaquina').addEventListener('click', () => {
+    //     mostrarModalPararMaquina(); // Chama a função já existente
+    // });
 });
 
 export function fetchStatusMaquinas() {
@@ -35,82 +35,82 @@ export function fetchStatusMaquinas() {
     const listaStatus = document.querySelector('#machine-status-list');
 
     // Faz a requisição para a API
-    fetch('api/status_maquinas/')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            // Atualiza o indicador de percentual
-            const totalMaquinas = data.status.length;
-            const maquinasOperando = data.status.filter(maquina => maquina.status === 'Em produção').length;
-            const percentualOperando = totalMaquinas > 0 ? Math.round((maquinasOperando / totalMaquinas) * 100) : 0;
+    // fetch('api/status_maquinas/')
+    //     .then(response => {
+    //         if (!response.ok) {
+    //             throw new Error(`HTTP error! status: ${response.status}`);
+    //         }
+    //         return response.json();
+    //     })
+    //     .then(data => {
+    //         // Atualiza o indicador de percentual
+    //         const totalMaquinas = data.status.length;
+    //         const maquinasOperando = data.status.filter(maquina => maquina.status === 'Em produção').length;
+    //         const percentualOperando = totalMaquinas > 0 ? Math.round((maquinasOperando / totalMaquinas) * 100) : 0;
 
-            indicador.textContent = `${percentualOperando}%`;
-            descricao.textContent = 'Máquinas em operação';
+    //         indicador.textContent = `${percentualOperando}%`;
+    //         descricao.textContent = 'Máquinas em operação';
 
-            // Atualiza a lista de status das máquinas
-            listaStatus.innerHTML = ''; // Limpa os itens antigos
-            if (data.status.length > 0) {
-                data.status.forEach(maquina => {
-                    const statusColor = 
-                        maquina.status === 'Em produção' ? 'bg-warning' : 
-                        maquina.status === 'Parada' ? 'bg-danger' : 
-                        'bg-success';
+    //         // Atualiza a lista de status das máquinas
+    //         listaStatus.innerHTML = ''; // Limpa os itens antigos
+    //         if (data.status.length > 0) {
+    //             data.status.forEach(maquina => {
+    //                 const statusColor = 
+    //                     maquina.status === 'Em produção' ? 'bg-warning' : 
+    //                     maquina.status === 'Parada' ? 'bg-danger' : 
+    //                     'bg-success';
 
-                    const statusItem = document.createElement('li');
-                    statusItem.classList.add('list-group-item', 'd-flex', 'align-items-center', 'justify-content-between', 'border-0');
+    //                 const statusItem = document.createElement('li');
+    //                 statusItem.classList.add('list-group-item', 'd-flex', 'align-items-center', 'justify-content-between', 'border-0');
 
-                    const motivoParada = maquina.status === 'Parada' ? 
-                        ` - <span class="text-danger">${maquina.motivo_parada || 'Sem motivo especificado'}</span>` : '';
+    //                 const motivoParada = maquina.status === 'Parada' ? 
+    //                     ` - <span class="text-danger">${maquina.motivo_parada || 'Sem motivo especificado'}</span>` : '';
 
-                    // Criar botão de retorno se a máquina estiver parada
-                    let botaoRetorno = '';
-                    if (maquina.status === 'Parada') {
-                        botaoRetorno = `
-                            <button class="btn btn-sm btn-outline-success retornar-maquina-btn" data-maquina="${maquina.maquina_id}">
-                                Retomar
-                            </button>
-                        `;
-                    }
+    //                 // Criar botão de retorno se a máquina estiver parada
+    //                 let botaoRetorno = '';
+    //                 if (maquina.status === 'Parada') {
+    //                     botaoRetorno = `
+    //                         <button class="btn btn-sm btn-outline-success retornar-maquina-btn" data-maquina="${maquina.maquina_id}">
+    //                             Retomar
+    //                         </button>
+    //                     `;
+    //                 }
 
-                    statusItem.innerHTML = `
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="fw-bold">${maquina.maquina}</span>
-                            <div class="status-circle ${statusColor}" style="
-                                width: 15px;
-                                height: 15px;
-                                border-radius: 50%;
-                            "></div>
-                            ${motivoParada}
-                        </div>
-                        ${botaoRetorno}
-                    `;
+    //                 statusItem.innerHTML = `
+    //                     <div class="d-flex align-items-center gap-2">
+    //                         <span class="fw-bold">${maquina.maquina}</span>
+    //                         <div class="status-circle ${statusColor}" style="
+    //                             width: 15px;
+    //                             height: 15px;
+    //                             border-radius: 50%;
+    //                         "></div>
+    //                         ${motivoParada}
+    //                     </div>
+    //                     ${botaoRetorno}
+    //                 `;
 
-                    listaStatus.appendChild(statusItem);
-                });
+    //                 listaStatus.appendChild(statusItem);
+    //             });
 
-                // Adicionar eventos de clique aos botões de retorno
-                document.querySelectorAll('.retornar-maquina-btn').forEach(button => {
-                    button.addEventListener('click', function () {
-                        const maquinaId = this.getAttribute('data-maquina');
-                        retornarMaquina(maquinaId);
-                    });
-                });
+    //             // Adicionar eventos de clique aos botões de retorno
+    //             document.querySelectorAll('.retornar-maquina-btn').forEach(button => {
+    //                 button.addEventListener('click', function () {
+    //                     const maquinaId = this.getAttribute('data-maquina');
+    //                     retornarMaquina(maquinaId);
+    //                 });
+    //             });
 
-            } else {
-                // Caso não haja máquinas registradas
-                listaStatus.innerHTML = '<li class="list-group-item text-muted">Nenhuma máquina registrada no momento.</li>';
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao buscar status das máquinas:', error);
-            indicador.textContent = '0%';
-            descricao.textContent = 'Erro ao carregar dados';
-            listaStatus.innerHTML = '<li class="list-group-item text-danger">Erro ao carregar os dados.</li>';
-        });
+    //         } else {
+    //             // Caso não haja máquinas registradas
+    //             listaStatus.innerHTML = '<li class="list-group-item text-muted">Nenhuma máquina registrada no momento.</li>';
+    //         }
+    //     })
+    //     .catch(error => {
+    //         console.error('Erro ao buscar status das máquinas:', error);
+    //         indicador.textContent = '0%';
+    //         descricao.textContent = 'Erro ao carregar dados';
+    //         listaStatus.innerHTML = '<li class="list-group-item text-danger">Erro ao carregar os dados.</li>';
+    //     });
 }
 
 export function fetchUltimasPecasProduzidas() {
