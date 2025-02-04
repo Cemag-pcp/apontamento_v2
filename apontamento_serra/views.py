@@ -649,7 +649,6 @@ def api_apontamentos_peca(request):
         .select_related('operador_final')  # Para otimizar a relação com operador_final
         .prefetch_related('ordem_pecas_serra__peca')  # Ajustado para usar o related_name correto
         .distinct()  # Evitar duplicatas
-        # .order_by('ordem_pecas_serra__data')
     )
 
     # Constrói o resultado manualmente
@@ -660,6 +659,8 @@ def api_apontamentos_peca(request):
             chave_unica = (ordem.id, apontamento.peca.id)  # Identificador único
             if chave_unica not in vistos:
                 vistos.add(chave_unica)  # Marca como visto
+                data_final = localtime(apontamento.data) if apontamento.data else None
+
                 resultado.append({
                     "ordem": ordem.ordem,
                     "codigo_peca": apontamento.peca.codigo,
@@ -671,9 +672,15 @@ def api_apontamentos_peca(request):
                     "maquina": ordem.get_maquina_display(),
                     "obs_operador": ordem.obs_operador,
                     "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
-                    "data_final": localtime(apontamento.data).strftime('%d/%m/%Y %H:%M')
+                    "data_final": data_final  # Mantemos o objeto datetime para ordenação
                 })
+    
     resultado.sort(key=lambda x: x['data_final'])
+
+    # Converte a data para o formato desejado após ordenar
+    for item in resultado:
+        if item['data_final']:
+            item['data_final'] = item['data_final'].strftime('%d/%m/%Y %H:%M')
 
     return JsonResponse(resultado, safe=False)
 
@@ -708,18 +715,19 @@ def api_apontamentos_mp(request):
         )
     )
 
+    propriedades_ordens = sorted(propriedades_ordens, key=lambda x: x['data_formatada'] or '')
+
     # Formata o campo `data_formatada` para o formato desejado
     propriedades_ordens = [
         {
             **item,
-            'data_formatada': localtime(item['data_formatada']).strftime('%d/%m/%Y %H:%M')
+            'data_formatada': localtime(item['data_formatada']).strftime('%d/%m/%Y %H:%M') if item['data_formatada'] else None
         }
         for item in propriedades_ordens
     ]
 
-    propriedades_ordens = sorted(propriedades_ordens, key=itemgetter('data_formatada'))
 
-    return JsonResponse(list(propriedades_ordens), safe=False)
+    return JsonResponse(propriedades_ordens, safe=False)
 
 def get_status_maquinas(request):
     # Obtemos todas as máquinas disponíveis

@@ -386,23 +386,24 @@ def get_ordens_criadas_duplicar_ordem(request):
         .order_by('-data_criacao')
     )
 
-    # 🔹 Otimização do Filtro de Peças
+    # otimização do Filtro de Peças
     if pecas:
         ordens_queryset = ordens_queryset.filter(
             ordem_pecas_corte__peca__in=pecas,
             ordem_pecas_corte__qtd_planejada__gt=0
         ).distinct()
 
-    # 🔹 Filtra Máquina e Ordem se necessário
+    # Filtra Máquina e Ordem se necessário
     if maquina:
         ordens_queryset = ordens_queryset.filter(grupo_maquina=maquina)
     if ordem:
         ordens_queryset = ordens_queryset.filter(ordem=ordem)
 
-    # 🔹 Contagem de Registros para Paginação
+    # Contagem de Registros para Paginação
+    # records_total = Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).count()
     records_filtered = ordens_queryset.count()
 
-    # 🔹 Paginação eficiente
+    # Paginação eficiente
     paginator = Paginator(ordens_queryset, limit)
     try:
         ordens_page = paginator.page(page)

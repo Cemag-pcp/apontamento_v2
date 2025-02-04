@@ -129,7 +129,8 @@ def importar_pecas(df_carga_pecas):
         except Exception as e:
             print(f"Erro ao inserir a linha {row.to_dict()}: {e}")
 
-importar_ordens(df_carga_ordem)
-importar_propriedades(df_carga_propriedade)
+# Chamada da função com o DataFrame
+# importar_ordens(df_carga_ordem)
+# importar_propriedades(df_carga_propriedade)
 importar_pecas(df_carga_pecas)
 

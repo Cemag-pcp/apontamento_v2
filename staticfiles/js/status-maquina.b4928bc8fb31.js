@@ -253,15 +253,18 @@ async function mostrarModalPararMaquina() {
     modal.show();
     Swal.close();
 
-    // Remove event listeners antigos para evitar múltiplas submissões
-    const clonedForm = formInterromper.cloneNode(true);
-    formInterromper.parentNode.replaceChild(clonedForm, formInterromper);
+    // Remove event listener antigo, caso exista, para evitar chamadas duplicadas
+    const novoForm = formInterromper.cloneNode(true);
+    formInterromper.replaceWith(novoForm);
+
+    // Obtém o novo formulário sem event listeners antigos
+    const formAtualizado = document.getElementById('formPararMaquina');
 
     // Adiciona o novo event listener para o formulário
-    clonedForm.addEventListener('submit', (event) => {
+    formAtualizado.addEventListener('submit', async (event) => {
         event.preventDefault();
 
-        const formData = new FormData(clonedForm);
+        const formData = new FormData(formAtualizado);
         const motivoInterrupcao = formData.get('motivoParadaMaquina');
         const maquina = formData.get('escolhaMaquinaParada');
 
@@ -284,35 +287,31 @@ async function mostrarModalPararMaquina() {
             }
         });
 
-        // Envia a requisição ao backend
-        fetch(`api/parar-maquina/`, {
-            method: 'PATCH',
-            body: JSON.stringify({
-                maquina: maquina,
-                motivo: motivoInterrupcao
-            }),
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(errorData => {
-                    throw new Error(errorData.error || `Erro na requisição: ${response.status}`);
-                });
-            }
-            fetchStatusMaquinas();
+        try {
+            const response = await fetch(`api/parar-maquina/`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    maquina: maquina,
+                    motivo: motivoInterrupcao
+                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
+                }
+            });
 
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Erro na requisição: ${response.status}`);
+            }
+
+            await fetchStatusMaquinas();
             const container = document.querySelector('.containerProcesso');
             carregarOrdensIniciadas(container);
 
             const containerInterrompido = document.querySelector('.containerInterrompido');
             carregarOrdensInterrompidas(containerInterrompido);
 
-            return response.json();
-        })
-        .then(data => {
             Swal.fire({
                 icon: 'success',
                 title: 'Sucesso',
@@ -320,15 +319,14 @@ async function mostrarModalPararMaquina() {
             });
 
             modal.hide();
-        })
-        .catch((error) => {
+        } catch (error) {
             console.error('Erro:', error);
             Swal.fire({
                 icon: 'error',
                 title: 'Erro',
                 text: error.message,
             });
-        });
+        }
     });
 }
 
