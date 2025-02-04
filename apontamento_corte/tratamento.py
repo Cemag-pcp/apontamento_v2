@@ -1,17 +1,28 @@
 import pandas as pd
+import os
+import django
+
+from django.utils.timezone import now  # Para trabalhar com data e hora
+
+# Configurações do Django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
+django.setup()
+
+from core.models import Ordem, Operador, PropriedadesOrdem
+from apontamento_corte.models import PecasOrdem
 
 df = pd.read_csv(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\file_temp\criadas.csv')
 df['status_atual'] = 'finalizada'
 df['data_programacao'] = df['data abertura de op']
 df['grupo_maquina'] = df['maquina'].apply(
     lambda x: 'plasma' if 'Plasma' in x 
-    else 'laser_2' if 'Laser JFY' in x 
+    else 'laser_2' if 'Laser JYF' in x 
     else 'laser_1' if 'Laser' in x 
     else 'outro'
 )
 df['maquina'] = df['maquina'].apply(
     lambda x: 'plasma_1' if 'Plasma' in x 
-    else 'laser_2' if 'Laser JFY' in x 
+    else 'laser_2' if 'Laser JYF' in x 
     else 'laser_1' if 'Laser' in x 
     else 'outro'
 )
@@ -44,55 +55,82 @@ df = df.drop(df[df.ordem == '1229-'].index)
 df = df.drop(df[df.ordem == '93l1'].index)
 df = df.drop(df[df.ordem == 'None'].index)
 df = df.drop(df[df.ordem == '53l1'].index)
-df.drop_duplicates(subset='ordem', keep='first', inplace=True)
 
 df['ordem'] = df['ordem'].astype(int)
 
-
 df_carga_ordem = df[['ordem','data_criacao','grupo_maquina','maquina','status_atual','operador_final_matricula','data_programacao']]
-df_carga_propriedade = df[['ordem', 'descricao_mp', 'tamanho', 'espessura', 'quantidade','aproveitamento','tipo_chapa',]]
+df_carga_propriedade = df[['ordem','grupo_maquina', 'descricao_mp', 'tamanho', 'espessura', 'quantidade','aproveitamento','tipo_chapa',]]
+df_carga_pecas = df[['ordem','Peças','Quantidade','grupo_maquina']] 
 
-
-import os
-import django
-
-# Configurações do Django
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
-django.setup()
-
-# Agora já pode importar os modelos sem erro
-from core.models import Ordem, Operador
-
-# Exemplo: Listar ordens
-print(Ordem.objects.all())
-
-
-from core.models import Ordem, Operador  # Importe os modelos necessários
-from django.utils.timezone import now  # Para trabalhar com data e hora
+df_carga_ordem.drop_duplicates(subset=['ordem'], keep='first', inplace=True)
+df_carga_propriedade.drop_duplicates(subset=['ordem'], keep='first', inplace=True)
 
 def importar_ordens(df_carga_ordem):
-    for index, row in df_carga_ordem.iterrows():
-        # Buscar operador_final pelo campo operador_final_matricula
-        operador = None
-        if pd.notna(row['operador_final_matricula']):
-            operador = Operador.objects.filter(matricula=row['operador_final_matricula']).first()
+    for _, row in df_carga_ordem.iterrows():
+        try:
+            # Buscar operador_final pelo campo operador_final_matricula
+            operador = None
+            if pd.notna(row.get('operador_final_matricula')):  # Usa .get() para evitar KeyError
+                operador = Operador.objects.filter(matricula=row['operador_final_matricula']).first()
 
-        # Criando a instância do modelo
-        ordem = Ordem(
-            ordem=row['ordem'],
-            data_criacao=row['data_criacao'] if pd.notna(row['data_criacao']) else now(),
-            grupo_maquina=row['grupo_maquina'],
-            maquina=row['maquina'],
-            status_atual=row['status_atual'],
-            operador_final=operador,
-            data_programacao=row['data_programacao'] if pd.notna(row['data_programacao']) else None
-        )
+            # Criar a ordem no banco de dados
+            Ordem.objects.create(
+                ordem=row.get('ordem'),
+                data_criacao=row['data_criacao'] if pd.notna(row.get('data_criacao')) else now(),
+                grupo_maquina=row['grupo_maquina'],
+                maquina=row['grupo_maquina'],
+                status_atual=row.get('status_atual', ''),
+                operador_final=operador,
+                data_programacao=row['data_programacao'] if pd.notna(row.get('data_programacao')) else None
+            )
 
-        # Salva a instância individualmente
-        ordem.save()
+            print(f"✅ Ordem {row.get('ordem', 'N/A')} importada com sucesso.")
 
-        # Exibe no console a ordem inserida
-        print(f"✅ Ordem Inserida: {ordem.ordem} | Máquina: {ordem.maquina} | Status: {ordem.status_atual}")
+        except Exception as e:
+            print(f"❌ Erro ao importar ordem {row.get('ordem', 'N/A')}: {e}")
+
+def importar_propriedades(df_carga_propriedade):
+    for _, row in df_carga_propriedade.iterrows():
+        try:
+            ordem = Ordem.objects.get(ordem=row['ordem'], grupo_maquina=row['grupo_maquina'])
+
+            # Criando e salvando cada instância separadamente
+            PropriedadesOrdem.objects.create(
+                ordem=ordem,
+                descricao_mp=row['descricao_mp'],
+                tamanho=row['tamanho'],
+                espessura=row['espessura'],
+                quantidade=float(row['quantidade'].replace(",",'.')),
+                aproveitamento=str(row['aproveitamento'])[:6],
+                tipo_chapa=row['tipo_chapa']
+            )
+
+        except Ordem.DoesNotExist:
+            print(f"Erro: Ordem {row['ordem']} não encontrada. Linha ignorada.")
+        except Exception as e:
+            print(f"Erro ao inserir a linha {row.to_dict()}: {e}")
+
+def importar_pecas(df_carga_pecas):
+    for _, row in df_carga_pecas.iterrows():
+        try:
+            ordem = Ordem.objects.get(ordem=row['ordem'], grupo_maquina=row['grupo_maquina'])
+
+            # Criando e salvando cada instância separadamente
+            PecasOrdem.objects.create(
+                ordem=ordem,
+                peca=row['Peças'],
+                qtd_planejada=int(row['Quantidade']),
+                qtd_morta=0,
+                qtd_boa=int(row['Quantidade']),
+            )
+
+        except Ordem.DoesNotExist:
+            print(f"Erro: Ordem {row['ordem']} não encontrada. Linha ignorada.")
+        except Exception as e:
+            print(f"Erro ao inserir a linha {row.to_dict()}: {e}")
 
 # Chamada da função com o DataFrame
 importar_ordens(df_carga_ordem)
+importar_propriedades(df_carga_propriedade)
+importar_pecas(df_carga_pecas)
+

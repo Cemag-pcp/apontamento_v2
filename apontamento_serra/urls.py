@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/status_ordem/', views.get_contagem_status_ordem, name='status_ordem'),
     path('api/buscar-maquinas-disponiveis/', views.get_maquinas_disponiveis, name='buscar_maquinas_disponiveis'),
     path('api/parar-maquina/', views.parar_maquina, name='parar_maquina'),
+    path('api/retornar-maquina/', views.retornar_maquina, name='retornar_maquina'),
 
     path('api/apontamentos-peca/serra', views.api_apontamentos_peca, name='api_apontamentos_peca'),
     path('api/apontamentos-mp/serra', views.api_apontamentos_mp, name='api_apontamentos_mp'),

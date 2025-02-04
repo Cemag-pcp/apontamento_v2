@@ -20,6 +20,7 @@ import tempfile
 import re
 import json
 from urllib.parse import unquote
+from datetime import datetime
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
@@ -338,67 +339,72 @@ def filtrar_ordens(request):
     return JsonResponse({"ordens": resultados})
 
 def get_ordens_criadas_duplicar_ordem(request):
-    # Captura os parâmetros de filtro
-    pecas = request.GET.get('pecas', '')  # Recebe como string
-    pecas = [unquote(p) for p in pecas.split(';')] if pecas else []  # Divide pelo ponto e vírgula e decodifica
+    # 🔹 Captura os parâmetros da requisição
+    pecas = request.GET.get('pecas', '')  
+    pecas = [unquote(p) for p in pecas.split(';')] if pecas else []
     
     maquina = unquote(request.GET.get('maquina', ''))
     ordem = unquote(request.GET.get('ordem', ''))
 
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
-    draw = int(request.GET.get('draw', 1))  # Captura o parâmetro draw
+    draw = int(request.GET.get('draw', 1))
 
-    # Filtra as ordens com base nos parâmetros
-    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2'], duplicada=False).order_by('status_prioridade')
+    # 🔹 Define a Query Base
+    ordens_queryset = (
+        Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2'], duplicada=False)
+        .prefetch_related('ordem_pecas_corte')  # Evita queries repetidas para peças
+        .select_related('propriedade')  # Carrega a propriedade diretamente
+        .order_by('-data_criacao')
+    )
 
+    # 🔹 Otimização do Filtro de Peças
     if pecas:
-        ordens_queryset = ordens_queryset.annotate(
-            pecas_em_comum=Count(
-                'ordem_pecas_corte',
-                filter=Q(ordem_pecas_corte__peca__in=pecas) & Q(ordem_pecas_corte__qtd_planejada__gt=0)  # Quantidade maior que 0
-            )
-        ).filter(
-            pecas_em_comum=len(pecas)  # Garante que todas as peças selecionadas estão presentes
-        )
+        ordens_queryset = ordens_queryset.filter(
+            ordem_pecas_corte__peca__in=pecas,
+            ordem_pecas_corte__qtd_planejada__gt=0
+        ).distinct()
+
+    # 🔹 Filtra Máquina e Ordem se necessário
     if maquina:
-        ordens_queryset = ordens_queryset.filter(grupo_maquina__icontains=maquina)
+        ordens_queryset = ordens_queryset.filter(grupo_maquina=maquina)
     if ordem:
         ordens_queryset = ordens_queryset.filter(ordem=ordem)
 
-    records_total = Ordem.objects.filter(
-        grupo_maquina__in=['plasma', 'laser_1', 'laser_2']
-    ).count()
-
+    # 🔹 Contagem de Registros para Paginação
+    # records_total = Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).count()
     records_filtered = ordens_queryset.count()
 
-    # Paginação
+    # 🔹 Paginação eficiente
     paginator = Paginator(ordens_queryset, limit)
     try:
         ordens_page = paginator.page(page)
     except EmptyPage:
-        return JsonResponse({'draw': draw, 'recordsTotal': records_total, 'recordsFiltered': records_filtered, 'data': []})
+        return JsonResponse({'draw': draw, 'recordsTotal': records_filtered, 'recordsFiltered': records_filtered, 'data': []})
 
-    # Monta os dados
-    data = [{
-        'id':ordem.pk,  
-        'ordem': ordem.ordem,
-        'grupo_maquina': ordem.get_grupo_maquina_display(),
-        'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
-        'obs': ordem.obs,
-        'status_atual': ordem.status_atual,
-        'propriedade': {
-            'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
-            'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
-            'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
+    # 🔹 Otimização da Serialização dos Dados
+    data = [
+        {
+            'id': ordem.pk,
+            'ordem': ordem.ordem,
+            'grupo_maquina': ordem.get_grupo_maquina_display(),
+            'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
+            'obs': ordem.obs,
+            'status_atual': ordem.status_atual,
             'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
-            'retalho': 'Sim' if ordem.propriedade.retalho else None,
-        }
-    } for ordem in ordens_page]
+            'propriedade': {
+                'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
+                'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
+                'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
+                'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+                'retalho': 'Sim' if ordem.propriedade and ordem.propriedade.retalho else None,
+            }
+        } for ordem in ordens_page
+    ]
 
     return JsonResponse({
         'draw': draw,
-        'recordsTotal': records_total,
+        'recordsTotal': records_filtered,
         'recordsFiltered': records_filtered,
         'data': data
     })
@@ -506,7 +512,6 @@ def gerar_op_duplicada(request, pk_ordem):
 def duplicar_op(request):
 
     return render(request, 'apontamento_corte/duplicar-op.html')
-
 
 class ProcessarArquivoView(View):
     def post(self, request):

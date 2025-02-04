@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="{% static 'css/badges.css' %}">
     <link rel="stylesheet" href="{% static 'css/spinner.css' %}">
     <link rel="stylesheet" href="{% static 'css/datatable.css' %}">
+    <link rel="stylesheet" href="{% static 'css/table-gerar-op.css' %}">
+
 {% endblock %}
 
 {% block content %}
@@ -57,7 +59,8 @@
                     <select class="form-control" name="filtro-maquina" id="filtro-maquina">
                         <option class="text-muted" value="">Filtrar por máquina</option>
                         <option value="plasma">Plasma</option>
-                        <option value="laser">Laser</option>
+                        <option value="laser_1">Laser 1 (Weller)</option>
+                        <option value="laser_2">Laser 2 (JFY)</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -66,22 +69,31 @@
             </div>
         </form>
     
-        <!-- Container de Ordens -->
-        <table id="ordens-table" class="table table-striped">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Peça</th>
-                    <th>Máquina</th>
-                    <th>Data de Criação</th>
-                    <th>Status</th>
-                    <th>Opção</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- O corpo será preenchido dinamicamente -->
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Ordem</th>
+                        <th>Data de Criação</th>
+                        <th>Máquina</th>
+                        <th>Descrição MP</th>
+                        <th>Aproveitamento</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-corpo">
+                    <tr>
+                        <td colspan="6">🔄 Carregando dados...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 🔹 Paginação -->
+        <div class="pagination-container" id="paginacao-container"></div>
+
+        <!-- 🔹 Loading Spinner -->
+        <div id="loading-spinner">🔄 Carregando...</div>
     
     </div>
 

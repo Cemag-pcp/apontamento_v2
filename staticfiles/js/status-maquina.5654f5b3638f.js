@@ -28,11 +28,11 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-function fetchStatusMaquinas() {
+export function fetchStatusMaquinas() {
     // Seleciona os elementos do container
-    const indicador = document.querySelector('.col-md-6.text-center .display-4');
-    const descricao = document.querySelector('.col-md-6.text-center p');
-    const listaStatus = document.querySelector('.col-md-6 ul');
+    const indicador = document.querySelector('.text-center.mb-3 .display-4');
+    const descricao = document.querySelector('.text-center.mb-3 p');
+    const listaStatus = document.querySelector('#machine-status-list');
 
     // Faz a requisição para a API
     fetch('api/status_maquinas/')
@@ -61,33 +61,61 @@ function fetchStatusMaquinas() {
                         'bg-success';
 
                     const statusItem = document.createElement('li');
-                    statusItem.classList.add('mb-2', 'd-flex', 'align-items-center', 'gap-2');
+                    statusItem.classList.add('list-group-item', 'd-flex', 'align-items-center', 'justify-content-between', 'border-0');
+
+                    const motivoParada = maquina.status === 'Parada' ? 
+                        ` - <span class="text-danger">${maquina.motivo_parada || 'Sem motivo especificado'}</span>` : '';
+
+                    // Criar botão de retorno se a máquina estiver parada
+                    let botaoRetorno = '';
+                    if (maquina.status === 'Parada') {
+                        botaoRetorno = `
+                            <button class="btn btn-sm btn-outline-success retornar-maquina-btn" data-maquina="${maquina.maquina_id}">
+                                Retomar
+                            </button>
+                        `;
+                    }
+
                     statusItem.innerHTML = `
-                        <span class="fw-bold">${maquina.maquina}</span>
-                        <div class="status-circle ${statusColor}" style="
-                            width: 15px;
-                            height: 15px;
-                            border-radius: 50%;
-                        "></div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fw-bold">${maquina.maquina}</span>
+                            <div class="status-circle ${statusColor}" style="
+                                width: 15px;
+                                height: 15px;
+                                border-radius: 50%;
+                            "></div>
+                            ${motivoParada}
+                        </div>
+                        ${botaoRetorno}
                     `;
+
                     listaStatus.appendChild(statusItem);
                 });
+
+                // Adicionar eventos de clique aos botões de retorno
+                document.querySelectorAll('.retornar-maquina-btn').forEach(button => {
+                    button.addEventListener('click', function () {
+                        const maquinaId = this.getAttribute('data-maquina');
+                        retornarMaquina(maquinaId);
+                    });
+                });
+
             } else {
                 // Caso não haja máquinas registradas
-                listaStatus.innerHTML = '<li class="text-muted">Nenhuma máquina registrada no momento.</li>';
+                listaStatus.innerHTML = '<li class="list-group-item text-muted">Nenhuma máquina registrada no momento.</li>';
             }
         })
         .catch(error => {
             console.error('Erro ao buscar status das máquinas:', error);
             indicador.textContent = '0%';
             descricao.textContent = 'Erro ao carregar dados';
-            listaStatus.innerHTML = '<li class="text-danger">Erro ao carregar os dados.</li>';
+            listaStatus.innerHTML = '<li class="list-group-item text-danger">Erro ao carregar os dados.</li>';
         });
 }
 
-function fetchUltimasPecasProduzidas() {
+export function fetchUltimasPecasProduzidas() {
     // Seleciona o elemento da lista onde as peças serão adicionadas
-    const listaPecas = document.querySelector('.col-md-4 .list-group');
+    const listaPecas = document.querySelector('#ultimas-pecas-list');
 
     // Faz a requisição para a API
     fetch('api/ultimas_pecas_produzidas/')
@@ -123,7 +151,7 @@ function fetchUltimasPecasProduzidas() {
         });
 }
 
-function fetchContagemStatusOrdens() {
+export function fetchContagemStatusOrdens() {
     // Seleciona o elemento da lista onde os status serão adicionados
     const listaStatus = document.getElementById('status-ordens-list');
 
@@ -307,4 +335,50 @@ async function mostrarModalPararMaquina() {
 // Função para obter o token CSRF
 function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+function retornarMaquina(maquina) {
+    Swal.fire({
+        title: 'Retornar máquina',
+        text: `Deseja retornar a máquina ${maquina} à produção?`,
+        showCancelButton: true,
+        confirmButtonText: 'Sim',
+        cancelButtonText: 'Cancelar',
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            return fetch(`api/retornar-maquina/`, {
+                method: 'PATCH',
+                body: JSON.stringify({ maquina }),  // Envia no corpo como JSON
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()  // Certifique-se de que está obtendo o CSRF token corretamente
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || `Erro na requisição: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                fetchStatusMaquinas();  // Atualiza a lista de máquinas após a ação
+                return data;
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.showValidationMessage(`Erro: ${error.message}`);
+            });
+        }
+    })
+    .then(result => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso',
+                text: 'Máquina retornada à produção.',
+            });
+        }
+    });
 }
