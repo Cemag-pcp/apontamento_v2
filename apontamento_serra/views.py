@@ -5,13 +5,14 @@ from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET,require_http_methods
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import localtime
 from django.db.models import F, Value, CharField, Func, Q, Prefetch, Count
 from django.db.models.functions import Coalesce, Concat
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ObjectDoesNotExist
 
 from .models import PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada
@@ -746,26 +747,22 @@ def get_status_maquinas(request):
         ).exists()
 
         if em_producao and paradas.exists():
-            print("aqui 1")
             status = 'Parada'
         elif interrompida and paradas.exists():
-            print("aqui 2")
-
             status = 'Parada'
         elif paradas.exists():
-            print("aqui 3")
-
             status = 'Parada'
-        elif interrompida:
-            print("aqui 4")
-
-            status = 'Parada'
+        elif interrompida and em_producao:
+            status = 'Em produção'
+        elif interrompida and not paradas.exists():
+            status = 'Livre'
         elif em_producao:
             status = 'Em produção'
         else: 
             status = 'Livre'
 
         status_data.append({
+            'maquina_id': maquina[0],
             'maquina': maquina[1],
             'status': status,
             'motivo_parada': paradas.last().motivo.nome if paradas.exists() else None
@@ -893,3 +890,32 @@ def parar_maquina(request):
         
     # Resposta padrão para métodos não permitidos
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+@csrf_exempt
+@require_http_methods(["PATCH"])  # Garante que apenas PATCH é permitido
+def retornar_maquina(request):
+    try:
+        data = json.loads(request.body)
+        maquina_nome = data.get('maquina')
+
+        if not maquina_nome:
+            return JsonResponse({'error': 'Nome da máquina não fornecido'}, status=400)
+
+        # Busca a máquina que está parada e ainda não tem data_fim definida
+        maquina = MaquinaParada.objects.get(maquina=maquina_nome, data_fim__isnull=True)
+
+        # Atualiza o status para funcionamento
+        maquina.data_fim = now()
+        maquina.save()
+
+        return JsonResponse({'success': 'Máquina retornada à produção com sucesso.'}, status=200)
+    
+    except ObjectDoesNotExist:
+        return JsonResponse({'error': 'Máquina não encontrada ou já está em operação.'}, status=404)
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Formato JSON inválido'}, status=400)
+
+    except Exception as e:
+        return JsonResponse({'error': f'Erro inesperado: {str(e)}'}, status=500)
+

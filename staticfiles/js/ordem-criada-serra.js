@@ -1,3 +1,7 @@
+import { fetchStatusMaquinas } from './status-maquina.js';
+import { fetchUltimasPecasProduzidas } from './status-maquina.js';
+import { fetchContagemStatusOrdens } from './status-maquina.js';
+
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -629,6 +633,9 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             // Recarrega os dados chamando a função de carregamento
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
+            
+            fetchContagemStatusOrdens();
+            fetchStatusMaquinas();
 
         })
         .catch((error) => {
@@ -804,6 +811,9 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 // Recarrega os dados chamando a função de carregamento
                 document.getElementById('ordens-container').innerHTML = '';
                 resetarCardsInicial();
+
+                fetchStatusMaquinas();
+                fetchContagemStatusOrdens();
 
             })
             .catch((error) => {
@@ -1073,7 +1083,11 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
             // Recarrega os dados chamando a função de carregamento
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
-                        
+
+            fetchStatusMaquinas();
+            fetchUltimasPecasProduzidas();
+            fetchContagemStatusOrdens();
+
             modal.hide();
         })
         .catch((error) => {
@@ -1153,6 +1167,9 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
             // Recarrega os dados chamando a função de carregamento
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
+
+            fetchContagemStatusOrdens();
+            fetchStatusMaquinas();
 
         })
         .catch((error) => {
@@ -1245,86 +1262,86 @@ function addPeca() {
 function criarOrdem() {
     const form = document.getElementById('opSerraForm');
 
-    form.addEventListener('submit', (event) => {
-        event.preventDefault(); // Impede o envio padrão do formulário
+    if (!form.dataset.listenerAdded) {  // Verifica se o listener já foi adicionado
+        form.dataset.listenerAdded = "true"; // Marca como adicionado
 
-        const formData = new FormData(form); // Captura os dados do formulário
+        form.addEventListener('submit', (event) => {
+            event.preventDefault(); // Impede o envio padrão do formulário
 
-        // Inicializa os dados principais do formulário
-        const data = {
-            mp: formData.get('mpEscolhida'),
-            retalho: formData.get('retalho') || false, // Checkbox retorna 'on', converte para booleano
-            descricao: formData.get('descricao') || '',
-            tamanhoVara: formData.get('tamanhoVara' || ''),
-            quantidade: formData.get('quantidade' || 0),
-            pecas: [], // Array para armazenar peças e quantidades
-            dataProgramacao: formData.get('dataProgramacao')
-        };
-        
-        // Exibe SweetAlert de carregamento
-        Swal.fire({
-            title: 'Criando Ordem...',
-            text: 'Por favor, aguarde.',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            },
-        });
+            const formData = new FormData(form); // Captura os dados do formulário
 
-        // Itera sobre o FormData para capturar as peças e quantidades
-        for (let [key, value] of formData.entries()) {
-            if (key.startsWith('pecaEscolhida_')) {
-                const index = key.split('_')[1]; // Extrai o índice do campo
-                const quantidade = formData.get(`quantidade_${index}`); // Busca a quantidade correspondente
+            // Inicializa os dados principais do formulário
+            const data = {
+                mp: formData.get('mpEscolhida'),
+                retalho: formData.get('retalho') === 'on', // Checkbox retorna 'on', converte para booleano
+                descricao: formData.get('descricao') || '',
+                tamanhoVara: formData.get('tamanhoVara') || '',
+                quantidade: parseInt(formData.get('quantidade'), 10) || 0,
+                pecas: [], // Array para armazenar peças e quantidades
+                dataProgramacao: formData.get('dataProgramacao')
+            };
 
-                if (quantidade) {
-                    data.pecas.push({
-                        peca: value, // ID da peça
-                        quantidade: parseInt(quantidade, 10) // Quantidade como número
-                    });
+            // Exibe SweetAlert de carregamento
+            Swal.fire({
+                title: 'Criando Ordem...',
+                text: 'Por favor, aguarde.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                },
+            });
+
+            // Itera sobre o FormData para capturar as peças e quantidades
+            for (let [key, value] of formData.entries()) {
+                if (key.startsWith('pecaEscolhida_')) {
+                    const index = key.split('_')[1]; // Extrai o índice do campo
+                    const quantidade = formData.get(`quantidade_${index}`); // Busca a quantidade correspondente
+
+                    if (quantidade) {
+                        data.pecas.push({
+                            peca: value, // ID da peça
+                            quantidade: parseInt(quantidade, 10) // Quantidade como número
+                        });
+                    }
                 }
             }
-        }
 
-        // Envia os dados usando fetch
-        fetch('api/criar-ordem/', {
-            method: 'POST', // Método HTTP
-            body: JSON.stringify(data), // Converte os dados para JSON
-            headers: {
-                'Content-Type': 'application/json', // Indica o envio de JSON
-                'X-CSRFToken': formData.get('csrfmiddlewaretoken') // Adiciona o token CSRF
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Erro ao enviar o formulário');
-            }
-            return response.json(); // Supondo que o servidor responda com JSON
-        })
-        .then(data => {
-            // Manipule a resposta do servidor
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso',
-                text: 'Ordem criada com sucesso.',
-            });
+            // Envia os dados usando fetch
+            fetch('api/criar-ordem/', {
+                method: 'POST',
+                body: JSON.stringify(data),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao enviar o formulário');
+                }
+                return response.json();
+            })
+            .then(data => {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: 'Ordem criada com sucesso.',
+                });
 
-            // Recarrega os dados chamando a função de carregamento
-            document.getElementById('ordens-container').innerHTML = '';
-            resetarCardsInicial();
+                document.getElementById('ordens-container').innerHTML = '';
+                resetarCardsInicial();
 
-            form.reset()
-
-        })
-        .catch(error => {
-            // Tratamento de erro
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro',
-                text: error.message,
+                form.reset();
+            })
+            .catch(error => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message,
+                });
             });
         });
-    });
+    }
 }
 
 function filtro() {

@@ -1,3 +1,7 @@
+import { fetchStatusMaquinas } from './status-maquina.js';
+import { fetchUltimasPecasProduzidas } from './status-maquina.js';
+import { fetchContagemStatusOrdens } from './status-maquina.js';
+
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -629,6 +633,9 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             // Recarrega os dados chamando a função de carregamento
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
+            
+            fetchContagemStatusOrdens();
+            fetchStatusMaquinas();
 
         })
         .catch((error) => {
@@ -804,6 +811,9 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 // Recarrega os dados chamando a função de carregamento
                 document.getElementById('ordens-container').innerHTML = '';
                 resetarCardsInicial();
+
+                fetchStatusMaquinas();
+                fetchContagemStatusOrdens();
 
             })
             .catch((error) => {
@@ -1073,7 +1083,11 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
             // Recarrega os dados chamando a função de carregamento
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
-                        
+
+            fetchStatusMaquinas();
+            fetchUltimasPecasProduzidas();
+            fetchContagemStatusOrdens();
+
             modal.hide();
         })
         .catch((error) => {
@@ -1153,6 +1167,9 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
             // Recarrega os dados chamando a função de carregamento
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
+
+            fetchContagemStatusOrdens();
+            fetchStatusMaquinas();
 
         })
         .catch((error) => {
