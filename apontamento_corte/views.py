@@ -338,6 +338,34 @@ def filtrar_ordens(request):
 
     return JsonResponse({"ordens": resultados})
 
+def corrigir_aproveitamento(valor):
+    """
+    Corrige valores de aproveitamento que foram inseridos de forma incorreta.
+    Exemplo:
+    - 9855 -> 0.9855
+    - 006 -> 0.6
+    """
+    if valor is None:
+        return 0  # Garante que valores nulos não quebrem a ordenação
+
+    try:
+        valor = float(valor)
+
+        # Se for maior que 1, assumimos que foi multiplicado por 10^n e ajustamos
+        if valor > 1:
+            num_digitos = len(str(int(valor)))  # Conta os dígitos inteiros
+            valor = valor / (10 ** num_digitos)  # Ajusta dividindo por 10^n
+
+        # Se for menor que 0.01, assume erro de casas decimais e ajusta
+        elif valor < 0.01:
+            valor = round(valor * 10, 1)  # Multiplica por 10 e arredonda para 1 casa decimal
+        
+        return valor
+
+    except ValueError:
+        return 0  # Se não for possível converter, assume 0
+
+
 def get_ordens_criadas_duplicar_ordem(request):
     # 🔹 Captura os parâmetros da requisição
     pecas = request.GET.get('pecas', '')  
@@ -372,7 +400,6 @@ def get_ordens_criadas_duplicar_ordem(request):
         ordens_queryset = ordens_queryset.filter(ordem=ordem)
 
     # 🔹 Contagem de Registros para Paginação
-    # records_total = Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).count()
     records_filtered = ordens_queryset.count()
 
     # 🔹 Paginação eficiente
@@ -382,7 +409,7 @@ def get_ordens_criadas_duplicar_ordem(request):
     except EmptyPage:
         return JsonResponse({'draw': draw, 'recordsTotal': records_filtered, 'recordsFiltered': records_filtered, 'data': []})
 
-    # 🔹 Otimização da Serialização dos Dados
+    # Otimização da Serialização dos Dados
     data = [
         {
             'id': ordem.pk,
@@ -391,16 +418,19 @@ def get_ordens_criadas_duplicar_ordem(request):
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+            'aproveitamento': corrigir_aproveitamento(ordem.propriedade.aproveitamento if ordem.propriedade else None),
             'propriedade': {
                 'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
                 'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
                 'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
-                'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+                'aproveitamento': corrigir_aproveitamento(ordem.propriedade.aproveitamento if ordem.propriedade else None),
                 'retalho': 'Sim' if ordem.propriedade and ordem.propriedade.retalho else None,
             }
         } for ordem in ordens_page
     ]
+
+    # 🔹 Ordena os dados com base no aproveitamento corrigido
+    data.sort(key=lambda x: x['aproveitamento'], reverse=True)
 
     return JsonResponse({
         'draw': draw,
