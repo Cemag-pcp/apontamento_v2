@@ -117,35 +117,35 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Ver Peças", se existir
                         if (buttonVerPeca) {
                             buttonVerPeca.addEventListener('click', () => {
-                                mostrarPecas(ordem.ordem, ordem.grupo_maquina);
+                                mostrarPecas(ordem.id);
                             });
                         }
 
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
                             buttonIniciar.addEventListener('click', () => {
-                                mostrarModalIniciar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Interromper", se existir
                         if (buttonInterromper) {
                             buttonInterromper.addEventListener('click', () => {
-                                mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalInterromper(ordem.id);
                             });
                         }
 
                         // Adiciona evento ao botão "Finalizar", se existir
                         if (buttonFinalizar) {
                             buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalFinalizar(ordem.id);
                             });
                         }
 
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalRetornar(ordem.id);
                             });
                         }
 
@@ -259,21 +259,21 @@ function carregarOrdensIniciadas(container) {
                 // Adiciona evento ao botão "Ver Peças", se existir
                 if (buttonVerPeca) {
                     buttonVerPeca.addEventListener('click', () => {
-                        mostrarPecas(ordem.ordem, ordem.grupo_maquina);
+                        mostrarPecas(ordem.id);
                     });
                 }
 
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
                     buttonInterromper.addEventListener('click', () => {
-                        mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalInterromper(ordem.id);
                     });
                 }
 
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        atualizarStatusOrdem(ordem.ordem, ordem.grupo_maquina, 'finalizada');
+                        mostrarModalFinalizar(ordem.id);
                     });
                 }
 
@@ -296,11 +296,10 @@ function carregarOrdensInterrompidas(container) {
         })
         .then(data => {
             container.innerHTML = ''; // Limpa o container
-
             data.ordens.forEach(ordem => {
                 // Cria o card de forma dinâmica
                 const card = document.createElement('div');
-                card.dataset.ordemId = ordem.ordem;
+                card.dataset.ordemId = ordem.id;
                 
                 // Define os botões dinamicamente
                 const botaoAcao = `
@@ -340,14 +339,14 @@ function carregarOrdensInterrompidas(container) {
                 // Evento para "Ver Peças"
                 if (buttonVerPeca) {
                     buttonVerPeca.addEventListener('click', () => {
-                        mostrarPecas(ordem.ordem, ordem.grupo_maquina);
+                        mostrarPecas(ordem.id);
                     });
                 }
 
                 // Evento para "Retornar"
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalRetornar(ordem.id);
                     });
                 }
 
@@ -365,7 +364,7 @@ function getCSRFToken() {
 }
 
 // Função para exibir as peças no modal
-function mostrarPecas(ordemId, maquinaName) {
+function mostrarPecas(ordemId) {
     const modalContent = document.getElementById('modalPecasContent');
 
     // Exibe SweetAlert de carregamento
@@ -378,12 +377,8 @@ function mostrarPecas(ordemId, maquinaName) {
         }
     });
 
-    // Converte o nome da máquina para minúsculas
-    const maquinaNameLower = maquinaName.toLowerCase().replace(" ","_").replace(" (jfy)","");
-    document.getElementById('modalPecas').removeAttribute('inert');
-
     // Fetch para buscar peças
-    fetch(`api/ordens-criadas/${ordemId}/${maquinaNameLower}/pecas/`)
+    fetch(`api/ordens-criadas/${ordemId}/pecas/`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro na resposta da API');
@@ -397,7 +392,6 @@ function mostrarPecas(ordemId, maquinaName) {
                 modalContent.innerHTML = `<p class="text-center text-muted">Não há peças cadastradas para esta ordem.</p>`;
             } else {
                 modalContent.innerHTML = `
-                    <h5 class="text-center">Peças da Ordem ${ordemId}</h5>
                     <table class="table table-bordered table-sm text-center">
                         <thead>
                             <tr class="table-light">
@@ -434,29 +428,13 @@ function mostrarPecas(ordemId, maquinaName) {
         });
 }
 
-function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
-    switch (status) {
-        case 'iniciada':
-            mostrarModalIniciar(ordemId, grupoMaquina);
-            break;
-        case 'interrompida':
-            mostrarModalInterromper(ordemId, grupoMaquina);
-            break;
-        case 'finalizada':
-            mostrarModalFinalizar(ordemId, grupoMaquina);
-            break;
-        default:
-            alert('Status desconhecido.');
-    }
-}
-
 // Modal para "Interromper"
-function mostrarModalInterromper(ordemId, grupoMaquina) {
+function mostrarModalInterromper(ordemId) {
     const modal = new bootstrap.Modal(document.getElementById('modalInterromper'));
     const modalTitle = document.getElementById('modalInterromperLabel');
     const formInterromper = document.getElementById('formInterromperOrdemCorte');
 
-    modalTitle.innerHTML = `Interromper Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Interromper Ordem`;
     modal.show();
 
     // Remove listeners antigos e adiciona novo
@@ -482,7 +460,7 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
-                grupo_maquina: grupoMaquina,
+                // grupo_maquina: grupoMaquina,
                 status: 'interrompida',
                 motivo: motivoInterrupcao
             }),
@@ -630,13 +608,13 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
 }
 
 // Modal para "Finalizar"
-function mostrarModalFinalizar(ordemId, grupoMaquina) {
+function mostrarModalFinalizar(ordemId) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     const modalTitle = document.getElementById('modalFinalizarLabel');
     const formFinalizar = document.getElementById('formFinalizarOrdemCorte');
 
     // Configura título do modal
-    modalTitle.innerHTML = `Finalizar Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Finalizar Ordem`;
     document.getElementById('bodyPecasFinalizar').innerHTML = '<p class="text-center text-muted">Carregando informações...</p>';
 
     Swal.fire({
@@ -653,7 +631,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
     formFinalizar.parentNode.replaceChild(clonedForm, formFinalizar);
 
     // Fetch para buscar peças e propriedades
-    fetch(`api/ordens-criadas/${ordemId}/${grupoMaquina.toLowerCase()}/pecas/`)
+    fetch(`api/ordens-criadas/${ordemId}/pecas/`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar informações da API');
@@ -792,6 +770,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                 Swal.showLoading();
             }
         });
+
         const obsFinal = document.getElementById('obsFinalizarCorte').value;
         const operadorFinal=document.getElementById('operadorFinal').value;
         const inputsMortas = document.querySelectorAll('.input-mortas');
@@ -819,7 +798,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
-                grupo_maquina: grupoMaquina,
+                // grupo_maquina: grupoMaquina,
                 status: 'finalizada',
                 pecas_mortas: pecasMortas,
                 qtdChapas: qtdChapas,
@@ -864,7 +843,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 }
 
 // Modal para "Retornar"
-function mostrarModalRetornar(ordemId, grupoMaquina) {
+function mostrarModalRetornar(ordemId) {
     const modal = new bootstrap.Modal(document.getElementById('modalRetornar'));
     const modalTitle = document.getElementById('modalRetornarLabel');
     const formRetornar = document.getElementById('formRetornarProducao');
@@ -894,7 +873,7 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
-                grupo_maquina: grupoMaquina,
+                // grupo_maquina: grupoMaquina,
                 status: 'iniciada',
             }),
             headers: {
@@ -1048,7 +1027,6 @@ function filtro() {
 
     });
 }
-
 
 document.addEventListener('DOMContentLoaded', () => {
 
