@@ -74,7 +74,7 @@
     <div id="containerPlanejar" class="mb-5">
         <!-- Botões para abrir modais -->
         <div class="d-flex justify-content-end gap-3 mb-4">
-            <button type="button" class="btn btn-primary" id="btnPararMaquina">
+            <button type="button" class="btn btn-primary" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
                 Parada de máquina
             </button>
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSerra">
@@ -447,11 +447,11 @@
 </div>
 
 <!-- Modal parar maquina -->
-<div class="modal fade" id="modalPararMaquina" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPararMaquinaLabel">
+<div class="modal fade" id="modalPararMaquina" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPararMaquinaLabel" aria-hidden="true">
     <div class="modal-dialog modal-md">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalPararMaquinaLabel"></h5>
+                <h5 class="modal-title" id="modalPararMaquinaLabel">Parar máquina</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -474,8 +474,7 @@
 
                     <!-- Footer do Formulário -->
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Parar</button>
+                        <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Parar</button>
                     </div>
                 </form>
             </div>
