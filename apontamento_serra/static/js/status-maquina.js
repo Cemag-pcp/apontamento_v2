@@ -231,111 +231,6 @@ async function fetchMaquinasDisponiveis() {
     }
 }
 
-async function mostrarModalPararMaquina() {
-    const modalElement = document.getElementById('modalPararMaquina');
-    const modal = new bootstrap.Modal(modalElement);
-    const modalTitle = document.getElementById('modalPararMaquinaLabel');
-    const formInterromper = document.getElementById('formPararMaquina');
-
-    modalTitle.innerHTML = `Escolha a máquina e o motivo`;
-
-    Swal.fire({
-        title: 'Carregando...',
-        text: 'Buscando informações da ordem...',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
-    // Atualiza as máquinas disponíveis no modal
-    await fetchMaquinasDisponiveis();
-
-    modal.show();
-    Swal.close();
-
-    //  Remover event listener duplicado ANTES de adicionar um novo
-    formInterromper.removeEventListener('submit', handleFormSubmit);
-
-    //  Adicionar novo event listener (com `once: true` para evitar repetições)
-    formInterromper.addEventListener('submit', handleFormSubmit, { once: true });
-}
-
-async function handleFormSubmit(event) {
-    event.preventDefault();
-
-    const formInterromper = event.target;
-    const formData = new FormData(formInterromper);
-    const motivoInterrupcao = formData.get('motivoParadaMaquina');
-    const maquina = formData.get('escolhaMaquinaParada');
-
-    // Validação básica dos campos
-    if (!maquina || !motivoInterrupcao) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Por favor, selecione uma máquina e informe o motivo.',
-        });
-        return;
-    }
-
-    Swal.fire({
-        title: 'Parando...',
-        text: 'Por favor, aguarde enquanto a máquina está sendo parada.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
-    try {
-        const response = await fetch(`api/parar-maquina/`, {
-            method: 'PATCH',
-            body: JSON.stringify({
-                maquina: maquina,
-                motivo: motivoInterrupcao
-            }),
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
-            }
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Erro na requisição: ${response.status}`);
-        }
-
-        await fetchStatusMaquinas();
-        const container = document.querySelector('.containerProcesso');
-        carregarOrdensIniciadas(container);
-
-        const containerInterrompido = document.querySelector('.containerInterrompido');
-        carregarOrdensInterrompidas(containerInterrompido);
-
-        Swal.fire({
-            icon: 'success',
-            title: 'Sucesso',
-            text: 'Ordem interrompida com sucesso.',
-        });
-
-        // Fechar modal corretamente
-        const modalElement = document.getElementById('modalPararMaquina');
-        const modalInstance = bootstrap.Modal.getInstance(modalElement);
-        if (modalInstance) {
-            modalInstance.hide();
-        }
-    } catch (error) {
-        console.error('Erro:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: error.message,
-        });
-    }
-}
-
-
 // Função para obter o token CSRF
 function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
@@ -385,4 +280,100 @@ function retornarMaquina(maquina) {
             });
         }
     });
+}
+
+async function mostrarModalPararMaquina() {
+    const modalElement = document.getElementById('modalPararMaquina');
+    const modal = new bootstrap.Modal(modalElement);
+    const modalTitle = document.getElementById('modalPararMaquinaLabel');
+    const formPararMaquina = document.getElementById('formPararMaquina');
+
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações da ordem...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // Atualiza as máquinas disponíveis no modal
+    await fetchMaquinasDisponiveis();
+    Swal.close(); // Fecha o SweetAlert de carregamento
+
+    modalTitle.innerHTML = `Escolha a máquina e o motivo`;
+    modal.show();
+
+    // 🔹 Remove qualquer event listener duplicado antes de adicionar um novo
+    formPararMaquina.removeEventListener('submit', handleFormSubmit);
+    formPararMaquina.addEventListener('submit', handleFormSubmit, { once: true });
+}
+
+// 🔹 Função separada para o envio do formulário
+async function handleFormSubmit(event) {
+    event.preventDefault();
+
+    Swal.fire({
+        title: 'Parando...',
+        text: 'Por favor, aguarde enquanto a máquina está sendo parada.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    try {
+        const response = await fetch(`api/parar-maquina/`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                maquina: document.getElementById('escolhaMaquinaParada').value,
+                motivo: document.getElementById('motivoParadaMaquina').value
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || `Erro na requisição: ${response.status}`);
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Sucesso',
+            text: 'Ordem retornada com sucesso.',
+        });
+
+        // Fecha o modal corretamente
+        const modalElement = document.getElementById('modalPararMaquina');
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+
+        // Remove manualmente qualquer modal-backdrop e classe modal-open
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+
+        // Atualiza a interface
+        const containerIniciado = document.querySelector('.containerProcesso');
+        carregarOrdensIniciadas(containerIniciado);
+
+        const containerInterrompido = document.querySelector('.containerInterrompido');
+        carregarOrdensInterrompidas(containerInterrompido);
+
+        fetchContagemStatusOrdens();
+        fetchStatusMaquinas();
+
+    } catch (error) {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message,
+        });
+    }
 }
