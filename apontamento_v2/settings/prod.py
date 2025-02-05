@@ -4,12 +4,10 @@ import os
 
 # Configurações específicas de produção
 DEBUG = False
-ALLOWED_HOSTS = ['apontamentousinagem.onrender.com','apontamento-v2-testes.onrender.com']
+ALLOWED_HOSTS = ['apontamentousinagem.onrender.com']
 CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
     'http://127.0.0.1',
-    'https://apontamento-v2-testes.onrender.com'
-
 ]
 
 # Banco de dados para produção
@@ -22,7 +20,7 @@ DATABASES = {
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
         'OPTIONS': {
-            'options': '-c search_path=apontamento_v2',
+            'options': '-c search_path=apontamento_v2_testes',
         },
     }
 }
