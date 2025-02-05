@@ -232,12 +232,13 @@ async function fetchMaquinasDisponiveis() {
 }
 
 async function mostrarModalPararMaquina() {
-    const modal = new bootstrap.Modal(document.getElementById('modalPararMaquina'));
+    const modalElement = document.getElementById('modalPararMaquina');
+    const modal = new bootstrap.Modal(modalElement);
     const modalTitle = document.getElementById('modalPararMaquinaLabel');
     const formInterromper = document.getElementById('formPararMaquina');
 
     modalTitle.innerHTML = `Escolha a máquina e o motivo`;
-    
+
     Swal.fire({
         title: 'Carregando...',
         text: 'Buscando informações da ordem...',
@@ -253,82 +254,87 @@ async function mostrarModalPararMaquina() {
     modal.show();
     Swal.close();
 
-    // Remove event listener antigo, caso exista, para evitar chamadas duplicadas
-    const novoForm = formInterromper.cloneNode(true);
-    formInterromper.replaceWith(novoForm);
+    //  Remover event listener duplicado ANTES de adicionar um novo
+    formInterromper.removeEventListener('submit', handleFormSubmit);
 
-    // Obtém o novo formulário sem event listeners antigos
-    const formAtualizado = document.getElementById('formPararMaquina');
+    //  Adicionar novo event listener (com `once: true` para evitar repetições)
+    formInterromper.addEventListener('submit', handleFormSubmit, { once: true });
+}
 
-    // Adiciona o novo event listener para o formulário
-    formAtualizado.addEventListener('submit', async (event) => {
-        event.preventDefault();
+async function handleFormSubmit(event) {
+    event.preventDefault();
 
-        const formData = new FormData(formAtualizado);
-        const motivoInterrupcao = formData.get('motivoParadaMaquina');
-        const maquina = formData.get('escolhaMaquinaParada');
+    const formInterromper = event.target;
+    const formData = new FormData(formInterromper);
+    const motivoInterrupcao = formData.get('motivoParadaMaquina');
+    const maquina = formData.get('escolhaMaquinaParada');
 
-        // Validação básica dos campos
-        if (!maquina || !motivoInterrupcao) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro',
-                text: 'Por favor, selecione uma máquina e informe o motivo.',
-            });
-            return;
-        }
-
+    // Validação básica dos campos
+    if (!maquina || !motivoInterrupcao) {
         Swal.fire({
-            title: 'Parando...',
-            text: 'Por favor, aguarde enquanto a máquina está sendo parada.',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
+            icon: 'error',
+            title: 'Erro',
+            text: 'Por favor, selecione uma máquina e informe o motivo.',
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: 'Parando...',
+        text: 'Por favor, aguarde enquanto a máquina está sendo parada.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    try {
+        const response = await fetch(`api/parar-maquina/`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                maquina: maquina,
+                motivo: motivoInterrupcao
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
             }
         });
 
-        try {
-            const response = await fetch(`api/parar-maquina/`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    maquina: maquina,
-                    motivo: motivoInterrupcao
-                }),
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
-                }
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Erro na requisição: ${response.status}`);
-            }
-
-            await fetchStatusMaquinas();
-            const container = document.querySelector('.containerProcesso');
-            carregarOrdensIniciadas(container);
-
-            const containerInterrompido = document.querySelector('.containerInterrompido');
-            carregarOrdensInterrompidas(containerInterrompido);
-
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso',
-                text: 'Ordem interrompida com sucesso.',
-            });
-
-            modal.hide();
-        } catch (error) {
-            console.error('Erro:', error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro',
-                text: error.message,
-            });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Erro na requisição: ${response.status}`);
         }
-    });
+
+        await fetchStatusMaquinas();
+        const container = document.querySelector('.containerProcesso');
+        carregarOrdensIniciadas(container);
+
+        const containerInterrompido = document.querySelector('.containerInterrompido');
+        carregarOrdensInterrompidas(containerInterrompido);
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Sucesso',
+            text: 'Ordem interrompida com sucesso.',
+        });
+
+        // Fechar modal corretamente
+        const modalElement = document.getElementById('modalPararMaquina');
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message,
+        });
+    }
 }
+
 
 // Função para obter o token CSRF
 function getCSRFToken() {
