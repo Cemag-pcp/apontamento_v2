@@ -284,9 +284,19 @@ function retornarMaquina(maquina) {
 
 async function mostrarModalPararMaquina() {
     const modalElement = document.getElementById('modalPararMaquina');
-    const modal = new bootstrap.Modal(modalElement);
     const modalTitle = document.getElementById('modalPararMaquinaLabel');
     const formPararMaquina = document.getElementById('formPararMaquina');
+
+    // 🔹 Remove qualquer backdrop existente ANTES de abrir o modal
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+
+    // 🔹 Se já houver um modal aberto, fecha antes de abrir um novo
+    const existingModalInstance = bootstrap.Modal.getInstance(modalElement);
+    if (existingModalInstance) {
+        existingModalInstance.hide();
+    }
+
+    const modal = new bootstrap.Modal(modalElement);
 
     Swal.fire({
         title: 'Carregando...',
@@ -304,12 +314,12 @@ async function mostrarModalPararMaquina() {
     modalTitle.innerHTML = `Escolha a máquina e o motivo`;
     modal.show();
 
-    // 🔹 Remove qualquer event listener duplicado antes de adicionar um novo
+    // 🔹 Remove event listener antigo antes de adicionar um novo
     formPararMaquina.removeEventListener('submit', handleFormSubmit);
     formPararMaquina.addEventListener('submit', handleFormSubmit, { once: true });
 }
 
-// 🔹 Função separada para o envio do formulário
+// 🔹 Função separada para submissão do formulário
 async function handleFormSubmit(event) {
     event.preventDefault();
 
@@ -344,27 +354,21 @@ async function handleFormSubmit(event) {
         Swal.fire({
             icon: 'success',
             title: 'Sucesso',
-            text: 'Ordem retornada com sucesso.',
+            text: 'Ordem interrompida com sucesso.',
         });
 
-        // Fecha o modal corretamente
+        // 🔹 Fecha o modal corretamente
         const modalElement = document.getElementById('modalPararMaquina');
         const modalInstance = bootstrap.Modal.getInstance(modalElement);
         if (modalInstance) {
             modalInstance.hide();
         }
 
-        // Remove manualmente qualquer modal-backdrop e classe modal-open
+        // 🔹 Remove modal-backdrop e modal-open manualmente
         document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
         document.body.classList.remove('modal-open');
 
         // Atualiza a interface
-        const containerIniciado = document.querySelector('.containerProcesso');
-        carregarOrdensIniciadas(containerIniciado);
-
-        const containerInterrompido = document.querySelector('.containerInterrompido');
-        carregarOrdensInterrompidas(containerInterrompido);
-
         fetchContagemStatusOrdens();
         fetchStatusMaquinas();
 
