@@ -20,7 +20,7 @@ function carregarTabela(pagina) {
         .finally(() => mostrarLoading(false)); // 🔥 Oculta o spinner
 }
 
-// 🔹 Atualiza a tabela
+//  Atualiza a tabela
 function atualizarTabela(ordens) {
     const tabelaCorpo = document.getElementById("tabela-corpo");
     tabelaCorpo.innerHTML = "";
@@ -48,8 +48,7 @@ function atualizarTabela(ordens) {
     });
 }
 
-// 🔹 Atualiza a paginação
-// 🔹 Atualiza a paginação
+//  Atualiza a paginação
 function atualizarPaginacao(totalRegistros, paginaAtual) {
     const totalPaginas = Math.ceil(totalRegistros / 10);
     const paginacaoContainer = document.getElementById("paginacao-container");
@@ -126,7 +125,7 @@ function atualizarPaginacao(totalRegistros, paginaAtual) {
     paginacaoContainer.appendChild(botaoProximo);
 }
 
-// 🔹 Exibe ou oculta o spinner de carregamento
+//  Exibe ou oculta o spinner de carregamento
 function mostrarLoading(mostrar) {
     const spinner = document.getElementById("loading-spinner");
     if (spinner) {
@@ -134,7 +133,7 @@ function mostrarLoading(mostrar) {
     }
 }
 
-// 🔹 Configuração do Select2 para o filtro de peças
+//  Configuração do Select2 para o filtro de peças
 function configurarSelect2Pecas() {
     $('#filtro-peca').select2({
         placeholder: 'Selecione uma peça ou mais',
@@ -176,7 +175,7 @@ function abrirModalDuplicacao(ordemId) {
         .then(response => response.json())
         .then(data => {
             Swal.close();
-            preencherModalDuplicacao(data);
+            preencherModalDuplicacao(data,ordemId);
             modal.show();
         })
         .catch(error => {
@@ -186,7 +185,7 @@ function abrirModalDuplicacao(ordemId) {
         });
 }
 
-// 🔹 Configuração do botão "Ver Peças"
+//  Configuração do botão "Ver Peças"
 function configurarBotaoVerPecas() {
     document.addEventListener('click', function (event) {
         if (event.target.classList.contains('btn-ver-pecas')) {
@@ -196,14 +195,19 @@ function configurarBotaoVerPecas() {
     });
 }
 
-// 🔹 Preenche o modal com informações da duplicação
-function preencherModalDuplicacao(data) {
+//  Preenche o modal com informações da duplicação
+function preencherModalDuplicacao(data,ordemId) {
     const bodyDuplicarOrdem = document.getElementById('bodyDuplicarOrdem');
+
+    document.getElementById('modalDuplicarOrdem').setAttribute('data-ordem-id', ordemId);
+
+    // Criando o conteúdo inicial do modal com a tabela da chapa
     bodyDuplicarOrdem.innerHTML = `
         <h6 class="text-center mt-3">Informações da Chapa</h6>
         <table class="table table-bordered table-sm text-center">
             <thead>
                 <tr class="table-light">
+                    <th>Chave</th>
                     <th>Descrição</th>
                     <th>Espessura</th>
                     <th>Quantidade</th>
@@ -213,9 +217,16 @@ function preencherModalDuplicacao(data) {
             </thead>
             <tbody>
                 <tr>
+                    <td>${ordemId}</td> 
                     <td>${data.propriedades?.descricao_mp || 'N/A'}</td>
                     <td>${data.propriedades?.espessura || 'N/A'}</td>
-                    <td><input type="number" class="form-control form-control-sm" value="${data.propriedades?.quantidade || 1}" style="width: 80px;"></td>
+                    <td>
+                        <input type="number" id="quantidadeChapas" 
+                               class="form-control form-control-sm" 
+                               data-value-original="${data.propriedades?.quantidade || 1}" 
+                               value="${data.propriedades?.quantidade || 1}" 
+                               min="1" style="width: 80px;">
+                    </td>
                     <td>${data.propriedades?.tipo_chapa || 'N/A'}</td>
                     <td>${data.propriedades?.aproveitamento || 'N/A'}</td>
                 </tr>
@@ -223,23 +234,168 @@ function preencherModalDuplicacao(data) {
         </table>
     `;
 
+    // Criando a tabela de peças, armazenando os dados no HTML para futura atualização
     if (data.pecas.length > 0) {
         bodyDuplicarOrdem.innerHTML += `
             <h6 class="text-center mt-3">Peças da Ordem</h6>
             <table class="table table-bordered table-sm text-center">
                 <thead>
-                    <tr class="table-light"><th>Peça</th><th>Qtd. Plan.</th></tr>
+                    <tr class="table-light">
+                        <th>Peça</th>
+                        <th>Qtd. Plan.</th>
+                    </tr>
                 </thead>
-                <tbody>${data.pecas.map(peca => `<tr><td>${peca.peca}</td><td>${peca.quantidade}</td></tr>`).join('')}</tbody>
+                <tbody id="tabelaPecas">
+                    ${data.pecas.map(peca => `
+                        <tr data-peca="${peca.peca}" 
+                            data-qtd-original="${peca.quantidade}">
+                            <td>${peca.peca}</td>
+                            <td class="qtd-peca">${peca.quantidade}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
             </table>
         `;
     }
+
+    // Captura o campo de quantidade de chapas
+    const inputQuantidadeChapas = document.getElementById('quantidadeChapas');
+    const quantidadeOriginalChapas = parseInt(inputQuantidadeChapas.getAttribute('data-value-original')) || 1;
+
+    // Evento para recalcular a quantidade de peças proporcionalmente
+    inputQuantidadeChapas.addEventListener('input', () => {
+        const novaQuantidadeChapas = parseInt(inputQuantidadeChapas.value) || 1;
+        atualizarQuantidadePecas(quantidadeOriginalChapas, novaQuantidadeChapas);
+    });
 }
 
-// 🔹 Configuração inicial ao carregar a página
+// Função para recalcular as quantidades de peças conforme a quantidade de chapas
+function atualizarQuantidadePecas(quantidadeOriginalChapas, novaQuantidadeChapas) {
+    const tabelaPecas = document.getElementById('tabelaPecas');
+
+    if (tabelaPecas) {
+        tabelaPecas.querySelectorAll('tr').forEach(row => {
+            const quantidadeOriginalPeca = parseInt(row.getAttribute('data-qtd-original')) || 0;
+
+            // Regra de três para recalcular proporcionalmente
+            const novaQuantidadePeca = Math.floor(
+                (novaQuantidadeChapas * quantidadeOriginalPeca) / quantidadeOriginalChapas
+            );
+
+            // Atualiza a célula com a nova quantidade
+            row.querySelector('.qtd-peca').textContent = novaQuantidadePeca;
+        });
+    }
+}
+
+function duplicarOrdem() {
+    const formDuplicarOrdem = document.getElementById('formDuplicarOrdem');
+
+    formDuplicarOrdem.addEventListener('submit', function (event) {
+        event.preventDefault(); // Evita recarregar a página
+
+        // Obtém o ID da ordem armazenado no modal
+        const modal = document.getElementById('modalDuplicarOrdem');
+        const ordemId = modal.getAttribute('data-ordem-id');
+        console.log(ordemId);
+
+        if (!ordemId) {
+            Swal.fire({ icon: 'error', title: 'Erro!', text: 'ID da ordem não encontrado.' });
+            return;
+        }
+
+        // Captura os valores do formulário
+        const obsDuplicar = document.getElementById('obsFinalizarCorte').value;
+        const dataProgramacao = document.getElementById('dataProgramacao').value;
+        const quantidadeChapas = parseFloat(document.getElementById('quantidadeChapas').value) || 1;
+
+        // Captura a lista de peças com as novas quantidades
+        const pecas = [];
+        document.querySelectorAll('#tabelaPecas tr').forEach(row => {
+            const pecaNome = row.getAttribute('data-peca');
+            const qtdPlanejada = parseInt(row.querySelector('.qtd-peca').textContent) || 0;
+
+            pecas.push({ peca: pecaNome, qtd_planejada: qtdPlanejada });
+        });
+
+        // Monta o objeto com os dados a serem enviados
+        const dadosDuplicacao = {
+            obs_duplicar: obsDuplicar,
+            dataProgramacao: dataProgramacao,
+            qtdChapa: quantidadeChapas,
+            pecas: pecas
+        };
+
+        console.log("Enviando dados para duplicação:", dadosDuplicacao);
+
+        // Exibe o Swal de carregamento
+        Swal.fire({
+            title: 'Duplicando Ordem...',
+            text: 'Por favor, aguarde...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        // Enviar a requisição para a API
+        fetch(`/corte/duplicar-op/api/duplicar-ordem/${ordemId}/`, {
+            method: 'POST',
+            body: JSON.stringify(dadosDuplicacao),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Certifica-se de incluir o CSRF Token
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errorData => {
+                    throw new Error(errorData.error || `Erro na requisição: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Sucesso:', data);
+
+            // Fecha o Swal de loading e exibe mensagem de sucesso
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: 'Ordem duplicada com sucesso.',
+                timer: 1500,  // Fecha automaticamente após 1.5s
+                showConfirmButton: false
+            });
+
+            // Esconde o modal após o sucesso
+            const bootstrapModal = bootstrap.Modal.getInstance(modal);
+            bootstrapModal.hide();
+
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+
+            // Fecha o Swal de loading e exibe erro
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: error.message,
+            });
+        });
+    });
+}
+
+
+// Função para obter CSRF Token (caso necessário)
+function getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+//  Configuração inicial ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
     configurarSelect2Pecas();
     configurarBotaoVerPecas();
+    duplicarOrdem();
 
     // Ação do botão de filtro
     document.getElementById("filtro-form").addEventListener("submit", (event) => {

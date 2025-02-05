@@ -42,10 +42,10 @@ def planejamento(request):
 
     return render(request, 'apontamento_corte/planejamento.html', {'motivos':motivos,'operadores':operadores,'espessuras':espessuras})
 
-def get_pecas_ordem(request, pk_ordem, name_maquina):
+def get_pecas_ordem(request, pk_ordem):
     try:
         # Busca a ordem com os relacionamentos necessários
-        ordem = Ordem.objects.prefetch_related('ordem_pecas_corte', 'propriedade').get(ordem=pk_ordem, grupo_maquina=name_maquina)
+        ordem = Ordem.objects.prefetch_related('ordem_pecas_corte', 'propriedade').get(pk=pk_ordem)
 
         # Propriedades da ordem
         propriedades = {
@@ -120,18 +120,18 @@ def atualizar_status_ordem(request):
 
                 status = body['status']
                 ordem_id = body['ordem_id']
-                grupo_maquina = body['grupo_maquina'].lower()
+                # grupo_maquina = body['grupo_maquina'].lower()
                 pecas_geral = body.get('pecas_mortas', [])
                 qtd_chapas = body.get('qtdChapas', None)
 
                 # Obtém a ordem
-                ordem = Ordem.objects.get(ordem=ordem_id, grupo_maquina=grupo_maquina)
+                ordem = Ordem.objects.get(pk=ordem_id)#, grupo_maquina=grupo_maquina)
                 
                 # Validações básicas
                 if ordem.status_atual == status:
                     return JsonResponse({'error': f'Essa ordem ja está {status}. Atualize a página.'}, status=400)
 
-                if not ordem_id or not grupo_maquina or not status:
+                if not ordem_id or not status:
                     return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
 
                 # Finaliza o processo atual (se existir)
@@ -178,7 +178,6 @@ def atualizar_status_ordem(request):
                     ordem.status_prioridade = 3
                     ordem.operador_final = get_object_or_404(Operador, pk=body.get('operadorFinal'))
                     ordem.obs_operador = body.get('obsFinal')
-                
                 elif status == 'interrompida':
                     novo_processo.motivo_interrupcao = MotivoInterrupcao.objects.get(nome=body['motivo'])
                     novo_processo.save()
@@ -214,7 +213,8 @@ def get_ordens_iniciadas(request):
 
     # Monta os dados para retorno
     data = [{
-        'ordem': ordem.ordem,
+        'id': ordem.id,
+        'ordem': ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
         'grupo_maquina': ordem.get_grupo_maquina_display(),
         'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
         'obs': ordem.obs,
@@ -257,7 +257,8 @@ def get_ordens_interrompidas(request):
         ultimo_processo_interrompido = ordem.processos.filter(status='interrompida').order_by('-data_inicio').first()
 
         data.append({
-            'ordem': ordem.ordem,
+            'id': ordem.id,
+            'ordem': ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
@@ -338,36 +339,8 @@ def filtrar_ordens(request):
 
     return JsonResponse({"ordens": resultados})
 
-def corrigir_aproveitamento(valor):
-    """
-    Corrige valores de aproveitamento que foram inseridos de forma incorreta.
-    Exemplo:
-    - 9855 -> 0.9855
-    - 006 -> 0.6
-    """
-    if valor is None:
-        return 0  # Garante que valores nulos não quebrem a ordenação
-
-    try:
-        valor = float(valor)
-
-        # Se for maior que 1, assumimos que foi multiplicado por 10^n e ajustamos
-        if valor > 1:
-            num_digitos = len(str(int(valor)))  # Conta os dígitos inteiros
-            valor = valor / (10 ** num_digitos)  # Ajusta dividindo por 10^n
-
-        # Se for menor que 0.01, assume erro de casas decimais e ajusta
-        elif valor < 0.01:
-            valor = round(valor * 10, 1)  # Multiplica por 10 e arredonda para 1 casa decimal
-        
-        return valor
-
-    except ValueError:
-        return 0  # Se não for possível converter, assume 0
-
-
 def get_ordens_criadas_duplicar_ordem(request):
-    # 🔹 Captura os parâmetros da requisição
+    #  Captura os parâmetros da requisição
     pecas = request.GET.get('pecas', '')  
     pecas = [unquote(p) for p in pecas.split(';')] if pecas else []
     
@@ -378,12 +351,12 @@ def get_ordens_criadas_duplicar_ordem(request):
     limit = int(request.GET.get('limit', 10))
     draw = int(request.GET.get('draw', 1))
 
-    # 🔹 Define a Query Base
+    #  Define a Query Base
     ordens_queryset = (
         Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2'], duplicada=False)
         .prefetch_related('ordem_pecas_corte')  # Evita queries repetidas para peças
         .select_related('propriedade')  # Carrega a propriedade diretamente
-        .order_by('-data_criacao')
+        .order_by('-propriedade__aproveitamento')
     )
 
     # otimização do Filtro de Peças
@@ -419,18 +392,18 @@ def get_ordens_criadas_duplicar_ordem(request):
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'aproveitamento': corrigir_aproveitamento(ordem.propriedade.aproveitamento if ordem.propriedade else None),
+            'aproveitamento': round(ordem.propriedade.aproveitamento, 5) if ordem.propriedade else None,
             'propriedade': {
                 'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
                 'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
                 'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
-                'aproveitamento': corrigir_aproveitamento(ordem.propriedade.aproveitamento if ordem.propriedade else None),
+                'aproveitamento': round(ordem.propriedade.aproveitamento, 5) if ordem.propriedade else None,
                 'retalho': 'Sim' if ordem.propriedade and ordem.propriedade.retalho else None,
             }
         } for ordem in ordens_page
     ]
 
-    # 🔹 Ordena os dados com base no aproveitamento corrigido
+    #  Ordena os dados com base no aproveitamento corrigido
     data.sort(key=lambda x: x['aproveitamento'], reverse=True)
 
     return JsonResponse({
@@ -470,9 +443,11 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
         return JsonResponse({'error': str(e)}, status=500)    
 
 def gerar_op_duplicada(request, pk_ordem):
+
     """
     Duplicar uma ordem existente com suas propriedades e criar uma nova entrada na base.
     """
+    
     if request.method != 'POST':
         return JsonResponse({'error': 'Método não permitido'}, status=405)
 
@@ -606,6 +581,36 @@ class ProcessarArquivoView(View):
             return JsonResponse({'error': f"Erro ao processar o arquivo: {str(e)}"}, status=500)
 
 class SalvarArquivoView(View):
+
+    def corrigir_aproveitamento(valor):
+        """
+        Corrige valores de aproveitamento que foram inseridos de forma incorreta.
+        Exemplo:
+        - 9855 -> 0.9855
+        - 006 -> 0.6
+        """
+        if valor is None:
+            return 0  # Garante que valores nulos não quebrem a ordenação
+
+        try:
+            valor = float(valor)
+
+            # Se for maior que 1, assumimos que foi multiplicado por 10^n e ajustamos
+            if valor > 1:
+                num_digitos = len(str(int(valor)))  # Conta os dígitos inteiros
+                valor = valor / (10 ** num_digitos)  # Ajusta dividindo por 10^n
+
+            # Se for menor que 0.01, assume erro de casas decimais e ajusta
+            elif valor < 0.001:
+                valor = valor * 1000  # Multiplica por 10 e arredonda para 1 casa decimal
+            elif valor < 0.01:
+                valor = valor * 100  # Multiplica por 10 e arredonda para 1 casa decimal
+            
+            return valor
+
+        except ValueError:
+            return 0  # Se não for possível converter, assume 0
+
     def post(self, request):
 
         """
@@ -669,7 +674,7 @@ class SalvarArquivoView(View):
                     descricao_mp=prop['descricao_mp'],
                     espessura=prop['espessura'],
                     quantidade=prop['quantidade'],
-                    aproveitamento=str(prop['aproveitamento'])[:9],
+                    aproveitamento=self.corrigir_aproveitamento(prop['aproveitamento']),
                     tipo_chapa=tipo_chapa,
                     retalho=retalho
                 )

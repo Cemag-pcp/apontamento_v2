@@ -8,6 +8,7 @@
 {% block links %}
     <link rel="stylesheet" href="{% static 'css/badges.css' %}">
     <link rel="stylesheet" href="{% static 'css/spinner.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -346,7 +347,7 @@
 </div>
 
 <!-- Modal para exibir as peças -->
-<div class="modal fade" id="modalPecas" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPecasLabel" inert>
+<div class="modal fade" id="modalPecas" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPecasLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">

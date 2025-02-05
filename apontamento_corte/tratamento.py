@@ -65,6 +65,8 @@ df_carga_pecas = df[['ordem','Peças','Quantidade','grupo_maquina']]
 df_carga_ordem.drop_duplicates(subset=['ordem'], keep='first', inplace=True)
 df_carga_propriedade.drop_duplicates(subset=['ordem'], keep='first', inplace=True)
 
+df_carga_propriedade['aproveitamento'] = df_carga_propriedade['aproveitamento'].apply(lambda x: corrigir_aproveitamento(x))
+
 def importar_ordens(df_carga_ordem):
     for _, row in df_carga_ordem.iterrows():
         try:
@@ -101,7 +103,7 @@ def importar_propriedades(df_carga_propriedade):
                 tamanho=row['tamanho'],
                 espessura=row['espessura'],
                 quantidade=float(row['quantidade'].replace(",",'.')),
-                aproveitamento=str(row['aproveitamento'])[:6],
+                aproveitamento=corrigir_aproveitamento(row['aproveitamento']),
                 tipo_chapa=row['tipo_chapa']
             )
 
@@ -129,8 +131,37 @@ def importar_pecas(df_carga_pecas):
         except Exception as e:
             print(f"Erro ao inserir a linha {row.to_dict()}: {e}")
 
+def corrigir_aproveitamento(valor):
+    """
+    Corrige valores de aproveitamento que foram inseridos de forma incorreta.
+    Exemplo:
+    - 9855 -> 0.9855
+    - 006 -> 0.6
+    """
+    if valor is None:
+        return 0  # Garante que valores nulos não quebrem a ordenação
+
+    try:
+        valor = float(valor)
+
+        # Se for maior que 1, assumimos que foi multiplicado por 10^n e ajustamos
+        if valor > 1:
+            num_digitos = len(str(int(valor)))  # Conta os dígitos inteiros
+            valor = valor / (10 ** num_digitos)  # Ajusta dividindo por 10^n
+
+        # Se for menor que 0.01, assume erro de casas decimais e ajusta
+        elif valor < 0.001:
+            valor = valor * 1000  # Multiplica por 10 e arredonda para 1 casa decimal
+        elif valor < 0.01:
+            valor = valor * 100  # Multiplica por 10 e arredonda para 1 casa decimal
+        
+        return valor
+
+    except ValueError:
+        return 0  # Se não for possível converter, assume 0
+
 # Chamada da função com o DataFrame
-# importar_ordens(df_carga_ordem)
-# importar_propriedades(df_carga_propriedade)
-importar_pecas(df_carga_pecas)
+importar_ordens(df_carga_ordem[:50])
+importar_propriedades(df_carga_propriedade[:50])
+importar_pecas(df_carga_pecas[:258])
 

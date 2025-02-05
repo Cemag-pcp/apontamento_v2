@@ -124,7 +124,7 @@ class PropriedadesOrdem(models.Model):
     tamanho=models.CharField(max_length=100, null=True, blank=True)
     espessura=models.CharField(max_length=20, null=True, blank=True)
     quantidade=models.FloatField()
-    aproveitamento=models.CharField(max_length=10, null=True, blank=True)
+    aproveitamento=models.FloatField(null=True, blank=True)
     tipo_chapa = models.CharField(max_length=20, choices=TIPO_CHAPA_CHOICES, null=True, blank=True)
     retalho = models.BooleanField(default=False)
     nova_mp = models.ForeignKey(Mp, on_delete=models.CASCADE, related_name='nova_mp', blank=True, null=True) # caso o usuario opte por mudar ao finalizar a ordem
