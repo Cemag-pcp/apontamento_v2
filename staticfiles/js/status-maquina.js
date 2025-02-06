@@ -1,3 +1,6 @@
+import { carregarOrdensIniciadas } from './ordem-criada-serra.js';
+import { carregarOrdensInterrompidas} from './ordem-criada-serra.js';
+
 document.addEventListener('DOMContentLoaded', function () {
     // Atualiza automaticamente ao carregar a página
     fetchStatusMaquinas();
@@ -341,6 +344,12 @@ async function handleFormSubmit(event) {
         // Atualiza a interface
         fetchContagemStatusOrdens();
         fetchStatusMaquinas();
+    
+        const containerIniciado = document.querySelector('.containerProcesso');
+        carregarOrdensIniciadas(containerIniciado);
+    
+        const containerInterrompido = document.querySelector('.containerInterrompido');
+        carregarOrdensInterrompidas(containerInterrompido);
 
     } catch (error) {
         console.error('Erro:', error);

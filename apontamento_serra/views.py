@@ -900,7 +900,7 @@ def parar_maquina(request):
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
 
 @csrf_exempt
-@require_http_methods(["PATCH"])  # Garante que apenas PATCH é permitido
+@require_http_methods(["PATCH"])  # So PATCH é permitido
 def retornar_maquina(request):
     try:
         data = json.loads(request.body)
