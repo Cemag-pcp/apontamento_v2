@@ -1,6 +1,6 @@
-import { fetchStatusMaquinas } from './status-maquina.js';
-import { fetchUltimasPecasProduzidas } from './status-maquina.js';
-import { fetchContagemStatusOrdens } from './status-maquina.js';
+import { fetchStatusMaquinas } from './status-maquina-v2.js';
+import { fetchUltimasPecasProduzidas } from './status-maquina-v2.js';
+import { fetchContagemStatusOrdens } from './status-maquina-v2.js';
 
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
