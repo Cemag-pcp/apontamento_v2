@@ -625,7 +625,7 @@ function mostrarModalFinalizarParcial(ordemId, grupoMaquina) {
     formFinalizar.parentNode.replaceChild(clonedForm, formFinalizar);
 
     // Configura título do modal
-    modalTitle.innerHTML = `Finalizar Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Finalizar Ordem Parcialmente ${ordemId}`;
     document.getElementById('bodyPecasFinalizarParcial').innerHTML = '<p class="text-center text-muted">Carregando informações...</p>';
 
     Swal.fire({

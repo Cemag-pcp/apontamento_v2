@@ -1,6 +1,3 @@
-import { carregarOrdensIniciadas } from './ordem-criada-serra.js';
-import { carregarOrdensInterrompidas} from './ordem-criada-serra.js';
-
 document.addEventListener('DOMContentLoaded', function () {
     // Atualiza automaticamente ao carregar a página
     fetchStatusMaquinas();
@@ -298,12 +295,12 @@ async function mostrarModalPararMaquina() {
     await fetchMaquinasDisponiveis();
     Swal.close(); // Fecha o SweetAlert de carregamento
 
-    // 🔹 Remove event listener antigo antes de adicionar um novo
+    //  Remove event listener antigo antes de adicionar um novo
     formPararMaquina.removeEventListener('submit', handleFormSubmit);
     formPararMaquina.addEventListener('submit', handleFormSubmit, { once: true });
 }
 
-// 🔹 Função separada para submissão do formulário
+//  Função separada para submissão do formulário
 async function handleFormSubmit(event) {
     event.preventDefault();
 
