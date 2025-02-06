@@ -182,6 +182,7 @@ class Profile(models.Model):
         ('serra', 'Serra'),
         ('usinagem', 'Usinagem'),
         ('corte','Corte'),
+        ('prod-esp', 'Prod especiais')
         
     ]
 
