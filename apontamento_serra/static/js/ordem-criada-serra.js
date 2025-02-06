@@ -1478,6 +1478,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         criarOrdem();
         filtro();
         importarOrdensSerra();
+        
     } catch (error) {
         console.error("Erro ao carregar a página:", error);
     }
