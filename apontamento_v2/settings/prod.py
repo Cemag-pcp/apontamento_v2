@@ -9,6 +9,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
     'http://127.0.0.1',
     'https://apontamento-v2-testes.onrender.com'
+    
 ]
 
 # Banco de dados para produção

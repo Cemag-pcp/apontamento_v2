@@ -1451,38 +1451,46 @@ function importarOrdensSerra() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        resetarCardsInicial();
+function teste(){
+    console.log('Teste');
+}
 
-        // // Inicializa carregamento de ordens simultaneamente
-        // const containerIniciado = document.querySelector('.containerProcesso');
-        // const containerInterrompido = document.querySelector('.containerInterrompido');
-
-        // if (containerIniciado) carregarOrdensIniciadas(containerIniciado);
-        // if (containerInterrompido) carregarOrdensInterrompidas(containerInterrompido);
-
-        // // Adiciona evento ao botão "Add" se ele existir
-        // const addPecaBtn = document.getElementById("addPeca");
-        // if (addPecaBtn) {
-        //     addPecaBtn.addEventListener("click", addPeca);
-        // }
-
-        // // Configuração do Select2 para diferentes campos
-        // configurarSelect2('#mpEscolhida', 'api/get-mp/', '#modalSerra');
-        // configurarSelect2('#pecaEscolhida_0', 'api/get-peca/', '#containerPecas');
-        // configurarSelect2('#filtro-mp', 'api/get-mp/', null, true);
-        // configurarSelect2('#filtro-peca', 'api/get-peca/', null, true);
-
-        // // Executa outras funções de inicialização
-        // criarOrdem();
-        // // filtro();
-        // importarOrdensSerra();
-        
-    } catch (error) {
-        console.error("Erro ao carregar a página:", error);
-    }
+document.addEventListener('DOMContentLoaded', function () {
+    teste();
 });
+
+// document.addEventListener('DOMContentLoaded', async () => {
+//     try {
+//         // resetarCardsInicial();
+
+//         // // Inicializa carregamento de ordens simultaneamente
+//         // const containerIniciado = document.querySelector('.containerProcesso');
+//         // const containerInterrompido = document.querySelector('.containerInterrompido');
+
+//         // if (containerIniciado) carregarOrdensIniciadas(containerIniciado);
+//         // if (containerInterrompido) carregarOrdensInterrompidas(containerInterrompido);
+
+//         // // Adiciona evento ao botão "Add" se ele existir
+//         // const addPecaBtn = document.getElementById("addPeca");
+//         // if (addPecaBtn) {
+//         //     addPecaBtn.addEventListener("click", addPeca);
+//         // }
+
+//         // // Configuração do Select2 para diferentes campos
+//         // configurarSelect2('#mpEscolhida', 'api/get-mp/', '#modalSerra');
+//         // configurarSelect2('#pecaEscolhida_0', 'api/get-peca/', '#containerPecas');
+//         // configurarSelect2('#filtro-mp', 'api/get-mp/', null, true);
+//         // configurarSelect2('#filtro-peca', 'api/get-peca/', null, true);
+
+//         // // Executa outras funções de inicialização
+//         // criarOrdem();
+//         // // filtro();
+//         // importarOrdensSerra();
+        
+//     } catch (error) {
+//         console.error("Erro ao carregar a página:", error);
+//     }
+// });
 
 /**
  * Configura o Select2 de forma reutilizável
