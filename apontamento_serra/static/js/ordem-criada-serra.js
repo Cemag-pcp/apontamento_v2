@@ -1476,7 +1476,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Executa outras funções de inicialização
         criarOrdem();
-        filtro();
+        // filtro();
         importarOrdensSerra();
         
     } catch (error) {
