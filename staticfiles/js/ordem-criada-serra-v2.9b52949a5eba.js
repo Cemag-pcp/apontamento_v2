@@ -1,19 +1,3 @@
-// Obtendo o caminho correto do módulo com hash
-const statusMaquinaPath = window.jsFiles.statusMaquina;
-
-// Variáveis globais para armazenar as funções importadas
-let fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens;
-
-// Importando o módulo dinamicamente
-import(statusMaquinaPath).then((module) => {
-    // Pegando as funções e armazenando globalmente
-    fetchStatusMaquinas = module.fetchStatusMaquinas;
-    fetchUltimasPecasProduzidas = module.fetchUltimasPecasProduzidas;
-    fetchContagemStatusOrdens = module.fetchContagemStatusOrdens;
-}).catch(error => {
-    console.error("Erro ao carregar status-maquina-v2.js:", error);
-});
-
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -646,13 +630,8 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
             
-            // ✅ Chamando as funções importadas somente quando disponíveis
-            if (fetchContagemStatusOrdens && fetchStatusMaquinas) {
-                fetchContagemStatusOrdens();
-                fetchStatusMaquinas();
-            } else {
-                console.warn("As funções importadas ainda não foram carregadas.");
-            }
+            fetchContagemStatusOrdens();
+            fetchStatusMaquinas();
 
         })
         .catch((error) => {
@@ -1468,38 +1447,46 @@ function importarOrdensSerra() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        resetarCardsInicial();
+function teste(){
+    console.log('Teste');
+}
 
-        // Inicializa carregamento de ordens simultaneamente
-        const containerIniciado = document.querySelector('.containerProcesso');
-        const containerInterrompido = document.querySelector('.containerInterrompido');
-
-        if (containerIniciado) carregarOrdensIniciadas(containerIniciado);
-        if (containerInterrompido) carregarOrdensInterrompidas(containerInterrompido);
-
-        // Adiciona evento ao botão "Add" se ele existir
-        const addPecaBtn = document.getElementById("addPeca");
-        if (addPecaBtn) {
-            addPecaBtn.addEventListener("click", addPeca);
-        }
-
-        // Configuração do Select2 para diferentes campos
-        configurarSelect2('#mpEscolhida', 'api/get-mp/', '#modalSerra');
-        configurarSelect2('#pecaEscolhida_0', 'api/get-peca/', '#containerPecas');
-        configurarSelect2('#filtro-mp', 'api/get-mp/', null, true);
-        configurarSelect2('#filtro-peca', 'api/get-peca/', null, true);
-
-        // Executa outras funções de inicialização
-        criarOrdem();
-        // filtro();
-        importarOrdensSerra();
-        
-    } catch (error) {
-        console.error("Erro ao carregar a página:", error);
-    }
+document.addEventListener('DOMContentLoaded', function () {
+    teste();
 });
+
+// document.addEventListener('DOMContentLoaded', async () => {
+//     try {
+//         // resetarCardsInicial();
+
+//         // // Inicializa carregamento de ordens simultaneamente
+//         // const containerIniciado = document.querySelector('.containerProcesso');
+//         // const containerInterrompido = document.querySelector('.containerInterrompido');
+
+//         // if (containerIniciado) carregarOrdensIniciadas(containerIniciado);
+//         // if (containerInterrompido) carregarOrdensInterrompidas(containerInterrompido);
+
+//         // // Adiciona evento ao botão "Add" se ele existir
+//         // const addPecaBtn = document.getElementById("addPeca");
+//         // if (addPecaBtn) {
+//         //     addPecaBtn.addEventListener("click", addPeca);
+//         // }
+
+//         // // Configuração do Select2 para diferentes campos
+//         // configurarSelect2('#mpEscolhida', 'api/get-mp/', '#modalSerra');
+//         // configurarSelect2('#pecaEscolhida_0', 'api/get-peca/', '#containerPecas');
+//         // configurarSelect2('#filtro-mp', 'api/get-mp/', null, true);
+//         // configurarSelect2('#filtro-peca', 'api/get-peca/', null, true);
+
+//         // // Executa outras funções de inicialização
+//         // criarOrdem();
+//         // // filtro();
+//         // importarOrdensSerra();
+        
+//     } catch (error) {
+//         console.error("Erro ao carregar a página:", error);
+//     }
+// });
 
 /**
  * Configura o Select2 de forma reutilizável
