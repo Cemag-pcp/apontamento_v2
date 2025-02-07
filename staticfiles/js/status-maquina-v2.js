@@ -55,9 +55,9 @@ export function fetchStatusMaquinas() {
             if (data.status.length > 0) {
                 data.status.forEach(maquina => {
                     const statusColor = 
-                        maquina.status === 'Em produção' ? 'bg-warning' : 
+                        maquina.status === 'Em produção' ? 'bg-success' : 
                         maquina.status === 'Parada' ? 'bg-danger' : 
-                        'bg-success';
+                        'bg-warning';
 
                     const statusItem = document.createElement('li');
                     statusItem.classList.add('list-group-item', 'd-flex', 'align-items-center', 'justify-content-between', 'border-0');
