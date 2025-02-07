@@ -485,16 +485,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    window.jsFiles = {
-        statusMaquina: "{% static 'js/status-maquina-v2.js' %}"
-    };
-</script>
-
-<script>
-    window.jsFiles = {
-        statusMaquina: "{% static 'js/ordem-criada-serra-v2.js' %}"
-    };
-</script>
+<script type="module" src="{% static 'js/ordem-criada-serra-v2.js' %}"></script>
+<script type="module" src="{% static 'js/status-maquina-v2.js' %}"></script>
 {% endblock %}
 
