@@ -1,32 +1,44 @@
-import { carregarOrdensIniciadas } from './ordem-criada-serra-v2.js';
-import { carregarOrdensInterrompidas} from './ordem-criada-serra-v2.js';
+// Obtendo o caminho correto do módulo com hash
+const ordemCriadaSerraPath = window.jsFiles.ordemCriadaSerra;
 
-// document.addEventListener('DOMContentLoaded', function () {
-//     // Atualiza automaticamente ao carregar a página
-//     fetchStatusMaquinas();
-//     fetchUltimasPecasProduzidas();
-//     fetchContagemStatusOrdens();
+// Variáveis globais para armazenar as funções importadas
+let carregarOrdensIniciadas, carregarOrdensInterrompidas;
 
-//     // Adiciona eventos de clique para atualizar manualmente
-//     document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
-//         console.log("Atualizando Status de Máquinas...");
-//         fetchStatusMaquinas(); // Chama a função existente
-//     });
+// Importando o módulo dinamicamente
+import(ordemCriadaSerraPath).then((module) => {
+    // Pegando as funções e armazenando globalmente
+    carregarOrdensIniciadas = module.carregarOrdensIniciadas;
+    carregarOrdensInterrompidas = module.carregarOrdensInterrompidas;
+}).catch(error => {
+    console.error("Erro ao carregar ordem-criada-serra-v2.js:", error);
+});
 
-//     document.getElementById('refresh-pecas').addEventListener('click', function () {
-//         console.log("Atualizando Últimas Peças Produzidas...");
-//         fetchUltimasPecasProduzidas(); // Chama a função existente
-//     });
+document.addEventListener('DOMContentLoaded', function () {
+    // Atualiza automaticamente ao carregar a página
+    fetchStatusMaquinas();
+    fetchUltimasPecasProduzidas();
+    fetchContagemStatusOrdens();
 
-//     document.getElementById('refresh-ordens').addEventListener('click', function () {
-//         console.log("Atualizando Status de Ordens...");
-//         fetchContagemStatusOrdens(); // Chama a função existente
-//     });
+    // Adiciona eventos de clique para atualizar manualmente
+    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
+        console.log("Atualizando Status de Máquinas...");
+        fetchStatusMaquinas(); // Chama a função existente
+    });
 
-//     document.getElementById('btnPararMaquina').addEventListener('click', () => {
-//         mostrarModalPararMaquina(); // Chama a função já existente
-//     });
-// });
+    document.getElementById('refresh-pecas').addEventListener('click', function () {
+        console.log("Atualizando Últimas Peças Produzidas...");
+        fetchUltimasPecasProduzidas(); // Chama a função existente
+    });
+
+    document.getElementById('refresh-ordens').addEventListener('click', function () {
+        console.log("Atualizando Status de Ordens...");
+        fetchContagemStatusOrdens(); // Chama a função existente
+    });
+
+    document.getElementById('btnPararMaquina').addEventListener('click', () => {
+        mostrarModalPararMaquina(); // Chama a função já existente
+    });
+});
 
 export function fetchStatusMaquinas() {
     // Seleciona os elementos do container

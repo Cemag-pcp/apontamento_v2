@@ -491,6 +491,10 @@
     };
 </script>
 
-<script type="module" src="{% static 'js/ordem-criada-serra-v2.js' %}"></script>
+<script>
+    window.jsFiles = {
+        statusMaquina: "{% static 'js/ordem-criada-serra-v2.js' %}"
+    };
+</script>
 {% endblock %}
 
