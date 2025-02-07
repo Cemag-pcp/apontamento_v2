@@ -1455,10 +1455,6 @@ function teste(){
     console.log('Teste');
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    teste();
-    console.log("teste 2")
-});
 
 // document.addEventListener('DOMContentLoaded', async () => {
 //     try {

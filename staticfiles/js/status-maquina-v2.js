@@ -1,5 +1,5 @@
-import { carregarOrdensIniciadas } from './ordem-criada-serra.js';
-import { carregarOrdensInterrompidas} from './ordem-criada-serra.js';
+import { carregarOrdensIniciadas } from './ordem-criada-serra-v2.js';
+import { carregarOrdensInterrompidas} from './ordem-criada-serra-v2.js';
 
 // document.addEventListener('DOMContentLoaded', function () {
 //     // Atualiza automaticamente ao carregar a página
