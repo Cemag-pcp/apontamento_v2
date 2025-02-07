@@ -137,8 +137,6 @@ def atualizar_status_ordem(request):
                     # Pode ser que a ordem tenha sido reiniciada, então não precisa atualizar a máquina
                     maquina_nome = body.get('maquina_nome')  # Usa get() para evitar KeyError
 
-                    print(maquina_nome)
-
                     # Verifica e finaliza a parada da máquina se necessário
                     maquinas_paradas = MaquinaParada.objects.filter(maquina=maquina_nome, data_fim__isnull=True)
                     for parada in maquinas_paradas:

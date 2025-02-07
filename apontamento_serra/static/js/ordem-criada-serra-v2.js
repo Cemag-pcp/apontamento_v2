@@ -847,6 +847,8 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
     const clonedForm = formFinalizar.cloneNode(true);
     formFinalizar.parentNode.replaceChild(clonedForm, formFinalizar);
 
+    document.getElementById('obsFinalizar').value = '';
+
     // Fetch para buscar peças e propriedades
     fetch(`api/ordens-criadas/${ordemId}/${grupoMaquina.toLowerCase()}/pecas/`)
         .then(response => {
@@ -990,6 +992,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 
             modal.show();
 
+
             if (!formFinalizar.checkValidity()) {
                 formFinalizar.reportValidity(); // Exibe as mensagens de erro nativas do navegador
                 return; // Interrompe a submissão se o formulário for inválido
@@ -1087,6 +1090,9 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
             fetchContagemStatusOrdens();
 
             modal.hide();
+
+            formFinalizar.reset()
+
         })
         .catch((error) => {
             Swal.fire({
