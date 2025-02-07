@@ -36,6 +36,9 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Middleware adicional para produção
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
+# Configuração para forçar atualização de arquivos estáticos
+WHITENOISE_MAX_AGE = 0
+
 # Configurações de segurança para produção (certifique-se de ajustar essas conforme necessário)
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
