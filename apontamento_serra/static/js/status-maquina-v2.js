@@ -1,29 +1,31 @@
-// document.addEventListener('DOMContentLoaded', function () {
-//     // Atualiza automaticamente ao carregar a página
-//     fetchStatusMaquinas();
-//     fetchUltimasPecasProduzidas();
-//     fetchContagemStatusOrdens();
+import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada-serra-v2.js';
 
-//     // Adiciona eventos de clique para atualizar manualmente
-//     document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
-//         console.log("Atualizando Status de Máquinas...");
-//         fetchStatusMaquinas(); // Chama a função existente
-//     });
+document.addEventListener('DOMContentLoaded', function () {
+    // Atualiza automaticamente ao carregar a página
+    fetchStatusMaquinas();
+    fetchUltimasPecasProduzidas();
+    fetchContagemStatusOrdens();
 
-//     document.getElementById('refresh-pecas').addEventListener('click', function () {
-//         console.log("Atualizando Últimas Peças Produzidas...");
-//         fetchUltimasPecasProduzidas(); // Chama a função existente
-//     });
+    // Adiciona eventos de clique para atualizar manualmente
+    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
+        console.log("Atualizando Status de Máquinas...");
+        fetchStatusMaquinas(); // Chama a função existente
+    });
 
-//     document.getElementById('refresh-ordens').addEventListener('click', function () {
-//         console.log("Atualizando Status de Ordens...");
-//         fetchContagemStatusOrdens(); // Chama a função existente
-//     });
+    document.getElementById('refresh-pecas').addEventListener('click', function () {
+        console.log("Atualizando Últimas Peças Produzidas...");
+        fetchUltimasPecasProduzidas(); // Chama a função existente
+    });
 
-//     document.getElementById('btnPararMaquina').addEventListener('click', () => {
-//         mostrarModalPararMaquina(); // Chama a função já existente
-//     });
-// });
+    document.getElementById('refresh-ordens').addEventListener('click', function () {
+        console.log("Atualizando Status de Ordens...");
+        fetchContagemStatusOrdens(); // Chama a função existente
+    });
+
+    document.getElementById('btnPararMaquina').addEventListener('click', () => {
+        mostrarModalPararMaquina(); // Chama a função já existente
+    });
+});
 
 export function fetchStatusMaquinas() {
     // Seleciona os elementos do container
