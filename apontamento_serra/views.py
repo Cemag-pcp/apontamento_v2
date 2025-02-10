@@ -103,10 +103,10 @@ def atualizar_status_ordem(request):
 
                 # Obtém a ordem
                 ordem = Ordem.objects.get(ordem=ordem_id, grupo_maquina=grupo_maquina)
-                
+
                 # Validações básicas
                 if ordem.status_atual == status:
-                    return JsonResponse({'error': f'Essa ordem ja está {status}. Atualize a página.'}, status=400)
+                    return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
 
                 if not ordem_id or not grupo_maquina or not status:
                     return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
@@ -133,34 +133,27 @@ def atualizar_status_ordem(request):
                     data_fim=now() if status == 'finalizada' else None
                 )
 
-                # Atualiza o status da ordem para o novo status
+                # Atualiza o status da ordem
                 ordem.status_atual = status
-                
-                if status == 'iniciada':
 
-                    # Verifica e finaliza a parada da máquina se necessário
+                if status == 'iniciada':
+                    # Finaliza paradas da máquina se necessário
                     maquinas_paradas = MaquinaParada.objects.filter(maquina=maquina_nome, data_fim__isnull=True)
                     for parada in maquinas_paradas:
                         parada.data_fim = now()
                         parada.save()
-                    
-                    if maquina_nome:
-                        ordem.maquina = maquina_nome
 
-                    # Verifica se ja existe alguma ordem iniciada nessa máquina
-                    if processo_atual.status == 'iniciada':
-                        return JsonResponse({'error': f'Ja existe uma ordem para essa máquina, finalize ou interrompa. Atualize a página'}, status=400)
-
+                    ordem.maquina = maquina_nome
                     ordem.status_prioridade = 1
+
                 elif status == 'finalizada':
-                    
                     tamanho_vara = body.get('tamanho_vara')
                     qtd_varas = body.get('qtd_vara')
                     operador_final = int(body.get('operador_final'))
                     obs_final = body.get('obs_finalizar')
 
-                    ordem.operador_final=get_object_or_404(Operador, pk=operador_final)
-                    ordem.obs_operador=obs_final
+                    ordem.operador_final = get_object_or_404(Operador, pk=operador_final)
+                    ordem.obs_operador = obs_final
 
                     mp_final = body.get('mp_final')
 
@@ -171,23 +164,23 @@ def atualizar_status_ordem(request):
                     ordem.propriedade.tamanho = tamanho_vara
                     ordem.propriedade.save()
 
-                    # Verifica se a quantidade de chapas mudaram
+                    # Verifica se a quantidade de chapas mudou
                     if int(qtd_varas) != ordem.propriedade.quantidade:
                         ordem.propriedade.quantidade = int(qtd_varas)
                         ordem.propriedade.save()
-                    
+
                     for peca in pecas_geral:
                         peca_id = peca.get('peca')
                         planejada = peca.get('planejadas')
                         mortas = peca.get('mortas', 0)
 
-                        peca = PecasOrdem.objects.get(ordem=ordem, peca=peca_id)
-                        peca.qtd_boa = planejada
-                        peca.qtd_morta = mortas
-
-                        peca.save()
+                        peca_obj = PecasOrdem.objects.get(ordem=ordem, peca=peca_id)
+                        peca_obj.qtd_boa = planejada
+                        peca_obj.qtd_morta = mortas
+                        peca_obj.save()
 
                     ordem.status_prioridade = 3
+
                 elif status == 'interrompida':
                     novo_processo.motivo_interrupcao = MotivoInterrupcao.objects.get(nome=body['motivo'])
                     novo_processo.save()
