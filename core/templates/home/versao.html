@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Histórico de versões</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/versao.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">📜 Histórico de Versões</h2>
+    
+    <div id="version-history">
+        {% for versao in versoes %}
+            <div class="card version-card mb-3 shadow-sm p-3 {{ versao.tipo }}">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        {% if versao.tipo == "bug" %} 🛠 
+                        {% elif versao.tipo == "funcionalidade" %} ✨ 
+                        {% elif versao.tipo == "implementacao" %} 🚀 
+                        {% endif %}
+                        Versão {{ versao.numero }}
+                    </h5>
+                    <h6 class="card-subtitle text-muted">📅 Data: {{ versao.data_lancamento }}</h6>
+                    <p class="mt-2">{{ versao.descricao }}</p>
+                </div>
+            </div>
+        {% empty %}
+            <p class="text-center text-muted">Nenhuma versão registrada ainda.</p>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}
+

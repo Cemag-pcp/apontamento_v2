@@ -1,0 +1,14 @@
+.version-card {
+    border-left: 5px solid #007bff;
+    transition: transform 0.2s ease-in-out;
+}
+.version-card:hover {
+    transform: scale(1.02);
+}
+.bug { border-left-color: #dc3545; } /* Vermelho */
+.funcionalidade { border-left-color: #ffc107; } /* Amarelo */
+.implementacao { border-left-color: #28a745; } /* Verde */
+.icon {
+    font-size: 1.5rem;
+    margin-right: 10px;
+}

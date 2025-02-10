@@ -1,10 +1,11 @@
 from django.contrib import admin
 from django import forms
-from .models import MaquinaParada, Profile, Ordem
+from .models import MaquinaParada, Profile, Ordem, Versao
 
 # Registro do modelo MaquinaParada
 admin.site.register(MaquinaParada)
 admin.site.register(Ordem)
+admin.site.register(Versao)
 
 # Formulário personalizado para Profile
 class ProfileAdminForm(forms.ModelForm):

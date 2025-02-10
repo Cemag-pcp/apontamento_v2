@@ -5,7 +5,7 @@ from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
 
-from .models import Ordem
+from .models import Ordem, Versao
 from cadastro.models import MotivoExclusao
 
 import json
@@ -68,3 +68,9 @@ class CustomLoginView(LoginView):
 
 def home(request):
     return render(request, 'home/home.html')  
+
+def versao(request):
+    # Busca todas as versões ordenadas pela data mais recente
+    versoes = Versao.objects.order_by('data_lancamento')
+
+    return render(request, 'home/versao.html', {'versoes': versoes})
