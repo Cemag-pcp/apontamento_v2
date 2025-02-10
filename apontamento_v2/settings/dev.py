@@ -19,7 +19,7 @@ DATABASES = {
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
         'OPTIONS': {
-            'options': '-c search_path=apontamento_v2',
+            'options': '-c search_path=apontamento_v2_testes',
         },
     }
 }
