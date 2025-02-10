@@ -1,4 +1,4 @@
-import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada-serra-v2.js';
+import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada-estamparia.js';
 
 document.addEventListener('DOMContentLoaded', function () {
     // Atualiza automaticamente ao carregar a página
@@ -8,14 +8,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Adiciona eventos de clique para atualizar manualmente
     document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
+        console.log("Atualizando Status de Máquinas...");
         fetchStatusMaquinas(); // Chama a função existente
     });
 
     document.getElementById('refresh-pecas').addEventListener('click', function () {
+        console.log("Atualizando Últimas Peças Produzidas...");
         fetchUltimasPecasProduzidas(); // Chama a função existente
     });
 
     document.getElementById('refresh-ordens').addEventListener('click', function () {
+        console.log("Atualizando Status de Ordens...");
         fetchContagemStatusOrdens(); // Chama a função existente
     });
 
@@ -31,7 +34,7 @@ export function fetchStatusMaquinas() {
     const listaStatus = document.querySelector('#machine-status-list');
 
     // Faz a requisição para a API
-    fetch('/core/api/status_maquinas/?setor=serra')
+    fetch('/core/api/status_maquinas/?setor=estamparia')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -114,7 +117,7 @@ export function fetchUltimasPecasProduzidas() {
     const listaPecas = document.querySelector('#ultimas-pecas-list');
 
     // Faz a requisição para a API
-    fetch(`/core/api/ultimas_pecas_produzidas/?setor=serra`)
+    fetch(`/core/api/ultimas_pecas_produzidas/?setor=estamparia`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -152,7 +155,7 @@ export function fetchContagemStatusOrdens() {
     const listaStatus = document.getElementById('status-ordens-list');
 
     // Faz a requisição para a API
-    fetch('/core/api/status_ordem/?setor=serra')
+    fetch('/core/api/status_ordem/?setor=estamparia')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -199,7 +202,7 @@ export function fetchContagemStatusOrdens() {
 
 async function fetchMaquinasDisponiveis() {
     try {
-        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=serra');
+        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=estamparia');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -313,7 +316,7 @@ async function handleFormSubmit(event) {
     });
 
     try {
-        const response = await fetch(`/core/api/parar-maquina/?setor=serra`, {
+        const response = await fetch(`/core/api/parar-maquina/?setor=estamparia`, {
             method: 'PATCH',
             body: JSON.stringify({
                 maquina: document.getElementById('escolhaMaquinaParada').value,

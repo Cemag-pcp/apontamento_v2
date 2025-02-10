@@ -148,7 +148,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina, ordem.maquina);
                             });
                         }
 
@@ -401,7 +401,7 @@ export function carregarOrdensInterrompidas(container, filtros={}) {
                 // Evento para "Retornar"
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina, ordem.maquina);
                     });
                 }
 
@@ -1105,7 +1105,10 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 }
 
 // Modal para "Retornar"
-function mostrarModalRetornar(ordemId, grupoMaquina) {
+function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
+
+    const maquinaTratada = maquina.toLowerCase().replace(" ","_");
+
     const modal = new bootstrap.Modal(document.getElementById('modalRetornar'));
     const modalTitle = document.getElementById('modalRetornarLabel');
     const formRetornar = document.getElementById('formRetornarProducao');
@@ -1137,6 +1140,8 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
                 ordem_id: ordemId,
                 grupo_maquina: grupoMaquina,
                 status: 'iniciada',
+                maquina_nome: maquinaTratada,
+
             }),
             headers: {
                 'Content-Type': 'application/json',

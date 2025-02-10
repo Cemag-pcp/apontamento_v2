@@ -1,21 +1,18 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.views import View
-from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now,localtime
-from django.db.models import Q,Prefetch,Count
+from django.db.models import Q
+from django.contrib.auth.decorators import login_required
 
 from .models import Ordem,PecasOrdem
-from core.models import OrdemProcesso
-from cadastro.models import MotivoInterrupcao, Pecas, Operador
+from core.models import OrdemProcesso,MaquinaParada
+from cadastro.models import MotivoInterrupcao, Pecas, Operador, MotivoMaquinaParada, MotivoExclusao
 
-import pandas as pd
 import os
-import tempfile
 import re
 import json
 
@@ -31,12 +28,19 @@ def extrair_numeracao(nome_arquivo):
         return match.group(1)
     return None
 
+@login_required
 def planejamento(request):
 
     motivos = MotivoInterrupcao.objects.filter(setor__nome='estamparia', visivel=True)
     operadores = Operador.objects.filter(setor__nome='estamparia')
+    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='estamparia')
+    motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='estamparia')
 
-    return render(request, 'apontamento_estamparia/planejamento.html', {'motivos':motivos,'operadores':operadores})
+    return render(request, 'apontamento_estamparia/planejamento.html', {
+                                                                    'motivos': motivos,
+                                                                    'operadores':operadores,
+                                                                    'motivos_maquina_parada':motivos_maquina_parada,
+                                                                    'motivos_exclusao': motivos_exclusao})
 
 def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:
@@ -74,9 +78,7 @@ def get_ordens_criadas(request):
     limit = int(request.GET.get('limit', 10))
 
     # Filtra as ordens com base nos parâmetros
-    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_estamparia').filter(
-        grupo_maquina='estamparia'
-    ).order_by('-status_prioridade')
+    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_estamparia', 'propriedade').filter(grupo_maquina='estamparia', excluida=False).order_by('status_prioridade','-data_criacao')
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
@@ -131,7 +133,8 @@ def atualizar_status_ordem(request):
                 grupo_maquina = body['grupo_maquina'].lower()
                 qt_produzida = body.get('qt_realizada')
                 qt_mortas = body.get('qt_mortas')
-                
+                maquina_nome = body.get('maquina_nome')
+
                 # Obtém a ordem
                 ordem = Ordem.objects.get(ordem=ordem_id, grupo_maquina=grupo_maquina)
                 
@@ -141,6 +144,15 @@ def atualizar_status_ordem(request):
 
                 if not ordem_id or not grupo_maquina or not status:
                     return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
+
+                # Verifica se já existe uma ordem iniciada na mesma máquina
+                if status == 'iniciada' and maquina_nome:
+                    ordem_em_andamento = Ordem.objects.filter(
+                        maquina=maquina_nome, status_atual='iniciada'
+                    ).exclude(id=ordem.id).exists()
+
+                    if ordem_em_andamento:
+                        return JsonResponse({'error': f'Já existe uma ordem iniciada para essa máquina ({maquina_nome}). Finalize ou interrompa antes de iniciar outra.'}, status=400)
 
                 # Finaliza o processo atual (se existir)
                 processo_atual = ordem.processos.filter(data_fim__isnull=True).first()
@@ -159,11 +171,15 @@ def atualizar_status_ordem(request):
                 ordem.status_atual = status
                 
                 if status == 'iniciada':
-                    # Pode ser que a ordem tenha sido reestarada, então não precisao atualizar a máquina
-                    try:
-                        ordem.maquina = body['maquina_nome']
-                    except:
-                        pass
+                    # Verifica e finaliza a parada da máquina se necessário
+                    maquinas_paradas = MaquinaParada.objects.filter(maquina=maquina_nome, data_fim__isnull=True)
+                    for parada in maquinas_paradas:
+                        parada.data_fim = now()
+                        parada.save()
+                    
+                    if maquina_nome:
+                        ordem.maquina = maquina_nome
+
                     ordem.status_prioridade = 1
                 elif status == 'finalizada':
                     operador_final = int(body.get('operador_final'))

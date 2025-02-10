@@ -14,11 +14,17 @@ STATUS_ANDAMENTO_CHOICES = (
 )
 
 MAQUINA_CHOICES = (
+    #Corte
     ('laser_1', 'Laser 1'),
     ('laser_2', 'Laser 2 (JFY)'),
     ('plasma_1', 'Plasma 1'),
     ('plasma_2', 'Plasma 2'),
     ('prensa', 'Prensa'),
+    #Serra
+    ('serra_1','Serra 1'),
+    ('serra_2','Serra 2'),
+    ('serra_3','Serra 3'),
+    #Usinagem
     ('furadeira_1', 'Furadeira 1'),
     ('furadeira_2', 'Furadeira 2'),
     ('furadeira_3', 'Furadeira 3'),
@@ -27,22 +33,22 @@ MAQUINA_CHOICES = (
     ('furadeira_6', 'Furadeira 6'),
     ('furadeira_7', 'Furadeira 7'),
     ('centro_de_usinagem', 'Centro de usinagem'),
-    ('serra_1','Serra 1'),
-    ('serra_2','Serra 2'),
-    ('serra_3','Serra 3'),
     ('torno_1', 'Torno 1'),
     ('torno_2', 'Torno 2'),
     ('chanfradeira', 'Chanfradeira'),
-    ('maq_solda', 'Máquina de solda'),
     ('furar', 'Furar'),
     ('chanfrar','Chanfrar'),
     ('tornear',' Tornear'),
+    #Estamparia
     ('viradeira_1','Viradeira 1'),
     ('viradeira_2','Viradeira 2'),
     ('viradeira_3','Viradeira 3'),
     ('viradeira_4','Viradeira 4'),
     ('viradeira_5','Viradeira 5'),
     ('prensa','Prensa'),
+    #Prod especiais
+    ('maq_solda', 'Máquina de solda'),
+
 )
 
 class Ordem(models.Model):

@@ -8,17 +8,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Adiciona eventos de clique para atualizar manualmente
     document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
-        console.log("Atualizando Status de Máquinas...");
         fetchStatusMaquinas(); // Chama a função existente
     });
 
     document.getElementById('refresh-pecas').addEventListener('click', function () {
-        console.log("Atualizando Últimas Peças Produzidas...");
         fetchUltimasPecasProduzidas(); // Chama a função existente
     });
 
     document.getElementById('refresh-ordens').addEventListener('click', function () {
-        console.log("Atualizando Status de Ordens...");
         fetchContagemStatusOrdens(); // Chama a função existente
     });
 
@@ -34,7 +31,7 @@ export function fetchStatusMaquinas() {
     const listaStatus = document.querySelector('#machine-status-list');
 
     // Faz a requisição para a API
-    fetch('api/status_maquinas/')
+    fetch('/core/api/status_maquinas/?setor=serra')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -117,7 +114,7 @@ export function fetchUltimasPecasProduzidas() {
     const listaPecas = document.querySelector('#ultimas-pecas-list');
 
     // Faz a requisição para a API
-    fetch('api/ultimas_pecas_produzidas/')
+    fetch(`/core/api/ultimas_pecas_produzidas/?setor=serra`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -155,7 +152,7 @@ export function fetchContagemStatusOrdens() {
     const listaStatus = document.getElementById('status-ordens-list');
 
     // Faz a requisição para a API
-    fetch('api/status_ordem/')
+    fetch('/core/api/status_ordem/?setor=serra')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -202,7 +199,7 @@ export function fetchContagemStatusOrdens() {
 
 async function fetchMaquinasDisponiveis() {
     try {
-        const response = await fetch('api/buscar-maquinas-disponiveis/');
+        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=serra');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -244,7 +241,7 @@ function retornarMaquina(maquina) {
         cancelButtonText: 'Cancelar',
         showLoaderOnConfirm: true,
         preConfirm: () => {
-            return fetch(`api/retornar-maquina/`, {
+            return fetch(`/core/api/retornar-maquina/`, {
                 method: 'PATCH',
                 body: JSON.stringify({ maquina }),  // Envia no corpo como JSON
                 headers: {
@@ -302,7 +299,7 @@ async function mostrarModalPararMaquina() {
     formPararMaquina.addEventListener('submit', handleFormSubmit, { once: true });
 }
 
-//  Função separada para submissão do formulário
+//  Função separada para submissão do formulário de parar maquina
 async function handleFormSubmit(event) {
     event.preventDefault();
 
@@ -316,7 +313,7 @@ async function handleFormSubmit(event) {
     });
 
     try {
-        const response = await fetch(`api/parar-maquina/`, {
+        const response = await fetch(`/core/api/parar-maquina/?setor=serra`, {
             method: 'PATCH',
             body: JSON.stringify({
                 maquina: document.getElementById('escolhaMaquinaParada').value,

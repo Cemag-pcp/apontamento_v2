@@ -17,4 +17,11 @@ urlpatterns = [
 
     path('versao/', views.versao, name='versao'),
 
+    path('api/retornar-maquina/', views.retornar_maquina, name='retornar_maquina'),
+    path('api/parar-maquina/', views.parar_maquina, name='parar_maquina'),
+    path('api/ultimas_pecas_produzidas/', views.get_ultimas_pecas_produzidas, name='ultimas_pecas_produzidas'),
+    path('api/status_ordem/', views.get_contagem_status_ordem, name='status_ordem'),
+    path('api/status_maquinas/', views.get_status_maquinas, name='status_maquinas'),
+    path('api/buscar-maquinas-disponiveis/', views.get_maquinas_disponiveis, name='buscar_maquinas_disponiveis'),
+
 ]

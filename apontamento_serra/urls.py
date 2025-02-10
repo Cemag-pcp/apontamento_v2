@@ -16,12 +16,6 @@ urlpatterns = [
     path('api/get-peca/', views.get_peca, name='get_peca'),
     path('api/criar-ordem/', views.criar_ordem, name='criar_ordem'),
     path('api/importar-ordens-serra/', views.importar_ordens_serra, name='importar_ordens_serra'),
-    path('api/status_maquinas/', views.get_status_maquinas, name='status_maquinas'),
-    path('api/ultimas_pecas_produzidas/', views.get_ultimas_pecas_produzidas, name='ultimas_pecas_produzidas'),
-    path('api/status_ordem/', views.get_contagem_status_ordem, name='status_ordem'),
-    path('api/buscar-maquinas-disponiveis/', views.get_maquinas_disponiveis, name='buscar_maquinas_disponiveis'),
-    path('api/parar-maquina/', views.parar_maquina, name='parar_maquina'),
-    path('api/retornar-maquina/', views.retornar_maquina, name='retornar_maquina'),
 
     path('api/apontamentos-peca/serra', views.api_apontamentos_peca, name='api_apontamentos_peca'),
     path('api/apontamentos-mp/serra', views.api_apontamentos_mp, name='api_apontamentos_mp'),

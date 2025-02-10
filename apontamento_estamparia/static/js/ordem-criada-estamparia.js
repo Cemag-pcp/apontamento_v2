@@ -1,3 +1,5 @@
+import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina.js';
+
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -66,6 +68,9 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
                                     <i class="fa fa-play"></i>
                                 </button>
+                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
+                                    <i class="fa fa-trash"></i>
+                                </button>
                             `;
                         } else if (ordem.status_atual === 'interrompida') {
                             botaoAcao = `
@@ -107,6 +112,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonProxProcesso = card.querySelector('.btn-iniciar-proximo-processo');
                         const buttonMandarProxProcesso = card.querySelector('.btn-proximo-processo')
                         const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
+                        const buttonExcluir= card.querySelector('.btn-excluir');
 
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
@@ -132,7 +138,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina, ordem.maquina);
                             });
                         }
 
@@ -154,6 +160,13 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         if (buttonFinalizarParcial) {
                             buttonFinalizarParcial.addEventListener('click', () => {
                                 mostrarModalFinalizarParcial(ordem.ordem, ordem.grupo_maquina);
+                            });
+                        }
+
+                        // Adiciona evento ao botão "Excluir", se existir
+                        if (buttonExcluir) {
+                            buttonExcluir.addEventListener('click', () => {
+                                mostrarModalExcluir(ordem.ordem, 'estamparia');
                             });
                         }
 
@@ -185,7 +198,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     });
 };
 
-function carregarOrdensIniciadas(container, filtros = {}) {
+export function carregarOrdensIniciadas(container, filtros = {}) {
     fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
@@ -277,9 +290,9 @@ function carregarOrdensIniciadas(container, filtros = {}) {
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
-}
+};
 
-function carregarOrdensInterrompidas(container, filtros = {}) {
+export function carregarOrdensInterrompidas(container, filtros = {}) {
     // Fetch para buscar ordens interrompidas
     fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
@@ -336,7 +349,7 @@ function carregarOrdensInterrompidas(container, filtros = {}) {
                 const buttonRetornar = card.querySelector('.btn-retornar');
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina, ordem.maquina);
                     });
                 }
             
@@ -348,7 +361,7 @@ function carregarOrdensInterrompidas(container, filtros = {}) {
             console.error('Erro ao buscar ordens interrompidas:', error);
             container.innerHTML = '<p class="text-danger">Erro ao carregar ordens interrompidas.</p>';
         });
-}
+};
 
 function carregarOrdensAgProProcesso(container, filtros = {}) {
     fetch(`api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
@@ -498,6 +511,9 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
 
+            fetchContagemStatusOrdens();
+            fetchStatusMaquinas();
+
         })
         .catch((error) => {
             console.error('Erro:', error);
@@ -603,6 +619,10 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 // Recarrega os dados chamando a função de carregamento
                 document.getElementById('ordens-container').innerHTML = '';
                 resetarCardsInicial();
+
+                fetchStatusMaquinas();
+                fetchContagemStatusOrdens();
+
             })
             .catch((error) => {
                 Swal.fire({
@@ -1035,6 +1055,8 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                 </div>    
             </div> 
             `;
+            
+            document.getElementById('obsFinalizar').value = '';
 
             // Exibe o modal
             modal.show();
@@ -1103,6 +1125,11 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                     resetarCardsInicial();
 
                     modal.hide();
+
+                    fetchContagemStatusOrdens();
+                    fetchStatusMaquinas();
+                    fetchUltimasPecasProduzidas();
+        
                 })
                 .catch((error) => {
                     Swal.fire({
@@ -1124,7 +1151,10 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 }
 
 // Modal para "Retornar"
-function mostrarModalRetornar(ordemId, grupoMaquina) {
+function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
+
+    const maquinaTratada = maquina.toLowerCase().replace(" ","_");
+
     const modal = new bootstrap.Modal(document.getElementById('modalRetornar'));
     const modalTitle = document.getElementById('modalRetornarLabel');
     const formRetornar = document.getElementById('formRetornarProducao');
@@ -1156,6 +1186,8 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
                 ordem_id: ordemId,
                 grupo_maquina: grupoMaquina,
                 status: 'iniciada',
+                maquina_nome: maquinaTratada,
+
             }),
             headers: {
                 'Content-Type': 'application/json',
@@ -1191,6 +1223,9 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
 
+            fetchContagemStatusOrdens();
+            fetchStatusMaquinas();
+
         })
         .catch((error) => {
             console.error('Erro:', error);
@@ -1203,11 +1238,86 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
     });
 }
 
+// Modal para "Excluir"
+function mostrarModalExcluir(ordemId, setor) {
+    const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+    const modalTitle = document.getElementById('modalExcluirLabel');
+    const formExcluir = document.getElementById('formExcluir');
+
+    modalTitle.innerHTML = `Excluir Ordem ${ordemId}`;
+    modal.show();
+
+    // Remove listeners antigos e adiciona novo
+    const clonedForm = formExcluir.cloneNode(true);
+    formExcluir.parentNode.replaceChild(clonedForm, formExcluir);
+
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(clonedForm);
+        const motivoExclusao = formData.get('motivoExclusao');
+
+        Swal.fire({
+            title: 'Excluindo...',
+            text: 'Por favor, aguarde enquanto a ordem está sendo excluída.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch(`/core/api/excluir-ordem/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                ordem_id: ordemId,
+                setor: setor,
+                motivo: motivoExclusao
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
+            }
+        })
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(({ status, body }) => {
+            if (status === 201) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: body.success,
+                });
+
+                modal.hide();
+
+                // Recarrega os dados chamando a função de carregamento
+                document.getElementById('ordens-container').innerHTML = '';
+                resetarCardsInicial();
+                fetchContagemStatusOrdens();
+
+            } else {
+                // Exibe o erro vindo do backend
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: body.error || 'Erro ao excluir a ordem.',
+                });
+            }
+        })
+        .catch((error) => {
+            console.error('Erro:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
+            });
+        });
+    });
+}
+
 function modalPlanejar() {
     const form = document.getElementById('opEstampariaForm');
     const modal = new bootstrap.Modal(document.getElementById('modalIniciarAposPlanejar'));
     const modalPlanejar = new bootstrap.Modal(document.getElementById('modalEstamparia'));
-    document.getElementById('modalEstamparia').focus();
 
     if (form) {
         form.addEventListener('submit', async (event) => {
@@ -1256,22 +1366,15 @@ function modalPlanejar() {
                     modal.show();
                     modalPlanejar.hide();
 
-                    // Transferir foco para um elemento seguro
-                    const mainElement = document.getElementById('layoutSidenav');
-                    if (mainElement) {
-                        mainElement.focus();
-                    }
-
                     // Força o foco no modal recém-aberto
                     document.getElementById('modalIniciarAposPlanejar').focus();
 
                     document.querySelector('.btn-iniciar-planejar').addEventListener('click', function(){
+                        modal.hide();
                         mostrarModalIniciar(data.ordem_id,'estamparia');
                     })
 
-                    document.querySelectorAll('.modal-backdrop').forEach((backdrop) => {
-                        backdrop.parentNode.removeChild(backdrop);
-                    });
+                    fetchContagemStatusOrdens();
 
                 } else {
                     Swal.fire({
