@@ -254,6 +254,7 @@ def get_ordens_criadas(request):
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
+            'maquina':ordem.maquina,
             'propriedade': {
                 'descricao_mp': propriedade.mp_codigo.codigo +" - "+ propriedade.mp_codigo.descricao if propriedade else None,
                 'quantidade': propriedade.quantidade if propriedade else None,

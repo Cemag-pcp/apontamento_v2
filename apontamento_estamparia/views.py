@@ -106,6 +106,7 @@ def get_ordens_criadas(request):
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
+            'maquina': ordem.maquina,
             'peca': {
                 'codigo': peca_info.peca.codigo if peca_info and peca_info.peca else None,
                 'descricao': peca_info.peca.descricao if peca_info and peca_info.peca else None,
