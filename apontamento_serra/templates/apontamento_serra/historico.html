@@ -16,51 +16,19 @@
 <div>
     <!-- Título Principal -->
     <div class="text-center mb-5">
-        <h1 class="display-5">Duplicador de ordem de produção</h1>
+        <h1 class="display-5">Histórico de apontamento</h1>
         <!-- <p class="text-muted">Duplique ordem de produção.</p> -->
     </div>
 
     <!-- Container para Planejamento -->
     <div id="containerPlanejar" class="mb-5">
-        <!-- Título Planejamento -->
-        <!-- <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3 class="text-secondary"></h3>
-            <div class="d-flex gap-3">
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalPlasma">
-                    Criar OP Plasma
-                </button>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalLaser">
-                    Criar OP Laser
-                </button>
-                <a class="btn btn-primary" href="#" role="button">
-                    Duplicar Op
-                </a>
-            </div>
-        </div> -->
-
         <!-- Painel de Ordens Criadas -->
         <h4 class="mb-3 text-secondary">Pesquise a ordem</h4>
         <!-- Formulário de Filtro -->
         <form id="filtro-form" class="mb-4">
             <div class="row g-3 align-items-center">
-                <!-- <select class="js-example-basic-multiple" name="states[]" multiple="multiple">
-                    <option value="AL">Alabama</option>
-                      ...
-                    <option value="WY">Wyoming</option>
-                </select> -->
                 <div class="col-md-3">
                     <input type="text" class="form-control" name="filtro-ordem" id="filtro-ordem" placeholder="Filtrar por ordem">
-                </div>
-                <div class="col-md-4">
-                    <select id="filtro-peca" class="form-control" multiple="multiple"></select>
-                </div>
-                <div class="col-md-3">
-                    <select class="form-control" name="filtro-maquina" id="filtro-maquina">
-                        <option class="text-muted" value="">Filtrar por máquina</option>
-                        <option value="plasma">Plasma</option>
-                        <option value="laser_1">Laser 1 (Weller)</option>
-                        <option value="laser_2">Laser 2 (JFY)</option>
-                    </select>
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100">Filtrar</button>
@@ -75,12 +43,14 @@
                         <th>Ordem</th>
                         <th>Data de Criação</th>
                         <th>Máquina</th>
-                        <th>Descrição MP</th>
-                        <th>Aproveitamento</th>
+                        <th>Mp</th>
+                        <th>Tamanho</th>
+                        <th>Quantidade</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tabela-corpo">
+                    <div id="loading-spinner">🔄 Carregando...</div>
                     <tr>
                         <td colspan="6">🔄 Carregando dados...</td>
                     </tr>
@@ -92,13 +62,13 @@
         <div class="pagination-container" id="paginacao-container"></div>
 
         <!--  Loading Spinner -->
-        <div id="loading-spinner">🔄 Carregando...</div>
+        
     
     </div>
 
 </div>
 
-<!-- Modal para configurar ordem e duplicar -->
+<!-- Modal para configurar ordem -->
 <div class="modal fade" id="modalDuplicarOrdem" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalDuplicarOrdemLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
@@ -116,22 +86,10 @@
                         <!-- Peças -->
                     </div>
 
-                    <div class="row mb-3 align-items-center">
-                        <!-- Observação -->
-                        <div class="col-sm-6">
-                            <label for="obsFinalizarCorte" class="form-label">Observação</label>
-                            <textarea class="form-control" name="obsFinalizarCorte" id="obsFinalizarCorte" placeholder="Algum comentário"></textarea>
-                        </div>    
-                        <div class="col-md-6">
-                            <label for="dataProgramacao" class="form-label">Programação:</label>
-                            <input type="date" id="dataProgramacao" name="dataProgramacao" class="form-control" required>
-                        </div>
-                    </div>
-
                     <!-- Footer do Formulário -->
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Duplicar</button>
+                        <button type="submit" class="btn btn-primary">Salvar</button>
                     </div>
                 </form>
             </div>
@@ -139,9 +97,11 @@
     </div>
 </div>
 
+<input type="hidden" id="pagina-atual" value="1">
+
 {% endblock %}
 
 {% block scripts %}
-<script type="module" src="{% static 'js/duplicar-op.js' %}"></script>
+<script type="module" src="{% static 'js/historico.js' %}"></script>
 {% endblock %}
 

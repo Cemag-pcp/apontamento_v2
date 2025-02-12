@@ -7,7 +7,7 @@ class SetorAccessMiddleware:
 
     def __call__(self, request):
         # Ignorar caminhos específicos
-        EXCLUDED_PATHS = ['/core', '/admin', '/login', '/logout']  # Adicione outros caminhos que deseja ignorar
+        EXCLUDED_PATHS = ['/cadastro', '/core', '/admin', '/login', '/logout']  # Adicione outros caminhos que deseja ignorar
 
         # Ignora a verificação para as URLs configuradas em EXCLUDED_PATHS
         if any(request.path.startswith(path) for path in EXCLUDED_PATHS):

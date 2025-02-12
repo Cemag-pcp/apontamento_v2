@@ -210,6 +210,7 @@ def get_ordens_criadas(request):
     status_atual = request.GET.get('status', '').strip()
     filtro_mp = request.GET.get('mp', '').strip()
     filtro_peca = request.GET.get('peca', '').strip()
+    status = request.GET.get('status', '')
 
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
@@ -225,6 +226,8 @@ def get_ordens_criadas(request):
         ordens_queryset = ordens_queryset.filter(propriedade__mp_codigo__codigo=filtro_mp)
     if filtro_peca:
         ordens_queryset = ordens_queryset.filter(ordem_pecas_serra__peca__codigo=filtro_peca)
+    if status:
+        ordens_queryset = ordens_queryset.filter(status_atual=status)
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -247,21 +250,26 @@ def get_ordens_criadas(request):
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina':ordem.maquina,
+            'maquina':ordem.get_maquina_display(),
             'propriedade': {
                 'descricao_mp': propriedade.mp_codigo.codigo +" - "+ propriedade.mp_codigo.descricao if propriedade else None,
+                'mp_codigo': propriedade.mp_codigo.codigo if propriedade.mp_codigo else None,
                 'quantidade': propriedade.quantidade if propriedade else None,
-                'tipo_chapa': propriedade.get_tipo_chapa_display() if propriedade else None,
+                'tamanho': propriedade.tamanho if propriedade else None,
                 'aproveitamento': propriedade.aproveitamento if propriedade else None,
                 'retalho': 'Sim' if propriedade and propriedade.retalho else 'Não',
+                'nova_mp': propriedade.nova_mp.codigo +" - "+ propriedade.nova_mp.descricao if propriedade.nova_mp else None,
+                'nova_mp_codigo': propriedade.nova_mp.codigo if propriedade.nova_mp else None,
             } if propriedade else None,
             'pecas': [
                 {
+                    'id': peca_ordem.id,
                     'peca_id': peca_ordem.peca.id,
                     'peca_codigo': peca_ordem.peca.codigo,
                     'peca_nome': peca_ordem.peca.descricao if peca_ordem.peca.descricao else 'Sem descrição',
                     'quantidade': peca_ordem.qtd_planejada,
-                    'qtd_morta': peca_ordem.qtd_morta
+                    'qtd_morta': peca_ordem.qtd_morta,
+                    'qtd_boa': peca_ordem.qtd_boa
                 }
                 for peca_ordem in ordem.ordem_pecas_serra.all()
             ]  # Lista todas as peças associadas
@@ -730,3 +738,45 @@ def api_apontamentos_mp(request):
 
 
     return JsonResponse(propriedades_ordens, safe=False)
+
+def historico(request):
+
+    return render(request, "apontamento_serra/historico.html")
+
+@csrf_exempt
+def atualizar_propriedades_ordem(request):
+
+    if request.method == 'POST':
+        data = json.loads(request.body)
+
+        print(data)
+
+        ordem_id = data.get('ordemId')
+        tamanho = data.get('novoTamanho')
+        quantidade = data.get('novaQuantidade')
+        codigo_mp=data.get('novaMateriaPrimaId')
+
+        ordem = get_object_or_404(Ordem, pk=ordem_id)
+        edit_propriedade = get_object_or_404(PropriedadesOrdem, ordem=ordem)
+        edit_propriedade.tamanho = tamanho
+        edit_propriedade.quantidade = quantidade
+        edit_propriedade.nova_mp = get_object_or_404(Mp, codigo=codigo_mp)
+        edit_propriedade.save()
+
+    return JsonResponse({'status': 'success'})
+
+@csrf_exempt
+def atualizar_pecas_ordem(request):
+
+    data = json.loads(request.body)
+
+    if request.method == 'POST':
+
+        for peca in data['pecas']:
+            edit_info_apontamento = get_object_or_404(PecasOrdem, pk=peca['peca_id'])
+            edit_info_apontamento.qtd_boa = peca['qtd_boa']
+            edit_info_apontamento.qtd_morta = peca['qtd_morta']
+    
+            edit_info_apontamento.save()
+
+    return JsonResponse({'status':'success'})
