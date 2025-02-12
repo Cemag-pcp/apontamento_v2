@@ -334,7 +334,7 @@ function preencherModalVerPecas(data) {
                         <th>Peça ID</th>
                         <th>Código</th>
                         <th>Nome</th>
-                        <th>Quantidade Planejada</th>
+                        <th>Quantidade Boa</th>
                         <th>Quantidade Morta</th>
                     </tr>
                 </thead>
