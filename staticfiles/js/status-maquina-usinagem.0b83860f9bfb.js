@@ -1,4 +1,4 @@
-import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada-estamparia.js';
+import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada-usinagem.js';
 
 export function fetchStatusMaquinas() {
     // Seleciona os elementos do container
@@ -7,7 +7,7 @@ export function fetchStatusMaquinas() {
     const listaStatus = document.querySelector('#machine-status-list');
 
     // Faz a requisição para a API
-    fetch('/core/api/status_maquinas/?setor=estamparia')
+    fetch('/core/api/status_maquinas/?setor=usinagem')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -90,7 +90,7 @@ export function fetchUltimasPecasProduzidas() {
     const listaPecas = document.querySelector('#ultimas-pecas-list');
 
     // Faz a requisição para a API
-    fetch(`/core/api/ultimas_pecas_produzidas/?setor=estamparia`)
+    fetch(`/core/api/ultimas_pecas_produzidas/?setor=usinagem`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -128,7 +128,7 @@ export function fetchContagemStatusOrdens() {
     const listaStatus = document.getElementById('status-ordens-list');
 
     // Faz a requisição para a API
-    fetch('/core/api/status_ordem/?setor=estamparia')
+    fetch('/core/api/status_ordem/?setor=usinagem')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -175,7 +175,7 @@ export function fetchContagemStatusOrdens() {
 
 async function fetchMaquinasDisponiveis() {
     try {
-        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=estamparia');
+        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=usinagem');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -289,7 +289,7 @@ async function handleFormSubmit(event) {
     });
 
     try {
-        const response = await fetch(`/core/api/parar-maquina/?setor=estamparia`, {
+        const response = await fetch(`/core/api/parar-maquina/?setor=usinagem`, {
             method: 'PATCH',
             body: JSON.stringify({
                 maquina: document.getElementById('escolhaMaquinaParada').value,
