@@ -12,7 +12,7 @@ from django.db import transaction
 from django.db.models import Prefetch, Count
 
 from .models import Ordem, Versao
-from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas
+from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina
 from core.models import Ordem,MaquinaParada,OrdemProcesso
 
 import json
@@ -36,7 +36,7 @@ def excluir_ordem(request):
             motivo_exclusao = get_object_or_404(MotivoExclusao, pk=int(motivo))
 
             # Busca a ordem
-            ordem = get_object_or_404(Ordem, ordem=ordem_id, grupo_maquina=setor)
+            ordem = get_object_or_404(Ordem, pk=ordem_id, grupo_maquina=setor)
 
             # Verifica o status atual da ordem antes de permitir a exclusão
             if ordem.status_atual in ['aguardando_iniciar', 'finalizada']:
@@ -118,7 +118,7 @@ def parar_maquina(request):
             with transaction.atomic():
                 # Decodifica o corpo da requisição
                 data = json.loads(request.body)
-                maquina = data.get('maquina')
+                maquina = get_object_or_404(Maquina, pk=data.get('maquina')) 
                 motivo = data.get('motivo')
 
                 # Validação básica de dados
@@ -178,10 +178,15 @@ def parar_maquina(request):
 def get_ultimas_pecas_produzidas(request):
     setor = request.GET.get('setor', '')  # Captura o setor da URL
 
-    # Filtra as ordens finalizadas e carrega as peças associadas ao setor informado
-    ultimas_ordens = Ordem.objects.filter(status_atual='finalizada').prefetch_related(
-        Prefetch(f'ordem_pecas_{setor}__peca', queryset=Pecas.objects.all())
-    ).order_by('-ultima_atualizacao')[:10]  # Ordena pelas mais recentes e limita a 10
+    if setor == 'corte':
+        ultimas_ordens = Ordem.objects.filter(status_atual='finalizada').prefetch_related(
+            'ordem_pecas_corte'  # Apenas busca as peças diretamente
+        ).order_by('-ultima_atualizacao')[:10]
+    else:
+        # Filtra as ordens finalizadas e carrega as peças associadas ao setor informado
+        ultimas_ordens = Ordem.objects.filter(status_atual='finalizada').prefetch_related(
+            Prefetch(f'ordem_pecas_{setor}__peca', queryset=Pecas.objects.all())
+        ).order_by('-ultima_atualizacao')[:10]  # Ordena pelas mais recentes e limita a 10
 
     # Prepara a lista de peças para o retorno JSON
     pecas = []
@@ -191,10 +196,16 @@ def get_ultimas_pecas_produzidas(request):
         if ordem_pecas:  # Verifica se existe a relação
             for ordem_peca in ordem_pecas.all():
                 peca = ordem_peca.peca
-                peca_dict = {
-                    'nome': f'{peca.codigo} - {peca.descricao[:30] + "..." if peca.descricao and len(peca.descricao) > 30 else (peca.descricao if peca.descricao else "Sem descrição")}',
-                    'data_producao': ordem.ultima_atualizacao.strftime('%Y-%m-%d %H:%M:%S'),
-                }
+                if setor == 'corte':
+                    peca_dict = {
+                        'nome': f'{peca[:30] + "..." if peca and len(peca) > 30 else (peca if peca else "Sem descrição")}',
+                        'data_producao': ordem.ultima_atualizacao.strftime('%Y-%m-%d %H:%M:%S'),
+                    }
+                else:
+                    peca_dict = {
+                        'nome': f'{peca.codigo} - {peca.descricao[:30] + "..." if peca.descricao and len(peca.descricao) > 30 else (peca.descricao if peca.descricao else "Sem descrição")}',
+                        'data_producao': ordem.ultima_atualizacao.strftime('%Y-%m-%d %H:%M:%S'),
+                    }
 
                 # Adiciona 'quantidade' apenas se qtd_boa for diferente de 0
                 if ordem_peca.qtd_boa != 0:
@@ -208,8 +219,12 @@ def get_contagem_status_ordem(request):
 
     setor = request.GET.get('setor', '')  # Captura o setor da URL
 
+    if setor == 'corte':
+        contagem_status = Ordem.objects.filter(grupo_maquina__in=('laser_1','laser_2','plasma'), excluida=False).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
+    else:
+        contagem_status = Ordem.objects.filter(grupo_maquina=setor, excluida=False).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
+
     # Consulta os dados agrupados por status
-    contagem_status = Ordem.objects.filter(grupo_maquina=setor, excluida=False).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
 
     # Total de ordens
     total_ordens = sum(item['total'] for item in contagem_status)
@@ -227,64 +242,41 @@ def get_contagem_status_ordem(request):
     return JsonResponse({'status_contagem': status_data})
 
 def get_status_maquinas(request):
-
     setor = request.GET.get('setor', '')
 
-    if setor == 'serra':    
-        maquinas = [
-            ('serra_1', 'Serra 1'),
-            ('serra_2','Serra 2'),
-            ('serra_3', 'Serra 3')
-        ]
-    elif setor == 'estamparia':
-        maquinas = [
-            ('viradeira_1','Viradeira 1'),
-            ('viradeira_2','Viradeira 2'),
-            ('viradeira_3','Viradeira 3'),
-            ('viradeira_4','Viradeira 4'),
-            ('viradeira_5','Viradeira 5'),
-            ('prensa','Prensa')
-        ]
+    if setor:    
+        maquinas = Maquina.objects.filter(setor__nome=setor).values_list('id', 'nome')
+    else:
+        return JsonResponse({'error': 'Setor inválido'}, status=400)
 
     status_data = []
-    for maquina in maquinas:
-        # Verifica se ja tem uma parada ativa dessa máquina
-        paradas = MaquinaParada.objects.filter(
-            maquina=maquina[0],
-            data_fim__isnull=True
-        )
-
-        # Verifica o último status
+    
+    for maquina_id, maquina_nome in maquinas:
+        # Verifica se já existe uma parada ativa para essa máquina
+        paradas = MaquinaParada.objects.filter(maquina_id=maquina_id, data_fim__isnull=True)
+        
+        # Verifica o status da máquina
         em_producao = OrdemProcesso.objects.filter(
-            ordem__maquina=maquina[0],
-            status='iniciada',
-            data_fim__isnull=True
+            ordem__maquina_id=maquina_id, status='iniciada', data_fim__isnull=True
         ).exists()
-
+        
         interrompida = OrdemProcesso.objects.filter(
-            ordem__maquina=maquina[0],
-            status='interrompida',
-            data_fim__isnull=True
+            ordem__maquina_id=maquina_id, status='interrompida', data_fim__isnull=True
         ).exists()
 
-        if em_producao and paradas.exists():
+        # Determina o status da máquina
+        if paradas.exists():
             status = 'Parada'
-        elif interrompida and paradas.exists():
-            status = 'Parada'
-        elif paradas.exists():
-            status = 'Parada'
-        elif interrompida and em_producao:
-            status = 'Em produção'
-        elif interrompida and not paradas.exists():
-            status = 'Livre'
         elif em_producao:
             status = 'Em produção'
-        else: 
+        elif interrompida:
+            status = 'Livre'
+        else:
             status = 'Livre'
 
         status_data.append({
-            'maquina_id': maquina[0],
-            'maquina': maquina[1],
+            'maquina_id': maquina_id,
+            'maquina': maquina_nome,
             'status': status,
             'motivo_parada': paradas.last().motivo.nome if paradas.exists() else None
         })
@@ -295,21 +287,10 @@ def get_maquinas_disponiveis(request):
 
     setor = request.GET.get('setor', '')
 
-    if setor == 'serra':    
-        maquinas = [
-            ('serra_1', 'Serra 1'),
-            ('serra_2','Serra 2'),
-            ('serra_3', 'Serra 3')
-        ]
-    elif setor == 'estamparia':
-        maquinas = [
-            ('viradeira_1','Viradeira 1'),
-            ('viradeira_2','Viradeira 2'),
-            ('viradeira_3','Viradeira 3'),
-            ('viradeira_4','Viradeira 4'),
-            ('viradeira_5','Viradeira 5'),
-            ('prensa','Prensa')
-        ]
+    if setor:    
+        maquinas = Maquina.objects.filter(setor__nome=setor, tipo='maquina').values_list('id', 'nome')
+    else:
+        return JsonResponse({'error': 'Setor inválido'}, status=400)
 
     # Obtem todas as máquinas que estão ativas em `OrdemProcesso` ou `MaquinaParada`
     maquinas_em_processo = OrdemProcesso.objects.filter(data_fim__isnull=True).values_list('maquina', flat=True).exclude(status='iniciada')

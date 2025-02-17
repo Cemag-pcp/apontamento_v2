@@ -10,8 +10,8 @@ from django.utils.timezone import now,localtime
 from django.db.models import Count, Q
 
 from .models import Ordem,PecasOrdem
-from core.models import OrdemProcesso,PropriedadesOrdem
-from cadastro.models import MotivoInterrupcao, Operador, Espessura
+from core.models import OrdemProcesso,PropriedadesOrdem,MaquinaParada
+from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, MotivoMaquinaParada
 from .utils import *
 
 import pandas as pd
@@ -29,7 +29,8 @@ TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 def extrair_numeracao(nome_arquivo):
-    match = re.search(r"(?i)OP(\d+)", nome_arquivo)  # (?i) torna a busca case insensitive
+    match = re.search(r"(?i)OP\s*(\d+)", nome_arquivo)  # Permite espaços opcionais entre OP e o número
+    print(match)
     if match:
         return match.group(1)
     return None
@@ -39,8 +40,9 @@ def planejamento(request):
     motivos = MotivoInterrupcao.objects.filter(setor__nome='corte', visivel=True)
     operadores = Operador.objects.filter(setor__nome='corte')
     espessuras = Espessura.objects.all()
+    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='serra').exclude(nome='Finalizada parcial')
 
-    return render(request, 'apontamento_corte/planejamento.html', {'motivos':motivos,'operadores':operadores,'espessuras':espessuras})
+    return render(request, 'apontamento_corte/planejamento.html', {'motivos':motivos,'operadores':operadores,'espessuras':espessuras,'motivos_maquina_parada':motivos_maquina_parada,})
 
 def get_pecas_ordem(request, pk_ordem):
     try:
@@ -100,6 +102,8 @@ def get_ordens_criadas(request):
         'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
         'obs': ordem.obs,
         'status_atual': ordem.status_atual,
+        'maquina': ordem.maquina.nome if ordem.maquina else None,
+        'maquina_id': ordem.maquina.id if ordem.maquina else None,
         'propriedade': {
             'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
             'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
@@ -117,12 +121,16 @@ def atualizar_status_ordem(request):
             with transaction.atomic():
                 # Parse do corpo da requisição
                 body = json.loads(request.body)
+                print(body)
 
                 status = body['status']
                 ordem_id = body['ordem_id']
                 # grupo_maquina = body['grupo_maquina'].lower()
                 pecas_geral = body.get('pecas_mortas', [])
                 qtd_chapas = body.get('qtdChapas', None)
+                maquina_request = body.get('maquina')
+                if maquina_request:
+                    maquina_nome = get_object_or_404(Maquina, pk=int(maquina_request))
 
                 # Obtém a ordem
                 ordem = Ordem.objects.get(pk=ordem_id)#, grupo_maquina=grupo_maquina)
@@ -131,8 +139,14 @@ def atualizar_status_ordem(request):
                 if ordem.status_atual == status:
                     return JsonResponse({'error': f'Essa ordem ja está {status}. Atualize a página.'}, status=400)
 
-                if not ordem_id or not status:
-                    return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
+                # Verifica se já existe uma ordem iniciada na mesma máquina
+                if status == 'iniciada' and maquina_nome:
+                    ordem_em_andamento = Ordem.objects.filter(
+                        maquina=maquina_nome, status_atual='iniciada'
+                    ).exclude(id=ordem.id).exists()
+
+                    if ordem_em_andamento:
+                        return JsonResponse({'error': f'Já existe uma ordem iniciada para essa máquina ({maquina_nome}). Finalize ou interrompa antes de iniciar outra.'}, status=400)
 
                 # Finaliza o processo atual (se existir)
                 processo_atual = ordem.processos.filter(data_fim__isnull=True).first()
@@ -151,11 +165,13 @@ def atualizar_status_ordem(request):
                 ordem.status_atual = status
                 
                 if status == 'iniciada':
-                    # Pode ser que a ordem tenha sido reestarada, então não precisao atualizar a máquina
-                    try:
-                        ordem.maquina = body['maquina_nome']
-                    except:
-                        pass
+                    # Finaliza paradas da máquina se necessário
+                    maquinas_paradas = MaquinaParada.objects.filter(maquina=maquina_nome, data_fim__isnull=True)
+                    for parada in maquinas_paradas:
+                        parada.data_fim = now()
+                        parada.save()
+
+                    ordem.maquina = maquina_nome
                     ordem.status_prioridade = 1
                 elif status == 'finalizada':
 
@@ -219,7 +235,8 @@ def get_ordens_iniciadas(request):
         'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
         'obs': ordem.obs,
         'status_atual': ordem.status_atual,
-        'maquina': ordem.get_maquina_display(),
+        'maquina': ordem.maquina.nome if ordem.maquina else None,
+        'maquina_id': ordem.maquina.id if ordem.maquina else None,
         'ultima_atualizacao': ordem.ultima_atualizacao,
         'propriedade': {
             'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
@@ -263,8 +280,10 @@ def get_ordens_interrompidas(request):
             'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina': ordem.get_maquina_display(),
+            'maquina': ordem.maquina.nome if ordem.maquina else None,
+            'maquina_id': ordem.maquina.id if ordem.maquina else None,
             'motivo_interrupcao': ultimo_processo_interrompido.motivo_interrupcao.nome if ultimo_processo_interrompido and ultimo_processo_interrompido.motivo_interrupcao else None,
+            'ultima_atualizacao': ordem.ultima_atualizacao,
             'propriedade': {
                 'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
                 'espessura': ordem.propriedade.espessura if ordem.propriedade else None,
@@ -529,7 +548,6 @@ class ProcessarArquivoView(View):
         # Verifica se o arquivo foi enviado
         uploaded_file = request.FILES.get('file')
         tipo_maquina = request.POST.get('tipoMaquina')
-        print(tipo_maquina)
 
         if not uploaded_file:
             return JsonResponse({'error': 'Nenhum arquivo enviado.'}, status=400)
@@ -582,6 +600,7 @@ class ProcessarArquivoView(View):
 
 class SalvarArquivoView(View):
 
+    @staticmethod
     def corrigir_aproveitamento(valor):
         """
         Corrige valores de aproveitamento que foram inseridos de forma incorreta.
@@ -633,17 +652,20 @@ class SalvarArquivoView(View):
         # Ler o arquivo Excel enviado
         ordem_producao_excel = pd.read_excel(uploaded_file)
 
-        if tipo_maquina=='plasma':
+        tipo_maquina_tratada = tipo_maquina.replace("_"," ").title()
+
+        tipo_maquina_object = get_object_or_404(Maquina, nome__contains=tipo_maquina_tratada) if tipo_maquina in ['laser_1','laser_2'] else None
+
+        if tipo_maquina =='plasma':
             # Exibir os dados lidos no console para depuração
             excel_tratado,propriedades = tratamento_planilha_plasma(ordem_producao_excel)
-        elif tipo_maquina=='laser_2':
+        elif tipo_maquina_object.nome=='Laser 2 (JFY)':
 
             # apenas para o laser2
             ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='AllPartsList')
 
             excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2)
-            print(propriedades)
-        elif tipo_maquina=='laser_1':
+        elif tipo_maquina_object.nome=='Laser 1':
 
             comprimento = request.POST.get('comprimento')
             largura=request.POST.get('largura')
@@ -664,7 +686,7 @@ class SalvarArquivoView(View):
                 obs=descricao,
                 grupo_maquina=tipo_maquina,
                 data_programacao=data_programacao,
-                maquina=tipo_maquina if tipo_maquina in ['laser_1','laser_2'] else None
+                maquina=tipo_maquina_object
             )
             
             # salvar propriedades
@@ -674,7 +696,7 @@ class SalvarArquivoView(View):
                     descricao_mp=prop['descricao_mp'],
                     espessura=prop['espessura'],
                     quantidade=prop['quantidade'],
-                    aproveitamento=self.corrigir_aproveitamento(prop['aproveitamento']),
+                    aproveitamento=SalvarArquivoView.corrigir_aproveitamento(prop['aproveitamento']),
                     tipo_chapa=tipo_chapa,
                     retalho=retalho
                 )

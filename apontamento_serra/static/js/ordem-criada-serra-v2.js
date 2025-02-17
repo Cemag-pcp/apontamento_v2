@@ -120,42 +120,42 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Ver Peças", se existir
                         if (buttonVerPeca) {
                             buttonVerPeca.addEventListener('click', () => {
-                                mostrarPecas(ordem.ordem, ordem.grupo_maquina);
+                                mostrarPecas(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
                             buttonIniciar.addEventListener('click', () => {
-                                mostrarModalIniciar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Interromper", se existir
                         if (buttonInterromper) {
                             buttonInterromper.addEventListener('click', () => {
-                                mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Finalizar", se existir
                         if (buttonFinalizar) {
                             buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalFinalizar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina, ordem.maquina);
+                                mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
                             });
                         }
 
                         // Adiciona evento ao botão "Excluir", se existir
                         if (buttonExcluir) {
                             buttonExcluir.addEventListener('click', () => {
-                                mostrarModalExcluir(ordem.ordem, 'serra');
+                                mostrarModalExcluir(ordem.id, 'serra');
                             });
                         }
 
@@ -292,21 +292,21 @@ export function carregarOrdensIniciadas(container, filtros={}) {
                 // Adiciona evento ao botão "Ver Peças", se existir
                 if (buttonVerPeca) {
                     buttonVerPeca.addEventListener('click', () => {
-                        mostrarPecas(ordem.ordem, ordem.grupo_maquina);
+                        mostrarPecas(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
                     buttonInterromper.addEventListener('click', () => {
-                        mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        atualizarStatusOrdem(ordem.ordem, ordem.grupo_maquina, 'finalizada');
+                        atualizarStatusOrdem(ordem.id, ordem.grupo_maquina, 'finalizada');
                     });
                 }
 
@@ -394,14 +394,14 @@ export function carregarOrdensInterrompidas(container, filtros={}) {
                 // Evento para "Ver Peças"
                 if (buttonVerPeca) {
                     buttonVerPeca.addEventListener('click', () => {
-                        mostrarPecas(ordem.ordem, ordem.grupo_maquina);
+                        mostrarPecas(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 // Evento para "Retornar"
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina, ordem.maquina);
+                        mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
                     });
                 }
 
@@ -439,7 +439,7 @@ function resetarCardsInicial(filtros = {}) {
         ordem: filtros.ordem || filtroOrdem.value.trim(),
         mp: filtros.mp || filtroMp.value.trim(),
         status: filtros.status || filtroStatus.value.trim(),
-        peca: filtros.status || filtroPeca.value.trim(),
+        peca: filtros.peca || filtroPeca.value.trim(),
     };
 
     // Função principal para buscar e renderizar ordens
@@ -719,36 +719,44 @@ function mostrarModalExcluir(ordemId, setor) {
 
 // Modal para "Iniciar"
 function mostrarModalIniciar(ordemId, grupoMaquina) {
+
     const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
-    const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
 
     modalTitle.innerHTML = `Iniciar Ordem ${ordemId}`;
-    modal.show();
 
+    // Exibe SweetAlert de carregamento
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações das peças...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
     // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = `<option value="">------</option>`;
 
-    // Define as máquinas para cada grupo
-    const maquinasPorGrupo = {
-        serra: [
-            { value: 'serra_1', label: 'Serra 1' },
-            { value: 'serra_2', label: 'Serra 2' },
-            { value: 'serra_3', label: 'Serra 3' },
-        ],
-    };
+    fetch('/cadastro/api/buscar-maquinas/?setor=serra', {
+        method: 'GET',
+        headers: {'Content-Type':'application/json'}
+    })
+    .then(response => response.json())
+    .then(
+        data => {
+            const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
+            escolhaMaquina.innerHTML = `<option value="">------</option>`;
 
-    // Preenche o select com base no grupo de máquinas
-    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
-        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
-            const option = document.createElement('option');
-            option.value = maquina.value;
-            option.textContent = maquina.label;
-            escolhaMaquina.appendChild(option);
-        });
-    } else {
-        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
-    }
+            Swal.close();
+            data.maquinas.forEach((maquina) => {
+                const option = document.createElement('option');
+                option.value = maquina.id;
+                option.textContent = maquina.nome;
+                escolhaMaquina.appendChild(option);
+            })
+            modal.show();
+        }
+    )
 
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formIniciarOrdemCorte');
@@ -1107,7 +1115,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 // Modal para "Retornar"
 function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
 
-    const maquinaTratada = maquina.toLowerCase().replace(" ","_");
+    // const maquinaTratada = maquina.toLowerCase().replace(" ","_");
 
     const modal = new bootstrap.Modal(document.getElementById('modalRetornar'));
     const modalTitle = document.getElementById('modalRetornarLabel');
@@ -1140,7 +1148,7 @@ function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
                 ordem_id: ordemId,
                 grupo_maquina: grupoMaquina,
                 status: 'iniciada',
-                maquina_nome: maquinaTratada,
+                maquina_nome: maquina,
 
             }),
             headers: {
@@ -1362,8 +1370,10 @@ function filtro() {
         // Captura os valores atualizados dos filtros
         const filtros = {
             ordem: document.getElementById('filtro-ordem').value.trim(),
-            mp: document.getElementById('filtro-mp').value.trim(),
             status: document.getElementById('filtro-status').value.trim(),
+            mp: document.getElementById('filtro-mp').value.trim(),
+            peca: document.getElementById('filtro-peca').value.trim(),
+
         };
 
         // Recarrega os resultados com os novos filtros

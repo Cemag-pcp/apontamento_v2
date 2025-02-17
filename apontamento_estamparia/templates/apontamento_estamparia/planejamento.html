@@ -211,7 +211,7 @@
 </div>
 
 <!-- Modal para exibir as peças -->
-<div class="modal fade" id="modalPecas" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPecasLabel">
+<div class="modal fade" id="modalPecas" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPecasLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -233,15 +233,13 @@
         <div class="modal-content">
         <div class="modal-header">
             <h5 class="modal-title" id="modalIniciarAposPlanejarLabel">Iniciar Ordem</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
             Deseja iniciar a ordem agora?
         </div>
         <div class="modal-footer">
-            <button class="btn btn-primary btn-iniciar-planejar" data-bs-dismiss="modal">Sim</button>
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Não</button>
-            
+            <button class="btn btn-primary btn-iniciar-planejar">Sim</button>
+            <button type="button" class="btn btn-secondary btn-nao-iniciar-planejar">Não</button>
         </div>
         </div>
     </div>
@@ -278,7 +276,7 @@
 </div>
 
 <!-- Modal proximo processo -->
-<div class="modal fade" id="modalProxProcesso" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalProxProcessoLabel">
+<div class="modal fade" id="modalProxProcesso" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalProxProcessoLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -314,7 +312,7 @@
 </div>
 
 <!-- Modal interromper ordem -->
-<div class="modal fade" id="modalInterromper" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInterromperLabel">
+<div class="modal fade" id="modalInterromper" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInterromperLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -345,7 +343,7 @@
 </div>
 
 <!-- Modal finalizar ordem -->
-<div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarLabel">
+<div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarLabel" aria-hidden="true">
     <div class="modal-dialog modal-md">
         <div class="modal-content">
             <div class="modal-header">
@@ -385,8 +383,8 @@
     </div>
 </div>
 
-<!-- Modal finalizar ordem -->
-<div class="modal fade" id="modalFinalizarParcial" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarParcialLabel">
+<!-- Modal finalizar ordem parcialmente -->
+<div class="modal fade" id="modalFinalizarParcial" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalFinalizarParcialLabel" aria-hidden="true">
     <div class="modal-dialog modal-md">
         <div class="modal-content">
             <div class="modal-header">
@@ -423,7 +421,7 @@
 </div>
 
 <!-- Modal retornar ordem -->
-<div class="modal fade" id="modalRetornar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalRetornarLabel">
+<div class="modal fade" id="modalRetornar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalRetornarLabel" aria-hidden="true">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header">

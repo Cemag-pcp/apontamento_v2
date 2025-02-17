@@ -16,8 +16,8 @@ class Processo(models.Model):
 class Maquina(models.Model):
 
     nome = models.CharField(max_length=20, unique=True)
-    setor = models.ManyToManyField(Setor, related_name='maquina_setor')
-    # processo = models.CharField()
+    setor = models.ForeignKey(Setor, related_name='maquina_setor', on_delete=models.CASCADE)
+    tipo = models.CharField(max_length=20)
 
     def __str__(self):
         return self.nome

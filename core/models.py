@@ -3,7 +3,7 @@ from django.utils.timezone import now
 from django.db.models import Max
 from django.contrib.auth.models import User
 
-from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao
+from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao,Maquina
 
 STATUS_ANDAMENTO_CHOICES = (
     ('aguardando_iniciar', 'Aguardando iniciar'),
@@ -68,7 +68,7 @@ class Ordem(models.Model):
     data_criacao = models.DateTimeField(default=now, editable=False)
     obs = models.TextField(null=True, blank=True)
     grupo_maquina = models.CharField(max_length=20, choices=GRUPO_MAQUINA_CHOICES, blank=True, null=True)
-    maquina = models.CharField(max_length=20, choices=MAQUINA_CHOICES, blank=True, null=True)
+    maquina = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='maquina_ordem', blank=True, null=True)#models.CharField(max_length=20, choices=MAQUINA_CHOICES, blank=True, null=True)
     status_atual = models.CharField(max_length=20, choices=STATUS_ANDAMENTO_CHOICES, default='aguardando_iniciar')
     status_prioridade = models.IntegerField(default=0)
     operador_final = models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador', blank=True, null=True)
@@ -142,7 +142,7 @@ class OrdemProcesso(models.Model):
     data_inicio = models.DateTimeField(default=now)  # Armazena quando o status foi definido
     data_fim = models.DateTimeField(null=True, blank=True)  # Armazena quando o status foi finalizado
     motivo_interrupcao = models.ForeignKey(MotivoInterrupcao, on_delete=models.CASCADE, null=True, blank=True)
-    maquina = models.CharField(max_length=30, null=True, blank=True)
+    maquina = models.ForeignKey(Maquina, related_name='processo_maquina', on_delete=models.CASCADE, null=True, blank=True)
 
     def finalizar_atual(self):
         """
@@ -171,7 +171,7 @@ class OrdemProcesso(models.Model):
 
 class MaquinaParada(models.Model):
 
-    maquina = models.CharField(max_length=30, choices=MAQUINA_CHOICES)
+    maquina = maquina = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='maquina_maquina_parada', blank=True, null=True)
     data_inicio = models.DateTimeField(default=now)
     data_fim = models.DateTimeField(null=True, blank=True)
     motivo = models.ForeignKey(MotivoMaquinaParada, on_delete=models.CASCADE, null=True, blank=True)

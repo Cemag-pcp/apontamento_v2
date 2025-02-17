@@ -1,3 +1,5 @@
+import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina-usinagem.js';
+
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -16,7 +18,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const card = document.createElement('div');
                         card.classList.add('col-md-4'); // Adiciona a classe de coluna
 
-                        card.dataset.ordemId = ordem.ordem; // Adiciona o ID da ordem para referência
+                        card.dataset.ordemId = ordem.id; // Adiciona o ID da ordem para referência
                         card.dataset.grupoPeca = ordem.grupo_peca || ''; // Adiciona o grupo máquina
                         card.dataset.obs = ordem.obs || ''; // Adiciona observações
                     
@@ -111,49 +113,49 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
                             buttonIniciar.addEventListener('click', () => {
-                                mostrarModalIniciar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalIniciar(ordem.id, ordem.maquina_id);
                             });
                         }
 
                         // Adiciona evento ao botão "Interromper", se existir
                         if (buttonInterromper) {
                             buttonInterromper.addEventListener('click', () => {
-                                mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalInterromper(ordem.id, ordem.maquina_id);
                             });
                         }
 
                         // Adiciona evento ao botão "Finalizar", se existir
                         if (buttonFinalizar) {
                             buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalFinalizar(ordem.id);
                             });
                         }
 
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalRetornar(ordem.id, ordem.maquina_id);
                             });
                         }
 
                         // Adiciona evento ao botão para iniciar proximo processo
                         if (buttonProxProcesso) {
                             buttonProxProcesso.addEventListener('click', () => {
-                                mostrarModalIniciarProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalIniciarProxProcesso(ordem.id, ordem.maquina_id);
                             });
                         }
 
                         // Adiciona evento ao botão para enviar para proximo processo
                         if (buttonMandarProxProcesso) {
                             buttonMandarProxProcesso.addEventListener('click', () => {
-                                mostrarModalProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalProxProcesso(ordem.id, ordem.maquina_id);
                             });
                         }
 
                         // Adiciona evento ao botão para enviar para proximo processo
                         if (buttonFinalizarParcial) {
                             buttonFinalizarParcial.addEventListener('click', () => {
-                                mostrarModalFinalizarParcial(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalFinalizarParcial(ordem.id);
                             });
                         }
 
@@ -185,7 +187,28 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     });
 };
 
-function carregarOrdensIniciadas(container, filtros = {}) {
+function iniciarContador(ordemId, dataCriacao) {
+    const contador = document.getElementById(`contador-${ordemId}`);
+    const dataInicial = new Date(dataCriacao); // Converte a data de criação para objeto Date
+
+    function atualizarContador() {
+        const agora = new Date();
+        const diferenca = Math.floor((agora - dataInicial) / 1000); // Diferença em segundos
+
+        const dias = Math.floor(diferenca / 86400);
+        const horas = Math.floor((diferenca % 86400) / 3600);
+        const minutos = Math.floor((diferenca % 3600) / 60);
+        const segundos = diferenca % 60;
+
+        contador.textContent = `${dias}d ${horas}h ${minutos}m ${segundos}s`;
+    }
+
+    // Atualiza o contador a cada segundo
+    atualizarContador();
+    setInterval(atualizarContador, 1000);
+}
+
+export function carregarOrdensIniciadas(container, filtros = {}) {
     fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
@@ -193,7 +216,7 @@ function carregarOrdensIniciadas(container, filtros = {}) {
             data.ordens.forEach(ordem => {
 
                 const card = document.createElement('div');
-                card.dataset.ordemId = ordem.ordem;
+                card.dataset.ordemId = ordem.id;
 
                 // Defina os botões dinamicamente com base no status
                 let botaoAcao = '';
@@ -219,8 +242,16 @@ function carregarOrdensIniciadas(container, filtros = {}) {
                 const pecaInfo = ordem.pecas[0]; // Assume que deseja exibir apenas a primeira peça para detalhes
 
                 card.innerHTML = `
-                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-primary text-white">
+                <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+
+                    <!-- Contador fixado no topo direito -->
+                    <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                        id="contador-${ordem.ordem}" 
+                        style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                        Carregando...
+                    </span>
+
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
                         <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
                         <small class="text-white">Planejada: ${totalQtdPlanejada || 0} Realizada: ${totalQtdBoa}</small>
                     </div>
@@ -250,36 +281,39 @@ function carregarOrdensIniciadas(container, filtros = {}) {
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
                     buttonInterromper.addEventListener('click', () => {
-                        mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalInterromper(ordem.id, ordem.maquina_id);
                     });
                 }
 
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        atualizarStatusOrdem(ordem.ordem, ordem.grupo_maquina, 'finalizada');
+                        atualizarStatusOrdem(ordem.id, ordem.maquina_id, 'finalizada');
                     });
                 }
 
                 if (buttonProxProcesso) {
                     buttonProxProcesso.addEventListener('click', () => {
-                        mostrarModalProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalProxProcesso(ordem.id, ordem.maquina_id);
                     });
                 }
 
                 if (buttonFinalizarParcial) {
                     buttonFinalizarParcial.addEventListener('click', () => {
-                        mostrarModalFinalizarParcial(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalFinalizarParcial(ordem.id);
                     });
                 }
 
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
+
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
 }
 
-function carregarOrdensInterrompidas(container, filtros = {}) {
+export function carregarOrdensInterrompidas(container, filtros = {}) {
     // Fetch para buscar ordens interrompidas
     fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
@@ -294,7 +328,7 @@ function carregarOrdensInterrompidas(container, filtros = {}) {
             data.ordens.forEach(ordem => {
                 // Cria o card
                 const card = document.createElement('div');
-                card.dataset.ordemId = ordem.ordem;
+                card.dataset.ordemId = ordem.id;
             
                 // Cria a lista de peças em formato simplificado
                 const pecasHTML = ordem.pecas.map(peca => `
@@ -312,8 +346,15 @@ function carregarOrdensInterrompidas(container, filtros = {}) {
             
                 // Estrutura do card com fonte menor
                 card.innerHTML = `
-                    <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                        <div class="card-header bg-danger text-white">
+                    <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+                        <!-- Contador fixado no topo direito -->
+                        <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                            id="contador-${ordem.ordem}" 
+                            style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                            Carregando...
+                        </span>
+
+                        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center p-3">
                             <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
                             <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small> 
                         </div>
@@ -336,12 +377,15 @@ function carregarOrdensInterrompidas(container, filtros = {}) {
                 const buttonRetornar = card.querySelector('.btn-retornar');
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalRetornar(ordem.id, ordem.maquina_id);
                     });
                 }
             
                 // Adiciona o card ao container
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
+
             });
         })
         .catch(error => {
@@ -358,7 +402,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
             data.ordens.forEach(ordem => {
 
                 const card = document.createElement('div');
-                card.dataset.ordemId = ordem.ordem;
+                card.dataset.ordemId = ordem.id;
 
                 // Defina os botões dinamicamente com base no status
                 let botaoAcao = '';
@@ -370,9 +414,17 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                 `;
 
                 card.innerHTML = `
-                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-warning text-white">
-                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+                    
+                    <!-- Contador fixado no topo direito -->
+                    <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                        id="contador-${ordem.ordem}" 
+                        style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                        Carregando...
+                    </span>
+
+                    <div class="card-header bg-warning text-white d-flex justify-content-between align-items-center p-3">
+                        <h6 class="card-title mb-0"><small>#${ordem.ordem} - ${ordem.maquina}</small></h6>
                         <small class="text-white">
                             Planejada: ${ordem.totais.qtd_planejada || 0} 
                             Realizada: ${ordem.totais.qtd_boa || 0} 
@@ -401,11 +453,14 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                 // Adiciona evento ao botão para iniciar proximo processo
                 if (buttonProxProcesso) {
                     buttonProxProcesso.addEventListener('click', () => {
-                        mostrarModalIniciarProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalIniciarProxProcesso(ordem.id, ordem.maquina_id);
                     });
                 }
 
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
+
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
@@ -498,6 +553,10 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
 
+            fetchStatusMaquinas();
+            // fetchUltimasPecasProduzidas();
+            fetchContagemStatusOrdens();
+
         })
         .catch((error) => {
             console.error('Erro:', error);
@@ -510,44 +569,39 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
 function mostrarModalIniciar(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
-    const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
 
-    modalTitle.innerHTML = `Iniciar Ordem ${ordemId}`;
-    modal.show();
+    // Exibe SweetAlert de carregamento
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações das peças...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
 
     // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = `<option value="">------</option>`;
+    fetch('/cadastro/api/buscar-maquinas/?setor=usinagem', {
+        method: 'GET',
+        headers: {'Content-Type':'application/json'}
+    })
+    .then(response => response.json())
+    .then(
+        data => {
+            const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
+            escolhaMaquina.innerHTML = `<option value="">------</option>`;
 
-    // Define as máquinas para cada grupo
-    const maquinasPorGrupo = {
-        usinagem: [
-            { value: 'furadeira_1', label: 'Furadeira 1'},
-            { value: 'furadeira_2', label: 'Furadeira 2'},
-            { value: 'furadeira_3', label: 'Furadeira 3'},
-            { value: 'furadeira_4', label: 'Furadeira 4'},
-            { value: 'furadeira_5', label: 'Furadeira 5'},
-            { value: 'furadeira_6', label: 'Furadeira 6'},
-            { value: 'furadeira_7', label: 'Furadeira 7'},
-            { value: 'centro_de_usinagem', label: 'Centro de usinagem' },
-            { value: 'torno_1', label: 'Torno 1' },
-            { value: 'torno_2', label: 'Torno 2' },
-            { value: 'chanfradeira', label: 'Chanfradeira' },
-        ]
-    };
-
-    // Preenche o select com base no grupo de máquinas
-    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
-        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
-            const option = document.createElement('option');
-            option.value = maquina.value;
-            option.textContent = maquina.label;
-            escolhaMaquina.appendChild(option);
-        });
-    } else {
-        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
-    }
-
-    
+            Swal.close();
+            data.maquinas.forEach((maquina) => {
+                const option = document.createElement('option');
+                option.value = maquina.id;
+                option.textContent = maquina.nome;
+                escolhaMaquina.appendChild(option);
+            })
+            modalTitle.innerHTML = `Iniciar Ordem ${ordemId}`;
+            modal.show();
+        }
+    )   
 
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formIniciarOrdemCorte');
@@ -608,6 +662,11 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 // Recarrega os dados chamando a função de carregamento
                 document.getElementById('ordens-container').innerHTML = '';
                 resetarCardsInicial();
+
+                fetchStatusMaquinas();
+                // fetchUltimasPecasProduzidas();
+                fetchContagemStatusOrdens();
+    
             })
             .catch((error) => {
                 Swal.fire({
@@ -620,7 +679,7 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
 }
 
 // Modal para "Parcial"
-function mostrarModalFinalizarParcial(ordemId, grupoMaquina) {
+function mostrarModalFinalizarParcial(ordemId) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizarParcial'));
     const modalTitle = document.getElementById('modalFinalizarParcialLabel');
     const formFinalizar = document.getElementById('formFinalizarParcial');
@@ -643,7 +702,7 @@ function mostrarModalFinalizarParcial(ordemId, grupoMaquina) {
     });
 
     // Fetch para buscar informações da ordem
-    fetch(`api/ordens-criadas/${ordemId}/${grupoMaquina.toLowerCase()}/pecas/`)
+    fetch(`api/ordens-criadas/${ordemId}/pecas/`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar informações da API');
@@ -734,6 +793,11 @@ function mostrarModalFinalizarParcial(ordemId, grupoMaquina) {
                     resetarCardsInicial();
 
                     modal.hide();
+
+                    fetchStatusMaquinas();
+                    fetchUltimasPecasProduzidas();
+                    fetchContagemStatusOrdens();
+    
                 })
                 .catch((error) => {
                     Swal.fire({
@@ -764,39 +828,46 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
 
     colQtdProxProcesso.style.display = 'block';
     
-    const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
+    // const escolhaProcesso = document.getElementById('escolhaMaquinaProxProcesso');
     const qtdProxProcesso = document.getElementById('qtdProxProcesso');
     qtdProxProcesso.required = true;
     
     // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = `<option value="">------</option>`;
+    // escolhaProcesso.innerHTML = `<option value="">------</option>`;
 
-    // Define as máquinas para cada grupo
-    const maquinasPorGrupo = {
-        usinagem: [
-            { value: 'furar', label: 'Furar'},
-            { value: 'centro_de_usinagem', label: 'Centro de usinagem' },
-            { value: 'tornear', label: 'Tornear' },
-            { value: 'chanfrar', label: 'Chanfrar' },
-        ]
-    };
+    // Exibe SweetAlert de carregamento
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações dos processos...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
 
-    // Preenche o select com base no grupo de máquinas
-    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
-        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
-            const option = document.createElement('option');
-            option.value = maquina.value;
-            option.textContent = maquina.label;
-            escolhaMaquina.appendChild(option);
-        });
-    } else {
-        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
-    }
+    // Limpa opções antigas no select
+    fetch('/cadastro/api/buscar-processos/?setor=usinagem', {
+        method: 'GET',
+        headers: {'Content-Type':'application/json'}
+    })
+    .then(response => response.json())
+    .then(
+        data => {
+            const escolhaProcesso = document.getElementById('escolhaMaquinaProxProcesso');
+            escolhaProcesso.innerHTML = `<option value="">------</option>`;
 
-    modalTitle.innerHTML = `Próximo processo para a ordem: ${ordemId}`;
-    labelModalMaquinaProxProcesso.innerHTML = 'Escolha o próximo processo'
-    modal.show();
-    
+            Swal.close();
+            data.processos.forEach((processo) => {
+                const option = document.createElement('option');
+                option.value = processo.id;
+                option.textContent = processo.nome;
+                escolhaProcesso.appendChild(option);
+            })
+            modalTitle.innerHTML = `Passar para próximo processo`;
+            modal.show();
+        }
+    ) 
+
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formProxProcesso');
     const clonedForm = formIniciar.cloneNode(true);
@@ -862,6 +933,10 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
                 // Recarrega os dados chamando a função de carregamento
                 document.getElementById('ordens-container').innerHTML = '';
                 resetarCardsInicial();
+
+                fetchStatusMaquinas();
+                // fetchUltimasPecasProduzidas();
+                fetchContagemStatusOrdens();
             })
             .catch((error) => {
                 Swal.fire({
@@ -879,49 +954,45 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
     const modalTitle = document.getElementById('modalProxProcessoLabel');
     const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
 
-    const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
     const qtdProxProcesso = document.getElementById('qtdProxProcesso');
     const colQtdProxProcesso = document.getElementById('colQtdProxProcesso');
 
     colQtdProxProcesso.style.display = 'none';
     qtdProxProcesso.required = false;
 
-    // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = `<option value="">------</option>`;
+    // Exibe SweetAlert de carregamento
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações das máquinas...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
 
-    // Define as máquinas para cada grupo
-    const maquinasPorGrupo = {
-        usinagem: [
-            { value: 'furadeira_1', label: 'Furadeira 1'},
-            { value: 'furadeira_2', label: 'Furadeira 2'},
-            { value: 'furadeira_3', label: 'Furadeira 3'},
-            { value: 'furadeira_4', label: 'Furadeira 4'},
-            { value: 'furadeira_5', label: 'Furadeira 5'},
-            { value: 'furadeira_6', label: 'Furadeira 6'},
-            { value: 'furadeira_7', label: 'Furadeira 7'},
-            { value: 'centro_de_usinagem', label: 'Centro de usinagem' },
-            { value: 'torno_1', label: 'Torno 1' },
-            { value: 'torno_2', label: 'Torno 2' },
-            { value: 'chanfradeira', label: 'Chanfradeira' },
-        ]
-    };
+    fetch('/cadastro/api/buscar-maquinas/?setor=usinagem', {
+        method: 'GET',
+        headers: {'Content-Type':'application/json'}
+    })
+    .then(response => response.json())
+    .then(
+        data => {
+            const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
+            escolhaMaquina.innerHTML = `<option value="">------</option>`;
 
-    // Preenche o select com base no grupo de máquinas
-    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
-        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
-            const option = document.createElement('option');
-            option.value = maquina.value;
-            option.textContent = maquina.label;
-            escolhaMaquina.appendChild(option);
-        });
-    } else {
-        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
-    }
+            Swal.close();
+            data.maquinas.forEach((maquina) => {
+                const option = document.createElement('option');
+                option.value = maquina.id;
+                option.textContent = maquina.nome;
+                escolhaMaquina.appendChild(option);
+            })
+            modalTitle.innerHTML = `Iniciar próximo processo`;
+            labelModalMaquinaProxProcesso.innerHTML = 'Em qual máquina será iniciado?'
+            modal.show();
+        }
+    )   
 
-    modalTitle.innerHTML = `Iniciar próximo processo para a ordem: ${ordemId}`;
-    labelModalMaquinaProxProcesso.innerHTML = 'Em qual máquina será iniciado?'
-    modal.show();
-    
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formProxProcesso');
     const clonedForm = formIniciar.cloneNode(true);
@@ -988,6 +1059,10 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
 
                 colQtdProxProcesso.style.display = 'block';
                 qtdProxProcesso.required = true;
+
+                fetchStatusMaquinas();
+                // fetchUltimasPecasProduzidas();
+                fetchContagemStatusOrdens();
             
             })
             .catch((error) => {
@@ -1005,7 +1080,7 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
 }
 
 // Modal para "Finalizar"
-function mostrarModalFinalizar(ordemId, grupoMaquina) {
+function mostrarModalFinalizar(ordemId) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     const modalTitle = document.getElementById('modalFinalizarLabel');
     const formFinalizar = document.getElementById('formFinalizarOrdemUsinagem');
@@ -1028,7 +1103,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
     });
 
     // Fetch para buscar informações da ordem
-    fetch(`api/ordens-criadas/${ordemId}/${grupoMaquina.toLowerCase()}/pecas/`)
+    fetch(`api/ordens-criadas/${ordemId}/pecas/`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar informações da API');
@@ -1082,7 +1157,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                     method: 'PATCH',
                     body: JSON.stringify({
                         ordem_id: ordemId,
-                        grupo_maquina: grupoMaquina,
+                        // grupo_maquina: grupoMaquina,
                         status: 'finalizada',
                         qt_realizada: qtRealizada,
                         qt_mortas: qtMortas,
@@ -1117,6 +1192,10 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                     resetarCardsInicial();
 
                     modal.hide();
+
+                    fetchStatusMaquinas();
+                    fetchUltimasPecasProduzidas();
+                    fetchContagemStatusOrdens();
                 })
                 .catch((error) => {
                     Swal.fire({
@@ -1138,7 +1217,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 }
 
 // Modal para "Retornar"
-function mostrarModalRetornar(ordemId, grupoMaquina) {
+function mostrarModalRetornar(ordemId, maquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalRetornar'));
     const modalTitle = document.getElementById('modalRetornarLabel');
     const formRetornar = document.getElementById('formRetornarProducao');
@@ -1168,7 +1247,7 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
-                grupo_maquina: grupoMaquina,
+                maquina_nome: maquina,
                 status: 'iniciada',
             }),
             headers: {
@@ -1204,6 +1283,9 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
             // Recarrega os dados chamando a função de carregamento
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
+
+            fetchStatusMaquinas();
+            fetchContagemStatusOrdens();
 
         })
         .catch((error) => {

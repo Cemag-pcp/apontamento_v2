@@ -1,4 +1,28 @@
-import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada-estamparia.js';
+import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada.js';
+
+document.addEventListener('DOMContentLoaded', function () {
+    // Atualiza automaticamente ao carregar a página
+    fetchStatusMaquinas();
+    fetchUltimasPecasProduzidas();
+    fetchContagemStatusOrdens();
+
+    // Adiciona eventos de clique para atualizar manualmente
+    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
+        fetchStatusMaquinas(); // Chama a função existente
+    });
+
+    document.getElementById('refresh-pecas').addEventListener('click', function () {
+        fetchUltimasPecasProduzidas(); // Chama a função existente
+    });
+
+    document.getElementById('refresh-ordens').addEventListener('click', function () {
+        fetchContagemStatusOrdens(); // Chama a função existente
+    });
+
+    document.getElementById('btnPararMaquina').addEventListener('click', () => {
+        mostrarModalPararMaquina(); // Chama a função já existente
+    });
+});
 
 export function fetchStatusMaquinas() {
     // Seleciona os elementos do container
@@ -7,7 +31,7 @@ export function fetchStatusMaquinas() {
     const listaStatus = document.querySelector('#machine-status-list');
 
     // Faz a requisição para a API
-    fetch('/core/api/status_maquinas/?setor=estamparia')
+    fetch('/core/api/status_maquinas/?setor=corte')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -90,7 +114,7 @@ export function fetchUltimasPecasProduzidas() {
     const listaPecas = document.querySelector('#ultimas-pecas-list');
 
     // Faz a requisição para a API
-    fetch(`/core/api/ultimas_pecas_produzidas/?setor=estamparia`)
+    fetch(`/core/api/ultimas_pecas_produzidas/?setor=corte`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -128,7 +152,7 @@ export function fetchContagemStatusOrdens() {
     const listaStatus = document.getElementById('status-ordens-list');
 
     // Faz a requisição para a API
-    fetch('/core/api/status_ordem/?setor=estamparia')
+    fetch('/core/api/status_ordem/?setor=corte')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -175,7 +199,7 @@ export function fetchContagemStatusOrdens() {
 
 async function fetchMaquinasDisponiveis() {
     try {
-        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=estamparia');
+        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=corte');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -289,7 +313,7 @@ async function handleFormSubmit(event) {
     });
 
     try {
-        const response = await fetch(`/core/api/parar-maquina/?setor=estamparia`, {
+        const response = await fetch(`/core/api/parar-maquina/?setor=corte`, {
             method: 'PATCH',
             body: JSON.stringify({
                 maquina: document.getElementById('escolhaMaquinaParada').value,
@@ -332,30 +356,3 @@ async function handleFormSubmit(event) {
         });
     }
 }
-
-document.addEventListener('DOMContentLoaded', function () {
-    // Atualiza automaticamente ao carregar a página
-    fetchStatusMaquinas();
-    fetchUltimasPecasProduzidas();
-    fetchContagemStatusOrdens();
-
-    // Adiciona eventos de clique para atualizar manualmente
-    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
-        console.log("Atualizando Status de Máquinas...");
-        fetchStatusMaquinas(); // Chama a função existente
-    });
-
-    document.getElementById('refresh-pecas').addEventListener('click', function () {
-        console.log("Atualizando Últimas Peças Produzidas...");
-        fetchUltimasPecasProduzidas(); // Chama a função existente
-    });
-
-    document.getElementById('refresh-ordens').addEventListener('click', function () {
-        console.log("Atualizando Status de Ordens...");
-        fetchContagemStatusOrdens(); // Chama a função existente
-    });
-
-    document.getElementById('btnPararMaquina').addEventListener('click', () => {
-        mostrarModalPararMaquina(); // Chama a função já existente
-    });
-});

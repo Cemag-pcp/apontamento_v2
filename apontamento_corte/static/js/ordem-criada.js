@@ -1,3 +1,5 @@
+import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina-corte.js';
+
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -145,7 +147,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.id);
+                                mostrarModalRetornar(ordem.id, ordem.maquina_id);
                             });
                         }
 
@@ -191,7 +193,7 @@ function iniciarContador(ordemId, dataCriacao) {
     setInterval(atualizarContador, 1000);
 }
 
-function carregarOrdensIniciadas(container) {
+export function carregarOrdensIniciadas(container) {
     fetch('api/ordens-iniciadas/?page=1&limit=10')
         .then(response => response.json())
         .then(data => {
@@ -229,22 +231,30 @@ function carregarOrdensIniciadas(container) {
                 }
 
                 card.innerHTML = `
-                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
-                        <span class="badge badge-pill badge-warning" id="contador-${ordem.ordem}" style="font-size: 0.65rem;">Carregando...</span>
+                <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+                    <!-- Contador fixado no topo direito -->
+                    <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                        id="contador-${ordem.ordem}" 
+                        style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                        Carregando...
+                    </span>
+
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
+                        <h6 class="card-title fw-bold mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
                     </div>
-                    <div class="card-body bg-light">
-                        <p class="card-text mb-2 small">
+
+                    <div class="card-body bg-light p-3">
+                        <p class="card-text mb-3">
                             <strong>Observação:</strong> ${ordem.obs || 'Sem observações'}
                         </p>
-                        <p class="card-text mb-0 small">
+                        <p class="card-text mb-3">
                             <strong>Descrição MP:</strong> ${ordem.propriedade.descricao_mp || 'Sem descrição'}
                         </p>
                     </div>
-                    <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
-                        <button class="btn btn-outline-primary btn-sm btn-ver-peca" title="Ver Peças">
-                            <i class="fa fa-eye"></i> Ver Peças
+
+                    <div class="card-footer d-flex justify-content-between align-items-center bg-white p-3 border-top">
+                        <button class="btn btn-outline-primary btn-sm btn-ver-peca">
+                            Ver Peças
                         </button>
                         <div class="d-flex gap-2">
                             ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
@@ -285,7 +295,7 @@ function carregarOrdensIniciadas(container) {
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
 }
 
-function carregarOrdensInterrompidas(container) {
+export function carregarOrdensInterrompidas(container) {
     // Fetch para buscar ordens interrompidas
     fetch('api/ordens-interrompidas/?page=1&limit=10')
         .then(response => {
@@ -309,22 +319,31 @@ function carregarOrdensInterrompidas(container) {
                 `;
 
                 card.innerHTML = `
-                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-danger text-white">
-                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
-                        <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
+                <div class="card shadow-lg border-0 rounded-3 mb-3">
+                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <h6 class="card-title fw-bold mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                            <small class="text-white d-block mt-1">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
+                        </div>
+                        <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                            id="contador-${ordem.ordem}" 
+                            style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                            Carregando...
+                        </span>
                     </div>
-                    <div class="card-body bg-light">
-                        <p class="card-text mb-2 small">
+                    
+                    <div class="card-body bg-light p-3">
+                        <p class="card-text mb-3">
                             <strong>Observação:</strong> ${ordem.obs || 'N/A'}
                         </p>
-                        <p class="card-text mb-2 small">
+                        <p class="card-text mb-3">
                             <strong>Descrição MP:</strong> ${ordem.propriedade.descricao_mp || 'Sem descrição'}
                         </p>
                     </div>
-                    <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
-                        <button class="btn btn-outline-primary btn-sm btn-ver-peca" title="Ver Peças">
-                            <i class="fa fa-eye"></i> Ver Peças
+                    
+                    <div class="card-footer d-flex justify-content-between align-items-center bg-white p-3 border-top">
+                        <button class="btn btn-outline-primary btn-sm btn-ver-peca">
+                            Ver Peças
                         </button>
                         <div class="d-flex gap-2">
                             ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
@@ -346,11 +365,14 @@ function carregarOrdensInterrompidas(container) {
                 // Evento para "Retornar"
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.id);
+                        mostrarModalRetornar(ordem.id, ordem.maquina_id);
                     });
                 }
 
                 container.appendChild(card); // Adiciona o card ao container
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao);
+
             });
         })
         .catch(error => {
@@ -490,6 +512,9 @@ function mostrarModalInterromper(ordemId) {
             // Recarrega os dados chamando a função de carregamento
             resetarCardsInicial();
 
+            fetchStatusMaquinas();
+            fetchContagemStatusOrdens();
+
         })
         .catch((error) => {
             console.error('Erro:', error);
@@ -515,14 +540,14 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
     // Define as máquinas para cada grupo
     const maquinasPorGrupo = {
         laser_1: [
-            { value: 'laser_1', label: 'Laser 1' },
+            { value: '1', label: 'Laser 1' },
         ],
         laser_2: [
-            {value: 'laser_2', label: 'Laser 2 (JFY)'},
+            {value: '2', label: 'Laser 2 (JFY)'},
         ],
         plasma: [
-            { value: 'plasma_1', label: 'Plasma 1' },
-            { value: 'plasma_2', label: 'Plasma 2' },
+            { value: '3', label: 'Plasma 1' },
+            { value: '4', label: 'Plasma 2' },
         ],
     };
 
@@ -565,7 +590,7 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 ordem_id: ordemId,
                 grupo_maquina: grupoMaquina,
                 status: 'iniciada',
-                maquina_nome: maquinaName,
+                maquina: maquinaName,
             }),
             headers: {
                 'Content-Type': 'application/json',
@@ -595,6 +620,9 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 carregarOrdensIniciadas(containerIniciado);
 
                 resetarCardsInicial(); 
+
+                fetchStatusMaquinas();
+                fetchContagemStatusOrdens();
 
             })
             .catch((error) => {
@@ -663,7 +691,7 @@ function mostrarModalFinalizar(ordemId) {
                                 <input 
                                     type="number" 
                                     min="1" 
-                                    max="20" 
+                                    max="100" 
                                     class="form-control form-control-sm" 
                                     id="propQtd" 
                                     data-qtd-chapa="${data.propriedades.quantidade}" 
@@ -831,6 +859,11 @@ function mostrarModalFinalizar(ordemId) {
             resetarCardsInicial();
                         
             modal.hide();
+
+            fetchStatusMaquinas();
+            fetchContagemStatusOrdens();
+            fetchUltimasPecasProduzidas();
+
         })
         .catch((error) => {
             Swal.fire({
@@ -843,7 +876,7 @@ function mostrarModalFinalizar(ordemId) {
 }
 
 // Modal para "Retornar"
-function mostrarModalRetornar(ordemId) {
+function mostrarModalRetornar(ordemId, maquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalRetornar'));
     const modalTitle = document.getElementById('modalRetornarLabel');
     const formRetornar = document.getElementById('formRetornarProducao');
@@ -875,6 +908,7 @@ function mostrarModalRetornar(ordemId) {
                 ordem_id: ordemId,
                 // grupo_maquina: grupoMaquina,
                 status: 'iniciada',
+                maquina: maquina,
             }),
             headers: {
                 'Content-Type': 'application/json',
@@ -907,6 +941,9 @@ function mostrarModalRetornar(ordemId) {
             carregarOrdensInterrompidas(containerInterrompido);
 
             resetarCardsInicial();
+
+            fetchStatusMaquinas();
+            fetchContagemStatusOrdens();
 
         })
         .catch((error) => {
