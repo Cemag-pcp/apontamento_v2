@@ -674,7 +674,7 @@ def api_apontamentos_peca(request):
                 resultado.append({
                     "ordem": ordem.ordem,
                     "codigo_peca": apontamento.peca.codigo,
-                    "descricao_peca": apontamento.peca.descricao,
+                    "descricao_peca": apontamento.peca.descricao if apontamento.peca.descricao else 'Cadastrar descrição',
                     "qtd_boa": apontamento.qtd_boa,
                     "qtd_morta": apontamento.qtd_morta,
                     "qtd_planejada": apontamento.qtd_planejada,
