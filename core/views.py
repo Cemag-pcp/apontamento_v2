@@ -84,6 +84,18 @@ def versao(request):
 @csrf_exempt
 @require_http_methods(["PATCH"])  # So PATCH é permitido
 def retornar_maquina(request):
+
+    """
+    
+    Para retornar uma maquina:
+
+    {
+        "maquina": 30
+    }
+    
+    """
+
+
     try:
         data = json.loads(request.body)
         maquina_nome = data.get('maquina')
@@ -109,7 +121,20 @@ def retornar_maquina(request):
     except Exception as e:
         return JsonResponse({'error': f'Erro inesperado: {str(e)}'}, status=500)
 
+@csrf_exempt
 def parar_maquina(request):
+
+    """
+
+    Para parar uma máquina:
+
+    {
+        "setor": "montagem",
+        "maquina": 30,
+        "motivo": "Manutenção"
+    }
+
+    """
 
     setor = request.GET.get('setor', '')
 
@@ -120,7 +145,7 @@ def parar_maquina(request):
                 data = json.loads(request.body)
                 maquina = get_object_or_404(Maquina, pk=data.get('maquina')) 
                 motivo = data.get('motivo')
-
+                
                 # Validação básica de dados
                 if not maquina or not motivo:
                     return JsonResponse({'error': 'Dados inválidos: maquina ou motivo ausente.'}, status=400)
@@ -131,7 +156,7 @@ def parar_maquina(request):
 
                 # Busca o motivo específico no banco de dados
                 try:
-                    motivo_instance = MotivoMaquinaParada.objects.get(nome=motivo, setor__nome=setor)
+                    motivo_instance = MotivoMaquinaParada.objects.get(nome=motivo)
                 except MotivoMaquinaParada.DoesNotExist:
                     return JsonResponse({'error': 'Motivo não encontrado para o setor especificado.'}, status=404)
 

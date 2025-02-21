@@ -14,6 +14,6 @@ urlpatterns = [
     path('api/ordens-interrompidas/', views.get_ordens_interrompidas, name='get_ordens_interrompidas'),
 
     path('api/get-pecas/', views.get_pecas, name='get_pecas'),
-    path('api/criar-ordem-usinagem/', views.planejar_ordem_prod_esp, name='planejar_ordem_prod_esp'),
+    path('api/criar-ordem-prod-especiais/', views.planejar_ordem_prod_esp, name='planejar_ordem_prod_esp'),
 
 ]

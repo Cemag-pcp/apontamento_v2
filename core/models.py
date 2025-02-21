@@ -5,6 +5,8 @@ from django.contrib.auth.models import User
 
 from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao,Maquina
 
+from datetime import timedelta
+
 STATUS_ANDAMENTO_CHOICES = (
     ('aguardando_iniciar', 'Aguardando iniciar'),
     ('iniciada', 'Iniciada'),
@@ -61,7 +63,9 @@ class Ordem(models.Model):
         ('usinagem', 'Usinagem'),
         ('serra', 'Serra'),
         ('prod_esp', 'Prod. Especiais'),
-        ('estamparia', 'Estamparia')
+        ('estamparia', 'Estamparia'),
+        ('montagem', 'Montagem'),
+        ('pintura','Pintura')
     )
 
     ordem = models.IntegerField(blank=True, null=True)
@@ -90,12 +94,30 @@ class Ordem(models.Model):
     )
     duplicada = models.BooleanField(default=False) # Opção para ordens duplicadas
 
+    #Campos para apontamento de montagem e pintura
+    data_carga = models.DateField(null=True, blank=True)
+    cor = models.CharField(max_length=50, blank=True, null=True) # Cinza, Vermelho, Amarelo...
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['ordem', 'maquina'], name='unique_ordem_processo')
         ]
 
     def save(self, *args, **kwargs):
+        
+        if self.grupo_maquina == 'montagem' and self.data_carga:
+            self.data_programacao = self.data_carga - timedelta(days=3)
+
+            # Se a data_programacao cair num sábado (5) ou domingo (6), ajustar para sexta-feira
+            while self.data_programacao.weekday() in [5, 6]:  # 5 = Sábado, 6 = Domingo
+                self.data_programacao -= timedelta(days=1)  # Retrocede até sexta
+
+        elif self.grupo_maquina == 'pintura' and self.data_carga:
+            self.data_programacao = self.data_carga - timedelta(days=1)
+
+            # Se a data_programacao cair num sábado (5) ou domingo (6), ajustar para sexta-feira
+            while self.data_programacao.weekday() in [5, 6]:  # 5 = Sábado, 6 = Domingo
+                self.data_programacao -= timedelta(days=1)  # Retrocede até sexta
 
         if not self.pk and self.duplicada:
             # Gera uma identificação única para a duplicata

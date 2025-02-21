@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Gerenciamento de Processo</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'css/spinner.css' %}">
+    <link rel="stylesheet" href="{% static 'css/datatable.css' %}">
+    <link rel="stylesheet" href="{% static 'css/table-gerar-op.css' %}">
+{% endblock %}
+
+{% block content %}
+<div>
+    <!-- Título Principal -->
+    <div class="text-center mb-5">
+        <h1 class="display-5">Histórico de apontamento</h1>
+        <!-- <p class="text-muted">Duplique ordem de produção.</p> -->
+    </div>
+
+    <!-- Container para Planejamento -->
+    <div id="containerPlanejar" class="mb-5">
+        <!-- Painel de Ordens Criadas -->
+        <h4 class="mb-3 text-secondary">Pesquise a ordem</h4>
+        <!-- Formulário de Filtro -->
+        <form id="filtro-form" class="mb-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" name="filtro-ordem" id="filtro-ordem" placeholder="Filtrar por ordem">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </div>
+        </form>
+    
+        <div class="table-container">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Ordem</th>
+                        <th>Data de Criação</th>
+                        <th>Máquina</th>
+                        <th>Peça</th>
+                        <th>Qt. Boa</th>
+                        <th>Qt. Morta</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-corpo">
+                    <div id="loading-spinner">🔄 Carregando...</div>
+                    <tr>
+                        <td colspan="6">🔄 Carregando dados...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!--  Paginação -->
+        <div class="pagination-container" id="paginacao-container"></div>
+
+        <!--  Loading Spinner -->
+        
+    
+    </div>
+
+</div>
+
+<!-- Modal para configurar ordem -->
+<div class="modal fade" id="modalDuplicarOrdem" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalDuplicarOrdemLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDuplicarOrdemLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formDuplicarOrdem">
+                    {% csrf_token %}
+                    
+                    <div id="bodyDuplicarOrdem">
+                        <!-- Informações da Chapa -->
+
+                        <!-- Peças -->
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="pagina-atual" value="1">
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/historico-estamparia.js' %}"></script>
+{% endblock %}
+

@@ -7,6 +7,8 @@
 
 {% block links %}
     <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+
 {% endblock %}
 
 {% block content %}
@@ -199,7 +201,6 @@
                             <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
                         </div>
                     </div>
-
         
                     <div class="text-end">
                         <button class="btn btn-success" id="confirmButton">Planejar</button>
@@ -228,7 +229,7 @@
 </div>
 
 <!-- Modal para perguntar se irá iniciar a ordem após planejamento -->
-<div class="modal fade" id="modalIniciarAposPlanejar" aria-labelledby="modalIniciarAposPlanejarLabel" tabindex="-1">
+<div class="modal fade" id="modalIniciarAposPlanejar" aria-labelledby="modalIniciarAposPlanejarLabel" data-bs-backdrop="static" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
         <div class="modal-header">

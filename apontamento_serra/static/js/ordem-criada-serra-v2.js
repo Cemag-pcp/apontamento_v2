@@ -246,10 +246,16 @@ export function carregarOrdensIniciadas(container, filtros={}) {
                 }
 
                 card.innerHTML = `
-                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+                    <!-- Contador fixado no topo direito -->
+                    <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                        id="contador-${ordem.ordem}" 
+                        style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                        Carregando...
+                    </span>
+
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
                         <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
-                        <span class="badge badge-pill badge-warning" id="contador-${ordem.ordem}" style="font-size: 0.65rem;">Carregando...</span>
                     </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
@@ -344,13 +350,17 @@ export function carregarOrdensInterrompidas(container, filtros={}) {
                 `;
 
                 card.innerHTML = `
-                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                <div class="card shadow-lg border-0 rounded-3 mb-3">
+                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center p-3">
                         <div>
                             <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
                             <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
                         </div>
-                        <span class="badge badge-pill badge-warning" id="contador-${ordem.ordem}" style="font-size: 0.65rem;">Carregando...</span>
+                        <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                            id="contador-${ordem.ordem}" 
+                            style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                            Carregando...
+                        </span>
                     </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">

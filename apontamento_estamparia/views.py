@@ -7,6 +7,7 @@ from django.views.decorators.http import require_GET
 from django.utils.timezone import now,localtime
 from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso,MaquinaParada
@@ -84,7 +85,8 @@ def get_ordens_criadas(request):
 
     # Query principal das ordens
     ordens_queryset = Ordem.objects.filter(
-        grupo_maquina='estamparia'
+        grupo_maquina='estamparia',
+        excluida=False
     ).annotate(
         peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
         peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
@@ -119,12 +121,30 @@ def get_ordens_criadas(request):
                 'codigo': ordem.peca_codigo,
                 'descricao': ordem.peca_descricao,
                 'quantidade': ordem.peca_quantidade,
-            } if ordem.peca_codigo else None
+            } if ordem.peca_codigo else None,
+            'info_pecas': [
+                {
+                    'ordem_id':ordem.pk,
+                    'ordem': ordem.ordem,
+                    'data_criacao': ordem.data_criacao,
+                    'maquina': ordem.maquina.nome,
+                    'id': peca_ordem.id,
+                    'peca_id': peca_ordem.peca.id,
+                    'peca_codigo': peca_ordem.peca.codigo,
+                    'peca_nome': peca_ordem.peca.descricao if peca_ordem.peca.descricao else 'Sem descrição',
+                    'quantidade': peca_ordem.qtd_planejada,
+                    'qtd_morta': peca_ordem.qtd_morta,
+                    'qtd_boa': peca_ordem.qtd_boa
+                }
+                for peca_ordem in ordem.ordem_pecas_estamparia.all() if peca_ordem.qtd_boa > 0
+            ]  # Lista todas as peças associadas
+
         })
 
     return JsonResponse({
         'ordens': data,
-        'has_next': ordens_page.has_next(),
+        'total_ordens': paginator.count,  # Envia total de ordens
+        'has_next': ordens_page.has_next(),  # Envia se há próxima página
     })
 
 def atualizar_status_ordem(request):
@@ -134,7 +154,6 @@ def atualizar_status_ordem(request):
     try:
         # Parse do corpo da requisição
         body = json.loads(request.body)
-        print(body)
 
         status = body.get('status')
         ordem_id = body.get('ordem_id')
@@ -541,3 +560,22 @@ def api_apontamentos_peca(request):
         })
 
     return JsonResponse(resultado, safe=False)
+
+def historico(request):
+
+    return render(request, "apontamento_estamparia/historico.html")
+
+@csrf_exempt
+def atualizar_pecas_ordem(request):
+
+    data = json.loads(request.body)
+
+    if request.method == 'POST':
+
+        edit_info_apontamento = get_object_or_404(PecasOrdem, pk=int(data['ordemId']))
+        edit_info_apontamento.qtd_boa = int(data['novaQtBoa'])
+        edit_info_apontamento.qtd_morta = int(data['novaQtMorta'])
+
+        edit_info_apontamento.save()
+
+    return JsonResponse({'status':'success'})

@@ -1,195 +1,176 @@
-import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina.js';
+// import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina.js';
 
-export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
+export const loadOrdens = (container, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
-    return new Promise((resolve, reject) => { // Retorna uma Promise
-        if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
+    return new Promise((resolve, reject) => {
+        if (isLoading) return resolve({ ordens: [] });
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}`)
+        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&cor=${filtros.cor || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
-
+                container.innerHTML = ""; // Limpa antes de inserir novas ordens
+                
                 if (ordens.length > 0) {
+                    // Criar cabeçalho da tabela
+                    const table = document.createElement('table');
+                    table.classList.add('table', 'table-bordered', 'table-striped');
+
+                    table.innerHTML = `
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 5%; text-align: center;">
+                                    <input type="checkbox" id="select-all">
+                                </th>
+                                <th style="width: 10%;">Ordem</th>
+                                <th style="width: 15%;">Código Peça</th>
+                                <th style="width: 15%;">Data Programação</th>
+                                <th style="width: 10%;">Cor</th>
+                                <th style="width: 10%;">Qtd. Disponível</th>
+                                <th style="width: 10%;">Qtd. a Pendurar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-ordens-corpo"></tbody>
+                    `;
+
+                    container.appendChild(table);
+                    const tabelaCorpo = document.getElementById('tabela-ordens-corpo');
 
                     ordens.forEach(ordem => {
-                        const card = document.createElement('div');
-                        card.classList.add('col-md-4'); // Adiciona a classe de coluna
+                        console.log(ordem);
+                        const linha = document.createElement('tr');
+                        linha.dataset.ordemId = ordem.id;
+                        linha.dataset.pecaOrdem = ordem.peca_ordem_id;
+                        linha.dataset.cor = ordem.cor; // Adiciona a cor da peça para controle
 
-                        card.dataset.ordemId = ordem.id; // Adiciona o ID da ordem para referência
-                        card.dataset.grupoPeca = ordem.grupo_peca || ''; // Adiciona o grupo máquina
-                        card.dataset.obs = ordem.obs || ''; // Adiciona observações
-                    
-                        let statusBadge = ''; // Variável para armazenar o HTML do badge
+                        linha.innerHTML = `
+                            <td style="text-align: center;">
+                                <input type="checkbox" class="ordem-checkbox" data-ordem-id="${ordem.id}" data-cor="${ordem.cor}">
+                            </td>
+                            <td>#${ordem.ordem}</td>
+                            <td>
+                                <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca_codigo}" 
+                                   target="_blank" rel="noopener noreferrer">
+                                    ${ordem.peca_codigo}
+                                </a>
+                            </td>
+                            <td>${ordem.data_programacao}</td>
+                            <td>${ordem.cor}</td>
+                            <td>${ordem.qt_restante}</td>
+                            <td>
+                                <input type="number" class="form-control qt-produzida" min="1" max="${ordem.qt_restante}">
+                            </td>
+                        `;
 
-                        switch (ordem.status_atual) {
-                            case 'aguardando_iniciar':
-                                statusBadge = '<span class="badge rounded-pill bg-warning badge-small ms-2">Aguardando Iniciar</span>';
-                                break;
-                            case 'iniciada':
-                                statusBadge = '<span class="badge rounded-pill bg-info badge-small ms-2">Iniciada</span>';
-                                break;
-                            case 'finalizada':
-                                statusBadge = '<span class="badge rounded-pill bg-success badge-small ms-2">Finalizada</span>';
-                                break;
-                            case 'interrompida':
-                                statusBadge = '<span class="badge rounded-pill bg-danger badge-small ms-2">Interrompida</span>';
-                                break;
-                            case 'agua_prox_proc':
-                                statusBadge = '<span class="badge rounded-pill bg-primary badge-small ms-2">Próximo processo</span>';
-                                break;
-                            default:
-                                statusBadge = '<span class="badge rounded-pill bg-dark badge-small ms-2">Desconhecido</span>';
-                        }
-
-                        // Defina os botões dinamicamente com base no status
-                        let botaoAcao = '';
-
-                        if (ordem.status_atual === 'iniciada') {
-                            botaoAcao = `
-                                <button class="btn btn-danger btn-sm btn-interromper" title="Interromper">
-                                    <i class="fa fa-stop"></i>
-                                </button>
-                                <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
-                                    <i class="fa fa-check"></i>
-                                </button>
-                                <button class="btn btn-primary btn-sm btn-proximo-processo" title="Passar para o próximo processo">
-                                    <i class="fa fa-arrow-right"></i>
-                                </button>  
-                                <button class="btn btn-info btn-sm btn-finalizar-parcial" title="Finalizar parcial">
-                                    <i class="fa fa-hourglass-half"></i>
-                                </button>
-
-                            `;
-                        } else if (ordem.status_atual === 'aguardando_iniciar') {
-                            botaoAcao = `
-                                <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
-                                    <i class="fa fa-play"></i>
-                                </button>
-                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                            `;
-                        } else if (ordem.status_atual === 'interrompida') {
-                            botaoAcao = `
-                                <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
-                                    <i class="fa fa-redo"></i>
-                                </button>
-                            `;
-                        } else if (ordem.status_atual === 'agua_prox_proc') {
-                            botaoAcao = `
-                                <button class="btn btn-warning btn-sm btn-iniciar-proximo-processo" title="Iniciar próximo processo">
-                                    <i class="fa fa-play"></i>
-                                </button>
-                            `;
-                        }
-                    
-                        // Monta o card com os botões dinâmicos
-                        card.innerHTML = `
-                        <div class="card shadow-sm bg-light text-dark">
-                            <div class="card-body">
-                                <h5 class="card-title d-flex justify-content-between align-items-center">
-                                    <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca.codigo}" target="_blank" rel="noopener noreferrer">
-                                        ${ordem.peca.codigo} - ${ordem.peca.descricao}
-                                    </a>
-                                    ${statusBadge}
-                                </h5>
-                                <p class="text-muted mb-2" style="font-size: 0.85rem;">#${ordem.ordem} Criado em: ${ordem.data_criacao}</p>
-                                <p class="mb-2">${ordem.obs || '<span class="text-muted">Sem observações</span>'}</p>
-                            </div>
-                            <div class="card-footer text-end" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
-                                ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
-                            </div>
-                        </div>`;
-                        
-                        // Seleciona os botões dinamicamente
-                        const buttonIniciar = card.querySelector('.btn-iniciar');
-                        const buttonInterromper = card.querySelector('.btn-interromper');
-                        const buttonFinalizar = card.querySelector('.btn-finalizar');
-                        const buttonRetornar = card.querySelector('.btn-retornar');
-                        const buttonProxProcesso = card.querySelector('.btn-iniciar-proximo-processo');
-                        const buttonMandarProxProcesso = card.querySelector('.btn-proximo-processo')
-                        const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
-                        const buttonExcluir= card.querySelector('.btn-excluir');
-
-                        // Adiciona evento ao botão "Iniciar", se existir
-                        if (buttonIniciar) {
-                            buttonIniciar.addEventListener('click', () => {
-                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
-                            });
-                        }
-
-                        // Adiciona evento ao botão "Interromper", se existir
-                        if (buttonInterromper) {
-                            buttonInterromper.addEventListener('click', () => {
-                                mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
-                            });
-                        }
-
-                        // Adiciona evento ao botão "Finalizar", se existir
-                        if (buttonFinalizar) {
-                            buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.id, ordem.grupo_maquina);
-                            });
-                        }
-
-                        // Adiciona evento ao botão "Retornar", se existir
-                        if (buttonRetornar) {
-                            buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
-                            });
-                        }
-
-                        // Adiciona evento ao botão para iniciar proximo processo
-                        if (buttonProxProcesso) {
-                            buttonProxProcesso.addEventListener('click', () => {
-                                mostrarModalIniciarProxProcesso(ordem.id, ordem.grupo_maquina);
-                            });
-                        }
-
-                        // Adiciona evento ao botão para enviar para proximo processo
-                        if (buttonMandarProxProcesso) {
-                            buttonMandarProxProcesso.addEventListener('click', () => {
-                                mostrarModalProxProcesso(ordem.id, ordem.grupo_maquina);
-                            });
-                        }
-
-                        // Adiciona evento ao botão para enviar para proximo processo
-                        if (buttonFinalizarParcial) {
-                            buttonFinalizarParcial.addEventListener('click', () => {
-                                mostrarModalFinalizarParcial(ordem.id, ordem.grupo_maquina);
-                            });
-                        }
-
-                        // Adiciona evento ao botão "Excluir", se existir
-                        if (buttonExcluir) {
-                            buttonExcluir.addEventListener('click', () => {
-                                mostrarModalExcluir(ordem.id, 'estamparia');
-                            });
-                        }
-
-                        // Adiciona o card ao container
-                        container.appendChild(card);
+                        tabelaCorpo.appendChild(linha);
                     });
-                    
-                    // Esconde o botão "Carregar Mais" caso `has_next` seja false
-                    const loadMoreButton = document.getElementById('loadMore');
-                    if (!data.has_next) {
-                        loadMoreButton.style.display = 'none'; // Esconde o botão
-                    } else {
-                        loadMoreButton.style.display = 'block'; // Mostra o botão caso ainda haja dados
-                    }
 
-                    resolve(data); // Retorna os dados carregados
+                    // Evento para habilitar/desabilitar o botão ao marcar checkboxes e verificar cor e quantidade preenchida
+                    const checkboxes = document.querySelectorAll(".ordem-checkbox");
+
+                    checkboxes.forEach(checkbox => {
+                        checkbox.addEventListener("change", () => {
+                            const selecionados = [...checkboxes].filter(cb => cb.checked);
+                            const corSelecionada = selecionados.length > 0 ? selecionados[0].dataset.cor : null;
+                            let isValid = true;
+                    
+                            selecionados.forEach(cb => {
+                                const linha = cb.closest('tr');
+                                const qtInput = linha.querySelector('.qt-produzida');
+                                const maxQtPermitida = parseInt(qtInput.getAttribute("max"), 10);
+                                const qtSelecionada = parseInt(qtInput.value, 10);
+                    
+                                // ⚠ Verifica se o campo de quantidade foi preenchido corretamente
+                                if (!qtInput.value || qtSelecionada <= 0) {
+                                    cb.checked = false; // Desmarca o checkbox inválido
+                                    isValid = false;
+                    
+                                    Swal.fire({
+                                        icon: "warning",
+                                        title: "Quantidade Inválida",
+                                        text: "Você precisa preencher a quantidade antes de selecionar esta ordem!",
+                                        confirmButtonText: "OK"
+                                    });
+                                    return;
+                                }
+                    
+                                // ⚠ Verifica se a quantidade ultrapassa o permitido
+                                if (qtSelecionada > maxQtPermitida) {
+                                    cb.checked = false; // Desmarca a seleção inválida
+                                    isValid = false;
+                    
+                                    Swal.fire({
+                                        icon: "warning",
+                                        title: "Quantidade Excedida",
+                                        text: `O valor máximo permitido é ${maxQtPermitida}.`,
+                                        confirmButtonText: "OK"
+                                    });
+                                    return;
+                                }
+                            });
+                    
+                            // ⚠ Se houver cores diferentes, impede a seleção
+                            const coresDiferentes = selecionados.some(cb => cb.dataset.cor !== corSelecionada);
+                            if (coresDiferentes) {
+                                checkbox.checked = false;
+                                isValid = false;
+                    
+                                Swal.fire({
+                                    icon: "warning",
+                                    title: "Seleção Inválida",
+                                    text: "Todas as peças do cambão devem ter a mesma cor!",
+                                    confirmButtonText: "OK"
+                                });
+                            }
+                    
+                            // ✅ Habilita o botão apenas se houver seleções válidas
+                            document.getElementById("btn-criar-cambao").disabled = selecionados.length === 0 || !isValid;
+                        });
+                    });
+
+                    // Evento para selecionar todos os checkboxes (somente se todas forem da mesma cor e com quantidade preenchida)
+                    document.getElementById("select-all").addEventListener("change", (e) => {
+                        const isChecked = e.target.checked;
+                        const primeiraCor = checkboxes[0]?.dataset.cor;
+                        let isValid = true;
+
+                        checkboxes.forEach(cb => {
+                            const linha = cb.closest('tr');
+                            const qtInput = linha.querySelector('.qt-produzida');
+
+                            if (cb.dataset.cor === primeiraCor && qtInput.value && parseInt(qtInput.value) > 0) {
+                                cb.checked = isChecked;
+                            } else {
+                                cb.checked = false;
+                                isValid = false;
+                            }
+                        });
+
+                        if (!isValid) {
+                            Swal.fire({
+                                icon: "warning",
+                                title: "Seleção Inválida",
+                                text: "Verifique se todas as ordens possuem a mesma cor e quantidade preenchida corretamente!",
+                                confirmButtonText: "OK"
+                            });
+                        }
+
+                        // Verifica se há checkboxes válidos marcados
+                        const algumSelecionado = [...checkboxes].some(cb => cb.checked);
+                        document.getElementById("btn-criar-cambao").disabled = !algumSelecionado || !isValid;
+                    });
+
+                    resolve(data);
                 } else {
-                    resolve(data); // Retorna mesmo se não houver dados
+                    container.innerHTML = '<p class="text-danger">Nenhuma ordem encontrada.</p>';
+                    resolve(data);
                 }
             })
             .catch(error => {
                 console.error('Erro ao buscar ordens:', error);
-                container.insertAdjacentHTML('beforeend', '<p class="text-danger">Erro ao carregar as ordens.</p>');
+                container.innerHTML = '<p class="text-danger">Erro ao carregar as ordens.</p>';
                 reject(error);
             })
             .finally(() => {
@@ -197,27 +178,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
             });
     });
 };
-
-function iniciarContador(ordemId, dataCriacao) {
-    const contador = document.getElementById(`contador-${ordemId}`);
-    const dataInicial = new Date(dataCriacao); // Converte a data de criação para objeto Date
-
-    function atualizarContador() {
-        const agora = new Date();
-        const diferenca = Math.floor((agora - dataInicial) / 1000); // Diferença em segundos
-
-        const dias = Math.floor(diferenca / 86400);
-        const horas = Math.floor((diferenca % 86400) / 3600);
-        const minutos = Math.floor((diferenca % 3600) / 60);
-        const segundos = diferenca % 60;
-
-        contador.textContent = `${dias}d ${horas}h ${minutos}m ${segundos}s`;
-    }
-
-    // Atualiza o contador a cada segundo
-    atualizarContador();
-    setInterval(atualizarContador, 1000);
-}
 
 export function carregarOrdensIniciadas(container, filtros = {}) {
     fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
@@ -1488,59 +1448,40 @@ function modalPlanejar() {
 
 function resetarCardsInicial(filtros = {}) {
     const container = document.getElementById('ordens-container');
-    const loadMoreButton = document.getElementById('loadMore');
-    let page = 1; // Página inicial
-    const limit = 10; // Quantidade de ordens por página
     let isLoading = false; // Flag para evitar chamadas simultâneas
-    let hasMoreData = true; // Flag para interromper chamadas quando não houver mais dados
 
-    // Atualiza os filtros com os valores enviados
-    const filtroOrdem = document.getElementById('filtro-ordem');
-    const filtroPeca = document.getElementById('filtro-peca');
-    const filtroStatus = document.getElementById('filtro-status');
-
+    // Obtém os filtros atualizados
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroCor = document.getElementById('filtro-cor');
+    
     const currentFiltros = {
-        ordem: filtros.ordem || filtroOrdem.value.trim(),
-        peca: filtros.peca || filtroPeca.value.trim(),
-        status: filtros.status || filtroStatus.value.trim(),
+        data_carga: filtroDataCarga.value,
+        cor: filtroCor.value,
     };
 
-    // Função principal para buscar e renderizar ordens
+    // Função para buscar e renderizar ordens sem paginação
     const fetchOrdens = () => {
-        if (isLoading || !hasMoreData) return;
+        if (isLoading) return;
         isLoading = true;
 
-        loadOrdens(container, page, limit, currentFiltros)
+        loadOrdens(container, currentFiltros) // Carrega todas as ordens de uma vez
             .then((data) => {
                 if (data.ordens.length === 0) {
-                    hasMoreData = false;
-                    loadMoreButton.style.display = 'none'; // Esconde o botão quando não há mais dados
-                    if (page === 1) {
-                        container.innerHTML = '<p class="text-muted">Nenhuma ordem encontrada.</p>';
-                    } else {
-                        container.insertAdjacentHTML('beforeend', '<p class="text-muted">Nenhuma ordem adicional encontrada.</p>');
-                    }
-                } else {
-                    loadMoreButton.style.display = 'block'; // Garante que o botão seja exibido quando houver mais dados
-                    page++; // Incrementa a página para o próximo carregamento
+                    container.innerHTML = '<p class="text-muted">Nenhuma ordem encontrada.</p>';
                 }
             })
             .catch((error) => {
                 console.error('Erro ao carregar ordens:', error);
+                container.innerHTML = '<p class="text-danger">Erro ao carregar as ordens.</p>';
             })
             .finally(() => {
                 isLoading = false;
             });
     };
 
-    // Carrega a primeira página automaticamente
-    container.innerHTML = ''; // Limpa o container antes de carregar novos resultados
+    // Limpa o container antes de carregar novos resultados e chama a função
+    container.innerHTML = '';
     fetchOrdens();
-
-    // Configurar o botão "Carregar Mais"
-    loadMoreButton.onclick = () => {
-        fetchOrdens(); // Carrega a próxima página ao clicar no botão
-    };
 }
 
 function filtro() {
@@ -1549,76 +1490,503 @@ function filtro() {
     form.addEventListener('submit', (event) => {
         event.preventDefault(); // Evita comportamento padrão do formulário
 
+        const filtroDataCarga = document.getElementById('filtro-data-carga');
+        const filtroCor = document.getElementById('filtro-cor');
+
         // Captura os valores atualizados dos filtros
         const filtros = {
-            ordem: document.getElementById('filtro-ordem').value.trim(),
-            peca: document.getElementById('filtro-peca').value.trim(),
-            status: document.getElementById('filtro-status').value.trim(),
+            data_carga: filtroDataCarga.value,
+            cor: filtroCor.value,
         };
 
         // Recarrega os resultados com os novos filtros
         resetarCardsInicial(filtros);
 
-        // Filtrar ordens em andamento
-        const containerIniciado = document.querySelector('.containerProcesso');
-        carregarOrdensIniciadas(containerIniciado, filtros);
-
-        // Filtrar ordens interrompidas
-        const containerInterrompido = document.querySelector('.containerInterrompido');
-        carregarOrdensInterrompidas(containerInterrompido, filtros);
-
-        // Filtrar ordens aguardando prox processo
-        const containerProxProcesso = document.querySelector('.containerProxProcesso');
-        carregarOrdensAgProProcesso(containerProxProcesso, filtros);
-
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+async function abrirModalCambao() {
+    const checkboxes = document.querySelectorAll(".ordem-checkbox:checked");
+    const tabelaCambao = document.getElementById("tabelaCambao");
+    const corCambao = document.getElementById("corCambao");
+    const selectCambao = document.getElementById("cambaoSelecionado");
 
-    resetarCardsInicial();
-    modalPlanejar();
-    
-    $('#pecaSelect').select2({
-        placeholder: 'Selecione a peça',
-        ajax: {
-            url: 'api/get-pecas/',
-            dataType: 'json',
-            delay: 250,
-            data: function (params) {
-                return {
-                    search: params.term || '',
-                    page: params.page || 1,
-                    per_page: 10
-                };
-            },
-            processResults: function (data, params) {
-                params.page = params.page || 1;
-                return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
-                    pagination: {
-                        more: data.pagination.more
-                    }
-                };
-            },
-            cache: true
-        },
-        minimumInputLength: 0,
-        dropdownParent: $('#modalEstamparia'),
+    if (checkboxes.length === 0) {
+        Swal.fire({
+            icon: "warning",
+            title: "Nenhuma ordem selecionada",
+            text: "Selecione pelo menos uma ordem para criar um cambão.",
+            confirmButtonText: "OK"
+        });
+        return;
+    }
+
+    let corSelecionada = checkboxes[0].dataset.cor;
+    let pecaOrdens = [];
+    let quantidades = [];
+    let erros = [];
+
+    tabelaCambao.innerHTML = ""; // Limpa a tabela antes de preencher
+    selectCambao.innerHTML = `<option value="">Carregando...</option>`; // Carrega cambões
+
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Aguarde...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
     });
 
-    const containerIniciado = document.querySelector('.containerProcesso');
-    carregarOrdensIniciadas(containerIniciado);
+    // Buscar cambões disponíveis da API
+    try {
+        const response = await fetch("http://127.0.0.1:8084/pintura/api/cambao-livre/");
+        const data = await response.json();
 
-    const containerInterrompido = document.querySelector('.containerInterrompido');
-    carregarOrdensInterrompidas(containerInterrompido);
+        if (data.cambao_livres.length > 0) {
+            Swal.close();
+            selectCambao.innerHTML = `<option value="">Selecione um cambão...</option>`;
+            data.cambao_livres.forEach(cambao => {
+                selectCambao.innerHTML += `<option value="${cambao.id}">Cambão ${cambao.id}</option>`;
+            });
+        } else {
+            selectCambao.innerHTML = `<option value="">Nenhum cambão disponível</option>`;
+        }
+    } catch (error) {
+        console.error("Erro ao buscar cambões:", error);
+        selectCambao.innerHTML = `<option value="">Erro ao carregar cambões</option>`;
+        Swal.close();
+    }
 
-    const containerProxProcesso = document.querySelector('.containerProxProcesso')
-    carregarOrdensAgProProcesso(containerProxProcesso);
+    checkboxes.forEach(cb => {
+        const linha = cb.closest("tr");
+        const pecaOrdem = linha.dataset.pecaOrdem;
+        const codigoPeca = linha.querySelector("a").textContent;
+        const quantidadeInput = linha.querySelector(".qt-produzida");
+        const quantidade = parseInt(quantidadeInput.value, 10);
 
+        if (!quantidade || quantidade <= 0) {
+            erros.push(`Ordem #${pecaOrdem}: Defina uma quantidade válida.`);
+            return;
+        }
+
+        pecaOrdens.push(pecaOrdem);
+        quantidades.push(quantidade);
+
+        tabelaCambao.innerHTML += `
+            <tr>
+                <td>#${pecaOrdem}</td>
+                <td>${codigoPeca}</td>
+                <td>${quantidade}</td>
+            </tr>
+        `;
+    });
+
+    if (erros.length > 0) {
+        Swal.fire({
+            icon: "warning",
+            title: "Erro ao criar Cambão",
+            html: erros.join("<br>"),
+            confirmButtonText: "OK"
+        });
+        return;
+    }
+
+    corCambao.textContent = corSelecionada;
+
+    document.getElementById("confirmarCriacaoCambao").dataset.cambaoData = JSON.stringify({
+        peca_ordens: pecaOrdens,
+        quantidade: quantidades,
+        cor: corSelecionada
+    });
+
+    let modal = new bootstrap.Modal(document.getElementById("modalCriarCambao"));
+    modal.show();
+}
+
+// Função de contador para mostrar tempo decorrido
+function iniciarContador(cambaoId, dataCriacao) {
+    const contador = document.getElementById(`contador-${cambaoId}`);
+    const dataInicial = new Date(dataCriacao); // Converte a data de criação para objeto Date
+
+    function atualizarContador() {
+        const agora = new Date();
+        const diferenca = Math.floor((agora - dataInicial) / 1000); // Diferença em segundos
+
+        const dias = Math.floor(diferenca / 86400);
+        const horas = Math.floor((diferenca % 86400) / 3600);
+        const minutos = Math.floor((diferenca % 3600) / 60);
+        const segundos = diferenca % 60;
+
+        contador.textContent = `${dias}d ${horas}h ${minutos}m ${segundos}s`;
+    }
+
+    // Atualiza o contador a cada segundo
+    atualizarContador();
+    setInterval(atualizarContador, 1000);
+}
+
+// Evento para confirmar a criação do cambão
+document.getElementById("confirmarCriacaoCambao").addEventListener("click", () => {
+
+    const botaoConfirmar = document.getElementById("confirmarCriacaoCambao");
+    const selectCambao = document.getElementById("cambaoSelecionado");
+    const selectTipo = document.getElementById("tipoPintura");
+    const dadosCambao = JSON.parse(botaoConfirmar.dataset.cambaoData);
+    const cambaoId = selectCambao.value;
+    const tipoId = selectTipo.value;
+    let modal = document.getElementById("modalCriarCambao");
+    
+    if (!cambaoId) {
+
+        console.log("Alerta: Cambão não selecionado!");
+        Swal.fire({
+            icon: "warning",
+            title: "Seleção obrigatória",
+            text: "Por favor, selecione um cambão antes de continuar.",
+            confirmButtonText: "OK",
+            allowOutsideClick: false
+        });
+        return;
+    } else if (!tipoId) {
+        console.log("Alerta: Tipo não selecionado!");
+        Swal.fire({
+            icon: "warning",
+            title: "Seleção obrigatória",
+            text: "Por favor, selecione um tipo antes de continuar.",
+            confirmButtonText: "OK",
+            allowOutsideClick: false
+        });
+        return;
+    }
+
+    // Adiciona o cambão selecionado ao payload
+    dadosCambao.cambao_id = parseInt(cambaoId);
+    dadosCambao.tipo = tipoId;
+
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Aguarde...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    fetch("api/add-pecas-cambao/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            // "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+        },
+        body: JSON.stringify(dadosCambao)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: "success",
+                title: "Cambão Criado",
+                text: "O cambão foi gerado com sucesso.",
+                confirmButtonText: "OK"
+            }).then(() => {
+                Swal.close();
+
+                let modalInstance = bootstrap.Modal.getInstance(modal);
+                if (modalInstance) {
+                    modalInstance.hide();
+                };
+                
+                resetarCardsInicial();
+                cambaoProcesso();
+            });
+        } else {
+            Swal.fire({
+                icon: "error",
+                title: "Erro ao Criar Cambão",
+                text: data.error || "Ocorreu um erro ao gerar o cambão.",
+                confirmButtonText: "OK"
+            });
+        }
+    })
+    .catch(error => {
+        console.error("Erro ao criar cambão:", error);
+        Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: "Ocorreu um erro ao tentar criar o cambão.",
+            confirmButtonText: "OK"
+        });
+    });
+});
+
+async function cambaoProcesso() {
+    try {
+        const response = await fetch("api/cambao-processo/");
+        const data = await response.json();
+        const cambaoContainer = document.getElementById("cambao-container");
+        cambaoContainer.innerHTML = ""; // Limpa antes de adicionar os novos
+
+        if (data.cambao_em_processo.length === 0) {
+            cambaoContainer.innerHTML = '<p class="text-muted text-center">Nenhum cambão em processo.</p>';
+            return;
+        }
+
+        const colorMap = {
+            "Vermelho": "#FF4D4D",
+            "Azul": "#4D79FF",
+            "Verde": "#4CAF50",
+            "Amarelo": "#FFC107",
+            "Laranja": "#FF9800",
+            "Roxo": "#9C27B0",
+            "Cinza": "#6C757D",
+            "Preto": "#212529",
+            "Branco": "#FFFFFF",
+            "Marrom": "#795548"
+        };
+
+        const coresAgrupadas = {}; // Objeto para agrupar os cambões por cor
+
+        // Agrupa os cambões por cor
+        data.cambao_em_processo.forEach(cambao => {
+            if (!coresAgrupadas[cambao.cor]) {
+                coresAgrupadas[cambao.cor] = [];
+            }
+            coresAgrupadas[cambao.cor].push(cambao);
+        });
+
+        const maxLength = 22; // Número máximo de caracteres a exibir
+
+        // Gera as colunas para cada cor
+        Object.entries(coresAgrupadas).forEach(([cor, camboes]) => {
+            const corHex = colorMap[cor] || "#808080"; // Se não encontrar, usa cinza padrão
+            const colDiv = document.createElement("div");
+            colDiv.classList.add("col-md-4");
+            console.log(camboes);
+            colDiv.innerHTML = `
+                <div class="card shadow-sm position-relative">
+                    <div class="card-header text-white text-center" style="background-color: ${corHex};">
+                        <h5>${cor}</h5>
+                    </div>
+                    <div class="card-body p-2">
+                        ${camboes.map(cambao => `
+                            <div class="border rounded p-2 mb-2">
+                                <div class="d-flex justify-content-between">
+                                    <strong>Cambão #${cambao.id}</strong> 
+                                    <span class="badge bg-warning">${cambao.tipo}</span>
+                                </div>
+                                <span class="badge bg-dark text-light px-2 py-1 my-2" 
+                                      id="contador-cambao-${cambao.id}" 
+                                      style="font-size: 0.85rem;">
+                                    Carregando...
+                                </span>
+                                <ul class="list-unstyled mt-2">
+                                    ${cambao.pecas.map(peca => `
+                                        <li class="d-flex justify-content-between">
+                                            <span>Peça: 
+                                                <strong title="${peca.peca}">
+                                                    ${peca.peca.length > maxLength ? peca.peca.substring(0, maxLength) + "..." : peca.peca}
+                                                </strong>
+                                            </span> 
+                                            <span>Qtd: <strong>${peca.quantidade_pendurada}</strong></span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                                <div class="d-flex justify-content-between mt-2">
+                                    <small class="text-muted">Início: ${new Date(cambao.data_pendura).toLocaleString()}</small>
+                                    <button class="btn btn-sm btn-danger btn-finalizar" data-cambao-id="${cambao.id}">
+                                        Encerrar
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            cambaoContainer.appendChild(colDiv);
+
+            // Iniciar contador para cada cambão
+            camboes.forEach(cambao => {
+                iniciarContador(`cambao-${cambao.id}`, cambao.data_pendura);
+            });
+        });
+
+        // Evento de clique para abrir o modal de finalização
+        document.querySelectorAll(".btn-finalizar").forEach(botao => {
+            botao.addEventListener("click", function () {
+                const cambaoId = this.dataset.cambaoId;
+                document.getElementById("confirmarEncerramentoCambao").dataset.cambaoId = cambaoId;
+
+                const operadorSelect = document.getElementById("operadorSelect");
+                operadorSelect.disabled = true; // Bloqueia o select antes de carregar
+                operadorSelect.innerHTML = `<option value="" disabled selected>Carregando operadores...</option>`; 
+
+                // Buscar operadores disponíveis para o select
+                fetch("api/listar-operadores/")
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error("Erro ao buscar operadores");
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`;
+                        
+                        if (data.operadores.length === 0) {
+                            operadorSelect.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
+                        } else {
+                            data.operadores.forEach(operador => {
+                                operadorSelect.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+                            });
+                            operadorSelect.disabled = false; // Habilita o select após carregar os dados
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Erro ao carregar operadores:", error);
+                        operadorSelect.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
+                    });
+
+                // Exibe o modal
+                let modal = new bootstrap.Modal(document.getElementById("modalFinalizarCambao"));
+                modal.show();
+            });
+        });
+
+
+    } catch (error) {
+        console.error("Erro ao buscar cambões:", error);
+    }
+}
+
+// Evento de clique para confirmar a finalização
+document.getElementById("confirmarEncerramentoCambao").removeEventListener("click", finalizarCambao);
+document.getElementById("confirmarEncerramentoCambao").addEventListener("click", finalizarCambao);
+
+function finalizarCambao() {
+    let modal = document.getElementById("modalFinalizarCambao");
+    let modalInstance = bootstrap.Modal.getInstance(modal);
+
+    const cambaoId = this.dataset.cambaoId;
+    const operadorId = document.getElementById("operadorSelect").value;
+
+    if (!operadorId) {
+        Swal.fire({
+            icon: "warning",
+            title: "Operador não selecionado",
+            text: "Por favor, selecione um operador antes de finalizar o cambão.",
+            confirmButtonText: "OK"
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Finalizando cambão...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    fetch("api/finalizar-cambao/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+        },
+        body: JSON.stringify({ cambao_id: cambaoId, operador: operadorId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: "success",
+                title: "Cambão Finalizado",
+                text: "O cambão foi encerrado com sucesso.",
+                confirmButtonText: "OK"
+            }).then(() => {
+                if (modalInstance) {
+                    modalInstance.hide(); // Fecha corretamente o modal
+                }
+                cambaoProcesso();
+            });
+        } else {
+            Swal.fire({
+                icon: "error",
+                title: "Erro ao Finalizar",
+                text: data.error || "Ocorreu um erro ao finalizar o cambão.",
+                confirmButtonText: "OK"
+            });
+        }
+    })
+    .catch(error => {
+        console.error("Erro ao finalizar cambão:", error);
+        Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: "Ocorreu um erro ao tentar finalizar o cambão.",
+            confirmButtonText: "OK"
+        });
+    });
+}
+
+function carregarCores(dataCarga) {
+    const filtroCor = document.getElementById('filtro-cor');
+    filtroCor.disabled = true; // Desabilita enquanto carrega
+
+    fetch(`api/cores-carga/?data_carga=${encodeURIComponent(dataCarga)}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Erro ao buscar cores da carga.");
+            }
+            return response.json();
+        })
+        .then(data => {
+            const selectCor = document.getElementById('filtro-cor');
+            if (!selectCor) {
+                console.error("Elemento 'filtro-cor' não encontrado.");
+                return;
+            }
+
+            // Limpa as opções existentes
+            selectCor.innerHTML = `<option value="">------</option>`;
+
+            if (data.cores && data.cores.length > 0) {
+                // Adiciona as cores sem duplicação
+                data.cores.forEach(cor => {
+                    const option = document.createElement('option');
+                    option.value = cor; // Agora `cor` é diretamente o valor correto
+                    option.textContent = cor;
+                    selectCor.appendChild(option);
+                });
+                filtroCor.disabled = false; // Habilita o select após o carregamento
+            } else {
+                console.warn("Nenhuma cor encontrada para a data selecionada.");
+            }
+        })
+        .catch(error => console.error("Erro no carregamento das cores:", error));
+}
+
+// Evento para carregar cores ao mudar a data de carga
+function coresCarga() {
+    document.getElementById('filtro-data-carga').addEventListener('change', (event) => {
+        const dataCarga = event.target.value; // Pega o valor da data selecionada
+        if (dataCarga) {
+            carregarCores(dataCarga);
+        }
+    });
+}
+
+// Chama a função ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+    resetarCardsInicial();
+    cambaoProcesso();
     filtro();
-
+    coresCarga();
+    
+    const botaoCriarCambao = document.getElementById("btn-criar-cambao");
+    
+    if (botaoCriarCambao) {
+        botaoCriarCambao.addEventListener("click", () => abrirModalCambao());
+    }
 });

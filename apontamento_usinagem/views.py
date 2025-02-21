@@ -126,7 +126,7 @@ def get_ordens_criadas(request):
 
 def atualizar_status_ordem(request):
     if request.method == 'PATCH':
-        # try:
+        try:
             with transaction.atomic():
                 # Parse do corpo da requisição
                 body = json.loads(request.body)
@@ -255,10 +255,10 @@ def atualizar_status_ordem(request):
                     'data_inicio': novo_processo.data_inicio,
                 })
 
-        # except Ordem.DoesNotExist:
-        #     return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
-        # except Exception as e:
-        #     return JsonResponse({'error': str(e)}, status=500)
+        except Ordem.DoesNotExist:
+            return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
 
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
 
