@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
-from django.db.models import Sum,Q,Prefetch,Count,OuterRef, Subquery, F, Value
+from django.db.models import Sum,Q,Prefetch,Count,OuterRef, Subquery, F, Value, Avg
 from django.db.models.functions import Coalesce
 from django.db import transaction, models
 from django.shortcuts import get_object_or_404, render
@@ -14,7 +14,7 @@ from core.models import Ordem
 from cadastro.models import Operador
 
 def planejamento(request):
-    return render(request, "planejamento.html")
+    return render(request, "apontamento_pintura/planejamento.html")
 
 def ordens_criadas(request):
     data_carga = request.GET.get('data_carga', now().date())  # Garantindo que seja apenas a data
@@ -81,7 +81,16 @@ def criar_ordem(request):
             obs = data.get('obs', '')
             nome_peca = data.get('peca_nome')
             qtd_planejada = data.get('qtd_planejada', 0)
-            data_carga = data.get('data_carga', now())
+            data_carga_str = data.get('data_carga')  # Mantém como string inicialmente
+
+            # ✅ Converter data_carga para datetime.date, se fornecida
+            if data_carga_str:
+                try:
+                    data_carga = datetime.strptime(data_carga_str, "%Y-%m-%d").date()
+                except ValueError:
+                    return JsonResponse({'error': 'Formato de data inválido! Use YYYY-MM-DD.'}, status=400)
+            else:
+                data_carga = now().date()
 
             if not nome_peca:
                 return JsonResponse({'error': 'Nome da peça é obrigatório!'}, status=400)
@@ -139,7 +148,8 @@ def adicionar_pecas_cambao(request):
             quantidades = data.get('quantidade', [])  # Lista de quantidades correspondentes
             cor = data.get('cor')
             tipo_tinta = data.get('tipo')
-            
+            operador_inicial = data.get('operador')
+
             if not cambao_id or not peca_ordens or not quantidades or not cor:
                 return JsonResponse({'error': 'Todos os campos são obrigatórios!'}, status=400)
 
@@ -191,7 +201,9 @@ def adicionar_pecas_cambao(request):
                         peca_ordem=peca_ordem,
                         quantidade_pendurada=quantidade,
                         data_pendura=now(),
-                        status='pendurada'
+                        status='pendurada',
+                        operador_inicio=get_object_or_404(Operador, pk=operador_inicial)
+
                     )
 
                 # Atualizar status do cambão para "em uso"
@@ -273,7 +285,7 @@ def finalizar_cambao(request):
                         qtd_boa=item.quantidade_pendurada,
                         data=now(),
                         tipo=cambao.tipo,
-                        operador=operador,
+                        operador_fim=operador,
                     )
 
                     # Atualizar o status da peça no cambão para "finalizada"
@@ -366,3 +378,69 @@ def listar_cores_carga(request):
     ).values_list('cor', flat=True).distinct()
 
     return JsonResponse({"cores": list(cores)})  # Retorna lista simples de cores únicas
+
+def percentual_concluido_carga(request):
+    data_carga = request.GET.get('data_carga', now().date())  # Garantindo que seja apenas a data
+
+    # Soma correta da quantidade planejada por peça e ordem (evitando duplicação)
+    total_planejado = PecasOrdem.objects.filter(
+        ordem__data_carga=data_carga,
+        ordem__grupo_maquina='pintura'
+    ).values('ordem', 'peca').distinct().aggregate(
+        total_planejado=Coalesce(Sum('qtd_planejada', output_field=models.FloatField()), Value(0.0))
+    )["total_planejado"]
+
+    # Soma total da quantidade boa produzida
+    total_finalizado = PecasOrdem.objects.filter(
+        ordem__data_carga=data_carga,
+        ordem__grupo_maquina='pintura'
+    ).aggregate(
+        total_finalizado=Coalesce(Sum('qtd_boa', output_field=models.FloatField()), Value(0.0))
+    )["total_finalizado"]
+
+    # Evitar divisão por zero
+    percentual_concluido = (total_finalizado / total_planejado * 100) if total_planejado > 0 else 0.0
+
+    return JsonResponse({
+        "percentual_concluido": round(percentual_concluido, 2),  # Arredonda para 2 casas decimais
+        "total_planejado": total_planejado,
+        "total_finalizado": total_finalizado
+    })
+
+def andamento_ultimas_cargas(request):
+    # Obtém as últimas 5 datas de carga disponíveis para pintura
+    ultimas_cargas = Ordem.objects.filter(grupo_maquina='pintura')\
+        .order_by('-data_carga')\
+        .values_list('data_carga', flat=True)\
+        .distinct()[:5]
+
+    andamento_cargas = []
+    
+    for data in ultimas_cargas:
+        # Soma correta da quantidade planejada (evitando duplicações)
+        total_planejado = PecasOrdem.objects.filter(
+            ordem__data_carga=data,
+            ordem__grupo_maquina='pintura'
+        ).values('ordem', 'peca').distinct().aggregate(
+            total_planejado=Coalesce(Sum('qtd_planejada', output_field=models.FloatField()), Value(0.0))
+        )["total_planejado"]
+
+        # Soma total da quantidade boa produzida
+        total_finalizado = PecasOrdem.objects.filter(
+            ordem__data_carga=data,
+            ordem__grupo_maquina='pintura'
+        ).aggregate(
+            total_finalizado=Coalesce(Sum('qtd_boa', output_field=models.FloatField()), Value(0.0))
+        )["total_finalizado"]
+
+        # Evita divisão por zero e calcula o percentual corretamente
+        percentual_concluido = (total_finalizado / total_planejado * 100) if total_planejado > 0 else 0.0
+
+        andamento_cargas.append({
+            "data_carga": data.strftime("%d/%m/%Y"),
+            "percentual_concluido": round(percentual_concluido, 2),
+            "total_planejado": total_planejado,
+            "total_finalizado": total_finalizado
+        })
+
+    return JsonResponse({"andamento_cargas": andamento_cargas})

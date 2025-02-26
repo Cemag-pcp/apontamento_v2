@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Gerenciamento de Processo</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+
+{% endblock %}
+
+{% block content %}
+<div>
+
+    <!-- Título Principal -->
+    <div class="text-center mb-5">
+        <h1 class="display-5">Apontamento de Pintura</h1>
+        <p class="text-muted">Gerencie e acompanhe os processos de pintura.</p>
+    </div>
+
+    <!-- Container para Andamento da carga do dia escolhido no filtro -->
+    <div class="mb-5">
+        <div class="row gx-4">
+            <!-- Coluna 1: Status para andamneto da carga do dia escolhido no filtro -->
+            <div class="col-md-6">
+                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
+                    Andamento carga
+                    <button class="btn btn-sm" id="refresh-status-carga">🔄</button>
+                </h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="text-center mb-3">
+                        <div id="percentual-carga" class="display-4 text-primary">Escolha uma data</div>
+                        <p class="text-muted">Concluído</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Coluna 2: Status de cargas 5 dias -->
+            <div class="col-md-6">
+                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
+                    Andamento das últimas 5 cargas
+                    <button class="btn btn-sm" id="refresh-pecas">
+                        🔄
+                    </button>
+                </h4>
+                <div class="border rounded p-3 bg-light" style="height: auto; max-height: 400px; overflow-y: auto;">
+                    <ul class="list-group" id="ultimas-pecas-list"></ul>
+                </div>
+            </div>
+    
+        </div>
+    </div>
+
+    <div id="containerPlanejar" class="mb-5">
+        <!-- Painel de Ordens Criadas -->
+        <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
+    
+        <!-- Formulário de Filtro -->
+        <form id="filtro-form" class="mb-3 p-3 border rounded bg-light">
+            <div class="row g-3 align-items-center">
+                <!-- Filtro por Data -->
+                <div class="col-md-4">
+                    <label for="filtro-data-carga" class="form-label"><strong>Data da Carga</strong></label>
+                    <input type="date" id="filtro-data-carga" class="form-control">
+                </div>
+    
+                <!-- Filtro por setor de produção -->
+                <div class="col-md-4">
+                    <label for="filtro-setor" class="form-label"><strong>Setor</strong></label>
+                    <select class="form-select" name="filtro-setor" id="filtro-setor" disabled>
+                        <option value="" selected>Escolha um setor...</option>
+                    </select>
+                </div>
+    
+                <!-- Botão de Filtrar -->
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </div>
+        </form>
+    
+        <!-- Tabela de Ordens Criadas -->
+        <div class="border rounded p-4 bg-white shadow-sm">
+            <div class="table-responsive">
+                <div id="ordens-container" style="max-height: 650px; min-height: 250px; overflow-y: auto; overflow-x: auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container para Acompanhamento -->
+    <div class="mb-5">
+        <div class="row gy-4">
+            <div class="col-md-6">
+                <h4 class="text-center text-secondary">Processos em Andamento</h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="row row-cols-2 g-3 containerProcesso">
+                        <!-- Os cards são adicionados aqui dinamicamente -->
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h4 class="text-center text-secondary">Processos Interrompidos</h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="row row-cols-2 g-3 containerInterrompido">
+                        <!-- Os cards são adicionados aqui dinamicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal de Confirmação para iniciar -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalLabel">Confirmar Início da Ordem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                Deseja iniciar a ordem?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmStartButton">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação para retornar -->
+<div class="modal fade" id="confirmRetornoModal" tabindex="-1" aria-labelledby="confirmRetornoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmRetornoModalLabel">Confirmar retorno da ordem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                Deseja retornar a ordem?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmRetornoButton">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Finalização de Ordem -->
+<div class="modal fade" id="finalizarModal" tabindex="-1" aria-labelledby="finalizarModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="finalizarModalLabel">Finalizar Ordem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="finalizarForm">
+                <input type="hidden" id="ordemIdFinalizar">
+                <div class="mb-3">
+                    <label for="operadorFinal" class="form-label">Operador</label>
+                    <select id="operadorFinal" class="form-select" required>
+                    <option value="">Selecione um operador</option>
+                    <!-- Operadores serão carregados dinamicamente -->
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="qtRealizada" class="form-label">Quantidade Realizada</label>
+                    <input type="number" class="form-control" id="qtRealizada" required>
+                </div>
+                <div class="mb-3">
+                    <label for="obsFinalizar" class="form-label">Observação</label>
+                    <textarea class="form-control" id="obsFinalizar" rows="3"></textarea>
+                </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="confirmFinalizar">Finalizar Ordem</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal interromper ordem -->
+<div class="modal fade" id="modalInterromper" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInterromperLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalInterromperLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="escolhaMotivo" class="form-label">Qual motivo?</label>
+                    <select class="form-control" id="motivoInterrupcao" name="motivoInterrupcao" required>
+                        <option value="">------</option>
+                    </select>
+                </div>
+
+                <!-- Footer do Formulário -->
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Cancelar</button>
+                    <button class="btn btn-primary btn-interromper" id="confirmInterromper">Interromper</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/ordem-criada-montagem.js' %}"></script>
+{% endblock %}
+

@@ -20,6 +20,38 @@
         <p class="text-muted">Gerencie e acompanhe os processos de pintura.</p>
     </div>
 
+    <!-- Container para Andamento da carga do dia escolhido no filtro -->
+    <div class="mb-5">
+        <div class="row gx-4">
+            <!-- Coluna 1: Status para andamneto da carga do dia escolhido no filtro -->
+            <div class="col-md-6">
+                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
+                    Andamento carga
+                    <button class="btn btn-sm" id="refresh-status-carga">🔄</button>
+                </h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="text-center mb-3">
+                        <div id="percentual-carga" class="display-4 text-primary">Escolha uma data</div>
+                        <p class="text-muted">Concluído</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Coluna 2: Status de cargas 5 dias -->
+            <div class="col-md-6">
+                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
+                    Andamento das últimas 5 cargas
+                    <button class="btn btn-sm" id="refresh-pecas">
+                        🔄
+                    </button>
+                </h4>
+                <div class="border rounded p-3 bg-light" style="height: auto; max-height: 400px; overflow-y: auto;">
+                    <ul class="list-group" id="ultimas-pecas-list"></ul>
+                </div>
+            </div>
+    
+        </div>
+    </div>
+
     <div id="containerPlanejar" class="mb-5">
         <!-- Painel de Ordens Criadas -->
         <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
@@ -92,18 +124,24 @@
             
                 <!-- Linha com os dois selects lado a lado -->
                 <div class="row mb-3">
-                    <div class="col-sm-6">
+                    <div class="col-sm-4">
                         <label for="cambaoSelecionado" class="form-label">Selecionar Cambão:</label>
                         <select id="cambaoSelecionado" class="form-select">
-                            <option value="">Carregando cambões disponíveis...</option>
+                            <option value="" disabled selected>Carregando cambões disponíveis...</option>
                         </select>
                     </div>
-                    <div class="col-sm-6">
+                    <div class="col-sm-4">
                         <label for="tipoPintura" class="form-label">Tipo:</label>
                         <select id="tipoPintura" class="form-select">
-                            <option value="">Escolha</option>
+                            <option value="" disabled selected>Escolha</option>
                             <option value="PÓ">PÓ</option>
                             <option value="PU">PU</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-4">
+                        <label for="operadorInicial" class="form-label">Operador:</label>
+                        <select id="operadorInicial" class="form-select">
+                            <option value="" disabled selected>Selecione um operador...</option>
                         </select>
                     </div>
                 </div>

@@ -14,6 +14,8 @@ urlpatterns = [
     path('api/cambao-processo/', views.cambao_em_processo, name='cambao_em_processo'),
     path('api/listar-operadores/', views.listar_operadores, name='listar_operadores'),
     path('api/cores-carga/', views.listar_cores_carga, name='listar_cores_carga'),
+    path('api/andamento-carga/', views.percentual_concluido_carga, name='percentual_concluido_carga'),
+    path('api/andamento-ultimas-cargas/', views.andamento_ultimas_cargas, name='andamento_ultimas_cargas'),
 
 ]
 

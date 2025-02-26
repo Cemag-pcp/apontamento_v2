@@ -41,7 +41,7 @@ def planejamento(request):
 def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:
         # Busca a ordem com os relacionamentos necessários
-        ordem = Ordem.objects.prefetch_related('ordem_pecas_prod_especiais').get(ordem=pk_ordem, grupo_maquina=name_maquina)
+        ordem = Ordem.objects.prefetch_related('ordem_pecas_prod_especiais').get(pk=pk_ordem, grupo_maquina=name_maquina)
 
         # Obtém a peça relacionada
         peca_ordem = ordem.ordem_pecas_prod_especiais.first()  # Obtém a primeira peça (ou única)

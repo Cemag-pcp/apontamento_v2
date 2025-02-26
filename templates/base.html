@@ -67,9 +67,14 @@
                                 Início
                                 <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
                             </a>
-                            <div class="collapse" id="collapseHome" aria-labelledby="headingVersao" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseHome" aria-labelledby="headingInicio" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:versao' %}">Versões</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseHome" aria-labelledby="headingInicio" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="#">Gerir cargas</a>
                                 </nav>
                             </div>
 
@@ -142,6 +147,28 @@
                             <div class="collapse" id="collapseEstamparia" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'estamparia:historico' %}">Histórico</a>
+                                </nav>
+                            </div>
+
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapsePintura" aria-expanded="false" aria-controls="collapsePintura">
+                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
+                                Pintura
+                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            </a>
+                            <div class="collapse" id="collapsePintura" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'pintura:planejamento' %}">Ordens</a>
+                                </nav>
+                            </div>
+
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseMontagem" aria-expanded="false" aria-controls="collapseMontagem">
+                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
+                                Montagem
+                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            </a>
+                            <div class="collapse" id="collapseMontagem" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'montagem:planejamento' %}">Ordens</a>
                                 </nav>
                             </div>
 

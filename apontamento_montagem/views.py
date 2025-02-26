@@ -1,12 +1,15 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
-from django.db.models import Sum
-from django.db import transaction
+from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg
+from django.db import transaction, models
 from django.shortcuts import get_object_or_404
+from django.db.models.functions import Coalesce
 
 import json
 from datetime import datetime
+
+from django.shortcuts import render
 
 from .models import PecasOrdem
 from core.models import Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada
@@ -31,17 +34,17 @@ def criar_ordem(request):
             data = json.loads(request.body)
 
             # Capturar dados da ordem
-            grupo_maquina = data.get('grupo_maquina', 'montagem')  # Define 'pintura' como padrão
+            grupo_maquina = data.get('grupo_maquina', 'montagem')  # Define 'montagem' como padrão
             obs = data.get('obs', '')
             nome_peca = data.get('peca_nome')
             qtd_planejada = data.get('qtd_planejada', 0)
             data_carga = data.get('data_carga', now())
-            setor_conjunto = data.get('setor_conjunto')
+            maquina_name = data.get('setor_conjunto')
 
             if not nome_peca:
                 return JsonResponse({'error': 'Nome da peça é obrigatório!'}, status=400)
 
-            if not setor_conjunto:
+            if not maquina_name:
                 return JsonResponse({'error': 'Setor de conjunto é obrigatório!'}, status=400)
 
             with transaction.atomic():
@@ -52,7 +55,7 @@ def criar_ordem(request):
                     obs=obs,
                     data_criacao=now(),
                     data_carga=datetime.strptime(data_carga, "%Y-%m-%d").date(),
-                    maquina=get_object_or_404(Maquina, nome=setor_conjunto)
+                    maquina=get_object_or_404(Maquina, nome=maquina_name),
                 )
 
                 # Criar a única peça associada à ordem
@@ -114,7 +117,6 @@ def atualizar_status_ordem(request):
         ordem_id = body.get('ordem_id')
         grupo_maquina = 'montagem'
         qt_produzida = body.get('qt_realizada', 0)
-        qt_mortas = body.get('qt_mortas', 0)
 
         if not ordem_id or not grupo_maquina or not status:
             return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
@@ -126,6 +128,9 @@ def atualizar_status_ordem(request):
         if ordem.status_atual == status:
             return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
 
+        if status == 'retorno' and ordem.status_atual == 'iniciada':
+            return JsonResponse({'error': f'Essa ordem já está iniciada. Atualize a página.'}, status=400)
+
         with transaction.atomic():  # Entra na transação somente após garantir que todos os objetos existem
 
             # Finaliza o processo atual (se existir)
@@ -136,14 +141,17 @@ def atualizar_status_ordem(request):
             # Cria o novo processo
             novo_processo = OrdemProcesso.objects.create(
                 ordem=ordem,
-                status=status,
+                status='iniciada' if status == 'retorno' else status,
                 data_inicio=now(),
                 data_fim=now() if status in ['finalizada'] else None,
             )
 
             if status == 'iniciada':
-                # Finaliza a parada da máquina se necessário
-                
+
+                # Validações básicas
+                if ordem.status_atual == 'interrompida':
+                    return JsonResponse({'error': f'Essa ordem está interrompida, retorne ela.'}, status=400)
+
                 maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
                 for parada in maquinas_paradas:
                     parada.data_fim = now()
@@ -153,6 +161,18 @@ def atualizar_status_ordem(request):
 
                 # Atualiza o status da ordem
                 ordem.status_atual = status
+
+            elif status == 'retorno':
+                
+                maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
+                for parada in maquinas_paradas:
+                    parada.data_fim = now()
+                    parada.save()
+
+                ordem.status_prioridade = 1
+
+                # Atualiza o status da ordem
+                ordem.status_atual = 'iniciada'
 
             elif status == 'finalizada':
                 operador_final = get_object_or_404(Operador, pk=int(body.get('operador_final')))
@@ -180,7 +200,6 @@ def atualizar_status_ordem(request):
                     peca=peca.peca,
                     qtd_planejada=peca.qtd_planejada,
                     qtd_boa=int(qt_produzida),
-                    qtd_morta=int(qt_mortas),
                     operador=operador_final,
                     processo_ordem=novo_processo
                 )
@@ -219,3 +238,276 @@ def atualizar_status_ordem(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
+def ordens_criadas(request):
+    """
+    View que agrega os dados de PecasOrdem (por ordem) e junta com a model Ordem,
+    trazendo algumas colunas da Ordem e calculando o saldo:
+        saldo = soma(qtd_planejada) - soma(qtd_boa)
+    
+    Parâmetros esperados na URL (via GET):
+      - data_carga: data da carga (default: hoje)
+      - maquina: nome da máquina (opcional)
+      - status: status da ordem (opcional)
+    """
+    data_carga = request.GET.get('data_carga')
+    maquina_param = request.GET.get('maquina', '')
+    status_param = request.GET.get('status', '')
+
+    if data_carga == '':
+        data_carga = now().date()
+
+    # Monta os filtros para a model Ordem
+    filtros_ordem = {
+        'data_carga': data_carga,
+        'grupo_maquina': 'montagem'
+    }
+    if maquina_param:
+        maquina = get_object_or_404(Maquina, nome=maquina_param)
+        filtros_ordem['maquina'] = maquina
+    if status_param:
+        filtros_ordem['status_atual'] = status_param
+
+    # Recupera os IDs das ordens que atendem aos filtros
+    ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
+
+    # Consulta na PecasOrdem filtrando pelas ordens identificadas,
+    # trazendo alguns campos da Ordem (usando a notação "ordem__<campo>"),
+    # e agrupando para calcular as somas e o saldo.
+    pecas_ordem_agg = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).values(
+        'ordem',                    # id da ordem (chave para o agrupamento)
+        'ordem__data_carga',        # data da carga da ordem
+        'ordem__data_programacao',  # data da programação da ordem
+        'ordem__maquina__nome',     # nome da máquina (ajuste se necessário)
+        'ordem__status_atual',      # status atual da ordem
+        'peca',                     # nome da peça
+    ).annotate(
+        total_planejada=Coalesce(
+            Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
+        ),
+        total_boa=Coalesce(
+            Sum('qtd_boa'), Value(0.0, output_field=FloatField())
+        )
+    ).annotate(
+        restante=ExpressionWrapper(
+            F('total_planejada') - F('total_boa'), output_field=FloatField()
+        )
+    )
+
+    return JsonResponse({"ordens": list(pecas_ordem_agg)})
+
+def verificar_qt_restante(request):
+
+    ordem_id = request.GET.get('ordem_id')
+
+    ordem_ids = Ordem.objects.filter(pk=ordem_id).values_list('id', flat=True)
+
+    # Consulta na PecasOrdem filtrando pelas ordens identificadas,
+    # trazendo alguns campos da Ordem (usando a notação "ordem__<campo>"),
+    # e agrupando para calcular as somas e o saldo.
+    pecas_ordem_agg = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).values(
+        'ordem',                    # id da ordem (chave para o agrupamento)
+        'ordem__data_carga',        # data da carga da ordem
+        'ordem__data_programacao',  # data da programação da ordem
+        'ordem__maquina__nome',     # nome da máquina (ajuste se necessário)
+        'ordem__status_atual',      # status atual da ordem
+        'peca',                     # nome da peça
+    ).annotate(
+        total_planejada=Coalesce(
+            Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
+        ),
+        total_boa=Coalesce(
+            Sum('qtd_boa'), Value(0.0, output_field=FloatField())
+        )
+    ).annotate(
+        restante=ExpressionWrapper(
+            F('total_planejada') - F('total_boa'), output_field=FloatField()
+        )
+    )
+
+    return JsonResponse({"ordens": list(pecas_ordem_agg)})
+
+def ordens_iniciadas(request):
+    """
+    Retorna todas as ordens que estão com status "iniciada" e que ainda não foram finalizadas,
+    trazendo informações da ordem, peças relacionadas (sem repetição), soma das quantidades planejadas/boas e processos em andamento.
+    """
+    # Filtra ordens com status 'iniciada' e grupo de máquina 'montagem'
+    ordens_filtradas = Ordem.objects.filter(
+        status_atual='iniciada',
+        grupo_maquina='montagem'
+    ).prefetch_related('ordem_pecas_montagem', 'processos')
+
+    resultado = []
+
+    for ordem in ordens_filtradas:
+        # Filtra apenas os processos que ainda não foram finalizados (data_fim nula)
+        processos_ativos = ordem.processos.filter(data_fim__isnull=True)
+
+        # Obtém apenas os nomes das peças, eliminando duplicatas
+        pecas_unicas = sorted(set(peca.peca for peca in ordem.ordem_pecas_montagem.all()))
+
+        # Calcula a soma total de qtd_planejada e qtd_boa para esta ordem
+        agregacoes = ordem.ordem_pecas_montagem.aggregate(
+            total_planejada=Avg('qtd_planejada', default=0.0),
+            total_boa=Sum('qtd_boa', default=0.0)
+        )
+
+        resultado.append({
+            "ordem_id": ordem.id,
+            "ordem_numero": ordem.ordem,
+            "data_carga": ordem.data_carga,
+            "data_programacao": ordem.data_programacao,
+            "grupo_maquina": ordem.grupo_maquina,
+            "maquina": ordem.maquina.nome if ordem.maquina else None,
+            "status_atual": ordem.status_atual,
+            "ultima_atualizacao": ordem.ultima_atualizacao,
+            "pecas": pecas_unicas,  # Lista apenas os nomes das peças (sem repetições)
+            "qtd_restante": agregacoes['total_planejada'] - agregacoes['total_boa'],  # Soma total de qtd_planejada
+            "processos": [
+                {
+                    "processo_id": processo.id,
+                    "status": processo.status,
+                    "data_inicio": processo.data_inicio,
+                    "data_fim": processo.data_fim,
+                    "motivo_interrupcao": processo.motivo_interrupcao.nome if processo.motivo_interrupcao else None,
+                    "maquina": processo.maquina.nome if processo.maquina else None
+                }
+                for processo in processos_ativos
+            ]
+        })
+
+    return JsonResponse({"ordens": resultado}, safe=False)
+
+def ordens_interrompidas(request):
+    """
+    Retorna todas as ordens que estão com status "interrompida" e que ainda não foram finalizadas,
+    trazendo informações da ordem, peças relacionadas (sem repetição), soma das quantidades planejadas/boas e processos em andamento.
+    """
+    # Filtra ordens com status 'iniciada' e grupo de máquina 'montagem'
+    ordens_filtradas = Ordem.objects.filter(
+        status_atual='interrompida',
+        grupo_maquina='montagem'
+    ).prefetch_related('ordem_pecas_montagem', 'processos')
+
+    resultado = []
+
+    for ordem in ordens_filtradas:
+        # Filtra apenas os processos que ainda não foram finalizados (data_fim nula)
+        processos_ativos = ordem.processos.filter(data_fim__isnull=True)
+
+        # Obtém apenas os nomes das peças, eliminando duplicatas
+        pecas_unicas = sorted(set(peca.peca for peca in ordem.ordem_pecas_montagem.all()))
+
+        # Calcula a soma total de qtd_planejada e qtd_boa para esta ordem
+        agregacoes = ordem.ordem_pecas_montagem.aggregate(
+            total_planejada=Avg('qtd_planejada', default=0.0),
+            total_boa=Sum('qtd_boa', default=0.0)
+        )
+
+        resultado.append({
+            "ordem_id": ordem.id,
+            "ordem_numero": ordem.ordem,
+            "data_carga": ordem.data_carga,
+            "data_programacao": ordem.data_programacao,
+            "grupo_maquina": ordem.grupo_maquina,
+            "maquina": ordem.maquina.nome if ordem.maquina else None,
+            "status_atual": ordem.status_atual,
+            "ultima_atualizacao": ordem.ultima_atualizacao,
+            "pecas": pecas_unicas,  # Lista apenas os nomes das peças (sem repetições)
+            "qtd_restante": agregacoes['total_planejada'] - agregacoes['total_boa'],  # Soma total de qtd_planejada
+            "processos": [
+                {
+                    "processo_id": processo.id,
+                    "status": processo.status,
+                    "data_inicio": processo.data_inicio,
+                    "data_fim": processo.data_fim,
+                    "motivo_interrupcao": processo.motivo_interrupcao.nome if processo.motivo_interrupcao else None,
+                    "maquina": processo.maquina.nome if processo.maquina else None
+                }
+                for processo in processos_ativos
+            ]
+        })
+
+    return JsonResponse({"ordens": resultado}, safe=False)
+
+def listar_operadores(request):
+
+    operadores = Operador.objects.filter(setor__nome='montagem')
+
+    return JsonResponse({"operadores": list(operadores.values())})
+
+def percentual_concluido_carga(request):
+    data_carga = request.GET.get('data_carga', now().date())  # Garantindo que seja apenas a data
+
+    # Soma correta da quantidade planejada por peça e ordem (evitando duplicação)
+    total_planejado = PecasOrdem.objects.filter(
+        ordem__data_carga=data_carga,
+        ordem__grupo_maquina='montagem'
+    ).values('ordem', 'peca').distinct().aggregate(
+        total_planejado=Coalesce(Sum('qtd_planejada', output_field=FloatField()), Value(0.0))
+    )["total_planejado"]
+
+    # Soma total da quantidade boa produzida
+    total_finalizado = PecasOrdem.objects.filter(
+        ordem__data_carga=data_carga,
+        ordem__grupo_maquina='montagem'
+    ).aggregate(
+        total_finalizado=Coalesce(Sum('qtd_boa', output_field=FloatField()), Value(0.0))
+    )["total_finalizado"]
+
+    # Evitar divisão por zero
+    percentual_concluido = (total_finalizado / total_planejado * 100) if total_planejado > 0 else 0.0
+
+    return JsonResponse({
+        "percentual_concluido": round(percentual_concluido, 2),  # Arredonda para 2 casas decimais
+        "total_planejado": total_planejado,
+        "total_finalizado": total_finalizado
+    })
+
+def andamento_ultimas_cargas(request):
+    # Obtém as últimas 5 datas de carga disponíveis para pintura
+    ultimas_cargas = Ordem.objects.filter(grupo_maquina='montagem')\
+        .order_by('-data_carga')\
+        .values_list('data_carga', flat=True)\
+        .distinct()[:5]
+
+    andamento_cargas = []
+    
+    for data in ultimas_cargas:
+        # Soma correta da quantidade planejada (evitando duplicações)
+        total_planejado = PecasOrdem.objects.filter(
+            ordem__data_carga=data,
+            ordem__grupo_maquina='montagem'
+        ).values('ordem', 'peca').distinct().aggregate(
+            total_planejado=Coalesce(Sum('qtd_planejada', output_field=models.FloatField()), Value(0.0))
+        )["total_planejado"]
+
+        # Soma total da quantidade boa produzida
+        total_finalizado = PecasOrdem.objects.filter(
+            ordem__data_carga=data,
+            ordem__grupo_maquina='montagem'
+        ).aggregate(
+            total_finalizado=Coalesce(Sum('qtd_boa', output_field=models.FloatField()), Value(0.0))
+        )["total_finalizado"]
+
+        # Evita divisão por zero e calcula o percentual corretamente
+        percentual_concluido = (total_finalizado / total_planejado * 100) if total_planejado > 0 else 0.0
+
+        andamento_cargas.append({
+            "data_carga": data.strftime("%d/%m/%Y"),
+            "percentual_concluido": round(percentual_concluido, 2),
+            "total_planejado": total_planejado,
+            "total_finalizado": total_finalizado
+        })
+
+    return JsonResponse({"andamento_cargas": andamento_cargas})
+
+def listar_motivos_interrupcao(request):
+
+    motivos = MotivoInterrupcao.objects.filter(setor__nome='montagem', visivel=True)
+
+    return JsonResponse({"motivos": list(motivos.values())})
+
+def planejamento(request):
+
+    return render(request, 'apontamento_montagem/planejamento.html')

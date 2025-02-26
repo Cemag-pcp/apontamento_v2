@@ -118,3 +118,4 @@ class ConjuntoCarreta(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['conjunto', 'carreta'], name='unique_conjunto_carreta')
         ]
+

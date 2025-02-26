@@ -24,7 +24,7 @@ export const loadOrdens = (container, filtros = {}) => {
                                 <th style="width: 5%; text-align: center;">
                                     <input type="checkbox" id="select-all">
                                 </th>
-                                <th style="width: 10%;">Ordem</th>
+                                <th style="width: 10%;">Ch. Peça</th>
                                 <th style="width: 15%;">Código Peça</th>
                                 <th style="width: 15%;">Data Programação</th>
                                 <th style="width: 10%;">Cor</th>
@@ -1540,7 +1540,7 @@ async function abrirModalCambao() {
 
     // Buscar cambões disponíveis da API
     try {
-        const response = await fetch("http://127.0.0.1:8084/pintura/api/cambao-livre/");
+        const response = await fetch("api/cambao-livre/");
         const data = await response.json();
 
         if (data.cambao_livres.length > 0) {
@@ -1600,6 +1600,32 @@ async function abrirModalCambao() {
         cor: corSelecionada
     });
 
+    const operadorSelect = document.getElementById('operadorInicial');
+
+    fetch("api/listar-operadores/")
+    .then(response => {
+        if (!response.ok) {
+            throw new Error("Erro ao buscar operadores");
+        }
+        return response.json();
+    })
+    .then(data => {
+        operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`;
+        
+        if (data.operadores.length === 0) {
+            operadorSelect.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
+        } else {
+            data.operadores.forEach(operador => {
+                operadorSelect.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+            });
+            operadorSelect.disabled = false; // Habilita o select após carregar os dados
+        }
+    })
+    .catch(error => {
+        console.error("Erro ao carregar operadores:", error);
+        operadorSelect.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
+    });
+
     let modal = new bootstrap.Modal(document.getElementById("modalCriarCambao"));
     modal.show();
 }
@@ -1630,11 +1656,15 @@ function iniciarContador(cambaoId, dataCriacao) {
 document.getElementById("confirmarCriacaoCambao").addEventListener("click", () => {
 
     const botaoConfirmar = document.getElementById("confirmarCriacaoCambao");
+    
     const selectCambao = document.getElementById("cambaoSelecionado");
     const selectTipo = document.getElementById("tipoPintura");
-    const dadosCambao = JSON.parse(botaoConfirmar.dataset.cambaoData);
+    const selectOperador = document.getElementById("operadorInicial");
     const cambaoId = selectCambao.value;
     const tipoId = selectTipo.value;
+    const operadorId = selectOperador.value;
+    
+    const dadosCambao = JSON.parse(botaoConfirmar.dataset.cambaoData);
     let modal = document.getElementById("modalCriarCambao");
     
     if (!cambaoId) {
@@ -1658,11 +1688,23 @@ document.getElementById("confirmarCriacaoCambao").addEventListener("click", () =
             allowOutsideClick: false
         });
         return;
+    } else if (!operadorId) {
+        console.log("Alerta: Operador não selecionado!");
+        Swal.fire({
+            icon: "warning",
+            title: "Seleção obrigatória",
+            text: "Por favor, selecione um operador antes de continuar.",
+            confirmButtonText: "OK",
+            allowOutsideClick: false
+        });
+        return;
     }
+
 
     // Adiciona o cambão selecionado ao payload
     dadosCambao.cambao_id = parseInt(cambaoId);
     dadosCambao.tipo = tipoId;
+    dadosCambao.operador = operadorId;
 
     Swal.fire({
         title: 'Carregando...',
@@ -1892,7 +1934,7 @@ function finalizarCambao() {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+            // "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
         },
         body: JSON.stringify({ cambao_id: cambaoId, operador: operadorId })
     })
@@ -1977,12 +2019,95 @@ function coresCarga() {
     });
 }
 
+function atualizarAndamentoCarga(dataCarga) {
+    fetch(`api/andamento-carga/?data_carga=${encodeURIComponent(dataCarga)}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Erro ao buscar andamento da carga.");
+            }
+            return response.json();
+        })
+        .then(data => {
+            const percentual = data.percentual_concluido || 0; // Se não houver dado, assume 0%
+            const percentualDisplay = document.getElementById("percentual-carga");
+
+            // Adiciona efeito de transição suave ao atualizar o valor
+            percentualDisplay.style.transition = "0.5s ease-in-out";
+            percentualDisplay.textContent = `${percentual.toFixed(1)}%`; // Exibe 1 casa decimal
+        })
+        .catch(error => console.error("Erro no carregamento do andamento da carga:", error));
+}
+
+// Evento de mudança no select para atualizar automaticamente
+document.getElementById("filtro-data-carga").addEventListener("change", function () {
+    atualizarAndamentoCarga(this.value);
+});
+
+// Evento no botão 🔄 para atualização manual
+document.getElementById("refresh-status-carga").addEventListener("click", function () {
+    const dataCarga = document.getElementById("filtro-data-carga").value;
+    if (dataCarga) {
+        atualizarAndamentoCarga(dataCarga);
+    }
+})
+
+function atualizarUltimasCargas() {
+    fetch("api/andamento-ultimas-cargas/")
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Erro ao buscar andamento das últimas cargas.");
+            }
+            return response.json();
+        })
+        .then(data => {
+            const listaCargas = document.getElementById("ultimas-pecas-list");
+            listaCargas.innerHTML = ""; // Limpa antes de adicionar os novos
+
+            if (data.andamento_cargas.length === 0) {
+                listaCargas.innerHTML = `<li class="list-group-item text-muted text-center">Nenhuma carga recente.</li>`;
+                return;
+            }
+
+            data.andamento_cargas.forEach(carga => {
+                const li = document.createElement("li");
+                li.classList.add("list-group-item", "d-flex", "justify-content-between", "align-items-center");
+
+                // Criação de uma barra de progresso
+                li.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span>${carga.data_carga}</span>
+                    <div class="progress w-50 position-relative">
+                        <div class="progress-bar ${carga.percentual_concluido === 100 ? 'bg-success' : 'bg-warning'}" 
+                            role="progressbar" 
+                            style="width: ${carga.percentual_concluido}%;"
+                            aria-valuenow="${carga.percentual_concluido}" 
+                            aria-valuemin="0" 
+                            aria-valuemax="100">
+                        </div>
+                        <span class="position-absolute w-100 text-center fw-bold"
+                            style="top: 50%; transform: translateY(-50%); color: black;">
+                            ${carga.percentual_concluido}%
+                        </span>
+                    </div>
+                </div>
+                `;
+
+                listaCargas.appendChild(li);
+            });
+        })
+        .catch(error => console.error("Erro ao carregar andamento das últimas cargas:", error));
+}
+
+// Evento no botão 🔄 para atualização manual
+document.getElementById("refresh-pecas").addEventListener("click", atualizarUltimasCargas);
+
 // Chama a função ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
     resetarCardsInicial();
     cambaoProcesso();
     filtro();
     coresCarga();
+    atualizarUltimasCargas();
     
     const botaoCriarCambao = document.getElementById("btn-criar-cambao");
     
