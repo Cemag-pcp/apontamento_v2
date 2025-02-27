@@ -32,5 +32,6 @@ urlpatterns = [
     path('estamparia/', include('apontamento_estamparia.urls')),
     path('pintura/', include('apontamento_pintura.urls')),
     path('montagem/', include('apontamento_montagem.urls')),
+    path('inspecao/', include('inspecao.urls')),
 
 ]

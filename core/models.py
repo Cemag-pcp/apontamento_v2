@@ -210,8 +210,10 @@ class Profile(models.Model):
         ('serra', 'Serra'),
         ('usinagem', 'Usinagem'),
         ('corte','Corte'),
-        ('prod-esp', 'Prod especiais')
-        
+        ('prod-esp', 'Prod especiais'),
+        ('inspecao/estamparia', 'Inspecao Estamparia'),
+        ('inspecao/pintura', 'Inspecao Pintura'),
+        ('inspecao/montagem', 'Inspecao Montagem'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
