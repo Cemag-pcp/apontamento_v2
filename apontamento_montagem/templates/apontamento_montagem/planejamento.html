@@ -16,15 +16,43 @@
 
     <!-- Título Principal -->
     <div class="text-center mb-5">
-        <h1 class="display-5">Apontamento de Pintura</h1>
-        <p class="text-muted">Gerencie e acompanhe os processos de pintura.</p>
+        <h1 class="display-5">Apontamento de Montagem</h1>
+        <p class="text-muted">Gerencie e acompanhe os processos de montagem.</p>
     </div>
 
     <!-- Container para Andamento da carga do dia escolhido no filtro -->
     <div class="mb-5">
         <div class="row gx-4">
-            <!-- Coluna 1: Status para andamneto da carga do dia escolhido no filtro -->
-            <div class="col-md-6">
+            <!-- Coluna 1: Status de Máquina -->
+            <div class="col-md-4">
+                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
+                    Status de Máquina
+                    <button class="btn btn-sm" id="refresh-status-maquinas">
+                        🔄
+                    </button>
+                </h4>
+                <div class="border rounded p-3 bg-light">
+                    <div class="text-center mb-3">
+                        <div class="display-4 text-primary">-</div>
+                        <p class="text-muted">Máquinas em operação</p>
+                    </div>
+                    <div class="border-top pt-2">
+                        <ul class="list-group list-group-flush" id="machine-status-list" style="overflow-y:auto; max-height: 150px;">
+                            <!-- Lista de status das máquinas -->
+                        </ul>
+                    </div>
+                </div>
+                <!-- Legenda abaixo da coluna -->
+                <div class="text-center mt-3">
+                    <span class="legend">
+                        <span class="badge bg-warning rounded-circle" style="width: 15px; height: 15px; display: inline-block;"></span> Ocioso
+                        <span class="badge bg-danger rounded-circle" style="width: 15px; height: 15px; display: inline-block; margin-left: 10px;"></span> Parado
+                        <span class="badge bg-success rounded-circle" style="width: 15px; height: 15px; display: inline-block; margin-left: 10px;"></span> Em operação
+                    </span>
+                </div>
+            </div>
+            <!-- Coluna 2: Status para andamneto da carga do dia escolhido no filtro -->
+            <div class="col-md-4">
                 <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
                     Andamento carga
                     <button class="btn btn-sm" id="refresh-status-carga">🔄</button>
@@ -36,8 +64,8 @@
                     </div>
                 </div>
             </div>
-            <!-- Coluna 2: Status de cargas 5 dias -->
-            <div class="col-md-6">
+            <!-- Coluna 3: Status de cargas 5 dias -->
+            <div class="col-md-4">
                 <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
                     Andamento das últimas 5 cargas
                     <button class="btn btn-sm" id="refresh-pecas">
@@ -53,32 +81,42 @@
     </div>
 
     <div id="containerPlanejar" class="mb-5">
+
+        <div class="d-flex justify-content-end gap-3 mb-4">
+            <button type="button" class="btn btn-primary" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
+                Parada de máquina
+            </button>
+        </div>
+
         <!-- Painel de Ordens Criadas -->
         <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
     
         <!-- Formulário de Filtro -->
-        <form id="filtro-form" class="mb-3 p-3 border rounded bg-light">
-            <div class="row g-3 align-items-center">
+        <form id="filtro-form" class="mb-4 p-4 border rounded bg-light shadow-sm">
+            <div class="row g-3 align-items-end">
                 <!-- Filtro por Data -->
                 <div class="col-md-4">
                     <label for="filtro-data-carga" class="form-label"><strong>Data da Carga</strong></label>
                     <input type="date" id="filtro-data-carga" class="form-control">
                 </div>
-    
-                <!-- Filtro por setor de produção -->
-                <div class="col-md-4">
-                    <label for="filtro-setor" class="form-label"><strong>Setor</strong></label>
-                    <select class="form-select" name="filtro-setor" id="filtro-setor" disabled>
-                        <option value="" selected>Escolha um setor...</option>
-                    </select>
+
+                <!-- Filtro por Setor de Produção como botões -->
+                <div class="col-md-5">
+                    <label class="form-label"><strong>Setor</strong></label>
+                    <div id="setor-container" class="d-flex justify-content-start flex-wrap gap-2 p-2 bg-white border rounded">
+                        <p class="text-muted mb-0">Carregando setores...</p>
+                    </div>
+                    <input type="hidden" name="filtro-setor" id="filtro-setor"> <!-- Campo oculto para armazenar o valor do setor -->
                 </div>
-    
-                <!-- Botão de Filtrar -->
-                <div class="col-md-4 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+
+                <!-- Botões de Ação -->
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter"></i> Filtrar</button>
+                    <button type="button" id="limpar-filtro" class="btn btn-outline-secondary"><i class="fas fa-undo"></i> Limpar</button>
                 </div>
             </div>
         </form>
+
     
         <!-- Tabela de Ordens Criadas -->
         <div class="border rounded p-4 bg-white shadow-sm">
@@ -196,9 +234,17 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="escolhaMotivo" class="form-label">Qual motivo?</label>
+                    <label for="motivoInterrupcao" class="form-label">Qual motivo?</label>
                     <select class="form-control" id="motivoInterrupcao" name="motivoInterrupcao" required>
                         <option value="">------</option>
+                    </select>
+                </div>
+
+                <!-- Novo campo para seleção de peças -->
+                <div class="mb-3" id="selectPecasContainer" style="display: none;">
+                    <label for="pecasDisponiveis" class="form-label">Selecione a peça em falta:</label>
+                    <select class="form-control select2" id="pecasDisponiveis" name="pecasDisponiveis" style="width: 100%;">
+                        <option value="">Carregando peças...</option>
                     </select>
                 </div>
 
@@ -207,6 +253,42 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Cancelar</button>
                     <button class="btn btn-primary btn-interromper" id="confirmInterromper">Interromper</button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal parar maquina -->
+<div class="modal fade" id="modalPararMaquina" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalPararMaquinaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalPararMaquinaLabel">Parar máquina</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formPararMaquina">
+                    <div class="mb-3">
+                        <label for="escolhaMaquina" class="form-label">Qual máquina?</label>
+                        <select class="form-control" id="escolhaMaquinaParada" name="escolhaMaquinaParada" required>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="escolhaMotivo" class="form-label">Qual motivo?</label>
+                        <select class="form-control" id="motivoParadaMaquina" name="motivoParadaMaquina" required>
+                            <option value="">------</option>
+                            {% for motivo in motivos_maquina_parada %}
+                            <option value="{{motivo.nome}}">{{motivo.nome}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary" data-bs-dismiss="modal">Parar</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

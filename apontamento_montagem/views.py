@@ -12,8 +12,8 @@ from datetime import datetime
 from django.shortcuts import render
 
 from .models import PecasOrdem
-from core.models import Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada
-from cadastro.models import Operador, Maquina
+from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada
+from cadastro.models import Operador, Maquina, Pecas, Conjuntos
 
 @csrf_exempt
 def criar_ordem(request):
@@ -221,6 +221,17 @@ def atualizar_status_ordem(request):
                 novo_processo.save()
                 ordem.status_prioridade = 2
 
+                peca_falta = body.get('peca_falta')
+                maquina_id = body.get('maquina_id')
+                data_carga = body.get('data_carga')
+
+                if peca_falta:
+                    solicitacao_peca=SolicitacaoPeca.objects.create(
+                        peca=get_object_or_404(Pecas, pk=peca_falta),
+                        localizacao_solicitante=get_object_or_404(Maquina, pk=maquina_id),
+                        data_carga=datetime.strptime(data_carga, "%Y-%m-%d").date()
+                    )
+
                 # Atualiza o status da ordem
                 ordem.status_atual = status
 
@@ -250,7 +261,7 @@ def ordens_criadas(request):
       - status: status da ordem (opcional)
     """
     data_carga = request.GET.get('data_carga')
-    maquina_param = request.GET.get('maquina', '')
+    maquina_param = request.GET.get('setor', '')
     status_param = request.GET.get('status', '')
 
     if data_carga == '':
@@ -262,7 +273,7 @@ def ordens_criadas(request):
         'grupo_maquina': 'montagem'
     }
     if maquina_param:
-        maquina = get_object_or_404(Maquina, nome=maquina_param)
+        maquina = get_object_or_404(Maquina, pk=maquina_param)
         filtros_ordem['maquina'] = maquina
     if status_param:
         filtros_ordem['status_atual'] = status_param
@@ -293,7 +304,10 @@ def ordens_criadas(request):
         )
     )
 
-    return JsonResponse({"ordens": list(pecas_ordem_agg)})
+    maquinas = Ordem.objects.filter(id__in=ordem_ids).values('maquina__nome','maquina__id').distinct()
+
+    return JsonResponse({"ordens": list(pecas_ordem_agg),
+                         "maquinas":list(maquinas)})
 
 def verificar_qt_restante(request):
 
@@ -359,6 +373,7 @@ def ordens_iniciadas(request):
             "data_programacao": ordem.data_programacao,
             "grupo_maquina": ordem.grupo_maquina,
             "maquina": ordem.maquina.nome if ordem.maquina else None,
+            "maquina_id": ordem.maquina.id if ordem.maquina else None,
             "status_atual": ordem.status_atual,
             "ultima_atualizacao": ordem.ultima_atualizacao,
             "pecas": pecas_unicas,  # Lista apenas os nomes das peças (sem repetições)
@@ -510,4 +525,16 @@ def listar_motivos_interrupcao(request):
 
 def planejamento(request):
 
-    return render(request, 'apontamento_montagem/planejamento.html')
+    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='montagem').exclude(nome='Finalizada parcial')
+
+    return render(request, 'apontamento_montagem/planejamento.html', {'motivos_maquina_parada': motivos_maquina_parada})
+
+def listar_pecas_disponiveis(request):
+
+    conjunto = request.GET.get('conjunto')
+    
+    conjunto_object = get_object_or_404(Conjuntos, codigo=conjunto)
+
+    pecas_disponiveis = Pecas.objects.filter(conjunto=conjunto_object)
+
+    return JsonResponse({'pecas':list(pecas_disponiveis.values())})

@@ -5,12 +5,16 @@ export const loadOrdens = (container, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] });
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}`)
+        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&setor=${filtros.setor || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
                 container.innerHTML = ""; // Limpa antes de inserir novas ordens
-                
+
+                const filtroSetorInput = document.getElementById("filtro-setor");
+                const setorContainer = document.getElementById("setor-container");
+                setorContainer.innerHTML = ""; // Limpa os botões antes de popular
+
                 if (ordens.length > 0) {
                     // Criar cabeçalho da tabela
                     const table = document.createElement('table');
@@ -62,6 +66,38 @@ export const loadOrdens = (container, filtros = {}) => {
                     container.innerHTML = '<p class="text-danger">Nenhuma ordem encontrada.</p>';
                     resolve(data);
                 }
+
+                if (data.maquinas.length === 0) {
+                    setorContainer.innerHTML = '<p class="text-muted">Nenhuma máquina encontrada</p>';
+                    return;
+                }
+    
+                data.maquinas.forEach(maquina => {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.classList.add("btn", "btn-outline-primary", "setor-btn");
+                    button.dataset.setor = maquina.maquina__id;
+                    button.textContent = maquina.maquina__nome;
+    
+                    // Evento de clique para selecionar o setor
+                    button.addEventListener("click", function () {
+                        // Remover seleção de outros botões
+                        document.querySelectorAll(".setor-btn").forEach(btn => {
+                            btn.classList.remove("btn-primary");
+                            btn.classList.add("btn-outline-primary");
+                        });
+    
+                        // Adicionar a seleção ao botão clicado
+                        this.classList.remove("btn-outline-primary");
+                        this.classList.add("btn-primary");
+    
+                        // Definir valor do setor no campo oculto
+                        filtroSetorInput.value = this.dataset.setor;
+                    });
+    
+                    setorContainer.appendChild(button);
+                });
+
             })
             .catch(error => {
                 console.error('Erro ao buscar ordens:', error);
@@ -269,7 +305,7 @@ export function carregarOrdensIniciadas(filtros = {}) {
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
                     buttonInterromper.addEventListener('click', () => {
-                        mostrarModalInterromper(ordem.ordem_id);
+                        mostrarModalInterromper(ordem.ordem_id, ordem.pecas, ordem.maquina_id, ordem.data_carga);
                     });
                 }
 
@@ -374,66 +410,114 @@ export function carregarOrdensInterrompidas(filtros = {}) {
 
 };
 
-function getCSRFToken() {
-    return document.querySelector('[name=csrfmiddlewaretoken]').value;
-}
-
 // Modal para "Interromper"
-function mostrarModalInterromper(ordemId) {
+function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) {
     const modal = new bootstrap.Modal(document.getElementById('modalInterromper'));
     const modalTitle = document.getElementById('modalInterromperLabel');
-    const motivoInterrupcaoSelect = document.getElementById('motivoInterrupcao');
-    const confirmInterromperButton = document.getElementById('confirmInterromper');
+    const motivoInterrupcaoSelect = $('#motivoInterrupcao'); // AGORA É JQUERY
+    const pecasDisponiveisSelect = $('#pecasDisponiveis'); // Usando jQuery para Select2
+    const selectPecasContainer = $('#selectPecasContainer');
+    const confirmInterromperButton = $('#confirmInterromper');
 
     // Define o título do modal
     modalTitle.innerHTML = `Interromper Ordem ${ordemId}`;
     modal.show();
 
     // Limpa e desativa o select antes de carregar os dados
-    motivoInterrupcaoSelect.innerHTML = `<option value="" disabled selected>Carregando...</option>`;
-    motivoInterrupcaoSelect.disabled = true;
+    motivoInterrupcaoSelect.html(`<option value="" disabled selected>Carregando...</option>`).prop('disabled', true);
+    selectPecasContainer.hide(); // Esconde o select de peças por padrão
 
     // Buscar motivos de interrupção
     fetch("api/listar-motivos-interrupcao/")
-    .then(response => {
-        if (!response.ok) {
-            throw new Error("Erro ao buscar motivos de interrupção");
-        }
-        return response.json();
-    })
-    .then(data => {
-        motivoInterrupcaoSelect.innerHTML = `<option value="" disabled selected>Selecione um motivo...</option>`;
+        .then(response => response.json())
+        .then(data => {
+            motivoInterrupcaoSelect.html(`<option value="" disabled selected>Selecione um motivo...</option>`);
 
-        if (data.motivos.length === 0) {
-            motivoInterrupcaoSelect.innerHTML = `<option value="" disabled>Nenhum motivo encontrado</option>`;
+            if (data.motivos.length === 0) {
+                motivoInterrupcaoSelect.append(`<option value="" disabled>Nenhum motivo encontrado</option>`);
+            } else {
+                data.motivos.forEach(motivo => {
+                    motivoInterrupcaoSelect.append(`<option value="${motivo.id}">${motivo.nome}</option>`);
+                });
+                motivoInterrupcaoSelect.prop('disabled', false); // Habilita o select após carregar os dados
+            }
+        })
+        .catch(error => {
+            console.error("Erro ao carregar motivos:", error);
+            motivoInterrupcaoSelect.html(`<option value="" disabled>Erro ao carregar</option>`);
+        });
+
+    // **Correção: Remover eventos duplicados antes de adicionar**
+    motivoInterrupcaoSelect.off("change").on("change", function () {
+        const motivoSelecionado = motivoInterrupcaoSelect.find(":selected").text();
+
+        if (motivoSelecionado === "Falta de peça") {
+            selectPecasContainer.show(); // Exibe o campo de peças
+            carregarPecasDisponiveis(codigoConjunto); // Chama apenas uma vez
         } else {
-            data.motivos.forEach(motivo => {
-                const option = document.createElement("option");
-                option.value = motivo.id; // Garante que o valor é numérico
-                option.textContent = motivo.nome;
-                motivoInterrupcaoSelect.appendChild(option);
-            });
-            motivoInterrupcaoSelect.disabled = false; // Habilita o select após carregar os dados
+            selectPecasContainer.hide();
+            pecasDisponiveisSelect.empty(); // Limpa as opções anteriores
         }
-    })
-    .catch(error => {
-        console.error("Erro ao carregar motivos:", error);
-        motivoInterrupcaoSelect.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
     });
 
-    // Remover event listener antigo antes de adicionar um novo (evita múltiplas chamadas)
-    confirmInterromperButton.replaceWith(confirmInterromperButton.cloneNode(true));
-    document.getElementById('confirmInterromper').addEventListener('click', () => finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, modal));
+    // **Correção: Remover evento antigo antes de adicionar um novo para evitar múltiplas submissões**
+    confirmInterromperButton.off("click").on("click", function () {
+        finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveisSelect, modal, maquinaId, dataCarga);
+    });
 }
 
-function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, modal) {
-    const motivoSelecionado = motivoInterrupcaoSelect.value;
+// Função para carregar peças disponíveis para a ordem selecionada
+function carregarPecasDisponiveis(codigoConjunto) {
+    const pecasDisponiveisSelect = $('#pecasDisponiveis');
 
-    if (!motivoSelecionado || motivoSelecionado === "") {
+    fetch(`api/listar-pecas-disponiveis/?conjunto=${codigoConjunto}`)
+    .then(response => response.json())
+    .then(data => {
+        pecasDisponiveisSelect.empty(); // Limpa o select
+        pecasDisponiveisSelect.append(new Option("Selecione uma peça...", "", true, true));
+
+        if (data.pecas.length === 0) {
+            pecasDisponiveisSelect.append(new Option("Nenhuma peça disponível", "", false, false));
+        } else {
+            data.pecas.forEach(peca => {
+                pecasDisponiveisSelect.append(new Option(`${peca.codigo} - ${peca.descricao}`, peca.id, false, false));
+            });
+        }
+
+        pecasDisponiveisSelect.prop("disabled", false);
+        pecasDisponiveisSelect.select2({
+            dropdownParent: $('#modalInterromper') // ID do modal onde o select está
+        }); // Inicializa Select2
+    })
+    .catch(error => {
+        console.error("Erro ao carregar peças disponíveis:", error);
+        pecasDisponiveisSelect.append(new Option("Erro ao carregar peças", "", false, false));
+    });
+}
+
+// Função para finalizar interrupção e enviar para API
+function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveisSelect, modal, maquinaId, dataCarga) {
+    const motivoSelecionado = motivoInterrupcaoSelect.val(); // Pegando o valor do select corretamente via jQuery
+    const pecaSelecionada = pecasDisponiveisSelect.val(); // Pegando a peça selecionada
+
+    // **Verificação segura para evitar erro caso não haja seleção**
+    const motivoTexto = motivoInterrupcaoSelect.find(":selected").text() ?? 'N/A';
+
+    if (!motivoSelecionado) {
         Swal.fire({
             icon: 'warning',
             title: 'Atenção',
             text: 'Selecione um motivo para interromper a ordem.'
+        });
+        return;
+    }
+
+    // Se o motivo for "Falta de peça", a peça deve ser obrigatória
+    if (motivoTexto === "Falta de peça" && (!pecaSelecionada || pecaSelecionada === "")) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Você deve selecionar uma peça para continuar.'
         });
         return;
     }
@@ -448,42 +532,37 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, modal) {
         }
     });
 
-    fetch(`api/ordens/atualizar-status/`, {
+    const payload = {
+        ordem_id: parseInt(ordemId),
+        status: 'interrompida',
+        motivo: parseInt(motivoSelecionado)
+    };
+
+    // Se o motivo for "Falta de peça", adiciona a peça ao JSON
+    if (motivoTexto === "Falta de peça") {
+        payload.peca_falta = parseInt(pecaSelecionada);
+        payload.maquina_id = parseInt(maquinaId);
+        payload.data_carga = dataCarga;
+    }
+
+    fetch("api/ordens/atualizar-status/", {
         method: 'POST',
-        body: JSON.stringify({
-            ordem_id: parseInt(ordemId),
-            status: 'interrompida',
-            motivo: parseInt(motivoSelecionado)
-        }),
-        headers: {
-            'Content-Type': 'application/json',
-        }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
     })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(err => { throw err; });
-        }
-        return response.json();
-    })
+    .then(response => response.json())
     .then(data => {
-        Swal.fire({
-            icon: 'success',
-            title: 'Sucesso',
-            text: 'Ordem interrompida com sucesso.',
-        }).then(() => {
+        Swal.fire({ icon: 'success', title: 'Sucesso', text: 'Ordem interrompida com sucesso.' })
+        .then(() => {
             modal.hide();
             carregarOrdensIniciadas();
-            carregarOrdensInterrompidas(); // Recarrega a página para atualizar os dados
-            resetarCardsInicial();
+            carregarOrdensInterrompidas();
+            fetchStatusMaquinas();
         });
     })
-    .catch((error) => {
-        console.error('Erro ao interromper a ordem:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: error.error || 'Ocorreu um erro ao tentar interromper a ordem. Tente novamente.'
-        });
+    .catch(error => {
+        console.error("Erro ao interromper a ordem:", error);
+        Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao interromper. Tente novamente.' });
     });
 }
 
@@ -657,6 +736,7 @@ function confirmarRetorno(ordemId, modal) {
             carregarOrdensInterrompidas();
             carregarOrdensIniciadas();
             resetarCardsInicial();
+            fetchStatusMaquinas();
         });
 
     })
@@ -676,9 +756,11 @@ function resetarCardsInicial(filtros = {}) {
 
     // Obtém os filtros atualizados
     const filtroDataCarga = document.getElementById('filtro-data-carga');
-    
+    const filtroSetor = document.getElementById('filtro-setor');
+
     const currentFiltros = {
         data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
     };
 
     // Função para buscar e renderizar ordens sem paginação
@@ -713,141 +795,18 @@ function filtro() {
         event.preventDefault(); // Evita comportamento padrão do formulário
 
         const filtroDataCarga = document.getElementById('filtro-data-carga');
+        const filtroSetor = document.getElementById('filtro-setor');
 
         // Captura os valores atualizados dos filtros
         const filtros = {
             data_carga: filtroDataCarga.value,
+            setor: filtroSetor.value
         };
 
         // Recarrega os resultados com os novos filtros
         resetarCardsInicial(filtros);
 
     });
-}
-
-async function abrirModalCambao() {
-    const checkboxes = document.querySelectorAll(".ordem-checkbox:checked");
-    const tabelaCambao = document.getElementById("tabelaCambao");
-    const corCambao = document.getElementById("corCambao");
-    const selectCambao = document.getElementById("cambaoSelecionado");
-
-    if (checkboxes.length === 0) {
-        Swal.fire({
-            icon: "warning",
-            title: "Nenhuma ordem selecionada",
-            text: "Selecione pelo menos uma ordem para criar um cambão.",
-            confirmButtonText: "OK"
-        });
-        return;
-    }
-
-    let corSelecionada = checkboxes[0].dataset.cor;
-    let pecaOrdens = [];
-    let quantidades = [];
-    let erros = [];
-
-    tabelaCambao.innerHTML = ""; // Limpa a tabela antes de preencher
-    selectCambao.innerHTML = `<option value="">Carregando...</option>`; // Carrega cambões
-
-    Swal.fire({
-        title: 'Carregando...',
-        text: 'Aguarde...',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
-    // Buscar cambões disponíveis da API
-    try {
-        const response = await fetch("api/cambao-livre/");
-        const data = await response.json();
-
-        if (data.cambao_livres.length > 0) {
-            Swal.close();
-            selectCambao.innerHTML = `<option value="">Selecione um cambão...</option>`;
-            data.cambao_livres.forEach(cambao => {
-                selectCambao.innerHTML += `<option value="${cambao.id}">Cambão ${cambao.id}</option>`;
-            });
-        } else {
-            selectCambao.innerHTML = `<option value="">Nenhum cambão disponível</option>`;
-        }
-    } catch (error) {
-        console.error("Erro ao buscar cambões:", error);
-        selectCambao.innerHTML = `<option value="">Erro ao carregar cambões</option>`;
-        Swal.close();
-    }
-
-    checkboxes.forEach(cb => {
-        const linha = cb.closest("tr");
-        const pecaOrdem = linha.dataset.pecaOrdem;
-        const codigoPeca = linha.querySelector("a").textContent;
-        const quantidadeInput = linha.querySelector(".qt-produzida");
-        const quantidade = parseInt(quantidadeInput.value, 10);
-
-        if (!quantidade || quantidade <= 0) {
-            erros.push(`Ordem #${pecaOrdem}: Defina uma quantidade válida.`);
-            return;
-        }
-
-        pecaOrdens.push(pecaOrdem);
-        quantidades.push(quantidade);
-
-        tabelaCambao.innerHTML += `
-            <tr>
-                <td>#${pecaOrdem}</td>
-                <td>${codigoPeca}</td>
-                <td>${quantidade}</td>
-            </tr>
-        `;
-    });
-
-    if (erros.length > 0) {
-        Swal.fire({
-            icon: "warning",
-            title: "Erro ao criar Cambão",
-            html: erros.join("<br>"),
-            confirmButtonText: "OK"
-        });
-        return;
-    }
-
-    corCambao.textContent = corSelecionada;
-
-    document.getElementById("confirmarCriacaoCambao").dataset.cambaoData = JSON.stringify({
-        peca_ordens: pecaOrdens,
-        quantidade: quantidades,
-        cor: corSelecionada
-    });
-
-    const operadorSelect = document.getElementById('operadorInicial');
-
-    fetch("api/listar-operadores/")
-    .then(response => {
-        if (!response.ok) {
-            throw new Error("Erro ao buscar operadores");
-        }
-        return response.json();
-    })
-    .then(data => {
-        operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`;
-        
-        if (data.operadores.length === 0) {
-            operadorSelect.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
-        } else {
-            data.operadores.forEach(operador => {
-                operadorSelect.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
-            });
-            operadorSelect.disabled = false; // Habilita o select após carregar os dados
-        }
-    })
-    .catch(error => {
-        console.error("Erro ao carregar operadores:", error);
-        operadorSelect.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
-    });
-
-    let modal = new bootstrap.Modal(document.getElementById("modalCriarCambao"));
-    modal.show();
 }
 
 // Função de contador para mostrar tempo decorrido
@@ -954,19 +913,298 @@ function atualizarUltimasCargas() {
 // Evento no botão 🔄 para atualização manual
 document.getElementById("refresh-pecas").addEventListener("click", atualizarUltimasCargas);
 
+async function mostrarModalPararMaquina() {
+    const formPararMaquina = document.getElementById('formPararMaquina');
+
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações da ordem...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // Atualiza as máquinas disponíveis no modal
+    await fetchMaquinasDisponiveis();
+    Swal.close(); // Fecha o SweetAlert de carregamento
+
+    //  Remove event listener antigo antes de adicionar um novo
+    formPararMaquina.removeEventListener('submit', handleFormSubmit);
+    formPararMaquina.addEventListener('submit', handleFormSubmit, { once: true });
+}
+
+export function fetchStatusMaquinas() {
+    // Seleciona os elementos do container
+    const indicador = document.querySelector('.text-center.mb-3 .display-4');
+    const descricao = document.querySelector('.text-center.mb-3 p');
+    const listaStatus = document.querySelector('#machine-status-list');
+
+    // Faz a requisição para a API
+    fetch('/core/api/status_maquinas/?setor=montagem')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Atualiza o indicador de percentual
+            const totalMaquinas = data.status.length;
+            const maquinasOperando = data.status.filter(maquina => maquina.status === 'Em produção').length;
+            const percentualOperando = totalMaquinas > 0 ? Math.round((maquinasOperando / totalMaquinas) * 100) : 0;
+
+            indicador.textContent = `${percentualOperando}%`;
+            descricao.textContent = 'Máquinas em operação';
+
+            // Atualiza a lista de status das máquinas
+            listaStatus.innerHTML = ''; // Limpa os itens antigos
+            if (data.status.length > 0) {
+                data.status.forEach(maquina => {
+                    const statusColor = 
+                        maquina.status === 'Em produção' ? 'bg-success' : 
+                        maquina.status === 'Parada' ? 'bg-danger' : 
+                        'bg-warning';
+
+                    const statusItem = document.createElement('li');
+                    statusItem.classList.add('list-group-item', 'd-flex', 'align-items-center', 'justify-content-between', 'border-0');
+
+                    const motivoParada = maquina.status === 'Parada' ? 
+                        ` - <span class="text-danger">${maquina.motivo_parada || 'Sem motivo especificado'}</span>` : '';
+
+                    // Criar botão de retorno se a máquina estiver parada
+                    let botaoRetorno = '';
+                    if (maquina.status === 'Parada') {
+                        botaoRetorno = `
+                            <button class="btn btn-sm btn-outline-success retornar-maquina-btn" data-maquina="${maquina.maquina_id}">
+                                Retomar
+                            </button>
+                        `;
+                    }
+
+                    statusItem.innerHTML = `
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fw-bold">${maquina.maquina}</span>
+                            <div class="status-circle ${statusColor}" style="
+                                width: 15px;
+                                height: 15px;
+                                border-radius: 50%;
+                            "></div>
+                            ${motivoParada}
+                        </div>
+                        ${botaoRetorno}
+                    `;
+
+                    listaStatus.appendChild(statusItem);
+                });
+
+                // Adicionar eventos de clique aos botões de retorno
+                document.querySelectorAll('.retornar-maquina-btn').forEach(button => {
+                    button.addEventListener('click', function () {
+                        const maquinaId = this.getAttribute('data-maquina');
+                        retornarMaquina(maquinaId);
+                    });
+                });
+
+            } else {
+                // Caso não haja máquinas registradas
+                listaStatus.innerHTML = '<li class="list-group-item text-muted">Nenhuma máquina registrada no momento.</li>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar status das máquinas:', error);
+            indicador.textContent = '0%';
+            descricao.textContent = 'Erro ao carregar dados';
+            listaStatus.innerHTML = '<li class="list-group-item text-danger">Erro ao carregar os dados.</li>';
+        });
+}
+
+async function fetchMaquinasDisponiveis() {
+    try {
+        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=montagem');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+
+        // Exemplo de manipulação dos dados retornados
+        const selectMaquina = document.getElementById('escolhaMaquinaParada');
+        selectMaquina.innerHTML = ''; // Limpa as opções anteriores
+
+        if (data.maquinas_disponiveis.length > 0) {
+            data.maquinas_disponiveis.forEach(maquina => {
+                const option = document.createElement('option');
+                option.value = maquina.alias; // Usa o alias como valor
+                option.textContent = maquina.nome; // Usa o nome como texto visível
+                selectMaquina.appendChild(option);
+            });
+        } else {
+            const option = document.createElement('option');
+            option.textContent = 'Nenhuma máquina disponível';
+            option.disabled = true;
+            selectMaquina.appendChild(option);
+        }
+    } catch (error) {
+        console.error('Erro ao buscar máquinas disponíveis:', error);
+    }
+}
+
+function retornarMaquina(maquina) {
+    Swal.fire({
+        title: 'Retornar máquina',
+        text: `Deseja retornar a máquina ${maquina} à produção?`,
+        showCancelButton: true,
+        confirmButtonText: 'Sim',
+        cancelButtonText: 'Cancelar',
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            return fetch(`/core/api/retornar-maquina/`, {
+                method: 'PATCH',
+                body: JSON.stringify({ maquina }),  // Envia no corpo como JSON
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || `Erro na requisição: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                fetchStatusMaquinas();  // Atualiza a lista de máquinas após a ação
+                return data;
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.showValidationMessage(`Erro: ${error.message}`);
+            });
+        }
+    })
+    .then(result => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso',
+                text: 'Máquina retornada à produção.',
+            });
+        }
+    });
+}
+
+//  Função separada para submissão do formulário de parar maquina
+async function handleFormSubmit(event) {
+    event.preventDefault();
+
+    Swal.fire({
+        title: 'Parando...',
+        text: 'Por favor, aguarde enquanto a máquina está sendo parada.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    try {
+        const response = await fetch(`/core/api/parar-maquina/?setor=montagem`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                maquina: document.getElementById('escolhaMaquinaParada').value,
+                motivo: document.getElementById('motivoParadaMaquina').value
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || `Erro na requisição: ${response.status}`);
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Sucesso',
+            text: 'Ordem interrompida com sucesso.',
+        });
+
+        fetchStatusMaquinas();
+        resetarCardsInicial();
+        carregarOrdensIniciadas();
+        carregarOrdensInterrompidas();
+
+    } catch (error) {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message,
+        });
+    }
+}
+
+function selecionarSetor() {
+    const setorButtons = document.querySelectorAll(".setor-btn");
+    const filtroSetorInput = document.getElementById("filtro-setor");
+    const limparFiltroBtn = document.getElementById("limpar-filtro");
+
+    setorButtons.forEach(button => {
+        button.addEventListener("click", function () {
+            // Remove a seleção de todos os botões
+            setorButtons.forEach(btn => {
+                btn.classList.remove("btn-primary");
+                btn.classList.add("btn-outline-primary");
+            });
+
+            // Ativa o botão clicado
+            this.classList.remove("btn-outline-primary");
+            this.classList.add("btn-primary");
+
+            // Atualiza o input hidden
+            filtroSetorInput.value = this.dataset.setor;
+            console.log("Setor selecionado:", filtroSetorInput.value);
+        });
+    });
+
+    // **Evento para limpar o filtro**
+    limparFiltroBtn.addEventListener("click", function () {
+        // Remove a seleção de todos os botões
+        setorButtons.forEach(btn => {
+            btn.classList.remove("btn-primary");
+            btn.classList.add("btn-outline-primary");
+        });
+
+        // Resetar o campo oculto
+        filtroSetorInput.value = "";
+
+        resetarCardsInicial();
+        
+    });
+}
+
 // Chama a função ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
     resetarCardsInicial();
     carregarOrdensIniciadas();
     carregarOrdensInterrompidas();
-    // cambaoProcesso();
     filtro();
-    // coresCarga();
     atualizarUltimasCargas();
-    
-    // const botaoCriarCambao = document.getElementById("btn-criar-cambao");
-    
-    // if (botaoCriarCambao) {
-    //     botaoCriarCambao.addEventListener("click", () => abrirModalCambao());
-    // }
+    selecionarSetor();
+
+    // Atualiza automaticamente ao carregar a página
+    fetchStatusMaquinas();
+
+    // Adiciona eventos de clique para atualizar manualmente
+    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
+        console.log("Atualizando Status de Máquinas...");
+        fetchStatusMaquinas(); // Chama a função existente
+    });
+
+    document.getElementById('btnPararMaquina').addEventListener('click', () => {
+        mostrarModalPararMaquina(); // Chama a função já existente
+    });
+
 });

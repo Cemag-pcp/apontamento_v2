@@ -3,7 +3,7 @@ from django.utils.timezone import now
 from django.db.models import Max
 from django.contrib.auth.models import User
 
-from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao,Maquina
+from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao,Maquina,Pecas,Setor
 
 from datetime import timedelta
 
@@ -260,3 +260,16 @@ class Versao(models.Model):
 
     def __str__(self):
         return f"Versão {self.numero}"
+
+class SolicitacaoPeca(models.Model):
+
+    peca=models.ForeignKey(Pecas, on_delete=models.CASCADE, related_name='peca_solicitacao_peca')
+    qtd_solicitada=models.FloatField(default=1)
+    localizacao_solicitante=models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='localizacao_solicitacao_peca')
+    mais_informacoes=models.TextField(blank=True, null=True)
+    data_solicitacao=models.DateField(auto_now_add=True)
+    data_carga=models.DateField(blank=True, null=True)
+    
+
+    def __str__(self):
+        return f"{self.peca} - {self.setor_solicitante}"

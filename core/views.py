@@ -166,28 +166,32 @@ def parar_maquina(request):
                     motivo=motivo_instance
                 )
 
-                # Verifica se existe alguma ordem em processo associada à máquina
-                ordem_em_processo = OrdemProcesso.objects.filter(data_fim__isnull=True, status='iniciada', ordem__maquina=maquina).first()
+                # Busca todas as ordens em processo que ainda não foram finalizadas para essa máquina
+                ordens_em_processo = OrdemProcesso.objects.filter(data_fim__isnull=True, status='iniciada', ordem__maquina=maquina)
 
-                if ordem_em_processo:
+                if ordens_em_processo.exists():  # Apenas executa se houver ordens iniciadas
 
-                    ordem_em_processo.data_fim=now()
-                    ordem_em_processo.save()
+                    motivo_interrupcao = MotivoInterrupcao.objects.get(nome='Máquina parada')
 
-                    # Cria um novo processo com status "interrompido"
-                    novo_processo = OrdemProcesso.objects.create(
-                        ordem=ordem_em_processo.ordem,
-                        status='interrompida',
-                        data_inicio=now(),
-                        motivo_interrupcao=MotivoInterrupcao.objects.get(nome='Máquina parada')
-                    )
-                    novo_processo.save()
+                    for ordem_processo in ordens_em_processo:
+                        # Finaliza a ordem em processo atual
+                        ordem_processo.data_fim = now()
+                        ordem_processo.save()
 
-                    # Atualiza a ordem associada
-                    ordem=ordem_em_processo.ordem
-                    ordem.status_prioridade=2
-                    ordem.status_atual='interrompida'
-                    ordem.save()
+                        # Cria um novo processo com status "interrompido"
+                        novo_processo = OrdemProcesso.objects.create(
+                            ordem=ordem_processo.ordem,
+                            status='interrompida',
+                            data_inicio=now(),
+                            motivo_interrupcao=motivo_interrupcao
+                        )
+                        novo_processo.save()
+
+                        # Atualiza o status da ordem associada
+                        ordem = ordem_processo.ordem
+                        ordem.status_prioridade = 2
+                        ordem.status_atual = 'interrompida'
+                        ordem.save()
 
                 return JsonResponse({'success': 'Máquina parada com sucesso.'}, status=201)
 

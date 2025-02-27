@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/listar-motivos-interrupcao/', views.listar_motivos_interrupcao, name='listar_motivos_interrupcao'),
     path('api/verificar-qt-restante/', views.verificar_qt_restante, name='verificar_qt_restante'),
     path('api/andamento-ultimas-cargas/', views.andamento_ultimas_cargas, name='andamento_ultimas_cargas'),
+    path('api/listar-pecas-disponiveis/', views.listar_pecas_disponiveis, name='listar_pecas_disponiveis'),
 
 
 ]

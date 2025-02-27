@@ -22,23 +22,6 @@ class Maquina(models.Model):
     def __str__(self):
         return self.nome
 
-class Pecas(models.Model):
-
-    codigo = models.CharField(max_length=255, unique=True)
-    descricao = models.CharField(max_length=255, blank=True, null=True)
-    materia_prima = models.CharField(max_length=100, blank=True, null=True)
-    comprimento = models.FloatField(blank=True, null=True)
-    setor = models.ManyToManyField(Setor, related_name='pecas_setor', blank=True)
-    apelido = models.CharField(max_length=255, blank=True, null=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['codigo'], name='unique_codigo')
-        ]
-
-    def __str__(self):
-        return f'{self.codigo} - {self.descricao}'
-
 class MotivoInterrupcao(models.Model):
     
     nome = models.CharField(max_length=20, unique=True)
@@ -119,3 +102,20 @@ class ConjuntoCarreta(models.Model):
             models.UniqueConstraint(fields=['conjunto', 'carreta'], name='unique_conjunto_carreta')
         ]
 
+class Pecas(models.Model):
+
+    codigo = models.CharField(max_length=255, unique=True)
+    descricao = models.CharField(max_length=255, blank=True, null=True)
+    materia_prima = models.CharField(max_length=100, blank=True, null=True)
+    comprimento = models.FloatField(blank=True, null=True)
+    setor = models.ManyToManyField(Setor, related_name='pecas_setor', blank=True)
+    apelido = models.CharField(max_length=255, blank=True, null=True)
+    conjunto = models.ForeignKey(Conjuntos, on_delete=models.CASCADE, related_name='peca_conjunto')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['codigo','conjunto'], name='unique_codigo_conjunto')
+        ]
+
+    def __str__(self):
+        return f'{self.codigo} - {self.descricao}'
