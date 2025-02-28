@@ -16,7 +16,9 @@ class SetorAccessMiddleware:
         # Verifica se o usuário está autenticado e possui perfil
         if request.user.is_authenticated and hasattr(request.user, 'profile'):
             # Verifica o setor solicitado na URL
-            setor_solicitado = request.path.split('/')[1]  # Exemplo: /serra/ -> 'serra'
+            setor_solicitado = request.path
+            # if not 'inspecao' in request.path:
+            #     setor_solicitado = request.path.split('/')[1]  # Exemplo: /serra/ -> 'serra'
             if setor_solicitado not in request.user.profile.setores_permitidos:
                 return render(request, 'home/erro-acesso.html', status=403)  # Renderiza a página de erro
 

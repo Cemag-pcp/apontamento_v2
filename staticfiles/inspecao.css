@@ -1,0 +1,10 @@
+.tab{
+    font-weight: 500; 
+    cursor: pointer;
+}
+
+.tab-active{
+    font-weight: 500; 
+    color: #ababab; 
+    cursor: pointer;
+}

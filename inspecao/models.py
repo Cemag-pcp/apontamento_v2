@@ -1,23 +1,43 @@
 from django.db import models
 from core.models import Profile
 
+
 class Inspecao(models.Model):
 
-    ordem = models.ForeignKey('Ordem', on_delete=models.CASCADE, related_name='inspecoes')
     data_inspecao = models.DateTimeField(auto_now_add=True)
 
     # Chaves estrangeiras opcionais para cada setor
-    pecas_ordem_pintura = models.ForeignKey('apontamento_pintura.PecasOrdem', on_delete=models.CASCADE, null=True, blank=True)
-    pecas_ordem_montagem = models.ForeignKey('apontamento_montagem.PecasOrdem', on_delete=models.CASCADE, null=True, blank=True)
-    pecas_ordem_estamparia = models.ForeignKey('apontamento_estamparia.PecasOrdem', on_delete=models.CASCADE, null=True, blank=True)
+    pecas_ordem_pintura = models.ForeignKey(
+        "apontamento_pintura.PecasOrdem",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    pecas_ordem_montagem = models.ForeignKey(
+        "apontamento_montagem.PecasOrdem",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    pecas_ordem_estamparia = models.ForeignKey(
+        "apontamento_estamparia.PecasOrdem",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
 
     def __str__(self):
         return f"Inspeção {self.id} - Ordem {self.ordem.id} - Setor {self.setor}"
-    
+
+
 class DadosExecucaoInspecao(models.Model):
 
-    inspecao = models.ForeignKey(Inspecao, on_delete=models.CASCADE, null=False, blank=False)
-    inspetor = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=False, blank=False)
+    inspecao = models.ForeignKey(
+        Inspecao, on_delete=models.CASCADE, null=False, blank=False
+    )
+    inspetor = models.ForeignKey(
+        Profile, on_delete=models.SET_NULL, null=True, blank=True
+    )
     data_execucao = models.DateTimeField(auto_now_add=True)
     num_execucao = models.IntegerField()
     conformidade = models.IntegerField(null=False, blank=False)
@@ -28,9 +48,11 @@ class DadosExecucaoInspecao(models.Model):
         # Verifica se o objeto já existe no banco de dados
         if self.pk is None:
             # Se não existe, busca o último num_execucao para o mesmo inspecao_estanqueidade
-            ultima_execucao = DadosExecucaoInspecao.objects.filter(
-                inspecao=self.inspecao
-            ).order_by('-num_execucao').first()
+            ultima_execucao = (
+                DadosExecucaoInspecao.objects.filter(inspecao=self.inspecao)
+                .order_by("-num_execucao")
+                .first()
+            )
 
             # Se existir uma execução anterior, incrementa o num_execucao
             if ultima_execucao:
@@ -42,9 +64,12 @@ class DadosExecucaoInspecao(models.Model):
         # Chama o método save da superclasse para salvar o objeto
         super(DadosExecucaoInspecao, self).save(*args, **kwargs)
 
+
 class Reinspecao(models.Model):
 
-    dados_execucao = models.ForeignKey(DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False)
+    dados_execucao = models.ForeignKey(
+        DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False
+    )
     data_reinspecao = models.DateTimeField(auto_now_add=True)
 
 
@@ -56,49 +81,65 @@ class Causas(models.Model):
     def __str__(self):
         return f"{self.nome} cadastrada para o setor {self.setor}"
 
+
 class CausasNaoConformidade(models.Model):
-        
-    dados_execucao = models.ForeignKey(DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False)
-    causa = models.ForeignKey(Causas, null=False, blank=False)
+
+    dados_execucao = models.ForeignKey(
+        DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False
+    )
+    causa = models.ForeignKey(Causas, on_delete=models.SET_NULL, null=True, blank=True)
     foto = models.CharField(max_length=255, null=False, blank=False)
     quantidade = models.IntegerField(null=False, blank=False)
 
     def __str__(self):
         return self.causa.nome
 
+
 #### Inspecao Estanqueidade ####
+
 
 class InspecaoEstanqueidade(models.Model):
 
     TIPO_INSPECAO = (
-        ('tanque', 'Tanque'),
-        ('tubo', 'Tubo'),
-        ('cilindro', 'Cilindro')
+        ("tanque", "Tanque"), 
+        ("tubo", "Tubo"), 
+        ("cilindro", "Cilindro")
     )
 
-    data_inspecao = models.DateTimeField(null=False, blank=False) 
+    data_inspecao = models.DateTimeField(null=False, blank=False)
     codigo = models.CharField(max_length=50, null=False, blank=False)
     descricao = models.CharField(max_length=50, null=False, blank=False)
-    tipo_inspecao = models.CharField(max_length=10, choices=TIPO_INSPECAO, null=False, blank=False)
+    tipo_inspecao = models.CharField(
+        max_length=10, choices=TIPO_INSPECAO, null=False, blank=False
+    )
     data_carga = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.codigo} - {self.descricao}"
-    
+
+
 class DadosExecucaoInspecaoEstanqueidade(models.Model):
 
-    inspecao_estanqueidade = models.ForeignKey(InspecaoEstanqueidade, on_delete=models.CASCADE, null=False, blank=False)
-    inspetor = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=False, blank=False)
+    inspecao_estanqueidade = models.ForeignKey(
+        InspecaoEstanqueidade, on_delete=models.CASCADE, null=False, blank=False
+    )
+    inspetor = models.ForeignKey(
+        Profile, on_delete=models.SET_NULL, null=True, blank=True
+    )
     num_execucao = models.IntegerField()
-    data_exec = models.DateTimeField(auto_now_add=True)  
+    data_exec = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         # Verifica se o objeto já existe no banco de dados
         if self.pk is None:
             # Se não existe, busca o último num_execucao para o mesmo inspecao_estanqueidade
-            ultima_execucao = DadosExecucaoInspecaoEstanqueidade.objects.filter(
-                inspecao_estanqueidade=self.inspecao_estanqueidade
-            ).order_by('-num_execucao').first()
+            ultima_execucao = (
+                DadosExecucaoInspecaoEstanqueidade.objects.filter(
+                    inspecao_estanqueidade=self.inspecao_estanqueidade
+                )
+                .order_by("-num_execucao")
+                .first()
+            )
 
             # Se existir uma execução anterior, incrementa o num_execucao
             if ultima_execucao:
@@ -110,40 +151,66 @@ class DadosExecucaoInspecaoEstanqueidade(models.Model):
         # Chama o método save da superclasse para salvar o objeto
         super(DadosExecucaoInspecaoEstanqueidade, self).save(*args, **kwargs)
 
+
 class ReinspecaoEstanqueidade(models.Model):
 
-    dados_exec_inspecao = models.ForeignKey(DadosExecucaoInspecaoEstanqueidade, null=False, blank=False)
+    dados_exec_inspecao = models.ForeignKey(
+        DadosExecucaoInspecaoEstanqueidade,
+        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+    )
     data_reinsp = models.DateTimeField(auto_now_add=True)
+
 
 class DetalhesPressaoTanque(models.Model):
 
     TIPO_TESTE = (
-        ('CTPI','Corpo do tanque parte inferior'),
-        ('CTL','Corpo do tanque + longarinas'),
-        ('CT','Corpo do tanque'),
-        ('CTC','Corpo do tanque + chassi'),
+        ("CTPI", "Corpo do tanque parte inferior"),
+        ("CTL", "Corpo do tanque + longarinas"),
+        ("CT", "Corpo do tanque"),
+        ("CTC", "Corpo do tanque + chassi"),
     )
 
-    dados_exec_inspecao = models.ForeignKey(DadosExecucaoInspecaoEstanqueidade, null=False, blank=False)
+    dados_exec_inspecao = models.ForeignKey(
+        DadosExecucaoInspecaoEstanqueidade,
+        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+    )
     pressao_inicial = models.FloatField(null=False, blank=False)
     pressao_final = models.FloatField(null=False, blank=False)
     nao_conformidade = models.BooleanField(default=False)
-    tipo_teste = models.CharField(max_length=5, choices=TIPO_TESTE, null=False, blank=False)
+    tipo_teste = models.CharField(
+        max_length=5, choices=TIPO_TESTE, null=False, blank=False
+    )
     tempo_execucao = models.TimeField(null=False, blank=False)
+
 
 class InfoAdicionaisExecTubosCilindros(models.Model):
 
-    dados_exec_inspecao = models.ForeignKey(DadosExecucaoInspecaoEstanqueidade, on_delete=models.CASCADE, null=False, blank=False)
+    dados_exec_inspecao = models.ForeignKey(
+        DadosExecucaoInspecaoEstanqueidade,
+        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+    )
     nao_conformidade = models.IntegerField(null=False, blank=False)
     nao_conformidade_refugo = models.IntegerField(null=False, blank=False)
     qtd_inspecionada = models.IntegerField(null=False, blank=False)
     observacao = models.CharField(max_length=100, null=True, blank=True)
     foto_ficha = models.CharField(max_length=150, null=False, blank=False)
 
+
 class CausasEstanqueidadeTubosCilindros(models.Model):
 
-    info_tubos_cilindros = models.ForeignKey(InfoAdicionaisExecTubosCilindros, on_delete=models.CASCADE, null=False, blank=False)
-    causa = models.ForeignKey(Causas, null=False, blank=False)
+    info_tubos_cilindros = models.ForeignKey(
+        InfoAdicionaisExecTubosCilindros,
+        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+    )
+    causa = models.ForeignKey(Causas, on_delete=models.SET_NULL, null=True, blank=True)
     foto = models.CharField(max_length=255, null=False, blank=False)
     quantidade = models.IntegerField(null=False, blank=False)
 

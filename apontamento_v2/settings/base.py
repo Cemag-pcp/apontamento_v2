@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'cadastro',
     'usuario',
     'core',
+    'inspecao',
 
     'apontamento_serra',
     'apontamento_usinagem',
@@ -98,6 +99,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'apontamento_corte/static'),
     os.path.join(BASE_DIR, 'apontamento_prod_especiais/static'),
 
+    os.path.join(BASE_DIR, 'inspecao/static'),
     os.path.join(BASE_DIR, 'cadastro/static'),
 ]
 

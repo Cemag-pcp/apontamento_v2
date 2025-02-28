@@ -1,0 +1,59 @@
+.tab-active {
+    font-weight: 500; 
+    color: #ababab; 
+    cursor: pointer;
+}
+
+.tab-active:hover {
+    color: #747474; 
+}
+
+.btn-white{
+    background-color: white;
+    border-color: #e4e4e7;
+    font-weight: 600;
+}
+
+.btn-white:hover{
+    background-color: rgb(240, 240, 240);
+    border-color: #e4e4e7;
+    font-weight: 600;
+}
+
+.btn-white:active{
+    border-color: #e4e4e7 !important;
+}
+
+.border-yellow { 
+    border-left-color: #fff131;
+    border-left-width: 4px;
+}
+
+.border-yellow { 
+    border-left-color: #fff131;
+    border-left-width: 4px;
+}
+
+.border-gray { 
+    border-left-color: #b8b8b8;
+    border-left-width: 4px;
+}
+
+.border-blue { 
+    border-left-color: #2079ff;
+    border-left-width: 4px;
+}
+
+.border-green { 
+    border-left-color: #22c55e;
+    border-left-width: 4px;
+}
+
+.border-orange { 
+    border-left-color: #f59e0b;
+    border-left-width: 4px;
+}
+.border-red { 
+    border-left-color: #ef4444;
+    border-left-width: 4px;
+}

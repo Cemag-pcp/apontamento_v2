@@ -203,17 +203,20 @@ class Profile(models.Model):
         ('operador', 'Operador'),
         ('supervisor', 'Supervisor'),
         ('pcp', 'PCP'),
+
     ]
 
     SETOR_CHOICES = [
-        ('estamparia', 'Estamparia'),
-        ('serra', 'Serra'),
-        ('usinagem', 'Usinagem'),
-        ('corte','Corte'),
-        ('prod-esp', 'Prod especiais'),
-        ('inspecao/estamparia', 'Inspecao Estamparia'),
-        ('inspecao/pintura', 'Inspecao Pintura'),
-        ('inspecao/montagem', 'Inspecao Montagem'),
+        ('/estamparia/', 'Estamparia'),
+        ('/serra/', 'Serra'),
+        ('/usinagem/', 'Usinagem'),
+        ('/corte/','Corte'),
+        ('/prod-esp/', 'Prod especiais'),
+        ('/inspecao/estamparia/', 'Inspecao Estamparia'),
+        ('/inspecao/pintura/', 'Inspecao Pintura'),
+        ('/inspecao/montagem/', 'Inspecao Montagem'),
+        ('/inspecao/tanque/', 'Inspecao Tanque'),
+        ('/inspecao/tubos-cilindros/', 'Inspecao Tubos e Cilindros'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
