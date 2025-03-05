@@ -27,7 +27,15 @@ class Inspecao(models.Model):
     )
 
     def __str__(self):
-        return f"Inspeção {self.id} - Ordem {self.ordem.id} - Setor {self.setor}"
+
+        if self.pecas_ordem_pintura:
+            setor_inspecao = f"Pintura - {self.pecas_ordem_pintura.id}"
+        elif self.pecas_ordem_montagem:
+            setor_inspecao = f"Montagem - {self.pecas_ordem_montagem.id}"
+        else:
+            setor_inspecao = f"Estamparia - {self.pecas_ordem_estamparia.id}"
+
+        return f"Inspeção {self.id} - {setor_inspecao}"
 
 
 class DadosExecucaoInspecao(models.Model):
