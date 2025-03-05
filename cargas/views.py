@@ -94,31 +94,44 @@ def gerar_dados_sequenciamento(request):
 
     # Gerar os arquivos e a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_final, setor)
+    
+    if setor == 'pintura':
+        tabela_completa.drop_duplicates(subset=['Código','Datas','cor'])
+        # formato datetime
+        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
+        tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
+    else:
+        tabela_completa.drop_duplicates(subset=['Código','Datas','Célula'])
+        tabela_completa["Datas"] = tabela_completa["Datas"].astype(str)
+        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%Y-%d-%m", errors="coerce")
+        tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
 
-    tabela_completa.drop_duplicates(subset=['Código','Datas','cor'])
     # Criar a carga para a API de criar ordem
     ordens = []
     for _, row in tabela_completa.iterrows():
         ordens.append({
             "grupo_maquina": setor.lower(),
-            "cor": row["cor"],
+            "cor": row["cor"] if setor == 'pintura' else '',
             "obs": "Ordem gerada automaticamente",
             "peca_nome": str(row["Código"]) + " - " + row["Peca"],
             "qtd_planejada": int(row["Qtde_total"]),
-            "data_carga": datetime.strptime(row["Datas"], "%d/%m/%Y").strftime("%Y-%m-%d")
+            "data_carga" : row["Datas"],#.strftime("%Y-%m-%d") if isinstance(row["Datas"], pd.Timestamp) else datetime.strptime(str(row["Datas"]), "%d/%m/%Y").strftime("%Y-%m-%d")
+            "setor_conjunto" : row["Célula"]
         })
+
+    url_criar_ordem = request.build_absolute_uri(reverse("pintura:criar_ordem")) if setor == 'pintura' else request.build_absolute_uri(reverse("montagem:criar_ordem"))
 
     # Chamar API de criar ordem
     response_ordem = requests.post(
-        request.build_absolute_uri(reverse("pintura:criar_ordem")),
+        url_criar_ordem,
         json={"ordens": ordens},
         headers={"Content-Type": "application/json"}
     )
 
     if response_ordem.status_code != 200:
-        return HttpResponse("Erro ao criar ordens.", status=500)
+        return HttpResponse(f"Erro ao criar ordens: {response_ordem.text}", status=500)
 
-    return JsonResponse({""})
+    return JsonResponse({"message": "Sequenciamento gerado com sucesso!"})
 
 @csrf_exempt
 def remanejar_carga(request):

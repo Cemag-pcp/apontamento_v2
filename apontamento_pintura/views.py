@@ -106,7 +106,7 @@ def criar_ordem(request):
                     return JsonResponse({'error': 'Formato de data inválido! Use YYYY-MM-DD.'}, status=400)
 
         #  Verifica se alguma das datas já tem carga alocada no banco
-        datas_existentes = set(Ordem.objects.filter(data_carga__in=datas_requisicao).values_list('data_carga', flat=True))
+        datas_existentes = set(Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina='pintura').values_list('data_carga', flat=True))
         datas_bloqueadas = datas_existentes.intersection(datas_requisicao)
 
         if datas_bloqueadas:

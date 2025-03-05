@@ -434,6 +434,208 @@ def gerar_arquivos(data_inicial, data_final, setor):
                     start_index = end_index
                     file_counter += 1
 
+        if setor == 'montagem':
+
+            base_carretas['Código'] = base_carretas['Código'].astype(str)
+            base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
+
+            ####### retirando cores dos códigos######
+
+            base_carga['Recurso'] = base_carga['Recurso'].astype(str)
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
+
+            ###### retirando espaco em branco####
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.strip()
+
+            ##### excluindo colunas e linhas#####
+
+            base_carretas.drop(['Etapa2', 'Etapa3', 'Etapa4',
+                            'Etapa5'], axis=1, inplace=True)
+
+            # & (base_carretas['Unit_Price'] < 600)].index, inplace=True)
+            base_carretas.drop(
+                base_carretas[(base_carretas['Etapa'] == '')].index, inplace=True)
+            
+            base_carretas = base_carretas.reset_index(drop=True)
+            
+            for i in range(len(base_carretas)):
+                if len(base_carretas['Recurso'][i]) == 5:
+                    base_carretas['Recurso'][i] = "0" + base_carretas['Recurso'][i]
+
+            #### criando código único#####
+
+            codigo_unico = data_escolhida[:2] + data_escolhida[3:5] + data_escolhida[6:10]
+
+            #### filtrando data da carga#####
+
+            datas_unique = pd.DataFrame(base_carga['Datas'].unique())
+
+            escolha_data = (base_carga['Datas'] == data_escolhida)
+            filtro_data = base_carga.loc[escolha_data]
+            filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
+
+            filtro_data = filtro_data.reset_index(drop=True)
+            filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
+
+            for i in range(len(filtro_data)):
+                if filtro_data['Recurso'][i][0] == '0':
+                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+                if len(filtro_data['Recurso'][i]) == 5:
+                    filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
+            
+            ##### juntando planilhas de acordo com o recurso#######
+
+            tab_completa = pd.merge(filtro_data, base_carretas[[
+                                    'Recurso', 'Código', 'Peca', 'Qtde', 'Célula']], on=['Recurso'], how='left')
+            tab_completa = tab_completa.dropna(axis=0)
+
+            # base_carretas[base_carretas['Recurso'] == '034538M21']
+
+            # carretas_agrupadas = filtro_data[['Recurso','Qtde']]
+            # carretas_agrupadas = pd.DataFrame(filtro_data.groupby('Recurso').sum())
+            # carretas_agrupadas = carretas_agrupadas[['Qtde']]
+
+            # st.dataframe(carretas_agrupadas)
+
+            tab_completa['Código'] = tab_completa['Código'].astype(str)
+
+            tab_completa.reset_index(inplace=True, drop=True)
+
+            celulas_unique = pd.DataFrame(tab_completa['Célula'].unique())
+            celulas_unique = celulas_unique.dropna(axis=0)
+            celulas_unique.reset_index(inplace=True)
+
+            recurso_unique = pd.DataFrame(tab_completa['Recurso'].unique())
+            recurso_unique = recurso_unique.dropna(axis=0)
+
+            # criando coluna de quantidade total de itens
+
+            try:
+                tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(
+                    ',', '.')
+            except:
+                pass
+
+            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(float)
+            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
+
+            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(float)
+            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)
+
+            tab_completa['Qtde_total'] = tab_completa['Qtde_x'] * \
+                tab_completa['Qtde_y']
+
+            tab_completa = tab_completa.drop(
+                columns=['Recurso', 'Qtde_x', 'Qtde_y'])
+
+            tab_completa = tab_completa.groupby(
+                ['Código', 'Peca', 'Célula', 'Datas']).sum()
+
+            # tab_completa1 = tab_completa[['Código','Peca','Célula','Datas','Carga','Qtde_total']]
+
+            # tab_completa = tab_completa.groupby(
+            #     ['Código', 'Peca', 'Célula', 'Datas','Carga']).sum()
+
+            # tab_completa = tab_completa.drop_duplicates()
+
+            tab_completa.reset_index(inplace=True)
+
+            # tratando coluna de código e recurso
+
+            for d in range(0, tab_completa.shape[0]):
+
+                if len(tab_completa['Código'][d]) == 5:
+                    tab_completa['Código'][d] = '0' + tab_completa['Código'][d]
+
+            # criando coluna de código para arquivar
+
+            hoje = datetime.now()
+
+            ts = pd.Timestamp(hoje)
+
+            hoje1 = hoje.strftime('%d%m%Y')
+
+            controle_seq = tab_completa
+            controle_seq["codigo"] = hoje1 + data_escolhida
+
+            k = 9
+
+            # if carga_escolhida != 'Selecione':
+            #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
+            
+            # print(tab_completa.columns)
+            # tab_completa = tab_completa.groupby(
+            #     ['Código', 'Peca', 'Célula', 'Datas', 'Carga', 'PED_CHCRIACAO', 'Ano', 'codigo']).sum()
+        
+            tab_completa = tab_completa.reset_index(drop=True)
+
+            # carga_unique = tab_completa['Carga'].unique()
+
+            # for carga in carga_unique:
+            file_counter = 1  # Contador de arquivos
+            rows_per_file = 21  # Número máximo de linhas por arquivo
+            k = 9  # Posição inicial no Excel
+
+            for i in range(0, len(celulas_unique)):
+                # Filtrar os dados para a célula atual
+                filtro_excel = (tab_completa['Célula'] == celulas_unique[0][i])
+                filtrar = tab_completa.loc[filtro_excel].reset_index(drop=True)
+
+                # Verificar se o DataFrame está vazio
+                if filtrar.empty:
+                    continue
+
+                # Índice inicial para controle de divisão em blocos
+                start_index = 0
+
+                while start_index < len(filtrar):
+                    # Criar um novo Workbook para cada conjunto de 21 linhas
+                    wb = Workbook()
+                    wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_montagem.xlsx')
+                    ws = wb.active
+
+                    # Define o limite superior para as linhas deste arquivo
+                    end_index = min(start_index + rows_per_file, len(filtrar))
+                    k = 9  # Reseta a linha inicial para cada novo arquivo
+
+                    # Escreve os dados no Excel para as linhas entre start_index e end_index
+                    for j in range(start_index, end_index):
+                        ws['G5'] = celulas_unique[0][i]  # Nome da célula
+                        ws['AD5'] = hoje  # Data de hoje
+
+                        # Gerar código único baseado na célula
+                        if celulas_unique[0][i] == "EIXO COMPLETO":
+                            ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico + "C"
+                        elif celulas_unique[0][i] == "EIXO SIMPLES":
+                            ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico + "S"
+                        else:
+                            ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico
+
+                        # Preenchimento das células do Excel
+                        ws['M4'] = data_escolhida  # Data da carga
+                        ws['B' + str(k)] = filtrar['Código'][j]
+                        ws['G' + str(k)] = filtrar['Peca'][j]
+                        ws['AD' + str(k)] = filtrar['Qtde_total'][j]
+                        k += 1
+
+                    # Salvar o arquivo com numeração sequencial
+                    file_name = f"Montagem {celulas_unique[0][i]} {data_nome_planilha} {file_counter}.xlsx"
+                    wb.template = False
+                    wb.save(file_name)
+                    filenames.append(file_name)
+
+                    # Incrementar o índice de início e o contador de arquivos
+                    start_index = end_index
+                    file_counter += 1
+
         tab_completa = pd.concat([tab_completa, tab_completa], ignore_index=True)
     
     return filenames
@@ -716,6 +918,216 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             #         # Incrementar índice e contador de arquivos
             #         start_index = end_index
             #         file_counter += 1
+
+        if setor == 'montagem':
+
+            base_carretas['Código'] = base_carretas['Código'].astype(str)
+            base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
+
+            ####### retirando cores dos códigos######
+
+            base_carga['Recurso'] = base_carga['Recurso'].astype(str)
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
+
+            ###### retirando espaco em branco####
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.strip()
+
+            ##### excluindo colunas e linhas#####
+
+            base_carretas.drop(['Etapa2', 'Etapa3', 'Etapa4',
+                            'Etapa5'], axis=1, inplace=True)
+
+            # & (base_carretas['Unit_Price'] < 600)].index, inplace=True)
+            base_carretas.drop(
+                base_carretas[(base_carretas['Etapa'] == '')].index, inplace=True)
+            
+            base_carretas = base_carretas.reset_index(drop=True)
+            
+            for i in range(len(base_carretas)):
+                if len(base_carretas['Recurso'][i]) == 5:
+                    base_carretas['Recurso'][i] = "0" + base_carretas['Recurso'][i]
+
+            #### criando código único#####
+
+            codigo_unico = data_escolhida[:2] + data_escolhida[3:5] + data_escolhida[6:10]
+
+            #### filtrando data da carga#####
+
+            datas_unique = pd.DataFrame(base_carga['Datas'].unique())
+
+            escolha_data = (base_carga['Datas'] == data_escolhida)
+            filtro_data = base_carga.loc[escolha_data]
+            filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
+
+            filtro_data = filtro_data.reset_index(drop=True)
+            filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
+
+            for i in range(len(filtro_data)):
+                if filtro_data['Recurso'][i][0] == '0':
+                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+                if len(filtro_data['Recurso'][i]) == 5:
+                    filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
+            
+            ##### juntando planilhas de acordo com o recurso#######
+
+            tab_completa = pd.merge(filtro_data, base_carretas[[
+                                    'Recurso', 'Código', 'Peca', 'Qtde', 'Célula']], on=['Recurso'], how='left')
+            tab_completa = tab_completa.dropna(axis=0)
+
+            # base_carretas[base_carretas['Recurso'] == '034538M21']
+
+            # carretas_agrupadas = filtro_data[['Recurso','Qtde']]
+            # carretas_agrupadas = pd.DataFrame(filtro_data.groupby('Recurso').sum())
+            # carretas_agrupadas = carretas_agrupadas[['Qtde']]
+
+            # st.dataframe(carretas_agrupadas)
+
+            tab_completa['Código'] = tab_completa['Código'].astype(str)
+
+            tab_completa.reset_index(inplace=True, drop=True)
+
+            celulas_unique = pd.DataFrame(tab_completa['Célula'].unique())
+            celulas_unique = celulas_unique.dropna(axis=0)
+            celulas_unique.reset_index(inplace=True)
+
+            recurso_unique = pd.DataFrame(tab_completa['Recurso'].unique())
+            recurso_unique = recurso_unique.dropna(axis=0)
+
+            # criando coluna de quantidade total de itens
+
+            try:
+                tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(
+                    ',', '.')
+            except:
+                pass
+
+            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(float)
+            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
+
+            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(float)
+            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)
+
+            tab_completa['Qtde_total'] = tab_completa['Qtde_x'] * \
+                tab_completa['Qtde_y']
+
+            tab_completa = tab_completa.drop(
+                columns=['Recurso', 'Qtde_x', 'Qtde_y'])
+
+            tab_completa = tab_completa.groupby(
+                ['Código', 'Peca', 'Célula', 'Datas']).sum()
+
+            # tab_completa1 = tab_completa[['Código','Peca','Célula','Datas','Carga','Qtde_total']]
+
+            # tab_completa = tab_completa.groupby(
+            #     ['Código', 'Peca', 'Célula', 'Datas','Carga']).sum()
+
+            # tab_completa = tab_completa.drop_duplicates()
+
+            tab_completa.reset_index(inplace=True)
+
+            # tratando coluna de código e recurso
+
+            for d in range(0, tab_completa.shape[0]):
+
+                if len(tab_completa['Código'][d]) == 5:
+                    tab_completa['Código'][d] = '0' + tab_completa['Código'][d]
+
+            # criando coluna de código para arquivar
+
+            hoje = datetime.now()
+
+            ts = pd.Timestamp(hoje)
+
+            hoje1 = hoje.strftime('%d%m%Y')
+
+            controle_seq = tab_completa
+            controle_seq["codigo"] = hoje1 + data_escolhida
+
+            k = 9
+
+            # if carga_escolhida != 'Selecione':
+            #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
+            
+            # print(tab_completa.columns)
+            # tab_completa = tab_completa.groupby(
+            #     ['Código', 'Peca', 'Célula', 'Datas', 'Carga', 'PED_CHCRIACAO', 'Ano', 'codigo']).sum()
+        
+            tab_completa = tab_completa.reset_index(drop=True)
+
+            # carga_unique = tab_completa['Carga'].unique()
+
+            # for carga in carga_unique:
+            file_counter = 1  # Contador de arquivos
+            rows_per_file = 21  # Número máximo de linhas por arquivo
+            k = 9  # Posição inicial no Excel
+
+            # for i in range(0, len(celulas_unique)):
+            #     # Filtrar os dados para a célula atual
+            #     filtro_excel = (tab_completa['Célula'] == celulas_unique[0][i])
+            #     filtrar = tab_completa.loc[filtro_excel].reset_index(drop=True)
+
+            #     # Verificar se o DataFrame está vazio
+            #     if filtrar.empty:
+            #         continue
+
+            #     # Índice inicial para controle de divisão em blocos
+            #     start_index = 0
+
+            #     while start_index < len(filtrar):
+            #         # Criar um novo Workbook para cada conjunto de 21 linhas
+            #         wb = Workbook()
+            #         wb = load_workbook('modelo_op_montagem.xlsx')
+            #         ws = wb.active
+
+            #         # Define o limite superior para as linhas deste arquivo
+            #         end_index = min(start_index + rows_per_file, len(filtrar))
+            #         k = 9  # Reseta a linha inicial para cada novo arquivo
+
+            #         # Escreve os dados no Excel para as linhas entre start_index e end_index
+            #         for j in range(start_index, end_index):
+            #             ws['G5'] = celulas_unique[0][i]  # Nome da célula
+            #             ws['AD5'] = hoje  # Data de hoje
+
+            #             # Gerar código único baseado na célula
+            #             if celulas_unique[0][i] == "EIXO COMPLETO":
+            #                 ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico + "C"
+            #             elif celulas_unique[0][i] == "EIXO SIMPLES":
+            #                 ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico + "S"
+            #             else:
+            #                 ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico
+
+            #             # Preenchimento das células do Excel
+            #             ws['M4'] = data_escolhida  # Data da carga
+            #             ws['B' + str(k)] = filtrar['Código'][j]
+            #             ws['G' + str(k)] = filtrar['Peca'][j]
+            #             ws['AD' + str(k)] = filtrar['Qtde_total'][j]
+            #             k += 1
+
+            #         # Salvar o arquivo com numeração sequencial
+            #         file_name = f"Montagem {celulas_unique[0][i]} {data_nome_planilha} {file_counter}.xlsx"
+            #         wb.template = False
+            #         wb.save(file_name)
+            #         filenames.append(file_name)
+
+            #         # Incrementar o índice de início e o contador de arquivos
+            #         start_index = end_index
+            #         file_counter += 1
+
+            # Preparar os dados para inserção no banco de dados
+            # data_formatada = datetime.strptime(data_escolhida, '%d/%m/%Y').strftime('%Y-%m-%d')
+            # tab_completa['Datas'] = data_formatada
+            # data_insert_sql = tab_completa[['Célula', 'Código', 'Peca', 'Qtde_total', 'Datas']].values.tolist()
+
+            # Chamar a função de inserção
+            # insert_montagem(data_formatada, data_insert_sql, check_atualizar_base_carga)
 
         tab_completa = pd.concat([tab_completa, tab_completa], ignore_index=True)
     
