@@ -274,7 +274,7 @@ def get_status_maquinas(request):
     setor = request.GET.get('setor', '')
 
     if setor:    
-        maquinas = Maquina.objects.filter(setor__nome=setor).values_list('id', 'nome')
+        maquinas = Maquina.objects.filter(setor__nome=setor, tipo='maquina').values_list('id', 'nome')
     else:
         return JsonResponse({'error': 'Setor inválido'}, status=400)
 
