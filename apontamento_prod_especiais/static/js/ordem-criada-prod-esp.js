@@ -92,28 +92,28 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
                             buttonIniciar.addEventListener('click', () => {
-                                mostrarModalIniciar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalIniciar(ordem.id);
                             });
                         }
 
                         // Adiciona evento ao botão "Interromper", se existir
                         if (buttonInterromper) {
                             buttonInterromper.addEventListener('click', () => {
-                                mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Finalizar", se existir
                         if (buttonFinalizar) {
                             buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalFinalizar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalRetornar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
@@ -182,9 +182,17 @@ function carregarOrdensIniciadas(container) {
                 }
 
                 card.innerHTML = `
-                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-primary text-white">
-                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+
+                    <!-- Contador fixado no topo direito -->
+                    <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                        id="contador-${ordem.ordem}" 
+                        style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                        Carregando...
+                    </span>
+
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
+                        <h6 class="card-title mb-0">#${ordem.ordem}</h6>
                     </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
@@ -210,21 +218,45 @@ function carregarOrdensIniciadas(container) {
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
                     buttonInterromper.addEventListener('click', () => {
-                        mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        atualizarStatusOrdem(ordem.ordem, ordem.grupo_maquina, 'finalizada');
+                        mostrarModalFinalizar(ordem.id, ordem.grupo_maquina, 'finalizada');
                     });
                 }
 
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
+
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
+}
+
+function iniciarContador(ordemId, dataCriacao) {
+    const contador = document.getElementById(`contador-${ordemId}`);
+    const dataInicial = new Date(dataCriacao); // Converte a data de criação para objeto Date
+
+    function atualizarContador() {
+        const agora = new Date();
+        const diferenca = Math.floor((agora - dataInicial) / 1000); // Diferença em segundos
+
+        const dias = Math.floor(diferenca / 86400);
+        const horas = Math.floor((diferenca % 86400) / 3600);
+        const minutos = Math.floor((diferenca % 3600) / 60);
+        const segundos = diferenca % 60;
+
+        contador.textContent = `${dias}d ${horas}h ${minutos}m ${segundos}s`;
+    }
+
+    // Atualiza o contador a cada segundo
+    atualizarContador();
+    setInterval(atualizarContador, 1000);
 }
 
 function carregarOrdensInterrompidas(container) {
@@ -259,9 +291,17 @@ function carregarOrdensInterrompidas(container) {
             
                 // Estrutura do card com fonte menor
                 card.innerHTML = `
-                    <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                        <div class="card-header bg-danger text-white">
-                            <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+                    <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+
+                        <!-- Contador fixado no topo direito -->
+                        <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                            id="contador-${ordem.ordem}" 
+                            style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                            Carregando...
+                        </span>
+
+                        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center p-3">
+                            <h6 class="card-title mb-0">#${ordem.ordem}</h6>
                             <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small>
                         </div>
                         <div class="card-body bg-light">
@@ -283,12 +323,15 @@ function carregarOrdensInterrompidas(container) {
                 const buttonRetornar = card.querySelector('.btn-retornar');
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalRetornar(ordem.id, ordem.grupo_maquina);
                     });
                 }
             
                 // Adiciona o card ao container
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
+
             });
         })
         .catch(error => {
@@ -301,21 +344,21 @@ function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
 
-function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
-    switch (status) {
-        case 'iniciada':
-            mostrarModalIniciar(ordemId, grupoMaquina);
-            break;
-        case 'interrompida':
-            mostrarModalInterromper(ordemId, grupoMaquina);
-            break;
-        case 'finalizada':
-            mostrarModalFinalizar(ordemId, grupoMaquina);
-            break;
-        default:
-            alert('Status desconhecido.');
-    }
-}
+// function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
+//     switch (status) {
+//         case 'iniciada':
+//             mostrarModalIniciar(ordemId, grupoMaquina);
+//             break;
+//         case 'interrompida':
+//             mostrarModalInterromper(ordemId, grupoMaquina);
+//             break;
+//         case 'finalizada':
+//             mostrarModalFinalizar(ordemId, grupoMaquina);
+//             break;
+//         default:
+//             alert('Status desconhecido.');
+//     }
+// }
 
 // Modal para "Interromper"
 function mostrarModalInterromper(ordemId, grupoMaquina) {
@@ -326,7 +369,7 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
     const modalTitle = document.getElementById('modalInterromperLabel');
     const formInterromper = document.getElementById('formInterromperOrdemCorte');
 
-    modalTitle.innerHTML = `Interromper Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Interromper Ordem`;
     modal.show();
 
     // Remove listeners antigos e adiciona novo
@@ -392,38 +435,15 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
 }
 
 // Modal para "Iniciar"
-function mostrarModalIniciar(ordemId, grupoMaquina) {
+function mostrarModalIniciar(ordemId) {
 
-    grupoMaquina = 'prod_esp'
+    const grupoMaquina = 'prod_esp'
 
     const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
-    const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
 
     modalTitle.innerHTML = `Iniciar Ordem ${ordemId}`;
     modal.show();
-
-    // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = `<option value="">------</option>`;
-
-    // Define as máquinas para cada grupo
-    const maquinasPorGrupo = {
-        prod_esp: [
-            { value: 'maq_solda', label: 'Máquina de solda' },
-        ]
-    };
-
-    // Preenche o select com base no grupo de máquinas
-    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
-        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
-            const option = document.createElement('option');
-            option.value = maquina.value;
-            option.textContent = maquina.label;
-            escolhaMaquina.appendChild(option);
-        });
-    } else {
-        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
-    }
 
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formIniciarOrdemCorte');
@@ -452,7 +472,6 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 ordem_id: ordemId,
                 grupo_maquina: grupoMaquina,
                 status: 'iniciada',
-                maquina_nome: maquinaName,
             }),
             headers: {
                 'Content-Type': 'application/json',
@@ -501,7 +520,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     const modalTitle = document.getElementById('modalFinalizarLabel');
-    const formFinalizar = document.getElementById('formFinalizarOrdemUsinagem');
+    const formFinalizar = document.getElementById('formFinalizarOrdemProdEspeciais');
 
     // Remove event listeners antigos para evitar duplicidade
     const clonedForm = formFinalizar.cloneNode(true);
@@ -636,7 +655,7 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
     const modalTitle = document.getElementById('modalRetornarLabel');
     const formRetornar = document.getElementById('formRetornarProducao');
 
-    modalTitle.innerHTML = `Retornar Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Confirmar retorno`;
     modal.show();
 
     // Remove listeners antigos e adiciona novo
@@ -708,74 +727,6 @@ function mostrarModalRetornar(ordemId, grupoMaquina) {
             });
         });
     });
-}
-
-function configurarFormulario() {
-    const form = document.getElementById('opUsinagemForm');
-
-    if (form) {
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-
-            const formData = new FormData(form);
-
-            Swal.fire({
-                title: 'Enviando...',
-                text: 'Aguarde enquanto processamos sua solicitação.',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                },
-            });
-
-            try {
-                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-                const response = await fetch('api/criar-ordem-usinagem/', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': csrfToken,
-                    },
-                    body: formData,
-                });
-
-                const data = await response.json();
-
-                Swal.close();
-
-                if (response.ok) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: 'Ordem de Produção criada com sucesso.',
-                        confirmButtonText: 'OK',
-                    });
-
-                    form.reset();
-
-                    // Recarrega os cards
-                    document.getElementById('ordens-container').innerHTML = '';
-                    resetarCardsInicial();
-
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro!',
-                        text: data.error || 'Erro ao criar a Ordem de Produção.',
-                        confirmButtonText: 'OK',
-                    });
-                }
-            } catch (error) {
-                Swal.close();
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro inesperado!',
-                    text: 'Ocorreu um erro ao processar sua solicitação. Tente novamente.',
-                    confirmButtonText: 'OK',
-                });
-                console.error('Erro:', error);
-            }
-        });
-    }
 }
 
 function resetarCardsInicial(filtros = {}) {
@@ -853,10 +804,118 @@ function filtro() {
     });
 }
 
+// Função separada para evitar múltiplos event listeners
+async function handleSubmit(event) {
+    event.preventDefault(); // Evita o recarregamento da página
+
+    const form = event.target;
+    const formData = new FormData(form);
+
+    Swal.fire({
+        title: 'Enviando...',
+        text: 'Aguarde enquanto processamos sua solicitação.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        },
+    });
+
+    try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const response = await fetch('api/criar-ordem-prod-especiais/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+            },
+            body: formData,
+        });
+
+        const data = await response.json();
+
+        Swal.close();
+
+        if (response.ok) {
+            Swal.fire({
+                title: 'Sucesso!',
+                text: 'Ordem de Produção criada com sucesso.',
+                confirmButtonText: 'OK',
+            });
+
+            form.reset();
+
+            //  Remove o foco do elemento ativo antes de fechar o modal
+            document.activeElement.blur();
+
+            // Fecha corretamente o modal atual
+            const modalPlanejarInstance = bootstrap.Modal.getInstance(document.getElementById('modalProdEspeciais'));
+            if (modalPlanejarInstance) {
+                modalPlanejarInstance.hide();
+            }
+
+            // Recarrega os cards
+            document.getElementById('ordens-container').innerHTML = '';
+            resetarCardsInicial();
+
+            // Abre o modal correto
+            const modal = new bootstrap.Modal(document.getElementById('modalIniciarAposPlanejar'));
+            modal.show();
+
+            // Remove event listeners antigos antes de adicionar novos
+            const btnIniciar = document.querySelector('.btn-iniciar-planejar');
+            const btnNaoIniciar = document.querySelector('.btn-nao-iniciar-planejar');
+
+            if (btnIniciar) {
+                btnIniciar.replaceWith(btnIniciar.cloneNode(true));
+                document.querySelector('.btn-iniciar-planejar').addEventListener('click', function () {
+                    modal.hide();
+                    mostrarModalIniciar(data.ordem_id);
+                });
+            }
+
+            if (btnNaoIniciar) {
+                btnNaoIniciar.replaceWith(btnNaoIniciar.cloneNode(true));
+                document.querySelector('.btn-nao-iniciar-planejar').addEventListener('click', function () {
+                    modal.hide();
+                });
+            }
+
+        } else {
+            Swal.fire({
+                title: 'Erro!',
+                text: data.error || 'Erro ao criar a Ordem de Produção.',
+                confirmButtonText: 'OK',
+            });
+        }
+    } catch (error) {
+        Swal.close();
+        Swal.fire({
+            title: 'Erro inesperado!',
+            text: 'Ocorreu um erro ao processar sua solicitação. Tente novamente.',
+            confirmButtonText: 'OK',
+        });
+        console.error('Erro:', error);
+    }
+}
+
+// Modal para "planejar"
+function modalPlanejar() {
+    const form = document.getElementById('opProdEspeciaisForm');
+
+    if (!form) {
+        console.error("Formulário não encontrado!");
+        
+        return;
+    }
+
+    // Remove qualquer evento de submit duplicado antes de adicionar um novo
+    form.removeEventListener('submit', handleSubmit);
+    form.addEventListener('submit', handleSubmit);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     resetarCardsInicial();
-    configurarFormulario();
+    modalPlanejar();
     
     $('#pecaSelect').select2({
         placeholder: 'Selecione a peça',
@@ -888,7 +947,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cache: true
         },
         minimumInputLength: 0,
-        dropdownParent: $('#modalUsinagem'),
+        dropdownParent: $('#modalProdEspeciais'),
     });
 
     $('#filtro-conjunto').select2({

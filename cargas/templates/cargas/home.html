@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Gerenciamento de Processo</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css">
+{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+    <!-- Título e botão de geração de sequenciamento -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3><i class="fas fa-tasks"></i> Sequenciamento</h3>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalGerarRelatorio">
+            <i class="fas fa-chart-line"></i> Gerar Sequenciamento
+        </button>
+    </div>
+
+    <!-- FullCalendar -->
+    <div id="calendario"></div>
+</div>
+
+<!-- Modal de Remanejamento -->
+<div class="modal fade" id="modalRemanejar" tabindex="-1" aria-labelledby="modalRemanejarLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-exchange-alt"></i> Remanejar Carga</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                
+                <input type="hidden" id="eventId"> <!-- ID do evento (opcional) -->
+                <input type="hidden" id="setor" readonly>
+                <input type="hidden" id="dataAtual" readonly>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Nova Data</strong></label>
+                    <input type="date" class="form-control" id="novaData">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" id="confirmarRemanejamento"><i class="fas fa-check"></i> Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para geração de relatório -->
+<div class="modal fade" id="modalGerarRelatorio" tabindex="-1" aria-labelledby="modalGerarRelatorioLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-file-alt"></i> Gerar Sequenciamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                
+                <!--  Seção 1: Pesquisa de Dados -->
+                <fieldset class="border p-3 mb-4">
+                    <legend class="w-auto px-3 text-primary"><i class="fas fa-search"></i> Pesquisa de Dados</legend>
+                    
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label"><strong>Data início</strong></label>
+                            <input type="date" class="form-control" id="data-inicio" placeholder="Selecione a data inicial">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label"><strong>Data fim</strong></label>
+                            <input type="date" class="form-control" id="data-fim" placeholder="Selecione a data final">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" id="pesquisarDados"><i class="fas fa-search"></i> Pesquisar</button>
+
+                    <!-- Tabela de resumo -->
+                    <div class="table-responsive mt-3" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-bordered text-center">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Carreta</th>
+                                    <th>Quantidade</th>
+                                    <th>Base</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaResumo">
+                                <tr><td colspan="4">Nenhum dado disponível</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </fieldset>
+
+                <!--  Seção 2: Geração de Sequenciamento -->
+                <fieldset class="border p-3">
+                    <legend class="w-auto px-3 text-success"><i class="fas fa-cogs"></i> Geração de Sequenciamento</legend>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Setor</strong></label>
+                        <select class="form-select" id="setorSelect">
+                            <option value="">Selecione um setor</option>
+                            <option value="montagem">Montagem</option>
+                            <option value="pintura">Pintura</option>
+                            <option value="usinagem">Usinagem</option>
+                        </select>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <button class="btn btn-success" id="gerarSequenciamento" disabled><i class="fas fa-file-excel"></i> Gerar Arquivos</button>
+                        <button class="btn btn-success" id="gerarPlanejamento" disabled><i class="fas fa-save"></i> Gerar Planejamento</button>
+                    </div>
+                </fieldset>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script type="module" src="{% static 'js/gerar-sequenciamento.js' %}"></script>
+<script type="module" src="{% static 'js/full-calendar.js' %}"></script>
+{% endblock %}
+

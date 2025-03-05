@@ -30,5 +30,8 @@ urlpatterns = [
     path('corte/', include('apontamento_corte.urls')),
     path('prod-esp/', include('apontamento_prod_especiais.urls')),
     path('estamparia/', include('apontamento_estamparia.urls')),
+    path('pintura/', include('apontamento_pintura.urls')),
+    path('montagem/', include('apontamento_montagem.urls')),
+    path('cargas/', include('cargas.urls')),
 
 ]

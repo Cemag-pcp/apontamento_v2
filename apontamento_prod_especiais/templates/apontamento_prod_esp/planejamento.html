@@ -7,6 +7,8 @@
 
 {% block links %}
     <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+
 {% endblock %}
 
 {% block content %}
@@ -22,7 +24,7 @@
     <div id="containerPlanejar" class="mb-5">
         <!-- Botões para abrir modais -->
         <div class="d-flex justify-content-end gap-3 mb-4">
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalUsinagem">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProdEspeciais">
                 Planejar
             </button>
         </div>
@@ -36,7 +38,7 @@
                     <input type="text" id="filtro-ordem" class="form-control" placeholder="Filtrar por Ordem">
                 </div>
                 <div class="col-md-3">
-                    <select id="filtro-conjunto" class="form-select" name="filtro-conjunto" style="width: 100%;" required>
+                    <select id="filtro-conjunto" class="form-select" name="filtro-conjunto" style="width: 100%;">
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -89,16 +91,16 @@
 
 </div>
 
-<!-- Modal Criar OP Usinagem -->
-<div class="modal fade" id="modalUsinagem" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalUsinagemLabel" aria-hidden="true">
+<!-- Modal Criar Op -->
+<div class="modal fade" id="modalProdEspeciais" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalProdEspeciaisLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalUsinagemLabel">Criar OP Usinagem</h5>
+                <h5 class="modal-title" id="modalProdEspeciaisLabel">Criar OP</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="opUsinagemForm" method="post" enctype="multipart/form-data">
+                <form id="opProdEspeciaisForm" method="post" enctype="multipart/form-data">
                     {% csrf_token %}
                     <div class="row mb-3 align-items-center">
                         <!-- Data da Programação -->
@@ -168,11 +170,7 @@
                 <form id="formIniciarOrdemCorte">
                     <div class="mb-3">
                         <input type="hidden" id="grupoMaquina">
-                        <label for="escolhaMaquina" class="form-label">Qual máquina?</label>
-                        <select class="form-control" id="escolhaMaquinaIniciarOrdem" name="escolhaMaquinaIniciarOrdem" required>
-                            <option value="">------</option>
-                            <!-- Opções serão preenchidas dinamicamente pelo JavaScript -->
-                        </select>
+                        <p>Confirmar início?</p>
                     </div>
 
                     <!-- Footer do Formulário -->
@@ -226,7 +224,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="formFinalizarOrdemUsinagem">
+                <form id="formFinalizarOrdemProdEspeciais">
                     
                     <div id="bodyPecasFinalizar">
                     </div>
@@ -275,6 +273,24 @@
                     </div>
                 </form>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para perguntar se irá iniciar a ordem após planejamento -->
+<div class="modal fade" id="modalIniciarAposPlanejar" aria-labelledby="modalIniciarAposPlanejarLabel" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title" id="modalIniciarAposPlanejarLabel">Iniciar Ordem</h5>
+        </div>
+        <div class="modal-body">
+            Deseja iniciar a ordem agora?
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary btn-iniciar-planejar">Sim</button>
+            <button type="button" class="btn btn-secondary btn-nao-iniciar-planejar">Não</button>
+        </div>
         </div>
     </div>
 </div>

@@ -41,7 +41,7 @@ def planejamento(request):
 def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:
         # Busca a ordem com os relacionamentos necessários
-        ordem = Ordem.objects.prefetch_related('ordem_pecas_prod_especiais').get(ordem=pk_ordem, grupo_maquina=name_maquina)
+        ordem = Ordem.objects.prefetch_related('ordem_pecas_prod_especiais').get(pk=pk_ordem, grupo_maquina=name_maquina)
 
         # Obtém a peça relacionada
         peca_ordem = ordem.ordem_pecas_prod_especiais.first()  # Obtém a primeira peça (ou única)
@@ -125,22 +125,20 @@ def atualizar_status_ordem(request):
             with transaction.atomic():
                 # Parse do corpo da requisição
                 body = json.loads(request.body)
+                print(body)
 
                 status = body['status']
                 ordem_id = body['ordem_id']
                 grupo_maquina = body['grupo_maquina'].lower()
                 qt_produzida = body.get('qt_realizada')
                 qt_mortas = body.get('qt_mortas')
-
+                
                 # Obtém a ordem
-                ordem = Ordem.objects.get(ordem=ordem_id, grupo_maquina=grupo_maquina)
+                ordem = Ordem.objects.get(pk=ordem_id)
                 
                 # Validações básicas
                 if ordem.status_atual == status:
                     return JsonResponse({'error': f'Essa ordem ja está {status}. Atualize a página.'}, status=400)
-
-                if not ordem_id or not grupo_maquina or not status:
-                    return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
 
                 # Finaliza o processo atual (se existir)
                 processo_atual = ordem.processos.filter(data_fim__isnull=True).first()
@@ -159,11 +157,6 @@ def atualizar_status_ordem(request):
                 ordem.status_atual = status
                 
                 if status == 'iniciada':
-                    # Pode ser que a ordem tenha sido reestarada, então não precisao atualizar a máquina
-                    try:
-                        ordem.maquina = body['maquina_nome']
-                    except:
-                        pass
                     ordem.status_prioridade = 1
                 elif status == 'finalizada':
                     operador_final = int(body.get('operador_final'))
@@ -179,7 +172,6 @@ def atualizar_status_ordem(request):
                     peca.save()
 
                     ordem.status_prioridade = 3
-
                 elif status == 'interrompida':
                     novo_processo.motivo_interrupcao = MotivoInterrupcao.objects.get(nome=body['motivo'])
                     novo_processo.save()
@@ -205,8 +197,8 @@ def atualizar_status_ordem(request):
 def get_ordens_iniciadas(request):
     # Filtra as ordens com base no status 'iniciada' e prefetch da peça relacionada
     ordens_queryset = Ordem.objects.prefetch_related(
-        'ordem_pecas_prod_especiais'
-    ).filter(grupo_maquina='prod_esp',status_atual='iniciada')
+        'ordem_pecas_prod_especiais__conjunto'
+    ).filter(grupo_maquina='prod_esp', status_atual='iniciada')
 
     # Paginação
     page = int(request.GET.get('page', 1))  # Obtém o número da página
@@ -220,17 +212,20 @@ def get_ordens_iniciadas(request):
     # Monta os dados para retorno
     data = []
     for ordem in ordens_page:
-        peca_info = ordem.ordem_pecas_prod_especiais.first()  # Obtém a única peça relacionada
+        peca_info = ordem.ordem_pecas_prod_especiais.first()  # Obtém a primeira peça relacionada
+        conjunto_info = peca_info.conjunto if peca_info else None  # Obtém o conjunto se houver uma peça
+
         data.append({
+            'id': ordem.id,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina': ordem.get_maquina_display(),
+            'ultima_atualizacao': ordem.ultima_atualizacao,
             'peca': {
-                'codigo': peca_info.conjunto.codigo if peca_info and peca_info.conjunto else 'Sem codigo',
-                'descricao': peca_info.conjunto.descricao if peca_info and peca_info.conjunto else 'Sem descrição',
+                'codigo': conjunto_info.codigo if conjunto_info else 'Sem código',
+                'descricao': conjunto_info.descricao if conjunto_info else 'Sem descrição',
                 'quantidade': peca_info.qtd_planejada if peca_info else 0,
                 'qtd_morta': peca_info.qtd_morta if peca_info else 0
             } if peca_info else None  # Retorna `None` se nenhuma peça estiver associada
@@ -272,12 +267,13 @@ def get_ordens_interrompidas(request):
             })
 
         data.append({
+            'id': ordem.id,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina': ordem.get_maquina_display(),
+            'ultima_atualizacao': ordem.ultima_atualizacao,
             'motivo_interrupcao': ultimo_processo_interrompido.motivo_interrupcao.nome if ultimo_processo_interrompido and ultimo_processo_interrompido.motivo_interrupcao else None,
             'pecas': pecas_data,  # Adiciona informações das peças
         })
@@ -294,6 +290,7 @@ def get_pecas(request):
     """
     Retorna uma lista paginada de peças do setor `prod_esp`, com suporte a busca por código ou descrição.
     """
+
     # Obtém os parâmetros da requisição
     search = request.GET.get('search', '').strip()  # Termo de busca
     page = int(request.GET.get('page', 1))  # Página atual (padrão é 1)
@@ -306,7 +303,7 @@ def get_pecas(request):
         return JsonResponse({'results': [], 'pagination': {'more': False}})
 
     # Filtra as peças que pertencem ao setor `prod_esp`
-    pecas_query = Pecas.objects.filter(setor=setor_prod_esp)
+    pecas_query = Conjuntos.objects.filter()
 
     # Aplica o filtro de busca, se fornecido
     if search:
@@ -350,4 +347,5 @@ def planejar_ordem_prod_esp(request):
 
         return JsonResponse({
             'message': 'Status atualizado com sucesso.',
+            'ordem_id': nova_ordem.pk
         })

@@ -18,7 +18,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const card = document.createElement('div');
                         card.classList.add('col-md-4'); // Adiciona a classe de coluna
 
-                        card.dataset.ordemId = ordem.ordem; // Adiciona o ID da ordem para referência
+                        card.dataset.ordemId = ordem.id; // Adiciona o ID da ordem para referência
                         card.dataset.grupoPeca = ordem.grupo_peca || ''; // Adiciona o grupo máquina
                         card.dataset.obs = ordem.obs || ''; // Adiciona observações
                     
@@ -117,56 +117,56 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
                             buttonIniciar.addEventListener('click', () => {
-                                mostrarModalIniciar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Interromper", se existir
                         if (buttonInterromper) {
                             buttonInterromper.addEventListener('click', () => {
-                                mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Finalizar", se existir
                         if (buttonFinalizar) {
                             buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalFinalizar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina, ordem.maquina);
+                                mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
                             });
                         }
 
                         // Adiciona evento ao botão para iniciar proximo processo
                         if (buttonProxProcesso) {
                             buttonProxProcesso.addEventListener('click', () => {
-                                mostrarModalIniciarProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalIniciarProxProcesso(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão para enviar para proximo processo
                         if (buttonMandarProxProcesso) {
                             buttonMandarProxProcesso.addEventListener('click', () => {
-                                mostrarModalProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalProxProcesso(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão para enviar para proximo processo
                         if (buttonFinalizarParcial) {
                             buttonFinalizarParcial.addEventListener('click', () => {
-                                mostrarModalFinalizarParcial(ordem.ordem, ordem.grupo_maquina);
+                                mostrarModalFinalizarParcial(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Excluir", se existir
                         if (buttonExcluir) {
                             buttonExcluir.addEventListener('click', () => {
-                                mostrarModalExcluir(ordem.ordem, 'estamparia');
+                                mostrarModalExcluir(ordem.id, 'estamparia');
                             });
                         }
 
@@ -198,6 +198,27 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     });
 };
 
+function iniciarContador(ordemId, dataCriacao) {
+    const contador = document.getElementById(`contador-${ordemId}`);
+    const dataInicial = new Date(dataCriacao); // Converte a data de criação para objeto Date
+
+    function atualizarContador() {
+        const agora = new Date();
+        const diferenca = Math.floor((agora - dataInicial) / 1000); // Diferença em segundos
+
+        const dias = Math.floor(diferenca / 86400);
+        const horas = Math.floor((diferenca % 86400) / 3600);
+        const minutos = Math.floor((diferenca % 3600) / 60);
+        const segundos = diferenca % 60;
+
+        contador.textContent = `${dias}d ${horas}h ${minutos}m ${segundos}s`;
+    }
+
+    // Atualiza o contador a cada segundo
+    atualizarContador();
+    setInterval(atualizarContador, 1000);
+}
+
 export function carregarOrdensIniciadas(container, filtros = {}) {
     fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
@@ -206,7 +227,7 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
             data.ordens.forEach(ordem => {
 
                 const card = document.createElement('div');
-                card.dataset.ordemId = ordem.ordem;
+                card.dataset.ordemId = ordem.id;
 
                 // Defina os botões dinamicamente com base no status
                 let botaoAcao = '';
@@ -232,8 +253,15 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                 const pecaInfo = ordem.pecas[0]; // Assume que deseja exibir apenas a primeira peça para detalhes
 
                 card.innerHTML = `
-                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-primary text-white">
+                <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+                    <!-- Contador fixado no topo direito -->
+                    <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                        id="contador-${ordem.ordem}" 
+                        style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                        Carregando...
+                    </span>
+    
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
                         <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
                         <small class="text-white">Planejada: ${totalQtdPlanejada || 0} Realizada: ${totalQtdBoa}</small>
                     </div>
@@ -263,30 +291,33 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
                     buttonInterromper.addEventListener('click', () => {
-                        mostrarModalInterromper(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        atualizarStatusOrdem(ordem.ordem, ordem.grupo_maquina, 'finalizada');
+                        atualizarStatusOrdem(ordem.id, ordem.grupo_maquina, 'finalizada');
                     });
                 }
 
                 if (buttonProxProcesso) {
                     buttonProxProcesso.addEventListener('click', () => {
-                        mostrarModalProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalProxProcesso(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 if (buttonFinalizarParcial) {
                     buttonFinalizarParcial.addEventListener('click', () => {
-                        mostrarModalFinalizarParcial(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalFinalizarParcial(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
+
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
@@ -307,7 +338,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
             data.ordens.forEach(ordem => {
                 // Cria o card
                 const card = document.createElement('div');
-                card.dataset.ordemId = ordem.ordem;
+                card.dataset.ordemId = ordem.id;
             
                 // Cria a lista de peças em formato simplificado
                 const pecasHTML = ordem.pecas.map(peca => `
@@ -325,8 +356,15 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
             
                 // Estrutura do card com fonte menor
                 card.innerHTML = `
-                    <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                        <div class="card-header bg-danger text-white">
+                    <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+                        <!-- Contador fixado no topo direito -->
+                        <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                            id="contador-${ordem.ordem}" 
+                            style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                            Carregando...
+                        </span>
+    
+                        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center p-3">
                             <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
                             <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small> 
                         </div>
@@ -349,12 +387,15 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
                 const buttonRetornar = card.querySelector('.btn-retornar');
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.ordem, ordem.grupo_maquina, ordem.maquina);
+                        mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
                     });
                 }
             
                 // Adiciona o card ao container
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
+
             });
         })
         .catch(error => {
@@ -371,7 +412,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
             data.ordens.forEach(ordem => {
 
                 const card = document.createElement('div');
-                card.dataset.ordemId = ordem.ordem;
+                card.dataset.ordemId = ordem.id;
 
                 // Defina os botões dinamicamente com base no status
                 let botaoAcao = '';
@@ -383,9 +424,17 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                 `;
 
                 card.innerHTML = `
-                <div class="card shadow-sm border-0" style="border-radius: 10px; overflow: hidden;">
-                    <div class="card-header bg-warning text-white">
-                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
+
+                <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+                    <!-- Contador fixado no topo direito -->
+                    <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
+                        id="contador-${ordem.ordem}" 
+                        style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
+                        Carregando...
+                    </span>
+
+                    <div class="card-header bg-warning text-white d-flex justify-content-between align-items-center p-3">
+                        <h6 class="card-title mb-0"><small>#${ordem.ordem} - ${ordem.maquina}</small></h6>
                         <small class="text-white">
                             Planejada: ${ordem.totais.qtd_planejada || 0} 
                             Realizada: ${ordem.totais.qtd_boa || 0} 
@@ -414,11 +463,14 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                 // Adiciona evento ao botão para iniciar proximo processo
                 if (buttonProxProcesso) {
                     buttonProxProcesso.addEventListener('click', () => {
-                        mostrarModalIniciarProxProcesso(ordem.ordem, ordem.grupo_maquina);
+                        mostrarModalIniciarProxProcesso(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 container.appendChild(card);
+
+                iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
+
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
@@ -526,41 +578,38 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
 function mostrarModalIniciar(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
-    const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
 
-    // const modalConfirmacao = new bootstrap.Modal(document.getElementById('modalConfirmar'))
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações das máquinas...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
 
-    modalTitle.innerHTML = `Iniciar Ordem ${ordemId}`;
-    modal.show();
+    fetch('/cadastro/api/buscar-maquinas/?setor=estamparia', {
+        method: 'GET',
+        headers: {'Content-Type':'application/json'}
+    })
+    .then(response => response.json())
+    .then(data => {
+        const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
+        escolhaMaquina.innerHTML = `<option value="">------</option>`;
 
-    // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = `<option value="">------</option>`;
-
-    // Define as máquinas para cada grupo
-    const maquinasPorGrupo = {
-        estamparia: [
-            { value: 'viradeira_1', label: 'Viradeira 1'},
-            { value: 'viradeira_2', label: 'Viradeira 2'},
-            { value: 'viradeira_3', label: 'Viradeira 3'},
-            { value: 'viradeira_4', label: 'Viradeira 4'},
-            { value: 'viradeira_5', label: 'Viradeira 5'},
-            { value: 'prensa', label: 'Prensa' },
-        ]
-    };
-
-    // Preenche o select com base no grupo de máquinas
-    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
-        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
+        Swal.close();
+        data.maquinas.forEach((maquina) => {
             const option = document.createElement('option');
-            option.value = maquina.value;
-            option.textContent = maquina.label;
+            option.value = maquina.id;
+            option.textContent = maquina.nome;
             escolhaMaquina.appendChild(option);
         });
-    } else {
-        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
-    }
 
-    // Remove listeners antigos e adiciona novo no formulário
+        modalTitle.innerHTML = 'Escolha a máquina';
+        modal.show();
+    });
+
+    // Remove event listeners antigos do formulário e adiciona um novo
     const formIniciar = document.getElementById('formIniciarOrdemCorte');
     const clonedForm = formIniciar.cloneNode(true);
     formIniciar.parentNode.replaceChild(clonedForm, formIniciar);
@@ -571,7 +620,6 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
         const formData = new FormData(clonedForm);
         const maquinaName = formData.get('escolhaMaquinaIniciarOrdem');
 
-        // Exibe SweetAlert de carregamento
         Swal.fire({
             title: 'Iniciando Ordem...',
             text: 'Por favor, aguarde.',
@@ -591,46 +639,41 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
             }),
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken(), // Inclui o CSRF Token no cabeçalho
+                'X-CSRFToken': getCSRFToken(),
             },
         })
-            .then(async (response) => {
-                const data = await response.json();
+        .then(async (response) => {
+            const data = await response.json();
 
-                if (!response.ok) {
-                    throw new Error(data.error || 'Erro ao iniciar a ordem.');
-                }
+            if (!response.ok) {
+                throw new Error(data.error || 'Erro ao iniciar a ordem.');
+            }
 
-                return data; // Retorna os dados para o próximo `.then`
-            })
-            .then(() => {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Sucesso',
-                    text: 'Ordem iniciada com sucesso.',
-                });
-
-                modal.hide();
-
-                // Atualiza a interface
-                const containerIniciado = document.querySelector('.containerProcesso');
-                carregarOrdensIniciadas(containerIniciado);
-
-                // Recarrega os dados chamando a função de carregamento
-                document.getElementById('ordens-container').innerHTML = '';
-                resetarCardsInicial();
-
-                fetchStatusMaquinas();
-                fetchContagemStatusOrdens();
-
-            })
-            .catch((error) => {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: error.message,
-                });
+            return data;
+        })
+        .then(() => {
+            Swal.fire({
+                title: 'Sucesso',
+                text: 'Ordem iniciada com sucesso.',
             });
+
+            modal.hide();
+
+            const containerIniciado = document.querySelector('.containerProcesso');
+            carregarOrdensIniciadas(containerIniciado);
+
+            document.getElementById('ordens-container').innerHTML = '';
+            resetarCardsInicial();
+
+            fetchStatusMaquinas();
+            fetchContagemStatusOrdens();
+        })
+        .catch((error) => {
+            Swal.fire({
+                title: 'Erro',
+                text: error.message,
+            });
+        });
     });
 }
 
@@ -773,42 +816,50 @@ function mostrarModalFinalizarParcial(ordemId, grupoMaquina) {
 function mostrarModalProxProcesso(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalProxProcesso'));
     const modalTitle = document.getElementById('modalProxProcessoLabel');
-    const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
 
     const colQtdProxProcesso = document.getElementById('colQtdProxProcesso');
 
     colQtdProxProcesso.style.display = 'block';
     
-    const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
     const qtdProxProcesso = document.getElementById('qtdProxProcesso');
+    qtdProxProcesso.value = '';
     qtdProxProcesso.required = true;
     
+    // Exibe SweetAlert de carregamento
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações dos processos...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
     // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = `<option value="">------</option>`;
+    fetch('/cadastro/api/buscar-processos/?setor=estamparia', {
+        method: 'GET',
+        headers: {'Content-Type':'application/json'}
+    })
+    .then(response => response.json())
+    .then(
+        data => {
+            const escolhaProcesso = document.getElementById('escolhaMaquinaProxProcesso');
+            const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
+            escolhaProcesso.innerHTML = `<option value="">------</option>`;
 
-    // Define as máquinas para cada grupo
-    const maquinasPorGrupo = {
-        estamparia: [
-            { value: 'estampar', label: 'Estampar'},
-        ]
-    };
+            Swal.close();
+            data.processos.forEach((processo) => {
+                const option = document.createElement('option');
+                option.value = processo.id;
+                option.textContent = processo.nome;
+                escolhaProcesso.appendChild(option);
+            })
+            modalTitle.innerHTML = `Passar para próximo processo`;
+            labelModalMaquinaProxProcesso.innerHTML = 'Escolha o próximo processo:'
+            modal.show();
+        }
+    ) 
 
-    // Preenche o select com base no grupo de máquinas
-    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
-        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
-            const option = document.createElement('option');
-            option.value = maquina.value;
-            option.textContent = maquina.label;
-            escolhaMaquina.appendChild(option);
-        });
-    } else {
-        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
-    }
-
-    modalTitle.innerHTML = `Próximo processo para a ordem: ${ordemId}`;
-    labelModalMaquinaProxProcesso.innerHTML = 'Escolha o próximo processo'
-    modal.show();
-    
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formProxProcesso');
     const clonedForm = formIniciar.cloneNode(true);
@@ -889,9 +940,8 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
 function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalProxProcesso'));
     const modalTitle = document.getElementById('modalProxProcessoLabel');
-    const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
 
-    const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
+    // const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
     const qtdProxProcesso = document.getElementById('qtdProxProcesso');
     const colQtdProxProcesso = document.getElementById('colQtdProxProcesso');
 
@@ -899,35 +949,44 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
     qtdProxProcesso.required = false;
 
     // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = `<option value="">------</option>`;
+    // escolhaMaquina.innerHTML = `<option value="">------</option>`;
 
-    // Define as máquinas para cada grupo
-    const maquinasPorGrupo = {
-        estamparia: [
-            { value: 'viradeira_1', label: 'Viradeira 1'},
-            { value: 'viradeira_2', label: 'Viradeira 2'},
-            { value: 'viradeira_3', label: 'Viradeira 3'},
-            { value: 'viradeira_4', label: 'Viradeira 4'},
-            { value: 'viradeira_5', label: 'Viradeira 5'},
-        ]
-    };
-
-    // Preenche o select com base no grupo de máquinas
-    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
-        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
-            const option = document.createElement('option');
-            option.value = maquina.value;
-            option.textContent = maquina.label;
-            escolhaMaquina.appendChild(option);
-        });
-    } else {
-        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
-    }
-
-    modalTitle.innerHTML = `Iniciar próximo processo para a ordem: ${ordemId}`;
-    labelModalMaquinaProxProcesso.innerHTML = 'Em qual máquina será iniciado?'
-    modal.show();
+    // Exibe SweetAlert de carregamento
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações das máquinas...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
     
+    // Limpa opções antigas no select
+
+    fetch('/cadastro/api/buscar-maquinas/?setor=estamparia', {
+        method: 'GET',
+        headers: {'Content-Type':'application/json'}
+    })
+    .then(response => response.json())
+    .then(
+        data => {
+            const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
+            const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
+            escolhaMaquina.innerHTML = `<option value="">------</option>`;
+
+            Swal.close();
+            data.maquinas.forEach((maquina) => {
+                const option = document.createElement('option');
+                option.value = maquina.id;
+                option.textContent = maquina.nome;
+                escolhaMaquina.appendChild(option);
+            })
+            modalTitle.innerHTML = 'Iniciar próximo processo'
+            labelModalMaquinaProxProcesso.innerHTML = 'Em qual máquina será iniciado?'
+            modal.show();
+        }
+    )
+
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formProxProcesso');
     const clonedForm = formIniciar.cloneNode(true);
@@ -994,6 +1053,9 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
 
                 colQtdProxProcesso.style.display = 'block';
                 qtdProxProcesso.required = true;
+
+                fetchStatusMaquinas();
+                fetchContagemStatusOrdens();
             
             })
             .catch((error) => {
@@ -1153,13 +1215,13 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 // Modal para "Retornar"
 function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
 
-    const maquinaTratada = maquina.toLowerCase().replace(" ","_");
+    // const maquinaTratada = maquina.toLowerCase().replace(" ","_");
 
     const modal = new bootstrap.Modal(document.getElementById('modalRetornar'));
     const modalTitle = document.getElementById('modalRetornarLabel');
     const formRetornar = document.getElementById('formRetornarProducao');
 
-    modalTitle.innerHTML = `Retornar Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Retornar Ordem`;
     modal.show();
 
     // Remove listeners antigos e adiciona novo
@@ -1186,7 +1248,7 @@ function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
                 ordem_id: ordemId,
                 grupo_maquina: grupoMaquina,
                 status: 'iniciada',
-                maquina_nome: maquinaTratada,
+                maquina_nome: maquina,
 
             }),
             headers: {
@@ -1314,88 +1376,114 @@ function mostrarModalExcluir(ordemId, setor) {
     });
 }
 
-function modalPlanejar() {
-    const form = document.getElementById('opEstampariaForm');
-    const modal = new bootstrap.Modal(document.getElementById('modalIniciarAposPlanejar'));
-    const modalPlanejar = new bootstrap.Modal(document.getElementById('modalEstamparia'));
+// Função separada para evitar múltiplos event listeners
+async function handleSubmit(event) {
+    event.preventDefault(); // Evita o recarregamento da página
 
-    if (form) {
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            
-            const formData = new FormData(form);
+    const form = event.target;
+    const formData = new FormData(form);
 
+    Swal.fire({
+        title: 'Enviando...',
+        text: 'Aguarde enquanto processamos sua solicitação.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        },
+    });
+
+    try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const response = await fetch('api/criar-ordem-estamparia/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+            },
+            body: formData,
+        });
+
+        const data = await response.json();
+
+        Swal.close();
+
+        if (response.ok) {
             Swal.fire({
-                title: 'Enviando...',
-                text: 'Aguarde enquanto processamos sua solicitação.',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                },
+                title: 'Sucesso!',
+                text: 'Ordem de Produção criada com sucesso.',
+                confirmButtonText: 'OK',
             });
 
-            try {
-                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-                const response = await fetch('api/criar-ordem-estamparia/', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': csrfToken,
-                    },
-                    body: formData,
-                });
+            form.reset();
 
-                const data = await response.json();
+            //  Remove o foco do elemento ativo antes de fechar o modal
+            document.activeElement.blur();
 
-                Swal.close();
-
-                if (response.ok) {
-
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: 'Ordem de Produção criada com sucesso.',
-                        confirmButtonText: 'OK',
-                    });
-
-                    form.reset();
-
-                    // Recarrega os cards
-                    document.getElementById('ordens-container').innerHTML = '';
-                    resetarCardsInicial();
-
-                    modal.show();
-                    modalPlanejar.hide();
-
-                    // Força o foco no modal recém-aberto
-                    document.getElementById('modalIniciarAposPlanejar').focus();
-
-                    document.querySelector('.btn-iniciar-planejar').addEventListener('click', function(){
-                        modal.hide();
-                        mostrarModalIniciar(data.ordem_id,'estamparia');
-                    })
-
-                    fetchContagemStatusOrdens();
-
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro!',
-                        text: data.error || 'Erro ao criar a Ordem de Produção.',
-                        confirmButtonText: 'OK',
-                    });
-                }
-            } catch (error) {
-                Swal.close();
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro inesperado!',
-                    text: 'Ocorreu um erro ao processar sua solicitação. Tente novamente.',
-                    confirmButtonText: 'OK',
-                });
-                console.error('Erro:', error);
+            // Fecha corretamente o modal atual
+            const modalPlanejarInstance = bootstrap.Modal.getInstance(document.getElementById('modalEstamparia'));
+            if (modalPlanejarInstance) {
+                modalPlanejarInstance.hide();
             }
+
+            // Recarrega os cards
+            document.getElementById('ordens-container').innerHTML = '';
+            resetarCardsInicial();
+
+            // Abre o modal correto
+            const modal = new bootstrap.Modal(document.getElementById('modalIniciarAposPlanejar'));
+            modal.show();
+
+            // Remove event listeners antigos antes de adicionar novos
+            const btnIniciar = document.querySelector('.btn-iniciar-planejar');
+            const btnNaoIniciar = document.querySelector('.btn-nao-iniciar-planejar');
+
+            if (btnIniciar) {
+                btnIniciar.replaceWith(btnIniciar.cloneNode(true));
+                document.querySelector('.btn-iniciar-planejar').addEventListener('click', function () {
+                    modal.hide();
+                    mostrarModalIniciar(data.ordem_id, 'estamparia');
+                });
+            }
+
+            if (btnNaoIniciar) {
+                btnNaoIniciar.replaceWith(btnNaoIniciar.cloneNode(true));
+                document.querySelector('.btn-nao-iniciar-planejar').addEventListener('click', function () {
+                    modal.hide();
+                });
+            }
+
+            fetchContagemStatusOrdens();
+
+        } else {
+            Swal.fire({
+                title: 'Erro!',
+                text: data.error || 'Erro ao criar a Ordem de Produção.',
+                confirmButtonText: 'OK',
+            });
+        }
+    } catch (error) {
+        Swal.close();
+        Swal.fire({
+            title: 'Erro inesperado!',
+            text: 'Ocorreu um erro ao processar sua solicitação. Tente novamente.',
+            confirmButtonText: 'OK',
         });
+        console.error('Erro:', error);
     }
+}
+
+// Modal para "planejar"
+function modalPlanejar() {
+    const form = document.getElementById('opEstampariaForm');
+
+    if (!form) {
+        console.error("Formulário não encontrado!");
+        
+        return;
+    }
+
+    // Remove qualquer evento de submit duplicado antes de adicionar um novo
+    form.removeEventListener('submit', handleSubmit);
+    form.addEventListener('submit', handleSubmit);
 }
 
 function resetarCardsInicial(filtros = {}) {

@@ -13,7 +13,7 @@ from django.contrib.auth.decorators import login_required
 
 from .models import PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada
-from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operador, Setor, MotivoMaquinaParada
+from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operador, Setor, MotivoMaquinaParada, Maquina
 
 import os
 import re
@@ -37,7 +37,7 @@ def planejamento(request):
 
     motivos = MotivoInterrupcao.objects.filter(setor__nome='serra', visivel=True)
     operadores = Operador.objects.filter(setor__nome='serra')
-    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='serra')
+    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='serra').exclude(nome='Finalizada parcial')
     motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='serra')
 
     return render(request, 'apontamento_serra/planejamento.html', {
@@ -51,8 +51,8 @@ def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:
         # Busca a ordem com os relacionamentos necessários
         ordem = Ordem.objects.select_related('propriedade').prefetch_related('ordem_pecas_serra__peca').get(
-            ordem=pk_ordem,
-            grupo_maquina=name_maquina
+            pk=pk_ordem,
+            # grupo_maquina=name_maquina
         )
 
         # Propriedades da ordem
@@ -94,22 +94,22 @@ def atualizar_status_ordem(request):
             with transaction.atomic():
                 # Parse do corpo da requisição
                 body = json.loads(request.body)
-
+                print(body)
+                
                 status = body['status']
                 ordem_id = body['ordem_id']
-                grupo_maquina = body['grupo_maquina'].lower()
+                # grupo_maquina = body['grupo_maquina'].lower()
                 pecas_geral = body.get('pecas_mortas', [])
-                maquina_nome = body.get('maquina_nome')
+                maquina_request = body.get('maquina_nome')
+                if maquina_request:
+                    maquina_nome = get_object_or_404(Maquina, pk=int(maquina_request))
 
                 # Obtém a ordem
-                ordem = Ordem.objects.get(ordem=ordem_id, grupo_maquina=grupo_maquina)
+                ordem = Ordem.objects.get(pk=int(ordem_id))
 
                 # Validações básicas
                 if ordem.status_atual == status:
                     return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
-
-                if not ordem_id or not grupo_maquina or not status:
-                    return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
 
                 # Verifica se já existe uma ordem iniciada na mesma máquina
                 if status == 'iniciada' and maquina_nome:
@@ -210,7 +210,7 @@ def get_ordens_criadas(request):
     status_atual = request.GET.get('status', '').strip()
     filtro_mp = request.GET.get('mp', '').strip()
     filtro_peca = request.GET.get('peca', '').strip()
-    status = request.GET.get('status', '')
+    # status = request.GET.get('status', '')
 
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
@@ -226,8 +226,6 @@ def get_ordens_criadas(request):
         ordens_queryset = ordens_queryset.filter(propriedade__mp_codigo__codigo=filtro_mp)
     if filtro_peca:
         ordens_queryset = ordens_queryset.filter(ordem_pecas_serra__peca__codigo=filtro_peca)
-    if status:
-        ordens_queryset = ordens_queryset.filter(status_atual=status)
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -250,7 +248,8 @@ def get_ordens_criadas(request):
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina':ordem.get_maquina_display(),
+            'maquina':ordem.maquina.nome if ordem.maquina else None,
+            'maquina_id': ordem.maquina.id if ordem.maquina else None,
             'propriedade': {
                 'descricao_mp': propriedade.mp_codigo.codigo +" - "+ propriedade.mp_codigo.descricao if propriedade else None,
                 'mp_codigo': propriedade.mp_codigo.codigo if propriedade.mp_codigo else None,
@@ -337,12 +336,13 @@ def get_ordens_iniciadas(request):
 
         # Adiciona os dados da ordem
         data.append({
+            'id': ordem.id,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina': ordem.get_maquina_display(),
+            'maquina': ordem.maquina.nome,
             'ultima_atualizacao': ordem.ultima_atualizacao,
             'propriedade': {
                 'descricao_mp': propriedade.mp_codigo.codigo + " - " + propriedade.mp_codigo.descricao if propriedade else None,
@@ -406,12 +406,14 @@ def get_ordens_interrompidas(request):
 
         # Adiciona os dados da ordem
         data.append({
+            'id': ordem.id,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina': ordem.get_maquina_display(),
+            'maquina': ordem.maquina.nome,
+            'maquina_id': ordem.maquina.id,
             'ultima_atualizacao': ordem.ultima_atualizacao,
             'motivo_interrupcao': ultimo_processo_interrompido.motivo_interrupcao.nome if ultimo_processo_interrompido and ultimo_processo_interrompido.motivo_interrupcao else None,
             'propriedade': {
@@ -679,7 +681,7 @@ def api_apontamentos_peca(request):
                     "qtd_morta": apontamento.qtd_morta,
                     "qtd_planejada": apontamento.qtd_planejada,
                     "obs_plano": ordem.obs,
-                    "maquina": ordem.get_maquina_display(),
+                    "maquina": ordem.ordem.nome,
                     "obs_operador": ordem.obs_operador,
                     "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
                     "data_final": data_final  # Mantemos o objeto datetime para ordenação

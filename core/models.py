@@ -3,7 +3,9 @@ from django.utils.timezone import now
 from django.db.models import Max
 from django.contrib.auth.models import User
 
-from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao
+from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao,Maquina,Pecas,Setor
+
+from datetime import timedelta
 
 STATUS_ANDAMENTO_CHOICES = (
     ('aguardando_iniciar', 'Aguardando iniciar'),
@@ -61,14 +63,16 @@ class Ordem(models.Model):
         ('usinagem', 'Usinagem'),
         ('serra', 'Serra'),
         ('prod_esp', 'Prod. Especiais'),
-        ('estamparia', 'Estamparia')
+        ('estamparia', 'Estamparia'),
+        ('montagem', 'Montagem'),
+        ('pintura','Pintura')
     )
 
     ordem = models.IntegerField(blank=True, null=True)
     data_criacao = models.DateTimeField(default=now, editable=False)
     obs = models.TextField(null=True, blank=True)
     grupo_maquina = models.CharField(max_length=20, choices=GRUPO_MAQUINA_CHOICES, blank=True, null=True)
-    maquina = models.CharField(max_length=20, choices=MAQUINA_CHOICES, blank=True, null=True)
+    maquina = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='maquina_ordem', blank=True, null=True)#models.CharField(max_length=20, choices=MAQUINA_CHOICES, blank=True, null=True)
     status_atual = models.CharField(max_length=20, choices=STATUS_ANDAMENTO_CHOICES, default='aguardando_iniciar')
     status_prioridade = models.IntegerField(default=0)
     operador_final = models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador', blank=True, null=True)
@@ -78,7 +82,7 @@ class Ordem(models.Model):
     excluida = models.BooleanField(default=False) # Opção para exclusão de ordens
     motivo_exclusao = models.ForeignKey(MotivoExclusao, on_delete=models.CASCADE, null=True, blank=True) # Caso exclua a ordem, é necessário informar o motivo
     
-    #Para ordens duplicadas
+    #Para ordens duplicadas de corte
     ordem_duplicada = models.TextField(blank=True, null=True) # Armazena a identificação da ordem duplicada (Ex.: "dup#1","dup#2"...)
     ordem_pai = models.ForeignKey(
         'self',  # Referencia a própria tabela
@@ -90,12 +94,30 @@ class Ordem(models.Model):
     )
     duplicada = models.BooleanField(default=False) # Opção para ordens duplicadas
 
+    #Campos para apontamento de montagem e pintura
+    data_carga = models.DateField(null=True, blank=True)
+    cor = models.CharField(max_length=50, blank=True, null=True) # Cinza, Vermelho, Amarelo...
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['ordem', 'maquina'], name='unique_ordem_processo')
         ]
 
     def save(self, *args, **kwargs):
+        
+        if self.grupo_maquina == 'montagem' and self.data_carga:
+            self.data_programacao = self.data_carga - timedelta(days=3)
+
+            # Se a data_programacao cair num sábado (5) ou domingo (6), ajustar para sexta-feira
+            while self.data_programacao.weekday() in [5, 6]:  # 5 = Sábado, 6 = Domingo
+                self.data_programacao -= timedelta(days=1)  # Retrocede até sexta
+
+        elif self.grupo_maquina == 'pintura' and self.data_carga:
+            self.data_programacao = self.data_carga - timedelta(days=1)
+
+            # Se a data_programacao cair num sábado (5) ou domingo (6), ajustar para sexta-feira
+            while self.data_programacao.weekday() in [5, 6]:  # 5 = Sábado, 6 = Domingo
+                self.data_programacao -= timedelta(days=1)  # Retrocede até sexta
 
         if not self.pk and self.duplicada:
             # Gera uma identificação única para a duplicata
@@ -142,7 +164,7 @@ class OrdemProcesso(models.Model):
     data_inicio = models.DateTimeField(default=now)  # Armazena quando o status foi definido
     data_fim = models.DateTimeField(null=True, blank=True)  # Armazena quando o status foi finalizado
     motivo_interrupcao = models.ForeignKey(MotivoInterrupcao, on_delete=models.CASCADE, null=True, blank=True)
-    maquina = models.CharField(max_length=30, null=True, blank=True)
+    maquina = models.ForeignKey(Maquina, related_name='processo_maquina', on_delete=models.CASCADE, null=True, blank=True)
 
     def finalizar_atual(self):
         """
@@ -171,7 +193,7 @@ class OrdemProcesso(models.Model):
 
 class MaquinaParada(models.Model):
 
-    maquina = models.CharField(max_length=30, choices=MAQUINA_CHOICES)
+    maquina = maquina = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='maquina_maquina_parada', blank=True, null=True)
     data_inicio = models.DateTimeField(default=now)
     data_fim = models.DateTimeField(null=True, blank=True)
     motivo = models.ForeignKey(MotivoMaquinaParada, on_delete=models.CASCADE, null=True, blank=True)
@@ -238,3 +260,16 @@ class Versao(models.Model):
 
     def __str__(self):
         return f"Versão {self.numero}"
+
+class SolicitacaoPeca(models.Model):
+
+    peca=models.ForeignKey(Pecas, on_delete=models.CASCADE, related_name='peca_solicitacao_peca')
+    qtd_solicitada=models.FloatField(default=1)
+    localizacao_solicitante=models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='localizacao_solicitacao_peca')
+    mais_informacoes=models.TextField(blank=True, null=True)
+    data_solicitacao=models.DateField(auto_now_add=True)
+    data_carga=models.DateField(blank=True, null=True)
+    
+
+    def __str__(self):
+        return f"{self.peca} - {self.setor_solicitante}"

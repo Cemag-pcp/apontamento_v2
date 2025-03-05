@@ -5,12 +5,13 @@ from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now,localtime
-from django.db.models import Q
+from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso,MaquinaParada
-from cadastro.models import MotivoInterrupcao, Pecas, Operador, MotivoMaquinaParada, MotivoExclusao
+from cadastro.models import MotivoInterrupcao, Pecas, Operador, MotivoMaquinaParada, MotivoExclusao, Maquina
 
 import os
 import re
@@ -33,7 +34,7 @@ def planejamento(request):
 
     motivos = MotivoInterrupcao.objects.filter(setor__nome='estamparia', visivel=True)
     operadores = Operador.objects.filter(setor__nome='estamparia')
-    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='estamparia')
+    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='estamparia').exclude(nome='Finalizada parcial')
     motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='estamparia')
 
     return render(request, 'apontamento_estamparia/planejamento.html', {
@@ -45,7 +46,7 @@ def planejamento(request):
 def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:
         # Busca a ordem com os relacionamentos necessários
-        ordem = Ordem.objects.prefetch_related('ordem_pecas_estamparia').get(ordem=pk_ordem, grupo_maquina=name_maquina)
+        ordem = Ordem.objects.prefetch_related('ordem_pecas_estamparia').get(pk=pk_ordem)
 
         # Obtém a peça relacionada
         peca_ordem = ordem.ordem_pecas_estamparia.first()  # Obtém a primeira peça (ou única)
@@ -77,13 +78,25 @@ def get_ordens_criadas(request):
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
 
-    # Filtra as ordens com base nos parâmetros
-    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_estamparia', 'propriedade').filter(grupo_maquina='estamparia', excluida=False).order_by('status_prioridade','-data_criacao')
+    # Criamos uma subquery para obter a primeira peça associada à ordem
+    primeira_peca = PecasOrdem.objects.filter(
+        ordem=OuterRef('pk')
+    ).order_by('id')[:1]
+
+    # Query principal das ordens
+    ordens_queryset = Ordem.objects.filter(
+        grupo_maquina='estamparia',
+        excluida=False
+    ).annotate(
+        peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
+        peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
+        peca_quantidade=Subquery(primeira_peca.values('qtd_planejada'))
+    ).order_by('-status_prioridade')
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
     if filtro_peca:
-        ordens_queryset = ordens_queryset.filter(ordem_pecas_estamparia__peca__codigo=filtro_peca)
+        ordens_queryset = ordens_queryset.filter(peca_codigo=filtro_peca)
     if status_atual:
         ordens_queryset = ordens_queryset.filter(status_atual=status_atual)
 
@@ -97,8 +110,6 @@ def get_ordens_criadas(request):
     # Monta os dados para a resposta
     data = []
     for ordem in ordens_page:
-        peca_info = ordem.ordem_pecas_estamparia.first()  # Assume que há apenas uma peça por ordem
-
         data.append({
             'id': ordem.pk,
             'ordem': ordem.ordem,
@@ -106,198 +117,231 @@ def get_ordens_criadas(request):
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina': ordem.maquina,
             'peca': {
-                'codigo': peca_info.peca.codigo if peca_info and peca_info.peca else None,
-                'descricao': peca_info.peca.descricao if peca_info and peca_info.peca else None,
-                'quantidade': peca_info.qtd_planejada if peca_info else 0,
-            } if peca_info else None  # Retorna `None` se não houver peça
-        })
+                'codigo': ordem.peca_codigo,
+                'descricao': ordem.peca_descricao,
+                'quantidade': ordem.peca_quantidade,
+            } if ordem.peca_codigo else None,
+            'info_pecas': [
+                {
+                    'ordem_id':ordem.pk,
+                    'ordem': ordem.ordem,
+                    'data_criacao': ordem.data_criacao,
+                    'maquina': ordem.maquina.nome,
+                    'id': peca_ordem.id,
+                    'peca_id': peca_ordem.peca.id,
+                    'peca_codigo': peca_ordem.peca.codigo,
+                    'peca_nome': peca_ordem.peca.descricao if peca_ordem.peca.descricao else 'Sem descrição',
+                    'quantidade': peca_ordem.qtd_planejada,
+                    'qtd_morta': peca_ordem.qtd_morta,
+                    'qtd_boa': peca_ordem.qtd_boa
+                }
+                for peca_ordem in ordem.ordem_pecas_estamparia.all() if peca_ordem.qtd_boa > 0
+            ]  # Lista todas as peças associadas
 
-    # Verifica se há próxima página
-    has_next = ordens_page.has_next()
+        })
 
     return JsonResponse({
         'ordens': data,
-        'has_next': has_next,  # Indica se há próxima página
+        'total_ordens': paginator.count,  # Envia total de ordens
+        'has_next': ordens_page.has_next(),  # Envia se há próxima página
     })
 
 def atualizar_status_ordem(request):
-    if request.method == 'PATCH':
-        try:
-            with transaction.atomic():
-                # Parse do corpo da requisição
-                body = json.loads(request.body)
+    if request.method != 'PATCH':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
 
-                status = body['status']
-                ordem_id = body['ordem_id']
-                grupo_maquina = body['grupo_maquina'].lower()
-                qt_produzida = body.get('qt_realizada')
-                qt_mortas = body.get('qt_mortas')
-                maquina_nome = body.get('maquina_nome')
+    try:
+        # Parse do corpo da requisição
+        body = json.loads(request.body)
 
-                # Obtém a ordem
-                ordem = Ordem.objects.get(ordem=ordem_id, grupo_maquina=grupo_maquina)
-                
-                # Validações básicas
-                if ordem.status_atual == status:
-                    return JsonResponse({'error': f'Essa ordem ja está {status}. Atualize a página.'}, status=400)
+        status = body.get('status')
+        ordem_id = body.get('ordem_id')
+        grupo_maquina = body.get('grupo_maquina', '').lower()
+        qt_produzida = body.get('qt_realizada', 0)
+        qt_mortas = body.get('qt_mortas', 0)
+        maquina_nome = body.get('maquina_nome')
 
-                if not ordem_id or not grupo_maquina or not status:
-                    return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
+        if not ordem_id or not grupo_maquina or not status:
+            return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
 
-                # Verifica se já existe uma ordem iniciada na mesma máquina
-                if status == 'iniciada' and maquina_nome:
-                    ordem_em_andamento = Ordem.objects.filter(
-                        maquina=maquina_nome, status_atual='iniciada'
-                    ).exclude(id=ordem.id).exists()
+        # Obtém a ordem ANTES da transação, para evitar falha na atomicidade
+        ordem = get_object_or_404(Ordem, pk=ordem_id)
 
-                    if ordem_em_andamento:
-                        return JsonResponse({'error': f'Já existe uma ordem iniciada para essa máquina ({maquina_nome}). Finalize ou interrompa antes de iniciar outra.'}, status=400)
+        if maquina_nome:
+            maquina_nome = get_object_or_404(Maquina, pk=int(maquina_nome))
 
-                # Finaliza o processo atual (se existir)
-                processo_atual = ordem.processos.filter(data_fim__isnull=True).first()
-                if processo_atual:
-                    processo_atual.finalizar_atual()
+        # Validações básicas
+        if ordem.status_atual == status:
+            return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
 
-                # Cria o novo processo
-                novo_processo = OrdemProcesso.objects.create(
+        with transaction.atomic():  # Entra na transação somente após garantir que todos os objetos existem
+            # Verifica se já existe uma ordem iniciada na mesma máquina
+            if status == 'iniciada' and maquina_nome:
+                ordem_em_andamento = Ordem.objects.filter(
+                    maquina=maquina_nome, status_atual='iniciada'
+                ).exclude(id=ordem.id).exists()
+
+                if ordem_em_andamento:
+                    return JsonResponse({
+                        'error': f'Já existe uma ordem iniciada para essa máquina ({maquina_nome}).'
+                    }, status=400)
+
+            # Finaliza o processo atual (se existir)
+            processo_atual = ordem.processos.filter(data_fim__isnull=True).first()
+            if processo_atual:
+                processo_atual.finalizar_atual()
+
+            # Cria o novo processo
+            novo_processo = OrdemProcesso.objects.create(
+                ordem=ordem,
+                status=status,
+                data_inicio=now(),
+                data_fim=now() if status in ['finalizada', 'agua_prox_proc'] else None,
+            )
+
+            # Atualiza o status da ordem
+            ordem.status_atual = status
+
+            if status == 'iniciada':
+                # Finaliza a parada da máquina se necessário
+                maquinas_paradas = MaquinaParada.objects.filter(maquina=maquina_nome, data_fim__isnull=True)
+                for parada in maquinas_paradas:
+                    parada.data_fim = now()
+                    parada.save()
+
+                ordem.maquina = maquina_nome
+                ordem.status_prioridade = 1
+
+            elif status == 'finalizada':
+                operador_final = get_object_or_404(Operador, pk=int(body.get('operador_final')))
+                obs_final = body.get('obs_finalizar')
+
+                ordem.operador_final = operador_final
+                ordem.obs_operador = obs_final
+
+                peca = PecasOrdem.objects.filter(ordem=ordem).first()
+
+                PecasOrdem.objects.create(
                     ordem=ordem,
-                    status=status,
-                    data_inicio=now(),
-                    data_fim=now() if status == 'finalizada' or status == 'agua_prox_proc' else None,
+                    peca=peca.peca,
+                    qtd_planejada=peca.qtd_planejada,
+                    qtd_boa=int(qt_produzida),
+                    qtd_morta=int(qt_mortas),
+                    operador=operador_final
                 )
 
-                # Atualiza o status da ordem para o novo status
-                ordem.status_atual = status
-                
-                if status == 'iniciada':
-                    # Verifica e finaliza a parada da máquina se necessário
-                    maquinas_paradas = MaquinaParada.objects.filter(maquina=maquina_nome, data_fim__isnull=True)
-                    for parada in maquinas_paradas:
-                        parada.data_fim = now()
-                        parada.save()
-                    
-                    if maquina_nome:
-                        ordem.maquina = maquina_nome
+                ordem.status_prioridade = 3
 
-                    ordem.status_prioridade = 1
-                elif status == 'finalizada':
-                    operador_final = int(body.get('operador_final'))
-                    obs_final = body.get('obs_finalizar')
-                    operador_final_object = get_object_or_404(Operador, pk=operador_final)
+            elif status == 'interrompida':
+                novo_processo.motivo_interrupcao = get_object_or_404(MotivoInterrupcao, nome=body['motivo'])
+                novo_processo.save()
+                ordem.status_prioridade = 2
 
-                    ordem.operador_final=operador_final_object
-                    ordem.obs_operador=obs_final
+            elif status == 'agua_prox_proc':
+                ordem.maquina = maquina_nome
+                novo_processo.maquina = maquina_nome
 
-                    peca = PecasOrdem.objects.filter(ordem=ordem).first()
-                    # peca.qtd_boa = qt_produzida  
-                    # peca.qtd_morta = qt_mortas 
+                peca = PecasOrdem.objects.filter(ordem=ordem).first()
+                peca.qtd_planejada = int(body['qtd_prox_processo'])
+                peca.save()
+                novo_processo.save()
 
-                    PecasOrdem.objects.create(
-                        ordem=ordem,
-                        peca=peca.peca,
-                        qtd_planejada=peca.qtd_planejada,
-                        qtd_boa=int(qt_produzida),
-                        qtd_morta=int(qt_mortas),
-                        operador=operador_final_object
-                    )      
+                ordem.status_prioridade = 4
 
-                    peca.save()
+            elif status == 'finalizada_parcial':
 
-                    ordem.status_prioridade = 3
-                elif status == 'interrompida':
-                    novo_processo.motivo_interrupcao = MotivoInterrupcao.objects.get(nome=body['motivo'])
-                    novo_processo.save()
-                    ordem.status_prioridade = 2
-                elif status == 'agua_prox_proc':
-                    try:
-                        ordem.maquina = body['maquina_nome']
-                        novo_processo.maquina=body['maquina_nome']
+                peca = PecasOrdem.objects.filter(ordem=ordem).first()
 
-                        peca = PecasOrdem.objects.filter(ordem=ordem).first()
-                        peca.qtd_planejada = int(body['qtd_prox_processo'])
-                        
-                        peca.save()
-                        novo_processo.save()
-                    except:
-                        pass
-                    ordem.status_prioridade = 4
-                elif status == 'finalizada_parcial':
+                operador_final = get_object_or_404(Operador, pk=int(body.get('operador_final')))
+                ordem.status_atual = 'interrompida'
 
-                    peca = PecasOrdem.objects.filter(ordem=ordem).first()
-                    operador_final = int(body.get('operador_final'))
-                    ordem.status_atual = 'interrompida'
+                novo_processo.motivo_interrupcao = get_object_or_404(MotivoInterrupcao, nome='Finalizada parcial')
+                novo_processo.save()
+                ordem.status_prioridade = 2
 
-                    novo_processo.motivo_interrupcao = MotivoInterrupcao.objects.get(nome='Finalizada parcial')
-                    novo_processo.save()
+                PecasOrdem.objects.create(
+                    ordem=ordem,
+                    peca=peca.peca,
+                    qtd_planejada=peca.qtd_planejada,
+                    qtd_boa=int(qt_produzida),
+                    qtd_morta=int(qt_mortas),
+                    operador=operador_final
+                )
 
-                    ordem.status_prioridade = 2
+            ordem.save()
 
-                    PecasOrdem.objects.create(
-                        ordem=ordem,
-                        peca=peca.peca,
-                        qtd_planejada=peca.qtd_planejada,
-                        qtd_boa=int(qt_produzida),
-                        qtd_morta=int(qt_mortas),
-                        operador=get_object_or_404(Operador, pk=operador_final)
-                    )
+            return JsonResponse({
+                'message': 'Status atualizado com sucesso.',
+                'ordem_id': ordem.id,
+                'status': novo_processo.status,
+                'data_inicio': novo_processo.data_inicio,
+            })
 
-                ordem.save()
-
-                return JsonResponse({
-                    'message': 'Status atualizado com sucesso.',
-                    'ordem_id': ordem.id,
-                    'status': novo_processo.status,
-                    'data_inicio': novo_processo.data_inicio,
-                })
-
-        except Ordem.DoesNotExist:
-            return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-
-    return JsonResponse({'error': 'Método não permitido.'}, status=405)
-
+    except Ordem.DoesNotExist:
+        return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
 @require_GET
 def get_ordens_iniciadas(request):
-    # Filtra as ordens com base no status 'iniciada' e prefetch da peça relacionada
-    ordens_queryset = Ordem.objects.prefetch_related(
-        'ordem_pecas_estamparia'
-    ).filter(grupo_maquina='estamparia', status_atual='iniciada')
+    # Filtra as ordens baseadas no status e no grupo da máquina
+    ordens_queryset = Ordem.objects.filter(
+        grupo_maquina='estamparia',
+        status_atual='iniciada'
+    )
 
-    # Paginação
-    page = int(request.GET.get('page', 1))  # Obtém o número da página
-    limit = int(request.GET.get('limit', 10))  # Define o limite padrão por página
+    page = int(request.GET.get('page', 1))
+    limit = int(request.GET.get('limit', 10))
     filtro_ordem = request.GET.get('ordem', '').strip()
     filtro_peca = request.GET.get('peca', '').strip()
- 
+
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
     if filtro_peca:
-        ordens_queryset = ordens_queryset.filter(ordem_pecas_estamparia__peca__codigo=filtro_peca)
+        ordens_queryset = ordens_queryset.filter(
+            ordem_pecas_estamparia__peca__codigo=filtro_peca
+        )
 
-    paginator = Paginator(ordens_queryset, limit)  # Aplica a paginação
-
+    # Paginação
+    paginator = Paginator(ordens_queryset, limit)
     try:
-        ordens_page = paginator.page(page)  # Obtém a página atual
+        ordens_page = paginator.page(page)
     except EmptyPage:
-        return JsonResponse({'ordens': []})  # Retorna vazio se a página não existir
+        return JsonResponse({'ordens': []})
 
-    # Monta os dados para retorno
-    data = []
+    # Criamos um dicionário para armazenar as peças agrupadas por ordem
+    ordens_dict = {}
+
+    # Iteramos pelas ordens da página
     for ordem in ordens_page:
-        pecas_data = []
+        if ordem.id not in ordens_dict:
+            ordens_dict[ordem.id] = {
+                'id': ordem.id,
+                'ordem': ordem.ordem,
+                'grupo_maquina': ordem.get_grupo_maquina_display(),
+                'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
+                'obs': ordem.obs,
+                'status_atual': ordem.status_atual,
+                'maquina': ordem.maquina.nome if ordem.maquina else None,
+                'ultima_atualizacao': ordem.ultima_atualizacao,
+                'pecas': []  # Criamos uma lista para armazenar as peças da ordem
+            }
+
+        # Iteramos pelas peças associadas à ordem
         for peca_ordem in ordem.ordem_pecas_estamparia.all():
             # Verifica se já existe uma entrada para essa peça
-            peca_existente = next((item for item in pecas_data if item['codigo'] == peca_ordem.peca.codigo), None)
+            peca_existente = next(
+                (item for item in ordens_dict[ordem.id]['pecas'] if item['codigo'] == peca_ordem.peca.codigo),
+                None
+            )
 
             if peca_existente:
                 # Soma a quantidade de boas à peça existente
                 peca_existente['qtd_boa'] += peca_ordem.qtd_boa
             else:
                 # Adiciona uma nova entrada para a peça
-                pecas_data.append({
+                ordens_dict[ordem.id]['pecas'].append({
                     'codigo': peca_ordem.peca.codigo,
                     'descricao': peca_ordem.peca.descricao,
                     'qtd_boa': peca_ordem.qtd_boa,
@@ -305,19 +349,8 @@ def get_ordens_iniciadas(request):
                     'qtd_morta': peca_ordem.qtd_morta,
                 })
 
-        data.append({
-            'ordem': ordem.ordem,
-            'grupo_maquina': ordem.get_grupo_maquina_display(),
-            'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
-            'obs': ordem.obs,
-            'status_atual': ordem.status_atual,
-            'maquina': ordem.get_maquina_display(),
-            'pecas': pecas_data,  # Lista consolidada de peças
-        })
-
-    # Retorna os dados paginados como JSON
     return JsonResponse({
-        'ordens': data,
+        'ordens': list(ordens_dict.values()),  # Retorna apenas valores únicos
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
         'total_ordens': paginator.count
@@ -360,12 +393,15 @@ def get_ordens_interrompidas(request):
                 })
 
         data.append({
+            'id': ordem.id,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina': ordem.get_maquina_display(),
+            'maquina': ordem.maquina.nome if ordem.maquina else None,
+            'maquina_id': ordem.maquina.id if ordem.maquina else None,
+            'ultima_atualizacao': ordem.ultima_atualizacao,
             'motivo_interrupcao': ultimo_processo_interrompido.motivo_interrupcao.nome if ultimo_processo_interrompido and ultimo_processo_interrompido.motivo_interrupcao else None,
             'pecas': pecas_data,  # Adiciona informações das peças
         })
@@ -418,12 +454,15 @@ def get_ordens_ag_prox_proc(request):
             })
 
         data.append({
+            'id': ordem.id,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina': ordem.get_maquina_display(),
+            'maquina': ordem.maquina.nome if ordem.maquina else None,
+            'maquina_id': ordem.maquina.id if ordem.maquina else None,
+            'ultima_atualizacao': ordem.ultima_atualizacao,
             'totais': {
                 'qtd_boa': total_qtd_boa,
                 'qtd_planejada': total_qtd_planejada,
@@ -492,7 +531,7 @@ def planejar_ordem_estamparia(request):
 
         return JsonResponse({
             'message': 'Status atualizado com sucesso.',
-            'ordem_id': nova_ordem.ordem
+            'ordem_id': nova_ordem.pk
         })
 
 def api_apontamentos_peca(request):
@@ -513,10 +552,30 @@ def api_apontamentos_peca(request):
             "qtd_morta": apontamento.qtd_morta,
             "qtd_planejada": apontamento.qtd_planejada,
             "obs_plano": apontamento.ordem.obs or "Sem observações",
-            "maquina": apontamento.ordem.get_maquina_display(),
+            "maquina": apontamento.ordem.maquina.nome,
+            'maquina_id': apontamento.ordem.maquina.id,
             "obs_operador": apontamento.ordem.obs_operador or "Sem observações",
             "operador": f"{apontamento.operador.matricula} - {apontamento.operador.nome}",
             "data": localtime(apontamento.data).strftime('%d/%m/%Y %H:%M'),
         })
 
     return JsonResponse(resultado, safe=False)
+
+def historico(request):
+
+    return render(request, "apontamento_estamparia/historico.html")
+
+@csrf_exempt
+def atualizar_pecas_ordem(request):
+
+    data = json.loads(request.body)
+
+    if request.method == 'POST':
+
+        edit_info_apontamento = get_object_or_404(PecasOrdem, pk=int(data['ordemId']))
+        edit_info_apontamento.qtd_boa = int(data['novaQtBoa'])
+        edit_info_apontamento.qtd_morta = int(data['novaQtMorta'])
+
+        edit_info_apontamento.save()
+
+    return JsonResponse({'status':'success'})
