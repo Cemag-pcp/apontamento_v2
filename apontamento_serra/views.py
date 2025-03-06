@@ -658,7 +658,7 @@ def api_apontamentos_peca(request):
     ordens = (
         Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra', excluida=False)
         .exclude(Q(ordem_pecas_serra__peca__codigo='GRAU') | Q(ordem_pecas_serra__peca__codigo='RECORTE'))  # Exclui GRAU e RECORTE
-        .select_related('operador_final')  # Para otimizar a relação com operador_final
+        .select_related('operador_final', 'maquina')  # Para otimizar a relação com operador_final
         .prefetch_related('ordem_pecas_serra__peca')  # Ajustado para usar o related_name correto
         .distinct()  # Evitar duplicatas
     )
@@ -681,7 +681,7 @@ def api_apontamentos_peca(request):
                     "qtd_morta": apontamento.qtd_morta,
                     "qtd_planejada": apontamento.qtd_planejada,
                     "obs_plano": ordem.obs,
-                    "maquina": ordem.ordem.nome,
+                    "maquina": ordem.maquina.nome,
                     "obs_operador": ordem.obs_operador,
                     "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
                     "data_final": data_final  # Mantemos o objeto datetime para ordenação
@@ -737,7 +737,6 @@ def api_apontamentos_mp(request):
         }
         for item in propriedades_ordens
     ]
-
 
     return JsonResponse(propriedades_ordens, safe=False)
 
