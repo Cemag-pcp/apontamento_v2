@@ -26,66 +26,76 @@
 
 .border-yellow { 
     border-left-color: #fff131;
-    border-left-width: 4px;
+    border-left-width: 6px;
 }
 
 .border-yellow { 
     border-left-color: #fff131;
-    border-left-width: 4px;
+    border-left-width: 6px;
 }
 
 .border-gray { 
     border-left-color: #b8b8b8;
-    border-left-width: 4px;
+    border-left-width: 6px;
 }
 
 .border-blue { 
     border-left-color: #2079ff;
-    border-left-width: 4px;
+    border-left-width: 6px;
 }
 
 .border-green { 
     border-left-color: #22c55e;
-    border-left-width: 4px;
+    border-left-width: 6px;
 }
 
 .border-orange { 
     border-left-color: #f59e0b;
-    border-left-width: 4px;
+    border-left-width: 6px;
 }
 .border-red { 
     border-left-color: #ef4444;
-    border-left-width: 4px;
+    border-left-width: 6px;
 }
 
 .timeline {
     border-left: 1px solid hsl(0, 0%, 90%);
     position: relative;
     list-style: none;
-  }
-  
-  .timeline .timeline-item {
+}
+
+.timeline .timeline-item {
     position: relative;
     padding: 15px;
     cursor: pointer;
-  }
+}
 
-  .timeline .timeline-item:hover {
+.timeline .timeline-item:hover {
     background-color: rgb(243 243 243);
     border-radius: 10px;
-  }
-  
-  .timeline .timeline-item:after {
+}
+
+.timeline .timeline-item:after {
     position: absolute;
     display: block;
     top: 0;
-  }
-  
-  .timeline .timeline-item:after {
+}
+
+.timeline .timeline-item:after {
     background-color: hsl(0, 0%, 90%);
     left: -38px;
     border-radius: 50%;
     height: 11px;
     width: 11px;
     content: "";
-  }
+}
+
+.title {
+    font-size: 1.125rem; 
+    font-weight: 600;
+}
+
+.label-modal {
+    font-size: 0.875rem;
+    font-weight: 500;
+}

@@ -2,12 +2,95 @@
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="inspecionar-pinturaLabel">Modal title</h5>
+          <h5 class="modal-title title" id="inspecionar-pinturaLabel">Inspecionar Pintura</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
-          ...
-        </div>
+        <div class="modal-body p-4">
+          <div class="row">
+              <input type="date" name="id_peca" id="id_peca" class="form-control" readonly="readonly"
+                  style="display: none;">
+              <div class="col-sm-6 mb-4">
+                  <label class="label-modal" for="data_finalizada">Data Finalizada:</label>
+                  <input type="date" name="data_finalizada" id="data_finalizada" class="form-control">
+              </div>
+              <div class="col-sm-6 mb-4">
+                  <label class="label-modal" for="data_inspecao">Data Inspeção:</label>
+                  <input type="date" name="data_inspecao" id="data_inspecao" class="form-control">
+              </div>
+          </div>
+          <div class="row">
+              <div class="col-sm-10 mb-4">
+                  <label class="label-modal" for="peca_inspecionada">Conjunto:</label>
+                  <input type="text" name="peca_inspecionada" id="peca_inspecionada"
+                      class="form-control" readonly="readonly">
+              </div>
+              <div class="col-sm-2 mb-4">
+                  <label class="label-modal" for="cor_inspecionada">Cor:</label>
+                  <input type="text" name="cor_inspecionada" id="cor_inspecionada"
+                      class="form-control" readonly="readonly">
+              </div>
+          </div>
+          <div class="row">
+              <div class="col-sm-4 mb-4">
+                  <label class="label-modal">Quantidade Inspecionada:</label>
+                  <input id="qtd_produzida" type="number" name="qtd_produzida" value=""
+                      class="form-control" readonly="readonly">
+              </div>
+              <div class="col-sm-4 mb-4">
+                  <label class="label-modal">N° total de conformidades:</label>
+                  <input type="number" id="n_conformidades" name="n_conformidades" value=""
+                      class="form-control">
+              </div>
+              <div class="col-sm-4 mb-4">
+                  <label class="label-modal">N° total de não conformidades:</label>
+                  <input type="number" id="n_nao_conformidades" name="n_nao_conformidades" value=""
+                      class="form-control" readonly="readonly">
+              </div>
+              <div class="col-sm-4 mb-4" style="display: none;">
+                  <label class="label-modal">Qtd. causas das NÃO conformidades</label>
+                  <div class="input-group">
+                      <input type="number" class="form-control desabilitado" id="tipos_causas_pintura" value="1"
+                          style="font-size: 12px;">
+                  </div>
+              </div>
+          </div>
+          <div class="row" id="selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
+            <span class="label-modal text-end"> 1ª Causa</span>
+            <div class="col-sm-6 mb-4 selectBlock" id="selectBlock-0">
+                <label class="label-modal">Causas</label>
+                <select id="causasPintura" name="causasPintura" class="form-control" style="font-size: 14px;">
+                </select>
+            </div>
+            <div class="col-sm-6 mb-4">
+                <label class="label-modal">Quantidade</label>
+                <input type="number" style="font-size: 14px;" class="form-control" name="quantidade_causas_pintura-0" id="quantidade_causas_pintura-0">
+            </div>
+            <div class="col-sm-12 mb-4">
+                <label class="label-modal">Imagens</label>
+                <input class="form-control" type="file">
+            </div>
+          </div> 
+          <div class="col-sm-12 mt-3" style="display: flex; justify-content: space-between; align-items: center;">
+            <button class="btn btn-white" id="removeButtonPintura" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
+            <button class="btn btn-white" id="addButtonPintura" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
+          </div>
+          <div class="row">
+              <div id="coluna_causa" class="col-sm-12">
+
+              </div>
+          </div>
+          <hr>
+          <div class="row">
+              <div class="col-sm-6 mb-4">
+                  <label class="label-modal">Inspetor:</label>
+                  <select name="inspetor" id="inspetor" class="form-control">
+                      <option value="" selected hidden disabled></option>
+                      <option value="Elenilson">Elenilson</option>
+                      <option value="Marcelo">Marcelo</option>
+                  </select>
+              </div>
+          </div>    
+        </div>                
         <div class="modal-footer">
           <button type="button" class="btn btn-dark">Enviar inspeção</button>
         </div>
@@ -19,11 +102,94 @@
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="reinspecionar-pinturaLabel">Modal title</h5>
+          <h5 class="modal-title" id="reinspecionar-pinturaLabel">Reinspecionar Pintura</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
-          ...
+        <div class="modal-body p-4">
+          <div class="row">
+              <input type="date" name="id_peca" id="id_peca" class="form-control" readonly="readonly"
+                  style="display: none;">
+              <div class="col-sm-6 mb-4">
+                  <label class="label-modal" for="data_finalizada">Data Finalizada:</label>
+                  <input type="date" name="data_finalizada" id="data_finalizada" class="form-control">
+              </div>
+              <div class="col-sm-6 mb-4">
+                  <label class="label-modal" for="data_inspecao">Data Inspeção:</label>
+                  <input type="date" name="data_inspecao" id="data_inspecao" class="form-control">
+              </div>
+          </div>
+          <div class="row">
+              <div class="col-sm-10 mb-4">
+                  <label class="label-modal" for="peca_inspecionada">Conjunto:</label>
+                  <input type="text" name="peca_inspecionada" id="peca_inspecionada"
+                      class="form-control">
+              </div>
+              <div class="col-sm-2 mb-4">
+                  <label class="label-modal" for="cor_inspecionada">Cor:</label>
+                  <input type="text" name="cor_inspecionada" id="cor_inspecionada"
+                      class="form-control">
+              </div>
+          </div>
+          <div class="row">
+              <div class="col-sm-4 mb-4">
+                  <label class="label-modal">Quantidade Inspecionada:</label>
+                  <input id="qtd_produzida" type="number" name="qtd_produzida" value=""
+                      class="form-control">
+              </div>
+              <div class="col-sm-4 mb-4">
+                  <label class="label-modal">N° total de conformidades:</label>
+                  <input type="number" id="n_conformidades" name="n_conformidades" value=""
+                      class="form-control">
+              </div>
+              <div class="col-sm-4 mb-4">
+                  <label class="label-modal">N° total de não conformidades:</label>
+                  <input type="number" id="n_nao_conformidades" name="n_nao_conformidades" value=""
+                      class="form-control">
+              </div>
+              <div class="col-sm-4 mb-4" style="display: none;">
+                  <label class="label-modal">Qtd. causas das NÃO conformidades</label>
+                  <div class="input-group">
+                      <input type="number" class="form-control desabilitado" id="tipos_causas_pintura" value="1"
+                          style="font-size: 12px;">
+                  </div>
+              </div>
+          </div>
+          <div class="row" id="selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
+            <span class="label-modal text-end"> 1ª Causa</span>
+            <div class="col-sm-6 mb-4 selectBlock" id="selectBlock-0">
+                <label class="label-modal">Causas</label>
+                <select id="causasPintura" name="causasPintura" class="form-control" style="font-size: 14px;">
+                </select>
+            </div>
+            <div class="col-sm-6 mb-4">
+                <label class="label-modal">Quantidade</label>
+                <input type="number" style="font-size: 14px;" class="form-control" name="quantidade_causas_pintura-0" id="quantidade_causas_pintura-0">
+            </div>
+            <div class="col-sm-12 mb-4">
+                <label class="label-modal">Imagens</label>
+                <input class="form-control" type="file" multiple>
+            </div>
+          </div> 
+          <div class="col-sm-12 mt-3" style="display: flex; justify-content: space-between; align-items: center;">
+            <button class="btn btn-white" id="removeButtonPintura" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
+            <button class="btn btn-white" id="addButtonPintura" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
+          </div>
+          <div class="row">
+              <div id="coluna_causa" class="col-sm-12">
+
+              </div>
+          </div>
+          <hr>
+          <div class="row">
+              <div class="col-sm-6 mb-4">
+                  <label class="label-modal">Inspetor:</label>
+                  <select name="inspetor" id="inspetor" class="form-control">
+                      <option value="" selected hidden disabled></option>
+                      <option value="Elenilson">Elenilson</option>
+                      <option value="Marcelo">Marcelo</option>
+                  </select>
+              </div>
+          </div>    
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-dark">Enviar reinspeção</button>

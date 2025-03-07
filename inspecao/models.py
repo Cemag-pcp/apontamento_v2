@@ -79,28 +79,36 @@ class Reinspecao(models.Model):
         DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False
     )
     data_reinspecao = models.DateTimeField(auto_now_add=True)
+    reinspecionado = models.BooleanField(default=False)
 
 
 class Causas(models.Model):
 
+    SETOR_CHOICES = (
+        ("pintura","Pintura"),
+        ("montagem","Montagem"),
+        ("estamparia","Estamparia"),
+        ("tubos cilindros","Tubos e Cilindros"),
+        ("tanque","Tanque"),
+    )
+
     nome = models.CharField(max_length=40, null=False, blank=False)
-    setor = models.CharField(max_length=40, null=False, blank=False)
+    setor = models.CharField(max_length=40, choices=SETOR_CHOICES, null=False, blank=False)
 
     def __str__(self):
-        return f"{self.nome} cadastrada para o setor {self.setor}"
+        return f"{self.nome} - setor {self.setor}"
 
+    class Meta:
+        verbose_name = "Causa"
 
 class CausasNaoConformidade(models.Model):
 
     dados_execucao = models.ForeignKey(
         DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False
     )
-    causa = models.ForeignKey(Causas, on_delete=models.SET_NULL, null=True, blank=True)
+    causa = models.ManyToManyField(Causas, related_name="causas_nao_conformidade", blank=True)
     foto = models.CharField(max_length=255, null=False, blank=False)
     quantidade = models.IntegerField(null=False, blank=False)
-
-    def __str__(self):
-        return self.causa.nome
 
 
 #### Inspecao Estanqueidade ####

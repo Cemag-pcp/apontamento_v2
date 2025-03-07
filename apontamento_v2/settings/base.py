@@ -43,7 +43,7 @@ MIDDLEWARE = [
     'django.middleware.common.BrokenLinkEmailsMiddleware',
 
     # middleware personalizado para perfis de usuário
-    'core.middleware.SetorAccessMiddleware', 
+    'core.middleware.RotaAccessMiddleware', 
     
 ]
 
@@ -106,3 +106,4 @@ STATICFILES_DIRS = [
 
 LOGIN_REDIRECT_URL = '/core/'  
 LOGOUT_REDIRECT_URL = '/core/login/'  
+LOGIN_URL = '/core/login/'

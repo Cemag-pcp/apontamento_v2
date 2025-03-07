@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/modal-custom.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Gerenciar Acessos</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Usuário</th>
+                <th>Tipo de Acesso</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="userTable">
+            <!-- Usuários serão inseridos aqui via JavaScript -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Lateral -->
+<div class="modal fade right" id="accessModal" tabindex="-1" aria-labelledby="accessModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="accessModalLabel">Gerenciar Acessos</h5>
+                <button type="button" class="btn-close text-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6 id="userName"></h6>
+                <p class="text-muted" id="userRole"></p>
+                <input type="hidden" id="userId">
+                <div id="accessList">
+                    <!-- Lista de acessos será inserida aqui -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" onclick="saveAccess()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let users = [];
+    let rotasDisponiveis = [];
+
+    async function fetchUsers() {
+        try {
+            const response = await fetch("/core/api/usuarios/");
+            users = await response.json();
+            populateUserTable();
+        } catch (error) {
+            console.error("Erro ao buscar usuários:", error);
+        }
+    }
+
+    function populateUserTable() {
+        const tableBody = document.getElementById("userTable");
+        tableBody.innerHTML = "";
+        users.forEach(user => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${user.username}</td>
+                <td>${user.tipo_acesso}</td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="openModal(${user.id})">Gerenciar Acesso</button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    async function openModal(userId) {
+        const selectedUser = users.find(user => user.id === userId);
+        if (!selectedUser) return;
+
+        document.getElementById("userName").innerText = selectedUser.username;
+        document.getElementById("userRole").innerText = `Tipo de Acesso: ${selectedUser.tipo_acesso}`;
+        document.getElementById("userId").value = selectedUser.id;
+
+        try {
+            // Busca as permissões disponíveis e as permissões do usuário
+            const response = await fetch(`/core/api/listar-acessos/${userId}/`);
+            const permissoes = await response.json();
+
+            // Organiza as permissões em um dicionário por "app"
+            const permissoesPorApp = {};
+            permissoes.forEach(rota => {
+                if (!permissoesPorApp[rota.app]) {
+                    permissoesPorApp[rota.app] = [];
+                }
+                permissoesPorApp[rota.app].push(rota);
+            });
+
+            const accessList = document.getElementById("accessList");
+            accessList.innerHTML = "";
+
+            // Itera sobre os apps e cria as seções
+            Object.entries(permissoesPorApp).forEach(([appName, rotas]) => {
+                accessList.innerHTML += `<h5 class="mt-3">${appName}</h5>`;
+
+                rotas.forEach(rota => {
+                    accessList.innerHTML += `
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="access-${rota.id}" ${rota.ativo ? "checked" : ""}>
+                            <label class="form-check-label" for="access-${rota.id}">${rota.descricao}</label>
+                        </div>
+                    `;
+                });
+            });
+
+            // Abre o modal
+            new bootstrap.Modal(document.getElementById("accessModal")).show();
+
+        } catch (error) {
+            console.error("Erro ao buscar permissões:", error);
+        }
+    }
+   
+    async function saveAccess() {
+        const userId = document.getElementById('userId').value;
+
+        // Captura todas as permissões ativas diretamente dos checkboxes
+        const updatedAccesses = Array.from(document.querySelectorAll("#accessList input[type='checkbox']:checked"))
+            .map(input => input.id.replace("access-", "")); // Extrai apenas o ID numérico
+
+        console.log("Acessos Selecionados:", updatedAccesses); // Debug: Verifica se há permissões
+
+        if (updatedAccesses.length === 0) {
+            alert("Nenhuma permissão foi selecionada!");
+            return;
+        }
+
+        try {
+            const response = await fetch(`/core/api/atualizar-acessos/${userId}/update`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ permissoes: updatedAccesses }),
+            });
+
+            if (!response.ok) {
+                throw new Error("Erro ao salvar permissões");
+            }
+
+            alert("Acessos atualizados com sucesso!");
+            fetchUsers(); // Atualiza a tabela após salvar
+
+        } catch (error) {
+            console.error("Erro ao salvar permissões:", error);
+            alert("Erro ao salvar acessos. Verifique o console.");
+        }
+    }
+
+    // Inicializa a tabela ao carregar a página
+    fetchUsers();
+
+</script>
+
+{% endblock %}
