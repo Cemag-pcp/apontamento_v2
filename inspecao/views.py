@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.core.paginator import Paginator
 from django.db.models import Prefetch
 from .models import (
     Inspecao,
@@ -50,13 +51,15 @@ def get_itens_inspecao_pintura(request):
     )
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 3  # Itens por página
 
     # Filtra os dados
     datas = Inspecao.objects.filter(pecas_ordem_pintura__isnull=False).exclude(
         id__in=inspecoes_ids
     )
 
-    quantidade_total = len(datas)
+    quantidade_total = datas.count()  # Total de itens sem filtro
 
     if cores_filtradas:
         datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas)
@@ -74,8 +77,12 @@ def get_itens_inspecao_pintura(request):
         "pecas_ordem_pintura__operador_fim",
     ).order_by("-id")
 
+    # Paginação
+    paginador = Paginator(datas, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
+
     dados = []
-    for data in datas:
+    for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
         matricula_nome_operador = None
 
@@ -94,11 +101,16 @@ def get_itens_inspecao_pintura(request):
 
         dados.append(item)
 
-    return JsonResponse({"dados": dados, "total": quantidade_total, "total_filtrado":len(dados)}, status=200)
+    return JsonResponse({
+        "dados": dados,
+        "total": quantidade_total,
+        "total_filtrado": paginador.count,  # Total de itens após filtro
+        "pagina_atual": pagina_obj.number,
+        "total_paginas": paginador.num_pages,
+    }, status=200)
 
 
 def get_itens_reinspecao_pintura(request):
-
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
@@ -112,22 +124,22 @@ def get_itens_reinspecao_pintura(request):
     cores_filtradas = (
         request.GET.get("cores", "").split(",") if request.GET.get("cores") else []
     )
-
     inspetores_filtrados = (
         request.GET.get("inspetores", "").split(",")
         if request.GET.get("inspetores")
         else []
     )
-
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 3  # Itens por página
 
     # Filtra os dados
     datas = Inspecao.objects.filter(
         id__in=reinspecao_ids, pecas_ordem_pintura__isnull=False
     )
 
-    quantidade_total = len(datas)
+    quantidade_total = datas.count()  # Total de itens sem filtro
 
     if cores_filtradas:
         datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas)
@@ -138,7 +150,7 @@ def get_itens_reinspecao_pintura(request):
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
         datas = datas.filter(pecas_ordem_pintura__peca__icontains=pesquisa_filtrada)
-    
+
     if inspetores_filtrados:
         datas = datas.filter(
             dadosexecucaoinspecao__inspetor__user__username__in=inspetores_filtrados
@@ -150,8 +162,12 @@ def get_itens_reinspecao_pintura(request):
         "pecas_ordem_pintura__operador_fim",
     ).order_by("-id")
 
+    # Paginação
+    paginador = Paginator(datas, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
+
     dados = []
-    for data in datas:
+    for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
 
         matricula_nome_operador = None
@@ -170,7 +186,13 @@ def get_itens_reinspecao_pintura(request):
 
         dados.append(item)
 
-    return JsonResponse({"dados": dados, "total": quantidade_total, "total_filtrado":len(dados)}, status=200)
+    return JsonResponse({
+        "dados": dados,
+        "total": quantidade_total,
+        "total_filtrado": paginador.count,  # Total de itens após filtro
+        "pagina_atual": pagina_obj.number,
+        "total_paginas": paginador.num_pages,
+    }, status=200)
 
 
 def get_itens_inspecionados_pintura(request):
@@ -185,19 +207,20 @@ def get_itens_inspecionados_pintura(request):
     cores_filtradas = (
         request.GET.get("cores", "").split(",") if request.GET.get("cores") else []
     )
-
     inspetores_filtrados = (
         request.GET.get("inspetores", "").split(",")
         if request.GET.get("inspetores")
         else []
     )
-
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 3  # Itens por página
 
+    # Filtra os dados
     datas = Inspecao.objects.filter(id__in=inspecionados_ids)
 
-    quantidade_total = len(datas)
+    quantidade_total = datas.count()  # Total de itens sem filtro
 
     if cores_filtradas:
         datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas)
@@ -219,9 +242,12 @@ def get_itens_inspecionados_pintura(request):
         "pecas_ordem_pintura__operador_fim",
     ).order_by("-id")
 
-    dados = []
+    # Paginação
+    paginador = Paginator(datas, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
 
-    for data in datas:
+    dados = []
+    for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
 
         matricula_nome_operador = None
@@ -245,7 +271,13 @@ def get_itens_inspecionados_pintura(request):
 
         dados.append(item)
 
-    return JsonResponse({"dados": dados, "total": quantidade_total, "total_filtrado":len(dados)}, status=200)
+    return JsonResponse({
+        "dados": dados,
+        "total": quantidade_total,
+        "total_filtrado": paginador.count,  # Total de itens após filtro
+        "pagina_atual": pagina_obj.number,
+        "total_paginas": paginador.num_pages,
+    }, status=200)
 
 
 def inspecao_estamparia(request):

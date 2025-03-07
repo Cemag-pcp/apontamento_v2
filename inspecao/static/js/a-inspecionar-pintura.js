@@ -1,12 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
-    buscarItensInspecao(); // Chama a função quando a página carrega
+    buscarItensInspecao(1); // Chama a função quando a página carrega, começando na página 1
 });
 
 document.getElementById("btn-filtrar-inspecao").addEventListener("click", () => {
-    buscarItensInspecao(); // Chama a função quando o botão de filtro é clicado
+    buscarItensInspecao(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
 });
 
-function buscarItensInspecao() {
+function buscarItensInspecao(pagina) {
     let cardsInspecao = document.getElementById("cards-inspecao");
     let qtdPendenteInspecao = document.getElementById("qtd-pendente-inspecao");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecao");
@@ -14,9 +14,15 @@ function buscarItensInspecao() {
     let itensFiltradosCor = document.getElementById("itens-filtrados-inspecao-cor");
     let itensFiltradosData = document.getElementById("itens-filtrados-inspecao-data");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecao-pesquisa");
+    let paginacao = document.getElementById("paginacao-inspecao-pintura");
 
     // Limpa os cards antes de buscar novos
-    cardsInspecao.innerHTML = "";
+    cardsInspecao.innerHTML = `<div class="text-center">
+                                    <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>`;
+    paginacao.innerHTML = "";
 
     // Coletar os filtros aplicados
     let coresSelecionadas = [];
@@ -25,7 +31,6 @@ function buscarItensInspecao() {
     });
 
     let dataSelecionada = document.getElementById('data-filtro-inspecao').value;
-
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
     // Monta os parâmetros de busca
@@ -54,6 +59,8 @@ function buscarItensInspecao() {
         itensFiltradosPesquisa.style.display = "none";
     }
 
+    params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
+
     fetch(`/inspecao/api/itens-inspecao-pintura/?${params.toString()}`, {
         method: 'GET',
         headers: {
@@ -74,7 +81,7 @@ function buscarItensInspecao() {
 
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
-        if (params.size > 0) {
+        if (params.size > 1) {
             qtdFiltradaInspecao.style.display = 'block';
         } else {
             qtdFiltradaInspecao.style.display = 'none';
@@ -110,6 +117,20 @@ function buscarItensInspecao() {
         });
 
         itensInspecionar.textContent = "Itens a Inspecionar";
+
+        // Adiciona a paginação
+        if (items.total_paginas > 1) {
+            let paginacaoHTML = `<nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">`;
+            for (let i = 1; i <= items.total_paginas; i++) {
+                paginacaoHTML += `
+                    <li class="page-item ${i === items.pagina_atual ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="buscarItensInspecao(${i})">${i}</a>
+                    </li>`;
+            }
+            paginacaoHTML += `</ul></nav>`;
+            paginacao.innerHTML = paginacaoHTML;
+        }
     }).catch((error) => {
         console.error(error);
     });

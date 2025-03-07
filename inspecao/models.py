@@ -47,7 +47,7 @@ class DadosExecucaoInspecao(models.Model):
         Profile, on_delete=models.SET_NULL, null=True, blank=True
     )
     data_execucao = models.DateTimeField(auto_now_add=True)
-    num_execucao = models.IntegerField()
+    num_execucao = models.IntegerField(null=True, blank=True)
     conformidade = models.IntegerField(null=False, blank=False)
     nao_conformidade = models.IntegerField(null=False, blank=False)
     observacao = models.CharField(max_length=150, null=True, blank=True)
