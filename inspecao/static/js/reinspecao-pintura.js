@@ -87,7 +87,6 @@ function buscarItensReinspecao(pagina) {
         }
         return response.json();
     }).then(items => {
-        console.log(items);
         cardsInspecao.innerHTML = "";
 
         const quantidadeInspecoes = items.total;
@@ -116,14 +115,26 @@ function buscarItensReinspecao(pagina) {
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <h5> ${item.peca}</h5>
+                    <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Due:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
+                        <strong>🧮 Conformidade:</strong> ${item.conformidade}<br>
+                        <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
                         <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
                     </p>
                     <hr>
-                    <button class="btn btn-dark w-100" data-bs-toggle="modal" data-bs-target="#modal-reinspecionar-pintura">Iniciar Reinspeção</button>
+                    <button 
+                        data-id="${item.id}"
+                        data-data="${item.data}"
+                        data-tipo="${item.tipo}"
+                        data-nao-conformidade="${item.nao_conformidade}"
+                        data-conformidade="${item.conformidade}"
+                        data-cor="${item.cor}"
+                        data-peca="${item.peca}"
+                    class="btn btn-dark w-100 iniciar-reinspecao">
+                    Iniciar Reinspeção</button>
                 </div>
             </div>`;
 
@@ -136,12 +147,41 @@ function buscarItensReinspecao(pagina) {
         if (items.total_paginas > 1) {
             let paginacaoHTML = `<nav aria-label="Page navigation">
                 <ul class="pagination justify-content-center">`;
-            for (let i = 1; i <= items.total_paginas; i++) {
+
+            const paginaAtual = items.pagina_atual;
+            const totalPaginas = items.total_paginas;
+
+            // Função para adicionar um link de página
+            const adicionarLinkPagina = (i) => {
                 paginacaoHTML += `
-                    <li class="page-item ${i === items.pagina_atual ? 'active' : ''}">
+                    <li class="page-item ${i === paginaAtual ? 'active' : ''}">
                         <a class="page-link" href="#" onclick="buscarItensReinspecao(${i})">${i}</a>
                     </li>`;
+            };
+
+            // Mostrar a primeira página
+            adicionarLinkPagina(1);
+
+            // Mostrar reticências antes da página atual, se necessário
+            if (paginaAtual > 3) {
+                paginacaoHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
             }
+
+            // Mostrar páginas ao redor da página atual
+            for (let i = Math.max(2, paginaAtual - 1); i <= Math.min(totalPaginas - 1, paginaAtual + 1); i++) {
+                adicionarLinkPagina(i);
+            }
+
+            // Mostrar reticências após a página atual, se necessário
+            if (paginaAtual < totalPaginas - 2) {
+                paginacaoHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+
+            // Mostrar a última página
+            if (totalPaginas > 1) {
+                adicionarLinkPagina(totalPaginas);
+            }
+
             paginacaoHTML += `</ul></nav>`;
             paginacao.innerHTML = paginacaoHTML;
         }

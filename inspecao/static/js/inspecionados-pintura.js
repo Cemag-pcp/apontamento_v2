@@ -87,13 +87,12 @@ function buscarItensInspecionados(pagina) {
         }
         return response.json();
     }).then(items => {
-        console.log(items);
         cardsInspecao.innerHTML = "";
 
         const quantidadeInspecoes = items.total;
         const quantidadeFiltradaInspecoes = items.total_filtrado;
 
-        qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
+        qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens inspecionados`;
 
         if (params.size > 1) {
             qtdFiltradaInspecao.style.display = 'block';
@@ -128,7 +127,7 @@ function buscarItensInspecionados(pagina) {
                         <strong>📅 Due:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
-                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
+                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
                     <div class="d-flex justify-content-between">
@@ -136,7 +135,16 @@ function buscarItensInspecionados(pagina) {
                             ${iconeNaoConformidade}
                             <h4 style="font-size: 0.875rem; color:#71717a;">Possui não conformidade?</h4>
                         </div>
-                        <button class="btn btn-white w-50" data-bs-toggle="modal" data-bs-target="#modal-historico-pintura">Ver detalhes</button>
+                        <button 
+                            data-id="${item.id}"
+                            data-data="${item.data}"
+                            data-peca="${item.peca}"
+                            data-tipo="${item.tipo}"
+                            data-nao-conformidade="${item.nao_conformidade}"
+                            data-conformidade="${item.conformidade}"
+                            data-cor="${item.cor}"
+                            data-id-dados-execucao=${item.id_dados_execucao}
+                        class="btn btn-white historico-inspecao w-50">Ver detalhes</button>
                     </div>
                 </div>
             </div>`;
@@ -145,17 +153,46 @@ function buscarItensInspecionados(pagina) {
         });
 
         itensInspecionar.textContent = "Itens Inspecionados";
-
-        // Adiciona a paginação
+        
+        // Adiciona a paginação com reticências
         if (items.total_paginas > 1) {
             let paginacaoHTML = `<nav aria-label="Page navigation">
                 <ul class="pagination justify-content-center">`;
-            for (let i = 1; i <= items.total_paginas; i++) {
+
+            const paginaAtual = items.pagina_atual;
+            const totalPaginas = items.total_paginas;
+
+            // Função para adicionar um link de página
+            const adicionarLinkPagina = (i) => {
                 paginacaoHTML += `
-                    <li class="page-item ${i === items.pagina_atual ? 'active' : ''}">
+                    <li class="page-item ${i === paginaAtual ? 'active' : ''}">
                         <a class="page-link" href="#" onclick="buscarItensInspecionados(${i})">${i}</a>
                     </li>`;
+            };
+
+            // Mostrar a primeira página
+            adicionarLinkPagina(1);
+
+            // Mostrar reticências antes da página atual, se necessário
+            if (paginaAtual > 3) {
+                paginacaoHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
             }
+
+            // Mostrar páginas ao redor da página atual
+            for (let i = Math.max(2, paginaAtual - 1); i <= Math.min(totalPaginas - 1, paginaAtual + 1); i++) {
+                adicionarLinkPagina(i);
+            }
+
+            // Mostrar reticências após a página atual, se necessário
+            if (paginaAtual < totalPaginas - 2) {
+                paginacaoHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+
+            // Mostrar a última página
+            if (totalPaginas > 1) {
+                adicionarLinkPagina(totalPaginas);
+            }
+
             paginacaoHTML += `</ul></nav>`;
             paginacao.innerHTML = paginacaoHTML;
         }

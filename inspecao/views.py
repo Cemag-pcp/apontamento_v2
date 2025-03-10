@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Prefetch
@@ -25,15 +25,19 @@ def inspecao_montagem(request):
 
 def inspecao_pintura(request):
 
-    users = Profile.objects.filter(tipo_acesso="inspetor")
+    users = Profile.objects.filter(tipo_acesso="inspetor", permissoes__nome="inspecao/pintura")
+    causas = Causas.objects.filter(setor="pintura")
+
     cores = ["Amarelo", "Azul", "Cinza", "Laranja", "Verde", "Vermelho"]
+
+    list_causas = [{"nome": causa.nome} for causa in causas]
 
     lista_inspetores = [{"nome_usuario": user.user.username} for user in users]
 
     return render(
         request,
         "inspecao_pintura.html",
-        {"inspetores": lista_inspetores, "cores": cores},
+        {"inspetores": lista_inspetores, "causas": list_causas, "cores": cores},
     )
 
 
@@ -95,6 +99,7 @@ def get_itens_inspecao_pintura(request):
             "peca": data.pecas_ordem_pintura.peca,
             "maquina": data.pecas_ordem_pintura.ordem.maquina,
             "cor": data.pecas_ordem_pintura.ordem.cor,
+            "qtd_apontada": data.pecas_ordem_pintura.qtd_boa,
             "tipo": data.pecas_ordem_pintura.tipo,
             "operador": matricula_nome_operador,
         }
@@ -170,10 +175,6 @@ def get_itens_reinspecao_pintura(request):
     for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
 
-        matricula_nome_operador = None
-        if data.pecas_ordem_pintura.operador_fim:
-            matricula_nome_operador = f"{data.pecas_ordem_pintura.operador_fim.matricula} - {data.pecas_ordem_pintura.operador_fim.nome}"
-
         item = {
             "id": data.id,
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
@@ -181,7 +182,15 @@ def get_itens_reinspecao_pintura(request):
             "maquina": data.pecas_ordem_pintura.ordem.maquina,
             "cor": data.pecas_ordem_pintura.ordem.cor,
             "tipo": data.pecas_ordem_pintura.tipo,
-            "operador": matricula_nome_operador,
+            "conformidade": DadosExecucaoInspecao.objects.filter(inspecao=data)
+            .values_list("conformidade", flat=True)
+            .first(),
+            "nao_conformidade": DadosExecucaoInspecao.objects.filter(inspecao=data)
+            .values_list("nao_conformidade", flat=True)
+            .first(),
+            "inspetor": DadosExecucaoInspecao.objects.filter(inspecao=data)
+            .values_list("inspetor__user__username", flat=True)
+            .first(),
         }
 
         dados.append(item)
@@ -215,7 +224,7 @@ def get_itens_inspecionados_pintura(request):
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
-    itens_por_pagina = 3  # Itens por página
+    itens_por_pagina = 2 # Itens por página
 
     # Filtra os dados
     datas = Inspecao.objects.filter(id__in=inspecionados_ids)
@@ -250,22 +259,23 @@ def get_itens_inspecionados_pintura(request):
     for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
 
-        matricula_nome_operador = None
-        if data.pecas_ordem_pintura.operador_fim:
-            matricula_nome_operador = f"{data.pecas_ordem_pintura.operador_fim.matricula} - {data.pecas_ordem_pintura.operador_fim.nome}"
-
         possui_nao_conformidade = DadosExecucaoInspecao.objects.filter(
             inspecao=data, nao_conformidade__gt=0
         ).exists()
 
         item = {
             "id": data.id,
+            "id_dados_execucao": DadosExecucaoInspecao.objects.filter(inspecao=data)
+            .values_list("id", flat=True)
+            .first(),
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
             "peca": data.pecas_ordem_pintura.peca,
             "maquina": data.pecas_ordem_pintura.ordem.maquina,
             "cor": data.pecas_ordem_pintura.ordem.cor,
             "tipo": data.pecas_ordem_pintura.tipo,
-            "operador": matricula_nome_operador,
+            "inspetor": DadosExecucaoInspecao.objects.filter(inspecao=data)
+            .values_list("inspetor__user__username", flat=True)
+            .first(),
             "possui_nao_conformidade": possui_nao_conformidade,
         }
 
@@ -279,6 +289,17 @@ def get_itens_inspecionados_pintura(request):
         "total_paginas": paginador.num_pages,
     }, status=200)
 
+
+def get_historico_pintura(request, id):
+
+    if request.method != "GET":
+        return JsonResponse({"error":"Método não permitido"}, status=405)  
+
+    dados = DadosExecucaoInspecao.objects.filter(inspecao__id=id)
+
+    list_history = [{"dado":dado.id} for dado in dados]
+
+    return JsonResponse({"history":list_history}, status=200)
 
 def inspecao_estamparia(request):
     return render(request, "inspecao_estamparia.html")

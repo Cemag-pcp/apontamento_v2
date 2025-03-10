@@ -107,9 +107,12 @@ class CausasNaoConformidade(models.Model):
         DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False
     )
     causa = models.ManyToManyField(Causas, related_name="causas_nao_conformidade", blank=True)
-    foto = models.CharField(max_length=255, null=False, blank=False)
     quantidade = models.IntegerField(null=False, blank=False)
 
+
+class ArquivoCausa(models.Model):
+    causa_nao_conformidade = models.ForeignKey(CausasNaoConformidade, on_delete=models.CASCADE, related_name='arquivos')
+    arquivo = models.FileField(upload_to='causas_nao_conformidade/')
 
 #### Inspecao Estanqueidade ####
 
