@@ -876,6 +876,8 @@ def excluir_peca_ordem(request):
         peca = get_object_or_404(PecasOrdem, pk=index)
         peca.delete()
 
+        return JsonResponse({"status": "success", "message": "Peça excluída com sucesso."})
+
     except Ordem.DoesNotExist:
         return JsonResponse({"status": "error", "message": "Ordem não encontrada."}, status=404)
 
