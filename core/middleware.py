@@ -13,6 +13,11 @@ class RotaAccessMiddleware:
 
     def __call__(self, request):
         # Obtém o caminho da requisição, removendo "/" inicial e final
+        
+        #  Se a URL contém "api/", libera automaticamente
+        if "/api/" in request.path or request.path.startswith("api/"):
+            return self.get_response(request)
+        
         path = request.path.strip("/")
         
         login_url = reverse('core:login')
@@ -23,7 +28,7 @@ class RotaAccessMiddleware:
 
         # Obtém o perfil do usuário
         profile = getattr(request.user, 'profile', None)
-        print(profile)
+
         # Se o usuário for do tipo "pcp", permite acesso irrestrito
         if profile and getattr(profile, "tipo_acesso", "").lower() == "pcp":
             return self.get_response(request)
@@ -33,10 +38,6 @@ class RotaAccessMiddleware:
         if any(path.startswith(excluded) for excluded in EXCLUDED_PATHS):
             return self.get_response(request)
 
-        #  Se a URL contém "api/", libera automaticamente
-        if "/api/" in request.path or request.path.startswith("api/"):
-            return self.get_response(request)
-        
         # Busca a rota no banco de dados
         rota = RotaAcesso.objects.filter(nome=path).first()
 
