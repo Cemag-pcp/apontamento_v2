@@ -792,6 +792,11 @@ def duplicar_ordem(request):
     if request.method != "POST":
         return JsonResponse({"status": "error", "message": "Método não permitido. Use POST!"}, status=405)
 
+    # Verifica se o usuário é do tipo "operador" e bloqueia o acesso
+    if not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso != 'pcp':
+        return JsonResponse({'error': 'Acesso negado: você não tem permissão para duplicar ordens.'}, status=403)
+
+
     try:
         # Carrega o JSON enviado no corpo da requisição
         data = json.loads(request.body)
@@ -854,6 +859,9 @@ def duplicar_ordem(request):
 def excluir_peca_ordem(request):
     if request.method != 'POST':
         return JsonResponse({"status": "error", "message": "Método não permitido. Use POST."}, status=405)
+
+    if not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso != 'pcp':
+        return JsonResponse({"status": "error", "message": 'Acesso negado: você não tem permissão para excluir peças da ordem.'}, status=403)
 
     try:
         # Carrega os dados enviados na requisição

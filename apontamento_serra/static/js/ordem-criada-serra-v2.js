@@ -657,7 +657,7 @@ function excluirPeca(index, ordemId) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro!',
-                        text: 'Não foi possível excluir a peça. Tente novamente.',
+                        text: data.message,
                     });
                 }
             })

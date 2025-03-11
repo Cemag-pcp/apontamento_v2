@@ -19,8 +19,14 @@ class RotaAccessMiddleware:
 
         # Se o usuário não estiver autenticado, redireciona para o login
         if not request.user.is_authenticated and path != login_url.strip("/"):
-            print("morreu")
             return redirect(f"{login_url}?next={request.path}")
+
+        # Obtém o perfil do usuário
+        profile = getattr(request.user, 'profile', None)
+        print(profile)
+        # Se o usuário for do tipo "pcp", permite acesso irrestrito
+        if profile and getattr(profile, "tipo_acesso", "").lower() == "pcp":
+            return self.get_response(request)
 
         # Ignorar rotas administrativas
         EXCLUDED_PATHS = ['admin', 'login', 'logout', 'core']
