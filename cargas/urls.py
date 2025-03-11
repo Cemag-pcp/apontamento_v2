@@ -16,5 +16,6 @@ urlpatterns = [
     path('api/atualizar-planejamento/', views.atualizar_ordem_existente, name="atualizar_ordem_existente"),
     path('api/historico-planejamento-montagem/', views.historico_ordens_montagem, name="historico_ordens_montagem"),
     path('api/editar-planejamento/', views.editar_planejamento, name="editar_planejamento"),
+    path('api/historico-planejamento-pintura/', views.historico_ordens_pintura, name="historico_ordens_pintura"),
 
 ]

@@ -869,11 +869,14 @@ def excluir_peca_ordem(request):
         ordem_id = data.get("ordem_id")
         index = data.get("index")
 
+        ordem = Ordem.objects.get(pk=ordem_id)
+
+        if ordem.status_atual == 'finalizada':
+            return JsonResponse({"status":"error", "message":"Ordem finalizada, não é possível alterar."})    
+
         if not ordem_id or index is None:
             return JsonResponse({"status": "error", "message": "Os campos 'ordem_id' e 'index' são obrigatórios."}, status=400)
 
-        # Busca a ordem e suas peças
-        ordem = Ordem.objects.get(pk=ordem_id)
         pecas = PecasOrdem.objects.filter(ordem=ordem)
 
         # Verifica se há pelo menos uma peça restante antes de excluir
