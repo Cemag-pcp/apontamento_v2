@@ -1,23 +1,54 @@
-from django.http import HttpResponseForbidden
 from django.shortcuts import render
+from django.urls import reverse
+from django.shortcuts import redirect
 
-class SetorAccessMiddleware:
+from django.shortcuts import render, redirect
+from django.urls import reverse
+
+from core.models import RotaAcesso
+
+class RotaAccessMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Ignorar caminhos específicos
-        EXCLUDED_PATHS = ['/pintura','/montagem','/cargas','/cadastro', '/core', '/admin', '/login', '/logout']  # Adicione outros caminhos que deseja ignorar
+        # Obtém o caminho da requisição, removendo "/" inicial e final
+        path = request.path.strip("/")
+        
+        login_url = reverse('core:login')
 
-        # Ignora a verificação para as URLs configuradas em EXCLUDED_PATHS
-        if any(request.path.startswith(path) for path in EXCLUDED_PATHS):
+        # Se o usuário não estiver autenticado, redireciona para o login
+        if not request.user.is_authenticated and path != login_url.strip("/"):
+            print("morreu")
+            return redirect(f"{login_url}?next={request.path}")
+
+        # Ignorar rotas administrativas
+        EXCLUDED_PATHS = ['admin', 'login', 'logout', 'core']
+        if any(path.startswith(excluded) for excluded in EXCLUDED_PATHS):
             return self.get_response(request)
 
-        # Verifica se o usuário está autenticado e possui perfil
-        if request.user.is_authenticated and hasattr(request.user, 'profile'):
-            # Verifica o setor solicitado na URL
-            setor_solicitado = request.path.split('/')[1]  # Exemplo: /serra/ -> 'serra'
-            if setor_solicitado not in request.user.profile.setores_permitidos:
-                return render(request, 'home/erro-acesso.html', status=403)  # Renderiza a página de erro
+        #  Se a URL contém "api/", libera automaticamente
+        if "/api/" in request.path or request.path.startswith("api/"):
+            return self.get_response(request)
+        
+        # Busca a rota no banco de dados
+        rota = RotaAcesso.objects.filter(nome=path).first()
+
+        # Se a rota **não existir no banco**, bloqueia o acesso
+        if not rota:
+            return render(request, 'home/erro-acesso.html', status=403)
+
+        # Se a rota for do tipo API, sempre permite o acesso (apenas por segurança extra)
+        # if rota.tipo_rota == 'api':
+        #     return self.get_response(request)
+
+        # Obtém o perfil do usuário
+        profile = getattr(request.user, 'profile', None)
+        if not profile:
+            return render(request, 'home/erro-acesso.html', status=403)
+
+        # Verifica se o usuário tem permissão para acessar a rota
+        if not profile.permissoes.filter(id=rota.id).exists():
+            return render(request, 'home/erro-acesso.html', status=403)
 
         return self.get_response(request)

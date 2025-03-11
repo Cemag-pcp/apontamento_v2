@@ -17,6 +17,8 @@ urlpatterns = [
     path('api/get-peca/', views.get_peca, name='get_peca'),
     path('api/criar-ordem/', views.criar_ordem, name='criar_ordem'),
     path('api/importar-ordens-serra/', views.importar_ordens_serra, name='importar_ordens_serra'),
+    path('api/duplicar-ordem/', views.duplicar_ordem, name='duplicar_ordem'),
+    path('api/excluir-peca-ordem/', views.excluir_peca_ordem, name='excluir_peca_ordem'),
 
     path('atualizar-propriedades/', views.atualizar_propriedades_ordem, name='atualizar_propriedades_ordem'),
     path('atualizar-pecas/', views.atualizar_pecas_ordem, name='atualizar_pecas_ordem'),

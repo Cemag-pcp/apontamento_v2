@@ -326,8 +326,6 @@ function duplicarOrdem() {
             pecas: pecas
         };
 
-        console.log("Enviando dados para duplicação:", dadosDuplicacao);
-
         // Exibe o Swal de carregamento
         Swal.fire({
             title: 'Duplicando Ordem...',
@@ -361,10 +359,10 @@ function duplicarOrdem() {
             // Fecha o Swal de loading e exibe mensagem de sucesso
             Swal.fire({
                 icon: 'success',
-                title: 'Sucesso!',
+                title: `Sucesso! Nova ordem: ${data.nova_ordem}`,
                 text: 'Ordem duplicada com sucesso.',
-                timer: 1500,  // Fecha automaticamente após 1.5s
-                showConfirmButton: false
+                // timer: 1500,  // Fecha automaticamente após 1.5s
+                showConfirmButton: true
             });
 
             // Esconde o modal após o sucesso

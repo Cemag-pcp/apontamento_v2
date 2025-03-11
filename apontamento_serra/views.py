@@ -67,6 +67,7 @@ def get_pecas_ordem(request, pk_ordem, name_maquina):
         # Peças relacionadas à ordem
         pecas = [
             {
+                'id_peca': peca.id,
                 'peca_id': peca.peca.id,
                 'peca_codigo': peca.peca.codigo,
                 'peca_nome': f"{peca.peca.codigo} - {peca.peca.descricao}",
@@ -185,7 +186,7 @@ def atualizar_status_ordem(request):
                     novo_processo.motivo_interrupcao = MotivoInterrupcao.objects.get(nome=body['motivo'])
                     novo_processo.save()
                     ordem.status_prioridade = 2
-
+            
                 ordem.save()
 
                 return JsonResponse({
@@ -781,3 +782,105 @@ def atualizar_pecas_ordem(request):
             edit_info_apontamento.save()
 
     return JsonResponse({'status':'success'})
+
+@csrf_exempt
+def duplicar_ordem(request):
+    """
+    API para duplicar uma ordem existente.
+    """
+
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "Método não permitido. Use POST!"}, status=405)
+
+    try:
+        # Carrega o JSON enviado no corpo da requisição
+        data = json.loads(request.body)
+        ordem_id = data.get("ordem_id")
+
+        if not ordem_id:
+            return JsonResponse({"status": "error", "message": "O campo 'ordem_id' é obrigatório!"}, status=400)
+
+        # Obtém a ordem original
+        ordem_original = get_object_or_404(Ordem, pk=ordem_id)
+
+        # Garante que a ordem pode ser duplicada
+        # if ordem_original.status_atual == "finalizada":
+        #     return JsonResponse({"status": "error", "message": "Não é possível duplicar uma ordem já finalizada!"}, status=400)
+
+        with transaction.atomic():
+            # Criando a nova ordem duplicada
+            nova_ordem = Ordem.objects.create(
+                obs=f"Ordem duplicada #{ordem_original.ordem}",
+                grupo_maquina=ordem_original.grupo_maquina,
+                data_programacao=now().date(),  # Agora será sempre o dia atual
+                status_atual="aguardando_iniciar",
+            )
+
+            # Criando as propriedades da nova ordem
+            propriedade_original = PropriedadesOrdem.objects.filter(ordem=ordem_original).first()
+            if propriedade_original:
+                PropriedadesOrdem.objects.create(
+                    ordem=nova_ordem,
+                    mp_codigo=propriedade_original.mp_codigo,
+                    tamanho=propriedade_original.tamanho,
+                    quantidade=propriedade_original.quantidade,
+                    retalho=propriedade_original.retalho
+                )
+
+            # Duplicando as peças associadas
+            for peca in PecasOrdem.objects.filter(ordem=ordem_original):
+                PecasOrdem.objects.create(
+                    ordem=nova_ordem,
+                    peca=peca.peca,
+                    qtd_planejada=peca.qtd_planejada
+                )
+
+        return JsonResponse({
+            "status": "success",
+            "message": "Ordem duplicada com sucesso!",
+            "nova_ordem_id": nova_ordem.pk
+        }, status=201)
+
+    except json.JSONDecodeError as e:
+        return JsonResponse({"status": "error", "message": "Erro ao processar JSON", "details": str(e)}, status=400)
+
+    except Ordem.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "Ordem original não encontrada."}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": "Erro ao duplicar a ordem", "details": str(e)}, status=500)
+
+@csrf_exempt
+def excluir_peca_ordem(request):
+    if request.method != 'POST':
+        return JsonResponse({"status": "error", "message": "Método não permitido. Use POST."}, status=405)
+
+    try:
+        # Carrega os dados enviados na requisição
+        data = json.loads(request.body)
+        ordem_id = data.get("ordem_id")
+        index = data.get("index")
+
+        if not ordem_id or index is None:
+            return JsonResponse({"status": "error", "message": "Os campos 'ordem_id' e 'index' são obrigatórios."}, status=400)
+
+        # Busca a ordem e suas peças
+        ordem = Ordem.objects.get(pk=ordem_id)
+        pecas = PecasOrdem.objects.filter(ordem=ordem)
+
+        # Verifica se há pelo menos uma peça restante antes de excluir
+        if pecas.count() <= 1:
+            return JsonResponse({"status": "error", "message": "A ordem deve ter pelo menos uma peça."}, status=400)
+
+        # Obtém a peça específica e exclui
+        peca = get_object_or_404(PecasOrdem, pk=index)
+        peca.delete()
+
+    except Ordem.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "Ordem não encontrada."}, status=404)
+
+    except PecasOrdem.DoesNotExist:
+        return JsonResponse({"status": "error", "message": "Peça não encontrada."}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)

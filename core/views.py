@@ -3,17 +3,18 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.views import LoginView
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
 from django.db import transaction
 from django.db.models import Prefetch, Count
+from django.contrib.auth.models import User
 
 from .models import Ordem, Versao
 from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina
-from core.models import Ordem,MaquinaParada,OrdemProcesso
+from core.models import Ordem,MaquinaParada,OrdemProcesso,Profile,RotaAcesso
 
 import json
 import time
@@ -336,3 +337,88 @@ def get_maquinas_disponiveis(request):
     ]
 
     return JsonResponse({'maquinas_disponiveis': maquinas_disponiveis})
+
+@login_required
+def acessos(request):
+
+    return render(request, 'acessos/acessos.html')
+
+def api_listar_usuarios(request):
+    users = Profile.objects.select_related("user").prefetch_related("permissoes").all()
+
+    usuarios_json = [
+        {
+            "id": user.user.id,
+            "username": user.user.username,
+            "tipo_acesso": user.tipo_acesso,
+            "permissoes": list(user.permissoes.values_list("nome", flat=True)),
+        }
+        for user in users
+    ]
+    return JsonResponse(usuarios_json, safe=False)
+
+def api_listar_acessos(request, user_id):
+    try:
+        # Obtém todas as permissões cadastradas no sistema
+        todas_as_rotas = RotaAcesso.objects.all()
+
+        # Obtém o perfil do usuário
+        profile = Profile.objects.get(user_id=user_id)
+
+        # Obtém os IDs das permissões que o usuário já possui
+        permissoes_usuario = set(profile.permissoes.all().values_list("id", flat=True))
+
+        # Estrutura a resposta JSON
+        acessos = [
+            {
+                "id": rota.id, 
+                "nome": rota.nome, 
+                "descricao": rota.descricao, 
+                "ativo": rota.id in permissoes_usuario,  # Verifica se o usuário tem essa permissão
+                "app": rota.get_app_display()
+            }
+            for rota in todas_as_rotas
+        ]
+
+        return JsonResponse(acessos, safe=False)
+
+    except Profile.DoesNotExist:
+        return JsonResponse({"error": "Perfil não encontrado!"}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+def api_usuario_acessos(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    
+    # Se o usuário não tiver um Profile, cria um automaticamente
+    profile, created = Profile.objects.get_or_create(user=user)
+
+    acessos = [{"id": setor[0], "nome": setor[1], "ativo": setor[0] in (profile.setores_permitidos or [])} for setor in Profile.SETOR_CHOICES]
+
+    return JsonResponse({"acessos": acessos})
+
+@csrf_exempt
+def api_atualizar_acessos(request, user_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        profile = Profile.objects.get(user_id=user_id)
+
+        # Converte os IDs para inteiros
+        permissoes_ids = list(map(int, data.get("permissoes", [])))
+
+        # Busca as permissões pelo ID corretamente
+        permissoes_novas = RotaAcesso.objects.filter(id__in=permissoes_ids)
+
+        # Atualiza as permissões do perfil
+        profile.permissoes.set(permissoes_novas)
+
+        profile.save()
+        return JsonResponse({"message": "Acessos atualizados com sucesso!"})
+
+    except Profile.DoesNotExist:
+        return JsonResponse({"error": "Perfil não encontrado!"}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

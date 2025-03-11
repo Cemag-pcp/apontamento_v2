@@ -198,6 +198,32 @@ class MaquinaParada(models.Model):
     data_fim = models.DateTimeField(null=True, blank=True)
     motivo = models.ForeignKey(MotivoMaquinaParada, on_delete=models.CASCADE, null=True, blank=True)
 
+class RotaAcesso(models.Model):
+
+    TIPO_ROTA_CHOICES=(('api','Api'),('template','Template'))
+
+    APP_CHOICES = [
+        ('core', 'Core'),
+        ('users', 'Users'),
+        ('serra', 'Serra'),
+        ('estamparia', 'Estamparia'),
+        ('montagem', 'Montagem'),
+        ('pintura', 'Pintura'),
+        ('prod_especiais', 'Prod Especiais'),
+        ('corte', 'Corte'),
+        ('usinagem', 'Usinagem'),
+        ('cargas', 'Cargas'),
+        ('inspecao', 'Inspeção'),
+    ]
+
+    nome=models.CharField(max_length=50,unique=True) # exemplo: serra/historico
+    descricao=models.CharField(max_length=100) # exemplo: hstorico de serra
+    tipo_rota=models.CharField(max_length=10, choices=TIPO_ROTA_CHOICES) 
+    app=models.CharField(max_length=50, choices=APP_CHOICES)
+
+    def __str__(self):
+        return self.nome
+
 class Profile(models.Model):
     ACESSO_CHOICES = [
         ('operador', 'Operador'),
@@ -205,21 +231,17 @@ class Profile(models.Model):
         ('pcp', 'PCP'),
     ]
 
-    SETOR_CHOICES = [
-        ('estamparia', 'Estamparia'),
-        ('serra', 'Serra'),
-        ('usinagem', 'Usinagem'),
-        ('corte','Corte'),
-        ('prod-esp', 'Prod especiais')
-        
-    ]
-
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     tipo_acesso = models.CharField(max_length=20, choices=ACESSO_CHOICES)
-    setores_permitidos = models.JSONField(default=list)  # Lista de setores permitidos
+    
+    permissoes = models.ManyToManyField(RotaAcesso, blank=True)  # Permissões específicas para rotas
 
     def __str__(self):
         return f"{self.user.username} - {self.tipo_acesso}"
+    
+    def tem_acesso(self, rota_nome):
+        """ Verifica se o usuário tem acesso a uma determinada rota """
+        return self.permissoes.filter(nome=rota_nome).exists()
 
 class Versao(models.Model):
     

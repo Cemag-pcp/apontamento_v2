@@ -40,7 +40,7 @@ document.getElementById('fileUploadLaser2').addEventListener('change', async (ev
     });
 
     try {
-        const response = await fetch('/corte/processar-arquivo/', {
+        const response = await fetch('/corte/api/processar-arquivo/', {
             method: 'POST',
             headers: {
                 'X-CSRFToken': csrfToken, // Adicionar o token CSRF no cabeçalho
@@ -133,7 +133,7 @@ document.getElementById('confirmButtonLaser1').addEventListener('click', async (
     // Obter o token CSRF do formulário
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    const response = await fetch('/corte/salvar-arquivo/', {
+    const response = await fetch('/corte/api/salvar-arquivo/', {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrfToken, // Adicionar o token CSRF no cabeçalho
@@ -204,7 +204,7 @@ document.getElementById('confirmButtonLaser2').addEventListener('click', async (
     // Obter o token CSRF do formulário
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    const response = await fetch('/corte/salvar-arquivo/', {
+    const response = await fetch('/corte/api/salvar-arquivo/', {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrfToken, // Adicionar o token CSRF no cabeçalho

@@ -15,7 +15,7 @@ class Processo(models.Model):
 
 class Maquina(models.Model):
 
-    nome = models.CharField(max_length=20, unique=True)
+    nome = models.CharField(max_length=100, unique=True)
     setor = models.ForeignKey(Setor, related_name='maquina_setor', on_delete=models.CASCADE)
     tipo = models.CharField(max_length=20)
 

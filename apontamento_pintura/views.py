@@ -90,6 +90,7 @@ def criar_ordem(request):
     try:
         data = json.loads(request.body)
         ordens_data = data.get('ordens', [])
+        atualizacao_ordem = data.get('atualizacao_ordem', None)
 
         if not ordens_data:
             return JsonResponse({'error': 'Nenhuma ordem fornecida!'}, status=400)
@@ -109,8 +110,9 @@ def criar_ordem(request):
         datas_existentes = set(Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina='pintura').values_list('data_carga', flat=True))
         datas_bloqueadas = datas_existentes.intersection(datas_requisicao)
 
-        if datas_bloqueadas:
-            return JsonResponse({'error': f"Não é possível adicionar novas ordens. Datas já possuem carga alocada: {', '.join(map(str, datas_bloqueadas))}"}, status=400)
+        if not atualizacao_ordem:
+            if datas_bloqueadas:
+                return JsonResponse({'error': f"Não é possível adicionar novas ordens. Datas já possuem carga alocada: {', '.join(map(str, datas_bloqueadas))}"}, status=400)
 
         ordens_criadas = []
 

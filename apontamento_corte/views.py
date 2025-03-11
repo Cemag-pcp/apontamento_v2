@@ -527,7 +527,7 @@ def gerar_op_duplicada(request, pk_ordem):
                     qtd_planejada=peca['qtd_planejada']
                 )
 
-        return JsonResponse({'message': 'Ordem duplicada com sucesso', 'nova_ordem_id': nova_ordem.pk}, status=201)
+        return JsonResponse({'message': 'Ordem duplicada com sucesso', 'nova_ordem_id': nova_ordem.pk, 'nova_ordem': nova_ordem.pk}, status=201)
 
     except Ordem.DoesNotExist:
         return JsonResponse({'error': 'Ordem original não encontrada'}, status=404)

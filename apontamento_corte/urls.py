@@ -5,11 +5,16 @@ from .views import ProcessarArquivoView,SalvarArquivoView
 app_name = 'corte'
 
 urlpatterns = [
+    
+    #templates
+    
     path('', views.planejamento, name='planejamento'),
-    path('processar-arquivo/', ProcessarArquivoView.as_view(), name='processar_arquivo'),
-    path('salvar-arquivo/', SalvarArquivoView.as_view(), name='salvar_arquivo'),
     path('duplicar-op/', views.duplicar_op, name='duplicar_op'),
 
+    #apis
+
+    path('api/salvar-arquivo/', SalvarArquivoView.as_view(), name='salvar_arquivo'),
+    path('api/processar-arquivo/', ProcessarArquivoView.as_view(), name='processar_arquivo'),
     path('duplicar-op/api/ordens-criadas/', views.get_ordens_criadas_duplicar_ordem, name='get_ordens_criadas_duplicar_ordem'),
     path('duplicar-op/api/pecas/', views.get_pecas, name='get_pecas'),
     path('duplicar-op/api/duplicar-ordem/<int:pk_ordem>/pecas/', views.get_pecas_ordem_duplicar_ordem, name='get_pecas_ordem_duplicar_ordem'),

@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.db.models.functions import Coalesce
@@ -6,11 +6,14 @@ from django.db import models
 from django.db.models import Sum,Q,Prefetch,Count,OuterRef, Subquery, F, Value, Avg
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.timezone import now
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from apontamento_pintura.models import PecasOrdem as POPintura
 from apontamento_montagem.models import PecasOrdem as POMontagem
 from core.models import Ordem
-from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos
+from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
+from cadastro.models import Maquina
 
 import pandas as pd
 import os
@@ -92,6 +95,15 @@ def gerar_dados_sequenciamento(request):
     if not data_inicio or not data_final or not setor:
         return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)
 
+    intervalo_datas = criar_array_datas(data_inicio, data_final)
+
+    # formatando data string
+    intervalo_datas_formatado = [datetime.strptime(data, "%d/%m/%Y").strftime("%Y-%m-%d") for data in intervalo_datas]
+
+    # Verifica se já existe uma carga na nova data
+    if Ordem.objects.filter(grupo_maquina=setor, data_carga__in=intervalo_datas_formatado).exists():
+        return JsonResponse({'error': 'Já existe uma carga programada para essa data'}, status=400)
+
     # Gerar os arquivos e a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_final, setor)
     
@@ -119,19 +131,141 @@ def gerar_dados_sequenciamento(request):
             "setor_conjunto" : row["Célula"]
         })
 
+    # Obtém os cookies da sessão atual
+    session_cookies = request.COOKIES.get("sessionid")
+
     url_criar_ordem = request.build_absolute_uri(reverse("pintura:criar_ordem")) if setor == 'pintura' else request.build_absolute_uri(reverse("montagem:criar_ordem"))
 
     # Chamar API de criar ordem
     response_ordem = requests.post(
         url_criar_ordem,
         json={"ordens": ordens},
-        headers={"Content-Type": "application/json"}
+        headers={"Content-Type": "application/json"},
+        cookies={"sessionid": session_cookies},  # Inclui o cookie da sessão
     )
 
     if response_ordem.status_code != 200:
         return HttpResponse(f"Erro ao criar ordens: {response_ordem.text}", status=500)
 
     return JsonResponse({"message": "Sequenciamento gerado com sucesso!"})
+
+@csrf_exempt
+def atualizar_ordem_existente(request):
+    """
+    Chama a API 'criar_ordem'.
+    """
+    data_inicio = request.GET.get('data_inicio')
+    setor = request.GET.get('setor')
+
+    if not data_inicio or not setor:
+        return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)
+
+    intervalo_datas = criar_array_datas(data_inicio, data_inicio)
+
+    # formatando data string
+    intervalo_datas_formatado = [datetime.strptime(data, "%d/%m/%Y").strftime("%Y-%m-%d") for data in intervalo_datas]
+
+    # Para montagem
+    # Excluir ordens que ainda não possuem apontamentos registrados
+    if setor == 'montagem':
+        Ordem.objects.annotate(
+            total_produzido=Sum('ordem_pecas_montagem__qtd_boa')
+        ).filter(
+            total_produzido=0,  # Apenas ordens SEM apontamento
+            data_carga__in=intervalo_datas_formatado
+        ).delete()
+
+        # Filtra ordens que ja possuem apontamentos
+        ordens_com_apontamentos = Ordem.objects.annotate(
+            total_produzido=Sum('ordem_pecas_montagem__qtd_boa')
+        ).filter(
+            total_produzido__gt=0,  # (qtd_boa > 0)
+            data_carga__in=intervalo_datas_formatado
+        )
+    # para pintura
+    else:
+        Ordem.objects.annotate(
+            total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
+        ).filter(
+            total_produzido=0,  # Apenas ordens SEM apontamento
+            data_carga__in=intervalo_datas_formatado
+        ).delete()
+
+        # Filtra ordens que ja possuem apontamentos
+        ordens_com_apontamentos = Ordem.objects.annotate(
+            total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
+        ).filter(
+            total_produzido__gt=0,  # (qtd_boa > 0)
+            data_carga__in=intervalo_datas_formatado
+        )
+
+    # Gerar os arquivos e a tabela completa
+    tabela_completa = gerar_sequenciamento(data_inicio, data_inicio, setor)
+    
+    if setor == 'pintura':
+        tabela_completa.drop_duplicates(subset=['Código','Datas','cor'])
+        # formato datetime
+        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
+        tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
+    else:
+        tabela_completa.drop_duplicates(subset=['Código','Datas','Célula'])
+        tabela_completa["Datas"] = tabela_completa["Datas"].astype(str)
+        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%Y-%d-%m", errors="coerce")
+        tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
+
+    # Criar a carga para a API de criar ordem
+    ordens = []
+    for _, row in tabela_completa.iterrows():
+        
+        # para montagem
+        if setor=='montagem':
+        
+            ordem_existente = Ordem.objects.filter(
+                grupo_maquina=setor.lower(),
+                data_carga=row["Datas"],
+                ordem_pecas_montagem__peca=str(row["Código"]) + " - " + row["Peca"]
+            ).exists()
+        
+        # para pintura
+        else:
+            
+            ordem_existente = Ordem.objects.filter(
+                grupo_maquina=setor.lower(),
+                data_carga=row["Datas"],
+                ordem_pecas_pintura__peca=str(row["Código"]) + " - " + row["Peca"]
+            ).exists()
+       
+        if not ordem_existente:  # Evita duplicatas
+            ordens.append({
+                "grupo_maquina": setor.lower(),
+                "cor": row["cor"] if setor == 'pintura' else '',
+                "obs": "Ordem gerada automaticamente",
+                "peca_nome": str(row["Código"]) + " - " + row["Peca"],
+                "qtd_planejada": int(row["Qtde_total"]),
+                "data_carga": row["Datas"],
+                "setor_conjunto": row["Célula"]
+            })
+
+    # Obtém os cookies da sessão atual
+    session_cookies = request.COOKIES.get("sessionid")
+
+    # Chamar API de criar ordem com as novas ordens
+    response_ordem = requests.post(
+        request.build_absolute_uri(reverse("pintura:criar_ordem")) if setor == "pintura" else request.build_absolute_uri(reverse("montagem:criar_ordem")),
+        json={"ordens": ordens, "atualizacao_ordem": True},
+        headers={"Content-Type": "application/json"},
+        cookies={"sessionid": session_cookies},  # Inclui o cookie da sessão
+    )
+
+    if response_ordem.status_code != 200:
+        return HttpResponse("Erro ao criar ordens.", status=500)
+
+    # Retornar JSON com informações sobre ordens que precisam ser atualizadas manualmente
+    return JsonResponse({
+        "message": "Ordens atualizadas com sucesso!",
+        "ordens_a_serem_atualizadas": list(ordens_com_apontamentos.values_list()),  # Converte QuerySet em lista
+        "novas_ordens_criadas": len(ordens),  # Quantidade de novas ordens adicionadas
+    })
 
 @csrf_exempt
 def remanejar_carga(request):
@@ -249,3 +383,158 @@ def andamento_cargas(request):
             })
 
     return JsonResponse(andamento_cargas, safe=False)  # Retorna um ARRAY direto
+
+def historico_cargas(request):
+
+    return render(request, "cargas/historico.html")
+
+def historico_ordens_montagem(request):
+    """
+    View que agrega os dados de PecasOrdem (por ordem) e junta com a model Ordem,
+    trazendo algumas colunas da Ordem e calculando o saldo:
+        saldo = soma(qtd_planejada) - soma(qtd_boa)
+    
+    Parâmetros esperados na URL (via GET):
+      - data_carga: data da carga (default: hoje)
+      - maquina: nome da máquina (opcional)
+      - status: status da ordem (opcional)
+      - page: número da página
+      - limit: quantidade de itens por página
+
+    """
+
+    data_carga = request.GET.get('data_carga')
+    maquina_param = request.GET.get('setor', '') # Chassi, Içamento...
+    status_param = request.GET.get('status', '')
+
+    print(data_carga)
+
+    # Paginação
+    page = request.GET.get('page', 1)
+    limit = request.GET.get('limit', 10)  # Default: 10 itens por página
+
+    try:
+        limit = int(limit)
+        page = int(page)
+    except ValueError:
+        return JsonResponse({"error": "Parâmetros de paginação inválidos."}, status=400)
+
+    # Monta os filtros para a model Ordem
+    filtros_ordem = {
+        'grupo_maquina': 'montagem'
+    }
+
+    if data_carga:
+        try:
+            data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
+            filtros_ordem['data_carga'] = data_carga  # Removida a vírgula extra
+        except ValueError:
+            return JsonResponse({"error": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
+    if maquina_param:
+        maquina = get_object_or_404(Maquina, pk=maquina_param)
+        filtros_ordem['maquina'] = maquina
+    if status_param:
+        filtros_ordem['status_atual'] = status_param
+
+    # Recupera os IDs das ordens que atendem aos filtros
+    ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
+
+    # Consulta na PecasOrdem filtrando pelas ordens identificadas,
+    # trazendo alguns campos da Ordem (usando a notação "ordem__<campo>"),
+    # e agrupando para calcular as somas e o saldo.
+    pecas_ordem_agg = POMontagem.objects.filter(ordem_id__in=ordem_ids).values(
+        'ordem',                    # id da ordem (chave para o agrupamento)
+        'ordem__data_carga',        # data da carga da ordem
+        'ordem__data_programacao',  # data da programação da ordem
+        'ordem__maquina__nome',     # nome da máquina (ajuste se necessário)
+        'ordem__status_atual',      # status atual da ordem
+        'peca',                     # nome da peça
+    ).annotate(
+        total_planejada=Coalesce(
+            Avg('qtd_planejada'), Value(0.0, output_field=models.FloatField())
+        )
+    )
+
+    # Aplicando a paginação
+    paginator = Paginator(pecas_ordem_agg, limit)
+    
+    try:
+        ordens_paginadas = paginator.page(page)
+    except PageNotAnInteger:
+        ordens_paginadas = paginator.page(1)
+    except EmptyPage:
+        ordens_paginadas = []
+
+    maquinas = Ordem.objects.filter(id__in=ordem_ids).values('maquina__nome', 'maquina__id').distinct()
+
+    return JsonResponse({
+        "ordens": list(ordens_paginadas),
+        "maquinas": list(maquinas),
+        "total_ordens": paginator.count,
+        "total_paginas": paginator.num_pages,
+        "pagina_atual": page
+    })
+
+@csrf_exempt
+def editar_planejamento(request):
+    if request.method != "POST":
+        return JsonResponse({"erro": "Método não permitido. Use POST!"}, status=405)
+
+    try:
+        # Carregar dados do corpo da requisição
+        data = json.loads(request.body)
+
+        nova_data_carga = data.get('novaDataCarga')
+        qt_planejada = data.get('novaQtdPlan')
+        ordem_id = data.get('ordemId')
+        setor = data.get('setor')
+
+        # Validação de campos obrigatórios
+        if not ordem_id or not setor:
+            return JsonResponse({"erro": "Os campos 'setor' e 'ordem_id' são obrigatórios!"}, status=400)
+
+        # Buscar a ordem
+        ordem = get_object_or_404(Ordem, pk=ordem_id)
+
+        # Determinar o modelo correto com base no setor
+        if setor == 'montagem':
+            atualizar_ordens = POMontagem.objects.filter(ordem=ordem)
+        else:
+            atualizar_ordens = POPintura.objects.filter(ordem=ordem)
+
+        # Verifica se há conflito antes de atualizar a data de carga
+        if nova_data_carga:
+            try:
+                nova_data_carga = datetime.strptime(nova_data_carga, "%Y-%m-%d").date()
+            except ValueError:
+                return JsonResponse({"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
+
+            # Obtém todas as peças associadas à ordem atual
+            pecas_ordem = atualizar_ordens.values_list('peca', flat=True)
+
+            # Verifica se já existe outra ordem com a mesma peça para a nova data
+            conflito = Ordem.objects.filter(
+                data_carga=nova_data_carga,
+                ordem_pecas_montagem__peca__in=pecas_ordem
+            ).exclude(id=ordem_id).exists()
+
+            if conflito:
+                return JsonResponse({"erro": "Já existe uma ordem com o mesmo conjunto para essa data!"}, status=400)
+
+            # Atualiza a data da ordem
+            ordem.data_carga = nova_data_carga
+            ordem.save()
+
+        # Atualiza a quantidade planejada, se necessário
+        if qt_planejada:
+            atualizar_ordens.update(qtd_planejada=qt_planejada)
+
+        return JsonResponse({"mensagem": "Planejamento atualizado com sucesso!"}, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"erro": "Erro ao processar JSON. Verifique o formato da requisição!"}, status=400)
+
+    except Exception as e:
+        return JsonResponse({"erro": f"Ocorreu um erro: {str(e)}"}, status=500)    
+
+    

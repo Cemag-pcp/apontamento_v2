@@ -35,11 +35,13 @@ def criar_ordem(request):
     }
     """
 
+
     if request.method != 'POST':
         return JsonResponse({'error': 'Método não permitido!'}, status=405)
     try:
         data = json.loads(request.body)  # Tenta carregar o JSON
         ordens_data = data.get('ordens', [])
+        atualizacao_ordem = data.get('atualizacao_ordem', None)
 
         if not ordens_data:
             return JsonResponse({'error': 'Nenhuma ordem fornecida!'}, status=400)
@@ -59,9 +61,29 @@ def criar_ordem(request):
         datas_existentes = set(Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina='montagem').values_list('data_carga', flat=True))
         datas_bloqueadas = datas_existentes.intersection(datas_requisicao)
 
-        if datas_bloqueadas:
-            return JsonResponse({'error': f"Não é possível adicionar novas ordens. Datas já possuem carga alocada: {', '.join(map(str, datas_bloqueadas))}"}, status=400)
+        if not atualizacao_ordem:
+            if datas_bloqueadas:
+                return JsonResponse({'error': f"Não é possível adicionar novas ordens. Datas já possuem carga alocada: {', '.join(map(str, datas_bloqueadas))}"}, status=400)
+        
+        # Coletar todas as máquinas na requisição
+        maquinas_requisicao = set()
+        for ordem_info in ordens_data:
+            maquina_str = ordem_info.get('setor_conjunto')
+            if maquina_str:  # Garante que não é None ou string vazia
+                maquinas_requisicao.add(maquina_str)  # Corrigido para adicionar o nome correto da máquina
 
+        # Verifica se todas as células já estão cadastradas no model de máquinas
+        maquinas_existentes = set(Maquina.objects.filter(nome__in=maquinas_requisicao).values_list('nome', flat=True))
+
+        # Identifica as máquinas que não estão cadastradas
+        maquinas_faltantes = maquinas_requisicao - maquinas_existentes
+
+        if maquinas_faltantes:
+            return JsonResponse(
+                {'error': f"Não é possível adicionar novas ordens. As máquinas a seguir não estão cadastradas: {', '.join(maquinas_faltantes)}"}, 
+                status=400, safe=False
+            )
+        
         ordens_criadas = []
 
         with transaction.atomic():  # Garantir transação segura

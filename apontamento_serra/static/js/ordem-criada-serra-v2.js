@@ -51,6 +51,9 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
                                     <i class="fa fa-check"></i>
                                 </button>
+                                <button class="btn btn-primary btn-sm btn-duplicar" title="Duplicar Ordem">
+                                    <i class="fa fa-clone"></i>
+                                </button>
                             `;
                         } else if (ordem.status_atual === 'aguardando_iniciar') {
                             botaoAcao = `
@@ -60,11 +63,17 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
                                     <i class="fa fa-trash"></i>
                                 </button>
+                                <button class="btn btn-primary btn-sm btn-duplicar" title="Duplicar Ordem">
+                                    <i class="fa fa-clone"></i>
+                                </button>
                             `;
                         } else if (ordem.status_atual === 'interrompida') {
                             botaoAcao = `
                                 <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
                                     <i class="fa fa-redo"></i>
+                                </button>
+                                <button class="btn btn-primary btn-sm btn-duplicar" title="Duplicar Ordem">
+                                    <i class="fa fa-clone"></i>
                                 </button>
                             `;
                         }
@@ -116,6 +125,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonFinalizar = card.querySelector('.btn-finalizar');
                         const buttonRetornar = card.querySelector('.btn-retornar');
                         const buttonExcluir= card.querySelector('.btn-excluir');
+                        const buttonDuplicar= card.querySelector('.btn-duplicar');
 
                         // Adiciona evento ao botão "Ver Peças", se existir
                         if (buttonVerPeca) {
@@ -148,7 +158,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
+                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
@@ -156,6 +166,13 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         if (buttonExcluir) {
                             buttonExcluir.addEventListener('click', () => {
                                 mostrarModalExcluir(ordem.id, 'serra');
+                            });
+                        }
+
+                        // Adiciona evento ao botão "Duplicar", se existir
+                        if (buttonDuplicar) {
+                            buttonDuplicar.addEventListener('click', () => {
+                                mostrarModalDuplicar(ordem.id, 'serra');
                             });
                         }
 
@@ -411,7 +428,7 @@ export function carregarOrdensInterrompidas(container, filtros={}) {
                 // Evento para "Retornar"
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
+                        mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
@@ -517,7 +534,7 @@ function mostrarPecas(ordemId, maquinaName) {
         })
         .then(data => {
             Swal.close(); // Fecha o SweetAlert de carregamento
-
+            console.log(data);
             if (data.pecas.length === 0) {
                 modalContent.innerHTML = `<p class="text-center text-muted">Não há peças cadastradas para esta ordem.</p>`;
             } else {
@@ -528,17 +545,23 @@ function mostrarPecas(ordemId, maquinaName) {
                             <tr class="table-light">
                                 <th>Peça</th>
                                 <th>Quantidade</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            ${data.pecas.map(peca => `
-                                <tr>
+                        <tbody id="tabelaPecas">
+                            ${data.pecas.map((peca) => `
+                                <tr id="linha-${peca.id_peca}">
                                     <td>
-                                    <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
-                                        ${peca.peca_nome}
-                                    </a>
+                                        <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
+                                            ${peca.peca_nome}
+                                        </a>
                                     </td>
                                     <td>${peca.quantidade}</td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm btn-excluir-peca" data-index="${peca.id_peca}">
+                                            🗑 Excluir
+                                        </button>
+                                    </td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -549,6 +572,15 @@ function mostrarPecas(ordemId, maquinaName) {
             // Exibe o modal
             const modal = new bootstrap.Modal(document.getElementById('modalPecas'));
             modal.show();
+
+            // Adiciona evento de exclusão corretamente com delegação
+            document.getElementById('tabelaPecas').addEventListener('click', function (event) {
+                const button = event.target.closest('.btn-excluir-peca'); // Garante que pegamos o botão correto
+                if (button) {
+                    const index = button.getAttribute('data-index');
+                    excluirPeca(index, ordemId);
+                }
+            });
         })
         .catch(error => {
             Swal.close(); // Fecha o SweetAlert de carregamento
@@ -561,6 +593,84 @@ function mostrarPecas(ordemId, maquinaName) {
                 text: 'Erro ao carregar as peças. Por favor, tente novamente.',
             });
         });
+
+}
+
+// Função para excluir uma peça (mantendo ao menos uma)
+function excluirPeca(index, ordemId) {
+    const tabela = document.getElementById('tabelaPecas');
+    
+    // Verifica se há apenas uma peça na tabela (mantendo pelo menos uma)
+    if (tabela.rows.length <= 1) { // 1 cabeçalho + pelo menos 1 peça
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção!',
+            text: 'A ordem deve ter pelo menos uma peça.',
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: 'Tem certeza?',
+        text: 'Você deseja excluir esta peça?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sim, excluir!',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Chama a API para excluir a peça no backend
+            fetch('api/excluir-peca-ordem/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ ordem_id: ordemId, index: index }) // Envia os dados corretamente
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    // Remove a linha da tabela apenas se a API confirmar exclusão
+                    const linha = document.getElementById(`linha-${index}`);
+                    if (linha) linha.remove();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Peça excluída!',
+                        text: 'A peça foi removida com sucesso.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+
+                    const containerIniciado = document.querySelector('.containerProcesso');
+                    carregarOrdensIniciadas(containerIniciado);
+
+                    const containerInterrompido = document.querySelector('.containerInterrompido');
+                    carregarOrdensInterrompidas(containerInterrompido);
+        
+                    document.getElementById('ordens-container').innerHTML = '';
+                    resetarCardsInicial();
+
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Não foi possível excluir a peça. Tente novamente.',
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao excluir peça:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: 'Ocorreu um erro ao comunicar com o servidor.',
+                });
+            });
+        }
+    });
 }
 
 function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
@@ -713,6 +823,78 @@ function mostrarModalExcluir(ordemId, setor) {
                     icon: 'error',
                     title: 'Erro',
                     text: body.error || 'Erro ao excluir a ordem.',
+                });
+            }
+        })
+        .catch((error) => {
+            console.error('Erro:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
+            });
+        });
+    });
+}
+
+// Modal para "Duplicar"
+function mostrarModalDuplicar(ordemId){
+
+    const modal = new bootstrap.Modal(document.getElementById('modalDuplicar'));
+    const modalTitle = document.getElementById('modalDuplicarLabel');
+    const formDuplicar = document.getElementById('formDuplicar');
+
+    modalTitle.innerHTML = `Confirmar`;
+    modal.show();
+
+    // Remove listeners antigos e adiciona novo
+    const clonedForm = formDuplicar.cloneNode(true);
+    formDuplicar.parentNode.replaceChild(clonedForm, formDuplicar);
+
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(clonedForm);
+
+        Swal.fire({
+            title: 'Duplicando...',
+            text: 'Por favor, aguarde enquanto a ordem está sendo duplicada.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch(`api/duplicar-ordem/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                ordem_id: ordemId,
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
+            }
+        })
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(({ status, body }) => {
+            if (status === 201) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: body.success,
+                });
+
+                modal.hide();
+
+                // Recarrega os dados chamando a função de carregamento
+                document.getElementById('ordens-container').innerHTML = '';
+                resetarCardsInicial();
+            } else {
+                // Exibe o erro vindo do backend
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: body.error || 'Erro ao duplicar a ordem.',
                 });
             }
         })

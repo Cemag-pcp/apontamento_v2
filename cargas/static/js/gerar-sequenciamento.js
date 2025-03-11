@@ -86,17 +86,24 @@ function gerarPlanejamento() {
         method: "GET",
         headers: { "Content-Type": "application/json" },
     })
-    .then(response => response.json())
+    .then(response => {
+        return response.json().then(data => {
+            if (!response.ok) {
+                throw data; // Lança o erro para ser tratado no catch
+            }
+            return data;
+        });
+    })
     .then(data => {
-        if (data.error) {
-            alert("Erro ao gerar planejamento: " + data.error);
-        } else {
-            alert("Planejamento gerado com sucesso!");
-        }
+        alert("Planejamento gerado com sucesso!");
     })
     .catch(error => {
-        console.error("Erro na requisição:", error);
-        alert("Erro ao processar a solicitação.");
+        console.error("Erro ao criar ordens:", error);
+        if (error && error.error) {
+            alert("Erro ao gerar planejamento: " + error.error);
+        } else {
+            alert("Erro inesperado ao processar a solicitação.");
+        }
     })
     .finally(() => {
         btngerarPlanejamento.innerHTML = '<i class="fas fa-save"></i> Gerar Planejamento';
