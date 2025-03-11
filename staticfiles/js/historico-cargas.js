@@ -1,23 +1,20 @@
-
-// let ordensCarregadas = [];
-
-function carregarTabela(pagina) {
+function carregarTabela(pagina = 1) {
     mostrarLoading(true); // Exibe o spinner
 
     document.getElementById('pagina-atual').value = pagina;
+    const dataCargaEscolhida = document.getElementById('filtro-data-carga')?.value || '';
 
-    const ordemEscolhida = document.getElementById('filtro-ordem')?.value || '';
+    const limiteRegistros = 10; // Define o limite de registros por página
 
     const filtros = {
-        ordem: encodeURIComponent(ordemEscolhida),
+        dataCargaEscolhida: encodeURIComponent(dataCargaEscolhida),
     };
 
-    fetch(`/estamparia/api/ordens-criadas/?page=${pagina}&limit=10&status=finalizada&ordem=${filtros.ordem}`)
+    fetch(`/cargas/api/historico-planejamento-montagem/?data_carga=${filtros.dataCargaEscolhida || ''}&page=${pagina}&limit=${limiteRegistros}`)
         .then(response => response.json())
         .then(data => {
-            console.log(data.ordens); // Debug para verificar os dados recebidos
             atualizarTabela(data.ordens);
-            atualizarPaginacao(data.total_ordens, pagina);
+            atualizarPaginacao(data.total_ordens, pagina, data.total_paginas);
         })
         .finally(() => mostrarLoading(false)); // Oculta o spinner
 }
@@ -27,49 +24,42 @@ function atualizarTabela(ordens) {
     const tabelaCorpo = document.getElementById("tabela-corpo");
     tabelaCorpo.innerHTML = "";
 
+    console.log(ordens);
+
     if (ordens.length === 0) {
         tabelaCorpo.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhum dado encontrado.</td></tr>`;
         return;
     }
 
     ordens.forEach(ordem => {
-        // Filtrar apenas as peças com `qtd_boa > 0`
-        const pecasValidas = ordem.info_pecas //.filter(peca => peca.qtd_boa > 0);
 
-        if (pecasValidas.length === 0) {
-            return; // Se nenhuma peça válida, pula essa ordem
-        }
+        const linha = document.createElement("tr");
 
-        pecasValidas.forEach(peca => {
-            const linha = document.createElement("tr");
+        linha.innerHTML = `
+            <td>${ordem.ordem}</td>
+            <td>
+                <input type="date" class="form-control data-carga-input" 
+                    data-id="${ordem.ordem}" value="${ordem.ordem__data_carga}" 
+                    disabled>
+            </td>
+            <td>${ordem.ordem__maquina__nome}</td>
+            <td>${ordem.peca}</td>
+            <td>
+                <input type="number" class="form-control qtd-plan-input" 
+                    data-id="${ordem.ordem}" value="${ordem.total_planejada}" 
+                    disabled>
+            </td>
+            <td class="d-flex gap-2">
+                <button class="btn-editar btn btn-sm btn-warning" data-id="${ordem.ordem}">
+                    <i class="far fa-edit"></i>
+                </button>
+                <button class="btn-confirmar btn btn-sm btn-success d-none" data-id="${ordem.ordem}">
+                    <i class="fas fa-check"></i>
+                </button>
+            </td>
+        `;
 
-            linha.innerHTML = `
-                <td>${ordem.ordem}</td>
-                <td>${ordem.data_criacao}</td>
-                <td>${peca.maquina}</td>
-                <td>${peca.peca_codigo} - ${peca.peca_nome}</td>
-                <td>
-                    <input type="number" class="form-control qtb-boa-input" 
-                        data-id="${peca.id}" value="${peca.qtd_boa}" 
-                        disabled>
-                </td>
-                <td>
-                    <input type="number" class="form-control qtd-morta-input" 
-                        data-id="${peca.id}" value="${peca.qtd_morta}" 
-                        disabled>
-                </td>
-                <td class="d-flex gap-2">
-                    <button class="btn-editar btn btn-sm btn-warning" data-id="${peca.id}">
-                        <i class="far fa-edit"></i>
-                    </button>
-                    <button class="btn-confirmar btn btn-sm btn-success d-none" data-id="${peca.id}">
-                        <i class="fas fa-check"></i>
-                    </button>
-                </td>
-            `;
-
-            tabelaCorpo.appendChild(linha);
-        });
+        tabelaCorpo.appendChild(linha);
     });
 
     adicionarEventosBotoesEdicao();
@@ -94,14 +84,14 @@ function adicionarEventosBotoesEdicao() {
 
 // Ativa os inputs para edição e exibe o botão de confirmar
 function ativarEdicao(ordemId) {
-    const qtBoaInput = document.querySelector(`.qtb-boa-input[data-id="${ordemId}"]`);
-    const qtMortaInput = document.querySelector(`.qtd-morta-input[data-id="${ordemId}"]`);
+    const qtBoaInput = document.querySelector(`.qtd-plan-input[data-id="${ordemId}"]`);
+    const dataCargaInput = document.querySelector(`.data-carga-input[data-id="${ordemId}"]`);
     const botaoEditar = document.querySelector(`.btn-editar[data-id="${ordemId}"]`);
     const botaoConfirmar = document.querySelector(`.btn-confirmar[data-id="${ordemId}"]`);
 
-    if (qtBoaInput && qtMortaInput) {
+    if (qtBoaInput && dataCargaInput) {
         qtBoaInput.removeAttribute("disabled");
-        qtMortaInput.removeAttribute("disabled");
+        dataCargaInput.removeAttribute("disabled");
 
         botaoEditar.classList.add("d-none");
         botaoConfirmar.classList.remove("d-none");
@@ -110,48 +100,52 @@ function ativarEdicao(ordemId) {
 
 // Captura os valores editados e confirma a alteração
 function confirmarAlteracao(ordemId) {
-    const qtBoaInput = document.querySelector(`.qtb-boa-input[data-id="${ordemId}"]`);
-    const qtMortaInput = document.querySelector(`.qtd-morta-input[data-id="${ordemId}"]`);
+    const qtPlanInput = document.querySelector(`.qtd-plan-input[data-id="${ordemId}"]`);
+    const dataCargaInput = document.querySelector(`.data-carga-input[data-id="${ordemId}"]`);
     const botaoEditar = document.querySelector(`.btn-editar[data-id="${ordemId}"]`);
     const botaoConfirmar = document.querySelector(`.btn-confirmar[data-id="${ordemId}"]`);
 
-    const novaQtBoa = qtBoaInput.value;
-    const novaQtMorta = qtMortaInput.value;
+    const novaQtdPlan = qtPlanInput.value;
+    const novaDataCarga = dataCargaInput.value;
 
-    if (novaQtBoa === '' || novaQtMorta === '') {
+    if (novaQtdPlan === '') {
+        Swal.fire({ icon: 'error', title: 'Erro!', text: 'Preencha todos os campos.' });
+        return;
+    }
+
+    if (novaDataCarga === '') {
         Swal.fire({ icon: 'error', title: 'Erro!', text: 'Preencha todos os campos.' });
         return;
     }
 
     // Desativar os campos novamente
-    qtBoaInput.setAttribute("disabled", "true");
-    qtMortaInput.setAttribute("disabled", "true");
+    qtPlanInput.setAttribute("disabled", "true");
+    dataCargaInput.setAttribute("disabled", "true");
 
     // Alternar visibilidade dos botões
     botaoEditar.classList.remove("d-none");
     botaoConfirmar.classList.add("d-none");
 
-    // Dados a serem enviados para o backend
-    const dadosAtualizados = {
-        ordemId: ordemId,
-        novaQtBoa: novaQtBoa,
-        novaQtMorta: novaQtMorta,
-    };
-
-    console.log("Enviando dados para atualização:", dadosAtualizados);
-
     // Enviar os dados via fetch
-    fetch('/estamparia/atualizar-pecas/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dadosAtualizados)
+    fetch('/cargas/api/editar-planejamento/', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            ordemId: ordemId,
+            novaQtdPlan: novaQtdPlan,
+            novaDataCarga: novaDataCarga,
+            setor: 'montagem'
+        })
     })
     .then(response => response.json())
+    .then(data => {
+        if (data.erro) {
+            Swal.fire({ icon: "error", title: "Erro!", text: data.erro });
+        }
+    })
     .catch(error => {
-        console.error("Erro na requisição:", error);
-        Swal.fire({ icon: 'error', title: 'Erro!', text: 'Ocorreu um erro ao salvar as alterações.' });
+        console.error("Erro ao atualizar planejamento:", error);
+        Swal.fire({ icon: "error", title: "Erro!", text: "Falha na requisição." });
     });
 }
 
@@ -394,7 +388,7 @@ function getCSRFToken() {
 document.addEventListener('DOMContentLoaded', () => {
     
     configurarBotaoVerPecas();
-    // salvarPecas();
+    salvarPecas();
 
     // Ação do botão de filtro
     document.getElementById("filtro-form").addEventListener("submit", (event) => {
