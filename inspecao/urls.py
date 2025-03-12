@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/itens-inspecionados-pintura/', views.get_itens_inspecionados_pintura, name='itens-inspecionados-pintura'),
     path('api/itens-reinspecao-pintura/', views.get_itens_reinspecao_pintura, name='itens-reinspecao-pintura'),
     path('api/historico-pintura/<int:id>', views.get_historico_pintura, name='historico-pintura'),
+    path('api/envio-inspecao-pintura/', views.envio_inspecao_pintura, name='envio-inspecao-pintura'),
 
     path('tanque/', views.inspecao_tanque, name='inspecao-tanque'),
     path('tubos-cilindros/', views.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),

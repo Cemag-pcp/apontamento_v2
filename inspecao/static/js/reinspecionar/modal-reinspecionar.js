@@ -8,13 +8,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const peca = event.target.getAttribute("data-peca");
             const tipo = event.target.getAttribute("data-tipo");
             const cor = event.target.getAttribute("data-cor");
-            const conformidade = event.target.getAttribute("data-conformidade");
+            const totalReinspecao = event.target.getAttribute("data-nao-conformidade");
 
             document.getElementById("id-reinspecao-pintura").value = id;
             document.getElementById("data-finalizada-reinspecao-pintura").value = data;
             document.getElementById("peca-reinspecao-pintura").value = peca;
             document.getElementById("cor-reinspecao-pintura").value = `${cor} - ${tipo}`;
-            document.getElementById("qtd-reinspecao-pintura").value = conformidade;
+            document.getElementById("qtd-reinspecao-pintura").value = totalReinspecao;
 
             const modal = new bootstrap.Modal(document.getElementById("modal-reinspecionar-pintura"));
             modal.show();
@@ -32,31 +32,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const addButton = document.getElementById("add-reinspecao-pintura");
     const removeButton = document.getElementById("remove-reinspecao-pintura");
 
-    // Função para adicionar um novo contêiner
     addButton.addEventListener("click", () => {
-        // Seleciona o último contêiner existente
+
         const lastContainer = containerInspecao.lastElementChild;
 
-        // Remove a inicialização do Select2 antes de clonar
         $(lastContainer).find('select.select2').select2('destroy');
 
-        // Clona o último contêiner existente
         const newContainer = lastContainer.cloneNode(true);
 
-        // Atualiza o texto do span (ex: "2ª Causa", "3ª Causa", etc.)
         const span = newContainer.querySelector("span.label-modal");
         const currentCount = containerInspecao.children.length + 1;
         span.textContent = `${currentCount}ª Causa`;
 
-        // Limpa os valores dos inputs e selects
         newContainer.querySelector("select").value = "";
         newContainer.querySelector("input[type='number']").value = "";
         newContainer.querySelector("input[type='file']").value = "";
 
-        // Adiciona o novo contêiner ao DOM
         containerInspecao.appendChild(newContainer);
 
-        // Reaplica o select2 nos selects clonados
         $('.select2').each(function() {
             $(this).select2({
                 dropdownParent: $(this).closest('.modal'),
@@ -66,9 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 
-    // Função para remover o último contêiner
     removeButton.addEventListener("click", () => {
-        // Verifica se há mais de um contêiner para evitar remover o primeiro
         if (containerInspecao.children.length > 1) {
             containerInspecao.removeChild(containerInspecao.lastElementChild);
         }

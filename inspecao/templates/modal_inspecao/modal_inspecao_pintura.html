@@ -48,11 +48,11 @@
                 </div>
             </div>
             <div id="containerInspecao">
-              <div class="row mb-3" id="selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
+              <div class="row mb-3 selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
                 <span class="label-modal text-end"> 1ª Causa</span>
                 <div class="col-sm-6 mb-4">
                     <label class="label-modal">Causas:</label>
-                    <select class="form-control select2" style="font-size: 14px;" multiple required>
+                    <select class="form-control select2" name="causas_1[]" style="font-size: 14px;" multiple required>
                       {% for causa in causas %}
                         <option value="{{causa.nome}}">{{causa.nome}}</option>
                       {% endfor %}
@@ -64,11 +64,11 @@
                 </div>
                 <div class="col-sm-12 mb-4">
                     <label class="label-modal">Imagens:</label>
-                    <input class="form-control" type="file" multiple>
+                    <input class="form-control" type="file" name="imagens_1[]" multiple>
                 </div>
               </div> 
             </div>
-            <div class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
+            <div id="addRemoveContainer" class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
               <button type="button" class="btn btn-white" id="removeButtonPintura" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
               <button type="button" class="btn btn-white" id="addButtonPintura" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
             </div>
@@ -79,14 +79,17 @@
                     <select name="inspetor" id="inspetor" class="form-control" required>
                         <option value="" selected hidden disabled></option>
                         {% for inspetor in inspetores %}
-                          <option value="{{ inspetor.nome_usuario }}">{{ inspetor.nome_usuario }}</option>
+                          <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
                         {% endfor %}
                     </select>
                 </div>
             </div>    
           </div>                
           <div class="modal-footer">
-            <button type="submit" class="btn btn-dark">Enviar inspeção</button>
+            <button id="submit-inspecionar-pintura" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+              <span role="status">Enviar inspeção</span>
+            </button>
           </div>
         </form>
       </div>
@@ -198,49 +201,7 @@
         <div class="modal-body">
             <section class="py-3">
                 <ul class="timeline">
-                  <li class="timeline-item mb-5">
-                    <h5 class="fw-bold">Our company starts its operations</h5>
-                    <p class="text-muted mb-2 fw-bold">11 March 2020</p>
-                    <p class="text-muted">
-                      Lorem ipsum dolor sit amet consectetur adipisicing elit. Sit
-                      necessitatibus adipisci, ad alias, voluptate pariatur officia
-                      repellendus repellat inventore fugit perferendis totam dolor
-                      voluptas et corrupti distinctio maxime corporis optio?
-                    </p>
-                  </li>
-              
-                  <li class="timeline-item mb-5">
-                    <h5 class="fw-bold">First customer</h5>
-                    <p class="text-muted mb-2 fw-bold">19 March 2020</p>
-                    <p class="text-muted">
-                      Quisque ornare dui nibh, sagittis egestas nisi luctus nec. Sed
-                      aliquet laoreet sapien, eget pulvinar lectus maximus vel.
-                      Phasellus suscipit porta mattis.
-                    </p>
-                  </li>
-              
-                  <li class="timeline-item mb-5">
-                    <h5 class="fw-bold">Our team exceeds 10 people</h5>
-                    <p class="text-muted mb-2 fw-bold">24 June 2020</p>
-                    <p class="text-muted">
-                      Orci varius natoque penatibus et magnis dis parturient montes,
-                      nascetur ridiculus mus. Nulla ullamcorper arcu lacus, maximus
-                      facilisis erat pellentesque nec. Duis et dui maximus dui aliquam
-                      convallis. Quisque consectetur purus erat, et ullamcorper sapien
-                      tincidunt vitae.
-                    </p>
-                  </li>
-              
-                  <li class="timeline-item mb-5">
-                    <h5 class="fw-bold">Earned the first million $!</h5>
-                    <p class="text-muted mb-2 fw-bold">15 October 2020</p>
-                    <p class="text-muted">
-                      Nulla ac tellus convallis, pulvinar nulla ac, fermentum diam. Sed
-                      et urna sit amet massa dapibus tristique non finibus ligula. Nam
-                      pharetra libero nibh, id feugiat tortor rhoncus vitae. Ut suscipit
-                      vulputate mattis.
-                    </p>
-                  </li>
+
                 </ul>
               </section>
         </div>

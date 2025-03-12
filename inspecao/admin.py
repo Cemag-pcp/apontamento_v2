@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Inspecao, DadosExecucaoInspecao, Reinspecao, CausasNaoConformidade, Causas
+from .models import Inspecao, DadosExecucaoInspecao, Reinspecao, CausasNaoConformidade, Causas, ArquivoCausa
 
 class InspecaoAdmin(admin.ModelAdmin):
     list_display = ("data_inspecao", "pecas_ordem_pintura", "pecas_ordem_montagem", "pecas_ordem_estamparia")
@@ -16,5 +16,6 @@ class ReinspecaoAdmin(admin.ModelAdmin):
 admin.site.register(Inspecao, InspecaoAdmin)
 admin.site.register(DadosExecucaoInspecao, DadosExecucaoInspecaoAdmin)
 admin.site.register(Reinspecao, ReinspecaoAdmin)
+admin.site.register(ArquivoCausa)
 admin.site.register(Causas)
 admin.site.register(CausasNaoConformidade)

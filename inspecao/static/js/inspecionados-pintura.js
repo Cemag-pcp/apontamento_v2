@@ -123,6 +123,7 @@ function buscarItensInspecionados(pagina) {
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <h5> ${item.peca}</h5>
+                    <p>Inspeção #${item.id}</p>
                     <p>
                         <strong>📅 Due:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>

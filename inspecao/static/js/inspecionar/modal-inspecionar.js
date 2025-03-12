@@ -24,8 +24,44 @@ document.addEventListener("DOMContentLoaded", () => {
         const qtdInspecao = parseFloat(document.getElementById("qtd-inspecao-pintura").value) || 0;
         const conformidade = parseFloat(this.value) || 0;
         const naoConformidade = qtdInspecao - conformidade;
-
+        const containerInspecao = document.getElementById("containerInspecao");
+        const addRemoveContainer = document.getElementById("addRemoveContainer");
+    
         document.getElementById("nao-conformidade-inspecao-pintura").value = naoConformidade;
+        
+        if (naoConformidade <= 0) {
+            containerInspecao.style.display = "none";
+            addRemoveContainer.style.display = "none";
+    
+            // Remove o atributo 'required' de todos os inputs (exceto file) e selects dentro do containerInspecao
+            const inputs = containerInspecao.querySelectorAll('input');
+            const selects = containerInspecao.querySelectorAll('select');
+
+            inputs.forEach(input => {
+                if (input.type !== 'file') { // Ignora inputs do tipo file
+                    input.removeAttribute('required');
+                }
+                input.value = "";
+            });
+            selects.forEach(select => {
+                select.value = "";
+                select.removeAttribute('required');
+            });
+        } else {
+            containerInspecao.style.display = "block";
+            addRemoveContainer.style.display = "flex";
+    
+            // Adiciona o atributo 'required' de volta a todos os inputs (exceto file) e selects dentro do containerInspecao
+            const inputs = containerInspecao.querySelectorAll('input');
+            const selects = containerInspecao.querySelectorAll('select');
+    
+            inputs.forEach(input => {
+                if (input.type !== 'file') { // Ignora inputs do tipo file
+                    input.setAttribute('required', 'required');
+                }
+            });
+            selects.forEach(select => select.setAttribute('required', 'required'));
+        }
     });
 
     const containerInspecao = document.getElementById("containerInspecao");
@@ -44,8 +80,11 @@ document.addEventListener("DOMContentLoaded", () => {
         span.textContent = `${currentCount}ª Causa`;
 
         newContainer.querySelector("select").value = "";
+        newContainer.querySelector("select").name = `causas_${currentCount}`;
         newContainer.querySelector("input[type='number']").value = "";
         newContainer.querySelector("input[type='file']").value = "";
+        newContainer.querySelector("input[type='file']").name = `imagens_${currentCount}`;
+
 
         containerInspecao.appendChild(newContainer);
 

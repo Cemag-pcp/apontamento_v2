@@ -46,7 +46,7 @@ class DadosExecucaoInspecao(models.Model):
     inspetor = models.ForeignKey(
         Profile, on_delete=models.SET_NULL, null=True, blank=True
     )
-    data_execucao = models.DateTimeField(auto_now_add=True)
+    data_execucao = models.DateTimeField()
     num_execucao = models.IntegerField(null=True, blank=True)
     conformidade = models.IntegerField(null=False, blank=False)
     nao_conformidade = models.IntegerField(null=False, blank=False)
@@ -112,7 +112,7 @@ class CausasNaoConformidade(models.Model):
 
 class ArquivoCausa(models.Model):
     causa_nao_conformidade = models.ForeignKey(CausasNaoConformidade, on_delete=models.CASCADE, related_name='arquivos')
-    arquivo = models.FileField(upload_to='causas_nao_conformidade/')
+    arquivo = models.ImageField(upload_to='causas_nao_conformidade/', null=True, blank=True)
 
 #### Inspecao Estanqueidade ####
 

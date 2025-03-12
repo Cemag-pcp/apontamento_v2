@@ -103,6 +103,11 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'cadastro/static'),
 ]
 
+MEDIA_URL = '/media/'
+
+# Define o diretório onde os arquivos de mídia serão armazenados
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 
 LOGIN_REDIRECT_URL = '/core/'  
 LOGOUT_REDIRECT_URL = '/core/login/'  
