@@ -52,7 +52,7 @@
                 <span class="label-modal text-end"> 1ª Causa</span>
                 <div class="col-sm-6 mb-4">
                     <label class="label-modal">Causas:</label>
-                    <select class="form-control select2" name="causas_1[]" style="font-size: 14px;" multiple required>
+                    <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
                       {% for causa in causas %}
                         <option value="{{causa.nome}}">{{causa.nome}}</option>
                       {% endfor %}
@@ -64,7 +64,7 @@
                 </div>
                 <div class="col-sm-12 mb-4">
                     <label class="label-modal">Imagens:</label>
-                    <input class="form-control" type="file" name="imagens_1[]" multiple>
+                    <input class="form-control" type="file" name="imagens_1" multiple>
                 </div>
               </div> 
             </div>
@@ -96,7 +96,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="modal-reinspecionar-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-pinturaLabel" aria-hidden="true">
+<div class="modal fade" id="modal-reinspecionar-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-pinturaLabel">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
@@ -166,7 +166,7 @@
                 </div>
               </div> 
             </div>
-            <div class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
+            <div id="addRemoveContainerReinspecao" class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
               <button type="button" class="btn btn-white" id="remove-reinspecao-pintura" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
               <button type="button" class="btn btn-white" id="add-reinspecao-pintura" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
             </div>
@@ -177,21 +177,24 @@
                     <select name="inspetor-reinspecao-pintura" id="inspetor-reinspecao-pintura" class="form-control" required>
                         <option value="" selected hidden disabled></option>
                         {% for inspetor in inspetores %}
-                          <option value="{{ inspetor.nome_usuario }}">{{ inspetor.nome_usuario }}</option>
+                          <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
                         {% endfor %}
                     </select>
                 </div>
             </div>    
           </div> 
           <div class="modal-footer">
-            <button type="submit" class="btn btn-dark">Enviar reinspeção</button>
+            <button id="submit-reinspecionar-pintura" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+              <span role="status">Enviar inspeção</span>
+            </button>
           </div>
         </form>
       </div>
     </div>
 </div>
 
-<div class="modal fade" id="modal-historico-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-pinturaLabel" aria-hidden="true">
+<div class="modal fade" id="modal-historico-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-pinturaLabel">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header">
@@ -207,4 +210,22 @@
         </div>
       </div>
     </div>
+</div>
+
+<div class="modal fade" id="modal-causas-historico-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-pinturaLabel">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Causas Pintura</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+          <section class="py-3">
+              <div id="causas-pintura">
+
+              </div>
+          </section>
+      </div>
+    </div>
+  </div>
 </div>

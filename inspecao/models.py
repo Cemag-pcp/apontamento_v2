@@ -75,8 +75,8 @@ class DadosExecucaoInspecao(models.Model):
 
 class Reinspecao(models.Model):
 
-    dados_execucao = models.ForeignKey(
-        DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False
+    inspecao = models.ForeignKey(
+        Inspecao, on_delete=models.CASCADE, null=False, blank=False
     )
     data_reinspecao = models.DateTimeField(auto_now_add=True)
     reinspecionado = models.BooleanField(default=False)
@@ -113,6 +113,7 @@ class CausasNaoConformidade(models.Model):
 class ArquivoCausa(models.Model):
     causa_nao_conformidade = models.ForeignKey(CausasNaoConformidade, on_delete=models.CASCADE, related_name='arquivos')
     arquivo = models.ImageField(upload_to='causas_nao_conformidade/', null=True, blank=True)
+
 
 #### Inspecao Estanqueidade ####
 

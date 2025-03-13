@@ -125,7 +125,7 @@ function buscarItensInspecionados(pagina) {
                     <h5> ${item.peca}</h5>
                     <p>Inspeção #${item.id}</p>
                     <p>
-                        <strong>📅 Due:</strong> ${item.data}<br>
+                        <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
@@ -144,8 +144,11 @@ function buscarItensInspecionados(pagina) {
                             data-nao-conformidade="${item.nao_conformidade}"
                             data-conformidade="${item.conformidade}"
                             data-cor="${item.cor}"
-                            data-id-dados-execucao=${item.id_dados_execucao}
-                        class="btn btn-white historico-inspecao w-50">Ver detalhes</button>
+                            data-id-dados-execucao="${item.id_dados_execucao}"
+                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">              
+                            <span class="spinner-border spinner-border-sm" style="display:none"></span>
+                            Ver detalhes
+                        </button>
                     </div>
                 </div>
             </div>`;

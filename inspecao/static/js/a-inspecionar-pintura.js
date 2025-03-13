@@ -106,6 +106,7 @@ function buscarItensInspecao(pagina) {
                         <strong>📅 Due:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
+                        <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
                         <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
                     </p>
                     <hr>

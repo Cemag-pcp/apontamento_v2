@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const containerInspecao = document.getElementById("containerInspecao");
         const addRemoveContainer = document.getElementById("addRemoveContainer");
     
+        
         document.getElementById("nao-conformidade-inspecao-pintura").value = naoConformidade;
         
         if (naoConformidade <= 0) {

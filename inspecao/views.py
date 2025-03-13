@@ -2,7 +2,6 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Prefetch
 from django.utils import timezone
 from .models import (
     Inspecao,
@@ -20,7 +19,7 @@ from .models import (
 )
 from core.models import Profile
 from datetime import datetime, timedelta
-import json
+from collections import defaultdict
 
 
 def inspecao_montagem(request):
@@ -132,7 +131,7 @@ def get_itens_reinspecao_pintura(request):
 
     reinspecao_ids = set(
         Reinspecao.objects.filter(reinspecionado=False).values_list(
-            "dados_execucao__inspecao", flat=True
+            "inspecao", flat=True
         )
     )
 
@@ -148,7 +147,7 @@ def get_itens_reinspecao_pintura(request):
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
-    itens_por_pagina = 3  # Itens por página
+    itens_por_pagina = 12  # Itens por página
 
     # Filtra os dados
     datas = Inspecao.objects.filter(
@@ -195,13 +194,13 @@ def get_itens_reinspecao_pintura(request):
             "tipo": data.pecas_ordem_pintura.tipo,
             "conformidade": DadosExecucaoInspecao.objects.filter(inspecao=data)
             .values_list("conformidade", flat=True)
-            .first(),
+            .last(),
             "nao_conformidade": DadosExecucaoInspecao.objects.filter(inspecao=data)
             .values_list("nao_conformidade", flat=True)
-            .first(),
+            .last(),
             "inspetor": DadosExecucaoInspecao.objects.filter(inspecao=data)
             .values_list("inspetor__user__username", flat=True)
-            .first(),
+            .last(),
         }
 
         dados.append(item)
@@ -238,7 +237,7 @@ def get_itens_inspecionados_pintura(request):
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
-    itens_por_pagina = 2  # Itens por página
+    itens_por_pagina = 12  # Itens por página
 
     # Filtra os dados
     datas = Inspecao.objects.filter(id__in=inspecionados_ids)
@@ -310,58 +309,99 @@ def get_itens_inspecionados_pintura(request):
 
 
 def get_historico_pintura(request, id):
-
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    dados = DadosExecucaoInspecao.objects.filter(inspecao__id=id).order_by("-id")
+    # Otimiza a consulta usando select_related para trazer dados relacionados
+    dados = (
+        DadosExecucaoInspecao.objects.filter(inspecao__id=id)
+        .select_related("inspetor__user")
+        .order_by("-id")
+    )
 
-    list_history = []
-
-    for dado in dados:
-
-        data_ajustada = dado.data_execucao - timedelta(hours=3)
-
-        list_history.append(
-            {
-                "id": dado.id,
-                "data_execucao": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                "num_execucao": dado.num_execucao,
-                "conformidade": dado.conformidade,
-                "nao_conformidade": dado.nao_conformidade,
-                "inspetor": dado.inspetor.user.username,
-            }
-        )
+    # Usa list comprehension para construir a lista de histórico
+    list_history = [
+        {
+            "id": dado.id,
+            "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
+                "%d/%m/%Y %H:%M:%S"
+            ),
+            "num_execucao": dado.num_execucao,
+            "conformidade": dado.conformidade,
+            "nao_conformidade": dado.nao_conformidade,
+            "inspetor": dado.inspetor.user.username,  # Já está otimizado com select_related
+        }
+        for dado in dados
+    ]
 
     return JsonResponse({"history": list_history}, status=200)
+
+
+def get_historico_causas_pintura(request, id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    causas_nao_conformidade = (
+        CausasNaoConformidade.objects
+        .filter(dados_execucao__id=id)
+        .prefetch_related('causa', 'arquivos')
+    )
+
+    causas_dict = defaultdict(lambda: {
+        "id_cnc": None,
+        "nomes": [], 
+        "setor": None,
+        "quantidade": None,
+        "imagens": []
+    })
+
+    for cnc in causas_nao_conformidade:
+        for causa in cnc.causa.all():
+            if causas_dict[cnc.id]["id_cnc"] is None:
+                causas_dict[cnc.id]["id_cnc"] = cnc.id
+                causas_dict[cnc.id]["setor"] = causa.setor
+                causas_dict[cnc.id]["quantidade"] = cnc.quantidade
+                causas_dict[cnc.id]["imagens"] = [
+                    {
+                        "id": arquivo.id,
+                        "url": arquivo.arquivo.url 
+                    }
+                    for arquivo in cnc.arquivos.all()
+                ]
+            causas_dict[cnc.id]["nomes"].append(causa.nome)
+
+    causas_list = list(causas_dict.values())
+
+    print(causas_list)
+
+    return JsonResponse({"causas": causas_list}, status=200)
 
 
 def envio_inspecao_pintura(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
-    
+
     id_inspecao = request.POST.get("id-inspecao-pintura")
-
-    teste = DadosExecucaoInspecao.objects.filter(inspecao__pk=id_inspecao).first()
-
-    if teste:
+    # Verifica se já existe uma inspeção com o mesmo ID
+    if DadosExecucaoInspecao.objects.filter(inspecao__pk=id_inspecao).exists():
         return JsonResponse({"error": "Item já inspecionado."}, status=400)
 
     with transaction.atomic():
         # Dados básicos
         data_inspecao = request.POST.get("data-inspecao-pintura")
         conformidade = request.POST.get("conformidade-inspecao-pintura")
-        inspetor = request.POST.get("inspetor")
+        inspetor_id = request.POST.get("inspetor")
         nao_conformidade = request.POST.get("nao-conformidade-inspecao-pintura")
-        quantidade_total_causas = request.POST.get("quantidade-total-causas")
+        quantidade_total_causas = int(request.POST.get("quantidade-total-causas", 0))
 
         # Convertendo a string para um objeto datetime
         data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
 
-        # Cria uma instância de DadosExecucaoInspecao
+        # Obtém a inspeção e o inspetor
         inspecao = Inspecao.objects.get(id=id_inspecao)
-        inspetor = Profile.objects.get(user__pk=inspetor)
+        inspetor = Profile.objects.get(user__pk=inspetor_id)
 
+        # Cria uma instância de DadosExecucaoInspecao
         dados_execucao = DadosExecucaoInspecao(
             inspecao=inspecao,
             inspetor=inspetor,
@@ -374,16 +414,65 @@ def envio_inspecao_pintura(request):
         # Verifica se há não conformidade
         if int(nao_conformidade) > 0:
             # Cria uma instância de Reinspecao
-            reinspecao = Reinspecao(dados_execucao=dados_execucao)
+            reinspecao = Reinspecao(inspecao=inspecao)
             reinspecao.save()
 
             # Itera sobre todas as causas (causas_1, causas_2, etc.)
-            for i in range(1, int(quantidade_total_causas) + 1):
-                causas = request.POST.getlist(f"causas_{i}[]")  # Lista de causas
+            for i in range(1, quantidade_total_causas + 1):
+                causas = request.POST.getlist(f"causas_{i}")  # Lista de causas
                 quantidade = request.POST.get(f"quantidade_{i}")
-                imagens = request.FILES.getlist(f"imagens_{i}[]")  # Lista de arquivos
+                imagens = request.FILES.getlist(f"imagens_{i}")  # Lista de arquivos
 
-                # Itera sobre cada causa
+                # Obtém todas as causas de uma vez
+                causas_objs = Causas.objects.filter(nome__in=causas)
+                causa_nao_conformidade = CausasNaoConformidade.objects.create(
+                    dados_execucao=dados_execucao, quantidade=int(quantidade)
+                )
+                causa_nao_conformidade.causa.add(*causas_objs)
+
+                # Itera sobre cada imagem
+                for imagem in imagens:
+                    ArquivoCausa.objects.create(
+                        causa_nao_conformidade=causa_nao_conformidade, arquivo=imagem
+                    )
+
+    return JsonResponse({"success": True})
+
+
+def envio_reinspecao_pintura(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    with transaction.atomic():
+
+        id_inspecao = request.POST.get("id-reinspecao-pintura")
+        data_inspecao = request.POST.get("data-reinspecao-pintura")
+        conformidade = request.POST.get("conformidade-reinspecao-pintura")
+        inspetor = request.POST.get("inspetor-reinspecao-pintura")
+        nao_conformidade = request.POST.get("nao-conformidade-reinspecao-pintura")
+        quantidade_total_causas = request.POST.get("quantidade-total-causas")
+
+        data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
+
+        inspecao = Inspecao.objects.get(id=id_inspecao)
+        inspetor = Profile.objects.get(user__pk=inspetor)
+
+        dados_execucao = DadosExecucaoInspecao(
+            inspecao=inspecao,
+            inspetor=inspetor,
+            data_execucao=data_ajustada,
+            conformidade=int(conformidade),
+            nao_conformidade=int(nao_conformidade),
+        )
+        dados_execucao.save()
+
+        if int(nao_conformidade) > 0:
+
+            for i in range(1, int(quantidade_total_causas) + 1):
+                causas = request.POST.getlist(f"causas_{i}[]")
+                quantidade = request.POST.get(f"quantidade_{i}")
+                imagens = request.FILES.getlist(f"imagens_{i}[]")
+
                 for causa_nome in causas:
                     causa = Causas.objects.get(nome=causa_nome)
                     causa_nao_conformidade, created = (
@@ -393,12 +482,16 @@ def envio_inspecao_pintura(request):
                     )
                     causa_nao_conformidade.causa.add(causa)
 
-                # Itera sobre cada imagem
                 for imagem in imagens:
                     arquivo_causa = ArquivoCausa(
                         causa_nao_conformidade=causa_nao_conformidade, arquivo=imagem
                     )
                     arquivo_causa.save()
+        else:
+            print(inspecao)
+            reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
+            reinspecao.reinspecionado = True
+            reinspecao.save()
 
     return JsonResponse({"success": True})
 

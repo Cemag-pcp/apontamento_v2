@@ -24,8 +24,45 @@ document.addEventListener("DOMContentLoaded", () => {
         const qtdInspecao = parseFloat(document.getElementById("qtd-reinspecao-pintura").value) || 0;
         const conformidade = parseFloat(this.value) || 0;
         const naoConformidade = qtdInspecao - conformidade;
+        const containerInspecao = document.getElementById("containerReinspecao");
+        const addRemoveContainer = document.getElementById("addRemoveContainerReinspecao");
+
 
         document.getElementById("nao-conformidade-reinspecao-pintura").value = naoConformidade;
+
+        if (naoConformidade <= 0) {
+            containerInspecao.style.display = "none";
+            addRemoveContainer.style.display = "none";
+    
+            // Remove o atributo 'required' de todos os inputs (exceto file) e selects dentro do containerInspecao
+            const inputs = containerInspecao.querySelectorAll('input');
+            const selects = containerInspecao.querySelectorAll('select');
+
+            inputs.forEach(input => {
+                if (input.type !== 'file') { // Ignora inputs do tipo file
+                    input.removeAttribute('required');
+                }
+                input.value = "";
+            });
+            selects.forEach(select => {
+                select.value = "";
+                select.removeAttribute('required');
+            });
+        } else {
+            containerInspecao.style.display = "block";
+            addRemoveContainer.style.display = "flex";
+    
+            // Adiciona o atributo 'required' de volta a todos os inputs (exceto file) e selects dentro do containerInspecao
+            const inputs = containerInspecao.querySelectorAll('input');
+            const selects = containerInspecao.querySelectorAll('select');
+    
+            inputs.forEach(input => {
+                if (input.type !== 'file') { // Ignora inputs do tipo file
+                    input.setAttribute('required', 'required');
+                }
+            });
+            selects.forEach(select => select.setAttribute('required', 'required'));
+        }
     });
 
     const containerInspecao = document.getElementById("containerReinspecao");

@@ -12,8 +12,12 @@ urlpatterns = [
     path('api/itens-inspecao-pintura/', views.get_itens_inspecao_pintura, name='itens-inspecao-pintura'),
     path('api/itens-inspecionados-pintura/', views.get_itens_inspecionados_pintura, name='itens-inspecionados-pintura'),
     path('api/itens-reinspecao-pintura/', views.get_itens_reinspecao_pintura, name='itens-reinspecao-pintura'),
+
     path('api/historico-pintura/<int:id>', views.get_historico_pintura, name='historico-pintura'),
+    path('api/historico-causas-pintura/<int:id>', views.get_historico_causas_pintura, name='historico-pintura'),
+
     path('api/envio-inspecao-pintura/', views.envio_inspecao_pintura, name='envio-inspecao-pintura'),
+    path('api/envio-reinspecao-pintura/', views.envio_reinspecao_pintura, name='envio-reinspecao-pintura'),
 
     path('tanque/', views.inspecao_tanque, name='inspecao-tanque'),
     path('tubos-cilindros/', views.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),

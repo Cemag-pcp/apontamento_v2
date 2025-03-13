@@ -117,7 +117,7 @@ function buscarItensReinspecao(pagina) {
                     <h5> ${item.peca}</h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
-                        <strong>📅 Due:</strong> ${item.data}<br>
+                        <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🧮 Conformidade:</strong> ${item.conformidade}<br>
                         <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade}<br>
