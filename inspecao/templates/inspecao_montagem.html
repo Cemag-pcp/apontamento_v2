@@ -6,7 +6,8 @@
 
 {% block links %}
 
-    <link rel="stylesheet" href="/static/inspecao.css">
+    <link rel="stylesheet" href="/static/css/inspecao.css">
+    <link rel="stylesheet" href="/static/css/select2.css">
 
 {% endblock %}
 
@@ -16,156 +17,220 @@
 
 <ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
     <li class="nav-item" style="width: 33%;">
-        <a class="nav-link tab-active active text-center" style="font-size: 0.875rem;"  onclick="activeRow('inspecao-pintura','reinspecao-pintura','inspecionados-pintura', this)">Itens a Inspecionar</a>
+        <a id="itens-inspecionar" class="nav-link tab-active active text-center" style="font-size: 0.875rem;"  onclick="activeRow('inspecao-montagem','reinspecao-montagem','inspecionados-montagem', this)">
+            <span class="mx-2">Itens a Inspecionar</span>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </a>
     </li>
     <li class="nav-item" style="width: 33%;">
-        <a class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('reinspecao-pintura','inspecao-pintura','inspecionados-pintura', this)">Itens Reinspeção</a>
+        <a id="itens-reinspecao" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('reinspecao-montagem','inspecao-montagem','inspecionados-montagem', this)">
+            <span class="mx-2">Itens Reinspeção</span>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </a>
     </li>
     <li class="nav-item" style="width: 33%;">
-        <a class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-pintura','inspecao-pintura','reinspecao-pintura', this)">Itens Inspecionados</a>
+        <a id="itens-inspecionados" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-montagem','inspecao-montagem','reinspecao-montagem', this)">
+            <span class="mx-2">Itens Inspecionados</span>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </a>
     </li>
 </ul>
 
 
-<div id="inspecao-pintura" class="row mt-3">
+<div id="inspecao-montagem" class="row mt-3">
 
-    <div class="d-flex justify-content-between my-4">
-        <h4 style="width: 60%;">Itens de inspeção pendentes</h4>
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Inspeções pendentes</h4>
         <div>
-            <button class="btn btn-white"><i class="bi bi-funnel"></i> Filter</button>
+            <div class="btn-group">
+                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <form id="form-filtrar-inspecao">
+                    <div class="dropdown-menu p-3" style="width: 250px;">
+                        <p class="fw-bold mx-2 my-1">Filtrar inspeções</p>
+                        <hr>
+                        <input type="text" class="form-control mb-3" id="pesquisar-peca-inspecao" placeholder="Pesquisar as peças...">
+                        
+                        <h6>Máquina</h6>
+                        <div style="max-height: 160px; overflow-y: auto;">
+                            {% for maquina in maquinas %}
+                                <div class="form-check">
+                                    <input class="form-check-input-inspecao-montagem" id="{{maquina|lower}}-inspecao-montagem" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{maquina|lower}}-inspecao-montagem">{{maquina}}</label>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <h6 class="mt-3">Date</h6>
+                        <input type="date" class="form-control" id="data-filtro-inspecao">
+                
+                        <div class="d-flex justify-content-between mt-3">
+                            <button type="button" id="btn-limpar-inspecao-montagem"  class="btn btn-outline-secondary">Limpar</button>
+                            <button type="button" id="btn-filtrar-inspecao-montagem" class="btn btn-dark">Filtrar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-    <div>
-        
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-pendente-inspecao" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <span id="qtd-filtrada-inspecao" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
-    <!-- Card 1 -->
-    <div class="col-md-4 mb-4">
-        <div class="card p-3 border-red">
-            <h5> 1 Building A - Electrical Systems <span class="badge badge-high text-white p-2">High</span></h5>
-            <p>Annual inspection of electrical systems and fire safety equipment</p>
-            <p>
-                <strong>📅 Due:</strong> 14/11/2023<br>
-                <strong>📍 Location:</strong> Building A, Floor 1-3<br>
-                <strong>🎨 Cor:</strong> Vermelho<br>
-                <strong>🧑🏻‍🏭 Inspetor:</strong> John Smith
-            </p>
-            <hr>
-            <button class="btn btn-dark w-100">Iniciar Inspeção</button>
-        </div>
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="itens-filtrados-inspecao-maquina" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-inspecao-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="itens-filtrados-inspecao-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
     </div>
+    <!-- Cards -->
+     <div class="row" style="padding-right: 0;" id="cards-inspecao"></div>
+
+     <div id="paginacao-inspecao-montagem"></div>
+
 </div>
 
-<div id="reinspecao-pintura" class="row mt-3" style="display: none;">
+<div id="reinspecao-montagem" class="row mt-3" style="display: none;">
 
-    <div class="d-flex justify-content-between my-4">
-        <h4 style="width: 60%;">Itens que requerem reinspeção</h4>
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Requerem reinspeção</h4>
         <div>
-            <button class="btn btn-white"><i class="bi bi-funnel"></i> Filter</button>
-        </div>
-    </div>
+            <div class="btn-group">
+                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton2" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <form id="form-filtrar-reinspecao" action="">
+                    <div class="dropdown-menu p-3" style="width: 250px;">
+                        <p class="fw-bold mx-2 my-1">Filter Inspections</p>
+                        <hr>
+                        <input id="pesquisar-peca-reinspecao" type="text" class="form-control mb-3" placeholder="Pesquisar...">
+                        
+                        <h6>Máquina</h6>
+                        <div style="max-height: 160px; overflow-y: auto;">
+                            {% for maquina in maquinas %}
+                                <div class="form-check">
+                                    <input class="form-check-input-reinspecao-montagem" id="{{maquina|lower}}-reinspecao" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{maquina|lower}}-reinspecao">{{maquina}}</label>
+                                </div>
+                            {% endfor %}
+                        </div>
 
-    <!-- Card 1 -->
-    <div class="col-md-4 mb-4">
-        <div class="card p-3 border-orange">
-            <h5> 2 Building A - Electrical Systems <span class="badge badge-high text-white p-2">High</span></h5>
-            <p>Annual inspection of electrical systems and fire safety equipment</p>
-            <p>
-                <strong>📅 Due:</strong> 14/11/2023<br>
-                <strong>📍 Location:</strong> Building A, Floor 1-3<br>
-                <strong>🎨 Cor:</strong> Laranja<br>
-                <strong>🧑🏻‍🏭 Inspetor:</strong> John Smith
-            </p>
-            <hr>
-            <button class="btn btn-dark w-100">Iniciar Reinspeção</button>
+                        <h6 class="mt-3">Inspetor</h6>
+                        {% for inspetor in inspetores %}
+                            <div class="form-check">
+                                <input class="form-check-input-reinspecao-inspetores" id="{{inspetor|lower}}-reinspecao" type="checkbox" value="">
+                                <label class="form-check-label" for="{{inspetor|lower}}-reinspecao">{{inspetor.nome_usuario}}</label>
+                            </div>
+                        {% endfor %}
+                
+                        <h6 class="mt-3">Date</h6>
+                        <input id="data-filtro-reinspecao" type="date" class="form-control">
+                
+                        <div class="d-flex justify-content-between mt-3">
+                            <button id="btn-limpar-reinspecao" class="btn btn-outline-secondary">Limpar</button>
+                            <button id="btn-filtrar-reinspecao" class="btn btn-dark">Filtrar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-    
-    <!-- Card 2 -->
-    <div class="col-md-4 mb-4">
-        <div class="card p-3 border-blue">
-            <h5>Warehouse Safety Inspection <span class="badge badge-medium text-white p-2">Medium</span></h5>
-            <p>Quarterly inspection of warehouse safety protocols and equipment</p>
-            <p>
-                <strong>📅 Due:</strong> 19/11/2023<br>
-                <strong>📍 Location:</strong> Main Warehouse<br>
-                <strong>🎨 Cor:</strong> Azul<br>
-                <strong>🧑🏻‍🏭 Inspetor:</strong> Sarah Johnson
-            </p>
-            <hr>
-            <button class="btn btn-dark w-100">Iniciar Reinspeção</button>
-        </div>
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-pendente-reinspecao" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <span id="qtd-filtrada-reinspecao" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="itens-filtrados-reinspecao-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-reinspecao-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
+        <span id="itens-filtrados-reinspecao-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="itens-filtrados-reinspecao-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+    </div>
+    <!-- Cards -->
+     <div class="row" style="padding-right: 0;" id="cards-reinspecao"></div>
+
+     <div id="paginacao-reinspecao-montagem"></div>
     
 </div>
 
-<div id="inspecionados-pintura" class="row mt-3" style="display: none;">
+<div id="inspecionados-montagem" class="row mt-3" style="display: none;">
 
-    <div class="d-flex justify-content-between my-4">
-        <h4 style="width: 60%;">Inspeções concluídas</h4>
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Inspeções realizadas</h4>
         <div class="d-flex gap-2">
-            <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar em Excel</button>
-            <button class="btn btn-white"><i class="bi bi-funnel"></i> Filter</button>
+            <!-- <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar</button> -->
+            <div>
+                <div class="btn-group">
+                    <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                    <form id="form-filtrar-inspecionados" action="">
+                        <div class="dropdown-menu p-3" style="width: 250px;">
+                            <p class="fw-bold mx-2 my-1">Filter Inspections</p>
+                            <hr>
+                            <input id="pesquisar-peca-inspecionados" type="text" class="form-control mb-3" placeholder="Search inspections...">
+                            
+                            <h6>Máquina</h6>
+                            <div style="max-height: 160px; overflow-y: auto;">
+                                {% for maquina in maquinas %}
+                                    <div class="form-check">
+                                        <input class="form-check-input-inspecionados-montagem" id="{{maquina|lower}}-inspecionados" type="checkbox" value="">
+                                        <label class="form-check-label" for="{{maquina|lower}}-inspecionados">{{maquina}}</label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                    
+                            <h6 class="mt-3">Inspetor</h6>
+                            {% for inspetor in inspetores %}
+                                <div class="form-check">
+                                    <input class="form-check-input-inspecionados-inspetores" id="{{inspetor|lower}}-inspecionados" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{inspetor|lower}}-inspecionados">{{inspetor.nome_usuario}}</label>
+                                </div>
+                            {% endfor %}
+                                
+                            <h6 class="mt-3">Date</h6>
+                            <input id="data-filtro-inspecionados" type="date" class="form-control">
+                    
+                            <div class="d-flex justify-content-between mt-3">
+                                <button id="btn-limpar-inspecionados" class="btn btn-outline-secondary">Limpar</button>
+                                <button id="btn-filtrar-inspecionados" class="btn btn-dark">Filtrar</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
+    </div>
+    
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-inspecionados"class="rounded-pill py-1 px-2" style="background-color: #00940c; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <span id="qtd-filtrada-inspecionados" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
 
-    <!-- Card 1 -->
-    <div class="col-md-4 mb-4">
-        <div class="card p-3 border-green">
-            <h5>493181 - Lat. SUP (5000/4500) CBHM </h5>
-            <p>Código apontado pelo operador XXXXXX</p>
-            <p>
-                <strong>📅 Due:</strong> 14/11/2023<br>
-                <strong>📍 Location:</strong> Building A, Floor 1-3<br>
-                <strong>🎨 Cor:</strong> Verde<br>
-                <strong>🧑🏻‍🏭 Inspetor:</strong> John Smith
-            </p>
-            <hr>
-            <div class="text-end">
-                <button class="btn btn-white w-50">Ver detalhes</button>
-            </div>
-        </div>
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="itens-filtrados-inspecionados-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-inspecionados-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
+        <span id="itens-filtrados-inspecionados-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="itens-filtrados-inspecionados-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
     </div>
-    
-    <!-- Card 2 -->
-    <div class="col-md-4 mb-4">
-        <div class="card p-3 border-gray">
-            <h5>025046 - Tampa Traseira C/ ABA e GANCHO 90cm 4500 CBHM<span class="badge badge-medium text-white p-2">Medium</span></h5>
-            <p>Quarterly inspection of warehouse safety protocols and equipment</p>
-            <p>
-                <strong>📅 Due:</strong> 19/11/2023<br>
-                <strong>📍 Location:</strong> Main Warehouse<br>
-                <strong>🎨 Cor:</strong> Cinza<br>
-                <strong>🧑🏻‍🏭 Inspetor:</strong> Sarah Johnson
-            </p>
-            <hr>
-            <div class="text-end">
-                <button class="btn btn-white w-50">Ver detalhes</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Card 3 -->
-    <div class="col-md-4 mb-4">
-        <div class="card p-3 border-yellow">
-            <h5>Office Space Compliance Check <span class="badge badge-low p-2">Low</span></h5>
-            <p>Bi-annual inspection of office spaces for compliance with regulations</p>
-            <p>
-                <strong>📅 Due:</strong> 04/12/2023<br>
-                <strong>📍 Location:</strong> Office Building C<br>
-                <strong>🎨 Cor:</strong> Amarelo<br>
-                <strong>🧑🏻‍🏭 Inspetor:</strong> Michael Brown
-            </p>
-            <hr>
-            <div class="text-end">
-                <button class="btn btn-white w-50">Ver detalhes</button>
-            </div>
-        </div>
-    </div>
+    <!-- Cards -->
+    <div class="row" style="padding-right: 0;" id="cards-inspecionados"></div>
+    <div id="paginacao-inspecionados-montagem"></div>
 </div>
+
+{% include 'modal_inspecao/modal_inspecao_montagem.html' %}
 
 {% endblock %}
 
 {% block scripts %}
+
+<script src="{% static 'js/montagem/a-inspecionar-montagem.js' %}"></script>
+<script src="{% static 'js/montagem/inspecionados-montagem.js' %}"></script>
+<script src="{% static 'js/montagem/reinspecao-montagem.js' %}"></script>
+<script src="{% static 'js/montagem/inspecionar/enviar-inspecao.js' %}"></script>
+<script src="{% static 'js/montagem/inspecionar/modal-inspecionar.js' %}"></script>
+<script src="{% static 'js/montagem/reinspecionar/modal-reinspecionar.js' %}"></script>
+<script src="{% static 'js/montagem/reinspecionar/envio-reinspecao.js' %}"></script>
+<script src="{% static 'js/montagem/inspecionados/modal-inspecionados.js' %}"></script>
 
 <script>
 

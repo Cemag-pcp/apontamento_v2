@@ -19,6 +19,16 @@ urlpatterns = [
     path('api/envio-inspecao-pintura/', views.envio_inspecao_pintura, name='envio-inspecao-pintura'),
     path('api/envio-reinspecao-pintura/', views.envio_reinspecao_pintura, name='envio-reinspecao-pintura'),
 
+    path('api/itens-inspecao-montagem/', views.get_itens_inspecao_montagem, name='itens-inspecao-montagem'),
+    path('api/itens-inspecionados-montagem/', views.get_itens_inspecionados_montagem, name='itens-inspecionados-montagem'),
+    path('api/itens-reinspecao-montagem/', views.get_itens_reinspecao_montagem, name='itens-reinspecao-montagem'),
+
+    path('api/historico-montagem/<int:id>', views.get_historico_montagem, name='historico-montagem'),
+    path('api/historico-causas-montagem/<int:id>', views.get_historico_causas_montagem, name='historico-montagem'),
+
+    path('api/envio-inspecao-montagem/', views.envio_inspecao_montagem, name='envio-inspecao-montagem'),
+    path('api/envio-reinspecao-montagem/', views.envio_reinspecao_montagem, name='envio-reinspecao-montagem'),
+
     path('tanque/', views.inspecao_tanque, name='inspecao-tanque'),
     path('tubos-cilindros/', views.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),
 ]

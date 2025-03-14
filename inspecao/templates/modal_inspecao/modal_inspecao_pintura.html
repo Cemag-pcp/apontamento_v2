@@ -38,7 +38,7 @@
                 </div>
                 <div class="col-sm-4 mb-4">
                     <label class="label-modal">N° total de conformidades:</label>
-                    <input type="number" id="conformidade-inspecao-pintura" name="conformidade-inspecao-pintura" value=""
+                    <input type="number" id="conformidade-inspecao-pintura" min="0" name="conformidade-inspecao-pintura" value=""
                         class="form-control" required>
                 </div>
                 <div class="col-sm-4 mb-4">
@@ -136,7 +136,7 @@
                 </div>
                 <div class="col-sm-4 mb-4">
                     <label class="label-modal">N° total de conformidades:</label>
-                    <input type="number" id="conformidade-reinspecao-pintura" name="conformidade-reinspecao-pintura" value=""
+                    <input type="number" id="conformidade-reinspecao-pintura" min="0" name="conformidade-reinspecao-pintura" value=""
                         class="form-control" required>
                 </div>
                 <div class="col-sm-4 mb-4">
@@ -146,11 +146,11 @@
                 </div>
             </div>
             <div id="containerReinspecao">
-              <div class="row mb-3" id="selectContainerReinspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
+              <div class="row mb-3 selectContainerReinspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
                 <span class="label-modal text-end"> 1ª Causa</span>
                 <div class="col-sm-6 mb-4">
                     <label class="label-modal">Causas:</label>
-                    <select class="form-control select2" style="font-size: 14px;" multiple required>
+                    <select class="form-control select2" name="causas_reinspecao_1" style="font-size: 14px;" multiple required>
                       {% for causa in causas %}
                         <option value="{{causa.nome}}">{{causa.nome}}</option>
                       {% endfor %}
@@ -162,7 +162,7 @@
                 </div>
                 <div class="col-sm-12 mb-4">
                     <label class="label-modal">Imagens:</label>
-                    <input class="form-control" type="file" multiple>
+                    <input class="form-control" type="file" name="imagens_reinspecao_1" multiple>
                 </div>
               </div> 
             </div>
