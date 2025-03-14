@@ -119,3 +119,17 @@ class ConjuntoCarreta(models.Model):
             models.UniqueConstraint(fields=['conjunto', 'carreta'], name='unique_conjunto_carreta')
         ]
 
+class PecasEstanqueidade(models.Model):
+
+    TIPO_CHOICES = (
+        ("tanque", "Tanque"), 
+        ("tubo", "Tubo"), 
+        ("cilindro", "Cilindro")
+    )
+
+    codigo = models.CharField(max_length=255, unique=True)
+    descricao = models.CharField(max_length=255, blank=True, null=True)
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, null=False, blank=False)
+
+    def __str__(self):
+        return f'{self.codigo} - {self.descricao}'

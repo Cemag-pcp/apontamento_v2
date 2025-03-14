@@ -23,7 +23,7 @@ class RotaAccessMiddleware:
             return self.get_response(request)
 
         #  Se a URL contém "api/", libera automaticamente
-        if "api/" in path:
+        if "api/" in path or "media/" in path:
             return self.get_response(request)
 
         # Busca a rota no banco de dados

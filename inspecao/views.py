@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.utils import timezone
+from cadastro.models import PecasEstanqueidade
 from .models import (
     Inspecao,
     DadosExecucaoInspecao,
@@ -499,24 +500,21 @@ def envio_reinspecao_pintura(request):
                         f"causas_reinspecao_{i}"
                     )  # Lista de causas
                     quantidade = request.POST.get(f"quantidade_reinspecao_{i}")
-                    imagens = request.FILES.getlist(
-                        f"imagens_reinspecao_{i}"
-                    )  # Lista de arquivos
+                    imagens = request.FILES.getlist(f"imagens_reinspecao_{i}")
 
-                    for causa_nome in causas:
-                        # Obtém todas as causas de uma vez
-                        causas_objs = Causas.objects.filter(nome__in=causas)
-                        causa_nao_conformidade = CausasNaoConformidade.objects.create(
-                            dados_execucao=dados_execucao, quantidade=int(quantidade)
+                    # Obtém todas as causas de uma vez
+                    causas_objs = Causas.objects.filter(nome__in=causas)
+                    causa_nao_conformidade = CausasNaoConformidade.objects.create(
+                        dados_execucao=dados_execucao, quantidade=int(quantidade)
+                    )
+                    causa_nao_conformidade.causa.add(*causas_objs)
+
+                    # Itera sobre cada imagem
+                    for imagem in imagens:
+                        ArquivoCausa.objects.create(
+                            causa_nao_conformidade=causa_nao_conformidade,
+                            arquivo=imagem,
                         )
-                        causa_nao_conformidade.causa.add(*causas_objs)
-
-                        # Itera sobre cada imagem
-                        for imagem in imagens:
-                            ArquivoCausa.objects.create(
-                                causa_nao_conformidade=causa_nao_conformidade,
-                                arquivo=imagem,
-                            )
             else:
                 print(inspecao)
                 reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
@@ -761,7 +759,9 @@ def get_itens_inspecionados_montagem(request):
 
     dados_execucao = DadosExecucaoInspecao.objects.filter(
         inspecao__in=pagina_obj
-    ).select_related('inspecao', 'inspetor__user', 'inspecao__pecas_ordem_montagem__ordem__maquina')
+    ).select_related(
+        "inspecao", "inspetor__user", "inspecao__pecas_ordem_montagem__ordem__maquina"
+    )
 
     # Cria um dicionário para mapear inspecao_id para seus dados de execução
     dados_execucao_dict = {de.inspecao_id: de for de in dados_execucao}
@@ -769,7 +769,7 @@ def get_itens_inspecionados_montagem(request):
     dados = []
     for data in pagina_obj:
         de = dados_execucao_dict.get(data.id)
-        
+
         if de:
             data_ajustada = de.data_execucao - timedelta(hours=3)
             possui_nao_conformidade = de.nao_conformidade > 0 or de.num_execucao > 0
@@ -974,20 +974,19 @@ def envio_reinspecao_montagem(request):
                         f"imagens_reinspecao_{i}"
                     )  # Lista de arquivos
 
-                    for causa_nome in causas:
-                        # Obtém todas as causas de uma vez
-                        causas_objs = Causas.objects.filter(nome__in=causas)
-                        causa_nao_conformidade = CausasNaoConformidade.objects.create(
-                            dados_execucao=dados_execucao, quantidade=int(quantidade)
-                        )
-                        causa_nao_conformidade.causa.add(*causas_objs)
+                    # Obtém todas as causas de uma vez
+                    causas_objs = Causas.objects.filter(nome__in=causas)
+                    causa_nao_conformidade = CausasNaoConformidade.objects.create(
+                        dados_execucao=dados_execucao, quantidade=int(quantidade)
+                    )
+                    causa_nao_conformidade.causa.add(*causas_objs)
 
-                        # Itera sobre cada imagem
-                        for imagem in imagens:
-                            ArquivoCausa.objects.create(
-                                causa_nao_conformidade=causa_nao_conformidade,
-                                arquivo=imagem,
-                            )
+                    # Itera sobre cada imagem
+                    for imagem in imagens:
+                        ArquivoCausa.objects.create(
+                            causa_nao_conformidade=causa_nao_conformidade,
+                            arquivo=imagem,
+                        )
             else:
                 reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
                 reinspecao.reinspecionado = True
@@ -1008,7 +1007,247 @@ def inspecao_tanque(request):
 
 
 def inspecao_tubos_cilindros(request):
-    return render(request, "inspecao_tubos_cilindros.html")
+
+    users = Profile.objects.filter(
+        tipo_acesso="inspetor", permissoes__nome="inspecao/tubos-cilindros"
+    )
+
+    lista_inspetores = [
+        {"nome_usuario": user.user.username, "id": user.user.id} for user in users
+    ]
+
+    list_causas = list(
+        Causas.objects.filter(setor="tubos cilindros").values_list("nome", flat=True)
+    )
+
+    return render(
+        request,
+        "inspecao_tubos_cilindros.html",
+        {"inspetores": lista_inspetores, "causas": list_causas},
+    )
+
+
+def get_itens_reinspecao_tubos_cilindros(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    reinspecao_ids = set(
+        ReinspecaoEstanqueidade.objects.filter(reinspecionado=False).values_list(
+            "inspecao", flat=True
+        )
+    )
+
+    inspetores_filtrados = (
+        request.GET.get("inspetores", "").split(",")
+        if request.GET.get("inspetores")
+        else []
+    )
+    data_filtrada = request.GET.get("data", None)
+    pesquisa_filtrada = request.GET.get("pesquisar", None)
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 12  # Itens por página
+
+    datas = InspecaoEstanqueidade.objects.filter(id__in=reinspecao_ids)
+
+    quantidade_total = datas.count()
+
+    if data_filtrada:
+        datas = datas.filter(data_inspecao__date=data_filtrada)
+
+    if pesquisa_filtrada:
+        datas = datas.filter(peca__codigo__icontains=pesquisa_filtrada)
+
+    if inspetores_filtrados:
+        datas = datas.filter(
+            dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
+        )
+
+    datas = datas.select_related("peca").order_by("-id")
+
+    # Paginação
+    paginador = Paginator(datas, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
+
+    # Prefetch para otimizar a consulta dos dados de execução e informações adicionais
+    dados_execucao = (
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(
+            inspecao_estanqueidade__in=pagina_obj
+        )
+        .select_related("inspetor__user", "inspecao_estanqueidade__peca")
+        .prefetch_related("infoadicionaisexectuboscilindros_set")
+    )
+
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução e informações adicionais
+    dados_execucao_dict = {}
+    for de in dados_execucao:
+        info_adicionais = (
+            de.infoadicionaisexectuboscilindros_set.first()
+        )  # Pega a primeira informação adicional (se existir)
+        dados_execucao_dict[de.inspecao_estanqueidade_id] = {
+            "dados_execucao": de,
+            "info_adicionais": info_adicionais,
+        }
+
+    dados = []
+    for data in pagina_obj:
+        de_info = dados_execucao_dict.get(data.id)
+        if de_info:
+            de = de_info["dados_execucao"]
+            info_adicionais = de_info["info_adicionais"]
+
+            data_ajustada = de.data_exec - timedelta(hours=3)
+            possui_nao_conformidade = (
+                info_adicionais.nao_conformidade_retrabalho
+                + info_adicionais.nao_conformidade_refugo
+                > 0
+            ) or de.num_execucao > 0
+
+            item = {
+                "id": data.id,
+                "id_dados_execucao": de.id,
+                "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
+                "inspetor": de.inspetor.user.username if de.inspetor else None,
+                "possui_nao_conformidade": possui_nao_conformidade,
+                "nao_conformidade_retrabalho": (
+                    info_adicionais.nao_conformidade_retrabalho
+                    if info_adicionais
+                    else 0
+                ),
+                "nao_conformidade_refugo": (
+                    info_adicionais.nao_conformidade_refugo if info_adicionais else 0
+                ),
+                "qtd_inspecionada": (
+                    info_adicionais.qtd_inspecionada if info_adicionais else 0
+                ),
+                "observacao": info_adicionais.observacao if info_adicionais else None,
+            }
+
+            dados.append(item)
+
+    return JsonResponse(
+        {
+            "dados": dados,
+            "total": quantidade_total,
+            "total_filtrado": paginador.count,  # Total de itens após filtro
+            "pagina_atual": pagina_obj.number,
+            "total_paginas": paginador.num_pages,
+        },
+        status=200,
+    )
+
+def get_itens_inspecionados_tubos_cilindros(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    # Filtra apenas peças do tipo "tubo" ou "cilindro"
+    pecas_filtradas = PecasEstanqueidade.objects.filter(tipo__in=["tubo", "cilindro"])
+    inspecionados_ids = set(
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(
+            inspecao_estanqueidade__peca__in=pecas_filtradas
+        ).values_list("inspecao_estanqueidade", flat=True)
+    )
+
+    # Filtros
+    inspetores_filtrados = (
+        request.GET.get("inspetores", "").split(",")
+        if request.GET.get("inspetores")
+        else []
+    )
+    data_filtrada = request.GET.get("data", None)
+    pesquisa_filtrada = request.GET.get("pesquisar", None)
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 12  # Itens por página
+
+    # Filtra os dados
+    datas = InspecaoEstanqueidade.objects.filter(id__in=inspecionados_ids)
+
+    quantidade_total = datas.count()
+
+    if data_filtrada:
+        datas = datas.filter(data_inspecao__date=data_filtrada)
+
+    if pesquisa_filtrada:
+        datas = datas.filter(peca__codigo__icontains=pesquisa_filtrada)
+
+    if inspetores_filtrados:
+        datas = datas.filter(
+            dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
+        )
+
+    datas = datas.select_related("peca").order_by("-id")
+
+    # Paginação
+    paginador = Paginator(datas, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
+
+    # Prefetch para otimizar a consulta dos dados de execução e informações adicionais
+    dados_execucao = (
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(
+            inspecao_estanqueidade__in=pagina_obj
+        )
+        .select_related("inspetor__user", "inspecao_estanqueidade__peca")
+        .prefetch_related("infoadicionaisexectuboscilindros_set")
+    )
+
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução e informações adicionais
+    dados_execucao_dict = {}
+    for de in dados_execucao:
+        info_adicionais = (
+            de.infoadicionaisexectuboscilindros_set.first()
+        )  # Pega a primeira informação adicional (se existir)
+        dados_execucao_dict[de.inspecao_estanqueidade_id] = {
+            "dados_execucao": de,
+            "info_adicionais": info_adicionais,
+        }
+
+    dados = []
+    for data in pagina_obj:
+        de_info = dados_execucao_dict.get(data.id)
+        if de_info:
+            de = de_info["dados_execucao"]
+            info_adicionais = de_info["info_adicionais"]
+
+            data_ajustada = de.data_exec - timedelta(hours=3)
+            possui_nao_conformidade = (
+                info_adicionais.nao_conformidade_retrabalho
+                + info_adicionais.nao_conformidade_refugo
+                > 0
+            ) or de.num_execucao > 0
+
+            item = {
+                "id": data.id,
+                "id_dados_execucao": de.id,
+                "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
+                "inspetor": de.inspetor.user.username if de.inspetor else None,
+                "possui_nao_conformidade": possui_nao_conformidade,
+                "nao_conformidade_retrabalho": (
+                    info_adicionais.nao_conformidade_retrabalho
+                    if info_adicionais
+                    else 0
+                ),
+                "nao_conformidade_refugo": (
+                    info_adicionais.nao_conformidade_refugo if info_adicionais else 0
+                ),
+                "qtd_inspecionada": (
+                    info_adicionais.qtd_inspecionada if info_adicionais else 0
+                ),
+                "observacao": info_adicionais.observacao if info_adicionais else None,
+            }
+
+            dados.append(item)
+
+    return JsonResponse(
+        {
+            "dados": dados,
+            "total": quantidade_total,
+            "total_filtrado": paginador.count,  # Total de itens após filtro
+            "pagina_atual": pagina_obj.number,
+            "total_paginas": paginador.num_pages,
+        },
+        status=200,
+    )
 
 
 def reteste_estanqueidade_tubos_cilindros(request):
