@@ -54,13 +54,13 @@
                     <label class="label-modal">Causas:</label>
                     <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
                       {% for causa in causas %}
-                        <option value="{{causa.nome}}">{{causa.nome}}</option>
+                        <option value="{{causa.id}}">{{causa.nome}}</option>
                       {% endfor %}
                     </select>
                 </div>
                 <div class="col-sm-6 mb-4">
                     <label class="label-modal">Quantidade:</label>
-                    <input type="number" style="font-size: 14px;" class="form-control" required>
+                    <input type="number" style="font-size: 14px;" min="1" class="form-control" required>
                 </div>
                 <div class="col-sm-12 mb-4">
                     <label class="label-modal">Imagens:</label>
@@ -152,13 +152,13 @@
                     <label class="label-modal">Causas:</label>
                     <select class="form-control select2" name="causas_reinspecao_1" style="font-size: 14px;" multiple required>
                       {% for causa in causas %}
-                        <option value="{{causa.nome}}">{{causa.nome}}</option>
+                        <option value="{{causa.id}}">{{causa.nome}}</option>
                       {% endfor %}
                     </select>
                 </div>
                 <div class="col-sm-6 mb-4">
                     <label class="label-modal">Quantidade:</label>
-                    <input type="number" style="font-size: 14px;" class="form-control" required>
+                    <input type="number" style="font-size: 14px;" min="1" class="form-control" required>
                 </div>
                 <div class="col-sm-12 mb-4">
                     <label class="label-modal">Imagens:</label>

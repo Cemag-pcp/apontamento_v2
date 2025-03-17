@@ -16,8 +16,8 @@
 <div class="d-flex justify-content-between align-items-center mt-3">
     <h2 class="my-4">Inspeção Tubos e Cilindros</h2>
     <div class="d-flex flex-column gap-2">
-        <button class="btn btn-white">Inspeção Tubos</button>
-        <button class="btn btn-white">Inspeção Cilindros</button>
+        <button class="btn btn-white button-inspecao-tubos" id="button-inspecao-tubos">Inspeção Tubos</button>
+        <button class="btn btn-white button-inspecao-cilindros" id="button-inspecao-cilindros">Inspeção Cilindros</button>
     </div>
 </div>
 
@@ -25,13 +25,13 @@
     <li class="nav-item" style="width: 50%;">
         <a id="itens-reinspecao" class="nav-link tab-active active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('reinspecao-tubos-cilindros','inspecionados-tubos-cilindros', this)">
             <span class="mx-2">Itens Reinspeção</span>
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span class="spinner-border spinner-border-sm" role="status"></span>
         </a>
     </li>
     <li class="nav-item" style="width: 50%;">
         <a id="itens-inspecionados" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-tubos-cilindros','reinspecao-tubos-cilindros', this)">
             <span class="mx-2">Itens Inspecionados</span>
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span class="spinner-border spinner-border-sm" role="status"></span>
         </a>
     </li>
 </ul>
@@ -154,6 +154,9 @@
 <script src="{% static 'js/estanqueidade/reinspecionar/modal-reinspecionar.js' %}"></script>
 <script src="{% static 'js/estanqueidade/reinspecionar/envio-reinspecao.js' %}"></script>
 <script src="{% static 'js/estanqueidade/inspecionados/modal-inspecionados.js' %}"></script> 
+<script src="{% static 'js/estanqueidade/inspecao/modal-inspecao.js' %}"></script> 
+<script src="{% static 'js/estanqueidade/inspecao/enviar-inspecao.js' %}"></script> 
+<script src="{% static 'js/estanqueidade/events_inputs_estanqueidade.js' %}"></script>
 
 <script>
 

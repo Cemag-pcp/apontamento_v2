@@ -1,9 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
-    buscarItensInspecionados(1); // Chama a função quando a página carrega, começando na página 1
+    buscarItensInspecionadosEstanqueidade(1); // Chama a função quando a página carrega, começando na página 1
 });
 
 document.getElementById("btn-filtrar-inspecionados").addEventListener("click", () => {
-    buscarItensInspecionados(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
+    buscarItensInspecionadosEstanqueidade(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
 });
 
 document.getElementById("btn-limpar-inspecionados").addEventListener("click", (event) => {
@@ -18,10 +18,10 @@ document.getElementById("btn-limpar-inspecionados").addEventListener("click", (e
             input.value = ""; // Limpa inputs de texto e data
         }
     });
-    buscarItensInspecionados(1);
+    buscarItensInspecionadosEstanqueidade(1);
 });
 
-function buscarItensInspecionados(pagina) {
+function buscarItensInspecionadosEstanqueidade(pagina) {
     let cardsInspecao = document.getElementById("cards-inspecionados");
     let qtdPendenteInspecao = document.getElementById("qtd-inspecionados");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecionados");
@@ -172,7 +172,7 @@ function buscarItensInspecionados(pagina) {
             const adicionarLinkPagina = (i) => {
                 paginacaoHTML += `
                     <li class="page-item ${i === paginaAtual ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="buscarItensInspecionados(${i})">${i}</a>
+                        <a class="page-link" href="#" onclick="buscarItensInspecionadosEstanqueidade(${i})">${i}</a>
                     </li>`;
             };
 

@@ -2,7 +2,8 @@ document.addEventListener("DOMContentLoaded", () => {
     buscarItensInspecionados(1); // Chama a função quando a página carrega, começando na página 1
 });
 
-document.getElementById("btn-filtrar-inspecionados").addEventListener("click", () => {
+document.getElementById("btn-filtrar-inspecionados").addEventListener("click", (event) => {
+    event.preventDefault();
     buscarItensInspecionados(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
 });
 

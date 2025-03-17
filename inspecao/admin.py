@@ -9,7 +9,7 @@ from .models import (
     InspecaoEstanqueidade,
     ReinspecaoEstanqueidade,
     DadosExecucaoInspecaoEstanqueidade,
-    InfoAdicionaisExecTubosCilindros
+    InfoAdicionaisExecTubosCilindros,
 )
 
 
@@ -53,7 +53,7 @@ class DadosExecucaoInspecaoEstanqueidadeAdmin(admin.ModelAdmin):
     list_display_links = ("inspecao_estanqueidade",)
 
 class InfoAdicionaisExecTubosCilindrosAdmin(admin.ModelAdmin):
-    list_display = ("dados_exec_inspecao", "nao_conformidade_retrabalho", "nao_conformidade_refugo", "qtd_inspecionada", "observacao", "ficha")
+    list_display = ("dados_exec_inspecao", "nao_conformidade", "nao_conformidade_refugo", "qtd_inspecionada", "observacao", "ficha")
     list_display_links = ("dados_exec_inspecao",)
 
 

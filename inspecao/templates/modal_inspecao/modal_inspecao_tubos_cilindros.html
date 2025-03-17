@@ -1,54 +1,56 @@
-<div class="modal fade" data-backdrop="static" id="modal-inspecao-cilindro" tabindex="-1" role="dialog"
+<div class="modal fade" data-bs-backdrop="static" id="modal-inspecao-cilindro" tabindex="-1" role="dialog"
     aria-labelledby="modal-inspecao-cilindroLabel" style="overflow-y: auto;">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title title" id="modal-inspecao-cilindro-title">Cilindros</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
             <form id="form-inspecao-cilindro">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modal-inspecao-cilindro-title">Cilindros</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                        <span>&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body p-4" style="font-size: 14px; overflow-y: auto; max-height: 650px;">
+                <div class="modal-body p-4" style="max-height: 70vh;overflow-y: auto;">
                     <div class="row">
                         <div class="col-sm-6 mb-4">
-                            <label>Data da Inspeção</label>
+                            <label class="label-modal">Data da Inspeção</label>
                             <input type="datetime-local" class="form-control" id="data-inspecao-cilindro" required>
                         </div>
                         <div class="col-sm-6 mb-4 d-flex flex-column justify-content-end">
-                            <label>Inspetor</label>
-                            <select class="form-control" name="inspetores-inspecao-cilindro" id="inspetores-inspecao-cilindro" required>
-                                <option value="" hidden selected disabled></option>
-
+                            <label class="label-modal">Inspetor</label>
+                            <select class="form-control select2" name="inspetores-inspecao-cilindro" id="inspetores-inspecao-cilindro" required>
+                                <option value="" selected hidden disabled></option>
+                                {% for inspetor in inspetores %}
+                                  <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-sm-12 mb-4">
-                            <label>Peça</label>
-                            <select class="form-control" name="peca-estanqueidade-cilindro"
+                            <label class="label-modal">Peça</label>
+                            <select class="form-control select2" name="peca-estanqueidade-cilindro"
                                 id="peca-estanqueidade-cilindro" required>
                                 <option value="" disabled hidden selected></option>
-
+                                {% for peca in pecas_cilindros %}
+                                    <option value="{{peca.peca}}">{{peca.peca}}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-sm-6 mb-4">
-                            <label>Quantidade inspecionada</label>
+                            <label class="label-modal">Quantidade inspecionada</label>
                             <input type="number" min="1" class="form-control" id="qtd-inspecao-cilindro" required>
                         </div>
                         <div class="col-sm-6 mb-4">
-                            <label>Não conformidade</label>
+                            <label class="label-modal">Não conformidade</label>
                             <input type="number" min="0" class="form-control" id="nao-conformidade-inspecao-cilindro" required>
                         </div>
                     </div>
                     <div id="containerInspecaoCilindro">
-                        <div class="row mb-3 selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
+                        <div class="row mb-3 selectContainerInspecaoCilindro" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
                           <span class="label-modal text-end"> 1ª Causa</span>
                           <div class="col-sm-6 mb-4">
                               <label class="label-modal">Causas:</label>
-                              <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
+                              <select class="form-control select2 causas_cilindro" name="causas_1" style="font-size: 14px;" multiple required>
                                 {% for causa in causas %}
                                   <option value="{{causa.nome}}">{{causa.nome}}</option>
                                 {% endfor %}
@@ -56,7 +58,7 @@
                           </div>
                           <div class="col-sm-6 mb-4">
                               <label class="label-modal">Quantidade:</label>
-                              <input type="number" style="font-size: 14px;" class="form-control" required>
+                              <input type="number" style="font-size: 14px;" class="form-control quantidade_causas_cilindro" required>
                           </div>
                           <div class="col-sm-12 mb-4">
                               <label class="label-modal">Imagens:</label>
@@ -64,32 +66,25 @@
                           </div>
                         </div> 
                     </div>
-                    <div id="addRemoveContainer" class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
-                        <button type="button" class="btn btn-white" id="removeButtonPintura" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
-                        <button type="button" class="btn btn-white" id="addButtonPintura" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
+                    <div id="addRemoveContainerCilindro" class="col-sm-12 mb-2" style="display: flex; justify-content: space-between; align-items: center;">
+                        <button type="button" class="btn btn-white" id="remove-causas-cilindros" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="btn btn-white" id="add-causas-cilindros" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
                     </div>
                     <div class="row">
-                        <div class="col-sm-6 mb-4" id="container-motivo-inspecao-cilindro">
-                            <label>Motivo</label>
-                            <input type="text" class="form-control" id="motivo-inspecao-cilindro" required>
-                        </div>
                         <div class="col-sm-6 mb-4">
-                            <label>Observação</label>
+                            <label class="label-modal">Observação</label>
                             <input type="text" class="form-control" id="observacao-inspecao-cilindro">
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-sm-12 mb-4">
-                            <div>
-                                <p style="display: inline-block;margin-bottom: .5rem;">Ficha</p>
-                            </div>
-                            <input type="file" class="custom-file-input" accept="image/*" id="ficha-inspecao-cilindro">
-                            <label class="custom-file-label" style="top: auto;">0 arquivos</label>
+                            <label class="label-modal">Ficha:</label>
+                            <input class="form-control" type="file">
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-primary" type="submit">
+                    <button class="btn btn-dark" type="submit" id="submit-inspecionar-cilindro">
                         <span id="spinner-cilindro-inspecao" class="spinner-border spinner-border-sm d-none"
                             aria-hidden="true"></span>
                         <span id="status-button-cilindro-inspecao" role="status">Inspecionar</span>
@@ -100,51 +95,55 @@
     </div>
 </div>
 
-<div class="modal fade" data-backdrop="static" id="modal-inspecao-tubo" tabindex="-1" role="dialog"
+<div class="modal fade" data-bs-backdrop="static" id="modal-inspecao-tubo" tabindex="-1" role="dialog"
     aria-labelledby="modal-inspecao-tuboLabel" style="overflow-y: auto;">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <form>
+            <form id="form-inspecao-tubo">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modal-inspecao-tuboTitle">Tubos</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                        <span>&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body p-4" style="font-size: 14px; overflow-y: auto; max-height: 650px;">
+                <div class="modal-body p-4" style="max-height: 70vh;overflow-y: auto;">
                     <div class="row">
                         <div class="col-sm-6 mb-4">
-                            <label>Data da Inspeção</label>
+                            <label class="label-modal">Data da Inspeção</label>
                             <input type="datetime-local" class="form-control" id="data-inspecao-tubo" required>
                         </div>
                         <div class="col-sm-6 mb-4 d-flex flex-column justify-content-end">
-                            <label>Inspetor</label>
-                            <select class="form-control" id="inspetor-inspecao-tubo" required>
-                                <option value="" hidden selected disabled></option>
+                            <label class="label-modal">Inspetor</label>
+                            <select class="form-control select2" id="inspetor-inspecao-tubo" style="font-size: 14px;" required>
+                                <option value="" disabled hidden selected></option>
+                                {% for inspetor in inspetores %}
+                                    <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-sm-12 mb-4">
-                            <label>Código</label>
-                            <select class="form-control" id="peca-inspecao-tubo"
+                            <label class="label-modal">Código</label>
+                            <select class="form-control select2" id="peca-inspecao-tubo"
                                 required>
                                 <option value="" disabled hidden selected></option>
+                                {% for peca in pecas_tubos %}
+                                    <option value="{{peca.peca}}">{{peca.peca}}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
                     <div class="row align-items-baseline">
                         <div class="col-4 mb-4">
-                            <label>Quantidade inspecionada</label>
+                            <label class="label-modal">Quantidade inspecionada</label>
                             <input type="number" min="1" class="form-control" id="qtd-inspecao-tubo" required>
                         </div>
                         <div class="col-4 mb-4">
-                            <label>Não conforme retrabalho</label>
+                            <label class="label-modal">Não conforme retrabalho</label>
                             <input type="number" min="0"
                                 class="form-control" id="nao-conformidade-retrabalho-inspecao-tubo" required>
                         </div>
                         <div class="col-4 mb-4">
-                            <label>Não conforme refugo</label>
+                            <label class="label-modal">Não conforme refugo</label>
                             <input type="number" min="0" class="form-control" id="nao-conformidade-refugo-inspecao-tubo" required>
                         </div>
                     </div>
@@ -152,16 +151,16 @@
                         <div class="row mb-3 selectContainerInspecaoTubo" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
                           <span class="label-modal text-end"> 1ª Causa</span>
                           <div class="col-sm-6 mb-4">
-                              <label class="label-modal">Causas:</label>
-                              <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
+                            <label class="label-modal">Causas:</label>
+                            <select class="form-control select2 causas_tubo" name="causas_1" style="font-size: 14px;" multiple required>
                                 {% for causa in causas %}
-                                  <option value="{{causa.nome}}">{{causa.nome}}</option>
+                                    <option value="{{causa.id}}">{{causa.nome}}</option>
                                 {% endfor %}
-                              </select>
+                            </select>
                           </div>
                           <div class="col-sm-6 mb-4">
                               <label class="label-modal">Quantidade:</label>
-                              <input type="number" style="font-size: 14px;" class="form-control" required>
+                              <input type="number" style="font-size: 14px;" class="form-control quantidade_causas_tubo" required>
                           </div>
                           <div class="col-sm-12 mb-4">
                               <label class="label-modal">Imagens:</label>
@@ -169,33 +168,125 @@
                           </div>
                         </div> 
                     </div>
-                    <div id="addRemoveContainer" class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
-                        <button type="button" class="btn btn-white" id="removeButtonPintura" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
-                        <button type="button" class="btn btn-white" id="addButtonPintura" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
+                    <div id="addRemoveContainerTubo" class="col-sm-12 mb-2" style="display: flex; justify-content: space-between; align-items: center;">
+                        <button type="button" class="btn btn-white" id="remove-causas-tubos" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="btn btn-white" id="add-causas-tubos" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
                     </div>
                     <div class="row">
-                        <div class="col-sm-6 mb-4" id="container-motivo-inspecao-tubo">
-                            <label>Motivo</label>
-                            <input type="text" class="form-control" id="motivo-inspecao-tubo" required>
-                        </div>
                         <div class="col-sm-6 mb-4">
-                            <label>Observação</label>
+                            <label class="label-modal">Observação</label>
                             <input type="text" class="form-control" id="observacao-inspecao-tubo">
                         </div>
-                        <div class="col-sm-6 mb-4">
-                            <label>Ficha</label>
-                            <input type="text" class="form-control" id="ficha-inspecao-tubo">
+                        <div class="col-sm-12 mb-4">
+                            <label class="label-modal">Ficha:</label>
+                            <input class="form-control" type="file">
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-primary"type="submit">
-                        <span id="spinner-tubo-inspecao" class="spinner-border spinner-border-sm d-none"
-                            aria-hidden="true"></span>
+                    <button class="btn btn-dark" type="submit" id="submit-inspecionar-tubo">
+                        <span id="spinner-tubo-inspecao" class="spinner-border spinner-border-sm d-none"></span>
                         <span id="status-button-tubo-inspecao" role="status">Inspecionar</span>
                     </button>
                 </div>
             </form>
         </div>
+    </div>
+</div>
+
+<div class="modal fade" data-bs-backdrop="static" id="modal-reteste-estanqueidade" tabindex="-1" role="dialog" aria-labelledby="modal-reteste-estanqueidadeLabel">
+    <div class="modal-dialog" role="document">
+        <form id="form-reinspecao">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title title" id="cabecalho-reteste-estanqueidade">
+     
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh;overflow-y: auto;">
+                    <p id="reteste_descricao"></p>
+                    <div class="row">
+                        <div class="col-sm-2 mb-4 d-none">
+                            <label class="label-modal">id</label>
+                            <input type="text" class="form-control" id="id_reteste" disabled>
+                        </div>
+                    </div>
+                    <div class="row align-items-baseline">
+                        <div class="col-sm-4 mb-4">
+                            <label class="label-modal">Reteste</label>
+                            <select class="form-control" name="reteste_status_estanqueidade" id="reteste_status_estanqueidade" required>
+                                <option value="" selected hidden disabled></option>
+                                <option value="Conforme">Conforme</option>
+                                <option value="Não Conforme">Não Conforme</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-4 mb-4">
+                            <label class="label-modal">Quant. Reinspecão</label>
+                            <input type="text" class="form-control" id="qnt_reinspecao" disabled>
+                        </div>
+                        <div class="col-sm-4 mb-4">
+                            <label class="label-modal">Tipo Inspeção</label>
+                            <input type="text" class="form-control" id="tipo_inspecao_estanqueidade" disabled>
+                        </div>
+                    </div>
+                    <div class="row" id="nao_conformidade_tubos">
+
+                    </div>
+                    <div id="causasContainerEstanqueidade" style="display: none;">
+                        <div class="row mb-3 selectContainerInspecaoReteste" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
+                          <span class="label-modal text-end"> 1ª Causa</span>
+                          <div class="col-sm-6 mb-4">
+                            <label class="label-modal">Causas:</label>
+                            <select class="form-control select2 causas_reteste" name="causas_1" style="font-size: 14px;" multiple required>
+                                {% for causa in causas %}
+                                    <option value="{{causa.id}}">{{causa.nome}}</option>
+                                {% endfor %}
+                            </select>
+                          </div>
+                          <div class="col-sm-6 mb-4">
+                              <label class="label-modal">Quantidade:</label>
+                              <input type="number" style="font-size: 14px;" min="1" class="form-control quantidade_causas_reteste" required>
+                          </div>
+                          <div class="col-sm-12 mb-4">
+                              <label class="label-modal">Imagens:</label>
+                              <input class="form-control" type="file" name="imagens_1" multiple>
+                          </div>
+                        </div> 
+                    </div>
+                    <div id="addRemoveContainerReteste" class="col-sm-12 mb-2" style="display: none; justify-content: space-between; align-items: center;">
+                        <button type="button" class="btn btn-white" id="remove-reinspecao-tubos-cilindros" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="btn btn-white" id="add-reinspecao-tubos-cilindros" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                    <div class="row" id="motivo_ficha_retrabalho_estanqueidade" style="display: none;">
+                        <div class="col-sm-6 mb-4">
+                            <label class="label-modal">Observação</label>
+                            <input type="text" class="form-control" id="observacao_reteste_estanqueidade">
+                        </div>
+                        <div class="col-sm-12 mb-4">
+                            <label class="label-modal" for="ficha_reteste_estanqueidade">Ficha de Inspeção</label>
+                            <input type="text" class="form-control" id="ficha_reteste_estanqueidade" disabled>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <label class="label-modal" for="ficha_reteste_estanqueidade">Inspetor</label>
+                        <div class="col-sm-6 mb-4 d-flex flex-column justify-content-end" id="inspetor_reteste_estanqueidade">                    
+                            <select class="form-control" name="" id="" required>
+                                <option value=""></option>
+                                {% for inspetor in inspetores %}
+                                <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-dark" id="verificar_reteste" type="submit">
+                        <span id="spinner-reteste-estanqueidade" class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+                        <span id="status-button-reteste-estanqueidade" role="status">Inspecionar</span>
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>

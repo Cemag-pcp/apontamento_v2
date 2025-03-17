@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.core.paginator import Paginator
+from django.db.models import Q 
 from django.db import transaction
 from django.utils import timezone
 from cadastro.models import PecasEstanqueidade
@@ -37,7 +38,7 @@ def inspecao_montagem(request):
 
     print(maquinas)
 
-    list_causas = [{"nome": causa.nome} for causa in causas]
+    list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
 
     lista_inspetores = [
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
@@ -59,7 +60,7 @@ def inspecao_pintura(request):
 
     cores = ["Amarelo", "Azul", "Cinza", "Laranja", "Verde", "Vermelho"]
 
-    list_causas = [{"nome": causa.nome} for causa in causas]
+    list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
 
     lista_inspetores = [
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
@@ -447,7 +448,7 @@ def envio_inspecao_pintura(request):
                     imagens = request.FILES.getlist(f"imagens_{i}")  # Lista de arquivos
 
                     # Obtém todas as causas de uma vez
-                    causas_objs = Causas.objects.filter(nome__in=causas)
+                    causas_objs = Causas.objects.filter(id__in=causas)
                     causa_nao_conformidade = CausasNaoConformidade.objects.create(
                         dados_execucao=dados_execucao, quantidade=int(quantidade)
                     )
@@ -503,7 +504,7 @@ def envio_reinspecao_pintura(request):
                     imagens = request.FILES.getlist(f"imagens_reinspecao_{i}")
 
                     # Obtém todas as causas de uma vez
-                    causas_objs = Causas.objects.filter(nome__in=causas)
+                    causas_objs = Causas.objects.filter(id__in=causas)
                     causa_nao_conformidade = CausasNaoConformidade.objects.create(
                         dados_execucao=dados_execucao, quantidade=int(quantidade)
                     )
@@ -915,7 +916,7 @@ def envio_inspecao_montagem(request):
                     imagens = request.FILES.getlist(f"imagens_{i}")  # Lista de arquivos
 
                     # Obtém todas as causas de uma vez
-                    causas_objs = Causas.objects.filter(nome__in=causas)
+                    causas_objs = Causas.objects.filter(id__in=causas)
                     causa_nao_conformidade = CausasNaoConformidade.objects.create(
                         dados_execucao=dados_execucao, quantidade=int(quantidade)
                     )
@@ -975,7 +976,7 @@ def envio_reinspecao_montagem(request):
                     )  # Lista de arquivos
 
                     # Obtém todas as causas de uma vez
-                    causas_objs = Causas.objects.filter(nome__in=causas)
+                    causas_objs = Causas.objects.filter(id__in=causas)
                     causa_nao_conformidade = CausasNaoConformidade.objects.create(
                         dados_execucao=dados_execucao, quantidade=int(quantidade)
                     )
@@ -1016,14 +1017,32 @@ def inspecao_tubos_cilindros(request):
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
     ]
 
-    list_causas = list(
-        Causas.objects.filter(setor="tubos cilindros").values_list("nome", flat=True)
-    )
+    causas = Causas.objects.filter(setor="tubos cilindros")
+
+    list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
+
+    pecas = PecasEstanqueidade.objects.filter(tipo__in=["tubo", "cilindro"])
+
+    list_pecas_tubos = [
+        {"peca": f"{peca.codigo} - {peca.descricao}"}
+        for peca in pecas
+        if peca.tipo == "tubo"
+    ]
+    list_pecas_cilindros = [
+        {"peca": f"{peca.codigo} - {peca.descricao}"}
+        for peca in pecas
+        if peca.tipo == "cilindro"
+    ]
 
     return render(
         request,
         "inspecao_tubos_cilindros.html",
-        {"inspetores": lista_inspetores, "causas": list_causas},
+        {
+            "inspetores": lista_inspetores,
+            "causas": list_causas,
+            "pecas_tubos": list_pecas_tubos,
+            "pecas_cilindros": list_pecas_cilindros,
+        },
     )
 
 
@@ -1051,11 +1070,17 @@ def get_itens_reinspecao_tubos_cilindros(request):
 
     quantidade_total = datas.count()
 
+    print(datas)
+
     if data_filtrada:
         datas = datas.filter(data_inspecao__date=data_filtrada)
 
     if pesquisa_filtrada:
-        datas = datas.filter(peca__codigo__icontains=pesquisa_filtrada)
+        datas = datas.filter(
+            Q(peca__codigo__icontains=pesquisa_filtrada) | Q(peca__descricao__icontains=pesquisa_filtrada)
+        )
+    
+    print(datas)
 
     if inspetores_filtrados:
         datas = datas.filter(
@@ -1097,22 +1122,21 @@ def get_itens_reinspecao_tubos_cilindros(request):
 
             data_ajustada = de.data_exec - timedelta(hours=3)
             possui_nao_conformidade = (
-                info_adicionais.nao_conformidade_retrabalho
+                info_adicionais.nao_conformidade
                 + info_adicionais.nao_conformidade_refugo
                 > 0
             ) or de.num_execucao > 0
 
             item = {
                 "id": data.id,
+                "tipo_inspecao": data.peca.tipo,
                 "id_dados_execucao": de.id,
                 "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                 "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
-                "nao_conformidade_retrabalho": (
-                    info_adicionais.nao_conformidade_retrabalho
-                    if info_adicionais
-                    else 0
+                "nao_conformidade": (
+                    info_adicionais.nao_conformidade if info_adicionais else 0
                 ),
                 "nao_conformidade_refugo": (
                     info_adicionais.nao_conformidade_refugo if info_adicionais else 0
@@ -1135,6 +1159,7 @@ def get_itens_reinspecao_tubos_cilindros(request):
         },
         status=200,
     )
+
 
 def get_itens_inspecionados_tubos_cilindros(request):
     if request.method != "GET":
@@ -1210,7 +1235,7 @@ def get_itens_inspecionados_tubos_cilindros(request):
 
             data_ajustada = de.data_exec - timedelta(hours=3)
             possui_nao_conformidade = (
-                info_adicionais.nao_conformidade_retrabalho
+                info_adicionais.nao_conformidade
                 + info_adicionais.nao_conformidade_refugo
                 > 0
             ) or de.num_execucao > 0
@@ -1222,10 +1247,8 @@ def get_itens_inspecionados_tubos_cilindros(request):
                 "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
-                "nao_conformidade_retrabalho": (
-                    info_adicionais.nao_conformidade_retrabalho
-                    if info_adicionais
-                    else 0
+                "nao_conformidade": (
+                    info_adicionais.nao_conformidade if info_adicionais else 0
                 ),
                 "nao_conformidade_refugo": (
                     info_adicionais.nao_conformidade_refugo if info_adicionais else 0
@@ -1248,6 +1271,13 @@ def get_itens_inspecionados_tubos_cilindros(request):
         },
         status=200,
     )
+
+
+def envio_inspecao_tubos_cilindros(request):
+    if request.method != "POST":
+        return JsonResponse({"error":"Método não permitido"}, status=405)
+
+    return JsonResponse({"success":"Data"}, status=200)
 
 
 def reteste_estanqueidade_tubos_cilindros(request):

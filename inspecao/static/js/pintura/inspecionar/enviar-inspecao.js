@@ -38,16 +38,24 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
         });
     });
 
-    if(parseFloat(naoConformidade) > 0){
-        if(totalQuantidadeInput !== parseFloat(naoConformidade)){
+    const naoConformidadeNum = parseFloat(naoConformidade);
+
+    if (naoConformidadeNum !== 0) {
+        const erroMensagem = naoConformidadeNum > 0 && totalQuantidadeInput !== naoConformidadeNum
+            ? 'Verifique se a soma dos campos de "Quantidade" está igual ao valor de "N° total de não conformidades"'
+            : naoConformidadeNum < 0
+            ? 'Verifique se o "N° total de conformidades" está com o valor correto'
+            : null;
+    
+        if (erroMensagem) {
             Swal.fire({
                 icon: 'error',
-                title: 'Verifique se a soma dos campos de "Quantidade" está igual ao valor de "N° total de não conformidades"',
+                title: erroMensagem,
             });
-
+    
             buttonInspecionarPintura.disabled = false;
             buttonInspecionarPintura.querySelector(".spinner-border").style.display = "none";
-            return 
+            return;
         }
     }
 

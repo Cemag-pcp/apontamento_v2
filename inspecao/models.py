@@ -207,7 +207,7 @@ class InfoAdicionaisExecTubosCilindros(models.Model):
         null=False,
         blank=False,
     )
-    nao_conformidade_retrabalho = models.IntegerField(null=False, blank=False)
+    nao_conformidade = models.IntegerField(null=False, blank=False)
     nao_conformidade_refugo = models.IntegerField(null=False, blank=False)
     qtd_inspecionada = models.IntegerField(null=False, blank=False)
     observacao = models.CharField(max_length=100, null=True, blank=True)

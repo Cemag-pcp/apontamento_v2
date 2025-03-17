@@ -1,9 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
-    buscarItensReinspecao(1); // Chama a função quando a página carrega, começando na página 1
+    buscarItensReinspecaoEstanqueidade(1); // Chama a função quando a página carrega, começando na página 1
 });
 
-document.getElementById("btn-filtrar-reinspecao").addEventListener("click", () => {
-    buscarItensReinspecao(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
+document.getElementById("btn-filtrar-reinspecao").addEventListener("click", (event) => {
+    event.preventDefault();
+    buscarItensReinspecaoEstanqueidade(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
 });
 
 document.getElementById("btn-limpar-reinspecao").addEventListener("click", (event) => {
@@ -18,10 +19,10 @@ document.getElementById("btn-limpar-reinspecao").addEventListener("click", (even
             input.value = ""; // Limpa inputs de texto e data
         }
     });
-    buscarItensReinspecao(1);
+    buscarItensReinspecaoEstanqueidade(1);
 });
 
-function buscarItensReinspecao(pagina) {
+function buscarItensReinspecaoEstanqueidade(pagina) {
     let cardsInspecao = document.getElementById("cards-reinspecao");
     let qtdPendenteInspecao = document.getElementById("qtd-pendente-reinspecao");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-reinspecao");
@@ -134,16 +135,18 @@ function buscarItensReinspecao(pagina) {
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
                         <strong>🧮 Quantidade Inspecionada:</strong> ${item.qtd_inspecionada}<br>
-                        <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade_retrabalho}<br>
+                        <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade}<br>
+                        <strong>📍 Tipo da Inspeção:</strong> ${item.tipo_inspecao}<br>
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
                     <button 
                         data-id="${item.id}"
                         data-data="${item.data}"
-                        data-tipo="${item.tipo}"
                         data-nao-conformidade="${item.nao_conformidade}"
+                        data-nao-conformidade-refugo="${item.nao_conformidade_refugo}"
                         data-conformidade="${item.conformidade}"
+                        data-tipo="${item.tipo_inspecao}"
                         data-cor="${item.cor}"
                         data-peca="${item.peca}"
                     class="btn btn-dark w-100 iniciar-reinspecao">
@@ -168,7 +171,7 @@ function buscarItensReinspecao(pagina) {
             const adicionarLinkPagina = (i) => {
                 paginacaoHTML += `
                     <li class="page-item ${i === paginaAtual ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="buscarItensReinspecao(${i})">${i}</a>
+                        <a class="page-link" href="#" onclick="buscarItensReinspecaoEstanqueidade(${i})">${i}</a>
                     </li>`;
             };
 

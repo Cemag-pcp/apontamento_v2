@@ -1,18 +1,18 @@
 document.getElementById("form-reinspecao").addEventListener("submit", function (event) {
     event.preventDefault();
 
-    let modal = document.getElementById('modal-reinspecionar-montagem');
+    let modal = document.getElementById('modal-reinspecionar-tubos-cilindros');
     let modalInstance = bootstrap.Modal.getInstance(modal); // Obter a instância existente
-    let buttonInspecionarMontagem = document.getElementById("submit-reinspecionar-montagem");
-    buttonInspecionarMontagem.disabled = true;
-    buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "flex";
+    let buttonInspecionarTubosCilindros = document.getElementById("submit-reinspecionar-tubos-cilindros");
+    buttonInspecionarTubosCilindros.disabled = true;
+    buttonInspecionarTubosCilindros.querySelector(".spinner-border").style.display = "flex";
 
     // Criar um objeto FormData para enviar os arquivos
     const formData = new FormData(this); // Usar o formulário diretamente
 
     // Adicionar os dados básicos ao FormData
-    const naoConformidade = document.getElementById("nao-conformidade-reinspecao-montagem").value;
-    formData.append("nao-conformidade-reinspecao-montagem", naoConformidade);
+    const naoConformidade = document.getElementById("nao-conformidade-reinspecao-tubos-cilindros").value;
+    formData.append("nao-conformidade-reinspecao-tubos-cilindros", naoConformidade);
 
     // Adicionar causas, quantidades e imagens ao FormData
     const selectContainerInspecao = document.querySelectorAll(".selectContainerReinspecao");
@@ -38,7 +38,7 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     formData.append("quantidade-total-causas", selectContainerInspecao.length)
 
     // Enviar os dados para o backend
-    fetch("/inspecao/api/envio-reinspecao-montagem/", {
+    fetch("/inspecao/api/envio-reinspecao-tubos-cilindros/", {
         method: "POST",
         headers: {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
@@ -86,7 +86,7 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
         });
     })
     .finally(() => {
-        buttonInspecionarMontagem.disabled = false;
-        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+        buttonInspecionarTubosCilindros.disabled = false;
+        buttonInspecionarTubosCilindros.querySelector(".spinner-border").style.display = "none";
     });
 });

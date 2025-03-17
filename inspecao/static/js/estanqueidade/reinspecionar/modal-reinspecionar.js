@@ -6,68 +6,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const id = event.target.getAttribute("data-id");
             const data = event.target.getAttribute("data-data");
             const peca = event.target.getAttribute("data-peca");
-            const tipo = event.target.getAttribute("data-tipo");
-            const cor = event.target.getAttribute("data-cor");
+            const tipoInspecao = event.target.getAttribute("data-tipo");
             const totalReinspecao = event.target.getAttribute("data-nao-conformidade");
 
-            document.getElementById("id-reinspecao-montagem").value = id;
-            document.getElementById("data-finalizada-reinspecao-montagem").value = data;
-            document.getElementById("peca-reinspecao-montagem").value = peca;
-            document.getElementById("cor-reinspecao-montagem").value = `${cor} - ${tipo}`;
-            document.getElementById("qtd-reinspecao-montagem").value = totalReinspecao;
+            document.getElementById("cabecalho-reteste-estanqueidade").textContent = `Reteste - ${tipoInspecao}`
+            document.getElementById("tipo_inspecao_estanqueidade").value = tipoInspecao;
+            document.getElementById("qnt_reinspecao").value = totalReinspecao;
 
-            const modal = new bootstrap.Modal(document.getElementById("modal-reinspecionar-montagem"));
+            const modal = new bootstrap.Modal(document.getElementById("modal-reteste-estanqueidade"));
             modal.show();
         }
     })
-    document.getElementById("conformidade-reinspecao-montagem").addEventListener("input", function() {
-        const qtdInspecao = parseFloat(document.getElementById("qtd-reinspecao-montagem").value) || 0;
-        const conformidade = parseFloat(this.value) || 0;
-        const naoConformidade = qtdInspecao - conformidade;
-        const containerInspecao = document.getElementById("containerReinspecao");
-        const addRemoveContainer = document.getElementById("addRemoveContainerReinspecao");
 
-
-        document.getElementById("nao-conformidade-reinspecao-montagem").value = naoConformidade;
-
-        if (naoConformidade <= 0) {
-            containerInspecao.style.display = "none";
-            addRemoveContainer.style.display = "none";
-    
-            // Remove o atributo 'required' de todos os inputs (exceto file) e selects dentro do containerInspecao
-            const inputs = containerInspecao.querySelectorAll('input');
-            const selects = containerInspecao.querySelectorAll('select');
-
-            inputs.forEach(input => {
-                if (input.type !== 'file') { // Ignora inputs do tipo file
-                    input.removeAttribute('required');
-                }
-                input.value = "";
-            });
-            selects.forEach(select => {
-                select.value = "";
-                select.removeAttribute('required');
-            });
-        } else {
-            containerInspecao.style.display = "block";
-            addRemoveContainer.style.display = "flex";
-    
-            // Adiciona o atributo 'required' de volta a todos os inputs (exceto file) e selects dentro do containerInspecao
-            const inputs = containerInspecao.querySelectorAll('input');
-            const selects = containerInspecao.querySelectorAll('select');
-    
-            inputs.forEach(input => {
-                if (input.type !== 'file') { // Ignora inputs do tipo file
-                    input.setAttribute('required', 'required');
-                }
-            });
-            selects.forEach(select => select.setAttribute('required', 'required'));
-        }
-    });
-
-    const containerInspecao = document.getElementById("containerReinspecao");
-    const addButton = document.getElementById("add-reinspecao-montagem");
-    const removeButton = document.getElementById("remove-reinspecao-montagem");
+    const containerInspecao = document.getElementById("causasContainerEstanqueidade");
+    const addButton = document.getElementById("add-reinspecao-tubos-cilindros");
+    const removeButton = document.getElementById("remove-reinspecao-tubos-cilindros");
 
     addButton.addEventListener("click", () => {
 

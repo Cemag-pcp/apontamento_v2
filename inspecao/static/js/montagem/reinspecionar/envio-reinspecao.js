@@ -14,12 +14,16 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     const naoConformidade = document.getElementById("nao-conformidade-reinspecao-montagem").value;
     formData.append("nao-conformidade-reinspecao-montagem", naoConformidade);
 
+    let totalQuantidadeInput = 0;
+
     // Adicionar causas, quantidades e imagens ao FormData
     const selectContainerInspecao = document.querySelectorAll(".selectContainerReinspecao");
     selectContainerInspecao.forEach((container, index) => {
         const causaSelect = container.querySelector('select');
         const quantidadeInput = container.querySelector('input[type="number"]');
         const imagensInput = container.querySelector('input[type="file"]');
+        totalQuantidadeInput += parseFloat(quantidadeInput.value);
+        console.log(totalQuantidadeInput)
 
         // Adicionar causas
         Array.from(causaSelect.selectedOptions).forEach((option, i) => {
@@ -34,6 +38,27 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
             formData.append(`imagens_reinspecao_${index + 1}[${i}]`, file); // Anexar o arquivo diretamente
         });
     });
+
+    const naoConformidadeNum = parseFloat(naoConformidade);
+
+    if (naoConformidadeNum !== 0) {
+        const erroMensagem = naoConformidadeNum > 0 && totalQuantidadeInput !== naoConformidadeNum
+            ? 'Verifique se a soma dos campos de "Quantidade" está igual ao valor de "N° total de não conformidades"'
+            : naoConformidadeNum < 0
+            ? 'Verifique se o "N° total de conformidades" está com o valor correto'
+            : null;
+    
+        if (erroMensagem) {
+            Swal.fire({
+                icon: 'error',
+                title: erroMensagem,
+            });
+    
+            buttonInspecionarMontagem.disabled = false;
+            buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+            return;
+        }
+    }
 
     formData.append("quantidade-total-causas", selectContainerInspecao.length)
 
