@@ -424,7 +424,11 @@ export function mostrarPecas(ordemId) {
                         <tbody>
                             ${data.pecas.map(peca => `
                                 <tr>
-                                    <td>${peca.peca}</td>
+                                    <td>
+                                        <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca}" target="_blank" rel="noopener noreferrer">
+                                            ${peca.peca}
+                                        </a>
+                                    </td>
                                     <td>${peca.quantidade}</td>
                                 </tr>
                             `).join('')}
