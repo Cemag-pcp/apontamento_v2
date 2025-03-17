@@ -404,8 +404,8 @@ def historico_ordens_montagem(request):
     """
 
     data_carga = request.GET.get('data_carga')
-    maquina_param = request.GET.get('setor', '') # Chassi, Içamento...
-    status_param = request.GET.get('status', '')
+    maquina_param = request.GET.get('setor', None) # Chassi, Içamento...
+    status_param = request.GET.get('status', None)
 
     # Paginação
     page = request.GET.get('page', 1)

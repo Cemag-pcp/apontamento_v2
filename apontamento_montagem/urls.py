@@ -17,6 +17,7 @@ urlpatterns = [
     path('api/verificar-qt-restante/', views.verificar_qt_restante, name='verificar_qt_restante'),
     path('api/andamento-ultimas-cargas/', views.andamento_ultimas_cargas, name='andamento_ultimas_cargas'),
     path('api/listar-pecas-disponiveis/', views.listar_pecas_disponiveis, name='listar_pecas_disponiveis'),
+    path('api/buscar-maquinas/', views.buscar_maquinas, name='buscar_maquinas'),
 
 
 ]

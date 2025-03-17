@@ -5,6 +5,8 @@ const setorSelecionado = document.getElementById('setor-selecionado');
 const colunaSetor = document.getElementById('colunaSetor');
 const colunaCor = document.getElementById('colunaCor');
 const setor = document.getElementById('setor-selecionado').value;
+const colunaFiltroMontagem = document.getElementById('filtro-montagem');
+const colunaFiltroPintura = document.getElementById('filtro-pintura');
 
 function carregarTabela(pagina = 1) {
     return new Promise((resolve, reject) => {  // Adicionando uma Promise
@@ -18,7 +20,7 @@ function carregarTabela(pagina = 1) {
                             <div class="spinner-border text-primary mb-3" role="status">
                                 <span class="visually-hidden">Carregando...</span>
                             </div>
-                            <span class="text-muted">Processando sua solicitação...</span>
+                            <span class="text-muted">Buscando...</span>
                         </div>
                     </td>
                 </tr>
@@ -448,21 +450,68 @@ function alternarSetor(event) {
     // Atualizar título
     if (setor === 'montagem') {
         tituloSetor.innerHTML = '<i class="bi bi-tools me-1"></i>Setor: Montagem';
+        // Colunas de cor e setor
         colunaSetor.style.display = 'block';
         colunaCor.style.display = 'none';
+        // Campos de filtro para cor e setor
+        colunaFiltroMontagem.style.display = 'block';
+        colunaFiltroPintura.style.display = 'none';
+
     } else {
         tituloSetor.innerHTML = '<i class="bi bi-brush me-1"></i>Setor: Pintura';
+        // Colunas de cor e setor
         colunaSetor.style.display = 'none';
         colunaCor.style.display = 'block';
+        // Campos de filtro para cor e setor
+        colunaFiltroMontagem.style.display = 'none';
+        colunaFiltroPintura.style.display = 'block';
+
     }
     
     // Recarregar dados com o novo setor
     carregarTabela(1);
 }
 
+function maquinasMontagm(){
+
+    fetch('/montagem/api/buscar-maquinas', {
+        method:'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+
+        const select = document.getElementById("filtro-setor-montagem");
+
+        // Limpa as opções existentes
+        select.innerHTML = "";
+
+        // Adiciona uma opção padrão
+        const defaultOption = document.createElement("option");
+        defaultOption.value = "";
+        defaultOption.textContent = "Todos os setores";
+        select.appendChild(defaultOption);
+
+        // Itera sobre os dados recebidos da API e cria opções no select
+        data.maquinas.forEach(maquina => {
+            const option = document.createElement("option");
+            option.value = maquina.id;
+            option.textContent = maquina.nome;
+            select.appendChild(option);
+        });
+
+    })
+    .catch(error => {
+        console.error(error)
+    });
+}
+
 //  Configuração inicial ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
     
+    maquinasMontagm();
     configurarBotaoVerPecas();
     salvarPecas();
 

@@ -83,7 +83,7 @@ class Ordem(models.Model):
     motivo_exclusao = models.ForeignKey(MotivoExclusao, on_delete=models.CASCADE, null=True, blank=True) # Caso exclua a ordem, é necessário informar o motivo
     
     #Para ordens duplicadas de corte
-    ordem_duplicada = models.TextField(blank=True, null=True) # Armazena a identificação da ordem duplicada (Ex.: "dup#1","dup#2"...)
+    ordem_duplicada = models.TextField(blank=True, null=True) # Armazena a identificação da ordem duplicada (Ex.: "dup#1.1","dup#2.1"...)
     ordem_pai = models.ForeignKey(
         'self',  # Referencia a própria tabela
         on_delete=models.SET_NULL,  # Define como `NULL` se a ordem pai for excluída
@@ -93,6 +93,10 @@ class Ordem(models.Model):
         verbose_name='Ordem Pai'
     )
     duplicada = models.BooleanField(default=False) # Opção para ordens duplicadas
+
+    #Apenas para ordens de corte
+    sequenciada = models.BooleanField(null=True, blank=True) # Ordens de corte automaticamente são sequenciadas
+    motivo_retirar_sequenciada = models.ForeignKey(MotivoExclusao, on_delete=models.CASCADE, null=True, blank=True, related_name='motivo_retirar_sequenciada') # Caso retire a ordem de sequenciadas é ´necessário informar o motivo
 
     #Campos para apontamento de montagem e pintura
     data_carga = models.DateField(null=True, blank=True)
@@ -104,8 +108,11 @@ class Ordem(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+
+        if self.grupo_maquina in ['plasma','laser_1','laser_2']:
+            self.sequenciada = True
         
-        if self.grupo_maquina == 'montagem' and self.data_carga:
+        elif self.grupo_maquina == 'montagem' and self.data_carga:
             self.data_programacao = self.data_carga - timedelta(days=3)
 
             # Se a data_programacao cair num sábado (5) ou domingo (6), ajustar para sexta-feira

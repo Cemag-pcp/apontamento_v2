@@ -1,4 +1,4 @@
-import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina-corte.js';
+import { fetchStatusMaquinas, fetchOrdensSequenciadasLaser, fetchOrdensSequenciadasPlasma } from './status-maquina-corte.js';
 
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
@@ -25,7 +25,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&maquina=${filtros.maquina || ''}`)
+        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${encodeURIComponent(filtros.ordem || '')}&maquina=${filtros.maquina || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -386,7 +386,7 @@ function getCSRFToken() {
 }
 
 // Função para exibir as peças no modal
-function mostrarPecas(ordemId) {
+export function mostrarPecas(ordemId) {
     const modalContent = document.getElementById('modalPecasContent');
 
     // Exibe SweetAlert de carregamento
@@ -513,7 +513,7 @@ function mostrarModalInterromper(ordemId) {
             resetarCardsInicial();
 
             fetchStatusMaquinas();
-            fetchContagemStatusOrdens();
+            fetchOrdensSequenciadasPlasma();
 
         })
         .catch((error) => {
@@ -524,7 +524,7 @@ function mostrarModalInterromper(ordemId) {
 }
 
 // Modal para "Iniciar"
-function mostrarModalIniciar(ordemId, grupoMaquina) {
+export function mostrarModalIniciar(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
     const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
@@ -622,7 +622,7 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 resetarCardsInicial(); 
 
                 fetchStatusMaquinas();
-                fetchContagemStatusOrdens();
+                fetchOrdensSequenciadasPlasma();
 
             })
             .catch((error) => {
@@ -861,8 +861,8 @@ function mostrarModalFinalizar(ordemId) {
             modal.hide();
 
             fetchStatusMaquinas();
-            fetchContagemStatusOrdens();
-            fetchUltimasPecasProduzidas();
+            fetchOrdensSequenciadasPlasma();
+            fetchOrdensSequenciadasLaser();
 
         })
         .catch((error) => {
@@ -943,7 +943,7 @@ function mostrarModalRetornar(ordemId, maquina) {
             resetarCardsInicial();
 
             fetchStatusMaquinas();
-            fetchContagemStatusOrdens();
+            fetchOrdensSequenciadasPlasma();
 
         })
         .catch((error) => {
@@ -957,7 +957,7 @@ function mostrarModalRetornar(ordemId, maquina) {
     });
 }
 
-function resetarCardsInicial(filtros = {}) {
+export function resetarCardsInicial(filtros = {}) {
     const container = document.getElementById('ordens-container');
     const loadMoreButton = document.getElementById('loadMore');
     let page = 1; // Página inicial
@@ -1060,7 +1060,6 @@ function filtro() {
             });
         })
         .catch((error) => console.error("Erro ao filtrar ordens:", error));
-
 
     });
 }

@@ -15,10 +15,14 @@ export const loadOrdens = (container, filtros = {}) => {
                 const setorContainer = document.getElementById("setor-container");
                 setorContainer.innerHTML = ""; // Limpa os botões antes de popular
 
+
                 if (ordens.length > 0) {
                     // Criar cabeçalho da tabela
+                    const tableWrapper = document.createElement("div");
+                    tableWrapper.classList.add("table-container");
+    
                     const table = document.createElement('table');
-                    table.classList.add('table', 'table-bordered', 'table-striped');
+                    table.classList.add('table', 'table-bordered', 'table-striped', 'header-fixed');
 
                     table.innerHTML = `
                         <thead class="table-light">
@@ -36,22 +40,42 @@ export const loadOrdens = (container, filtros = {}) => {
                         <tbody id="tabela-ordens-corpo"></tbody>
                     `;
 
-                    container.appendChild(table);
+                    tableWrapper.appendChild(table);
+                    container.appendChild(tableWrapper);
+
                     const tabelaCorpo = document.getElementById('tabela-ordens-corpo');
                     ordens.forEach(ordem => {
                         const linha = document.createElement('tr');
                         linha.dataset.ordemId = ordem.ordem;
                         
+                        let badgeClass = "";
+                        switch (ordem.ordem__status_atual) {
+                            case "aguardando_iniciar":
+                                badgeClass = "badge bg-warning text-dark"; // Amarelo
+                                break;
+                            case "finalizada":
+                                badgeClass = "badge bg-success"; // Verde
+                                break;
+                            case "iniciada":
+                                badgeClass = "badge bg-primary"; // Azul
+                                break;
+                            case "interrompida":
+                                badgeClass = "badge bg-danger"; // Vermelho
+                                break;
+                            default:
+                                badgeClass = "badge bg-secondary"; // Cinza para status desconhecidos
+                        }
+
                         linha.innerHTML = `
                             <td>#${ordem.ordem}</td>
                             <td>${ordem.ordem__data_programacao}</td>
                             <td>
                                 <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca}" 
-                                   target="_blank" rel="noopener noreferrer">
+                                target="_blank" rel="noopener noreferrer">
                                     ${ordem.peca}
                                 </a>
                             </td>
-                            <td>${ordem.ordem__status_atual}</td>
+                            <td><span class="${badgeClass}">${ordem.ordem__status_atual.replace("_", " ")}</span></td>
                             <td>${ordem.ordem__maquina__nome}</td>
                             <td>${ordem.restante}</td>
                             <td>${ordem.total_boa}</td>
@@ -244,7 +268,7 @@ function iniciarOrdem(ordemId) {
 }
 
 export function carregarOrdensIniciadas(filtros = {}) {
-    fetch(`api/ordens-iniciadas/`)
+    fetch(`api/ordens-iniciadas/?setor=${filtros.setor || ''}`)
         .then(response => response.json())
         .then(data => {
             const container = document.querySelector('.containerProcesso');
@@ -330,7 +354,7 @@ export function carregarOrdensInterrompidas(filtros = {}) {
 
     const container = document.querySelector('.containerInterrompido');
 
-    fetch(`api/ordens-interrompidas/`)
+    fetch(`api/ordens-interrompidas/?setor=${filtros.setor || ''}`)
     .then(response => response.json())
     .then(data => {
         container.innerHTML = ''; // Limpa o container
@@ -805,7 +829,8 @@ function filtro() {
 
         // Recarrega os resultados com os novos filtros
         resetarCardsInicial(filtros);
-
+        carregarOrdensIniciadas(filtros);
+        carregarOrdensInterrompidas(filtros);
     });
 }
 
@@ -1181,12 +1206,53 @@ function selecionarSetor() {
         filtroSetorInput.value = "";
 
         resetarCardsInicial();
+        carregarOrdensIniciadas();
+        carregarOrdensInterrompidas();
         
     });
 }
 
-// Chama a função ao carregar a página
+function salvarFiltros() {
+    const filtroDataCarga = document.getElementById("filtro-data-carga");
+    const filtroSetor = document.getElementById("filtro-setor");
+
+    localStorage.setItem("filtroDataCarga", filtroDataCarga.value);
+    localStorage.setItem("filtroSetor", filtroSetor.value);
+}
+
+function restaurarFiltros() {
+    const filtroDataCarga = document.getElementById("filtro-data-carga");
+    const filtroSetor = document.getElementById("filtro-setor");
+
+    if (localStorage.getItem("filtroDataCarga")) {
+        filtroDataCarga.value = localStorage.getItem("filtroDataCarga");
+    }
+    if (localStorage.getItem("filtroSetor")) {
+        filtroSetor.value = localStorage.getItem("filtroSetor");
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Restaurar os filtros ao carregar a página
+    restaurarFiltros();
+
+    // Adiciona eventos de submissão e limpeza
+    const form = document.getElementById("filtro-form");
+    const btnLimpar = document.getElementById("limpar-filtro");
+
+    form.addEventListener("submit", function () {
+        salvarFiltros();
+    });
+
+    btnLimpar.addEventListener("click", function () {
+        localStorage.removeItem("filtroDataCarga");
+        localStorage.removeItem("filtroSetor");
+
+        document.getElementById("filtro-data-carga").value = "";
+        document.getElementById("filtro-setor").value = "";
+    });
+
+    // Outras funções do sistema
     resetarCardsInicial();
     carregarOrdensIniciadas();
     carregarOrdensInterrompidas();
@@ -1197,14 +1263,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Atualiza automaticamente ao carregar a página
     fetchStatusMaquinas();
 
-    // Adiciona eventos de clique para atualizar manualmente
+    // Adiciona eventos para ações do usuário
     document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
         console.log("Atualizando Status de Máquinas...");
-        fetchStatusMaquinas(); // Chama a função existente
+        fetchStatusMaquinas();
     });
 
     document.getElementById('btnPararMaquina').addEventListener('click', () => {
-        mostrarModalPararMaquina(); // Chama a função já existente
+        mostrarModalPararMaquina();
     });
-
 });

@@ -8,10 +8,11 @@ from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now,localtime
 from django.db.models import Count, Q
+from django.forms.models import model_to_dict
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,MaquinaParada
-from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, MotivoMaquinaParada
+from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, MotivoMaquinaParada, MotivoExclusao
 from .utils import *
 
 import pandas as pd
@@ -41,8 +42,9 @@ def planejamento(request):
     operadores = Operador.objects.filter(setor__nome='corte')
     espessuras = Espessura.objects.all()
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='serra').exclude(nome='Finalizada parcial')
+    motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='corte')
 
-    return render(request, 'apontamento_corte/planejamento.html', {'motivos':motivos,'operadores':operadores,'espessuras':espessuras,'motivos_maquina_parada':motivos_maquina_parada,})
+    return render(request, 'apontamento_corte/planejamento.html', {'motivos':motivos,'operadores':operadores,'espessuras':espessuras,'motivos_maquina_parada':motivos_maquina_parada,'motivos_exclusao':motivos_exclusao})
 
 def get_pecas_ordem(request, pk_ordem):
     try:
@@ -60,7 +62,7 @@ def get_pecas_ordem(request, pk_ordem):
 
         # Peças relacionadas à ordem
         pecas = [
-            {'peca': peca.peca, 'quantidade': peca.qtd_planejada}
+            {'peca': peca.peca, 'quantidade': peca.qtd_planejada if peca.qtd_boa == 0 else  peca.qtd_boa}
             for peca in ordem.ordem_pecas_corte.all()
         ]
 
@@ -74,7 +76,7 @@ def get_pecas_ordem(request, pk_ordem):
 
 def get_ordens_criadas(request):
     # Captura os parâmetros de filtro
-    filtro_ordem = request.GET.get('ordem', '').strip()
+    filtro_ordem = request.GET.get('ordem', '')
     filtro_maquina = request.GET.get('maquina', '').strip()
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
@@ -83,7 +85,11 @@ def get_ordens_criadas(request):
     ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).order_by('status_prioridade')
 
     if filtro_ordem:
-        ordens_queryset = ordens_queryset.filter(ordem__icontains=filtro_ordem)
+        if '.' in filtro_ordem or 'dup' in filtro_ordem:
+            ordens_queryset = ordens_queryset.filter(ordem_duplicada__contains=filtro_ordem)
+        else:
+            ordens_queryset = ordens_queryset.filter(ordem=int(filtro_ordem))
+
     if filtro_maquina:
         ordens_queryset = ordens_queryset.filter(grupo_maquina__icontains=filtro_maquina)
 
@@ -105,10 +111,10 @@ def get_ordens_criadas(request):
         'maquina': ordem.maquina.nome if ordem.maquina else None,
         'maquina_id': ordem.maquina.id if ordem.maquina else None,
         'propriedade': {
-            'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
-            'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
-            'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
-            'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+            'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade.descricao_mp else None,
+            'quantidade': ordem.propriedade.quantidade if ordem.propriedade.quantidade else None,
+            'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade.tipo_chapa else None,
+            'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade.aproveitamento else None,
             'retalho': 'Sim' if ordem.propriedade.retalho else None,
         }
     } for ordem in ordens_page]
@@ -448,7 +454,7 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
 
         # Peças relacionadas à ordem
         pecas = [
-            {'peca': peca.peca, 'quantidade': peca.qtd_planejada}
+            {'peca': peca.peca, 'quantidade': peca.qtd_planejada if peca.qtd_boa == 0 else peca.qtd_boa}
             for peca in ordem.ordem_pecas_corte.all()
             if peca.qtd_planejada > 0
         ]
@@ -527,7 +533,7 @@ def gerar_op_duplicada(request, pk_ordem):
                     qtd_planejada=peca['qtd_planejada']
                 )
 
-        return JsonResponse({'message': 'Ordem duplicada com sucesso', 'nova_ordem_id': nova_ordem.pk, 'nova_ordem': nova_ordem.pk}, status=201)
+        return JsonResponse({'message': 'Ordem duplicada com sucesso', 'nova_ordem_id': nova_ordem.pk, 'nova_ordem': nova_ordem.ordem_duplicada}, status=201)
 
     except Ordem.DoesNotExist:
         return JsonResponse({'error': 'Ordem original não encontrada'}, status=404)
@@ -537,6 +543,47 @@ def gerar_op_duplicada(request, pk_ordem):
 def duplicar_op(request):
 
     return render(request, 'apontamento_corte/duplicar-op.html')
+
+def get_ordens_sequenciadas(request):
+    """
+    Função para buscar ordens já sequenciadas não finalizadas
+    """
+
+    # Máquina do laser ou plasma
+    tipo_maquina = request.GET.get('maquina')
+    ordem = request.GET.get('ordem', '')
+
+    if tipo_maquina == 'laser':
+        filtro_grupo_maquina = {
+            'grupo_maquina__in': ['laser_1', 'laser_2', 'Laser 2 (JFY)']
+        }
+    else:
+        filtro_grupo_maquina = {
+            'grupo_maquina': 'plasma'
+        }
+
+    filtros = {
+        'sequenciada': True,
+        **filtro_grupo_maquina
+    }
+
+    if ordem:
+        # Verifica se é uma ordem duplicada; ajuste a condição para funcionar corretamente
+        if '.' in ordem or 'dup' in ordem:
+            filtros['ordem_duplicada__contains'] = ordem
+        else:
+            filtros['ordem'] = int(ordem)
+
+    ordens_sequenciadas = Ordem.objects.filter(~Q(status_atual='finalizada'), **filtros)
+    
+    # Converte cada objeto para dicionário e adiciona o display do grupo_maquina
+    data = []
+    for ordem_obj in ordens_sequenciadas:
+        ordem_dict = model_to_dict(ordem_obj)
+        ordem_dict['grupo_maquina_display'] = ordem_obj.get_grupo_maquina_display()
+        data.append(ordem_dict)
+
+    return JsonResponse({'ordens_sequenciadas': data})
 
 class ProcessarArquivoView(View):
     def post(self, request):
@@ -608,6 +655,9 @@ class SalvarArquivoView(View):
         - 9855 -> 0.9855
         - 006 -> 0.6
         """
+
+        valor = valor.replace("%","").replace(",",".")
+
         if valor is None:
             return 0  # Garante que valores nulos não quebrem a ordenação
 
@@ -691,6 +741,7 @@ class SalvarArquivoView(View):
             
             # salvar propriedades
             for prop in propriedades:
+
                 PropriedadesOrdem.objects.create(
                     ordem=nova_ordem,
                     descricao_mp=prop['descricao_mp'],

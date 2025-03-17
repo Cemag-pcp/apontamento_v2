@@ -426,11 +426,20 @@ def ordens_iniciadas(request):
     Retorna todas as ordens que estão com status "iniciada" e que ainda não foram finalizadas,
     trazendo informações da ordem, peças relacionadas (sem repetição), soma das quantidades planejadas/boas e processos em andamento.
     """
+
+    maquina_param = request.GET.get('setor', '')
+
+    filtros_ordem = {
+        'grupo_maquina': 'montagem',
+        'status_atual': 'iniciada'
+    }
+
+    if maquina_param:
+        maquina = get_object_or_404(Maquina, pk=maquina_param)
+        filtros_ordem['maquina'] = maquina
+
     # Filtra ordens com status 'iniciada' e grupo de máquina 'montagem'
-    ordens_filtradas = Ordem.objects.filter(
-        status_atual='iniciada',
-        grupo_maquina='montagem'
-    ).prefetch_related('ordem_pecas_montagem', 'processos')
+    ordens_filtradas = Ordem.objects.filter(**filtros_ordem).prefetch_related('ordem_pecas_montagem', 'processos')
 
     resultado = []
 
@@ -479,11 +488,19 @@ def ordens_interrompidas(request):
     Retorna todas as ordens que estão com status "interrompida" e que ainda não foram finalizadas,
     trazendo informações da ordem, peças relacionadas (sem repetição), soma das quantidades planejadas/boas e processos em andamento.
     """
-    # Filtra ordens com status 'iniciada' e grupo de máquina 'montagem'
-    ordens_filtradas = Ordem.objects.filter(
-        status_atual='interrompida',
-        grupo_maquina='montagem'
-    ).prefetch_related('ordem_pecas_montagem', 'processos')
+
+    maquina_param = request.GET.get('setor', '')
+
+    filtros_ordem = {
+        'grupo_maquina': 'montagem',
+        'status_atual': 'interrompida'
+    }
+
+    if maquina_param:
+        maquina = get_object_or_404(Maquina, pk=maquina_param)
+        filtros_ordem['maquina'] = maquina
+
+    ordens_filtradas = Ordem.objects.filter(**filtros_ordem).prefetch_related('ordem_pecas_montagem', 'processos')
 
     resultado = []
 
@@ -609,6 +626,12 @@ def planejamento(request):
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='montagem').exclude(nome='Finalizada parcial')
 
     return render(request, 'apontamento_montagem/planejamento.html', {'motivos_maquina_parada': motivos_maquina_parada})
+
+def buscar_maquinas(request):
+
+    maquinas = Maquina.objects.filter(setor__nome='montagem').values('id','nome')
+
+    return JsonResponse({"maquinas":list(maquinas)})
 
 def listar_pecas_disponiveis(request):
 

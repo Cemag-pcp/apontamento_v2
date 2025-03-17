@@ -8,7 +8,7 @@
 {% block links %}
     <link rel="stylesheet" href="{% static 'css/badges.css' %}">
     <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
-
+    <link rel="stylesheet" href="{% static 'css/table-fixed-header.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -117,11 +117,13 @@
             </div>
         </form>
 
-    
         <!-- Tabela de Ordens Criadas -->
-        <div class="border rounded p-4 bg-white shadow-sm">
-            <div class="table-responsive">
-                <div id="ordens-container" style="max-height: 650px; min-height: 250px; overflow-y: auto; overflow-x: auto;"></div>
+        <div id="ordens-container" class="table-responsive">
+            <!-- Tabela de Ordens Criadas -->
+            <div class="border rounded p-4 bg-white shadow-sm">
+                <div class="table-container">
+                    
+                </div>
             </div>
         </div>
     </div>

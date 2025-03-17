@@ -22,7 +22,7 @@ import time
 @login_required  # Garante que apenas usuários autenticados possam acessar a view
 def excluir_ordem(request):
     # Verifica se o usuário tem o tipo de acesso "pcp"
-    if not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso != 'pcp':
+    if not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso not in ['pcp','supervisor']:
         return JsonResponse({'error': 'Acesso negado: você não tem permissão para excluir ordens.'}, status=403)
 
     if request.method == 'POST':
@@ -33,6 +33,7 @@ def excluir_ordem(request):
             motivo = data['motivo']
             setor = data['setor']
 
+
             # Busca o motivo de exclusão
             motivo_exclusao = get_object_or_404(MotivoExclusao, pk=int(motivo))
 
@@ -41,8 +42,13 @@ def excluir_ordem(request):
 
             # Verifica o status atual da ordem antes de permitir a exclusão
             if ordem.status_atual in ['aguardando_iniciar', 'finalizada']:
-                ordem.excluida = True
-                ordem.motivo_exclusao = motivo_exclusao
+                # Exceção para o setor de corte (opção de retirar do sequenciamento)
+                if setor in ['laser_1','laser_2','plasma']:
+                    ordem.motivo_retirar_sequenciada = motivo_exclusao
+                    ordem.sequenciada = False
+                else:
+                    ordem.excluida = True
+                    ordem.motivo_exclusao = motivo_exclusao
                 ordem.save()
                 return JsonResponse({'success': 'Ordem excluída com sucesso.'}, status=201)
             else:

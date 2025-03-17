@@ -1,22 +1,22 @@
-import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada.js';
+import { carregarOrdensIniciadas, carregarOrdensInterrompidas, mostrarPecas, mostrarModalIniciar, resetarCardsInicial} from './ordem-criada.js';
 
 document.addEventListener('DOMContentLoaded', function () {
     // Atualiza automaticamente ao carregar a página
     fetchStatusMaquinas();
-    fetchUltimasPecasProduzidas();
-    fetchContagemStatusOrdens();
+    fetchOrdensSequenciadasLaser();
+    fetchOrdensSequenciadasPlasma();
 
     // Adiciona eventos de clique para atualizar manualmente
     document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
         fetchStatusMaquinas(); // Chama a função existente
     });
 
-    document.getElementById('refresh-pecas').addEventListener('click', function () {
-        fetchUltimasPecasProduzidas(); // Chama a função existente
+    document.getElementById('refresh-ordens-sequenciadas-laser').addEventListener('click', function () {
+        fetchOrdensSequenciadasLaser(); // Chama a função existente
     });
 
-    document.getElementById('refresh-ordens').addEventListener('click', function () {
-        fetchContagemStatusOrdens(); // Chama a função existente
+    document.getElementById('refresh-ordens-sequenciadas-plasma').addEventListener('click', function () {
+        fetchOrdensSequenciadasPlasma(); // Chama a função existente
     });
 
     document.getElementById('btnPararMaquina').addEventListener('click', () => {
@@ -109,92 +109,255 @@ export function fetchStatusMaquinas() {
         });
 }
 
-export function fetchUltimasPecasProduzidas() {
-    // Seleciona o elemento da lista onde as peças serão adicionadas
-    const listaPecas = document.querySelector('#ultimas-pecas-list');
+export function fetchOrdensSequenciadasLaser() {
+    // Seleciona o container onde os cards serão adicionados
+    const container = document.getElementById('ordens-sequenciadas-laser-container');
+    const btnFiltrarOrdemSequenciadaLaser = document.getElementById('btnPesquisarOrdemSequenciadaLaser');
+    const ordemLaser = document.getElementById('pesquisarOrdemSequenciadaLaser');
+    
+    // Função que realiza a requisição, dado um URL
+    function carregarOrdens(url) {
+        // Limpa o conteúdo imediatamente antes de iniciar a requisição
+        container.innerHTML = '';
+        
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Se a resposta não tiver ordens, exibe mensagem
+                if (data.ordens_sequenciadas && data.ordens_sequenciadas.length > 0) {
+                    data.ordens_sequenciadas.forEach(ordem => {
+                        // Mapeamento de cores para o badge de status
+                        const statusColors = {
+                            'aguardando_iniciar': 'primary',
+                            'iniciada': 'success',
+                            'interrompida': 'warning',
+                            'finalizada': 'secondary',
+                        };
+                        const badgeColor = statusColors[ordem.status_atual] || 'secondary';
 
-    // Faz a requisição para a API
-    fetch(`/core/api/ultimas_pecas_produzidas/?setor=corte`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            // Limpa o conteúdo anterior da lista
-            listaPecas.innerHTML = '';
+                        const statusColorsMaquina = {
+                            'laser_1': 'primary',
+                            'laser_2': 'success',
+                        };
+                        const badgeColorMaquina = statusColorsMaquina[ordem.grupo_maquina] || 'secondary';
 
-            // Adiciona os itens retornados pela API
-            if (data.pecas && data.pecas.length > 0) {
-                data.pecas.forEach(peca => {
-                    const listItem = document.createElement('li');
-                    listItem.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-center');
-                    listItem.innerHTML = `
-                        <span><i class="fa fa-cube text-primary me-2"></i>${peca.nome}</span>
-                        <span class="badge bg-primary rounded-pill">${peca.quantidade}</span>
-                    `;
-                    listaPecas.appendChild(listItem);
-                });
-            } else {
-                // Caso não haja peças retornadas
-                listaPecas.innerHTML = '<li class="list-group-item text-muted text-center">Nenhuma peça produzida recentemente.</li>';
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao buscar as últimas peças produzidas:', error);
-            listaPecas.innerHTML = '<li class="list-group-item text-danger text-center">Erro ao carregar os dados.</li>';
-        });
+                        let botoesAcao = '';
+
+                        if (ordem.status_atual === 'aguardando_iniciar'){
+                            botoesAcao = `
+                            <div>
+                                <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
+                                    <i class="fa fa-play"></i>
+                                </button>
+                                <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="btn btn-danger btn-sm btn-retirar-sequenciamento" data-index="${ordem.id}">
+                                    🗑
+                                </button>
+                            </div>
+                            `
+                        } else {
+                            botoesAcao = `
+                            <div>
+                                <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                            </div>
+                            `
+                        }
+
+                        // Cria um card para cada ordem
+                        const card = document.createElement('div');
+                        card.classList.add('card', 'mb-3');
+                        card.innerHTML = `
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
+                                <span class="badge bg-${badgeColor}">${ordem.status_atual}</span>
+                                <small><span class="badge bg-${badgeColorMaquina}">${ordem.grupo_maquina_display}</span></small>
+                            </h5>
+                            <p class="card-text mb-1">
+                                <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
+                            </p>
+                            <p class="card-text mb-1">
+                                <strong>Data Programação:</strong> ${ordem.data_programacao}
+                            </p>
+                        </div>
+                        <div class="card-footer d-flex justify-content-between align-items-center">
+                            ${botoesAcao}
+                        </div>
+                        `;
+                        container.appendChild(card);
+
+                        const buttonVerPeca = card.querySelector('.btn-ver-peca');
+                        const buttonIniciar = card.querySelector('.btn-iniciar');
+                        const buttonRetirarSequenciamento = card.querySelector('.btn-retirar-sequenciamento');
+
+                        buttonVerPeca.addEventListener('click', () => {
+                            mostrarPecas(ordem.id);
+                        });
+
+                        buttonIniciar.addEventListener('click', () => {
+                            mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
+                        });
+
+                        buttonRetirarSequenciamento.addEventListener('click', () => {
+                            mostrarModalExcluir(ordem.id, ordem.grupo_maquina);
+                        });
+
+                    });
+                } else {
+                    container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao buscar ordens sequenciadas:', error);
+                container.innerHTML = '<p class="text-center text-danger">Erro ao carregar os dados.</p>';
+            });
+    }
+    
+    // Busca inicial sem filtro de ordem
+    carregarOrdens(`api/ordens-sequenciadas/?maquina=laser`);
+    
+    // Evento de clique para filtrar por ordem digitada
+    btnFiltrarOrdemSequenciadaLaser.addEventListener('click', () => {
+        const ordemDigitada = ordemLaser.value.trim();
+        // Constrói a URL, incluindo o parâmetro "ordem" se houver valor
+        const url = `api/ordens-sequenciadas/?maquina=laser${ordemDigitada ? `&ordem=${encodeURIComponent(ordemDigitada)}` : ''}`;
+        carregarOrdens(url);
+    });
 }
 
-export function fetchContagemStatusOrdens() {
-    // Seleciona o elemento da lista onde os status serão adicionados
-    const listaStatus = document.getElementById('status-ordens-list');
+export function fetchOrdensSequenciadasPlasma() {
+    // Seleciona o container onde os cards serão adicionados
+    const container = document.getElementById('ordens-sequenciadas-plasma-container');
+    const btnFiltrarOrdemSequenciadaPlasma = document.getElementById('btnPesquisarOrdemSequenciadaPlasma');
+    const ordemPlasma = document.getElementById('pesquisarOrdemSequenciadaPlasma');
+    
+    // Função que realiza a requisição, dado um URL
+    function carregarOrdens(url) {
+        // Limpa o conteúdo imediatamente antes de iniciar a requisição
+        container.innerHTML = '';
+        
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Se a resposta não tiver ordens, exibe mensagem
+                if (data.ordens_sequenciadas && data.ordens_sequenciadas.length > 0) {
+                    data.ordens_sequenciadas.forEach(ordem => {
+                        // Mapeamento de cores para o badge de status
+                        const statusColors = {
+                            'aguardando_iniciar': 'primary',
+                            'iniciada': 'success',
+                            'interrompida': 'warning',
+                            'finalizada': 'secondary',
+                        };
+                        const badgeColor = statusColors[ordem.status_atual] || 'secondary';
 
-    // Faz a requisição para a API
-    fetch('/core/api/status_ordem/?setor=corte')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            // Limpa o conteúdo anterior da lista
-            listaStatus.innerHTML = '';
+                        let botoesAcao = '';
+                        
+                        if (ordem.status_atual === 'aguardando_iniciar'){
+                            botoesAcao = `
+                            <div>
+                                <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
+                                    <i class="fa fa-play"></i>
+                                </button>
+                                <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                            </div>
+                            <div>
+                                <button class="btn btn-danger btn-sm btn-retirar-sequenciamento" data-index="${ordem.id}">
+                                    🗑
+                                </button>
+                            </div>
+                            `
+                        } else {
+                            botoesAcao = `
+                            <div>
+                                <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                            </div>
+                            `
+                        }
 
-            // Adiciona os itens retornados pela API
-            if (data.status_contagem && data.status_contagem.length > 0) {
-                data.status_contagem.forEach(status => {
-                    const statusColor = {
-                        'aguardando_iniciar': 'primary',
-                        'iniciada': 'success',
-                        'interrompida': 'warning',
-                        'finalizada': 'secondary',
-                    }[status.status] || 'secondary';
-
-                    const listItem = document.createElement('li');
-                    listItem.classList.add('mb-3');
-                    listItem.innerHTML = `
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="text-${statusColor} fw-bold">${status.status.replace('_', ' ')}:</span>
-                            <span class="fw-bold text-${statusColor}">${status.total}</span>
+                        // Cria um card para cada ordem
+                        const card = document.createElement('div');
+                        card.classList.add('card', 'mb-3');
+                        card.innerHTML = `
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
+                                <span class="badge bg-${badgeColor}">${ordem.status_atual}</span>
+                            </h5>
+                            <p class="card-text mb-1">
+                                <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
+                            </p>
+                            <p class="card-text mb-1">
+                                <strong>Data Programação:</strong> ${ordem.data_programacao}
+                            </p>
                         </div>
-                        <div class="progress" style="height: 10px;">
-                            <div class="progress-bar bg-${statusColor}" role="progressbar" style="width: ${status.porcentagem}%;" aria-valuenow="${status.porcentagem}" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="card-footer d-flex justify-content-between align-items-center">
+                            ${botoesAcao}
                         </div>
-                    `;
-                    listaStatus.appendChild(listItem);
+                        `;
+                        container.appendChild(card);
+
+                        const buttonVerPeca = card.querySelector('.btn-ver-peca');
+                        const buttonIniciar = card.querySelector('.btn-iniciar');
+                        const buttonRetirarSequenciamento = card.querySelector('.btn-retirar-sequenciamento');
+
+                        if (buttonIniciar){
+                            buttonIniciar.addEventListener('click', () => {
+                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
+                            });
+                        }
+
+                        buttonVerPeca.addEventListener('click', () => {
+                            mostrarPecas(ordem.id);
+                        });
+                        
+                        if (buttonRetirarSequenciamento){
+                            buttonRetirarSequenciamento.addEventListener('click', () => {
+                                mostrarModalExcluir(ordem.id, ordem.grupo_maquina);
+                            });
+                        }
                 });
-            } else {
-                // Caso não haja status retornados
-                listaStatus.innerHTML = '<li class="text-muted text-center">Nenhuma ordem encontrada.</li>';
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao buscar contagem de status das ordens:', error);
-            listaStatus.innerHTML = '<li class="text-danger text-center">Erro ao carregar os dados.</li>';
-        });
+                } else {
+                    container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao buscar ordens sequenciadas:', error);
+                container.innerHTML = '<p class="text-center text-danger">Erro ao carregar os dados.</p>';
+            });
+    }
+    
+    // Busca inicial sem filtro de ordem
+    carregarOrdens(`api/ordens-sequenciadas/?maquina=plasma`);
+    
+    // Evento de clique para filtrar por ordem digitada
+    btnFiltrarOrdemSequenciadaPlasma.addEventListener('click', () => {
+        const ordemDigitada = ordemPlasma.value.trim();
+        console.log(ordemDigitada);
+        // Constrói a URL, incluindo o parâmetro "ordem" se houver valor
+        const url = `api/ordens-sequenciadas/?maquina=plasma${ordemDigitada ? `&ordem=${encodeURIComponent(ordemDigitada)}` : ''}`;
+        carregarOrdens(url);
+    });
 }
 
 async function fetchMaquinasDisponiveis() {
@@ -338,7 +501,7 @@ async function handleFormSubmit(event) {
         });
 
         // Atualiza a interface
-        fetchContagemStatusOrdens();
+        fetchOrdensSequenciadasPlasma();
         fetchStatusMaquinas();
     
         const containerIniciado = document.querySelector('.containerProcesso');
@@ -355,4 +518,81 @@ async function handleFormSubmit(event) {
             text: error.message,
         });
     }
+}
+
+// Modal para "Excluir"
+function mostrarModalExcluir(ordemId, setor) {
+    const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+    const modalTitle = document.getElementById('modalExcluirLabel');
+    const formExcluir = document.getElementById('formExcluir');
+
+    modalTitle.innerHTML = `Excluir Ordem ${ordemId}`;
+    modal.show();
+
+    // Remove listeners antigos e adiciona novo
+    const clonedForm = formExcluir.cloneNode(true);
+    formExcluir.parentNode.replaceChild(clonedForm, formExcluir);
+
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(clonedForm);
+        const motivoExclusao = formData.get('motivoExclusao');
+
+        Swal.fire({
+            title: 'Excluindo...',
+            text: 'Por favor, aguarde enquanto a ordem está sendo excluída.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch(`/core/api/excluir-ordem/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                ordem_id: ordemId,
+                setor: setor,
+                motivo: motivoExclusao
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
+            }
+        })
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(({ status, body }) => {
+            if (status === 201) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: body.success,
+                });
+
+                modal.hide();
+
+                // Recarrega os dados chamando a função de carregamento
+                document.getElementById('ordens-container').innerHTML = '';
+                fetchOrdensSequenciadasLaser();
+                fetchOrdensSequenciadasPlasma();
+                resetarCardsInicial();
+
+            } else {
+                // Exibe o erro vindo do backend
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: body.error || 'Erro ao excluir a ordem.',
+                });
+            }
+        })
+        .catch((error) => {
+            console.error('Erro:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
+            });
+        });
+    });
 }
