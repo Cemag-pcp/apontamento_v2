@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function () {
+function renderCallendar() {
     var calendarEl = document.getElementById('calendario');
 
     var calendar = new FullCalendar.Calendar(calendarEl, {
@@ -17,32 +17,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 .catch(error => failureCallback(error));
         },
         eventClick: function (info) {
-            // Pegamos as informações do evento
             let setor = info.event.extendedProps.setor;
-            let dataAtual = info.event.startStr; // Data original do evento
-            let eventId = info.event.id || `${setor}-${dataAtual}`; // Garante que o ID seja gerado se não existir
+            let dataAtual = info.event.startStr;
+            let eventId = info.event.id || `${setor}-${dataAtual}`;
 
-            // Preenche os dados no modal
             document.getElementById("modalSetor").innerText = setor;
             document.getElementById("eventId").value = eventId;
             document.getElementById("setor").value = setor;
             document.getElementById("dataAtual").value = dataAtual;
             document.getElementById("novaData").value = dataAtual;
 
-            // Abre o modal de escolha
             let escolhaModal = new bootstrap.Modal(document.getElementById("modalEscolha"));
             escolhaModal.show();
 
-            // Quando o usuário clicar em "Remanejar"
             document.getElementById("btnRemanejar").onclick = function () {
                 escolhaModal.hide();
                 let modalRemanejar = new bootstrap.Modal(document.getElementById("modalRemanejar"));
                 modalRemanejar.show();
             };
 
-            // Quando o usuário clicar em "Atualizar"
             document.getElementById("btnAtualizar").onclick = function () {
-                // Exibe o Swal de carregamento
                 Swal.fire({
                     title: 'Aguarde...',
                     text: 'Atualizando informações...',
@@ -52,10 +46,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         Swal.showLoading();
                     }
                 });
-            
+
                 escolhaModal.hide();
-            
-                // Chama a API para carregar detalhes da carga
+
                 fetch(`api/atualizar-planejamento/?data_inicio=${dataAtual}&setor=${setor}`, {
                     method: 'POST',
                     headers: {
@@ -65,7 +58,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
-                        // Exibe erro caso a API retorne um erro
                         Swal.fire({
                             icon: 'error',
                             title: 'Erro!',
@@ -73,12 +65,10 @@ document.addEventListener('DOMContentLoaded', function () {
                             confirmButtonText: 'OK'
                         });
                     } else {
-                        // Formata as ordens que precisam ser atualizadas
                         let ordensTexto = data.ordens_a_serem_atualizadas.length > 0
                             ? data.ordens_a_serem_atualizadas.map(ordem => `Ordem ${ordem[0]} - Status: ${ordem[6]}`).join("<br>")
                             : "Nenhuma ordem precisa ser atualizada manualmente.";
-            
-                        // Exibe sucesso com detalhes
+
                         Swal.fire({
                             icon: 'success',
                             title: 'Ordens Atualizadas!',
@@ -93,8 +83,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 })
                 .catch(error => {
                     console.error("Erro ao buscar detalhes da carga:", error);
-            
-                    // Exibe erro genérico caso a requisição falhe
+
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro!',
@@ -116,7 +105,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     calendar.render();
 
-    // Atualizar evento após remanejamento manual no modal
     document.getElementById('confirmarRemanejamento').addEventListener('click', function () {
         let eventId = document.getElementById('eventId').value;
         let setor = document.getElementById('setor').value;
@@ -128,7 +116,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // Atualiza a exibição do evento no calendário
         let eventoAtualizado = calendar.getEventById(eventId);
 
         if (eventoAtualizado) {
@@ -136,24 +123,13 @@ document.addEventListener('DOMContentLoaded', function () {
             alert(`Carga do setor ${setor} remanejada para ${novaData}`);
         }
 
-        // Chama a API para persistir a alteração no backend
         remanejarCarga(setor, dataAtual, novaData);
 
-        // Fecha o modal
         var modal = bootstrap.Modal.getInstance(document.getElementById('modalRemanejar'));
         modal.hide();
 
-        location.reload();
+        
     });
-
-});
-
-function renderCallendar(){
-
-}
-
-function infoCargas(){
-
 }
 
 function remanejarCarga(setor, dataAtual, novaData) {
@@ -172,9 +148,13 @@ function remanejarCarga(setor, dataAtual, novaData) {
     .then(data => {
         if (data.error) {
             alert("Erro: " + data.error);
+            renderCallendar();
         } else {
             alert("Sucesso: " + data.message);
+            renderCallendar();
         }
     })
     .catch(error => console.error("Erro na requisição:", error));
 }
+
+document.addEventListener('DOMContentLoaded', renderCallendar);

@@ -1,30 +1,80 @@
+const tituloSetor = document.getElementById('titulo-setor');
+const btnSetorMontagem = document.getElementById('setor-montagem');
+const btnSetorPintura = document.getElementById('setor-pintura');
+const setorSelecionado = document.getElementById('setor-selecionado');
+const colunaSetor = document.getElementById('colunaSetor');
+const colunaCor = document.getElementById('colunaCor');
+const setor = document.getElementById('setor-selecionado').value;
+const colunaFiltroMontagem = document.getElementById('filtro-montagem');
+const colunaFiltroPintura = document.getElementById('filtro-pintura');
+
 function carregarTabela(pagina = 1) {
-    mostrarLoading(true); // Exibe o spinner
+    return new Promise((resolve, reject) => {  // Adicionando uma Promise
+        try {
 
-    document.getElementById('pagina-atual').value = pagina;
-    const dataCargaEscolhida = document.getElementById('filtro-data-carga')?.value || '';
+            const tbody = document.getElementById("tabela-corpo");
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <div class="d-flex flex-column align-items-center justify-content-center">
+                            <div class="spinner-border text-primary mb-3" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                            <span class="text-muted">Buscando...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
 
-    const limiteRegistros = 10; // Define o limite de registros por página
+            document.getElementById('pagina-atual').value = pagina;
+            const dataCargaEscolhida = document.getElementById('filtro-data-carga')?.value || '';
+            const corPintura = document.getElementById('filtro-cor-pintura')?.value || '';
+            const setorMontagem = document.getElementById('filtro-setor-montagem')?.value || '';
+            const setor = document.getElementById('setor-selecionado').value;
 
-    const filtros = {
-        dataCargaEscolhida: encodeURIComponent(dataCargaEscolhida),
-    };
+            const limiteRegistros = 10; // Define o limite de registros por página
 
-    fetch(`/cargas/api/historico-planejamento-montagem/?data_carga=${filtros.dataCargaEscolhida || ''}&page=${pagina}&limit=${limiteRegistros}`)
-        .then(response => response.json())
-        .then(data => {
-            atualizarTabela(data.ordens);
-            atualizarPaginacao(data.total_ordens, pagina, data.total_paginas);
-        })
-        .finally(() => mostrarLoading(false)); // Oculta o spinner
+            const filtros = {
+                dataCargaEscolhida: encodeURIComponent(dataCargaEscolhida),
+                cor: encodeURIComponent(corPintura),
+                setor: encodeURIComponent(setorMontagem),
+            };
+
+            if (setor === 'montagem'){
+                fetch(`/cargas/api/historico-planejamento-montagem/?data_carga=${filtros.dataCargaEscolhida || ''}&setor=${filtros.setor || ''}&page=${pagina}&limit=${limiteRegistros}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        atualizarTabela(data.ordens, setor);
+                        atualizarPaginacao(data.total_ordens, pagina, data.total_paginas);
+                        resolve(); // Resolve a Promise após o sucesso
+                    })
+                    .catch(error => {
+                        console.error("Erro ao carregar a tabela:", error);
+                        reject(error); // Rejeita a Promise em caso de erro
+                    });
+            } else {
+                fetch(`/cargas/api/historico-planejamento-pintura/?data_carga=${filtros.dataCargaEscolhida || ''}&cor=${filtros.cor || ''}&page=${pagina}&limit=${limiteRegistros}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        atualizarTabela(data.ordens, setor);
+                        atualizarPaginacao(data.total_ordens, pagina, data.total_paginas);
+                        resolve(); // Resolve a Promise após o sucesso
+                    })
+                    .catch(error => {
+                        console.error("Erro ao carregar a tabela:", error);
+                        reject(error); // Rejeita a Promise em caso de erro
+                    });
+            }
+        } catch (error) {
+            reject(error); // Captura outros erros inesperados
+        }
+    });
 }
 
 //  Atualiza a tabela
-function atualizarTabela(ordens) {
+function atualizarTabela(ordens, setor) {
     const tabelaCorpo = document.getElementById("tabela-corpo");
     tabelaCorpo.innerHTML = "";
-
-    console.log(ordens);
 
     if (ordens.length === 0) {
         tabelaCorpo.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhum dado encontrado.</td></tr>`;
@@ -32,6 +82,10 @@ function atualizarTabela(ordens) {
     }
 
     ordens.forEach(ordem => {
+
+        const colunaSetor = setor === "montagem" 
+            ? `<td>${ordem.ordem__maquina__nome}</td>` 
+            : `<td>${ordem.ordem__cor}</td>`;
 
         const linha = document.createElement("tr");
 
@@ -42,14 +96,14 @@ function atualizarTabela(ordens) {
                     data-id="${ordem.ordem}" value="${ordem.ordem__data_carga}" 
                     disabled>
             </td>
-            <td>${ordem.ordem__maquina__nome}</td>
+            ${colunaSetor}
             <td>${ordem.peca}</td>
             <td>
                 <input type="number" class="form-control qtd-plan-input" 
                     data-id="${ordem.ordem}" value="${ordem.total_planejada}" 
                     disabled>
             </td>
-            <td class="d-flex gap-2">
+            <td>
                 <button class="btn-editar btn btn-sm btn-warning" data-id="${ordem.ordem}">
                     <i class="far fa-edit"></i>
                 </button>
@@ -67,6 +121,9 @@ function atualizarTabela(ordens) {
 
 // Adiciona eventos aos botões de edição
 function adicionarEventosBotoesEdicao() {
+
+    const setor = document.getElementById('setor-selecionado').value;
+
     document.querySelectorAll('.btn-editar').forEach(botao => {
         botao.addEventListener('click', function () {
             const ordemId = this.getAttribute('data-id');
@@ -77,7 +134,7 @@ function adicionarEventosBotoesEdicao() {
     document.querySelectorAll('.btn-confirmar').forEach(botao => {
         botao.addEventListener('click', function () {
             const ordemId = this.getAttribute('data-id');
-            confirmarAlteracao(ordemId);
+            confirmarAlteracao(ordemId, setor);
         });
     });
 }
@@ -99,7 +156,7 @@ function ativarEdicao(ordemId) {
 }
 
 // Captura os valores editados e confirma a alteração
-function confirmarAlteracao(ordemId) {
+function confirmarAlteracao(ordemId, setor) {
     const qtPlanInput = document.querySelector(`.qtd-plan-input[data-id="${ordemId}"]`);
     const dataCargaInput = document.querySelector(`.data-carga-input[data-id="${ordemId}"]`);
     const botaoEditar = document.querySelector(`.btn-editar[data-id="${ordemId}"]`);
@@ -134,7 +191,7 @@ function confirmarAlteracao(ordemId) {
             ordemId: ordemId,
             novaQtdPlan: novaQtdPlan,
             novaDataCarga: novaDataCarga,
-            setor: 'montagem'
+            setor: setor
         })
     })
     .then(response => response.json())
@@ -153,6 +210,7 @@ function confirmarAlteracao(ordemId) {
 function atualizarPaginacao(totalRegistros, paginaAtual) {
     const totalPaginas = Math.ceil(totalRegistros / 10);
     const paginacaoContainer = document.getElementById("paginacao-container");
+    const setor = document.getElementById('setor-selecionado').value;
 
     paginacaoContainer.innerHTML = "";
 
@@ -384,17 +442,101 @@ function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
 
+// Função para alternar entre setores
+function alternarSetor(event) {
+    const setor = event.target.value;
+    setorSelecionado.value = setor;
+    
+    // Atualizar título
+    if (setor === 'montagem') {
+        tituloSetor.innerHTML = '<i class="bi bi-tools me-1"></i>Setor: Montagem';
+        // Colunas de cor e setor
+        colunaSetor.style.display = 'block';
+        colunaCor.style.display = 'none';
+        // Campos de filtro para cor e setor
+        colunaFiltroMontagem.style.display = 'block';
+        colunaFiltroPintura.style.display = 'none';
+
+    } else {
+        tituloSetor.innerHTML = '<i class="bi bi-brush me-1"></i>Setor: Pintura';
+        // Colunas de cor e setor
+        colunaSetor.style.display = 'none';
+        colunaCor.style.display = 'block';
+        // Campos de filtro para cor e setor
+        colunaFiltroMontagem.style.display = 'none';
+        colunaFiltroPintura.style.display = 'block';
+
+    }
+    
+    // Recarregar dados com o novo setor
+    carregarTabela(1);
+}
+
+function maquinasMontagm(){
+
+    fetch('/montagem/api/buscar-maquinas', {
+        method:'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+
+        const select = document.getElementById("filtro-setor-montagem");
+
+        // Limpa as opções existentes
+        select.innerHTML = "";
+
+        // Adiciona uma opção padrão
+        const defaultOption = document.createElement("option");
+        defaultOption.value = "";
+        defaultOption.textContent = "Todos os setores";
+        select.appendChild(defaultOption);
+
+        // Itera sobre os dados recebidos da API e cria opções no select
+        data.maquinas.forEach(maquina => {
+            const option = document.createElement("option");
+            option.value = maquina.id;
+            option.textContent = maquina.nome;
+            select.appendChild(option);
+        });
+
+    })
+    .catch(error => {
+        console.error(error)
+    });
+}
+
 //  Configuração inicial ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
     
+    maquinasMontagm();
     configurarBotaoVerPecas();
     salvarPecas();
+
+    btnSetorMontagem.addEventListener('change', alternarSetor);
+    btnSetorPintura.addEventListener('change', alternarSetor);
 
     // Ação do botão de filtro
     document.getElementById("filtro-form").addEventListener("submit", (event) => {
         event.preventDefault();
-        mostrarLoading(true);
-        carregarTabela(1);
+
+        // Desabilitar botão de filtro enquanto carrega
+        const btnFiltrar = event.target.querySelector('button[type="submit"]');
+        const btnTextOriginal = btnFiltrar.innerHTML;
+        btnFiltrar.disabled = true;
+        btnFiltrar.innerHTML = `
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Filtrando...
+        `;
+        
+        // Chamar função para carregar os dados
+        carregarTabela(1).finally(() => {
+            // Restaurar botão quando terminar (independente de sucesso ou erro)
+            btnFiltrar.disabled = false;
+            btnFiltrar.innerHTML = btnTextOriginal;
+        });
     });
 
     carregarTabela(1);
