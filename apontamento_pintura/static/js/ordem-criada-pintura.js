@@ -1,5 +1,3 @@
-// import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina.js';
-
 export const loadOrdens = (container, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -1511,6 +1509,41 @@ function filtro() {
     });
 }
 
+// Registra o listener apenas uma vez, fora da função abrirModalCambao
+const selectTipo = document.getElementById("tipoPintura");
+selectTipo.addEventListener("change", async () => {
+    const selectCambao = document.getElementById("cambaoSelecionado");
+    const tipoPintura = selectTipo.value;   
+
+    selectCambao.disabled = true;
+
+    // Atualiza o select para indicar carregamento
+    selectCambao.innerHTML = `<option value="">Carregando...</option>`;
+
+    // Buscar cambões disponíveis da API
+    try {
+        const response = await fetch(`api/cambao-livre/?tipo=${encodeURIComponent(tipoPintura)}`);
+        const data = await response.json();
+
+        if (data.cambao_livres.length > 0) {
+
+            selectCambao.disabled = false;
+
+            selectCambao.innerHTML = `<option value="">Selecione um cambão...</option>`;
+            data.cambao_livres.forEach(cambao => {
+                selectCambao.innerHTML += `<option value="${cambao.id}">Cambão ${cambao.nome}</option>`;
+            });
+        } else {
+            
+            selectCambao.innerHTML = `<option value="">Nenhum cambão disponível</option>`;
+        }
+    } catch (error) {
+        console.error("Erro ao buscar cambões:", error);
+        selectCambao.innerHTML = `<option value="">Erro ao carregar cambões</option>`;
+        Swal.close();
+    }
+});
+
 async function abrirModalCambao() {
     const checkboxes = document.querySelectorAll(".ordem-checkbox:checked");
     const tabelaCambao = document.getElementById("tabelaCambao");
@@ -1535,34 +1568,30 @@ async function abrirModalCambao() {
     tabelaCambao.innerHTML = ""; // Limpa a tabela antes de preencher
     selectCambao.innerHTML = `<option value="">Carregando...</option>`; // Carrega cambões
 
-    Swal.fire({
-        title: 'Carregando...',
-        text: 'Aguarde...',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
+    // const selectTipo = document.getElementById("tipoPintura");
 
-    // Buscar cambões disponíveis da API
-    try {
-        const response = await fetch("api/cambao-livre/");
-        const data = await response.json();
+    // selectTipo.addEventListener("change", async () => {
+    //     const tipoPintura = selectTipo.value;   
 
-        if (data.cambao_livres.length > 0) {
-            Swal.close();
-            selectCambao.innerHTML = `<option value="">Selecione um cambão...</option>`;
-            data.cambao_livres.forEach(cambao => {
-                selectCambao.innerHTML += `<option value="${cambao.id}">Cambão ${cambao.id}</option>`;
-            });
-        } else {
-            selectCambao.innerHTML = `<option value="">Nenhum cambão disponível</option>`;
-        }
-    } catch (error) {
-        console.error("Erro ao buscar cambões:", error);
-        selectCambao.innerHTML = `<option value="">Erro ao carregar cambões</option>`;
-        Swal.close();
-    }
+    //     // Buscar cambões disponíveis da API
+    //     try {
+    //         const response = await fetch(`api/cambao-livre/?tipo=${tipoPintura}`);
+    //         const data = await response.json();
+
+    //         if (data.cambao_livres.length > 0) {
+    //             selectCambao.innerHTML = `<option value="">Selecione um cambão...</option>`;
+    //             data.cambao_livres.forEach(cambao => {
+    //                 selectCambao.innerHTML += `<option value="${cambao.id}">Cambão ${cambao.id}</option>`;
+    //             });
+    //         } else {
+    //             selectCambao.innerHTML = `<option value="">Nenhum cambão disponível</option>`;
+    //         }
+    //     } catch (error) {
+    //         console.error("Erro ao buscar cambões:", error);
+    //         selectCambao.innerHTML = `<option value="">Erro ao carregar cambões</option>`;
+    //         Swal.close();
+    //     }
+    // });
 
     checkboxes.forEach(cb => {
         const linha = cb.closest("tr");
@@ -1810,7 +1839,7 @@ async function cambaoProcesso() {
             const corHex = colorMap[cor] || "#808080"; // Se não encontrar, usa cinza padrão
             const colDiv = document.createElement("div");
             colDiv.classList.add("col-md-4");
-            console.log(camboes);
+
             colDiv.innerHTML = `
                 <div class="card shadow-sm position-relative">
                     <div class="card-header text-white text-center" style="background-color: ${corHex};">
@@ -1820,8 +1849,8 @@ async function cambaoProcesso() {
                         ${camboes.map(cambao => `
                             <div class="border rounded p-2 mb-2">
                                 <div class="d-flex justify-content-between">
-                                    <strong>Cambão #${cambao.id}</strong> 
-                                    <span class="badge bg-warning">${cambao.tipo}</span>
+                                    <strong>Cambão #${cambao.nome}</strong> 
+                                    <span class="badge ${cambao.tipo === 'PÓ' ? 'bg-primary' : 'bg-secondary'}">${cambao.tipo}</span>
                                 </div>
                                 <span class="badge bg-dark text-light px-2 py-1 my-2" 
                                       id="contador-cambao-${cambao.id}" 

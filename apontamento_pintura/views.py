@@ -350,7 +350,9 @@ def finalizar_cambao(request):
 
 def cambao_livre(request):
 
-    cambao_livres = Cambao.objects.filter(status='livre')
+    tipo=request.GET.get('tipo')
+
+    cambao_livres = Cambao.objects.filter(status='livre', tipo=tipo)
 
     return JsonResponse({"cambao_livres": list(cambao_livres.values())})
 
@@ -396,7 +398,8 @@ def cambao_em_processo(request):
             "pecas": pecas,
             "data_pendura": cambao.pecas_no_cambao.first().data_pendura if pecas else None,
             "status": "pendurada",
-            "tipo": cambao.tipo
+            "tipo": cambao.tipo,
+            "nome": cambao.nome
             # "data_fim": cambao.data_fim
         })
 

@@ -1,5 +1,3 @@
-// import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina.js';
-
 export const loadOrdens = (container, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 

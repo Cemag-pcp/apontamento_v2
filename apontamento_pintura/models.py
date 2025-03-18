@@ -18,6 +18,14 @@ class PecasOrdem(models.Model):
         return f"{self.peca} - {self.qtd_boa}/{self.qtd_planejada}"
 
 class Cambao(models.Model):
+
+    """
+    Model para escolher cambão
+    Tipo PO so terá apenas 1 cambao
+    Tipo PU poderá ter mais de 1 cambão
+    """
+
+    nome = models.CharField(max_length=20)
     cor = models.CharField(max_length=20)
     status = models.CharField(max_length=20, default='livre')  # 'livre', 'em uso', 'finalizado'
     tipo = models.CharField(max_length=20)  # PÓ ou PU
