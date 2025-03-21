@@ -16,7 +16,7 @@ urlpatterns = [
     path('api/cores-carga/', views.listar_cores_carga, name='listar_cores_carga'),
     path('api/andamento-carga/', views.percentual_concluido_carga, name='percentual_concluido_carga'),
     path('api/andamento-ultimas-cargas/', views.andamento_ultimas_cargas, name='andamento_ultimas_cargas'),
-
+    path('ap/retrabalho-pintura/', views.retrabalho_pintura, name='retrabalho_pintura')
 ]
 
 # templates

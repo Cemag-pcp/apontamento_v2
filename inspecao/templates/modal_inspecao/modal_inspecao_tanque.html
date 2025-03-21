@@ -1,0 +1,451 @@
+<div class="modal fade" data-bs-backdrop="static" id="modal-inspecao-tanque" tabindex="-1" role="dialog"
+aria-labelledby="tubosModalLabel" style="overflow-y: auto;">
+<div class="modal-dialog" role="document">
+    <div class="modal-content">
+        <form>
+            <div class="modal-header">
+                <h5 class="modal-title" id="tubosModalTitle">Tanque</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="font-size: 14px; overflow-y: auto; max-height: 650px;">
+                <div class="row">
+                    <div class="col-sm-4 mb-4">
+                        <label class="label-modal">Data da Inspeção</label>
+                        <input type="datetime-local" class="form-control" id="data-inspecao-estanqueidade-tanque" required>
+                    </div>
+                    <div class="col-sm-4 mb-4">
+                        <label class="label-modal">Data da Carga</label>
+                        <input type="datetime-local" class="form-control" id="data-carga-estanqueidade-tanque" required>
+                    </div>
+                    <div class="col-sm-4 mb-4">
+                        <label class="label-modal">Inspetor</label>
+                        <select class="form-control" name="inspetores_estanqueidade_tanque" id="inspetores_estanqueidade_tanque" required>
+                            <option value="" hidden selected disabled></option>
+                            {% for inspetor in inspetores %}
+                                <option value="{{inspetor.id}}">{{inspetor.nome_usuario}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-sm-12 mb-4">
+                        <label class="label-modal">Código</label>
+                        <select class="form-control" name="produto-estanqueidade-tanque" id="produto-estanqueidade-tanque" required>
+                            <option value="" selected hidden disabled></option>
+                            {% for tanque in tanques %}
+                                <option value="{{tanque.peca}}">{{tanque.peca}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <label class="label-modal">Testes Tanque</label>
+                    </div>
+                    <div class="col-sm-12" id="col-parteInferior">
+                        <ul class="list-group">
+                            <li class="d-flex justify-content-between align-items-center list-group-item" id="buttonParteInferior" style="border-radius: 10px;" data-bs-toggle="collapse" href="#parteInferior" role="button" aria-expanded="false" aria-controls="parteInferior">
+                                <h6 class="m-0 font-weight-bold text-dark">Teste Corpo do tanque parte inferior</h6>
+                                <i class="fa-solid fa-plus"></i>
+                            </li>
+                        </ul>
+                        <div class="collapse" id="parteInferior">
+                            <div class="card card-body">
+                                <div class="row align-items-end">     
+                                    <div class="col-sm-6 mb-4">
+                                        <label class="label-modal">Pressão Inicial (bar)</label>
+                                        <input type="number" min="0" step=".01" class="form-control pressao-inicial-parte-inferior" id="pressao-inicial-parte-inferior" required> 
+                                    </div>
+                                    <div class="col-sm-6 mb-4">
+                                        <label class="label-modal">Duração do teste (Corpo do tanque)</label>
+                                        <input type="time" value="00:00" step="1" class="form-control duracao-parte-inferior" id="duracao-parte-inferior" required> 
+                                    </div>
+                                    <div class="col-6 mb-4">
+                                        <label class="label-modal">Pressão Final (bar)</label>
+                                        <input type="number" min="0" step=".01" class="form-control pressao-final-parte-inferior" id="pressao-final-parte-inferior" required> 
+                                    </div>
+                                    <div class="col-6 mb-4">
+                                        <label class="label-modal">Houve vazamento?</label>
+                                        <select class="form-control" name="vazamento-parte-inferior" id="vazamento-parte-inferior" required>
+                                            <option value="" selected hidden disabled></option>
+                                            <option value="Sim">Sim</option>
+                                            <option value="Não">Não</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12" id="col-corpoLongarina">
+                        <ul class="list-group">
+                            <li class="d-flex justify-content-between align-items-center list-group-item" id="buttonCorpoLongarina" style="border-radius: 10px;" data-bs-toggle="collapse" href="#corpoLongarina" role="button" aria-expanded="false" aria-controls="corpoLongarina">
+                                <h6 class="m-0 font-weight-bold text-dark">Teste Corpo do tanque + Longarinas</h6>
+                                <i class="fa-solid fa-plus"></i>
+                            </li>
+                        </ul>
+                        <div class="collapse" id="corpoLongarina">
+                            <div class="card card-body">
+                                <div class="row align-items-end">     
+                                    <div class="col-sm-6 mb-4">
+                                        <label class="label-modal">Pressão Inicial (bar)</label>
+                                        <input type="number" min="0" step=".01" class="form-control pressao-inicial-longarina" id="pressao-inicial-longarina" required> 
+                                    </div>
+                                    <div class="col-sm-6 mb-4">
+                                        <label class="label-modal">Duração do teste (Corpo do tanque)</label>
+                                        <input type="time" value="00:00" step="1" class="form-control duracao-longarina" id="duracao-longarina" required> 
+                                    </div>
+                                    <div class="col-6 mb-4">
+                                        <label class="label-modal">Pressão Final (bar)</label>
+                                        <input type="number" min="0" step=".01" class="form-control pressao-final-longarina" id="pressao-final-longarina" required> 
+                                    </div>
+                                    <div class="col-6 mb-4">
+                                        <label class="label-modal">Houve vazamento?</label>
+                                        <select class="form-control" name="vazamento-longarina" id="vazamento-longarina" required>
+                                            <option value="" selected hidden disabled></option>
+                                            <option value="Sim">Sim</option>
+                                            <option value="Não">Não</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12" id="col-corpoTanque">
+                        <ul class="list-group">
+                            <li class="d-flex justify-content-between align-items-center list-group-item" id="buttonCorpoTanque" style="border-radius: 10px;" data-bs-toggle="collapse" href="#corpoTanque" role="button" aria-expanded="false" aria-controls="corpoTanque">
+                                <h6 class="m-0 font-weight-bold text-dark">Teste Corpo do tanque</h6>
+                                <i class="fa-solid fa-plus"></i>
+                            </li>
+                        </ul>
+                        <div class="collapse" id="corpoTanque">
+                            <div class="card card-body">
+                                <div class="row align-items-end">     
+                                    <div class="col-sm-6 mb-4">
+                                        <label class="label-modal">Pressão Inicial (bar)</label>
+                                        <input type="number" min="0" step=".01" class="form-control pressao-inicial-corpo-tanque" id="pressao-inicial-corpo-tanque" required> 
+                                    </div>
+                                    <div class="col-sm-6 mb-4">
+                                        <label class="label-modal">Duração do teste (Corpo do tanque)</label>
+                                        <input type="time" value="00:00" step="1" class="form-control duracao-corpo-tanque" id="duracao-corpo-tanque" required> 
+                                    </div>
+                                    <div class="col-6 mb-4">
+                                        <label class="label-modal">Pressão Final (bar)</label>
+                                        <input type="number" min="0" step=".01" class="form-control pressao-final-corpo-tanque" id="pressao-final-corpo-tanque" required> 
+                                    </div>
+                                    <div class="col-6 mb-4">
+                                        <label class="label-modal">Houve vazamento?</label>
+                                        <select class="form-control" name="vazamento-corpo-tanque" id="vazamento-corpo-tanque" required>
+                                            <option value="" selected hidden disabled></option>
+                                            <option value="Sim">Sim</option>
+                                            <option value="Não">Não</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12" id="col-corpoChassi">
+                        <ul class="list-group">
+                            <li class="d-flex justify-content-between align-items-center list-group-item" id="buttonCorpoChassi" style="border-radius: 10px;" data-bs-toggle="collapse" href="#corpoChassi" role="button" aria-expanded="false" aria-controls="corpoChassi">
+                                <h6 class="m-0 font-weight-bold text-dark">Teste Corpo do tanque + Chassi</h6>
+                                <i class="fa-solid fa-plus"></i>
+                            </li>
+                        </ul>
+                        <div class="collapse" id="corpoChassi">
+                            <div class="card card-body">
+                                <div class="row align-items-end">     
+                                    <div class="col-sm-6 mb-4">
+                                        <label class="label-modal">Pressão Inicial (bar)</label>
+                                        <input type="number" min="0" step=".01" class="form-control pressao-inicial-corpo-chassi" id="pressao-inicial-corpo-chassi" required> 
+                                    </div>
+                                    <div class="col-sm-6 mb-4">
+                                        <label class="label-modal">Duração do teste (Corpo do tanque)</label>
+                                        <input type="time" value="00:00" step="1" class="form-control duracao-corpo-chassi" id="duracao-corpo-chassi" required> 
+                                    </div>
+                                    <div class="col-6 mb-4">
+                                        <label class="label-modal">Pressão Final (bar)</label>
+                                        <input type="number" min="0" step=".01" class="form-control pressao-final-corpo-chassi" id="pressao-final-corpo-chassi" required> 
+                                    </div>
+                                    <div class="col-6 mb-4">
+                                        <label class="label-modal">Houve vazamento?</label>
+                                        <select class="form-control" name="vazamento-corpo-chassi" id="vazamento-corpo-chassi" required>
+                                            <option value="" selected hidden disabled></option>
+                                            <option value="Sim">Sim</option>
+                                            <option value="Não">Não</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-dark" id="inspecionar-tanque" type="submit">
+                    <span id="spinner-tanque-estanqueidade" class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+                    <span id="status-button-tanque-estanqueidade" role="status">Inspecionar</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+
+<div class="modal fade" data-bs-backdrop="static" id="modal-reinspecao-tanque" tabindex="-1" role="dialog"
+    aria-labelledby="tubosModalLabel" style="overflow-y: auto;">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form id="reinspecaoFormTanque">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tubosModalTitle">Tanque</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4" style="font-size: 14px; overflow-y: auto; max-height: 650px;">
+                    <div class="row">
+                        <div class="col-sm-6 mb-4 d-none">
+                            <label>Id da Reinspeção</label>
+                            <input type="text" class="form-control" id="id_estanqueidade_tanque_reinspecao" disabled>
+                        </div>
+                        <div class="col-sm-6 mb-4">
+                            <label class="label-modal">Data da Inspeção</label>
+                            <input type="text" class="form-control" id="data_estanqueidade_tanque_reinspecao" disabled>
+                        </div>
+                        <div class="col-sm-6 mb-4">
+                            <label class="label-modal">Data da Carga</label>
+                            <input type="text" class="form-control" id="data-carga-estanqueidade-tanque-reinspecao" disabled>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-8 mb-4">
+                            <label class="label-modal">Código</label>
+                            <select class="form-control" name="produto-estanqueidade-tanque-reinspecao" id="produto-estanqueidade-tanque-reinspecao" disabled>
+                                <option value="" selected hidden disabled></option>
+                                {% for tanque in tanques %}
+                                    <option value="{{tanque.peca}}">{{tanque.peca}}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-sm-4 mb-4">
+                            <label class="label-modal">Inspetor</label>
+                            <select class="form-control" name="inspetores_estanqueidade_tanque" id="inspetores_estanqueidade_tanque_reinspecao">
+                                <option value="" hidden selected disabled></option>
+                                {% for inspetor in inspetores %}
+                                    <option value="{{inspetor.id}}">{{inspetor.nome_usuario}}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-12">
+                            <label class="label-modal">Testes Tanque</label>
+                        </div>
+                        <div class="col-sm-12" id="col-parteInferior-reinspecao">
+                            <ul class="list-group">
+                                <li class="d-flex justify-content-between list-group-item" id="button-corpo-do-tanque-parte-inferior-reinspecao" style="border-radius: 10px;" data-bs-toggle="collapse" href="#parteInferior-reinspecao" role="button" aria-expanded="false" aria-controls="parteInferior-reinspecao">
+                                    <h6 class="m-0 font-weight-bold text-dark">Teste Corpo do tanque parte inferior</h6>
+                                    <i class="fa-solid fa-plus"></i>
+                                </li>
+                            </ul>
+                            <div class="collapse" id="parteInferior-reinspecao">
+                                <div class="card card-body">
+                                    <div class="row align-items-end">   
+                                        <div class="col-sm-6 mb-4 d-none">
+                                            <label class="label-modal">Flag</label>
+                                            <input type="text" class="form-control" id="flag-corpo-do-tanque-parte-inferior-reinspecao"> 
+                                        </div>    
+                                        <div class="col-sm-6 mb-4">
+                                            <label class="label-modal">Pressão Inicial (bar)</label>
+                                            <input type="number" min="0" step=".01" class="form-control pressao-inicial-corpo-do-tanque-parte-inferior-reinspecao" id="pressao-inicial-corpo-do-tanque-parte-inferior-reinspecao" required> 
+                                        </div>
+                                        <div class="col-sm-6 mb-4">
+                                            <label class="label-modal">Duração do teste (Corpo do tanque)</label>
+                                            <input type="time" value="00:00" step="1" class="form-control duracao-corpo-do-tanque-parte-inferior-reinspecao" id="duracao-corpo-do-tanque-parte-inferior-reinspecao" required> 
+                                        </div>
+                                        <div class="col-6 mb-4">
+                                            <label class="label-modal">Pressão Final (bar)</label>
+                                            <input type="number" min="0" step=".01" class="form-control pressao-final-corpo-do-tanque-parte-inferior-reinspecao" id="pressao-final-corpo-do-tanque-parte-inferior-reinspecao" required> 
+                                        </div>
+                                        <div class="col-6 mb-4">
+                                            <label class="label-modal">Houve vazamento?</label>
+                                            <select class="form-control" name="vazamento-corpo-do-tanque-parte-inferior-reinspecao" id="vazamento-corpo-do-tanque-parte-inferior-reinspecao" required>
+                                                <option value="" selected hidden disabled></option>
+                                                <option value="Sim">Sim</option>
+                                                <option value="Não">Não</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-12" id="col-corpoLongarina-reinspecao">
+                            <ul class="list-group">
+                                <li class="d-flex justify-content-between list-group-item" id="button-corpo-do-tanque-+-longarinas-reinspecao" style="border-radius: 10px;" data-bs-toggle="collapse" href="#corpoLongarina-reinspecao" role="button" aria-expanded="false" aria-controls="corpoLongarina-reinspecao">
+                                    <h6 class="m-0 font-weight-bold text-dark">Teste Corpo do tanque + Longarinas</h6>
+                                    <i class="fa-solid fa-plus"></i>
+                                </li>
+                            </ul>
+                            <div class="collapse" id="corpoLongarina-reinspecao">
+                                <div class="card card-body">
+                                    <div class="row align-items-end"> 
+                                        <div class="col-sm-6 mb-4 d-none">
+                                            <label class="label-modal">Flag</label>
+                                            <input type="text" class="form-control" id="flag-corpo-do-tanque-+-longarinas-reinspecao"> 
+                                        </div>     
+                                        <div class="col-sm-6 mb-4">
+                                            <label class="label-modal">Pressão Inicial (bar)</label>
+                                            <input type="number" min="0" step=".01" class="form-control pressao-inicial-corpo-do-tanque-+-longarinas-reinspecao" id="pressao-inicial-corpo-do-tanque-+-longarinas-reinspecao" required> 
+                                        </div>
+                                        <div class="col-sm-6 mb-4">
+                                            <label class="label-modal">Duração do teste (Corpo do tanque)</label>
+                                            <input type="time" value="00:00" step="1" class="form-control duracao-corpo-do-tanque-+-longarinas-reinspecao" id="duracao-corpo-do-tanque-+-longarinas-reinspecao" required> 
+                                        </div>
+                                        <div class="col-6 mb-4">
+                                            <label class="label-modal">Pressão Final (bar)</label>
+                                            <input type="number" min="0" step=".01" class="form-control pressao-final-corpo-do-tanque-+-longarinas-reinspecao" id="pressao-final-corpo-do-tanque-+-longarinas-reinspecao" required> 
+                                        </div>
+                                        <div class="col-6 mb-4">
+                                            <label class="label-modal">Houve vazamento?</label>
+                                            <select class="form-control" name="vazamento-corpo-do-tanque-+-longarinas-reinspecao" id="vazamento-corpo-do-tanque-+-longarinas-reinspecao" required>
+                                                <option value="" selected hidden disabled></option>
+                                                <option value="Sim">Sim</option>
+                                                <option value="Não">Não</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-12" id="col-corpoTanque-reinspecao">
+                            <ul class="list-group">
+                                <li class="d-flex justify-content-between list-group-item" id="button-corpo-do-tanque-reinspecao" style="border-radius: 10px;" data-bs-toggle="collapse" href="#corpoTanque-reinspecao" role="button" aria-expanded="false" aria-controls="corpoTanque-reinspecao">
+                                    <h6 class="m-0 font-weight-bold text-dark">Teste Corpo do tanque</h6>
+                                    <i class="fa-solid fa-plus"></i>
+                                </li>
+                            </ul>
+                            <div class="collapse" id="corpoTanque-reinspecao">
+                                <div class="card card-body">
+                                    <div class="row align-items-end">     
+                                        <div class="col-sm-6 mb-4 d-none">
+                                            <label class="label-modal">Flag</label>
+                                            <input type="text" class="form-control" id="flag-corpo-do-tanque-reinspecao"> 
+                                        </div>     
+                                        <div class="col-sm-6 mb-4">
+                                            <label class="label-modal">Pressão Inicial (bar)</label>
+                                            <input type="number" min="0" step=".01" class="form-control pressao-inicial-corpo-do-tanque-reinspecao" id="pressao-inicial-corpo-do-tanque-reinspecao" required> 
+                                        </div>
+                                        <div class="col-sm-6 mb-4">
+                                            <label class="label-modal">Duração do teste (Corpo do tanque)</label>
+                                            <input type="time" value="00:00" step="1" class="form-control duracao-corpo-do-tanque-reinspecao" id="duracao-corpo-do-tanque-reinspecao" required> 
+                                        </div>
+                                        <div class="col-6 mb-4">
+                                            <label class="label-modal">Pressão Final (bar)</label>
+                                            <input type="number" min="0" step=".01" class="form-control pressao-final-corpo-do-tanque-reinspecao" id="pressao-final-corpo-do-tanque-reinspecao" required> 
+                                        </div>
+                                        <div class="col-6 mb-4">
+                                            <label class="label-modal">Houve vazamento?</label>
+                                            <select class="form-control" name="vazamento-corpo-do-tanque-reinspecao" id="vazamento-corpo-do-tanque-reinspecao" required>
+                                                <option value="" selected hidden disabled></option>
+                                                <option value="Sim">Sim</option>
+                                                <option value="Não">Não</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-12" id="col-corpoChassi-reinspecao">
+                            <ul class="list-group">
+                                <li class="d-flex justify-content-between list-group-item" id="button-corpo-do-tanque-+-chassi-reinspecao" style="border-radius: 10px;" data-bs-toggle="collapse" href="#corpoChassi-reinspecao" role="button" aria-expanded="false" aria-controls="corpoChassi-reinspecao">
+                                    <h6 class="m-0 font-weight-bold text-dark">Teste Corpo do tanque + Chassi</h6>
+                                    <i class="fa-solid fa-plus"></i>
+                                </li>
+                            </ul>
+                            <div class="collapse" id="corpoChassi-reinspecao">
+                                <div class="card card-body">
+                                    <div class="row align-items-end">
+                                        <div class="col-sm-6 mb-4 d-none">
+                                            <label class="label-modal">Flag</label>
+                                            <input type="text" class="form-control" id="flag-corpo-do-tanque-+-chassi-reinspecao"> 
+                                        </div>      
+                                        <div class="col-sm-6 mb-4">
+                                            <label class="label-modal">Pressão Inicial (bar)</label>
+                                            <input type="number" min="0" step=".01" class="form-control pressao-inicial-corpo-do-tanque-+-chassi-reinspecao" id="pressao-inicial-corpo-do-tanque-+-chassi-reinspecao" required> 
+                                        </div>
+                                        <div class="col-sm-6 mb-4">
+                                            <label class="label-modal">Duração do teste (Corpo do tanque)</label>
+                                            <input type="time" value="00:00" step="1" class="form-control duracao-corpo-do-tanque-+-chassi-reinspecao" id="duracao-corpo-do-tanque-+-chassi-reinspecao" required> 
+                                        </div>
+                                        <div class="col-6 mb-4">
+                                            <label class="label-modal">Pressão Final (bar)</label>
+                                            <input type="number" min="0" step=".01" class="form-control pressao-final-corpo-do-tanque-+-chassi-reinspecao" id="pressao-final-corpo-do-tanque-+-chassi-reinspecao" required> 
+                                        </div>
+                                        <div class="col-6 mb-4">
+                                            <label class="label-modal">Houve vazamento?</label>
+                                            <select class="form-control" name="vazamento-corpo-do-tanque-+-chassi-reinspecao" id="vazamento-corpo-do-tanque-+-chassi-reinspecao" required>
+                                                <option value="" selected hidden disabled></option>
+                                                <option value="Sim">Sim</option>
+                                                <option value="Não">Não</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-dark" id="reinspecionar-tanque" type="submit">
+                        <span id="spinner-tanque-estanqueidade-reinspecao" class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+                        <span id="status-button-tanque-estanqueidade-reinspecao" role="status">Inspecionar</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-historico-tanque" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-tanqueLabel">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="reinspecionar-tanqueLabel">Histórico de Tubos e Cilindros</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <section class="py-3">
+                <ul class="timeline">
+
+                </ul>
+              </section>
+        </div>
+      </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-causas-historico-tanque" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-tanqueLabel">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Causas tubos cilindros</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <section class="py-3">
+                <div id="causas-tanque">
+  
+                </div>
+            </section>
+        </div>
+      </div>
+    </div>
+</div>

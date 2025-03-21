@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Q 
+from django.db.models import Q, Prefetch, OuterRef, Subquery, Max
 from django.db import transaction
 from django.utils import timezone
 from cadastro.models import PecasEstanqueidade
@@ -17,11 +17,13 @@ from .models import (
     ReinspecaoEstanqueidade,
     DetalhesPressaoTanque,
     InfoAdicionaisExecTubosCilindros,
-    CausasEstanqueidadeTubosCilindros,
+    CausasNaoConformidadeEstanqueidade,
+    ArquivoCausaEstanqueidade,
 )
 from core.models import Profile, Maquina
 from datetime import datetime, timedelta
 from collections import defaultdict
+import json
 
 
 def inspecao_montagem(request):
@@ -438,7 +440,7 @@ def envio_inspecao_pintura(request):
             # Verifica se há não conformidade
             if int(nao_conformidade) > 0:
                 # Cria uma instância de Reinspecao
-                reinspecao = Reinspecao(inspecao=inspecao)
+                reinspecao = Reinspecao(inspecao=inspecao, reinspecionado=False)
                 reinspecao.save()
 
                 # Itera sobre todas as causas (causas_1, causas_2, etc.)
@@ -709,6 +711,8 @@ def get_itens_inspecionados_montagem(request):
         DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
     )
 
+    print(inspecionados_ids)
+
     # Captura os filtros aplicados pela URL
     maquinas_filtradas = (
         request.GET.get("maquinas", "").split(",")
@@ -906,7 +910,7 @@ def envio_inspecao_montagem(request):
             # Verifica se há não conformidade
             if int(nao_conformidade) > 0:
                 # Cria uma instância de Reinspecao
-                reinspecao = Reinspecao(inspecao=inspecao)
+                reinspecao = Reinspecao(inspecao=inspecao, reinspecionado=False)
                 reinspecao.save()
 
                 # Itera sobre todas as causas (causas_1, causas_2, etc.)
@@ -1004,7 +1008,26 @@ def inspecao_estamparia(request):
 
 
 def inspecao_tanque(request):
-    return render(request, "inspecao_tanque.html")
+
+    users = Profile.objects.filter(
+        tipo_acesso="inspetor", permissoes__nome="inspecao/tanque"
+    )
+
+    lista_inspetores = [
+        {"nome_usuario": user.user.username, "id": user.user.id} for user in users
+    ]
+
+    tanques = PecasEstanqueidade.objects.filter(tipo="tanque")
+
+    dict_tanques = [
+        {"peca": f"{tanque.codigo} - {tanque.descricao}"} for tanque in tanques
+    ]
+
+    return render(
+        request,
+        "inspecao_tanque.html",
+        {"tanques": dict_tanques, "inspetores": lista_inspetores},
+    )
 
 
 def inspecao_tubos_cilindros(request):
@@ -1050,12 +1073,7 @@ def get_itens_reinspecao_tubos_cilindros(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    reinspecao_ids = set(
-        ReinspecaoEstanqueidade.objects.filter(reinspecionado=False).values_list(
-            "inspecao", flat=True
-        )
-    )
-
+    # Filtros
     inspetores_filtrados = (
         request.GET.get("inspetores", "").split(",")
         if request.GET.get("inspetores")
@@ -1066,30 +1084,29 @@ def get_itens_reinspecao_tubos_cilindros(request):
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
 
-    datas = InspecaoEstanqueidade.objects.filter(id__in=reinspecao_ids)
+    # Consulta base
+    reinspecao_ids = ReinspecaoEstanqueidade.objects.filter(
+        reinspecionado=False
+    ).values_list("inspecao", flat=True)
+    datas = InspecaoEstanqueidade.objects.filter(
+        id__in=reinspecao_ids, peca__tipo__in=["tubo", "cilindro"]
+    )
 
-    quantidade_total = datas.count()
-
-    print(datas)
-
+    # Aplicar filtros
     if data_filtrada:
         datas = datas.filter(data_inspecao__date=data_filtrada)
-
     if pesquisa_filtrada:
         datas = datas.filter(
-            Q(peca__codigo__icontains=pesquisa_filtrada) | Q(peca__descricao__icontains=pesquisa_filtrada)
+            Q(peca__codigo__icontains=pesquisa_filtrada)
+            | Q(peca__descricao__icontains=pesquisa_filtrada)
         )
-    
-    print(datas)
-
     if inspetores_filtrados:
         datas = datas.filter(
             dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
         )
 
+    # Ordenação e paginação
     datas = datas.select_related("peca").order_by("-id")
-
-    # Paginação
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
@@ -1099,32 +1116,29 @@ def get_itens_reinspecao_tubos_cilindros(request):
             inspecao_estanqueidade__in=pagina_obj
         )
         .select_related("inspetor__user", "inspecao_estanqueidade__peca")
-        .prefetch_related("infoadicionaisexectuboscilindros_set")
+        .prefetch_related(
+            Prefetch("infoadicionaisexectuboscilindros_set", to_attr="info_adicionais")
+        )
     )
 
     # Cria um dicionário para mapear inspecao_id para seus dados de execução e informações adicionais
-    dados_execucao_dict = {}
-    for de in dados_execucao:
-        info_adicionais = (
-            de.infoadicionaisexectuboscilindros_set.first()
-        )  # Pega a primeira informação adicional (se existir)
-        dados_execucao_dict[de.inspecao_estanqueidade_id] = {
-            "dados_execucao": de,
-            "info_adicionais": info_adicionais,
-        }
+    dados_execucao_dict = {de.inspecao_estanqueidade_id: de for de in dados_execucao}
 
+    # Montagem dos dados
     dados = []
     for data in pagina_obj:
-        de_info = dados_execucao_dict.get(data.id)
-        if de_info:
-            de = de_info["dados_execucao"]
-            info_adicionais = de_info["info_adicionais"]
-
+        de = dados_execucao_dict.get(data.id)
+        if de:
+            info_adicionais = de.info_adicionais[0] if de.info_adicionais else None
             data_ajustada = de.data_exec - timedelta(hours=3)
             possui_nao_conformidade = (
-                info_adicionais.nao_conformidade
-                + info_adicionais.nao_conformidade_refugo
-                > 0
+                (
+                    info_adicionais.nao_conformidade
+                    + info_adicionais.nao_conformidade_refugo
+                    > 0
+                )
+                if info_adicionais
+                else False
             ) or de.num_execucao > 0
 
             item = {
@@ -1132,7 +1146,7 @@ def get_itens_reinspecao_tubos_cilindros(request):
                 "tipo_inspecao": data.peca.tipo,
                 "id_dados_execucao": de.id,
                 "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
+                "peca": f"{data.peca.codigo} - {data.peca.descricao}",
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
                 "nao_conformidade": (
@@ -1146,14 +1160,12 @@ def get_itens_reinspecao_tubos_cilindros(request):
                 ),
                 "observacao": info_adicionais.observacao if info_adicionais else None,
             }
-
             dados.append(item)
 
     return JsonResponse(
         {
             "dados": dados,
-            "total": quantidade_total,
-            "total_filtrado": paginador.count,  # Total de itens após filtro
+            "total": paginador.count,  # Total de itens após filtro
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
         },
@@ -1185,7 +1197,9 @@ def get_itens_inspecionados_tubos_cilindros(request):
     itens_por_pagina = 12  # Itens por página
 
     # Filtra os dados
-    datas = InspecaoEstanqueidade.objects.filter(id__in=inspecionados_ids)
+    datas = InspecaoEstanqueidade.objects.filter(id__in=inspecionados_ids).order_by(
+        "-id"
+    )
 
     quantidade_total = datas.count()
 
@@ -1193,38 +1207,57 @@ def get_itens_inspecionados_tubos_cilindros(request):
         datas = datas.filter(data_inspecao__date=data_filtrada)
 
     if pesquisa_filtrada:
-        datas = datas.filter(peca__codigo__icontains=pesquisa_filtrada)
+        if " - " in pesquisa_filtrada:
+            codigo, descricao = pesquisa_filtrada.split(" - ", 1)
+            codigo = codigo.strip()
+            descricao = descricao.strip()
+            datas = datas.filter(
+                Q(peca__codigo__icontains=codigo)
+                & Q(peca__descricao__icontains=descricao)
+            )
+        else:
+            datas = datas.filter(
+                Q(peca__codigo__icontains=pesquisa_filtrada)
+                | Q(peca__descricao__icontains=pesquisa_filtrada)
+            )
 
     if inspetores_filtrados:
         datas = datas.filter(
             dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
         )
 
-    datas = datas.select_related("peca").order_by("-id")
+    # Subconsulta para obter o maior num_execucao para cada inspecao_estanqueidade
+    maior_num_execucao_subquery = (
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(
+            inspecao_estanqueidade=OuterRef("inspecao_estanqueidade")
+        )
+        .values("inspecao_estanqueidade")
+        .annotate(max_num_execucao=Max("num_execucao"))
+        .values("max_num_execucao")
+    )
 
-    # Paginação
-    paginador = Paginator(datas, itens_por_pagina)
-    pagina_obj = paginador.get_page(pagina)
-
-    # Prefetch para otimizar a consulta dos dados de execução e informações adicionais
+    # Filtra os dados de execução para incluir apenas os registros com o maior num_execucao
     dados_execucao = (
         DadosExecucaoInspecaoEstanqueidade.objects.filter(
-            inspecao_estanqueidade__in=pagina_obj
+            inspecao_estanqueidade__in=datas,
+            num_execucao=Subquery(maior_num_execucao_subquery),
         )
         .select_related("inspetor__user", "inspecao_estanqueidade__peca")
         .prefetch_related("infoadicionaisexectuboscilindros_set")
     )
 
     # Cria um dicionário para mapear inspecao_id para seus dados de execução e informações adicionais
-    dados_execucao_dict = {}
-    for de in dados_execucao:
-        info_adicionais = (
-            de.infoadicionaisexectuboscilindros_set.first()
-        )  # Pega a primeira informação adicional (se existir)
-        dados_execucao_dict[de.inspecao_estanqueidade_id] = {
+    dados_execucao_dict = {
+        de.inspecao_estanqueidade_id: {
             "dados_execucao": de,
-            "info_adicionais": info_adicionais,
+            "info_adicionais": de.infoadicionaisexectuboscilindros_set.first(),
         }
+        for de in dados_execucao
+    }
+
+    # Paginação
+    paginador = Paginator(datas, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
 
     dados = []
     for data in pagina_obj:
@@ -1244,7 +1277,7 @@ def get_itens_inspecionados_tubos_cilindros(request):
                 "id": data.id,
                 "id_dados_execucao": de.id,
                 "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
+                "peca": f"{data.peca.codigo} - {data.peca.descricao}",
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
                 "nao_conformidade": (
@@ -1265,7 +1298,7 @@ def get_itens_inspecionados_tubos_cilindros(request):
         {
             "dados": dados,
             "total": quantidade_total,
-            "total_filtrado": paginador.count,  # Total de itens após filtro
+            "total_filtrado": paginador.count,
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
         },
@@ -1274,11 +1307,891 @@ def get_itens_inspecionados_tubos_cilindros(request):
 
 
 def envio_inspecao_tubos_cilindros(request):
+
     if request.method != "POST":
-        return JsonResponse({"error":"Método não permitido"}, status=405)
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
 
-    return JsonResponse({"success":"Data"}, status=200)
+    try:
+        with transaction.atomic():
+            # Dados básicos
+            print(request.POST)
+            data_inspecao = request.POST.get("data_inspecao")
+            inspetor_id = request.POST.get("inspetor")
+            peca = request.POST.get("peca")
+            quantidade_inspecionada = int(
+                request.POST.get("quantidade_inspecionada", 0)
+            )
+            nao_conformidade = int(request.POST.get("nao_conformidade", 0))
+            nao_conformidade_refugo = int(
+                request.POST.get("nao_conformidade_refugo", 0)
+            )
+            observacao = request.POST.get("observacao")
+            quantidade_total_causas = int(
+                request.POST.get("quantidade-total-causas", 0)
+            )
+            tipo_inspecao = request.POST.get("tipo_inspecao")  # "Cilindro" ou "Tubo"
+            conformidade = (
+                quantidade_inspecionada - nao_conformidade - nao_conformidade_refugo
+            )
+            nao_conformidade_total = nao_conformidade + nao_conformidade_refugo
+
+            # Convertendo a string para um objeto datetime
+            data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
+
+            codigo = peca.split(" - ", maxsplit=1)[0]
+            descricao = peca.split(" - ", maxsplit=1)[1]
+
+            peca_estanqueidade = PecasEstanqueidade.objects.filter(
+                codigo=codigo
+            ).first()
+
+            inspecao = InspecaoEstanqueidade(
+                data_inspecao=data_ajustada, peca=peca_estanqueidade
+            )
+            inspecao.save()
+
+            inspetor = Profile.objects.get(user__pk=inspetor_id)
+            dados_execucao = DadosExecucaoInspecaoEstanqueidade(
+                inspecao_estanqueidade=inspecao,
+                inspetor=inspetor,
+                data_exec=data_ajustada,
+            )
+            dados_execucao.save()
+
+            informacoes_tubos_cilindros = InfoAdicionaisExecTubosCilindros(
+                dados_exec_inspecao=dados_execucao,
+                nao_conformidade=nao_conformidade,
+                nao_conformidade_refugo=nao_conformidade_refugo,
+                qtd_inspecionada=quantidade_inspecionada,
+                observacao=observacao,
+            )
+            informacoes_tubos_cilindros.save()
+
+            # Verifica se há não conformidade
+            if int(nao_conformidade_total) > 0:
+                reinspecao = ReinspecaoEstanqueidade(inspecao=inspecao)
+                reinspecao.save()
+                # Itera sobre todas as causas (causas_1, causas_2, etc.)
+                for i in range(1, quantidade_total_causas + 1):
+                    causas = request.POST.getlist(f"causas_{i}")  # Lista de causas
+                    quantidade = request.POST.get(f"quantidade_{i}")
+                    imagens = request.FILES.getlist(f"imagens_{i}")  # Lista de arquivos
+
+                    # Obtém todas as causas de uma vez
+                    causas_objs = Causas.objects.filter(id__in=causas)
+                    causa_nao_conformidade = (
+                        CausasNaoConformidadeEstanqueidade.objects.create(
+                            info_tubos_cilindros=informacoes_tubos_cilindros,
+                            quantidade=int(quantidade),
+                        )
+                    )
+                    causa_nao_conformidade.causa.add(*causas_objs)
+
+                    # Itera sobre cada imagem
+                    for imagem in imagens:
+                        ArquivoCausaEstanqueidade.objects.create(
+                            causa_nao_conformidade=causa_nao_conformidade,
+                            arquivos=imagem,
+                        )
+
+        return JsonResponse({"success": True})
+
+    except Exception as e:
+        print(e)
+        return JsonResponse({"error": "Erro"}, status=400)
 
 
-def reteste_estanqueidade_tubos_cilindros(request):
-    return
+def envio_reinspecao_tubos_cilindros(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    try:
+        with transaction.atomic():
+            data_reinspecao = request.POST.get("data_reinspecao")
+            inspecao_id = request.POST.get("inspecao_id")
+            inspetor_id = request.POST.get("inspetor_reteste_estanqueidade")
+            reteste_status_estanqueidade = request.POST.get(
+                "reteste_status_estanqueidade"
+            )
+            nao_conformidade_tubo_retrabalho = int(
+                request.POST.get("nao-conformidade-tubo-retrabalho", 0)
+            )
+            nao_conformidade_tubo_refugo = int(
+                request.POST.get("nao-conformidade-tubo-refugo", 0)
+            )
+            nao_conformidade_cilindro = int(
+                request.POST.get("nao-conformidade-reinspecao-cilindro", 0)
+            )
+            tipo_inspecao_estanqueidade = request.POST.get(
+                "tipo_inspecao_estanqueidade"
+            )
+
+            quantidade_total_causas = int(
+                request.POST.get("quantidade-total-causas", 0)
+            )
+
+            quantidade_reinspecionada = int(
+                request.POST.get("quantidade_reinspecionada", 0)
+            )
+
+            observacao = request.POST.get("observacao_reteste_estanqueidade")
+
+            data_ajustada = timezone.make_aware(datetime.fromisoformat(data_reinspecao))
+
+            if (
+                tipo_inspecao_estanqueidade == "tubo"
+                and reteste_status_estanqueidade == "Não Conforme"
+            ):
+                nao_conformidade = int(nao_conformidade_tubo_retrabalho)
+            elif (
+                tipo_inspecao_estanqueidade == "cilindro"
+                and reteste_status_estanqueidade == "Não Conforme"
+            ):
+                nao_conformidade = int(nao_conformidade_cilindro)
+            else:
+                nao_conformidade = 0
+
+            # Obtém a inspeção e o inspetor
+            inspecao = InspecaoEstanqueidade.objects.get(id=inspecao_id)
+            inspetor = Profile.objects.get(user__pk=inspetor_id)
+
+            # Cria uma instância de DadosExecucaoInspecao
+            dados_execucao = DadosExecucaoInspecaoEstanqueidade(
+                inspecao_estanqueidade=inspecao,
+                inspetor=inspetor,
+                data_exec=data_ajustada,
+            )
+            dados_execucao.save()
+
+            informacoes_tubos_cilindros = InfoAdicionaisExecTubosCilindros(
+                dados_exec_inspecao=dados_execucao,
+                nao_conformidade=nao_conformidade,
+                nao_conformidade_refugo=nao_conformidade_tubo_refugo,
+                qtd_inspecionada=quantidade_reinspecionada,
+                observacao=observacao,
+            )
+            informacoes_tubos_cilindros.save()
+
+            # Verifica se há não conformidade
+            if reteste_status_estanqueidade == "Não Conforme":
+                # Itera sobre todas as causas (causas_1, causas_2, etc.)
+                for i in range(1, quantidade_total_causas + 1):
+                    causas = request.POST.getlist(
+                        f"causas_reinspecao_{i}"
+                    )  # Lista de causas
+                    quantidade = request.POST.get(f"quantidade_reinspecao_{i}")
+                    imagens = request.FILES.getlist(
+                        f"imagens_reinspecao_{i}"
+                    )  # Lista de arquivos
+
+                    # Obtém todas as causas de uma vez
+                    causas_objs = Causas.objects.filter(id__in=causas)
+                    causa_nao_conformidade = (
+                        CausasNaoConformidadeEstanqueidade.objects.create(
+                            info_tubos_cilindros=informacoes_tubos_cilindros,
+                            quantidade=quantidade,
+                        )
+                    )
+                    causa_nao_conformidade.causa.add(*causas_objs)
+
+                    # Itera sobre cada imagem
+                    for imagem in imagens:
+                        ArquivoCausaEstanqueidade.objects.create(
+                            causa_nao_conformidade=causa_nao_conformidade,
+                            arquivos=imagem,
+                        )
+            else:
+                reinspecao = ReinspecaoEstanqueidade.objects.filter(
+                    inspecao=inspecao
+                ).first()
+                reinspecao.reinspecionado = True
+                reinspecao.save()
+
+        return JsonResponse({"success": True})
+
+    except Exception as e:
+        print(e)
+        return JsonResponse({"error": "Erro"}, status=400)
+
+
+def get_historico_tubos_cilindros(request, id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    # Otimiza a consulta usando select_related e prefetch_related
+    dados = (
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(inspecao_estanqueidade__id=id)
+        .select_related("inspetor__user")
+        .prefetch_related(
+            Prefetch(
+                "infoadicionaisexectuboscilindros_set",
+                queryset=InfoAdicionaisExecTubosCilindros.objects.all(),
+            )
+        )
+        .order_by("-id")
+    )
+
+    # Usa list comprehension para construir a lista de histórico
+    list_history = []
+    for dado in dados:
+        info_adicional = dado.infoadicionaisexectuboscilindros_set.first()
+        list_history.append(
+            {
+                "id": dado.id,
+                "id_tubos_cilindros": info_adicional.id if info_adicional else None,
+                "data_execucao": (dado.data_exec - timedelta(hours=3)).strftime(
+                    "%d/%m/%Y %H:%M:%S"
+                ),
+                "num_execucao": dado.num_execucao,
+                "inspetor": dado.inspetor.user.username if dado.inspetor else None,
+                "nao_conformidade": (
+                    info_adicional.nao_conformidade if info_adicional else None
+                ),
+                "nao_conformidade_refugo": (
+                    info_adicional.nao_conformidade_refugo if info_adicional else None
+                ),
+                "qtd_inspecionada": (
+                    info_adicional.qtd_inspecionada if info_adicional else None
+                ),
+            }
+        )
+
+    return JsonResponse({"history": list_history}, status=200)
+
+
+def get_historico_causas_tubos_cilindros(request, id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    causas_nao_conformidade = CausasNaoConformidadeEstanqueidade.objects.filter(
+        info_tubos_cilindros__id=id
+    ).prefetch_related("causa", "arquivos_estanqueidade")
+
+    causas_dict = defaultdict(
+        lambda: {
+            "id_cnc": None,
+            "nomes": [],
+            "setor": None,
+            "quantidade": None,
+            "imagens": [],
+        }
+    )
+
+    print(causas_nao_conformidade)
+
+    for cnc in causas_nao_conformidade:
+        for causa in cnc.causa.all():
+            if causas_dict[cnc.id]["id_cnc"] is None:
+                causas_dict[cnc.id]["id_cnc"] = cnc.id
+                causas_dict[cnc.id]["setor"] = causa.setor
+                causas_dict[cnc.id]["quantidade"] = cnc.quantidade
+                causas_dict[cnc.id]["imagens"] = [
+                    {"id": arquivo.id, "url": arquivo.arquivos.url}
+                    for arquivo in cnc.arquivos_estanqueidade.all()
+                ]
+            causas_dict[cnc.id]["nomes"].append(causa.nome)
+
+    causas_list = list(causas_dict.values())
+
+    print(causas_list)
+
+    return JsonResponse({"causas": causas_list}, status=200)
+
+
+def envio_inspecao_tanque(request):
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    try:
+        with transaction.atomic():
+            tipo_inspecao = request.POST.get("tipo_inspecao")
+            data_inspecao = request.POST.get("data_inspecao")
+            data_carga = request.POST.get("data_carga")
+            inspetor = request.POST.get("inspetor")
+            produto = request.POST.get("produto")
+
+            # Capturar os dados dos testes (aninhados)
+            testes = {
+                "parte_inferior": {
+                    "pressao_inicial": request.POST.get(
+                        "testes[parte_inferior][pressao_inicial]"
+                    ),
+                    "duracao": request.POST.get("testes[parte_inferior][duracao]"),
+                    "pressao_final": request.POST.get(
+                        "testes[parte_inferior][pressao_final]"
+                    ),
+                    "vazamento": request.POST.get("testes[parte_inferior][vazamento]")
+                    == "true",
+                },
+                "corpo_longarina": {
+                    "pressao_inicial": request.POST.get(
+                        "testes[corpo_longarina][pressao_inicial]"
+                    ),
+                    "duracao": request.POST.get("testes[corpo_longarina][duracao]"),
+                    "pressao_final": request.POST.get(
+                        "testes[corpo_longarina][pressao_final]"
+                    ),
+                    "vazamento": request.POST.get("testes[corpo_longarina][vazamento]")
+                    == "true",
+                },
+                "corpo_tanque": {
+                    "pressao_inicial": request.POST.get(
+                        "testes[corpo_tanque][pressao_inicial]"
+                    ),
+                    "duracao": request.POST.get("testes[corpo_tanque][duracao]"),
+                    "pressao_final": request.POST.get(
+                        "testes[corpo_tanque][pressao_final]"
+                    ),
+                    "vazamento": request.POST.get("testes[corpo_tanque][vazamento]")
+                    == "true",
+                },
+                "corpo_chassi": {
+                    "pressao_inicial": request.POST.get(
+                        "testes[corpo_chassi][pressao_inicial]"
+                    ),
+                    "duracao": request.POST.get("testes[corpo_chassi][duracao]"),
+                    "pressao_final": request.POST.get(
+                        "testes[corpo_chassi][pressao_final]"
+                    ),
+                    "vazamento": request.POST.get("testes[corpo_chassi][vazamento]")
+                    == "true",
+                },
+            }
+
+            # Exibir os dados no console para depuração
+            print("Tipo de Inspeção:", tipo_inspecao)
+            print("Data da Inspeção:", data_inspecao)
+            print("Data de Carga:", data_carga)
+            print("Inspetor:", inspetor)
+            print("Produto:", produto)
+            print("Testes:", json.dumps(testes, indent=4))
+
+            data_inspecao_ajustada = timezone.make_aware(
+                datetime.fromisoformat(data_inspecao)
+            )
+            data_carga_ajustada = timezone.make_aware(
+                datetime.fromisoformat(data_carga)
+            )
+
+            codigo = produto.split(" - ", maxsplit=1)[0]
+            descricao = produto.split(" - ", maxsplit=1)[1]
+
+            peca_estanqueidade = PecasEstanqueidade.objects.filter(
+                codigo=codigo
+            ).first()
+
+            inspecao = InspecaoEstanqueidade(
+                data_inspecao=data_inspecao_ajustada,
+                peca=peca_estanqueidade,
+                data_carga=data_carga_ajustada,
+            )
+            inspecao.save()
+
+            inspetor = Profile.objects.get(user__pk=inspetor)
+            dados_execucao = DadosExecucaoInspecaoEstanqueidade(
+                inspecao_estanqueidade=inspecao,
+                inspetor=inspetor,
+                data_exec=data_inspecao_ajustada,
+            )
+            dados_execucao.save()
+
+            if "6500" in descricao or "4300" in descricao:
+                detalhes_parte_inferior = DetalhesPressaoTanque(
+                    dados_exec_inspecao=dados_execucao,
+                    pressao_inicial=testes["parte_inferior"]["pressao_inicial"],
+                    pressao_final=testes["parte_inferior"]["pressao_final"],
+                    nao_conformidade=testes["parte_inferior"]["vazamento"],
+                    tipo_teste="ctpi",
+                    tempo_execucao=testes["parte_inferior"]["duracao"],
+                )
+                detalhes_parte_inferior.save()
+
+                detalhes_corpo_longarina = DetalhesPressaoTanque(
+                    dados_exec_inspecao=dados_execucao,
+                    pressao_inicial=testes["corpo_longarina"]["pressao_inicial"],
+                    pressao_final=testes["corpo_longarina"]["pressao_final"],
+                    nao_conformidade=testes["corpo_longarina"]["vazamento"],
+                    tipo_teste="ctl",
+                    tempo_execucao=testes["corpo_longarina"]["duracao"],
+                )
+                detalhes_corpo_longarina.save()
+            else:
+                detalhes_corpo_tanque = DetalhesPressaoTanque(
+                    dados_exec_inspecao=dados_execucao,
+                    pressao_inicial=testes["corpo_tanque"]["pressao_inicial"],
+                    pressao_final=testes["corpo_tanque"]["pressao_final"],
+                    nao_conformidade=testes["corpo_tanque"]["vazamento"],
+                    tipo_teste="ct",
+                    tempo_execucao=testes["corpo_tanque"]["duracao"],
+                )
+                detalhes_corpo_tanque.save()
+
+                detalhes_corpo_chassi = DetalhesPressaoTanque(
+                    dados_exec_inspecao=dados_execucao,
+                    pressao_inicial=testes["corpo_chassi"]["pressao_inicial"],
+                    pressao_final=testes["corpo_chassi"]["pressao_final"],
+                    nao_conformidade=testes["corpo_chassi"]["vazamento"],
+                    tipo_teste="ctc",
+                    tempo_execucao=testes["corpo_chassi"]["duracao"],
+                )
+                detalhes_corpo_chassi.save()
+
+            if any(
+                [
+                    testes["parte_inferior"]["vazamento"],
+                    testes["corpo_longarina"]["vazamento"],
+                    testes["corpo_tanque"]["vazamento"],
+                    testes["corpo_chassi"]["vazamento"],
+                ]
+            ):
+
+                reinspecao_parte_inferior = ReinspecaoEstanqueidade(
+                    inspecao=inspecao, data_reinsp=data_inspecao_ajustada
+                )
+                reinspecao_parte_inferior.save()
+
+        return JsonResponse({"success": True})
+
+    except Exception as e:
+        print(e)
+        return JsonResponse({"error": "Erro"}, status=400)
+
+
+def envio_inspecao_tanque(request):
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    try:
+        with transaction.atomic():
+            tipo_inspecao = request.POST.get("tipo_inspecao")
+            data_inspecao = request.POST.get("data_inspecao")
+            data_carga = request.POST.get("data_carga")
+            inspetor = request.POST.get("inspetor")
+            produto = request.POST.get("produto")
+
+            # Capturar os dados dos testes (aninhados)
+            testes = {
+                "parte_inferior": {
+                    "pressao_inicial": request.POST.get(
+                        "testes[parte_inferior][pressao_inicial]"
+                    ),
+                    "duracao": request.POST.get("testes[parte_inferior][duracao]"),
+                    "pressao_final": request.POST.get(
+                        "testes[parte_inferior][pressao_final]"
+                    ),
+                    "vazamento": request.POST.get("testes[parte_inferior][vazamento]")
+                    == "true",
+                },
+                "corpo_longarina": {
+                    "pressao_inicial": request.POST.get(
+                        "testes[corpo_longarina][pressao_inicial]"
+                    ),
+                    "duracao": request.POST.get("testes[corpo_longarina][duracao]"),
+                    "pressao_final": request.POST.get(
+                        "testes[corpo_longarina][pressao_final]"
+                    ),
+                    "vazamento": request.POST.get("testes[corpo_longarina][vazamento]")
+                    == "true",
+                },
+                "corpo_tanque": {
+                    "pressao_inicial": request.POST.get(
+                        "testes[corpo_tanque][pressao_inicial]"
+                    ),
+                    "duracao": request.POST.get("testes[corpo_tanque][duracao]"),
+                    "pressao_final": request.POST.get(
+                        "testes[corpo_tanque][pressao_final]"
+                    ),
+                    "vazamento": request.POST.get("testes[corpo_tanque][vazamento]")
+                    == "true",
+                },
+                "corpo_chassi": {
+                    "pressao_inicial": request.POST.get(
+                        "testes[corpo_chassi][pressao_inicial]"
+                    ),
+                    "duracao": request.POST.get("testes[corpo_chassi][duracao]"),
+                    "pressao_final": request.POST.get(
+                        "testes[corpo_chassi][pressao_final]"
+                    ),
+                    "vazamento": request.POST.get("testes[corpo_chassi][vazamento]")
+                    == "true",
+                },
+            }
+
+            # Exibir os dados no console para depuração
+            print("Tipo de Inspeção:", tipo_inspecao)
+            print("Data da Inspeção:", data_inspecao)
+            print("Data de Carga:", data_carga)
+            print("Inspetor:", inspetor)
+            print("Produto:", produto)
+            print("Testes:", json.dumps(testes, indent=4))
+
+            data_inspecao_ajustada = timezone.make_aware(
+                datetime.fromisoformat(data_inspecao)
+            )
+            data_carga_ajustada = timezone.make_aware(
+                datetime.fromisoformat(data_carga)
+            )
+
+            codigo = produto.split(" - ", maxsplit=1)[0]
+            descricao = produto.split(" - ", maxsplit=1)[1]
+
+            peca_estanqueidade = PecasEstanqueidade.objects.filter(
+                codigo=codigo
+            ).first()
+
+            inspecao = InspecaoEstanqueidade(
+                data_inspecao=data_inspecao_ajustada,
+                peca=peca_estanqueidade,
+                data_carga=data_carga_ajustada,
+            )
+            inspecao.save()
+
+            inspetor = Profile.objects.get(user__pk=inspetor)
+            dados_execucao = DadosExecucaoInspecaoEstanqueidade(
+                inspecao_estanqueidade=inspecao,
+                inspetor=inspetor,
+                data_exec=data_inspecao_ajustada,
+            )
+            dados_execucao.save()
+
+            if "6500" in descricao or "4300" in descricao:
+                detalhes_parte_inferior = DetalhesPressaoTanque(
+                    dados_exec_inspecao=dados_execucao,
+                    pressao_inicial=testes["parte_inferior"]["pressao_inicial"],
+                    pressao_final=testes["parte_inferior"]["pressao_final"],
+                    nao_conformidade=testes["parte_inferior"]["vazamento"],
+                    tipo_teste="ctpi",
+                    tempo_execucao=testes["parte_inferior"]["duracao"],
+                )
+                detalhes_parte_inferior.save()
+
+                detalhes_corpo_longarina = DetalhesPressaoTanque(
+                    dados_exec_inspecao=dados_execucao,
+                    pressao_inicial=testes["corpo_longarina"]["pressao_inicial"],
+                    pressao_final=testes["corpo_longarina"]["pressao_final"],
+                    nao_conformidade=testes["corpo_longarina"]["vazamento"],
+                    tipo_teste="ctl",
+                    tempo_execucao=testes["corpo_longarina"]["duracao"],
+                )
+                detalhes_corpo_longarina.save()
+            else:
+                detalhes_corpo_tanque = DetalhesPressaoTanque(
+                    dados_exec_inspecao=dados_execucao,
+                    pressao_inicial=testes["corpo_tanque"]["pressao_inicial"],
+                    pressao_final=testes["corpo_tanque"]["pressao_final"],
+                    nao_conformidade=testes["corpo_tanque"]["vazamento"],
+                    tipo_teste="ct",
+                    tempo_execucao=testes["corpo_tanque"]["duracao"],
+                )
+                detalhes_corpo_tanque.save()
+
+                detalhes_corpo_chassi = DetalhesPressaoTanque(
+                    dados_exec_inspecao=dados_execucao,
+                    pressao_inicial=testes["corpo_chassi"]["pressao_inicial"],
+                    pressao_final=testes["corpo_chassi"]["pressao_final"],
+                    nao_conformidade=testes["corpo_chassi"]["vazamento"],
+                    tipo_teste="ctc",
+                    tempo_execucao=testes["corpo_chassi"]["duracao"],
+                )
+                detalhes_corpo_chassi.save()
+
+            if any(
+                [
+                    testes["parte_inferior"]["vazamento"],
+                    testes["corpo_longarina"]["vazamento"],
+                    testes["corpo_tanque"]["vazamento"],
+                    testes["corpo_chassi"]["vazamento"],
+                ]
+            ):
+
+                reinspecao_parte_inferior = ReinspecaoEstanqueidade(
+                    inspecao=inspecao, data_reinsp=data_inspecao_ajustada
+                )
+                reinspecao_parte_inferior.save()
+
+        return JsonResponse({"success": True})
+
+    except Exception as e:
+        print(e)
+        return JsonResponse({"error": "Erro"}, status=400)
+
+
+def get_itens_reinspecao_tanque(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    reinspecao_ids = set(
+        ReinspecaoEstanqueidade.objects.filter(reinspecionado=False).values_list(
+            "inspecao", flat=True
+        )
+    )
+
+    inspetores_filtrados = (
+        request.GET.get("inspetores", "").split(",")
+        if request.GET.get("inspetores")
+        else []
+    )
+    data_filtrada = request.GET.get("data", None)
+    pesquisa_filtrada = request.GET.get("pesquisar", None)
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 12  # Itens por página
+
+    datas = InspecaoEstanqueidade.objects.filter(
+        id__in=reinspecao_ids, peca__tipo="tanque"
+    )
+
+    quantidade_total = datas.count()
+
+    if data_filtrada:
+        datas = datas.filter(data_inspecao__date=data_filtrada)
+
+    if pesquisa_filtrada:
+        datas = datas.filter(
+            Q(peca__codigo__icontains=pesquisa_filtrada)
+            | Q(peca__descricao__icontains=pesquisa_filtrada)
+        )
+
+    if inspetores_filtrados:
+        datas = datas.filter(
+            dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
+        )
+
+    datas = datas.select_related("peca").order_by("-id")
+
+    # Paginação
+    paginador = Paginator(datas, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
+
+    # Prefetch para otimizar a consulta dos dados de execução e informações adicionais
+    dados_execucao = (
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(
+            inspecao_estanqueidade__in=pagina_obj
+        )
+        .select_related("inspetor__user", "inspecao_estanqueidade__peca")
+        .prefetch_related("detalhespressaotanque_set")
+    )
+
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução e informações adicionais
+    dados_execucao_dict = {}
+    for de in dados_execucao:
+        info_adicionais = list(
+            de.detalhespressaotanque_set.all()
+        )  # Pega todas as informações adicionais
+        dados_execucao_dict[de.inspecao_estanqueidade_id] = {
+            "dados_execucao": de,
+            "info_adicionais": info_adicionais,
+        }
+
+    dados = []
+    for data in pagina_obj:
+        de_info = dados_execucao_dict.get(data.id)
+        if de_info:
+            de = de_info["dados_execucao"]
+            info_adicionais_list = de_info["info_adicionais"]
+
+            data_ajustada = de.data_exec - timedelta(hours=3)
+            data_carga_ajustada = data.data_carga - timedelta(hours=3)
+
+            possui_nao_conformidade = any(
+                info.nao_conformidade for info in info_adicionais_list
+            )
+
+            # Inicializa os campos para as duas informações adicionais
+            pressao_inicial_1 = None
+            pressao_final_1 = None
+            tipo_teste_1 = None
+            tempo_execucao_1 = None
+            nao_conformidade_1 = None
+            pressao_inicial_2 = None
+            pressao_final_2 = None
+            tipo_teste_2 = None
+            tempo_execucao_2 = None
+            nao_conformidade_2 = None
+
+            # Preenche os campos com as informações adicionais
+            if len(info_adicionais_list) > 0:
+                pressao_inicial_1 = info_adicionais_list[0].pressao_inicial
+                pressao_final_1 = info_adicionais_list[0].pressao_final
+                tipo_teste_1 = info_adicionais_list[0].tipo_teste
+                nao_conformidade_1 = info_adicionais_list[0].nao_conformidade
+                tempo_execucao_1 = (
+                    info_adicionais_list[0].tempo_execucao.strftime("%H:%M:%S")
+                    if info_adicionais_list[0].tempo_execucao
+                    else None
+                )
+
+            if len(info_adicionais_list) > 1:
+                pressao_inicial_2 = info_adicionais_list[1].pressao_inicial
+                pressao_final_2 = info_adicionais_list[1].pressao_final
+                tipo_teste_2 = info_adicionais_list[1].tipo_teste
+                nao_conformidade_2 = info_adicionais_list[1].nao_conformidade
+                tempo_execucao_2 = (
+                    info_adicionais_list[1].tempo_execucao.strftime("%H:%M:%S")
+                    if info_adicionais_list[1].tempo_execucao
+                    else None
+                )
+
+            item = {
+                "id": data.id,
+                "tipo_inspecao": data.peca.tipo,
+                "id_dados_execucao": de.id,
+                "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                "data_carga": data_carga_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
+                "inspetor": de.inspetor.user.username if de.inspetor else None,
+                "possui_nao_conformidade": possui_nao_conformidade,
+                "pressao_inicial_1": pressao_inicial_1,
+                "pressao_final_1": pressao_final_1,
+                "tipo_teste_1": tipo_teste_1,
+                "nao_conformidade_1": nao_conformidade_1,
+                "tempo_execucao_1": tempo_execucao_1,
+                "pressao_inicial_2": pressao_inicial_2,
+                "pressao_final_2": pressao_final_2,
+                "tipo_teste_2": tipo_teste_2,
+                "tempo_execucao_2": tempo_execucao_2,
+                "nao_conformidade_2": nao_conformidade_2,
+            }
+
+            dados.append(item)
+
+    return JsonResponse(
+        {
+            "dados": dados,
+            "total": quantidade_total,
+            "total_filtrado": paginador.count,  # Total de itens após filtro
+            "pagina_atual": pagina_obj.number,
+            "total_paginas": paginador.num_pages,
+        },
+        status=200,
+    )
+
+
+def get_itens_inspecionados_tanque(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    # Filtra apenas peças do tipo "tubo" ou "cilindro"
+    pecas_filtradas = PecasEstanqueidade.objects.filter(tipo="tanque")
+    inspecionados_ids = set(
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(
+            inspecao_estanqueidade__peca__in=pecas_filtradas
+        ).values_list("inspecao_estanqueidade", flat=True)
+    )
+
+    # Filtros
+    inspetores_filtrados = (
+        request.GET.get("inspetores", "").split(",")
+        if request.GET.get("inspetores")
+        else []
+    )
+    data_filtrada = request.GET.get("data", None)
+    pesquisa_filtrada = request.GET.get("pesquisar", None)
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 12  # Itens por página
+
+    # Filtra os dados
+    datas = InspecaoEstanqueidade.objects.filter(id__in=inspecionados_ids).order_by(
+        "-id"
+    )
+
+    quantidade_total = datas.count()
+
+    if data_filtrada:
+        datas = datas.filter(data_inspecao__date=data_filtrada)
+
+    if pesquisa_filtrada:
+        datas = datas.filter(
+            Q(peca__codigo__icontains=pesquisa_filtrada)
+            | Q(peca__descricao__icontains=pesquisa_filtrada)
+        )
+
+    if inspetores_filtrados:
+        datas = datas.filter(
+            dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
+        )
+
+    datas = datas.select_related("peca").order_by("-id")
+
+    # Paginação
+    paginador = Paginator(datas, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
+
+    # Prefetch para otimizar a consulta dos dados de execução e informações adicionais
+    dados_execucao = (
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(
+            inspecao_estanqueidade__in=pagina_obj
+        )
+        .select_related("inspetor__user", "inspecao_estanqueidade__peca")
+        .prefetch_related("detalhespressaotanque_set")
+    )
+
+    # Subconsulta para obter o maior num_execucao para cada inspecao_estanqueidade
+    maior_num_execucao_subquery = (
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(
+            inspecao_estanqueidade=OuterRef("inspecao_estanqueidade")
+        )
+        .values("inspecao_estanqueidade")
+        .annotate(max_num_execucao=Max("num_execucao"))
+        .values("max_num_execucao")
+    )
+
+    # Filtra os dados de execução para incluir apenas os registros com o maior num_execucao
+    dados_execucao = (
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(
+            inspecao_estanqueidade__in=datas,
+            num_execucao=Subquery(maior_num_execucao_subquery),
+        )
+        .select_related("inspetor__user", "inspecao_estanqueidade__peca")
+        .prefetch_related("infoadicionaisexectuboscilindros_set")
+    )
+
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução e informações adicionais
+    dados_execucao_dict = {}
+    for de in dados_execucao:
+        info_adicionais = list(
+            de.detalhespressaotanque_set.all()
+        )  # Pega todas as informações adicionais
+        dados_execucao_dict[de.inspecao_estanqueidade_id] = {
+            "dados_execucao": de,
+            "info_adicionais": info_adicionais,
+        }
+
+    dados = []
+    for data in pagina_obj:
+        de_info = dados_execucao_dict.get(data.id)
+        if de_info:
+            de = de_info["dados_execucao"]
+            info_adicionais_list = de_info["info_adicionais"]
+
+            data_ajustada = de.data_exec - timedelta(hours=3)
+            data_carga_ajustada = data.data_carga - timedelta(hours=3)
+
+            possui_nao_conformidade = any(
+                info.nao_conformidade for info in info_adicionais_list
+            )
+
+            item = {
+                "id": data.id,
+                "tipo_inspecao": data.peca.tipo,
+                "id_dados_execucao": de.id,
+                "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                "data_carga": data_carga_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
+                "inspetor": de.inspetor.user.username if de.inspetor else None,
+                "possui_nao_conformidade": possui_nao_conformidade,
+            }
+
+            dados.append(item)
+
+    return JsonResponse(
+        {
+            "dados": dados,
+            "total": quantidade_total,
+            "total_filtrado": paginador.count,  # Total de itens após filtro
+            "pagina_atual": pagina_obj.number,
+            "total_paginas": paginador.num_pages,
+        },
+        status=200,
+    )

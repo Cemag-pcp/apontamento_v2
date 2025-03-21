@@ -444,3 +444,7 @@ def andamento_ultimas_cargas(request):
         })
 
     return JsonResponse({"andamento_cargas": andamento_cargas})
+
+def retrabalho_pintura(request):
+    
+    return JsonResponse({"error":""})
