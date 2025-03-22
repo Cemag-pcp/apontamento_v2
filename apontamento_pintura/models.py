@@ -39,7 +39,13 @@ class CambaoPecas(models.Model):
         return f"{self.peca_ordem.peca} - {self.quantidade_pendurada}"
 
 class Retrabalho(models.Model):
+    TIPO_CHOICES = (
+        ("a retrabalhar", "A Retrabalhar"),
+        ("em processo", "Em processo"),
+        ("finalizado", "Finalizado"),
+    )
+
     reinspecao = models.ForeignKey(Reinspecao, on_delete=models.CASCADE, null=False, blank=False)
-    data_inicio = models.DateTimeField(auto_now_add=True)
+    data_inicio = models.DateTimeField(null=True, blank=True)
     data_fim = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=20, null=False, blank=False)
+    status = models.CharField(max_length=20,choices=TIPO_CHOICES, null=False, blank=False)

@@ -5,6 +5,7 @@ from django.db.models import Q, Prefetch, OuterRef, Subquery, Max
 from django.db import transaction
 from django.utils import timezone
 from cadastro.models import PecasEstanqueidade
+from apontamento_pintura.models import Retrabalho
 from .models import (
     Inspecao,
     DadosExecucaoInspecao,
@@ -156,9 +157,9 @@ def get_itens_reinspecao_pintura(request):
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
     reinspecao_ids = set(
-        Reinspecao.objects.filter(reinspecionado=False).values_list(
-            "inspecao", flat=True
-        )
+        Reinspecao.objects.filter(
+            reinspecionado=False  # Mantém o filtro original
+        ).values_list("inspecao", flat=True)
     )
 
     # Captura os filtros enviados pela URL
@@ -211,6 +212,13 @@ def get_itens_reinspecao_pintura(request):
     for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
 
+        status_reinspecao = (
+            Retrabalho.objects.filter(reinspecao__inspecao=data)
+            .values_list("status", flat=True)
+            .first()
+        )
+        print(status_reinspecao )
+
         item = {
             "id": data.id,
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
@@ -226,6 +234,7 @@ def get_itens_reinspecao_pintura(request):
             "inspetor": DadosExecucaoInspecao.objects.filter(inspecao=data)
             .values_list("inspetor__user__username", flat=True)
             .last(),
+            "status_reinspecao": status_reinspecao,
         }
 
         dados.append(item)
@@ -442,6 +451,9 @@ def envio_inspecao_pintura(request):
                 # Cria uma instância de Reinspecao
                 reinspecao = Reinspecao(inspecao=inspecao, reinspecionado=False)
                 reinspecao.save()
+
+                retrabalho = Retrabalho(reinspecao=reinspecao, status="a retrabalhar")
+                retrabalho.save()
 
                 # Itera sobre todas as causas (causas_1, causas_2, etc.)
                 for i in range(1, quantidade_total_causas + 1):

@@ -118,7 +118,9 @@ function buscarItensReinspecao(pagina) {
 
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
+        
         items.dados.forEach(item => {
+            console.log(item.status_reinspecao)
             let borderColors = {
                 "Laranja": "orange", "Verde": "green",
                 "Vermelho": "red", "Azul": "blue",
@@ -141,16 +143,18 @@ function buscarItensReinspecao(pagina) {
                         <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
                     </p>
                     <hr>
-                    <button 
-                        data-id="${item.id}"
-                        data-data="${item.data}"
-                        data-tipo="${item.tipo}"
-                        data-nao-conformidade="${item.nao_conformidade}"
-                        data-conformidade="${item.conformidade}"
-                        data-cor="${item.cor}"
-                        data-peca="${item.peca}"
-                    class="btn btn-dark w-100 iniciar-reinspecao">
-                    Iniciar Reinspeção</button>
+                    ${item.status_reinspecao !== "finalizado" 
+                        ? '<p class="text-center text-muted">Aguardando Retrabalho da Pintura</p>' 
+                        : `<button 
+                            data-id="${item.id}"
+                            data-data="${item.data}"
+                            data-tipo="${item.tipo}"
+                            data-nao-conformidade="${item.nao_conformidade}"
+                            data-conformidade="${item.conformidade}"
+                            data-cor="${item.cor}"
+                            data-peca="${item.peca}"
+                            class="btn btn-dark w-100 iniciar-reinspecao">
+                            Iniciar Reinspeção</button>`}
                 </div>
             </div>`;
 

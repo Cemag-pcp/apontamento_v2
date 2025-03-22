@@ -16,10 +16,18 @@ urlpatterns = [
     path('api/cores-carga/', views.listar_cores_carga, name='listar_cores_carga'),
     path('api/andamento-carga/', views.percentual_concluido_carga, name='percentual_concluido_carga'),
     path('api/andamento-ultimas-cargas/', views.andamento_ultimas_cargas, name='andamento_ultimas_cargas'),
-    path('ap/retrabalho-pintura/', views.retrabalho_pintura, name='retrabalho_pintura')
+
+    path('api/itens-retrabalho-pintura/', views.get_itens_retrabalho_pintura, name='itens_retrabalho_pintura'),
+    path('api/itens-em-processo-pintura/', views.get_itens_em_processo_pintura, name='itens_em_processo_pintura'),
+    path('api/itens-retrabalhados-pintura/', views.get_itens_retrabalhados_pintura, name='itens_retrabalhados_pintura'),
+
+    path('api/confirmar-retrabalho-pintura/', views.confirmar_retrabalho_pintura, name='confirmar_retrabalho_pintura'),
+    path('api/finalizar-retrabalho-pintura/', views.finalizar_retrabalho_pintura, name='finalizar_retrabalho_pintura'),
 ]
 
 # templates
 urlpatterns += [
     path('', views.planejamento, name='planejamento'),
+    path('retrabalho', views.retrabalho_pintura, name='retrabalho_pintura')
+
 ]

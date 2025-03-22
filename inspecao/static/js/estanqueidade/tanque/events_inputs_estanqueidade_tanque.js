@@ -1,6 +1,8 @@
-$("#produto-estanqueidade-tanque").on("change",function() {
+$("#produto-estanqueidade-tanque").on("change", function () {
 
     let codigoTanque = $(this).val();
+
+    console.log(codigoTanque) //035939 - FTC4300R
 
     // Campo para 4300 e 6500
     let listaCodigosTanque = [
@@ -8,7 +10,9 @@ $("#produto-estanqueidade-tanque").on("change",function() {
         "6500"
     ];
 
-    if (listaCodigosTanque.includes(codigoTanque)) {
+    let tanqueEncontrado = listaCodigosTanque.some(codigo => codigoTanque.includes(codigo));
+
+    if (tanqueEncontrado) {
         $("#col-parteInferior, #col-corpoLongarina").show();
         $("#col-corpoTanque, #col-corpoChassi").hide();
 
@@ -95,7 +99,7 @@ function disabledAllTypesReinspecao() {
         .addClass("fa-plus")
         .removeClass("fa-check")
         .removeClass("text-success")
-    
+
     $("#col-corpoTanque-reinspecao input, #col-corpoTanque-reinspecao select").prop("required", false);
     $("#col-corpoTanque-reinspecao input, #col-corpoTanque-reinspecao select").prop("disabled", false);
     $("#button-corpo-do-tanque-reinspecao").css("background-color", "#fff");
@@ -108,7 +112,7 @@ function disabledAllTypesReinspecao() {
         .addClass("fa-plus")
         .removeClass("fa-check")
         .removeClass("text-success")
-    
+
     $("#col-corpoChassi-reinspecao input, #col-corpoChassi-reinspecao select").prop("required", false);
     $("#col-corpoChassi-reinspecao input, #col-corpoChassi-reinspecao select").prop("disabled", false);
     $("#button-corpo-do-tanque-chassi-reinspecao").css("background-color", "#fff");
