@@ -31,25 +31,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.log(data)
 
                 data.history.forEach(element => {
-                    let nao_conformidade = element.nao_conformidade + element.nao_conformidade_refugo;
                     listaTimeline.innerHTML += `
-                    <li class="timeline-item" style="cursor:pointer;" 
-                            data-id="${element.id_tubos_cilindros}" 
-                            data-nao-conformidade="${nao_conformidade}" 
-                            data-data="${element.data_execucao}">
-                        <span class="timeline-icon ${nao_conformidade == 0 ? 'success' : 'danger'}">
-                            <i class="bi ${nao_conformidade == 0 ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
-                        </span>
-                        <div class="timeline-content">
-                            <h5>Execução #${element.num_execucao}</h5>
-                            <p class="date">${element.data_execucao}</p>
-                            <p><strong>Inspetor:</strong> ${element.inspetor}</p>
-                            <p class="text-muted"><strong>Conformidade:</strong> ${element.qtd_inspecionada - nao_conformidade}</p>
-                            <p class="${nao_conformidade == 0 ? 'text-success' : 'text-danger'}">
-                                <strong>Não Conformidade:</strong> ${nao_conformidade}
-                            </p>
-                        </div>
-                    </li>`;
+                            <li class="timeline-item" style="cursor:pointer;">
+                            <span class="timeline-icon ${element.vazamento === true ? 'success' : 'danger'}">
+                                <i class="bi ${element.vazamento === true ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
+                            </span>
+                            <div class="timeline-content">
+                                <h5>Execução #${element.num_execucao}</h5>
+                                <p class="date">${element.data_execucao}</p>
+                                <p><strong>Inspetor:</strong> ${element.inspetor || 'N/A'}</p>
+                                <p><strong>Pressão Inicial:</strong> ${element.pressao_inicial || 'N/A'}</p>
+                                <p><strong>Pressão Final:</strong> ${element.pressao_final || 'N/A'}</p>
+                                <p><strong>Tipo de Teste:</strong> ${element.tipo_teste || 'N/A'}</p>
+                                <p><strong>Tempo de Execução:</strong> ${element.tempo_execucao || 'N/A'}</p>
+                                <p class="${element.vazamento === true ? 'text-success' : 'text-danger'}">
+                                    <strong>Não Conformidade:</strong> ${element.vazamento === true ? 'Não' : 'Sim'}
+                                </p>
+                            </div>
+                        </li>`;
                 });
                 
                 

@@ -217,7 +217,7 @@ def get_itens_reinspecao_pintura(request):
             .values_list("status", flat=True)
             .first()
         )
-        print(status_reinspecao )
+        print(status_reinspecao)
 
         item = {
             "id": data.id,
@@ -1770,22 +1770,25 @@ def envio_inspecao_tanque(request):
         return JsonResponse({"error": "Erro"}, status=400)
 
 
-def envio_inspecao_tanque(request):
+def envio_reinspecao_tanque(request):
 
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
     try:
         with transaction.atomic():
+            id = request.POST.get("id")
+            id_dados_execucao = request.POST.get("id_dados_execucao")
+            print(id_dados_execucao)
             tipo_inspecao = request.POST.get("tipo_inspecao")
-            data_inspecao = request.POST.get("data_inspecao")
+            data_reinspecao = request.POST.get("data_reinspecao")
             data_carga = request.POST.get("data_carga")
             inspetor = request.POST.get("inspetor")
             produto = request.POST.get("produto")
 
             # Capturar os dados dos testes (aninhados)
             testes = {
-                "parte_inferior": {
+                "ctpi": {
                     "pressao_inicial": request.POST.get(
                         "testes[parte_inferior][pressao_inicial]"
                     ),
@@ -1796,7 +1799,7 @@ def envio_inspecao_tanque(request):
                     "vazamento": request.POST.get("testes[parte_inferior][vazamento]")
                     == "true",
                 },
-                "corpo_longarina": {
+                "ctl": {
                     "pressao_inicial": request.POST.get(
                         "testes[corpo_longarina][pressao_inicial]"
                     ),
@@ -1807,7 +1810,7 @@ def envio_inspecao_tanque(request):
                     "vazamento": request.POST.get("testes[corpo_longarina][vazamento]")
                     == "true",
                 },
-                "corpo_tanque": {
+                "ct": {
                     "pressao_inicial": request.POST.get(
                         "testes[corpo_tanque][pressao_inicial]"
                     ),
@@ -1818,7 +1821,7 @@ def envio_inspecao_tanque(request):
                     "vazamento": request.POST.get("testes[corpo_tanque][vazamento]")
                     == "true",
                 },
-                "corpo_chassi": {
+                "ctc": {
                     "pressao_inicial": request.POST.get(
                         "testes[corpo_chassi][pressao_inicial]"
                     ),
@@ -1831,97 +1834,56 @@ def envio_inspecao_tanque(request):
                 },
             }
 
+            data_reinspecao_ajustada = timezone.make_aware(
+                datetime.fromisoformat(data_reinspecao)
+            )
+
             # Exibir os dados no console para depuração
             print("Tipo de Inspeção:", tipo_inspecao)
-            print("Data da Inspeção:", data_inspecao)
+            print("Data da Reinspeção:", data_reinspecao_ajustada)
             print("Data de Carga:", data_carga)
             print("Inspetor:", inspetor)
             print("Produto:", produto)
             print("Testes:", json.dumps(testes, indent=4))
 
-            data_inspecao_ajustada = timezone.make_aware(
-                datetime.fromisoformat(data_inspecao)
-            )
-            data_carga_ajustada = timezone.make_aware(
-                datetime.fromisoformat(data_carga)
-            )
 
-            codigo = produto.split(" - ", maxsplit=1)[0]
-            descricao = produto.split(" - ", maxsplit=1)[1]
-
-            peca_estanqueidade = PecasEstanqueidade.objects.filter(
-                codigo=codigo
-            ).first()
-
-            inspecao = InspecaoEstanqueidade(
-                data_inspecao=data_inspecao_ajustada,
-                peca=peca_estanqueidade,
-                data_carga=data_carga_ajustada,
-            )
-            inspecao.save()
-
+            inspecao = InspecaoEstanqueidade.objects.filter(id=id).first()
             inspetor = Profile.objects.get(user__pk=inspetor)
+
             dados_execucao = DadosExecucaoInspecaoEstanqueidade(
                 inspecao_estanqueidade=inspecao,
                 inspetor=inspetor,
-                data_exec=data_inspecao_ajustada,
+                data_exec=data_reinspecao_ajustada,
             )
             dados_execucao.save()
 
-            if "6500" in descricao or "4300" in descricao:
-                detalhes_parte_inferior = DetalhesPressaoTanque(
-                    dados_exec_inspecao=dados_execucao,
-                    pressao_inicial=testes["parte_inferior"]["pressao_inicial"],
-                    pressao_final=testes["parte_inferior"]["pressao_final"],
-                    nao_conformidade=testes["parte_inferior"]["vazamento"],
-                    tipo_teste="ctpi",
-                    tempo_execucao=testes["parte_inferior"]["duracao"],
-                )
-                detalhes_parte_inferior.save()
+            detalhes_pressao = DetalhesPressaoTanque.objects.filter(
+                dados_exec_inspecao=id_dados_execucao,
+                nao_conformidade=True,
+            )
 
-                detalhes_corpo_longarina = DetalhesPressaoTanque(
-                    dados_exec_inspecao=dados_execucao,
-                    pressao_inicial=testes["corpo_longarina"]["pressao_inicial"],
-                    pressao_final=testes["corpo_longarina"]["pressao_final"],
-                    nao_conformidade=testes["corpo_longarina"]["vazamento"],
-                    tipo_teste="ctl",
-                    tempo_execucao=testes["corpo_longarina"]["duracao"],
-                )
-                detalhes_corpo_longarina.save()
-            else:
-                detalhes_corpo_tanque = DetalhesPressaoTanque(
-                    dados_exec_inspecao=dados_execucao,
-                    pressao_inicial=testes["corpo_tanque"]["pressao_inicial"],
-                    pressao_final=testes["corpo_tanque"]["pressao_final"],
-                    nao_conformidade=testes["corpo_tanque"]["vazamento"],
-                    tipo_teste="ct",
-                    tempo_execucao=testes["corpo_tanque"]["duracao"],
-                )
-                detalhes_corpo_tanque.save()
+            print(detalhes_pressao)
 
-                detalhes_corpo_chassi = DetalhesPressaoTanque(
+            for detalhe in detalhes_pressao:
+                detalhes_reinspecao = DetalhesPressaoTanque(
                     dados_exec_inspecao=dados_execucao,
-                    pressao_inicial=testes["corpo_chassi"]["pressao_inicial"],
-                    pressao_final=testes["corpo_chassi"]["pressao_final"],
-                    nao_conformidade=testes["corpo_chassi"]["vazamento"],
-                    tipo_teste="ctc",
-                    tempo_execucao=testes["corpo_chassi"]["duracao"],
+                    pressao_inicial=testes[detalhe.tipo_teste]["pressao_inicial"],
+                    pressao_final=testes[detalhe.tipo_teste]["pressao_final"],
+                    nao_conformidade=testes[detalhe.tipo_teste]["vazamento"],
+                    tipo_teste=detalhe.tipo_teste,
+                    tempo_execucao=testes[detalhe.tipo_teste]["duracao"],
                 )
-                detalhes_corpo_chassi.save()
+                detalhes_reinspecao.save()
 
-            if any(
-                [
-                    testes["parte_inferior"]["vazamento"],
-                    testes["corpo_longarina"]["vazamento"],
-                    testes["corpo_tanque"]["vazamento"],
-                    testes["corpo_chassi"]["vazamento"],
-                ]
-            ):
+            if not any([testes["ctpi"]["vazamento"], testes["ctl"]["vazamento"],
+                    testes["ct"]["vazamento"], testes["ctc"]["vazamento"]]):
 
-                reinspecao_parte_inferior = ReinspecaoEstanqueidade(
-                    inspecao=inspecao, data_reinsp=data_inspecao_ajustada
-                )
-                reinspecao_parte_inferior.save()
+                reinspecao = ReinspecaoEstanqueidade.objects.filter(
+                    inspecao=inspecao,
+                ).first()
+                reinspecao.reinspecionado = True
+
+                reinspecao.save()
 
         return JsonResponse({"success": True})
 
@@ -2207,3 +2169,56 @@ def get_itens_inspecionados_tanque(request):
         },
         status=200,
     )
+
+
+def get_historico_tanque(request, id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    # Otimiza a consulta usando select_related e prefetch_related
+    dados = (
+        DadosExecucaoInspecaoEstanqueidade.objects.filter(inspecao_estanqueidade__id=id)
+        .select_related("inspetor__user")
+        .prefetch_related(
+            Prefetch(
+                "detalhespressaotanque_set",
+                queryset=DetalhesPressaoTanque.objects.all(),
+            )
+        )
+        .order_by("-id")
+    )
+
+    print(dados)
+
+    # Usa list comprehension para construir a lista de histórico
+    list_history = []
+    for dado in dados:
+        detalhes_pressao = dado.detalhespressaotanque_set.first()
+        list_history.append(
+            {
+                "id": dado.id,
+                "id_detalhes_pressao": detalhes_pressao.id if detalhes_pressao else None,
+                "data_execucao": (dado.data_exec - timedelta(hours=3)).strftime(
+                    "%d/%m/%Y %H:%M:%S"
+                ),
+                "num_execucao": dado.num_execucao,
+                "inspetor": dado.inspetor.user.username if dado.inspetor else None,
+                "pressao_inicial": (
+                    detalhes_pressao.pressao_inicial if detalhes_pressao else None
+                ),
+                "pressao_final": (
+                    detalhes_pressao.pressao_final if detalhes_pressao else None
+                ),
+                "nao_conformidade": (
+                    detalhes_pressao.nao_conformidade if detalhes_pressao else None
+                ),
+                "tipo_teste": (
+                    detalhes_pressao.tipo_teste if detalhes_pressao else None
+                ),
+                "tempo_execucao": (
+                    detalhes_pressao.tempo_execucao.strftime("%H:%M:%S") if detalhes_pressao and detalhes_pressao.tempo_execucao else None
+                ),
+            }
+        )
+
+    return JsonResponse({"history": list_history}, status=200)

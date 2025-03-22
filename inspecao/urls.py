@@ -40,10 +40,10 @@ urlpatterns = [
 
     path('tanque/', views.inspecao_tanque, name='inspecao-tanque'),
     path('api/envio-inspecao-tanque/', views.envio_inspecao_tanque, name='envio-inspecao-tanque'),
-    path('api/envio-reinspecao-tanque/', views.envio_inspecao_tanque, name='envio-reinspecao-tanque'),
+    path('api/envio-reinspecao-tanque/', views.envio_reinspecao_tanque, name='envio-reinspecao-tanque'),
 
     path('api/itens-reinspecao-tanque/', views.get_itens_reinspecao_tanque, name='itens-reinspecao-tanque'),
     path('api/itens-inspecionados-tanque/', views.get_itens_inspecionados_tanque, name='itens-inspecionados-tanque'),
 
-    path('api/<int:id>/historico-tanque/', views.get_historico_tubos_cilindros, name='historico-tanque'),
+    path('api/<int:id>/historico-tanque/', views.get_historico_tanque, name='historico-tanque'),
 ]

@@ -4,15 +4,14 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("reinspecaoFormTanque").reset();
             
             const id = event.target.getAttribute("data-id");
-            const data = event.target.getAttribute("data-data");
+            const idDadosExecucao = event.target.getAttribute("data-id-dados-execucao");
             const dataCarga = event.target.getAttribute("data-data-carga");
             const peca = event.target.getAttribute("data-peca");
 
             document.getElementById("id_estanqueidade_tanque_reinspecao").value = id;
-            document.getElementById("data_estanqueidade_tanque_reinspecao").value = data;
+            document.getElementById("id_dados_execucao_estanqueidade_tanque_reinspecao").value = idDadosExecucao;
             document.getElementById("data-carga-estanqueidade-tanque-reinspecao").value = dataCarga;
             document.getElementById("produto-estanqueidade-tanque-reinspecao").value = peca;
-            document.getElementById("data_estanqueidade_tanque_reinspecao").value = data;
 
 
             const testes = [1, 2].map(num => ({

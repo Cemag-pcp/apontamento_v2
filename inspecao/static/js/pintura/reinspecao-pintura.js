@@ -120,7 +120,6 @@ function buscarItensReinspecao(pagina) {
 
         
         items.dados.forEach(item => {
-            console.log(item.status_reinspecao)
             let borderColors = {
                 "Laranja": "orange", "Verde": "green",
                 "Vermelho": "red", "Azul": "blue",

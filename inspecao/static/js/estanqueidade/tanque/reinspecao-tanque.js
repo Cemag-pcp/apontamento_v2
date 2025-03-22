@@ -170,6 +170,7 @@ function buscarItensReinspecaoEstanqueidadeTanque(pagina) {
                         <hr>
                         <button 
                             data-id="${item.id}"
+                            data-id-dados-execucao="${item.id_dados_execucao}"
                             data-data="${item.data}"
                             data-data-carga="${item.data_carga}"
                             data-tipo="${item.tipo_inspecao}"

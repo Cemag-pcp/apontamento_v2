@@ -20,8 +20,10 @@ document.getElementById('reinspecaoFormTanque').addEventListener('submit', async
     }
 
     // Adicionar os dados do formulário ao FormData
+    formData.append('id', document.getElementById('id_estanqueidade_tanque_reinspecao').value);
+    formData.append('id_dados_execucao', document.getElementById('id_dados_execucao_estanqueidade_tanque_reinspecao').value);
     formData.append('tipo_inspecao', 'Tanques');
-    formData.append('data_inspecao', document.getElementById('data_estanqueidade_tanque_reinspecao').value);
+    formData.append('data_reinspecao', document.getElementById('data_estanqueidade_tanque_reinspecao').value);
     formData.append('data_carga', document.getElementById('data-carga-estanqueidade-tanque-reinspecao').value);
     formData.append('inspetor', document.getElementById('inspetores_estanqueidade_tanque_reinspecao').value);
     formData.append('produto', document.getElementById('produto-estanqueidade-tanque-reinspecao').value);
