@@ -10,138 +10,145 @@
     <link rel="stylesheet" href="{% static 'css/spinner.css' %}">
     <link rel="stylesheet" href="{% static 'css/datatable.css' %}">
     <link rel="stylesheet" href="{% static 'css/table-gerar-op.css' %}">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 {% endblock %}
 
 {% block content %}
-<div>
-    <!-- Título Principal -->
+<div class="container py-4">
+    <!-- Header Section -->
     <div class="text-center mb-5">
-        <h1 class="display-5">Duplicador de ordem de produção</h1>
-        <!-- <p class="text-muted">Duplique ordem de produção.</p> -->
+        <h1 class="fw-bold text-primary mb-2">Duplicador de Ordem de Produção</h1>
+        <div class="border-bottom border-2 border-primary w-25 mx-auto mb-3"></div>
+        <p class="text-muted">Pesquise e duplique ordens de produção existentes</p>
     </div>
 
-    <!-- Container para Planejamento -->
-    <div id="containerPlanejar" class="mb-5">
-        <!-- Título Planejamento -->
-        <!-- <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3 class="text-secondary"></h3>
-            <div class="d-flex gap-3">
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalPlasma">
-                    Criar OP Plasma
-                </button>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalLaser">
-                    Criar OP Laser
-                </button>
-                <a class="btn btn-primary" href="#" role="button">
-                    Duplicar Op
-                </a>
-            </div>
-        </div> -->
-
-        <!-- Painel de Ordens Criadas -->
-        <h4 class="mb-3 text-secondary">Pesquise a ordem</h4>
-        <!-- Formulário de Filtro -->
-        <form id="filtro-form" class="mb-4">
-            <div class="row g-3 align-items-center">
-                <!-- <select class="js-example-basic-multiple" name="states[]" multiple="multiple">
-                    <option value="AL">Alabama</option>
-                      ...
-                    <option value="WY">Wyoming</option>
-                </select> -->
-                <div class="col-md-3">
-                    <input type="text" class="form-control" name="filtro-ordem" id="filtro-ordem" placeholder="Filtrar por ordem">
-                </div>
-                <div class="col-md-4">
-                    <select id="filtro-peca" class="form-control" multiple="multiple"></select>
-                </div>
-                <div class="col-md-3">
-                    <select class="form-control" name="filtro-maquina" id="filtro-maquina">
-                        <option class="text-muted" value="">Filtrar por máquina</option>
-                        <option value="plasma">Plasma</option>
-                        <option value="laser_1">Laser 1 (Weller)</option>
-                        <option value="laser_2">Laser 2 (JFY)</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
-                </div>
-            </div>
-        </form>
-    
-        <div class="table-container">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Ordem</th>
-                        <th>Data de Criação</th>
-                        <th>Máquina</th>
-                        <th>Descrição MP</th>
-                        <th>Aproveitamento</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="tabela-corpo">
-                    <tr>
-                        <td colspan="6">🔄 Carregando dados...</td>
-                    </tr>
-                </tbody>
-            </table>
+    <!-- Search Container -->
+    <div class="card shadow-sm mb-5 border-0 rounded-3">
+        <div class="card-header bg-light py-3 border-0">
+            <h5 class="mb-0 text-primary"><i class="bi bi-search me-2"></i>Pesquisar Ordem</h5>
         </div>
+        <div class="card-body p-4">
+            <!-- Search Form -->
+            <form id="filtro-form" class="mb-4">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-3">
+                        <label for="filtro-ordem" class="form-label small text-muted">Número da Ordem</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-hash"></i></span>
+                            <input type="text" class="form-control border-start-0 bg-light" name="filtro-ordem" id="filtro-ordem" placeholder="Digite o número">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filtro-peca" class="form-label small text-muted">Peça</label>
+                        <select id="filtro-peca" class="form-select bg-light" multiple="multiple"></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filtro-maquina" class="form-label small text-muted">Máquina</label>
+                        <select class="form-select bg-light" name="filtro-maquina" id="filtro-maquina">
+                            <option class="text-muted" value="">Todas as máquinas</option>
+                            <option value="plasma">Plasma</option>
+                            <option value="laser_1">Laser 1 (Weller)</option>
+                            <option value="laser_2">Laser 2 (JFY)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label d-block" style="visibility: hidden;">Filtrar</label>
+                        <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center">
+                            <i class="bi bi-filter me-2"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        
+            <!-- Results Table -->
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center">Ordem</th>
+                            <th class="text-center">Data de Criação</th>
+                            <th class="text-center">Máquina</th>
+                            <th class="text-center">Descrição MP</th>
+                            <th class="text-center">Aproveitamento</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-corpo">
+                        <tr>
+                            <td colspan="6" class="text-center py-4">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <div class="spinner-border text-primary me-2" role="status" style="width: 1rem; height: 1rem;"></div>
+                                    <span>Carregando dados...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
 
-        <!--  Paginação -->
-        <div class="pagination-container" id="paginacao-container"></div>
+            <!-- Pagination -->
+            <div class="pagination-container mt-4" id="paginacao-container"></div>
 
-        <!--  Loading Spinner -->
-        <div id="loading-spinner">🔄 Carregando...</div>
-    
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="text-center py-3 d-none">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2 text-primary">Carregando dados...</p>
+            </div>
+        </div>
     </div>
-
 </div>
 
-<!-- Modal para configurar ordem e duplicar -->
+<!-- Modal for Order Duplication -->
 <div class="modal fade" id="modalDuplicarOrdem" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalDuplicarOrdemLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalDuplicarOrdemLabel"></h5>
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title text-primary" id="modalDuplicarOrdemLabel">
+                    <i class="bi bi-files me-2"></i>Duplicar Ordem
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <form id="formDuplicarOrdem">
                     {% csrf_token %}
                     
-                    <div id="bodyDuplicarOrdem">
-                        <!-- Informações da Chapa -->
-
-                        <!-- Peças -->
+                    <div id="bodyDuplicarOrdem" class="mb-4">
+                        <!-- Dynamic content will be loaded here -->
                     </div>
 
                     <div class="row mb-3 align-items-center">
-                        <!-- Observação -->
                         <div class="col-sm-6">
-                            <label for="obsFinalizarCorte" class="form-label">Observação</label>
-                            <textarea class="form-control" name="obsFinalizarCorte" id="obsFinalizarCorte" placeholder="Algum comentário"></textarea>
+                            <label for="obsFinalizarCorte" class="form-label text-muted">Observação</label>
+                            <textarea class="form-control bg-light" name="obsFinalizarCorte" id="obsFinalizarCorte" placeholder="Adicione comentários relevantes" rows="3"></textarea>
                         </div>    
                         <div class="col-md-6">
-                            <label for="dataProgramacao" class="form-label">Programação:</label>
-                            <input type="date" id="dataProgramacao" name="dataProgramacao" class="form-control" required>
+                            <label for="dataProgramacao" class="form-label text-muted">Data de Programação</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar3"></i></span>
+                                <input type="date" id="dataProgramacao" name="dataProgramacao" class="form-control border-start-0 bg-light" required>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Footer do Formulário -->
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Duplicar</button>
+                    <!-- Form Footer -->
+                    <div class="modal-footer border-0 pt-4">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle me-2"></i>Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-files me-2"></i>Duplicar Ordem
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
 <script type="module" src="{% static 'js/duplicar-op.js' %}"></script>
 {% endblock %}
-

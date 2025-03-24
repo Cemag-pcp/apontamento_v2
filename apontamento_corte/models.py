@@ -12,4 +12,6 @@ class PecasOrdem(models.Model):
     qtd_boa=models.FloatField(default=0)
     data = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
-
+    # unique constraint de peça e ordem, para evitar duplicidade
+    class Meta:
+        unique_together = ('ordem', 'peca')

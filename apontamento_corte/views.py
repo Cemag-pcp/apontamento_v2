@@ -655,7 +655,7 @@ class SalvarArquivoView(View):
         - 9855 -> 0.9855
         - 006 -> 0.6
         """
-
+        valor = str(valor)
         valor = valor.replace("%","").replace(",",".")
 
         if valor is None:

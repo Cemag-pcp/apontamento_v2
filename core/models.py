@@ -109,7 +109,7 @@ class Ordem(models.Model):
 
     def save(self, *args, **kwargs):
 
-        if self.grupo_maquina in ['plasma','laser_1','laser_2']:
+        if not self.pk and self.grupo_maquina in ['plasma','laser_1','laser_2']:
             self.sequenciada = True
         
         elif self.grupo_maquina == 'montagem' and self.data_carga:

@@ -33,7 +33,6 @@ def excluir_ordem(request):
             motivo = data['motivo']
             setor = data['setor']
 
-
             # Busca o motivo de exclusão
             motivo_exclusao = get_object_or_404(MotivoExclusao, pk=int(motivo))
 
@@ -44,12 +43,16 @@ def excluir_ordem(request):
             if ordem.status_atual in ['aguardando_iniciar', 'finalizada']:
                 # Exceção para o setor de corte (opção de retirar do sequenciamento)
                 if setor in ['laser_1','laser_2','plasma']:
+                    print('adicionando o motivo...')
                     ordem.motivo_retirar_sequenciada = motivo_exclusao
+                    print('retirando do sequenciamento...')
                     ordem.sequenciada = False
+                    print("salvando no banco...")
+                    ordem.save()
                 else:
                     ordem.excluida = True
                     ordem.motivo_exclusao = motivo_exclusao
-                ordem.save()
+                    ordem.save(update_fields=['excluida', 'motivo_exclusao'])
                 return JsonResponse({'success': 'Ordem excluída com sucesso.'}, status=201)
             else:
                 return JsonResponse({'error': 'Finalize a ordem para excluí-la.'}, status=400)
