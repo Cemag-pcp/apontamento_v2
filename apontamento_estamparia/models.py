@@ -15,9 +15,7 @@ class PecasOrdem(models.Model):
     operador=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_produzido_estamparia', blank=True, null=True)
     data = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
-<<<<<<< HEAD
 
-=======
 class InfoAdicionaisInspecaoEstamparia(models.Model):
 
     dados_exec_inspecao = models.ForeignKey(DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False)
@@ -39,4 +37,3 @@ class MedidasInspecaoEstamparia(models.Model):
     medida_c = models.FloatField(null=True, blank=True)
     cabecalho_medida_d = models.CharField(max_length=10, null=True, blank=True)
     medida_d = models.FloatField(null=True, blank=True)
->>>>>>> dev-saul
