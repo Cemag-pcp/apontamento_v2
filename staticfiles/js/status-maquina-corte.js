@@ -45,7 +45,6 @@ export function fetchStatusMaquinas() {
             const percentualOperando = totalMaquinas > 0 ? Math.round((maquinasOperando / totalMaquinas) * 100) : 0;
 
             indicador.textContent = `${percentualOperando}%`;
-            descricao.textContent = 'Máquinas em operação';
 
             // Atualiza a lista de status das máquinas
             listaStatus.innerHTML = ''; // Limpa os itens antigos
@@ -227,26 +226,24 @@ export function fetchOrdensSequenciadasLaser() {
     // Busca inicial sem filtro de ordem
     carregarOrdens(`api/ordens-sequenciadas/?maquina=laser`);
     
-    // Evento de clique para filtrar por ordem digitada
-    btnFiltrarOrdemSequenciadaLaser.addEventListener('click', () => {
-        const ordemDigitada = ordemLaser.value.trim();
-        // Constrói a URL, incluindo o parâmetro "ordem" se houver valor
-        const url = `api/ordens-sequenciadas/?maquina=laser${ordemDigitada ? `&ordem=${encodeURIComponent(ordemDigitada)}` : ''}`;
-        carregarOrdens(url);
-    });
+    // Verifica se o listener já foi adicionado para evitar duplicação
+    if (!btnFiltrarOrdemSequenciadaLaser.dataset.listenerAdded) {
+        btnFiltrarOrdemSequenciadaLaser.addEventListener('click', () => {
+            const ordemDigitada = ordemPlasma.value.trim();
+            const url = `api/ordens-sequenciadas/?maquina=laser${ordemDigitada ? `&ordem=${encodeURIComponent(ordemDigitada)}` : ''}`;
+            carregarOrdens(url);
+        });
+        btnFiltrarOrdemSequenciadaLaser.dataset.listenerAdded = 'true';
+    }
 }
 
 export function fetchOrdensSequenciadasPlasma() {
-    // Seleciona o container onde os cards serão adicionados
     const container = document.getElementById('ordens-sequenciadas-plasma-container');
     const btnFiltrarOrdemSequenciadaPlasma = document.getElementById('btnPesquisarOrdemSequenciadaPlasma');
     const ordemPlasma = document.getElementById('pesquisarOrdemSequenciadaPlasma');
     
-    // Função que realiza a requisição, dado um URL
     function carregarOrdens(url) {
-        // Limpa o conteúdo imediatamente antes de iniciar a requisição
         container.innerHTML = '';
-        
         fetch(url)
             .then(response => {
                 if (!response.ok) {
@@ -255,7 +252,6 @@ export function fetchOrdensSequenciadasPlasma() {
                 return response.json();
             })
             .then(data => {
-                // Se a resposta não tiver ordens, exibe mensagem
                 if (data.ordens_sequenciadas && data.ordens_sequenciadas.length > 0) {
                     data.ordens_sequenciadas.forEach(ordem => {
                         // Mapeamento de cores para o badge de status
@@ -284,7 +280,7 @@ export function fetchOrdensSequenciadasPlasma() {
                                     🗑
                                 </button>
                             </div>
-                            `
+                            `;
                         } else {
                             botoesAcao = `
                             <div>
@@ -292,10 +288,9 @@ export function fetchOrdensSequenciadasPlasma() {
                                     <i class="fa fa-eye"></i>
                                 </button>
                             </div>
-                            `
+                            `;
                         }
 
-                        // Cria um card para cada ordem
                         const card = document.createElement('div');
                         card.classList.add('card', 'mb-3');
                         card.innerHTML = `
@@ -336,7 +331,7 @@ export function fetchOrdensSequenciadasPlasma() {
                                 mostrarModalExcluir(ordem.id, ordem.grupo_maquina);
                             });
                         }
-                });
+                    });
                 } else {
                     container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
                 }
@@ -350,14 +345,15 @@ export function fetchOrdensSequenciadasPlasma() {
     // Busca inicial sem filtro de ordem
     carregarOrdens(`api/ordens-sequenciadas/?maquina=plasma`);
     
-    // Evento de clique para filtrar por ordem digitada
-    btnFiltrarOrdemSequenciadaPlasma.addEventListener('click', () => {
-        const ordemDigitada = ordemPlasma.value.trim();
-        console.log(ordemDigitada);
-        // Constrói a URL, incluindo o parâmetro "ordem" se houver valor
-        const url = `api/ordens-sequenciadas/?maquina=plasma${ordemDigitada ? `&ordem=${encodeURIComponent(ordemDigitada)}` : ''}`;
-        carregarOrdens(url);
-    });
+    // Verifica se o listener já foi adicionado para evitar duplicação
+    if (!btnFiltrarOrdemSequenciadaPlasma.dataset.listenerAdded) {
+        btnFiltrarOrdemSequenciadaPlasma.addEventListener('click', () => {
+            const ordemDigitada = ordemPlasma.value.trim();
+            const url = `api/ordens-sequenciadas/?maquina=plasma${ordemDigitada ? `&ordem=${encodeURIComponent(ordemDigitada)}` : ''}`;
+            carregarOrdens(url);
+        });
+        btnFiltrarOrdemSequenciadaPlasma.dataset.listenerAdded = 'true';
+    }
 }
 
 async function fetchMaquinasDisponiveis() {
