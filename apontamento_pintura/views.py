@@ -17,7 +17,7 @@ from pytz import timezone
 from .models import PecasOrdem, CambaoPecas, Cambao
 from core.models import Ordem
 from cadastro.models import Operador
-
+from inspecao.models import Inspecao
 
 def planejamento(request):
     return render(request, "apontamento_pintura/planejamento.html")
@@ -373,6 +373,10 @@ def finalizar_cambao(request):
                         data=now(),
                         tipo=cambao.tipo,
                         operador_fim=operador,
+                    )
+
+                    Inspecao.objects.create(
+                        pecas_ordem_pintura=nova_peca_ordem,
                     )
 
                     # Atualizar o status da peça no cambão para "finalizada"
