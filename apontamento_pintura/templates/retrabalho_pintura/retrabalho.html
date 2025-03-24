@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %} <title>Inspeção Pintura</title> {% endblock %}
+
+{% block links %}
+
+    <link rel="stylesheet" href="/static/css/inspecao.css">
+    <link rel="stylesheet" href="/static/css/select2.css">
+
+{% endblock %}
+
+{% block content %}
+
+<h2 class="my-4">Retrabalho Pintura</h2>
+
+<ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
+    <li class="nav-item" style="width: 33%;">
+        <a id="itens-inspecionar" class="nav-link tab-active active text-center" style="font-size: 0.875rem;"  onclick="activeRow('retrabalho-pintura','em-processo-pintura','inspecionados-pintura', this)">
+            <span class="mx-2">Retrabalho</span>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </a>
+    </li>
+    <li class="nav-item" style="width: 33%;">
+        <a id="itens-em-processo" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('em-processo-pintura','retrabalho-pintura','inspecionados-pintura', this)">
+            <span class="mx-2">Em processo</span>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </a>
+    </li>
+    <li class="nav-item" style="width: 33%;">
+        <a id="itens-inspecionados" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-pintura','retrabalho-pintura','em-processo-pintura', this)">
+            <span class="mx-2">Itens enviados para retrabalho</span>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </a>
+    </li>
+</ul>
+
+
+<div id="retrabalho-pintura" class="row mt-3">
+
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Retrabalho pendente</h4>
+        <div>
+            <div class="btn-group">
+                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <form id="form-filtrar-retrabalho">
+                    <div class="dropdown-menu p-3" style="width: 250px;">
+                        <p class="fw-bold mx-2 my-1">Filtrar inspeções</p>
+                        <hr>
+                        <input type="text" class="form-control mb-3" id="pesquisar-peca-retrabalho" placeholder="Pesquisar as peças...">
+                        
+                        <h6>Cor</h6>
+                        {% for cor in cores %}
+                            <div class="form-check">
+                                <input class="form-check-input-retrabalho" id="{{cor|lower}}-retrabalho" type="checkbox" value="">
+                                <label class="form-check-label" for="{{cor|lower}}-retrabalho">{{cor}}</label>
+                            </div>
+                        {% endfor %}
+                
+                        <h6 class="mt-3">Inspetor</h6>
+                        {% for inspetor in inspetores %}
+                            <div class="form-check">
+                                <input class="form-check-input" id="{{inspetor|lower}}-retrabalho" type="checkbox" value="">
+                                <label class="form-check-label" for="{{inspetor|lower}}-retrabalho">{{inspetor.nome_usuario}}</label>
+                            </div>
+                        {% endfor %}
+                
+                        <h6 class="mt-3">Date</h6>
+                        <input type="date" class="form-control" id="data-filtro-retrabalho">
+                
+                        <div class="d-flex justify-content-between mt-3">
+                            <button id="btn-limpar-retrabalho"  class="btn btn-outline-secondary">Limpar</button>
+                            <button id="btn-filtrar-retrabalho" class="btn btn-dark">Filtrar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-pendente-retrabalho" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <span id="qtd-filtrada-retrabalho" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="itens-filtrados-retrabalho-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-retrabalho-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="itens-filtrados-retrabalho-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+    </div>
+    <!-- Cards -->
+     <div class="row" style="padding-right: 0;" id="cards-retrabalho"></div>
+
+     <div id="paginacao-retrabalho-pintura"></div>
+
+</div>
+
+<div id="em-processo-pintura" class="row mt-3" style="display: none;">
+
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Em processo</h4>
+        <div>
+            <div class="btn-group">
+                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton2" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <form id="form-filtrar-em-processo" action="">
+                    <div class="dropdown-menu p-3" style="width: 250px;">
+                        <p class="fw-bold mx-2 my-1">Filter Inspections</p>
+                        <hr>
+                        <input id="pesquisar-peca-em-processo" type="text" class="form-control mb-3" placeholder="Pesquisar...">
+                        
+                        <h6>Cor</h6>
+                        {% for cor in cores %}
+                            <div class="form-check">
+                                <input class="form-check-input-em-processo" id="{{cor|lower}}-em-processo" type="checkbox" value="">
+                                <label class="form-check-label" for="{{cor|lower}}-em-processo">{{cor}}</label>
+                            </div>
+                        {% endfor %}
+                
+                        <h6 class="mt-3">Inspetor</h6>
+                        {% for inspetor in inspetores %}
+                            <div class="form-check">
+                                <input class="form-check-input-em-processo-inspetores" id="{{inspetor|lower}}-em-processo" type="checkbox" value="">
+                                <label class="form-check-label" for="{{inspetor|lower}}-em-processo">{{inspetor.nome_usuario}}</label>
+                            </div>
+                        {% endfor %}
+                
+                        <h6 class="mt-3">Date</h6>
+                        <input id="data-filtro-em-processo" type="date" class="form-control">
+                
+                        <div class="d-flex justify-content-between mt-3">
+                            <button id="btn-limpar-em-processo" class="btn btn-outline-secondary">Limpar</button>
+                            <button id="btn-filtrar-em-processo" class="btn btn-dark">Filtrar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-pendente-em-processo" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <span id="qtd-filtrada-em-processo" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="itens-filtrados-em-processo-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-em-processo-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
+        <span id="itens-filtrados-em-processo-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="itens-filtrados-em-processo-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+    </div>
+    <!-- Cards -->
+     <div class="row" style="padding-right: 0;" id="cards-em-processo"></div>
+
+     <div id="paginacao-em-processo-pintura"></div>
+    
+</div>
+
+<div id="inspecionados-pintura" class="row mt-3" style="display: none;">
+
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Itens retrabalhados</h4>
+        <div class="d-flex gap-2">
+            <!-- <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar</button> -->
+            <div>
+                <div class="btn-group">
+                    <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                    <form id="form-filtrar-inspecionados" action="">
+                        <div class="dropdown-menu p-3" style="width: 250px;">
+                            <p class="fw-bold mx-2 my-1">Filter Inspections</p>
+                            <hr>
+                            <input id="pesquisar-peca-inspecionados" type="text" class="form-control mb-3" placeholder="Search inspections...">
+                            
+                            <h6>Cor</h6>
+                            {% for cor in cores %}
+                                <div class="form-check">
+                                    <input class="form-check-input-inspecionados" id="{{cor|lower}}-inspecionados" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{cor|lower}}-inspecionados">{{cor}}</label>
+                                </div>
+                            {% endfor %}
+                    
+                            <h6 class="mt-3">Inspetor</h6>
+                            {% for inspetor in inspetores %}
+                                <div class="form-check">
+                                    <input class="form-check-input-inspecionados-inspetores" id="{{inspetor|lower}}-inspecionados" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{inspetor|lower}}-inspecionados">{{inspetor.nome_usuario}}</label>
+                                </div>
+                            {% endfor %}
+                                
+                            <h6 class="mt-3">Date</h6>
+                            <input id="data-filtro-inspecionados" type="date" class="form-control">
+                    
+                            <div class="d-flex justify-content-between mt-3">
+                                <button id="btn-limpar-inspecionados" class="btn btn-outline-secondary">Limpar</button>
+                                <button id="btn-filtrar-inspecionados" class="btn btn-dark">Filtrar</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-inspecionados"class="rounded-pill py-1 px-2" style="background-color: #00940c; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <span id="qtd-filtrada-inspecionados" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="itens-filtrados-inspecionados-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-inspecionados-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
+        <span id="itens-filtrados-inspecionados-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="itens-filtrados-inspecionados-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+    </div>
+    <!-- Cards -->
+    <div class="row" style="padding-right: 0;" id="cards-inspecionados"></div>
+    <div id="paginacao-inspecionados-pintura"></div>
+</div>
+
+{% include 'retrabalho_pintura/modal/modal_retrabalho_pintura.html' %}
+
+{% endblock %}
+
+{% block scripts %}
+
+<script src="{% static 'js/retrabalho/a_retrabalhar/a-retrabalhar-pintura.js' %}"></script>
+<script src="{% static 'js/retrabalho/a_retrabalhar/confirmar-retrabalho.js' %}"></script>
+<script src="{% static 'js/retrabalho/em_processo/em-processo.js' %}"></script>
+<script src="{% static 'js/retrabalho/em_processo/finalizar-retrabalho.js' %}"></script>
+<script src="{% static 'js/retrabalho/historico/historico-retrabalho.js' %}"></script>
+<script src="{% static 'js/retrabalho/modal.js' %}"></script>
+
+<script>
+
+    function activeRow(rowVisible, firstRowInvisible, secondRowInvisible, clickedElement) {
+        
+        document.getElementById(rowVisible).style.display = "flex";
+        document.getElementById(firstRowInvisible).style.display = "none";
+        document.getElementById(secondRowInvisible).style.display = "none";
+
+        const tabs = document.querySelectorAll(".nav-tabs .nav-link");
+
+        tabs.forEach((tab) => {
+            tab.classList.remove("active")
+        })
+
+        clickedElement.classList.add("active");
+    }
+
+</script>
+
+{% endblock %}

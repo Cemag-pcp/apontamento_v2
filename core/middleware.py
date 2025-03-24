@@ -18,6 +18,24 @@ class RotaAccessMiddleware:
         if "/api/" in request.path or request.path.startswith("api/"):
             return self.get_response(request)
         
+        # Obtém o caminho da requisição, removendo "/" inicial e final
+        path = request.path.strip("/")
+        
+        login_url = reverse('core:login')
+
+        # Se o usuário não estiver autenticado, redireciona para o login
+        if not request.user.is_authenticated and path != login_url.strip("/"):
+            return redirect(f"{login_url}?next={request.path}")
+
+        # Ignorar rotas administrativas
+        EXCLUDED_PATHS = ['admin', 'login', 'logout', 'core']
+        if any(path.startswith(excluded) for excluded in EXCLUDED_PATHS):
+            return self.get_response(request)
+
+        #  Se a URL contém "api/", libera automaticamente
+        if "api/" in path or "media/" in path:
+            return self.get_response(request)
+        
         path = request.path.strip("/")
         
         login_url = reverse('core:login')

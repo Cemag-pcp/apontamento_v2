@@ -205,6 +205,7 @@ class MaquinaParada(models.Model):
     data_fim = models.DateTimeField(null=True, blank=True)
     motivo = models.ForeignKey(MotivoMaquinaParada, on_delete=models.CASCADE, null=True, blank=True)
 
+
 class RotaAcesso(models.Model):
 
     TIPO_ROTA_CHOICES=(('api','Api'),('template','Template'))
@@ -236,6 +237,7 @@ class Profile(models.Model):
         ('operador', 'Operador'),
         ('supervisor', 'Supervisor'),
         ('pcp', 'PCP'),
+        ('inspetor', 'Inspetor'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')

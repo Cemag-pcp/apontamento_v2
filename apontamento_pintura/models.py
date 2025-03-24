@@ -3,6 +3,7 @@ from django.utils.timezone import now
 
 from core.models import Ordem
 from cadastro.models import Operador
+from inspecao.models import Reinspecao
 
 class PecasOrdem(models.Model):
     ordem = models.ForeignKey(Ordem, on_delete=models.CASCADE, related_name='ordem_pecas_pintura')
@@ -44,3 +45,15 @@ class CambaoPecas(models.Model):
 
     def __str__(self):
         return f"{self.peca_ordem.peca} - {self.quantidade_pendurada}"
+
+class Retrabalho(models.Model):
+    TIPO_CHOICES = (
+        ("a retrabalhar", "A Retrabalhar"),
+        ("em processo", "Em processo"),
+        ("finalizado", "Finalizado"),
+    )
+
+    reinspecao = models.ForeignKey(Reinspecao, on_delete=models.CASCADE, null=False, blank=False)
+    data_inicio = models.DateTimeField(null=True, blank=True)
+    data_fim = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20,choices=TIPO_CHOICES, null=False, blank=False)

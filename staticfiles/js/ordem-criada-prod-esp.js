@@ -843,7 +843,11 @@ async function handleSubmit(event) {
 
             form.reset();
 
+<<<<<<< HEAD
             //  Remove o foco do elemento ativo antes de fechar o modal
+=======
+            // 🔹 Remove o foco do elemento ativo antes de fechar o modal
+>>>>>>> dev-saul
             document.activeElement.blur();
 
             // Fecha corretamente o modal atual

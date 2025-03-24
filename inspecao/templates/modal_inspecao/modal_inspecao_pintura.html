@@ -1,0 +1,231 @@
+<div class="modal fade" id="modal-inspecionar-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="inspecionar-pinturaLabel">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title title" id="inspecionar-pinturaLabel">Inspecionar Pintura</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="form-inspecao">
+          <div class="modal-body p-4" style="max-height: 70vh;overflow-y: auto;">
+            <div class="row">
+                <input type="hidden" name="id-inspecao-pintura" id="id-inspecao-pintura" class="form-control">
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal" for="data-finalizada-inspecao-pintura">Data Finalizada:</label>
+                    <input type="text" name="data-finalizada-inspecao-pintura" id="data-finalizada-inspecao-pintura" class="form-control" disabled>
+                </div>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal" for="data-inspecao-pintura">Data Inspeção:</label>
+                    <input type="datetime-local" name="data-inspecao-pintura" id="data-inspecao-pintura" class="form-control" required>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-8 mb-4">
+                    <label class="label-modal" for="peca-inspecao-pintura">Conjuntos:</label>
+                    <input type="text" name="peca-inspecao-pintura" id="peca-inspecao-pintura"
+                        class="form-control" disabled>
+                </div>
+                <div class="col-sm-4 mb-4">
+                    <label class="label-modal" for="cor-inspecao-pintura">Cor - Tipo:</label>
+                    <input type="text" name="cor-inspecao-pintura" id="cor-inspecao-pintura"
+                        class="form-control" disabled>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-4 mb-4">
+                    <label class="label-modal">Quantidade Inspecionada:</label>
+                    <input id="qtd-inspecao-pintura" type="number" name="qtd-inspecao-pintura" value=""
+                        class="form-control" disabled>
+                </div>
+                <div class="col-sm-4 mb-4">
+                    <label class="label-modal">N° total de conformidades:</label>
+                    <input type="number" id="conformidade-inspecao-pintura" min="0" name="conformidade-inspecao-pintura" value=""
+                        class="form-control" required>
+                </div>
+                <div class="col-sm-4 mb-4">
+                    <label class="label-modal">N° total de não conformidades:</label>
+                    <input type="number" id="nao-conformidade-inspecao-pintura" name="nao-conformidade-inspecao-pintura" value=""
+                        class="form-control" disabled>
+                </div>
+            </div>
+            <div id="containerInspecao">
+              <div class="row mb-3 selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
+                <span class="label-modal text-end"> 1ª Causa</span>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Causas:</label>
+                    <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
+                      {% for causa in causas %}
+                        <option value="{{causa.id}}">{{causa.nome}}</option>
+                      {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Quantidade:</label>
+                    <input type="number" style="font-size: 14px;" min="1" class="form-control" required>
+                </div>
+                <div class="col-sm-12 mb-4">
+                    <label class="label-modal">Imagens:</label>
+                    <input class="form-control" type="file" name="imagens_1" multiple>
+                </div>
+              </div> 
+            </div>
+            <div id="addRemoveContainer" class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
+              <button type="button" class="btn btn-white" id="removeButtonPintura" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
+              <button type="button" class="btn btn-white" id="addButtonPintura" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Inspetor:</label>
+                    <select name="inspetor" id="inspetor" class="form-control" required>
+                        <option value="" selected hidden disabled></option>
+                        {% for inspetor in inspetores %}
+                          <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>    
+          </div>                
+          <div class="modal-footer">
+            <button id="submit-inspecionar-pintura" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+              <span role="status">Enviar inspeção</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-reinspecionar-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-pinturaLabel">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="reinspecionar-pinturaLabel">Reinspecionar Pintura</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="form-reinspecao">
+          <div class="modal-body p-4" style="max-height: 70vh;overflow-y: auto;">
+            <div class="row">
+                <input type="hidden" name="id-reinspecao-pintura" id="id-reinspecao-pintura" class="form-control">
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal" for="data-finalizada-reinspecao-pintura">Data Inspeção:</label>
+                    <input type="text" name="data-finalizada-reinspecao-pintura" id="data-finalizada-reinspecao-pintura" class="form-control" disabled>
+                </div>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal" for="data-reinspecao-pintura">Data Reinspeção:</label>
+                    <input type="datetime-local" name="data-reinspecao-pintura" id="data-reinspecao-pintura" class="form-control" required>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-8 mb-4">
+                    <label class="label-modal" for="peca-reinspecao-pintura">Conjuntos:</label>
+                    <input type="text" name="peca-reinspecao-pintura" id="peca-reinspecao-pintura"
+                        class="form-control" disabled>
+                </div>
+                <div class="col-sm-4 mb-4">
+                    <label class="label-modal" for="cor-reinspecao-pintura">Cor - Tipo:</label>
+                    <input type="text" name="cor-reinspecao-pintura" id="cor-reinspecao-pintura"
+                        class="form-control" disabled>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-4 mb-4">
+                    <label class="label-modal">Quantidade Total Reinspeção:</label>
+                    <input id="qtd-reinspecao-pintura" type="number" name="qtd-reinspecao-pintura" value=""
+                        class="form-control" disabled>
+                </div>
+                <div class="col-sm-4 mb-4">
+                    <label class="label-modal">N° total de conformidades:</label>
+                    <input type="number" id="conformidade-reinspecao-pintura" min="0" name="conformidade-reinspecao-pintura" value=""
+                        class="form-control" required>
+                </div>
+                <div class="col-sm-4 mb-4">
+                    <label class="label-modal">N° total de não conformidades:</label>
+                    <input type="number" id="nao-conformidade-reinspecao-pintura" name="nao-conformidade-reinspecao-pintura" value=""
+                        class="form-control" disabled>
+                </div>
+            </div>
+            <div id="containerReinspecao">
+              <div class="row mb-3 selectContainerReinspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
+                <span class="label-modal text-end"> 1ª Causa</span>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Causas:</label>
+                    <select class="form-control select2" name="causas_reinspecao_1" style="font-size: 14px;" multiple required>
+                      {% for causa in causas %}
+                        <option value="{{causa.id}}">{{causa.nome}}</option>
+                      {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Quantidade:</label>
+                    <input type="number" style="font-size: 14px;" min="1" class="form-control" required>
+                </div>
+                <div class="col-sm-12 mb-4">
+                    <label class="label-modal">Imagens:</label>
+                    <input class="form-control" type="file" name="imagens_reinspecao_1" multiple>
+                </div>
+              </div> 
+            </div>
+            <div id="addRemoveContainerReinspecao" class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
+              <button type="button" class="btn btn-white" id="remove-reinspecao-pintura" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
+              <button type="button" class="btn btn-white" id="add-reinspecao-pintura" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-sm-6 mb-4">
+                    <label for="inspetor-reinspecao-pintura" class="label-modal">Inspetor:</label>
+                    <select name="inspetor-reinspecao-pintura" id="inspetor-reinspecao-pintura" class="form-control" required>
+                        <option value="" selected hidden disabled></option>
+                        {% for inspetor in inspetores %}
+                          <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>    
+          </div> 
+          <div class="modal-footer">
+            <button id="submit-reinspecionar-pintura" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+              <span role="status">Enviar inspeção</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-historico-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-pinturaLabel">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="reinspecionar-pinturaLabel">Histórico de Pintura</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <section class="py-3">
+                <ul class="timeline">
+
+                </ul>
+              </section>
+        </div>
+      </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-causas-historico-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-pinturaLabel">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Causas Pintura</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+          <section class="py-3">
+              <div id="causas-pintura">
+
+              </div>
+          </section>
+      </div>
+    </div>
+  </div>
+</div>

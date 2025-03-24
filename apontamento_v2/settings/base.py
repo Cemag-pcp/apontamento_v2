@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'cadastro',
     'usuario',
     'core',
+    'inspecao',
 
     'apontamento_serra',
     'apontamento_usinagem',
@@ -103,9 +104,16 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'apontamento_pintura/static'),
     os.path.join(BASE_DIR, 'cargas/static'),
 
+    os.path.join(BASE_DIR, 'inspecao/static'),
     os.path.join(BASE_DIR, 'cadastro/static'),
 ]
+
+MEDIA_URL = '/media/'
+
+# Define o diretório onde os arquivos de mídia serão armazenados
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 LOGIN_URL = '/core/login/'
 LOGIN_REDIRECT_URL = '/core/'  
 LOGOUT_REDIRECT_URL = '/core/login/'  
+LOGIN_URL = '/core/login/'

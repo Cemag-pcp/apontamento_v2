@@ -3,3 +3,4 @@ env_apontamento
 __pycache__/
 .env
 antigo
+.vscode

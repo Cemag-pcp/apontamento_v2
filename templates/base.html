@@ -22,6 +22,7 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
 
     {% block links %}
@@ -33,6 +34,7 @@
         <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
             <!-- Navbar Brand-->
             <a class="navbar-brand ps-3" href="#">CEMAG</a>
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
             <!-- Sidebar Toggle-->
             <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
             <!-- Navbar Search-->
@@ -167,9 +169,14 @@
                                 Pintura
                                 <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
                             </a>
-                            <div class="collapse" id="collapsePintura" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapsePintura" aria-labelledby="headingPintura" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'pintura:planejamento' %}">Ordens</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapsePintura" aria-labelledby="headingPintura" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'pintura:retrabalho_pintura' %}">Retrabalho</a>
                                 </nav>
                             </div>
 
@@ -184,6 +191,42 @@
                                 </nav>
                             </div>
 
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseInspecao" aria-expanded="false" aria-controls="collapseInspecao">
+                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
+                                Inspeção
+                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            </a>
+                                <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'inspecao:inspecao-pintura' %}">Pintura</a>
+                                    </nav>
+                                </div>
+                                <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'inspecao:inspecao-montagem' %}">Montagem</a>
+                                    </nav>
+                                </div>
+                                <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'inspecao:inspecao-estamparia' %}">Estamparia</a>
+                                    </nav>
+                                </div>
+
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseInspecaoEstanqueidade" aria-expanded="false" aria-controls="collapseInspecao">
+                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
+                                Inspeção Estanqueidade
+                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            </a>
+                                <div class="collapse" id="collapseInspecaoEstanqueidade" aria-labelledby="headingInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'inspecao:inspecao-tanque' %}">Tanque</a>
+                                    </nav>
+                                </div>
+                                <div class="collapse" id="collapseInspecaoEstanqueidade" aria-labelledby="headingInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'inspecao:inspecao-tubos-cilindros' %}">Tubos e Cilindros</a>
+                                    </nav>
+                                </div>
                         </div>
                     </div>
                     <div class="sb-sidenav-footer">
@@ -191,7 +234,6 @@
                             <!-- Exibe o tipo de acesso do usuário -->
                             Logado: <strong>{{ request.user.username }}</strong> 
                             <br>
-                            Acesso: <strong>{{ request.user.profile.tipo_acesso|title }}</strong>
                         </div>
                         <!-- Botão de Logout -->
                         <a href="{% url 'core:logout' %}" class="btn btn-danger btn-sm mt-2 w-100">Sair</a>

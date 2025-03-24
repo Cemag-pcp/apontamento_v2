@@ -394,7 +394,11 @@ function getCSRFToken() {
 document.addEventListener('DOMContentLoaded', () => {
     
     configurarBotaoVerPecas();
+<<<<<<< HEAD
     // salvarPecas();
+=======
+    salvarPecas();
+>>>>>>> dev-saul
 
     // Ação do botão de filtro
     document.getElementById("filtro-form").addEventListener("submit", (event) => {

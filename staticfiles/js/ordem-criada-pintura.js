@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+// import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina.js';
+
+>>>>>>> dev-saul
 export const loadOrdens = (container, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -13,11 +18,16 @@ export const loadOrdens = (container, filtros = {}) => {
                 
                 if (ordens.length > 0) {
                     // Criar cabeçalho da tabela
+<<<<<<< HEAD
                     const tableWrapper = document.createElement("div");
                     tableWrapper.classList.add("table-container");
         
                     const table = document.createElement('table');
                     table.classList.add('table', 'table-bordered', 'table-striped', 'header-fixed');
+=======
+                    const table = document.createElement('table');
+                    table.classList.add('table', 'table-bordered', 'table-striped');
+>>>>>>> dev-saul
 
                     table.innerHTML = `
                         <thead class="table-light">
@@ -36,10 +46,14 @@ export const loadOrdens = (container, filtros = {}) => {
                         <tbody id="tabela-ordens-corpo"></tbody>
                     `;
 
+<<<<<<< HEAD
                     tableWrapper.appendChild(table);
                     container.appendChild(tableWrapper);
     
                     // container.appendChild(table);
+=======
+                    container.appendChild(table);
+>>>>>>> dev-saul
                     const tabelaCorpo = document.getElementById('tabela-ordens-corpo');
 
                     ordens.forEach(ordem => {
@@ -1379,7 +1393,11 @@ async function handleSubmit(event) {
 
             form.reset();
 
+<<<<<<< HEAD
             //  Remove o foco do elemento ativo antes de fechar o modal
+=======
+            // 🔹 Remove o foco do elemento ativo antes de fechar o modal
+>>>>>>> dev-saul
             document.activeElement.blur();
 
             // Fecha corretamente o modal atual
@@ -1509,6 +1527,7 @@ function filtro() {
     });
 }
 
+<<<<<<< HEAD
 // Registra o listener apenas uma vez, fora da função abrirModalCambao
 const selectTipo = document.getElementById("tipoPintura");
 selectTipo.addEventListener("change", async () => {
@@ -1544,6 +1563,8 @@ selectTipo.addEventListener("change", async () => {
     }
 });
 
+=======
+>>>>>>> dev-saul
 async function abrirModalCambao() {
     const checkboxes = document.querySelectorAll(".ordem-checkbox:checked");
     const tabelaCambao = document.getElementById("tabelaCambao");
@@ -1568,6 +1589,7 @@ async function abrirModalCambao() {
     tabelaCambao.innerHTML = ""; // Limpa a tabela antes de preencher
     selectCambao.innerHTML = `<option value="">Carregando...</option>`; // Carrega cambões
 
+<<<<<<< HEAD
     // const selectTipo = document.getElementById("tipoPintura");
 
     // selectTipo.addEventListener("change", async () => {
@@ -1592,6 +1614,36 @@ async function abrirModalCambao() {
     //         Swal.close();
     //     }
     // });
+=======
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Aguarde...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // Buscar cambões disponíveis da API
+    try {
+        const response = await fetch("api/cambao-livre/");
+        const data = await response.json();
+
+        if (data.cambao_livres.length > 0) {
+            Swal.close();
+            selectCambao.innerHTML = `<option value="">Selecione um cambão...</option>`;
+            data.cambao_livres.forEach(cambao => {
+                selectCambao.innerHTML += `<option value="${cambao.id}">Cambão ${cambao.id}</option>`;
+            });
+        } else {
+            selectCambao.innerHTML = `<option value="">Nenhum cambão disponível</option>`;
+        }
+    } catch (error) {
+        console.error("Erro ao buscar cambões:", error);
+        selectCambao.innerHTML = `<option value="">Erro ao carregar cambões</option>`;
+        Swal.close();
+    }
+>>>>>>> dev-saul
 
     checkboxes.forEach(cb => {
         const linha = cb.closest("tr");
@@ -1839,7 +1891,11 @@ async function cambaoProcesso() {
             const corHex = colorMap[cor] || "#808080"; // Se não encontrar, usa cinza padrão
             const colDiv = document.createElement("div");
             colDiv.classList.add("col-md-4");
+<<<<<<< HEAD
 
+=======
+            console.log(camboes);
+>>>>>>> dev-saul
             colDiv.innerHTML = `
                 <div class="card shadow-sm position-relative">
                     <div class="card-header text-white text-center" style="background-color: ${corHex};">
@@ -1849,8 +1905,13 @@ async function cambaoProcesso() {
                         ${camboes.map(cambao => `
                             <div class="border rounded p-2 mb-2">
                                 <div class="d-flex justify-content-between">
+<<<<<<< HEAD
                                     <strong>Cambão #${cambao.nome}</strong> 
                                     <span class="badge ${cambao.tipo === 'PÓ' ? 'bg-primary' : 'bg-secondary'}">${cambao.tipo}</span>
+=======
+                                    <strong>Cambão #${cambao.id}</strong> 
+                                    <span class="badge bg-warning">${cambao.tipo}</span>
+>>>>>>> dev-saul
                                 </div>
                                 <span class="badge bg-dark text-light px-2 py-1 my-2" 
                                       id="contador-cambao-${cambao.id}" 
