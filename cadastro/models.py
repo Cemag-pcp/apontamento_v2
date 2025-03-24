@@ -102,7 +102,6 @@ class ConjuntoCarreta(models.Model):
             models.UniqueConstraint(fields=['conjunto', 'carreta'], name='unique_conjunto_carreta')
         ]
 
-<<<<<<< HEAD
 class Pecas(models.Model):
 
     codigo = models.CharField(max_length=255, unique=True)
@@ -120,7 +119,7 @@ class Pecas(models.Model):
 
     def __str__(self):
         return f'{self.codigo} - {self.descricao}'
-=======
+    
 class PecasEstanqueidade(models.Model):
 
     TIPO_CHOICES = (
@@ -135,4 +134,3 @@ class PecasEstanqueidade(models.Model):
 
     def __str__(self):
         return f'{self.codigo} - {self.descricao}'
->>>>>>> dev-saul
