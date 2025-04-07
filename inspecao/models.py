@@ -2,7 +2,6 @@ from django.db import models
 from core.models import Profile
 from cadastro.models import PecasEstanqueidade
 
-
 class Inspecao(models.Model):
 
     data_inspecao = models.DateTimeField(auto_now_add=True)
@@ -38,7 +37,6 @@ class Inspecao(models.Model):
 
         return f"Inspeção {self.id} - {setor_inspecao}"
 
-
 class DadosExecucaoInspecao(models.Model):
 
     inspecao = models.ForeignKey(
@@ -47,7 +45,7 @@ class DadosExecucaoInspecao(models.Model):
     inspetor = models.ForeignKey(
         Profile, on_delete=models.SET_NULL, null=True, blank=True
     )
-    data_execucao = models.DateTimeField()
+    data_execucao = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     num_execucao = models.IntegerField(null=True, blank=True)
     conformidade = models.IntegerField(null=False, blank=False)
     nao_conformidade = models.IntegerField(null=False, blank=False)
@@ -73,15 +71,13 @@ class DadosExecucaoInspecao(models.Model):
         # Chama o método save da superclasse para salvar o objeto
         super(DadosExecucaoInspecao, self).save(*args, **kwargs)
 
-
 class Reinspecao(models.Model):
 
     inspecao = models.ForeignKey(
         Inspecao, on_delete=models.CASCADE, null=False, blank=False
     )
     data_reinspecao = models.DateTimeField(auto_now_add=True)
-    reinspecionado = models.BooleanField()
-
+    reinspecionado = models.BooleanField(default=False)
 
 class Causas(models.Model):
 

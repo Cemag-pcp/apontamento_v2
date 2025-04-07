@@ -51,12 +51,12 @@
               <div class="row mb-3 selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
                 <span class="label-modal text-end"> 1ª Causa</span>
                 <div class="col-sm-6 mb-4">
-                    <label class="label-modal">Causas:</label>
-                    <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
-                      {% for causa in causas %}
-                        <option value="{{causa.id}}">{{causa.nome}}</option>
-                      {% endfor %}
-                    </select>
+                  <label class="label-modal">Causas: <small>selecione mais de uma</small></label>
+                  <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
+                    {% for causa in causas %}
+                      <option value="{{causa.id}}">{{causa.nome}}</option>
+                    {% endfor %}
+                  </select>
                 </div>
                 <div class="col-sm-6 mb-4">
                     <label class="label-modal">Quantidade:</label>
@@ -149,7 +149,7 @@
               <div class="row mb-3 selectContainerReinspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
                 <span class="label-modal text-end"> 1ª Causa</span>
                 <div class="col-sm-6 mb-4">
-                    <label class="label-modal">Causas:</label>
+                    <label class="label-modal">Causas: <small>selecione mais de uma</small></label>
                     <select class="form-control select2" name="causas_reinspecao_1" style="font-size: 14px;" multiple required>
                       {% for causa in causas %}
                         <option value="{{causa.id}}">{{causa.nome}}</option>

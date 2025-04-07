@@ -26,10 +26,15 @@ urlpatterns = [
     path('api/ordens-iniciadas/', views.get_ordens_iniciadas, name='get_ordens_iniciadas'),
     path('api/ordens-interrompidas/', views.get_ordens_interrompidas, name='get_ordens_interrompidas'),
     path('api/ordens-sequenciadas/', views.get_ordens_sequenciadas, name='get_ordens_sequenciadas'),
+    path('api/resequenciar-ordem/', views.resequenciar_ordem, name='resequenciar_ordem'),
     
     # verificar se esse endpoint está sendo usado
     path('api/duplicador-ordem/filtrar/', views.filtrar_ordens, name='filtrar_ordens'),
 
     path('api/get-pecas/', views.get_pecas, name='get_pecas'),
+
+    # consumir dados via google sheets
+    path('api/apontamentos/corte', views.api_ordens_finalizadas, name='api_ordens_finalizadas'),
+    path('api/apontamentos/mp', views.api_ordens_finalizadas_mp, name='api_ordens_finalizadas_mp'),
 
 ]

@@ -14,7 +14,7 @@ from core.models import Ordem, Operador, PropriedadesOrdem
 from apontamento_corte.models import PecasOrdem
 from cadastro.models import Maquina
 
-df = pd.read_csv(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\file_temp\criadas.csv')
+df = pd.read_csv(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\file_temp\criadas3.csv')
 df['status_atual'] = 'finalizada'
 df['data_programacao'] = df['data abertura de op']
 df['grupo_maquina'] = df['maquina'].apply(

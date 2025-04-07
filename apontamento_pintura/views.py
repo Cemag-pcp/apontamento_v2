@@ -405,6 +405,7 @@ def finalizar_cambao(request):
                         operador_fim=operador,
                     )
 
+                    # Cria uma inspeção para a peça
                     Inspecao.objects.create(
                         pecas_ordem_pintura=nova_peca_ordem,
                     )

@@ -18,19 +18,21 @@
 <ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
     <li class="nav-item" style="width: 33%;">
         <a id="itens-inspecionar" class="nav-link tab-active active text-center" style="font-size: 0.875rem;"  onclick="activeRow('retrabalho-pintura','em-processo-pintura','inspecionados-pintura', this)">
-            <span class="mx-2">Retrabalho</span>
+            <span id="titulo-itens-inspecionar" class="mx-2"></span>
+            <span id="badge-inspecionar" class="badge bg-primary mx-2">0</span>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </a>
     </li>
     <li class="nav-item" style="width: 33%;">
         <a id="itens-em-processo" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('em-processo-pintura','retrabalho-pintura','inspecionados-pintura', this)">
-            <span class="mx-2">Em processo</span>
+            <span id="titulo-itens-em-processo" class="mx-2"></span>
+            <span id="badge-em-processo" class="badge bg-primary mx-2">0</span>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </a>
     </li>
     <li class="nav-item" style="width: 33%;">
         <a id="itens-inspecionados" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-pintura','retrabalho-pintura','em-processo-pintura', this)">
-            <span class="mx-2">Itens enviados para retrabalho</span>
+            <span id="titulo-inspecionados" class="mx-2"></span>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </a>
     </li>
@@ -40,7 +42,6 @@
 <div id="retrabalho-pintura" class="row mt-3">
 
     <div class="d-flex justify-content-between mt-3">
-        <h4 style="width: 60%;">Retrabalho pendente</h4>
         <div>
             <div class="btn-group">
                 <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
@@ -81,7 +82,7 @@
         </div>
     </div>
     <div class="d-flex justify-content-end gap-2 my-2">
-        <span id="qtd-pendente-retrabalho" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <!-- <span id="qtd-pendente-retrabalho" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span> -->
         <span id="qtd-filtrada-retrabalho" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
     <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
@@ -99,7 +100,6 @@
 <div id="em-processo-pintura" class="row mt-3" style="display: none;">
 
     <div class="d-flex justify-content-between mt-3">
-        <h4 style="width: 60%;">Em processo</h4>
         <div>
             <div class="btn-group">
                 <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton2" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
@@ -140,7 +140,7 @@
         </div>
     </div>
     <div class="d-flex justify-content-end gap-2 my-2">
-        <span id="qtd-pendente-em-processo" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <!-- <span id="qtd-pendente-em-processo" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span> -->
         <span id="qtd-filtrada-em-processo" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
     <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
@@ -159,7 +159,6 @@
 <div id="inspecionados-pintura" class="row mt-3" style="display: none;">
 
     <div class="d-flex justify-content-between mt-3">
-        <h4 style="width: 60%;">Itens retrabalhados</h4>
         <div class="d-flex gap-2">
             <!-- <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar</button> -->
             <div>

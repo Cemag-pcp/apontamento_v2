@@ -268,10 +268,15 @@ function iniciarOrdem(ordemId) {
 }
 
 export function carregarOrdensIniciadas(filtros = {}) {
+    const container = document.querySelector('.containerProcesso');
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     fetch(`api/ordens-iniciadas/?setor=${filtros.setor || ''}`)
         .then(response => response.json())
         .then(data => {
-            const container = document.querySelector('.containerProcesso');
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
 
@@ -350,9 +355,14 @@ export function carregarOrdensIniciadas(filtros = {}) {
 };
 
 export function carregarOrdensInterrompidas(filtros = {}) {
+    const container = document.querySelector('.containerInterrompido');
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     // Fetch para buscar ordens interrompidas
 
-    const container = document.querySelector('.containerInterrompido');
 
     fetch(`api/ordens-interrompidas/?setor=${filtros.setor || ''}`)
     .then(response => response.json())
@@ -857,6 +867,13 @@ function iniciarContador(cambaoId, dataCriacao) {
 }
 
 function atualizarAndamentoCarga(dataCarga) {
+    const percentualDisplay = document.getElementById("percentual-carga");
+
+    percentualDisplay.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     fetch(`api/andamento-carga/?data_carga=${encodeURIComponent(dataCarga)}`)
         .then(response => {
             if (!response.ok) {
@@ -866,7 +883,6 @@ function atualizarAndamentoCarga(dataCarga) {
         })
         .then(data => {
             const percentual = data.percentual_concluido || 0; // Se não houver dado, assume 0%
-            const percentualDisplay = document.getElementById("percentual-carga");
 
             // Adiciona efeito de transição suave ao atualizar o valor
             percentualDisplay.style.transition = "0.5s ease-in-out";
@@ -889,6 +905,13 @@ document.getElementById("refresh-status-carga").addEventListener("click", functi
 })
 
 function atualizarUltimasCargas() {
+    const listaCargas = document.getElementById("ultimas-pecas-list");
+    
+    listaCargas.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+
     fetch("api/andamento-ultimas-cargas/")
         .then(response => {
             if (!response.ok) {
@@ -897,7 +920,6 @@ function atualizarUltimasCargas() {
             return response.json();
         })
         .then(data => {
-            const listaCargas = document.getElementById("ultimas-pecas-list");
             listaCargas.innerHTML = ""; // Limpa antes de adicionar os novos
 
             if (data.andamento_cargas.length === 0) {
@@ -964,6 +986,15 @@ export function fetchStatusMaquinas() {
     const indicador = document.querySelector('.text-center.mb-3 .display-4');
     const descricao = document.querySelector('.text-center.mb-3 p');
     const listaStatus = document.querySelector('#machine-status-list');
+
+    listaStatus.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+    indicador.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
 
     // Faz a requisição para a API
     fetch('/core/api/status_maquinas/?setor=montagem')
