@@ -1,4 +1,28 @@
-import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada-usinagem.js';
+import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada-serra-v2.js';
+
+document.addEventListener('DOMContentLoaded', function () {
+    // Atualiza automaticamente ao carregar a página
+    fetchStatusMaquinas();
+    fetchUltimasPecasProduzidas();
+    fetchContagemStatusOrdens();
+
+    // Adiciona eventos de clique para atualizar manualmente
+    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
+        fetchStatusMaquinas(); // Chama a função existente
+    });
+
+    document.getElementById('refresh-pecas').addEventListener('click', function () {
+        fetchUltimasPecasProduzidas(); // Chama a função existente
+    });
+
+    document.getElementById('refresh-ordens').addEventListener('click', function () {
+        fetchContagemStatusOrdens(); // Chama a função existente
+    });
+
+    document.getElementById('btnPararMaquina').addEventListener('click', () => {
+        mostrarModalPararMaquina(); // Chama a função já existente
+    });
+});
 
 export function fetchStatusMaquinas() {
     // Seleciona os elementos do container
@@ -6,8 +30,18 @@ export function fetchStatusMaquinas() {
     const descricao = document.querySelector('.text-center.mb-3 p');
     const listaStatus = document.querySelector('#machine-status-list');
 
+    indicador.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+    
+    listaStatus.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     // Faz a requisição para a API
-    fetch('/core/api/status_maquinas/?setor=usinagem')
+    fetch('/core/api/status_maquinas/?setor=serra')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -88,9 +122,14 @@ export function fetchStatusMaquinas() {
 export function fetchUltimasPecasProduzidas() {
     // Seleciona o elemento da lista onde as peças serão adicionadas
     const listaPecas = document.querySelector('#ultimas-pecas-list');
+    
+    listaPecas.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
 
     // Faz a requisição para a API
-    fetch(`/core/api/ultimas_pecas_produzidas/?setor=usinagem`)
+    fetch(`/core/api/ultimas_pecas_produzidas/?setor=serra`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -127,8 +166,13 @@ export function fetchContagemStatusOrdens() {
     // Seleciona o elemento da lista onde os status serão adicionados
     const listaStatus = document.getElementById('status-ordens-list');
 
+    listaStatus.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     // Faz a requisição para a API
-    fetch('/core/api/status_ordem/?setor=usinagem')
+    fetch('/core/api/status_ordem/?setor=serra')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -175,7 +219,7 @@ export function fetchContagemStatusOrdens() {
 
 async function fetchMaquinasDisponiveis() {
     try {
-        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=usinagem');
+        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=serra');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -289,7 +333,7 @@ async function handleFormSubmit(event) {
     });
 
     try {
-        const response = await fetch(`/core/api/parar-maquina/?setor=usinagem`, {
+        const response = await fetch(`/core/api/parar-maquina/?setor=serra`, {
             method: 'PATCH',
             body: JSON.stringify({
                 maquina: document.getElementById('escolhaMaquinaParada').value,
@@ -332,30 +376,3 @@ async function handleFormSubmit(event) {
         });
     }
 }
-
-document.addEventListener('DOMContentLoaded', function () {
-    // Atualiza automaticamente ao carregar a página
-    fetchStatusMaquinas();
-    fetchUltimasPecasProduzidas();
-    fetchContagemStatusOrdens();
-
-    // Adiciona eventos de clique para atualizar manualmente
-    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
-        console.log("Atualizando Status de Máquinas...");
-        fetchStatusMaquinas(); // Chama a função existente
-    });
-
-    document.getElementById('refresh-pecas').addEventListener('click', function () {
-        console.log("Atualizando Últimas Peças Produzidas...");
-        fetchUltimasPecasProduzidas(); // Chama a função existente
-    });
-
-    document.getElementById('refresh-ordens').addEventListener('click', function () {
-        console.log("Atualizando Status de Ordens...");
-        fetchContagemStatusOrdens(); // Chama a função existente
-    });
-
-    document.getElementById('btnPararMaquina').addEventListener('click', () => {
-        mostrarModalPararMaquina(); // Chama a função já existente
-    });
-});

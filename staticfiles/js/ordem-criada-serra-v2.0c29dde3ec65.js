@@ -2,7 +2,7 @@ import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOr
 
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
-
+    
     return new Promise((resolve, reject) => { // Retorna uma Promise
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
@@ -11,9 +11,10 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
+
                 if (ordens.length > 0) {
-                    console.log(ordens);
                     ordens.forEach(ordem => {
+
                         const card = document.createElement('div');
                         card.classList.add('col-md-4'); // Adiciona a classe de coluna
 
@@ -226,6 +227,12 @@ function iniciarContador(ordemId, dataCriacao) {
 }
 
 export function carregarOrdensIniciadas(container, filtros={}) {
+    
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+    
     fetch(`api/ordens-iniciadas/?page=1&limit=10&ordem=${filtros.ordem || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
 
         .then(response => response.json())
@@ -343,6 +350,12 @@ export function carregarOrdensIniciadas(container, filtros={}) {
 }
 
 export function carregarOrdensInterrompidas(container, filtros={}) {
+    
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     // Fetch para buscar ordens interrompidas
     fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
@@ -476,6 +489,9 @@ function resetarCardsInicial(filtros = {}) {
 
         loadOrdens(container, page, limit, currentFiltros)
             .then((data) => {
+                loadMoreButton.disabled = false;
+                loadMoreButton.innerHTML = `Carregar mais`; 
+
                 if (data.ordens.length === 0) {
                     hasMoreData = false;
                     loadMoreButton.style.display = 'none'; // Esconde o botão quando não há mais dados
@@ -503,6 +519,13 @@ function resetarCardsInicial(filtros = {}) {
 
     // Configurar o botão "Carregar Mais"
     loadMoreButton.onclick = () => {
+        loadMoreButton.disabled = true;
+        loadMoreButton.innerHTML = `                    
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+        `;
+
         fetchOrdens(); // Carrega a próxima página ao clicar no botão
     };
 }

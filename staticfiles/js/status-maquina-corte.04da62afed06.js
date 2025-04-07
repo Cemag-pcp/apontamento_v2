@@ -29,7 +29,14 @@ export function fetchStatusMaquinas() {
     const indicador = document.querySelector('.text-center.mb-3 .display-4');
     const descricao = document.querySelector('.text-center.mb-3 p');
     const listaStatus = document.querySelector('#machine-status-list');
-
+    indicador.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+    listaStatus.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
     // Faz a requisição para a API
     fetch('/core/api/status_maquinas/?setor=corte')
         .then(response => {
@@ -113,114 +120,134 @@ export function fetchOrdensSequenciadasLaser() {
     const container = document.getElementById('ordens-sequenciadas-laser-container');
     const btnFiltrarOrdemSequenciadaLaser = document.getElementById('btnPesquisarOrdemSequenciadaLaser');
     const ordemLaser = document.getElementById('pesquisarOrdemSequenciadaLaser');
-    
+
     // Função que realiza a requisição, dado um URL
     function carregarOrdens(url) {
+        container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+    
         // Limpa o conteúdo imediatamente antes de iniciar a requisição
-        container.innerHTML = '';
         
         fetch(url)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Se a resposta não tiver ordens, exibe mensagem
-                if (data.ordens_sequenciadas && data.ordens_sequenciadas.length > 0) {
-                    data.ordens_sequenciadas.forEach(ordem => {
-                        // Mapeamento de cores para o badge de status
-                        const statusColors = {
-                            'aguardando_iniciar': 'primary',
-                            'iniciada': 'success',
-                            'interrompida': 'warning',
-                            'finalizada': 'secondary',
-                        };
-                        const badgeColor = statusColors[ordem.status_atual] || 'secondary';
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            container.innerHTML = '';
+            // Se a resposta não tiver ordens, exibe mensagem
+            if (data.ordens_sequenciadas && data.ordens_sequenciadas.length > 0) {
+                data.ordens_sequenciadas.forEach(ordem => {
+                    // Mapeamento de cores para o badge de status
+                    const statusColors = {
+                        'aguardando_iniciar': 'warning',
+                        'iniciada': 'info',
+                        'interrompida': 'danger',
+                        'finalizada': 'success',
+                    };
 
-                        const statusColorsMaquina = {
-                            'laser_1': 'primary',
-                            'laser_2': 'success',
-                        };
-                        const badgeColorMaquina = statusColorsMaquina[ordem.grupo_maquina] || 'secondary';
+                    const statusLabels = {
+                        'aguardando_iniciar': 'Aguardando iniciar',
+                        'iniciada': 'Iniciada',
+                        'interrompida': 'Interrompida',
+                        'finalizada': 'Finalizada',
+                    };
 
-                        let botoesAcao = '';
+                    const badgeColor = statusColors[ordem.status_atual] || 'secondary';
+                    const statusLabel = statusLabels[ordem.status_atual] || ordem.status_atual;
 
-                        if (ordem.status_atual === 'aguardando_iniciar'){
-                            botoesAcao = `
-                            <div>
-                                <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
-                                    <i class="fa fa-play"></i>
-                                </button>
-                                <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
-                                    <i class="fa fa-eye"></i>
-                                </button>
-                            </div>
-                            <div>
-                                <button class="btn btn-danger btn-sm btn-retirar-sequenciamento" data-index="${ordem.id}">
-                                    🗑
-                                </button>
-                            </div>
-                            `
-                        } else {
-                            botoesAcao = `
-                            <div>
-                                <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
-                                    <i class="fa fa-eye"></i>
-                                </button>
-                            </div>
-                            `
-                        }
+                    const statusColorsMaquina = {
+                        'laser_1': 'primary',
+                        'laser_2': 'success',
+                    };
+                    const badgeColorMaquina = statusColorsMaquina[ordem.grupo_maquina] || 'secondary';
 
-                        // Cria um card para cada ordem
-                        const card = document.createElement('div');
-                        card.classList.add('card', 'mb-3');
-                        card.innerHTML = `
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
-                                <span class="badge bg-${badgeColor}">${ordem.status_atual}</span>
-                                <small><span class="badge bg-${badgeColorMaquina}">${ordem.grupo_maquina_display}</span></small>
-                            </h5>
-                            <p class="card-text mb-1">
-                                <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
-                            </p>
-                            <p class="card-text mb-1">
-                                <strong>Data Programação:</strong> ${ordem.data_programacao}
-                            </p>
+                    let botoesAcao = '';
+
+                    if (ordem.status_atual === 'aguardando_iniciar'){
+                        botoesAcao = `
+                        <div>
+                            <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
+                                <i class="fa fa-play"></i>
+                            </button>
+                            <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
+                                <i class="fa fa-eye"></i>
+                            </button>
                         </div>
-                        <div class="card-footer d-flex justify-content-between align-items-center">
-                            ${botoesAcao}
+                        <div>
+                            <button class="btn btn-danger btn-sm btn-retirar-sequenciamento" data-index="${ordem.id}">
+                                🗑
+                            </button>
                         </div>
-                        `;
-                        container.appendChild(card);
+                        `
+                    } else {
+                        botoesAcao = `
+                        <div>
+                            <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
+                                <i class="fa fa-eye"></i>
+                            </button>
+                        </div>
+                        `
+                    }
 
-                        const buttonVerPeca = card.querySelector('.btn-ver-peca');
-                        const buttonIniciar = card.querySelector('.btn-iniciar');
-                        const buttonRetirarSequenciamento = card.querySelector('.btn-retirar-sequenciamento');
+                    // Cria um card para cada ordem
+                    const card = document.createElement('div');
+                    card.classList.add('card', 'mb-3');
+                    card.innerHTML = `
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
+                            <span class="badge bg-${badgeColor}">${statusLabel}</span>
+                            <small><span class="badge bg-${badgeColorMaquina}">${ordem.grupo_maquina_display}</span></small>
+                        </h5>
+                        <p class="card-text mb-1">
+                            <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
+                        </p>
+                        <p class="card-text mb-1">
+                            <strong>Data Programação:</strong> ${ordem.data_programacao}
+                        </p>
+                    </div>
+                    <div class="card-footer d-flex justify-content-between align-items-center">
+                        ${botoesAcao}
+                    </div>
+                    `;
+                    container.appendChild(card);
 
+                    const buttonVerPeca = card.querySelector('.btn-ver-peca');
+                    const buttonIniciar = card.querySelector('.btn-iniciar');
+                    const buttonRetirarSequenciamento = card.querySelector('.btn-retirar-sequenciamento');
+
+                    if (buttonVerPeca) {
                         buttonVerPeca.addEventListener('click', () => {
                             mostrarPecas(ordem.id);
                         });
-
+                    }
+                    
+                    if (buttonIniciar) {
                         buttonIniciar.addEventListener('click', () => {
                             mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
                         });
-
+                    }
+                    
+                    if (buttonRetirarSequenciamento) {
                         buttonRetirarSequenciamento.addEventListener('click', () => {
                             mostrarModalExcluir(ordem.id, ordem.grupo_maquina);
                         });
+                    }
 
-                    });
-                } else {
-                    container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao buscar ordens sequenciadas:', error);
-                container.innerHTML = '<p class="text-center text-danger">Erro ao carregar os dados.</p>';
-            });
+                });
+            } else {
+                container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar ordens sequenciadas:', error);
+            container.innerHTML = '<p class="text-center text-danger">Erro ao carregar os dados.</p>';
+        });
     }
     
     // Busca inicial sem filtro de ordem
@@ -229,7 +256,7 @@ export function fetchOrdensSequenciadasLaser() {
     // Verifica se o listener já foi adicionado para evitar duplicação
     if (!btnFiltrarOrdemSequenciadaLaser.dataset.listenerAdded) {
         btnFiltrarOrdemSequenciadaLaser.addEventListener('click', () => {
-            const ordemDigitada = ordemPlasma.value.trim();
+            const ordemDigitada = ordemLaser.value.trim();
             const url = `api/ordens-sequenciadas/?maquina=laser${ordemDigitada ? `&ordem=${encodeURIComponent(ordemDigitada)}` : ''}`;
             carregarOrdens(url);
         });
@@ -242,104 +269,118 @@ export function fetchOrdensSequenciadasPlasma() {
     const btnFiltrarOrdemSequenciadaPlasma = document.getElementById('btnPesquisarOrdemSequenciadaPlasma');
     const ordemPlasma = document.getElementById('pesquisarOrdemSequenciadaPlasma');
     
+    
     function carregarOrdens(url) {
-        container.innerHTML = '';
+        container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
         fetch(url)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.ordens_sequenciadas && data.ordens_sequenciadas.length > 0) {
-                    data.ordens_sequenciadas.forEach(ordem => {
-                        // Mapeamento de cores para o badge de status
-                        const statusColors = {
-                            'aguardando_iniciar': 'primary',
-                            'iniciada': 'success',
-                            'interrompida': 'warning',
-                            'finalizada': 'secondary',
-                        };
-                        const badgeColor = statusColors[ordem.status_atual] || 'secondary';
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            container.innerHTML = '';
+            if (data.ordens_sequenciadas && data.ordens_sequenciadas.length > 0) {
+                data.ordens_sequenciadas.forEach(ordem => {
+                    // Mapeamento de cores para o badge de status
+                    const statusColors = {
+                        'aguardando_iniciar': 'warning',
+                        'iniciada': 'info',
+                        'interrompida': 'danger',
+                        'finalizada': 'success',
+                    };
 
-                        let botoesAcao = '';
-                        
-                        if (ordem.status_atual === 'aguardando_iniciar'){
-                            botoesAcao = `
-                            <div>
-                                <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
-                                    <i class="fa fa-play"></i>
-                                </button>
-                                <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
-                                    <i class="fa fa-eye"></i>
-                                </button>
-                            </div>
-                            <div>
-                                <button class="btn btn-danger btn-sm btn-retirar-sequenciamento" data-index="${ordem.id}">
-                                    🗑
-                                </button>
-                            </div>
-                            `;
-                        } else {
-                            botoesAcao = `
-                            <div>
-                                <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
-                                    <i class="fa fa-eye"></i>
-                                </button>
-                            </div>
-                            `;
-                        }
+                    const statusLabels = {
+                        'aguardando_iniciar': 'Aguardando iniciar',
+                        'iniciada': 'Iniciada',
+                        'interrompida': 'Interrompida',
+                        'finalizada': 'Finalizada',
+                    };
 
-                        const card = document.createElement('div');
-                        card.classList.add('card', 'mb-3');
-                        card.innerHTML = `
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
-                                <span class="badge bg-${badgeColor}">${ordem.status_atual}</span>
-                            </h5>
-                            <p class="card-text mb-1">
-                                <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
-                            </p>
-                            <p class="card-text mb-1">
-                                <strong>Data Programação:</strong> ${ordem.data_programacao}
-                            </p>
+                    const badgeColor = statusColors[ordem.status_atual] || 'secondary';
+                    const statusLabel = statusLabels[ordem.status_atual] || ordem.status_atual;
+
+                    let botoesAcao = '';
+                    
+                    if (ordem.status_atual === 'aguardando_iniciar'){
+                        botoesAcao = `
+                        <div>
+                            <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
+                                <i class="fa fa-play"></i>
+                            </button>
+                            <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
+                                <i class="fa fa-eye"></i>
+                            </button>
                         </div>
-                        <div class="card-footer d-flex justify-content-between align-items-center">
-                            ${botoesAcao}
+                        <div>
+                            <button class="btn btn-danger btn-sm btn-retirar-sequenciamento" data-index="${ordem.id}">
+                                🗑
+                            </button>
                         </div>
                         `;
-                        container.appendChild(card);
+                    } else {
+                        botoesAcao = `
+                        <div>
+                            <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
+                                <i class="fa fa-eye"></i>
+                            </button>
+                        </div>
+                        `;
+                    }
 
-                        const buttonVerPeca = card.querySelector('.btn-ver-peca');
-                        const buttonIniciar = card.querySelector('.btn-iniciar');
-                        const buttonRetirarSequenciamento = card.querySelector('.btn-retirar-sequenciamento');
+                    const card = document.createElement('div');
+                    card.classList.add('card', 'mb-3');
+                    card.innerHTML = `
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
+                            <span class="badge bg-${badgeColor}">${statusLabel}</span>
+                        </h5>
+                        <p class="card-text mb-1">
+                            <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
+                        </p>
+                        <p class="card-text mb-1">
+                            <strong>Data Programação:</strong> ${ordem.data_programacao}
+                        </p>
+                    </div>
+                    <div class="card-footer d-flex justify-content-between align-items-center">
+                        ${botoesAcao}
+                    </div>
+                    `;
+                    container.appendChild(card);
 
-                        if (buttonIniciar){
-                            buttonIniciar.addEventListener('click', () => {
-                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
-                            });
-                        }
+                    const buttonVerPeca = card.querySelector('.btn-ver-peca');
+                    const buttonIniciar = card.querySelector('.btn-iniciar');
+                    const buttonRetirarSequenciamento = card.querySelector('.btn-retirar-sequenciamento');
 
-                        buttonVerPeca.addEventListener('click', () => {
-                            mostrarPecas(ordem.id);
+                    if (buttonIniciar){
+                        buttonIniciar.addEventListener('click', () => {
+                            mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
                         });
-                        
-                        if (buttonRetirarSequenciamento){
-                            buttonRetirarSequenciamento.addEventListener('click', () => {
-                                mostrarModalExcluir(ordem.id, ordem.grupo_maquina);
-                            });
-                        }
+                    }
+
+                    buttonVerPeca.addEventListener('click', () => {
+                        mostrarPecas(ordem.id);
                     });
-                } else {
-                    container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao buscar ordens sequenciadas:', error);
-                container.innerHTML = '<p class="text-center text-danger">Erro ao carregar os dados.</p>';
-            });
+                    
+                    if (buttonRetirarSequenciamento){
+                        buttonRetirarSequenciamento.addEventListener('click', () => {
+                            mostrarModalExcluir(ordem.id, ordem.grupo_maquina);
+                        });
+                    }
+                });
+            } else {
+                container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao buscar ordens sequenciadas:', error);
+            container.innerHTML = '<p class="text-center text-danger">Erro ao carregar os dados.</p>';
+        });
     }
     
     // Busca inicial sem filtro de ordem
@@ -357,6 +398,7 @@ export function fetchOrdensSequenciadasPlasma() {
 }
 
 async function fetchMaquinasDisponiveis() {
+    
     try {
         const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=corte');
         if (!response.ok) {

@@ -1,4 +1,4 @@
-import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina-usinagem.js';
+import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina.js';
 
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
@@ -11,9 +11,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
-
                 if (ordens.length > 0) {
-
                     ordens.forEach(ordem => {
                         const card = document.createElement('div');
                         card.classList.add('col-md-4'); // Adiciona a classe de coluna
@@ -68,6 +66,9 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
                                     <i class="fa fa-play"></i>
                                 </button>
+                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
+                                    <i class="fa fa-trash"></i>
+                                </button>
                             `;
                         } else if (ordem.status_atual === 'interrompida') {
                             botaoAcao = `
@@ -109,53 +110,61 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonProxProcesso = card.querySelector('.btn-iniciar-proximo-processo');
                         const buttonMandarProxProcesso = card.querySelector('.btn-proximo-processo')
                         const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
+                        const buttonExcluir= card.querySelector('.btn-excluir');
 
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
                             buttonIniciar.addEventListener('click', () => {
-                                mostrarModalIniciar(ordem.id, ordem.maquina_id);
+                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Interromper", se existir
                         if (buttonInterromper) {
                             buttonInterromper.addEventListener('click', () => {
-                                mostrarModalInterromper(ordem.id, ordem.maquina_id);
+                                mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Finalizar", se existir
                         if (buttonFinalizar) {
                             buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.id);
+                                mostrarModalFinalizar(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão "Retornar", se existir
                         if (buttonRetornar) {
                             buttonRetornar.addEventListener('click', () => {
-                                mostrarModalRetornar(ordem.id, ordem.maquina_id);
+                                mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
                             });
                         }
 
                         // Adiciona evento ao botão para iniciar proximo processo
                         if (buttonProxProcesso) {
                             buttonProxProcesso.addEventListener('click', () => {
-                                mostrarModalIniciarProxProcesso(ordem.id, ordem.maquina_id);
+                                mostrarModalIniciarProxProcesso(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão para enviar para proximo processo
                         if (buttonMandarProxProcesso) {
                             buttonMandarProxProcesso.addEventListener('click', () => {
-                                mostrarModalProxProcesso(ordem.id, ordem.maquina_id);
+                                mostrarModalProxProcesso(ordem.id, ordem.grupo_maquina);
                             });
                         }
 
                         // Adiciona evento ao botão para enviar para proximo processo
                         if (buttonFinalizarParcial) {
                             buttonFinalizarParcial.addEventListener('click', () => {
-                                mostrarModalFinalizarParcial(ordem.id);
+                                mostrarModalFinalizarParcial(ordem.id, ordem.grupo_maquina);
+                            });
+                        }
+
+                        // Adiciona evento ao botão "Excluir", se existir
+                        if (buttonExcluir) {
+                            buttonExcluir.addEventListener('click', () => {
+                                mostrarModalExcluir(ordem.id, 'estamparia');
                             });
                         }
 
@@ -170,7 +179,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                     } else {
                         loadMoreButton.style.display = 'block'; // Mostra o botão caso ainda haja dados
                     }
-
                     resolve(data); // Retorna os dados carregados
                 } else {
                     resolve(data); // Retorna mesmo se não houver dados
@@ -209,6 +217,11 @@ function iniciarContador(ordemId, dataCriacao) {
 }
 
 export function carregarOrdensIniciadas(container, filtros = {}) {
+    container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+        
     fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
@@ -243,14 +256,13 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
 
                 card.innerHTML = `
                 <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
-
                     <!-- Contador fixado no topo direito -->
                     <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
                         id="contador-${ordem.ordem}" 
                         style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
                         Carregando...
                     </span>
-
+    
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
                         <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
                         <small class="text-white">Planejada: ${totalQtdPlanejada || 0} Realizada: ${totalQtdBoa}</small>
@@ -281,26 +293,26 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
                     buttonInterromper.addEventListener('click', () => {
-                        mostrarModalInterromper(ordem.id, ordem.maquina_id);
+                        mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        atualizarStatusOrdem(ordem.id, ordem.maquina_id, 'finalizada');
+                        atualizarStatusOrdem(ordem.id, ordem.grupo_maquina, 'finalizada');
                     });
                 }
 
                 if (buttonProxProcesso) {
                     buttonProxProcesso.addEventListener('click', () => {
-                        mostrarModalProxProcesso(ordem.id, ordem.maquina_id);
+                        mostrarModalProxProcesso(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
                 if (buttonFinalizarParcial) {
                     buttonFinalizarParcial.addEventListener('click', () => {
-                        mostrarModalFinalizarParcial(ordem.id);
+                        mostrarModalFinalizarParcial(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
@@ -311,9 +323,14 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
             });
         })
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
-}
+};
 
 export function carregarOrdensInterrompidas(container, filtros = {}) {
+    container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+
     // Fetch para buscar ordens interrompidas
     fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
@@ -353,7 +370,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
                             style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
                             Carregando...
                         </span>
-
+    
                         <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center p-3">
                             <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
                             <small class="text-white">Motivo: ${ordem.motivo_interrupcao || 'Sem motivo'}</small> 
@@ -377,7 +394,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
                 const buttonRetornar = card.querySelector('.btn-retornar');
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
-                        mostrarModalRetornar(ordem.id, ordem.maquina_id);
+                        mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
                     });
                 }
             
@@ -392,9 +409,14 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
             console.error('Erro ao buscar ordens interrompidas:', error);
             container.innerHTML = '<p class="text-danger">Erro ao carregar ordens interrompidas.</p>';
         });
-}
+};
 
 function carregarOrdensAgProProcesso(container, filtros = {}) {
+    container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+        
     fetch(`api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
@@ -414,8 +436,8 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                 `;
 
                 card.innerHTML = `
+
                 <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
-                    
                     <!-- Contador fixado no topo direito -->
                     <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
                         id="contador-${ordem.ordem}" 
@@ -453,7 +475,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                 // Adiciona evento ao botão para iniciar proximo processo
                 if (buttonProxProcesso) {
                     buttonProxProcesso.addEventListener('click', () => {
-                        mostrarModalIniciarProxProcesso(ordem.id, ordem.maquina_id);
+                        mostrarModalIniciarProxProcesso(ordem.id, ordem.grupo_maquina);
                     });
                 }
 
@@ -553,9 +575,8 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
 
-            fetchStatusMaquinas();
-            // fetchUltimasPecasProduzidas();
             fetchContagemStatusOrdens();
+            fetchStatusMaquinas();
 
         })
         .catch((error) => {
@@ -570,40 +591,37 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
 
-    // Exibe SweetAlert de carregamento
     Swal.fire({
         title: 'Carregando...',
-        text: 'Buscando informações das peças...',
+        text: 'Buscando informações das máquinas...',
         allowOutsideClick: false,
         didOpen: () => {
             Swal.showLoading();
         }
     });
 
-    // Limpa opções antigas no select
-    fetch('/cadastro/api/buscar-maquinas/?setor=usinagem', {
+    fetch('/cadastro/api/buscar-maquinas/?setor=estamparia', {
         method: 'GET',
         headers: {'Content-Type':'application/json'}
     })
     .then(response => response.json())
-    .then(
-        data => {
-            const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
-            escolhaMaquina.innerHTML = `<option value="">------</option>`;
+    .then(data => {
+        const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
+        escolhaMaquina.innerHTML = `<option value="">------</option>`;
 
-            Swal.close();
-            data.maquinas.forEach((maquina) => {
-                const option = document.createElement('option');
-                option.value = maquina.id;
-                option.textContent = maquina.nome;
-                escolhaMaquina.appendChild(option);
-            })
-            modalTitle.innerHTML = `Iniciar Ordem ${ordemId}`;
-            modal.show();
-        }
-    )   
+        Swal.close();
+        data.maquinas.forEach((maquina) => {
+            const option = document.createElement('option');
+            option.value = maquina.id;
+            option.textContent = maquina.nome;
+            escolhaMaquina.appendChild(option);
+        });
 
-    // Remove listeners antigos e adiciona novo no formulário
+        modalTitle.innerHTML = 'Escolha a máquina';
+        modal.show();
+    });
+
+    // Remove event listeners antigos do formulário e adiciona um novo
     const formIniciar = document.getElementById('formIniciarOrdemCorte');
     const clonedForm = formIniciar.cloneNode(true);
     formIniciar.parentNode.replaceChild(clonedForm, formIniciar);
@@ -614,7 +632,6 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
         const formData = new FormData(clonedForm);
         const maquinaName = formData.get('escolhaMaquinaIniciarOrdem');
 
-        // Exibe SweetAlert de carregamento
         Swal.fire({
             title: 'Iniciando Ordem...',
             text: 'Por favor, aguarde.',
@@ -634,52 +651,46 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
             }),
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken(), // Inclui o CSRF Token no cabeçalho
+                'X-CSRFToken': getCSRFToken(),
             },
         })
-            .then(async (response) => {
-                const data = await response.json();
+        .then(async (response) => {
+            const data = await response.json();
 
-                if (!response.ok) {
-                    throw new Error(data.error || 'Erro ao iniciar a ordem.');
-                }
+            if (!response.ok) {
+                throw new Error(data.error || 'Erro ao iniciar a ordem.');
+            }
 
-                return data; // Retorna os dados para o próximo `.then`
-            })
-            .then(() => {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Sucesso',
-                    text: 'Ordem iniciada com sucesso.',
-                });
-
-                modal.hide();
-
-                // Atualiza a interface
-                const containerIniciado = document.querySelector('.containerProcesso');
-                carregarOrdensIniciadas(containerIniciado);
-
-                // Recarrega os dados chamando a função de carregamento
-                document.getElementById('ordens-container').innerHTML = '';
-                resetarCardsInicial();
-
-                fetchStatusMaquinas();
-                // fetchUltimasPecasProduzidas();
-                fetchContagemStatusOrdens();
-    
-            })
-            .catch((error) => {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: error.message,
-                });
+            return data;
+        })
+        .then(() => {
+            Swal.fire({
+                title: 'Sucesso',
+                text: 'Ordem iniciada com sucesso.',
             });
+
+            modal.hide();
+
+            const containerIniciado = document.querySelector('.containerProcesso');
+            carregarOrdensIniciadas(containerIniciado);
+
+            document.getElementById('ordens-container').innerHTML = '';
+            resetarCardsInicial();
+
+            fetchStatusMaquinas();
+            fetchContagemStatusOrdens();
+        })
+        .catch((error) => {
+            Swal.fire({
+                title: 'Erro',
+                text: error.message,
+            });
+        });
     });
 }
 
 // Modal para "Parcial"
-function mostrarModalFinalizarParcial(ordemId) {
+function mostrarModalFinalizarParcial(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizarParcial'));
     const modalTitle = document.getElementById('modalFinalizarParcialLabel');
     const formFinalizar = document.getElementById('formFinalizarParcial');
@@ -689,7 +700,7 @@ function mostrarModalFinalizarParcial(ordemId) {
     formFinalizar.parentNode.replaceChild(clonedForm, formFinalizar);
 
     // Configura título do modal
-    modalTitle.innerHTML = `Finalizar Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Finalizar Ordem Parcialmente ${ordemId}`;
     document.getElementById('bodyPecasFinalizarParcial').innerHTML = '<p class="text-center text-muted">Carregando informações...</p>';
 
     Swal.fire({
@@ -702,7 +713,7 @@ function mostrarModalFinalizarParcial(ordemId) {
     });
 
     // Fetch para buscar informações da ordem
-    fetch(`api/ordens-criadas/${ordemId}/pecas/`)
+    fetch(`api/ordens-criadas/${ordemId}/${grupoMaquina.toLowerCase()}/pecas/`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar informações da API');
@@ -793,11 +804,6 @@ function mostrarModalFinalizarParcial(ordemId) {
                     resetarCardsInicial();
 
                     modal.hide();
-
-                    fetchStatusMaquinas();
-                    fetchUltimasPecasProduzidas();
-                    fetchContagemStatusOrdens();
-    
                 })
                 .catch((error) => {
                     Swal.fire({
@@ -822,19 +828,15 @@ function mostrarModalFinalizarParcial(ordemId) {
 function mostrarModalProxProcesso(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalProxProcesso'));
     const modalTitle = document.getElementById('modalProxProcessoLabel');
-    const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
 
     const colQtdProxProcesso = document.getElementById('colQtdProxProcesso');
 
     colQtdProxProcesso.style.display = 'block';
     
-    // const escolhaProcesso = document.getElementById('escolhaMaquinaProxProcesso');
     const qtdProxProcesso = document.getElementById('qtdProxProcesso');
+    qtdProxProcesso.value = '';
     qtdProxProcesso.required = true;
     
-    // Limpa opções antigas no select
-    // escolhaProcesso.innerHTML = `<option value="">------</option>`;
-
     // Exibe SweetAlert de carregamento
     Swal.fire({
         title: 'Carregando...',
@@ -846,7 +848,7 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
     });
 
     // Limpa opções antigas no select
-    fetch('/cadastro/api/buscar-processos/?setor=usinagem', {
+    fetch('/cadastro/api/buscar-processos/?setor=estamparia', {
         method: 'GET',
         headers: {'Content-Type':'application/json'}
     })
@@ -854,6 +856,7 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
     .then(
         data => {
             const escolhaProcesso = document.getElementById('escolhaMaquinaProxProcesso');
+            const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
             escolhaProcesso.innerHTML = `<option value="">------</option>`;
 
             Swal.close();
@@ -864,6 +867,7 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
                 escolhaProcesso.appendChild(option);
             })
             modalTitle.innerHTML = `Passar para próximo processo`;
+            labelModalMaquinaProxProcesso.innerHTML = 'Escolha o próximo processo:'
             modal.show();
         }
     ) 
@@ -933,10 +937,6 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
                 // Recarrega os dados chamando a função de carregamento
                 document.getElementById('ordens-container').innerHTML = '';
                 resetarCardsInicial();
-
-                fetchStatusMaquinas();
-                // fetchUltimasPecasProduzidas();
-                fetchContagemStatusOrdens();
             })
             .catch((error) => {
                 Swal.fire({
@@ -952,13 +952,16 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
 function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalProxProcesso'));
     const modalTitle = document.getElementById('modalProxProcessoLabel');
-    const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
 
+    // const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
     const qtdProxProcesso = document.getElementById('qtdProxProcesso');
     const colQtdProxProcesso = document.getElementById('colQtdProxProcesso');
 
     colQtdProxProcesso.style.display = 'none';
     qtdProxProcesso.required = false;
+
+    // Limpa opções antigas no select
+    // escolhaMaquina.innerHTML = `<option value="">------</option>`;
 
     // Exibe SweetAlert de carregamento
     Swal.fire({
@@ -969,14 +972,17 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
             Swal.showLoading();
         }
     });
+    
+    // Limpa opções antigas no select
 
-    fetch('/cadastro/api/buscar-maquinas/?setor=usinagem', {
+    fetch('/cadastro/api/buscar-maquinas/?setor=estamparia', {
         method: 'GET',
         headers: {'Content-Type':'application/json'}
     })
     .then(response => response.json())
     .then(
         data => {
+            const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
             const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
             escolhaMaquina.innerHTML = `<option value="">------</option>`;
 
@@ -987,11 +993,11 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
                 option.textContent = maquina.nome;
                 escolhaMaquina.appendChild(option);
             })
-            modalTitle.innerHTML = `Iniciar próximo processo`;
+            modalTitle.innerHTML = 'Iniciar próximo processo'
             labelModalMaquinaProxProcesso.innerHTML = 'Em qual máquina será iniciado?'
             modal.show();
         }
-    )   
+    )
 
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formProxProcesso');
@@ -1061,7 +1067,6 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
                 qtdProxProcesso.required = true;
 
                 fetchStatusMaquinas();
-                // fetchUltimasPecasProduzidas();
                 fetchContagemStatusOrdens();
             
             })
@@ -1080,10 +1085,10 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
 }
 
 // Modal para "Finalizar"
-function mostrarModalFinalizar(ordemId) {
+function mostrarModalFinalizar(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     const modalTitle = document.getElementById('modalFinalizarLabel');
-    const formFinalizar = document.getElementById('formFinalizarOrdemUsinagem');
+    const formFinalizar = document.getElementById('formFinalizarOrdemEstamparia');
 
     // Remove event listeners antigos para evitar duplicidade
     const clonedForm = formFinalizar.cloneNode(true);
@@ -1103,7 +1108,7 @@ function mostrarModalFinalizar(ordemId) {
     });
 
     // Fetch para buscar informações da ordem
-    fetch(`api/ordens-criadas/${ordemId}/pecas/`)
+    fetch(`api/ordens-criadas/${ordemId}/${grupoMaquina.toLowerCase()}/pecas/`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar informações da API');
@@ -1124,6 +1129,8 @@ function mostrarModalFinalizar(ordemId) {
                 </div>    
             </div> 
             `;
+            
+            document.getElementById('obsFinalizar').value = '';
 
             // Exibe o modal
             modal.show();
@@ -1157,7 +1164,7 @@ function mostrarModalFinalizar(ordemId) {
                     method: 'PATCH',
                     body: JSON.stringify({
                         ordem_id: ordemId,
-                        // grupo_maquina: grupoMaquina,
+                        grupo_maquina: grupoMaquina,
                         status: 'finalizada',
                         qt_realizada: qtRealizada,
                         qt_mortas: qtMortas,
@@ -1193,9 +1200,10 @@ function mostrarModalFinalizar(ordemId) {
 
                     modal.hide();
 
+                    fetchContagemStatusOrdens();
                     fetchStatusMaquinas();
                     fetchUltimasPecasProduzidas();
-                    fetchContagemStatusOrdens();
+        
                 })
                 .catch((error) => {
                     Swal.fire({
@@ -1217,12 +1225,15 @@ function mostrarModalFinalizar(ordemId) {
 }
 
 // Modal para "Retornar"
-function mostrarModalRetornar(ordemId, maquina) {
+function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
+
+    // const maquinaTratada = maquina.toLowerCase().replace(" ","_");
+
     const modal = new bootstrap.Modal(document.getElementById('modalRetornar'));
     const modalTitle = document.getElementById('modalRetornarLabel');
     const formRetornar = document.getElementById('formRetornarProducao');
 
-    modalTitle.innerHTML = `Retornar Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Retornar Ordem`;
     modal.show();
 
     // Remove listeners antigos e adiciona novo
@@ -1247,8 +1258,10 @@ function mostrarModalRetornar(ordemId, maquina) {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
-                maquina_nome: maquina,
+                grupo_maquina: grupoMaquina,
                 status: 'iniciada',
+                maquina_nome: maquina,
+
             }),
             headers: {
                 'Content-Type': 'application/json',
@@ -1284,8 +1297,8 @@ function mostrarModalRetornar(ordemId, maquina) {
             document.getElementById('ordens-container').innerHTML = '';
             resetarCardsInicial();
 
-            fetchStatusMaquinas();
             fetchContagemStatusOrdens();
+            fetchStatusMaquinas();
 
         })
         .catch((error) => {
@@ -1299,72 +1312,190 @@ function mostrarModalRetornar(ordemId, maquina) {
     });
 }
 
-function configurarFormulario() {
-    const form = document.getElementById('opUsinagemForm');
+// Modal para "Excluir"
+function mostrarModalExcluir(ordemId, setor) {
+    const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+    const modalTitle = document.getElementById('modalExcluirLabel');
+    const formExcluir = document.getElementById('formExcluir');
 
-    if (form) {
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
+    modalTitle.innerHTML = `Excluir Ordem ${ordemId}`;
+    modal.show();
 
-            const formData = new FormData(form);
+    // Remove listeners antigos e adiciona novo
+    const clonedForm = formExcluir.cloneNode(true);
+    formExcluir.parentNode.replaceChild(clonedForm, formExcluir);
 
-            Swal.fire({
-                title: 'Enviando...',
-                text: 'Aguarde enquanto processamos sua solicitação.',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                },
-            });
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
 
-            try {
-                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-                const response = await fetch('api/criar-ordem-usinagem/', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': csrfToken,
-                    },
-                    body: formData,
-                });
+        const formData = new FormData(clonedForm);
+        const motivoExclusao = formData.get('motivoExclusao');
 
-                const data = await response.json();
-
-                Swal.close();
-
-                if (response.ok) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: 'Ordem de Produção criada com sucesso.',
-                        confirmButtonText: 'OK',
-                    });
-
-                    form.reset();
-
-                    // Recarrega os cards
-                    document.getElementById('ordens-container').innerHTML = '';
-                    resetarCardsInicial();
-
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro!',
-                        text: data.error || 'Erro ao criar a Ordem de Produção.',
-                        confirmButtonText: 'OK',
-                    });
-                }
-            } catch (error) {
-                Swal.close();
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro inesperado!',
-                    text: 'Ocorreu um erro ao processar sua solicitação. Tente novamente.',
-                    confirmButtonText: 'OK',
-                });
-                console.error('Erro:', error);
+        Swal.fire({
+            title: 'Excluindo...',
+            text: 'Por favor, aguarde enquanto a ordem está sendo excluída.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
             }
         });
+
+        fetch(`/core/api/excluir-ordem/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                ordem_id: ordemId,
+                setor: setor,
+                motivo: motivoExclusao
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
+            }
+        })
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(({ status, body }) => {
+            if (status === 201) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: body.success,
+                });
+
+                modal.hide();
+
+                // Recarrega os dados chamando a função de carregamento
+                document.getElementById('ordens-container').innerHTML = '';
+                resetarCardsInicial();
+                fetchContagemStatusOrdens();
+
+            } else {
+                // Exibe o erro vindo do backend
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: body.error || 'Erro ao excluir a ordem.',
+                });
+            }
+        })
+        .catch((error) => {
+            console.error('Erro:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
+            });
+        });
+    });
+}
+
+// Função separada para evitar múltiplos event listeners
+async function handleSubmit(event) {
+    event.preventDefault(); // Evita o recarregamento da página
+
+    const form = event.target;
+    const formData = new FormData(form);
+
+    Swal.fire({
+        title: 'Enviando...',
+        text: 'Aguarde enquanto processamos sua solicitação.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        },
+    });
+
+    try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const response = await fetch('api/criar-ordem-estamparia/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+            },
+            body: formData,
+        });
+
+        const data = await response.json();
+
+        Swal.close();
+
+        if (response.ok) {
+            Swal.fire({
+                title: 'Sucesso!',
+                text: 'Ordem de Produção criada com sucesso.',
+                confirmButtonText: 'OK',
+            });
+
+            form.reset();
+
+            //  Remove o foco do elemento ativo antes de fechar o modal
+            document.activeElement.blur();
+
+            // Fecha corretamente o modal atual
+            const modalPlanejarInstance = bootstrap.Modal.getInstance(document.getElementById('modalEstamparia'));
+            if (modalPlanejarInstance) {
+                modalPlanejarInstance.hide();
+            }
+
+            // Recarrega os cards
+            document.getElementById('ordens-container').innerHTML = '';
+            resetarCardsInicial();
+
+            // Abre o modal correto
+            const modal = new bootstrap.Modal(document.getElementById('modalIniciarAposPlanejar'));
+            modal.show();
+
+            // Remove event listeners antigos antes de adicionar novos
+            const btnIniciar = document.querySelector('.btn-iniciar-planejar');
+            const btnNaoIniciar = document.querySelector('.btn-nao-iniciar-planejar');
+
+            if (btnIniciar) {
+                btnIniciar.replaceWith(btnIniciar.cloneNode(true));
+                document.querySelector('.btn-iniciar-planejar').addEventListener('click', function () {
+                    modal.hide();
+                    mostrarModalIniciar(data.ordem_id, 'estamparia');
+                });
+            }
+
+            if (btnNaoIniciar) {
+                btnNaoIniciar.replaceWith(btnNaoIniciar.cloneNode(true));
+                document.querySelector('.btn-nao-iniciar-planejar').addEventListener('click', function () {
+                    modal.hide();
+                });
+            }
+
+            fetchContagemStatusOrdens();
+
+        } else {
+            Swal.fire({
+                title: 'Erro!',
+                text: data.error || 'Erro ao criar a Ordem de Produção.',
+                confirmButtonText: 'OK',
+            });
+        }
+    } catch (error) {
+        Swal.close();
+        Swal.fire({
+            title: 'Erro inesperado!',
+            text: 'Ocorreu um erro ao processar sua solicitação. Tente novamente.',
+            confirmButtonText: 'OK',
+        });
+        console.error('Erro:', error);
     }
+}
+
+// Modal para "planejar"
+function modalPlanejar() {
+    const form = document.getElementById('opEstampariaForm');
+
+    if (!form) {
+        console.error("Formulário não encontrado!");
+        
+        return;
+    }
+
+    // Remove qualquer evento de submit duplicado antes de adicionar um novo
+    form.removeEventListener('submit', handleSubmit);
+    form.addEventListener('submit', handleSubmit);
 }
 
 function resetarCardsInicial(filtros = {}) {
@@ -1389,20 +1520,27 @@ function resetarCardsInicial(filtros = {}) {
     // Função principal para buscar e renderizar ordens
     const fetchOrdens = () => {
         if (isLoading || !hasMoreData) return;
+
         isLoading = true;
 
         loadOrdens(container, page, limit, currentFiltros)
             .then((data) => {
+                loadMoreButton.disabled = false;
+                loadMoreButton.innerHTML = `Carregar mais`; 
+
                 if (data.ordens.length === 0) {
+            
                     hasMoreData = false;
                     loadMoreButton.style.display = 'none'; // Esconde o botão quando não há mais dados
+
                     if (page === 1) {
                         container.innerHTML = '<p class="text-muted">Nenhuma ordem encontrada.</p>';
                     } else {
                         container.insertAdjacentHTML('beforeend', '<p class="text-muted">Nenhuma ordem adicional encontrada.</p>');
                     }
                 } else {
-                    loadMoreButton.style.display = 'block'; // Garante que o botão seja exibido quando houver mais dados
+                    hasMoreData = true; // Permite continuar carregando mais dados
+                    loadMoreButton.style.display = 'block'; // Mostra o botão se houver mais dados
                     page++; // Incrementa a página para o próximo carregamento
                 }
             })
@@ -1414,13 +1552,19 @@ function resetarCardsInicial(filtros = {}) {
             });
     };
 
-    // Carrega a primeira página automaticamente
-    container.innerHTML = ''; // Limpa o container antes de carregar novos resultados
+    // Limpa o container antes de carregar novos dados
+    container.innerHTML = '';
     fetchOrdens();
 
     // Configurar o botão "Carregar Mais"
-    loadMoreButton.onclick = () => {
-        fetchOrdens(); // Carrega a próxima página ao clicar no botão
+    loadMoreButton.onclick = async () => {
+        loadMoreButton.disabled = true;
+        loadMoreButton.innerHTML = `                    
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+        `;
+        fetchOrdens(); 
     };
 }
 
@@ -1458,7 +1602,7 @@ function filtro() {
 document.addEventListener('DOMContentLoaded', () => {
 
     resetarCardsInicial();
-    configurarFormulario();
+    modalPlanejar();
     
     $('#pecaSelect').select2({
         placeholder: 'Selecione a peça',
@@ -1488,7 +1632,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cache: true
         },
         minimumInputLength: 0,
-        dropdownParent: $('#modalUsinagem'),
+        dropdownParent: $('#modalEstamparia'),
     });
 
     const containerIniciado = document.querySelector('.containerProcesso');

@@ -26,7 +26,7 @@ function buscarItensEmProcesso(pagina) {
     let cardsInspecao = document.getElementById("cards-em-processo");
     let qtdPendenteInspecao = document.getElementById("qtd-pendente-em-processo");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-em-processo");
-    let itensInspecionar = document.getElementById("itens-em-processo");
+    let itensInspecionar = document.getElementById("titulo-itens-em-processo");
     let itensFiltradosCor = document.getElementById("itens-filtrados-em-processo-cor");
     let itensFiltradosData = document.getElementById("itens-filtrados-em-processo-data");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-em-processo-inspetor");
@@ -108,7 +108,7 @@ function buscarItensEmProcesso(pagina) {
         const quantidadeInspecoes = items.total;
         const quantidadeFiltradaInspecoes = items.total_filtrado;
 
-        qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
+        // qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
         if (params.size > 1) {
             qtdFiltradaInspecao.style.display = 'block';
@@ -119,6 +119,7 @@ function buscarItensEmProcesso(pagina) {
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         items.dados.forEach(item => {
+
             let borderColors = {
                 "Laranja": "orange", "Verde": "green",
                 "Vermelho": "red", "Azul": "blue",
@@ -138,7 +139,7 @@ function buscarItensEmProcesso(pagina) {
                         <strong>🧮 Conformidade:</strong> ${item.conformidade}<br>
                         <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
-                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
+                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
                     <button 
@@ -157,7 +158,9 @@ function buscarItensEmProcesso(pagina) {
             cardsInspecao.innerHTML += cards;
         });
 
-        itensInspecionar.textContent = "Itens a Reinspecionar";
+        itensInspecionar.textContent = "Em processo de retrabalho";
+        document.getElementById('badge-em-processo').innerText = quantidadeInspecoes;
+        document.querySelector('#itens-em-processo .spinner-border').style.display = 'none';
 
         // Adiciona a paginação
         if (items.total_paginas > 1) {

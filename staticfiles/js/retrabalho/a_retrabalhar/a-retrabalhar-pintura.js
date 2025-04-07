@@ -27,7 +27,7 @@ function buscarItensRetrabalho(pagina) {
     let cardsretrabalho = document.getElementById("cards-retrabalho");
     let qtdPendenteretrabalho = document.getElementById("qtd-pendente-retrabalho");
     let qtdFiltradaretrabalho = document.getElementById("qtd-filtrada-retrabalho");
-    let itensInspecionar = document.getElementById("itens-inspecionar");
+    let itensInspecionar = document.getElementById("titulo-itens-inspecionar");
     let itensFiltradosCor = document.getElementById("itens-filtrados-retrabalho-cor");
     let itensFiltradosData = document.getElementById("itens-filtrados-retrabalho-data");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-retrabalho-pesquisa");
@@ -95,8 +95,6 @@ function buscarItensRetrabalho(pagina) {
         const quantidadeInspecoes = items.total;
         const quantidadeFiltradaInspecoes = items.total_filtrado;
 
-        qtdPendenteretrabalho.textContent = `${quantidadeInspecoes} itens pendentes`;
-
         if (params.size > 1) {
             qtdFiltradaretrabalho.style.display = 'block';
         } else {
@@ -106,6 +104,8 @@ function buscarItensRetrabalho(pagina) {
         qtdFiltradaretrabalho.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         items.dados.forEach(item => {
+
+
             let borderColors = {
                 "Laranja": "orange", "Verde": "green",
                 "Vermelho": "red", "Azul": "blue",
@@ -120,7 +120,7 @@ function buscarItensRetrabalho(pagina) {
                     <h5> ${item.peca}</h5>
                     <p>Dados Execucao #${item.id}</p>
                     <p>
-                        <strong>📅 Due:</strong> ${item.data}<br>
+                        <strong>📅 Dt. Produzida:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
                         <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade}<br>
@@ -149,8 +149,10 @@ function buscarItensRetrabalho(pagina) {
             cardsretrabalho.innerHTML += cards;
         });
 
-        itensInspecionar.textContent = "Itens a Inspecionar";
-
+        itensInspecionar.textContent = "Pendente";
+        document.getElementById('badge-inspecionar').innerText = quantidadeInspecoes;
+        document.querySelector('#itens-inspecionar .spinner-border').style.display = 'none';
+        
         // Adiciona a paginação
               // Adiciona a paginação com reticências
         if (items.total_paginas > 1) {

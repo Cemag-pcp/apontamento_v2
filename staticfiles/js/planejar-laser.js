@@ -267,6 +267,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('filtro-form');
     const filtroOrdem = document.getElementById('filtro-ordem');
     const filtroMaquina = document.getElementById('filtro-maquina');
+    const filtroStatus = document.getElementById('filtro-status');
+    const filtroPeca = document.getElementById('filtro-peca');
 
     // Função para resetar dados e carregar com filtros
     const resetAndLoad = () => {
@@ -278,7 +280,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Passa os parâmetros de filtro para a chamada fetch
         loadOrdens(container, page, limit, {
             ordem: filtroOrdem.value,
-            maquina: filtroMaquina.value
+            maquina: filtroMaquina.value,
+            status: filtroStatus.value,
+            peca: filtroPeca.value
         });
 
     };

@@ -209,6 +209,11 @@ function iniciarContador(ordemId, dataCriacao) {
 }
 
 export function carregarOrdensIniciadas(container, filtros = {}) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
@@ -314,6 +319,11 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
 }
 
 export function carregarOrdensInterrompidas(container, filtros = {}) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     // Fetch para buscar ordens interrompidas
     fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
@@ -324,7 +334,6 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
         })
         .then(data => {
             container.innerHTML = ''; // Limpa o container
-            console.log(data);
             data.ordens.forEach(ordem => {
                 // Cria o card
                 const card = document.createElement('div');
@@ -395,6 +404,11 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
 }
 
 function carregarOrdensAgProProcesso(container, filtros = {}) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+    
     fetch(`api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {

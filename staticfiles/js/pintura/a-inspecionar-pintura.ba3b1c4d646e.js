@@ -1,17 +1,17 @@
 document.addEventListener("DOMContentLoaded", () => {
-    buscarItensInspecionadosRetrabalho(1); // Chama a função quando a página carrega, começando na página 1
+    buscarItensInspecao(1); // Chama a função quando a página carrega, começando na página 1
 });
 
-document.getElementById("btn-filtrar-inspecionados").addEventListener("click", (event) => {
-    event.preventDefault();
-    buscarItensInspecionadosRetrabalho(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
+document.getElementById("btn-filtrar-inspecao").addEventListener("click", (event) => {
+    event.preventDefault(); // Evita o recarregamento da página caso esteja dentro de um formulário
+    buscarItensInspecao(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
 });
 
-document.getElementById("btn-limpar-inspecionados").addEventListener("click", (event) => {
+document.getElementById("btn-limpar-inspecao").addEventListener("click", (event) => {
     event.preventDefault(); // Evita o recarregamento da página caso esteja dentro de um formulário
 
     // Seleciona todos os inputs dentro do formulário
-    const form = document.getElementById("form-filtrar-inspecionados");
+    const form = document.getElementById("form-filtrar-inspecao");
     form.querySelectorAll("input").forEach(input => {
         if (input.type === "checkbox") {
             input.checked = false; // Desmarca checkboxes
@@ -19,19 +19,19 @@ document.getElementById("btn-limpar-inspecionados").addEventListener("click", (e
             input.value = ""; // Limpa inputs de texto e data
         }
     });
-    buscarItensInspecionadosRetrabalho(1);
+    buscarItensInspecao(1);
 });
 
-function buscarItensInspecionadosRetrabalho(pagina) {
-    let cardsInspecao = document.getElementById("cards-inspecionados");
-    let qtdPendenteInspecao = document.getElementById("qtd-inspecionados");
-    let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecionados");
-    let itensInspecionar = document.getElementById("itens-inspecionados");
-    let itensFiltradosCor = document.getElementById("itens-filtrados-inspecionados-cor");
-    let itensFiltradosData = document.getElementById("itens-filtrados-inspecionados-data");
-    let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
-    let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
-    let paginacao = document.getElementById("paginacao-inspecionados-pintura");
+
+function buscarItensInspecao(pagina) {
+    let cardsInspecao = document.getElementById("cards-inspecao");
+    let qtdPendenteInspecao = document.getElementById("qtd-pendente-inspecao");
+    let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecao");
+    let itensInspecionar = document.getElementById("itens-inspecionar");
+    let itensFiltradosCor = document.getElementById("itens-filtrados-inspecao-cor");
+    let itensFiltradosData = document.getElementById("itens-filtrados-inspecao-data");
+    let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecao-pesquisa");
+    let paginacao = document.getElementById("paginacao-inspecao-pintura");
 
     // Limpa os cards antes de buscar novos
     cardsInspecao.innerHTML = `<div class="text-center">
@@ -43,17 +43,12 @@ function buscarItensInspecionadosRetrabalho(pagina) {
 
     // Coletar os filtros aplicados
     let coresSelecionadas = [];
-    document.querySelectorAll('.form-check-input-inspecionados:checked').forEach(checkbox => {
+    document.querySelectorAll('.form-check-input-inspecao:checked').forEach(checkbox => {
         coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let inspetorSelecionado = [];
-    document.querySelectorAll('.form-check-input-inspecionados-inspetores:checked').forEach(checkbox => {
-        inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
-    });
-
-    let dataSelecionada = document.getElementById('data-filtro-inspecionados').value;
-    let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecionados').value;
+    let dataSelecionada = document.getElementById('data-filtro-inspecao').value;
+    let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
@@ -81,17 +76,9 @@ function buscarItensInspecionadosRetrabalho(pagina) {
         itensFiltradosPesquisa.style.display = "none";
     }
 
-    if (inspetorSelecionado.length > 0) {
-        params.append("inspetores", inspetorSelecionado.join(","));
-        itensFiltradosInspetor.style.display = "block";
-        itensFiltradosInspetor.textContent = "Inspetores: " + inspetorSelecionado.join(", ");
-    } else {
-        itensFiltradosInspetor.style.display = "none";
-    }
-
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
-    fetch(`/pintura/api/itens-retrabalhados-pintura/?${params.toString()}`, {
+    fetch(`/inspecao/api/itens-inspecao-pintura/?${params.toString()}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -108,7 +95,7 @@ function buscarItensInspecionadosRetrabalho(pagina) {
         const quantidadeInspecoes = items.total;
         const quantidadeFiltradaInspecoes = items.total_filtrado;
 
-        qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens inspecionados`;
+        qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
         if (params.size > 1) {
             qtdFiltradaInspecao.style.display = 'block';
@@ -125,36 +112,40 @@ function buscarItensInspecionadosRetrabalho(pagina) {
                 "Amarelo": "yellow", "Cinza": "gray"
             };
 
-            let iconeNaoConformidade;
-
-            if (item.possui_nao_conformidade) {
-                iconeNaoConformidade = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
-            } else {
-                iconeNaoConformidade = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
-            }
-
             let color = borderColors[item.cor];
 
             const cards = `
             <div class="col-md-4 mb-4">
-                <div class="card p-3 border-${color}" style="min-height: 250px; display: flex; flex-direction: column; justify-content: space-between">
+                <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <h5> ${item.peca}</h5>
-                    <p>Inspeção #${item.id}</p>
+                    <p>Inspecao #${item.id}</p>
                     <p>
-                        <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
+                        <strong>📅 Dt. Produzida:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
-                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
+                        <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
+                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
                     </p>
+                    <hr>
+                    <button 
+                        data-id="${item.id}"
+                        data-data="${item.data}"
+                        data-qtd="${item.qtd_apontada}"
+                        data-tipo="${item.tipo}"
+                        data-cor="${item.cor}"
+                        data-peca="${item.peca}"
+                    class="btn btn-dark w-100 iniciar-inspecao">
+                    Iniciar Inspeção</button>
                 </div>
             </div>`;
 
             cardsInspecao.innerHTML += cards;
         });
 
-        itensInspecionar.textContent = "Itens Inspecionados";
-        
-        // Adiciona a paginação com reticências
+        itensInspecionar.textContent = "Retrabalho";
+
+        // Adiciona a paginação
+              // Adiciona a paginação com reticências
         if (items.total_paginas > 1) {
             let paginacaoHTML = `<nav aria-label="Page navigation">
                 <ul class="pagination justify-content-center">`;
@@ -166,7 +157,7 @@ function buscarItensInspecionadosRetrabalho(pagina) {
             const adicionarLinkPagina = (i) => {
                 paginacaoHTML += `
                     <li class="page-item ${i === paginaAtual ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="buscarItensInspecionados(${i})">${i}</a>
+                        <a class="page-link" href="#" onclick="buscarItensInspecao(${i})">${i}</a>
                     </li>`;
             };
 
