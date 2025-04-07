@@ -75,9 +75,13 @@ def get_pecas_ordem(request, pk_ordem):
         return JsonResponse({'error': str(e)}, status=500)    
 
 def get_ordens_criadas(request):
+
     # Captura os parâmetros de filtro
     filtro_ordem = request.GET.get('ordem', '')
     filtro_maquina = request.GET.get('maquina', '').strip()
+    filtro_status = request.GET.get('status', '')
+    filtro_peca = request.GET.get('peca', '').strip()
+
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
 
@@ -92,6 +96,10 @@ def get_ordens_criadas(request):
 
     if filtro_maquina:
         ordens_queryset = ordens_queryset.filter(grupo_maquina__icontains=filtro_maquina)
+    if filtro_status:
+        ordens_queryset = ordens_queryset.filter(status_atual=filtro_status)
+    if filtro_peca:
+        ordens_queryset = ordens_queryset.filter(ordem_pecas_corte__peca__icontains=filtro_peca)
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -110,6 +118,7 @@ def get_ordens_criadas(request):
         'status_atual': ordem.status_atual,
         'maquina': ordem.maquina.nome if ordem.maquina else None,
         'maquina_id': ordem.maquina.id if ordem.maquina else None,
+        'sequenciada': ordem.sequenciada,
         'propriedade': {
             'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade.descricao_mp else None,
             'quantidade': ordem.propriedade.quantidade if ordem.propriedade.quantidade else None,
@@ -518,6 +527,7 @@ def gerar_op_duplicada(request, pk_ordem):
                 PropriedadesOrdem.objects.create(
                     ordem=nova_ordem,  # Associa a nova ordem
                     descricao_mp=propriedade_original.descricao_mp,
+                    tamanho=propriedade_original.tamanho,
                     espessura=propriedade_original.espessura,
                     quantidade=qtd_chapa,
                     aproveitamento=propriedade_original.aproveitamento,
@@ -584,6 +594,92 @@ def get_ordens_sequenciadas(request):
         data.append(ordem_dict)
 
     return JsonResponse({'ordens_sequenciadas': data})
+
+def resequenciar_ordem(request):
+
+    # Verifica se o usuário tem o tipo de acesso "pcp"
+    if not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso not in ['pcp','supervisor']:
+        return JsonResponse({'error': 'Acesso negado: você não tem permissão para excluir ordens.'}, status=403)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            ordem_id = data['ordem_id']
+
+            ordem = get_object_or_404(Ordem, pk=ordem_id)
+
+            if ordem.sequenciada:
+                return JsonResponse({'error':'Essa ordem já está sequenciada.'}, status=400)
+
+            if ordem.status_atual != 'aguardando_iniciar':
+                return JsonResponse({'error':'Essa ordem precisa está com status "Aguardando iniciar".'}, status=400)
+
+            ordem.sequenciada = True
+            ordem.save()
+
+            return JsonResponse({'message': 'Ordem sequenciada com sucesso.'}, status=201)
+
+        except Exception as e:
+            return JsonResponse({'error': 'Erro interno no servidor.'}, status=500)
+
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+def api_ordens_finalizadas(request):
+
+    data = []
+
+    ordens = Ordem.objects.filter(status_atual='finalizada').select_related(
+        'propriedade', 'operador_final'
+    ).prefetch_related('ordem_pecas_corte').order_by('ultima_atualizacao')
+
+    for ordem in ordens:
+        propriedade = getattr(ordem, 'propriedade', None)
+        operador = ordem.operador_final.nome if ordem.operador_final else None
+        data_finalizacao = ordem.ultima_atualizacao
+
+        for peca in ordem.ordem_pecas_corte.all():
+            data.append({
+                "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
+                "peca": peca.peca,
+                "qtd_planejada": peca.qtd_planejada,
+                "tamanho_chapa": propriedade.tamanho if propriedade else None,
+                "qt_chapa": propriedade.quantidade if propriedade else None,
+                "aproveitamento": propriedade.aproveitamento if propriedade else None,
+                "espessura": propriedade.espessura if propriedade else None,
+                "qtd_morta": peca.qtd_morta,
+                "operador": operador,
+                "data_finalizacao": data_finalizacao,
+                "total_produzido": peca.qtd_boa
+            })
+
+    return JsonResponse(data, safe=False)
+
+def api_ordens_finalizadas_mp(request):
+
+    data = []
+
+    ordens = Ordem.objects.filter(status_atual='finalizada', grupo_maquina__in=['laser_1','laser_2','plasma']).select_related(
+        'propriedade', 'maquina'
+    ).order_by('ultima_atualizacao')
+
+    for ordem in ordens:
+        propriedade = getattr(ordem, 'propriedade', None)
+
+        data.append({
+            "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
+            "data_finalizacao": ordem.ultima_atualizacao,
+            "tamanho_chapa": propriedade.tamanho if propriedade else None,
+            "qt_chapa": propriedade.quantidade if propriedade else None,
+            "aproveitamento": propriedade.aproveitamento if propriedade else None,
+            "descricao_chapa": propriedade.descricao_mp if propriedade else None,
+            "espessura": propriedade.espessura if propriedade else None,
+            "maquina": ordem.maquina.nome if ordem.maquina else None,
+            "tipo_chapa": propriedade.get_tipo_chapa_display() if propriedade else None,
+            "retalho": "Sim" if propriedade and propriedade.retalho else "Não"
+
+        })
+
+    return JsonResponse(data, safe=False)
 
 class ProcessarArquivoView(View):
     def post(self, request):

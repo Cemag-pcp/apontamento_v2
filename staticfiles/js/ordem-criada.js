@@ -3,29 +3,11 @@ import { fetchStatusMaquinas, fetchOrdensSequenciadasLaser, fetchOrdensSequencia
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
-    const spinner = document.getElementById('loading'); // Referência ao spinner
-
-    const showSpinner = () => {
-        if (spinner) {
-            spinner.style.display = 'flex'; // Exibe o spinner
-        } else {
-            console.warn('Spinner não encontrado no DOM.');
-        }
-    };
-
-    const hideSpinner = () => {
-        if (spinner) {
-            spinner.style.display = 'none'; // Oculta o spinner
-        } else {
-            console.warn('Spinner não encontrado no DOM.');
-        }
-    };
-
     return new Promise((resolve, reject) => { // Retorna uma Promise
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${encodeURIComponent(filtros.ordem || '')}&maquina=${filtros.maquina || ''}`)
+        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${encodeURIComponent(filtros.ordem || '')}&maquina=${filtros.maquina || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -58,10 +40,11 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         }
 
                         // Defina os botões dinamicamente com base no status
-                        let botaoAcao = '';
+                        let botaoAcao = `
+                        `;
 
                         if (ordem.status_atual === 'iniciada') {
-                            botaoAcao = `
+                            botaoAcao += `
                                 <button class="btn btn-danger btn-sm btn-interromper me-2" title="Interromper">
                                     <i class="fa fa-stop"></i>
                                 </button>
@@ -70,13 +53,21 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 </button>
                             `;
                         } else if (ordem.status_atual === 'aguardando_iniciar') {
-                            botaoAcao = `
+                            botaoAcao += `
                                 <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
                                     <i class="fa fa-play"></i>
                                 </button>
                             `;
+                        
+                            if (!ordem.sequenciada) {
+                                botaoAcao += `
+                                    <button class="btn btn-dark btn-sm btn-sequenciar me-2" title="Sequenciar">
+                                        <i class="fa fa-step-forward"></i>
+                                    </button>
+                                `;
+                            }
                         } else if (ordem.status_atual === 'interrompida') {
-                            botaoAcao = `
+                            botaoAcao += `
                                 <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
                                     <i class="fa fa-redo"></i>
                                 </button>
@@ -115,6 +106,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonInterromper = card.querySelector('.btn-interromper');
                         const buttonFinalizar = card.querySelector('.btn-finalizar');
                         const buttonRetornar = card.querySelector('.btn-retornar');
+                        const buttonSequenciar = card.querySelector('.btn-sequenciar');
 
                         // Adiciona evento ao botão "Ver Peças", se existir
                         if (buttonVerPeca) {
@@ -151,6 +143,13 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                             });
                         }
 
+                        // Adiciona evento ao botão "Resequenciar", se existir
+                        if (buttonSequenciar) {
+                            buttonSequenciar.addEventListener('click', () => {
+                                mostrarModalResequenciar(ordem.id);
+                            });
+                        }
+
                         // Adiciona o card ao container
                         container.appendChild(card);
                     });
@@ -167,7 +166,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
             })
             .finally(() => {
                 isLoading = false; // Libera a flag em qualquer caso
-                hideSpinner(); // Oculta o spinner após o carregamento
             });
     });
 };
@@ -194,6 +192,11 @@ function iniciarContador(ordemId, dataCriacao) {
 }
 
 export function carregarOrdensIniciadas(container) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     fetch('api/ordens-iniciadas/?page=1&limit=10')
         .then(response => response.json())
         .then(data => {
@@ -215,6 +218,7 @@ export function carregarOrdensIniciadas(container) {
                         <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
                             <i class="fa fa-check"></i>
                         </button>
+                        
                     `;
                 } else if (ordem.status_atual === 'aguardando_iniciar') {
                     botaoAcao = `
@@ -296,6 +300,11 @@ export function carregarOrdensIniciadas(container) {
 }
 
 export function carregarOrdensInterrompidas(container) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+    
     // Fetch para buscar ordens interrompidas
     fetch('api/ordens-interrompidas/?page=1&limit=10')
         .then(response => {
@@ -961,6 +970,82 @@ function mostrarModalRetornar(ordemId, maquina) {
     });
 }
 
+// Modal para "Resequenciar"
+function mostrarModalResequenciar(ordemId, setor) {
+    const modal = new bootstrap.Modal(document.getElementById('modalResequenciar'));
+    const modalTitle = document.getElementById('modalResequenciarLabel');
+    const formResequenciar = document.getElementById('formResequenciar');
+
+    modalTitle.innerHTML = `Sequenciar Ordem ${ordemId}`;
+    modal.show();
+
+    // Remove listeners antigos e adiciona novo
+    const clonedForm = formResequenciar.cloneNode(true);
+    formResequenciar.parentNode.replaceChild(clonedForm, formResequenciar);
+
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(clonedForm);
+        const motivoExclusao = formData.get('motivoExclusao');
+
+        Swal.fire({
+            title: 'Sequenciando...',
+            text: 'Por favor, aguarde enquanto a ordem está sendo sequenciada.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch(`api/resequenciar-ordem/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                ordem_id: ordemId,
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
+            }
+        })
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(({ status, body }) => {
+            if (status === 201) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: body.success,
+                });
+
+                modal.hide();
+
+                // Recarrega os dados chamando a função de carregamento
+                document.getElementById('ordens-container').innerHTML = '';
+                fetchOrdensSequenciadasLaser();
+                fetchOrdensSequenciadasPlasma();
+                resetarCardsInicial();
+
+            } else {
+                // Exibe o erro vindo do backend
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: body.error || 'Erro ao sequenciar a ordem.',
+                });
+            }
+        })
+        .catch((error) => {
+            console.error('Erro:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
+            });
+        });
+    });
+}
+
+
 export function resetarCardsInicial(filtros = {}) {
     const container = document.getElementById('ordens-container');
     const loadMoreButton = document.getElementById('loadMore');
@@ -972,10 +1057,14 @@ export function resetarCardsInicial(filtros = {}) {
     // Atualiza os filtros com os valores enviados
     const filtroOrdem = document.getElementById('filtro-ordem');
     const filtroMaquina = document.getElementById('filtro-maquina');
+    const filtroStatus = document.getElementById('filtro-status');
+    const filtroPeca = document.getElementById('filtro-peca');
 
     const currentFiltros = {
         ordem: filtros.ordem || filtroOrdem.value.trim(),
-        maquina: filtros.maquina || filtroMaquina.value.trim(),
+        maquina: filtros.maquina || filtroMaquina.value,
+        status: filtros.status || filtroStatus.value,
+        peca: filtros.peca || filtroPeca.value
     };
 
     // Função principal para buscar e renderizar ordens
@@ -985,6 +1074,9 @@ export function resetarCardsInicial(filtros = {}) {
 
         loadOrdens(container, page, limit, currentFiltros)
             .then((data) => {
+                loadMoreButton.disabled = false;
+                loadMoreButton.innerHTML = `Carregar mais`; 
+
                 if (data.ordens.length === 0) {
                     hasMoreData = false;
                     loadMoreButton.style.display = 'none'; // Esconde o botão quando não há mais dados
@@ -1012,7 +1104,25 @@ export function resetarCardsInicial(filtros = {}) {
 
     // Configurar o botão "Carregar Mais"
     loadMoreButton.onclick = () => {
-        fetchOrdens(); // Carrega a próxima página ao clicar no botão
+
+        // Atualiza os filtros com os valores enviados
+        const filtroOrdem = document.getElementById('filtro-ordem');
+        const filtroMaquina = document.getElementById('filtro-maquina');
+        const filtroStatus = document.getElementById('filtro-status');
+        const filtroPeca = document.getElementById('filtro-peca');
+
+        currentFiltros.ordem = filtroOrdem.value.trim();
+        currentFiltros.maquina = filtroMaquina.value;
+        currentFiltros.status = filtroStatus.value;
+        currentFiltros.peca = filtroPeca.value;
+    
+        loadMoreButton.disabled = true;
+        loadMoreButton.innerHTML = `                    
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+        `;
+        fetchOrdens(currentFiltros); // Carrega a próxima página ao clicar no botão
     };
 }
 
@@ -1036,36 +1146,40 @@ function carregarPecasDuplicar() {
 function filtro() {
     const form = document.getElementById('formFiltrarOrdem');
 
-    form.addEventListener('submit', (event) => {
-        event.preventDefault(); // Evita comportamento padrão do formulário
+    if (form){
+        form.addEventListener('submit', (event) => {
+            event.preventDefault(); // Evita comportamento padrão do formulário
+    
+            // Captura os valores atualizados dos filtros
+            const filtroPecas= document.getElementById('filtroPecas')
+            const filtroMaquina= document.getElementById('filtroMaquina').value
+    
+            const pecasSelecionadas = Array.from(filtroPecas.selectedOptions).map((opt) => opt.value);
+    
+            fetch(`api/duplicador-ordem/filtrar/?pecas=${pecasSelecionadas.join(",")}&maquina=${filtroMaquina}`)
+            .then((response) => response.json())
+            .then((data) => {
+    
+                resultadoFiltro.innerHTML = "";
+                data.ordens.forEach((ordem) => {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td>${ordem.id}</td>
+                        <td>${ordem.peca}</td>
+                        <td>${ordem.quantidade}</td>
+                        <td>
+                            <button class="btn btn-primary btn-sm btn-duplicar" data-id="${ordem.id}">Duplicar</button>
+                        </td>
+                    `;
+                    resultadoFiltro.appendChild(row);
+                });
+            })
+            .catch((error) => console.error("Erro ao filtrar ordens:", error));
+    
+        });
+    }
 
-        // Captura os valores atualizados dos filtros
-        const filtroPecas= document.getElementById('filtroPecas')
-        const filtroMaquina= document.getElementById('filtroMaquina').value
 
-        const pecasSelecionadas = Array.from(filtroPecas.selectedOptions).map((opt) => opt.value);
-
-        fetch(`api/duplicador-ordem/filtrar/?pecas=${pecasSelecionadas.join(",")}&maquina=${filtroMaquina}`)
-        .then((response) => response.json())
-        .then((data) => {
-
-            resultadoFiltro.innerHTML = "";
-            data.ordens.forEach((ordem) => {
-                const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td>${ordem.id}</td>
-                    <td>${ordem.peca}</td>
-                    <td>${ordem.quantidade}</td>
-                    <td>
-                        <button class="btn btn-primary btn-sm btn-duplicar" data-id="${ordem.id}">Duplicar</button>
-                    </td>
-                `;
-                resultadoFiltro.appendChild(row);
-            });
-        })
-        .catch((error) => console.error("Erro ao filtrar ordens:", error));
-
-    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {

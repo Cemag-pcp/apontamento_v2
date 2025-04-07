@@ -5,7 +5,14 @@ export function fetchStatusMaquinas() {
     const indicador = document.querySelector('.text-center.mb-3 .display-4');
     const descricao = document.querySelector('.text-center.mb-3 p');
     const listaStatus = document.querySelector('#machine-status-list');
-
+    listaStatus.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+    indicador.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
     // Faz a requisição para a API
     fetch('/core/api/status_maquinas/?setor=usinagem')
         .then(response => {
@@ -88,6 +95,10 @@ export function fetchStatusMaquinas() {
 export function fetchUltimasPecasProduzidas() {
     // Seleciona o elemento da lista onde as peças serão adicionadas
     const listaPecas = document.querySelector('#ultimas-pecas-list');
+    listaPecas.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
 
     // Faz a requisição para a API
     fetch(`/core/api/ultimas_pecas_produzidas/?setor=usinagem`)
@@ -126,6 +137,10 @@ export function fetchUltimasPecasProduzidas() {
 export function fetchContagemStatusOrdens() {
     // Seleciona o elemento da lista onde os status serão adicionados
     const listaStatus = document.getElementById('status-ordens-list');
+    listaStatus.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
 
     // Faz a requisição para a API
     fetch('/core/api/status_ordem/?setor=usinagem')

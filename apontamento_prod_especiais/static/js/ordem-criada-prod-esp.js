@@ -146,6 +146,11 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
 };
 
 function carregarOrdensIniciadas(container) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     fetch('api/ordens-iniciadas/?page=1&limit=10')
         .then(response => response.json())
         .then(data => {
@@ -239,6 +244,7 @@ function carregarOrdensIniciadas(container) {
 }
 
 function iniciarContador(ordemId, dataCriacao) {
+    
     const contador = document.getElementById(`contador-${ordemId}`);
     const dataInicial = new Date(dataCriacao); // Converte a data de criação para objeto Date
 
@@ -260,6 +266,11 @@ function iniciarContador(ordemId, dataCriacao) {
 }
 
 function carregarOrdensInterrompidas(container) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     // Fetch para buscar ordens interrompidas
     fetch('api/ordens-interrompidas/?page=1&limit=10')
         .then(response => {
@@ -343,22 +354,6 @@ function carregarOrdensInterrompidas(container) {
 function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
-
-// function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
-//     switch (status) {
-//         case 'iniciada':
-//             mostrarModalIniciar(ordemId, grupoMaquina);
-//             break;
-//         case 'interrompida':
-//             mostrarModalInterromper(ordemId, grupoMaquina);
-//             break;
-//         case 'finalizada':
-//             mostrarModalFinalizar(ordemId, grupoMaquina);
-//             break;
-//         default:
-//             alert('Status desconhecido.');
-//     }
-// }
 
 // Modal para "Interromper"
 function mostrarModalInterromper(ordemId, grupoMaquina) {
@@ -755,6 +750,9 @@ function resetarCardsInicial(filtros = {}) {
 
         loadOrdens(container, page, limit, currentFiltros)
             .then((data) => {
+                loadMoreButton.disabled = false;
+                loadMoreButton.innerHTML = `Carregar mais`; 
+
                 if (data.ordens.length === 0) {
                     hasMoreData = false;
                     loadMoreButton.style.display = 'none'; // Esconde o botão quando não há mais dados
@@ -782,6 +780,13 @@ function resetarCardsInicial(filtros = {}) {
 
     // Configurar o botão "Carregar Mais"
     loadMoreButton.onclick = () => {
+        loadMoreButton.disabled = true;
+        loadMoreButton.innerHTML = `                    
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+        `;
+
         fetchOrdens(); // Carrega a próxima página ao clicar no botão
     };
 }

@@ -120,7 +120,7 @@ function buscarItensInspecao(pagina) {
                     <h5> ${item.peca}</h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
-                        <strong>📅 Due:</strong> ${item.data}<br>
+                        <strong>📅 Dt. Produzida:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
                         <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
@@ -142,7 +142,7 @@ function buscarItensInspecao(pagina) {
             cardsInspecao.innerHTML += cards;
         });
 
-        itensInspecionar.textContent = "Itens a Inspecionar";
+        itensInspecionar.textContent = "Retrabalho";
 
         // Adiciona a paginação
               // Adiciona a paginação com reticências

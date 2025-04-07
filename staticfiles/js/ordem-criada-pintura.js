@@ -184,6 +184,11 @@ export const loadOrdens = (container, filtros = {}) => {
 };
 
 export function carregarOrdensIniciadas(container, filtros = {}) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
@@ -288,6 +293,11 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
 };
 
 export function carregarOrdensInterrompidas(container, filtros = {}) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     // Fetch para buscar ordens interrompidas
     fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
@@ -369,6 +379,11 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
 };
 
 function carregarOrdensAgProProcesso(container, filtros = {}) {
+    container.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     fetch(`api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
@@ -1798,10 +1813,15 @@ document.getElementById("confirmarCriacaoCambao").addEventListener("click", () =
 });
 
 async function cambaoProcesso() {
+    const cambaoContainer = document.getElementById("cambao-container");
+    cambaoContainer.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+    
     try {
         const response = await fetch("api/cambao-processo/");
         const data = await response.json();
-        const cambaoContainer = document.getElementById("cambao-container");
         cambaoContainer.innerHTML = ""; // Limpa antes de adicionar os novos
 
         if (data.cambao_em_processo.length === 0) {
@@ -2055,6 +2075,14 @@ function coresCarga() {
 }
 
 function atualizarAndamentoCarga(dataCarga) {
+
+    const percentualDisplay = document.getElementById("percentual-carga");
+
+    percentualDisplay.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     fetch(`api/andamento-carga/?data_carga=${encodeURIComponent(dataCarga)}`)
         .then(response => {
             if (!response.ok) {
@@ -2064,7 +2092,6 @@ function atualizarAndamentoCarga(dataCarga) {
         })
         .then(data => {
             const percentual = data.percentual_concluido || 0; // Se não houver dado, assume 0%
-            const percentualDisplay = document.getElementById("percentual-carga");
 
             // Adiciona efeito de transição suave ao atualizar o valor
             percentualDisplay.style.transition = "0.5s ease-in-out";
@@ -2087,6 +2114,13 @@ document.getElementById("refresh-status-carga").addEventListener("click", functi
 })
 
 function atualizarUltimasCargas() {
+    const listaCargas = document.getElementById("ultimas-pecas-list");
+
+    listaCargas.innerHTML = `
+    <div class="spinner-border text-dark" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>`;
+
     fetch("api/andamento-ultimas-cargas/")
         .then(response => {
             if (!response.ok) {
@@ -2095,7 +2129,6 @@ function atualizarUltimasCargas() {
             return response.json();
         })
         .then(data => {
-            const listaCargas = document.getElementById("ultimas-pecas-list");
             listaCargas.innerHTML = ""; // Limpa antes de adicionar os novos
 
             if (data.andamento_cargas.length === 0) {

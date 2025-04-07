@@ -11,9 +11,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
-
                 if (ordens.length > 0) {
-
                     ordens.forEach(ordem => {
                         const card = document.createElement('div');
                         card.classList.add('col-md-4'); // Adiciona a classe de coluna
@@ -181,7 +179,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                     } else {
                         loadMoreButton.style.display = 'block'; // Mostra o botão caso ainda haja dados
                     }
-
                     resolve(data); // Retorna os dados carregados
                 } else {
                     resolve(data); // Retorna mesmo se não houver dados
@@ -220,6 +217,11 @@ function iniciarContador(ordemId, dataCriacao) {
 }
 
 export function carregarOrdensIniciadas(container, filtros = {}) {
+    container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+        
     fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
@@ -324,6 +326,11 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
 };
 
 export function carregarOrdensInterrompidas(container, filtros = {}) {
+    container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+
     // Fetch para buscar ordens interrompidas
     fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
@@ -405,6 +412,11 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
 };
 
 function carregarOrdensAgProProcesso(container, filtros = {}) {
+    container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+        
     fetch(`api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
@@ -1508,20 +1520,27 @@ function resetarCardsInicial(filtros = {}) {
     // Função principal para buscar e renderizar ordens
     const fetchOrdens = () => {
         if (isLoading || !hasMoreData) return;
+
         isLoading = true;
 
         loadOrdens(container, page, limit, currentFiltros)
             .then((data) => {
+                loadMoreButton.disabled = false;
+                loadMoreButton.innerHTML = `Carregar mais`; 
+
                 if (data.ordens.length === 0) {
+            
                     hasMoreData = false;
                     loadMoreButton.style.display = 'none'; // Esconde o botão quando não há mais dados
+
                     if (page === 1) {
                         container.innerHTML = '<p class="text-muted">Nenhuma ordem encontrada.</p>';
                     } else {
                         container.insertAdjacentHTML('beforeend', '<p class="text-muted">Nenhuma ordem adicional encontrada.</p>');
                     }
                 } else {
-                    loadMoreButton.style.display = 'block'; // Garante que o botão seja exibido quando houver mais dados
+                    hasMoreData = true; // Permite continuar carregando mais dados
+                    loadMoreButton.style.display = 'block'; // Mostra o botão se houver mais dados
                     page++; // Incrementa a página para o próximo carregamento
                 }
             })
@@ -1533,13 +1552,19 @@ function resetarCardsInicial(filtros = {}) {
             });
     };
 
-    // Carrega a primeira página automaticamente
-    container.innerHTML = ''; // Limpa o container antes de carregar novos resultados
+    // Limpa o container antes de carregar novos dados
+    container.innerHTML = '';
     fetchOrdens();
 
     // Configurar o botão "Carregar Mais"
-    loadMoreButton.onclick = () => {
-        fetchOrdens(); // Carrega a próxima página ao clicar no botão
+    loadMoreButton.onclick = async () => {
+        loadMoreButton.disabled = true;
+        loadMoreButton.innerHTML = `                    
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+        `;
+        fetchOrdens(); 
     };
 }
 

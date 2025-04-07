@@ -22,7 +22,6 @@ document.getElementById("btn-limpar-inspecao-montagem").addEventListener("click"
     buscarItensInspecao(1);
 });
 
-
 function buscarItensInspecao(pagina) {
     let cardsInspecao = document.getElementById("cards-inspecao");
     let qtdPendenteInspecao = document.getElementById("qtd-pendente-inspecao");

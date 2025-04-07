@@ -1,9 +1,11 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Q, Prefetch, OuterRef, Subquery, Max
 from django.db import transaction
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+
 from cadastro.models import PecasEstanqueidade
 from apontamento_pintura.models import Retrabalho
 from .models import (
@@ -22,9 +24,18 @@ from .models import (
     ArquivoCausaEstanqueidade,
 )
 from core.models import Profile, Maquina
+from apontamento_estamparia.models import InfoAdicionaisInspecaoEstamparia, MedidasInspecaoEstamparia, DadosNaoConformidade, ImagemNaoConformidade
+
 from datetime import datetime, timedelta
 from collections import defaultdict
 import json
+
+
+def motivos_causas(request, setor):
+
+    motivos = Causas.objects.filter(setor=setor)
+
+    return JsonResponse({'motivos': list(motivos.values())})
 
 
 def inspecao_montagem(request):
@@ -38,8 +49,6 @@ def inspecao_montagem(request):
             "nome", flat=True
         )
     )
-
-    print(maquinas)
 
     list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
 
@@ -1016,7 +1025,239 @@ def envio_reinspecao_montagem(request):
 
 
 def inspecao_estamparia(request):
-    return render(request, "inspecao_estamparia.html")
+
+    maquinas = Maquina.objects.filter(setor__nome="estamparia", tipo='maquina')
+    motivos = Causas.objects.filter(setor="estamparia")
+    inspetores = Profile.objects.filter(
+        tipo_acesso="inspetor", permissoes__nome="inspecao/estamparia"
+    )
+
+    inspetores = [
+        {"nome_usuario": inspetor.user.username, "id": inspetor.user.id} for inspetor in inspetores
+    ]
+
+    context={"maquinas": maquinas, "motivos": motivos, "inspetores":inspetores}
+
+    return render(request, "inspecao_estamparia.html", context)
+
+@csrf_exempt
+def inspecionar_estamparia(request):
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    if request.method == "POST":
+
+        # Coletar dados simples do formulário
+        dataInspecao = request.POST.get('dataInspecao')
+        pecasProduzidas = int(request.POST.get('pecasProduzidas'))
+        inspetor = request.POST.get('inspetor')
+        numPecaDefeituosa = int(request.POST.get('numPecaDefeituosa', None)) if request.POST.get('numPecaDefeituosa', None) else 0
+        
+        # Coletar causas de peças mortas (JSON convertido para lista)
+        causasPecaMorta_raw = request.POST.get('causasPecaMorta')
+        causasPecaMorta = json.loads(causasPecaMorta_raw) if causasPecaMorta_raw else []
+        
+        inspecao=get_object_or_404(Inspecao, pk=request.POST.get("id-inspecao"))
+        inspetor = Profile.objects.get(user__pk=inspetor)
+
+        # Coletar não conformidades (JSON convertido para lista de dicionários)
+        nao_conformidades_raw = request.POST.get('naoConformidades')
+        nao_conformidades = json.loads(nao_conformidades_raw) if nao_conformidades_raw else []
+
+        total_pecas_afetadas = 0
+
+        # Faz um loop para percorrer cada não conformidade e somar a quantidade afetada
+        for nao_conformidade in nao_conformidades:
+            quantidade = int(nao_conformidade.get('quantidadeAfetada', 0)) if nao_conformidade.get('quantidadeAfetada', 0) else 0
+            total_pecas_afetadas += quantidade  # Acumula a quantidade afetada
+
+        # model: DadosExecucaoInspecao
+        conformidade = pecasProduzidas - (numPecaDefeituosa+total_pecas_afetadas) # total produzido - (não conformidade + peça morta)
+        nao_conformidade = total_pecas_afetadas # soma de todas não conformidade, não considera peças mortas
+
+        with transaction.atomic():
+
+            new_dados_execucao_inspecao = DadosExecucaoInspecao.objects.create(
+                inspecao=inspecao,
+                inspetor=inspetor,
+                conformidade=conformidade,
+                nao_conformidade=nao_conformidade,
+            )
+
+            # model: InfoAdicionalEstamparia
+            dados_exec_inspecao = get_object_or_404(DadosExecucaoInspecao, inspecao=inspecao)
+            inspecao_completa = request.POST.get("inspecao_total") # campo boleano
+
+            new_info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.create(
+                dados_exec_inspecao=dados_exec_inspecao,
+                inspecao_completa= True if inspecao_completa == "sim" else False,
+                qtd_mortas=numPecaDefeituosa if numPecaDefeituosa > 0 else 0,
+            )
+
+            # Relacionar as causas ao objeto criado
+            if causasPecaMorta:
+                new_info_adicionais.motivo_mortas.set(causasPecaMorta)  # Relaciona as causas pelo ManyToManyField
+
+            # model: MedidasInspecaoEstamparia
+            informacoes_adicionais_estamparia = get_object_or_404(InfoAdicionaisInspecaoEstamparia, pk=new_info_adicionais.pk)
+
+            medidas_raw = request.POST.get('medidas')
+            medidas = json.loads(medidas_raw) if medidas_raw else []
+
+            cabecalho_medida_a = None
+            medida_a = None
+            cabecalho_medida_b = None
+            medida_b = None
+            cabecalho_medida_c = None
+            medida_c = None
+            cabecalho_medida_d = None
+            medida_d = None
+
+            if medidas:
+                primeira_linha = medidas[0]  # pega a primeira linha de medidas
+
+                if 'medida1' in primeira_linha:
+                    cabecalho_medida_a = primeira_linha['medida1']['nome']
+                    medida_a = primeira_linha['medida1']['valor']
+                
+                if 'medida2' in primeira_linha:
+                    cabecalho_medida_b = primeira_linha['medida2']['nome']
+                    medida_b = primeira_linha['medida2']['valor']
+                
+                if 'medida3' in primeira_linha:
+                    cabecalho_medida_c = primeira_linha['medida3']['nome']
+                    medida_c = primeira_linha['medida3']['valor']
+                
+                if 'medida4' in primeira_linha:
+                    cabecalho_medida_d = primeira_linha['medida4']['nome']
+                    medida_d = primeira_linha['medida4']['valor']
+
+            new_medidas_inspecao=MedidasInspecaoEstamparia.objects.create(
+                informacoes_adicionais_estamparia=informacoes_adicionais_estamparia,
+                cabecalho_medida_a=cabecalho_medida_a,
+                medida_a=medida_a,
+                cabecalho_medida_b=cabecalho_medida_b,
+                medida_b=medida_b,
+                cabecalho_medida_c=cabecalho_medida_c,
+                medida_c=medida_c,
+                cabecalho_medida_d=cabecalho_medida_d,
+                medida_d=medida_d,
+            )
+
+            # model: DadosNaoConformidade
+            for nao_conformidade in nao_conformidades:
+
+                qt_nao_conformidade = int(nao_conformidade.get('quantidadeAfetada', 0))
+                destino = nao_conformidade.get('destino')
+                causas = nao_conformidade.get('causas', [])  # Recebe a lista de IDs das causas
+                imagens = request.FILES.getlist(f"fotoNaoConformidade{qt_nao_conformidade}")  # Pega as imagens enviadas
+
+                # Criar o objeto principal da não conformidade
+                new_dados_nao_conformidade = DadosNaoConformidade.objects.create(
+                    informacoes_adicionais_estamparia=informacoes_adicionais_estamparia,
+                    qt_nao_conformidade=qt_nao_conformidade,
+                    destino=destino
+                )
+
+                # Relacionar as causas ao objeto criado
+                if causas:
+                    new_dados_nao_conformidade.causas.set(causas)  # Relaciona as causas pelo ManyToManyField
+
+                # Salvar as imagens relacionadas
+                for img in imagens:
+                    ImagemNaoConformidade.objects.create(
+                        nao_conformidade=new_dados_nao_conformidade,
+                        imagem=img
+                    )
+                
+                # Salva o objeto principal
+                new_dados_nao_conformidade.save()
+
+            # Reinspecao
+            if len(nao_conformidades) > 0:
+                reinspecao = Reinspecao(inspecao=inspecao)
+                reinspecao.save()
+
+    return JsonResponse({"success": True, "message": "Inspeção realizada com sucesso!"}) 
+
+def get_itens_inspecao_estamparia(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    inspecoes_ids = set(
+        DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
+    )
+
+    # Captura os parâmetros enviados na URL
+    maquinas_filtradas = (
+        request.GET.get("maquinas", "").split(",")
+        if request.GET.get("maquinas")
+        else []
+    )
+    data_filtrada = request.GET.get("data", None)
+    pesquisa_filtrada = request.GET.get("pesquisar", None)
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 12  # Itens por página
+
+    # Filtra os dados
+    datas = Inspecao.objects.filter(pecas_ordem_estamparia__isnull=False).exclude(
+        id__in=inspecoes_ids
+    )
+
+    quantidade_total = datas.count()  # Total de itens sem filtro
+
+    if maquinas_filtradas:
+        datas = datas.filter(
+            pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas
+        )
+
+    if data_filtrada:
+        datas = datas.filter(data_inspecao__date=data_filtrada)
+
+    if pesquisa_filtrada:
+        pesquisa_filtrada = pesquisa_filtrada.lower()
+        datas = datas.filter(pecas_ordem_estamparia__peca__codigo__icontains=pesquisa_filtrada)
+
+    datas = datas.select_related(
+        "pecas_ordem_estamparia",
+        "pecas_ordem_estamparia__ordem",
+        "pecas_ordem_estamparia__operador",
+    ).order_by("-id")
+
+    # Paginação
+    paginador = Paginator(datas, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
+
+    dados = []
+    for data in pagina_obj:
+        data_ajustada = data.data_inspecao - timedelta(hours=3)
+        matricula_nome_operador = None
+
+        if data.pecas_ordem_estamparia.operador:
+            matricula_nome_operador = f"{data.pecas_ordem_estamparia.operador.matricula} - {data.pecas_ordem_estamparia.operador.nome}"
+
+        item = {
+            "id": data.id,
+            "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+            "peca": data.pecas_ordem_estamparia.peca.codigo + " - " + data.pecas_ordem_estamparia.peca.descricao,
+            "maquina": data.pecas_ordem_estamparia.ordem.maquina.nome,
+            "qtd_apontada": data.pecas_ordem_estamparia.qtd_boa,
+            "operador": matricula_nome_operador,
+        }
+
+        dados.append(item)
+
+    return JsonResponse(
+        {
+            "dados": dados,
+            "total": quantidade_total,
+            "total_filtrado": paginador.count,  # Total de itens após filtro
+            "pagina_atual": pagina_obj.number,
+            "total_paginas": paginador.num_pages,
+        },
+        status=200,
+    )
 
 
 def inspecao_tanque(request):
@@ -2222,3 +2463,4 @@ def get_historico_tanque(request, id):
         )
 
     return JsonResponse({"history": list_history}, status=200)
+

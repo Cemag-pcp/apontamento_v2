@@ -26,7 +26,7 @@ function buscarItensInspecionadosRetrabalho(pagina) {
     let cardsInspecao = document.getElementById("cards-inspecionados");
     let qtdPendenteInspecao = document.getElementById("qtd-inspecionados");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecionados");
-    let itensInspecionar = document.getElementById("itens-inspecionados");
+    let itensInspecionar = document.getElementById("titulo-inspecionados");
     let itensFiltradosCor = document.getElementById("itens-filtrados-inspecionados-cor");
     let itensFiltradosData = document.getElementById("itens-filtrados-inspecionados-data");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
@@ -108,7 +108,7 @@ function buscarItensInspecionadosRetrabalho(pagina) {
         const quantidadeInspecoes = items.total;
         const quantidadeFiltradaInspecoes = items.total_filtrado;
 
-        qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens inspecionados`;
+        qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens retrabalhados`;
 
         if (params.size > 1) {
             qtdFiltradaInspecao.style.display = 'block';
@@ -152,8 +152,9 @@ function buscarItensInspecionadosRetrabalho(pagina) {
             cardsInspecao.innerHTML += cards;
         });
 
-        itensInspecionar.textContent = "Itens Inspecionados";
-        
+        itensInspecionar.textContent = "Itens retrabalhados";
+        document.querySelector('#itens-inspecionados .spinner-border').style.display = 'none';
+
         // Adiciona a paginação com reticências
         if (items.total_paginas > 1) {
             let paginacaoHTML = `<nav aria-label="Page navigation">

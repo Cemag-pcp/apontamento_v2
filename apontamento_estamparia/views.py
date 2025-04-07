@@ -12,7 +12,9 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso,MaquinaParada
 from cadastro.models import MotivoInterrupcao, Pecas, Operador, MotivoMaquinaParada, MotivoExclusao, Maquina
+from inspecao.models import Inspecao, DadosExecucaoInspecao
 
+from datetime import datetime, timedelta
 import os
 import re
 import json
@@ -222,13 +224,17 @@ def atualizar_status_ordem(request):
 
                 peca = PecasOrdem.objects.filter(ordem=ordem).first()
 
-                PecasOrdem.objects.create(
+                nova_peca_ordem = PecasOrdem.objects.create(
                     ordem=ordem,
                     peca=peca.peca,
                     qtd_planejada=peca.qtd_planejada,
                     qtd_boa=int(qt_produzida),
                     qtd_morta=int(qt_mortas),
                     operador=operador_final
+                )
+
+                Inspecao.objects.create(
+                    pecas_ordem_estamparia=nova_peca_ordem
                 )
 
                 ordem.status_prioridade = 3
