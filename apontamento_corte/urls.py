@@ -7,12 +7,10 @@ app_name = 'corte'
 urlpatterns = [
     
     #templates
-    
     path('', views.planejamento, name='planejamento'),
     path('duplicar-op/', views.duplicar_op, name='duplicar_op'),
 
     #apis
-
     path('api/salvar-arquivo/', SalvarArquivoView.as_view(), name='salvar_arquivo'),
     path('api/processar-arquivo/', ProcessarArquivoView.as_view(), name='processar_arquivo'),
     path('duplicar-op/api/ordens-criadas/', views.get_ordens_criadas_duplicar_ordem, name='get_ordens_criadas_duplicar_ordem'),

@@ -376,7 +376,7 @@ def filtrar_ordens(request):
 def get_ordens_criadas_duplicar_ordem(request):
     #  Captura os parâmetros da requisição
     pecas = request.GET.get('pecas', '')  
-    pecas = [unquote(p) for p in pecas.split(';')] if pecas else []
+    pecas = [unquote(p) for p in pecas.split(',')] if pecas else []
     
     maquina = unquote(request.GET.get('maquina', ''))
     ordem = unquote(request.GET.get('ordem', ''))
