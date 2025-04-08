@@ -637,21 +637,26 @@ def api_ordens_finalizadas(request):
 
     data = []
 
-    ordens = Ordem.objects.filter(status_atual='finalizada').select_related(
+    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-08").select_related(
         'propriedade', 'operador_final'
     ).prefetch_related('ordem_pecas_corte').order_by('ultima_atualizacao')
 
     for ordem in ordens:
         propriedade = getattr(ordem, 'propriedade', None)
-        operador = ordem.operador_final.nome if ordem.operador_final else None
-        data_finalizacao = ordem.ultima_atualizacao
+        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
+
+        # converte e formata a data no timezone local
+        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
 
         for peca in ordem.ordem_pecas_corte.all():
             data.append({
                 "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
                 "peca": peca.peca,
                 "qtd_planejada": peca.qtd_planejada,
-                "tamanho_chapa": propriedade.tamanho if propriedade else None,
+                "tamanho_chapa": (
+                    propriedade.tamanho if propriedade and propriedade.tamanho
+                    else propriedade.descricao_mp.split(' - ')[1] if propriedade and propriedade.descricao_mp else None
+                ),
                 "qt_chapa": propriedade.quantidade if propriedade else None,
                 "aproveitamento": propriedade.aproveitamento if propriedade else None,
                 "espessura": propriedade.espessura if propriedade else None,
@@ -667,17 +672,23 @@ def api_ordens_finalizadas_mp(request):
 
     data = []
 
-    ordens = Ordem.objects.filter(status_atual='finalizada', grupo_maquina__in=['laser_1','laser_2','plasma']).select_related(
+    ordens = Ordem.objects.filter(status_atual='finalizada', grupo_maquina__in=['laser_1','laser_2','plasma'], ultima_atualizacao__gte="2025-04-08").select_related(
         'propriedade', 'maquina'
     ).order_by('ultima_atualizacao')
 
     for ordem in ordens:
         propriedade = getattr(ordem, 'propriedade', None)
 
+        # converte e formata a data no timezone local
+        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
+
         data.append({
             "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
-            "data_finalizacao": ordem.ultima_atualizacao,
-            "tamanho_chapa": propriedade.tamanho if propriedade else None,
+            "data_finalizacao": data_finalizacao,
+            "tamanho_chapa": (
+                propriedade.tamanho if propriedade and propriedade.tamanho
+                else propriedade.descricao_mp.split(' - ')[1] if propriedade and propriedade.descricao_mp else None
+            ),
             "qt_chapa": propriedade.quantidade if propriedade else None,
             "aproveitamento": propriedade.aproveitamento if propriedade else None,
             "descricao_chapa": propriedade.descricao_mp if propriedade else None,
@@ -685,7 +696,6 @@ def api_ordens_finalizadas_mp(request):
             "maquina": ordem.maquina.nome if ordem.maquina else None,
             "tipo_chapa": propriedade.get_tipo_chapa_display() if propriedade else None,
             "retalho": "Sim" if propriedade and propriedade.retalho else "Não"
-
         })
 
     return JsonResponse(data, safe=False)

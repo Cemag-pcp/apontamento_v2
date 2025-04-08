@@ -554,9 +554,11 @@ export function mostrarModalIniciar(ordemId, grupoMaquina) {
     const maquinasPorGrupo = {
         laser_1: [
             { value: '16', label: 'Laser 1' },
+            { value: '17', label: 'Laser 2 (JFY)' },
         ],
         laser_2: [
-            {value: '17', label: 'Laser 2 (JFY)'},
+            { value: '17', label: 'Laser 2 (JFY)' },
+            { value: '16', label: 'Laser 1' },
         ],
         plasma: [
             { value: '19', label: 'Plasma 1' },
