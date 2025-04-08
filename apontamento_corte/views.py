@@ -584,13 +584,22 @@ def get_ordens_sequenciadas(request):
         else:
             filtros['ordem'] = int(ordem)
 
-    ordens_sequenciadas = Ordem.objects.filter(~Q(status_atual='finalizada'), **filtros)
+    ordens_sequenciadas = Ordem.objects.filter(~Q(status_atual='finalizada'), **filtros).select_related('propriedade')
     
     # Converte cada objeto para dicionário e adiciona o display do grupo_maquina
     data = []
     for ordem_obj in ordens_sequenciadas:
         ordem_dict = model_to_dict(ordem_obj)
         ordem_dict['grupo_maquina_display'] = ordem_obj.get_grupo_maquina_display()
+
+        propriedade = getattr(ordem_obj, 'propriedade', None)
+        if propriedade:
+            ordem_dict['descricao_mp'] = propriedade.descricao_mp if propriedade.descricao_mp else None
+            ordem_dict['quantidade'] = propriedade.quantidade
+        else:
+            ordem_dict['descricao_mp'] = None
+            ordem_dict['quantidade'] = None
+
         data.append(ordem_dict)
 
     return JsonResponse({'ordens_sequenciadas': data})
@@ -628,21 +637,26 @@ def api_ordens_finalizadas(request):
 
     data = []
 
-    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-07").select_related(
+    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-08").select_related(
         'propriedade', 'operador_final'
     ).prefetch_related('ordem_pecas_corte').order_by('ultima_atualizacao')
 
     for ordem in ordens:
         propriedade = getattr(ordem, 'propriedade', None)
-        operador = ordem.operador_final.nome if ordem.operador_final else None
-        data_finalizacao = ordem.ultima_atualizacao
+        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
+
+        # converte e formata a data no timezone local
+        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
 
         for peca in ordem.ordem_pecas_corte.all():
             data.append({
                 "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
                 "peca": peca.peca,
                 "qtd_planejada": peca.qtd_planejada,
-                "tamanho_chapa": propriedade.tamanho if propriedade else None,
+                "tamanho_chapa": (
+                    propriedade.tamanho if propriedade and propriedade.tamanho
+                    else propriedade.descricao_mp.split(' - ')[1] if propriedade and propriedade.descricao_mp else None
+                ),
                 "qt_chapa": propriedade.quantidade if propriedade else None,
                 "aproveitamento": propriedade.aproveitamento if propriedade else None,
                 "espessura": propriedade.espessura if propriedade else None,
@@ -658,17 +672,23 @@ def api_ordens_finalizadas_mp(request):
 
     data = []
 
-    ordens = Ordem.objects.filter(status_atual='finalizada', grupo_maquina__in=['laser_1','laser_2','plasma']).select_related(
+    ordens = Ordem.objects.filter(status_atual='finalizada', grupo_maquina__in=['laser_1','laser_2','plasma'], ultima_atualizacao__gte="2025-04-08").select_related(
         'propriedade', 'maquina'
     ).order_by('ultima_atualizacao')
 
     for ordem in ordens:
         propriedade = getattr(ordem, 'propriedade', None)
 
+        # converte e formata a data no timezone local
+        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
+
         data.append({
             "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
-            "data_finalizacao": ordem.ultima_atualizacao,
-            "tamanho_chapa": propriedade.tamanho if propriedade else None,
+            "data_finalizacao": data_finalizacao,
+            "tamanho_chapa": (
+                propriedade.tamanho if propriedade and propriedade.tamanho
+                else propriedade.descricao_mp.split(' - ')[1] if propriedade and propriedade.descricao_mp else None
+            ),
             "qt_chapa": propriedade.quantidade if propriedade else None,
             "aproveitamento": propriedade.aproveitamento if propriedade else None,
             "descricao_chapa": propriedade.descricao_mp if propriedade else None,
@@ -676,7 +696,6 @@ def api_ordens_finalizadas_mp(request):
             "maquina": ordem.maquina.nome if ordem.maquina else None,
             "tipo_chapa": propriedade.get_tipo_chapa_display() if propriedade else None,
             "retalho": "Sim" if propriedade and propriedade.retalho else "Não"
-
         })
 
     return JsonResponse(data, safe=False)
