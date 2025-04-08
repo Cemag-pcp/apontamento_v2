@@ -628,7 +628,7 @@ def api_ordens_finalizadas(request):
 
     data = []
 
-    ordens = Ordem.objects.filter(status_atual='finalizada').select_related(
+    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-07").select_related(
         'propriedade', 'operador_final'
     ).prefetch_related('ordem_pecas_corte').order_by('ultima_atualizacao')
 

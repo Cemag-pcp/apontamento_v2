@@ -210,6 +210,12 @@ export function fetchOrdensSequenciadasLaser() {
                         <p class="card-text mb-1">
                             <strong>Data Programação:</strong> ${ordem.data_programacao}
                         </p>
+                        <p class="card-text mb-1">
+                            <strong>Chapa:</strong> ${ordem.mp_descricao}
+                        </p>
+                        <p class="card-text mb-1">
+                            <strong>Qt. Chapa:</strong> ${ordem.quantiade}
+                        </p>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center">
                         ${botoesAcao}

@@ -81,7 +81,7 @@ class Ordem(models.Model):
     ultima_atualizacao = models.DateTimeField(auto_now=True)
     excluida = models.BooleanField(default=False) # Opção para exclusão de ordens
     motivo_exclusao = models.ForeignKey(MotivoExclusao, on_delete=models.CASCADE, null=True, blank=True) # Caso exclua a ordem, é necessário informar o motivo
-    
+
     #Para ordens duplicadas de corte
     ordem_duplicada = models.TextField(blank=True, null=True) # Armazena a identificação da ordem duplicada (Ex.: "dup#1.1","dup#2.1"...)
     ordem_pai = models.ForeignKey(
