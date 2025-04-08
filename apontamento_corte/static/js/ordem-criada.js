@@ -553,14 +553,14 @@ export function mostrarModalIniciar(ordemId, grupoMaquina) {
     // Define as máquinas para cada grupo
     const maquinasPorGrupo = {
         laser_1: [
-            { value: '1', label: 'Laser 1' },
+            { value: '16', label: 'Laser 1' },
         ],
         laser_2: [
-            {value: '2', label: 'Laser 2 (JFY)'},
+            {value: '17', label: 'Laser 2 (JFY)'},
         ],
         plasma: [
-            { value: '3', label: 'Plasma 1' },
-            { value: '4', label: 'Plasma 2' },
+            { value: '19', label: 'Plasma 1' },
+            { value: '54', label: 'Plasma 2' },
         ],
     };
 
