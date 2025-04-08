@@ -1,12 +1,14 @@
 function carregarTabela(pagina) {
     mostrarLoading(true); // 🔥 Exibe o spinner
 
-    const pecasSelecionadas = document.getElementById('filtro-peca')?.value || '';
+    const selectElement = document.getElementById('filtro-peca');
+
     const maquinaSelecionada = document.getElementById('filtro-maquina')?.value || '';
     const ordemEscolhida = document.getElementById('filtro-ordem')?.value || '';
+    const pecasSelecionadas = Array.from(selectElement.selectedOptions).map(option => option.value);
 
     const filtros = {
-        pecas: encodeURIComponent(pecasSelecionadas),
+        pecas: pecasSelecionadas.map(encodeURIComponent),
         maquina: encodeURIComponent(maquinaSelecionada),
         ordem: encodeURIComponent(ordemEscolhida),
     };
