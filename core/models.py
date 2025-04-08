@@ -151,6 +151,7 @@ class PropriedadesOrdem(models.Model):
 
     TIPO_CHAPA_CHOICES=(('aco_carbono','Aço carbono'),
                         ('anti_derrapante','Anti derrapante'),
+                        ('inox','Inox'),
                         ('alta_resistencia','Alta resistência'))
 
     ordem = models.OneToOneField(Ordem,on_delete=models.CASCADE,related_name='propriedade')
