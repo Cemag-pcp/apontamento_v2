@@ -138,6 +138,9 @@ export function fetchOrdensSequenciadasLaser() {
             return response.json();
         })
         .then(data => {
+
+            console.log(data);
+
             container.innerHTML = '';
             // Se a resposta não tiver ordens, exibe mensagem
             if (data.ordens_sequenciadas && data.ordens_sequenciadas.length > 0) {
@@ -210,6 +213,14 @@ export function fetchOrdensSequenciadasLaser() {
                         <p class="card-text mb-1">
                             <strong>Data Programação:</strong> ${ordem.data_programacao}
                         </p>
+                        <p class="card-text mb-1">
+                            <strong>Data Programação:</strong> ${ordem.descricao_mp}
+                        </p>
+
+                        <p class="card-text mb-1">
+                            <strong>Data Programação:</strong> ${ordem.quantidade}
+                        </p>
+
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center">
                         ${botoesAcao}

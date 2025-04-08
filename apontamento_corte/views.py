@@ -584,13 +584,22 @@ def get_ordens_sequenciadas(request):
         else:
             filtros['ordem'] = int(ordem)
 
-    ordens_sequenciadas = Ordem.objects.filter(~Q(status_atual='finalizada'), **filtros)
+    ordens_sequenciadas = Ordem.objects.filter(~Q(status_atual='finalizada'), **filtros).select_related('propriedade')
     
     # Converte cada objeto para dicionário e adiciona o display do grupo_maquina
     data = []
     for ordem_obj in ordens_sequenciadas:
         ordem_dict = model_to_dict(ordem_obj)
         ordem_dict['grupo_maquina_display'] = ordem_obj.get_grupo_maquina_display()
+
+        propriedade = getattr(ordem_obj, 'propriedade', None)
+        if propriedade:
+            ordem_dict['descricao_mp'] = propriedade.descricao_mp if propriedade.descricao_mp else None
+            ordem_dict['quantidade'] = propriedade.quantidade
+        else:
+            ordem_dict['descricao_mp'] = None
+            ordem_dict['quantidade'] = None
+
         data.append(ordem_dict)
 
     return JsonResponse({'ordens_sequenciadas': data})
