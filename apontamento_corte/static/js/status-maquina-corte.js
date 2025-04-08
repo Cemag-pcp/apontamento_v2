@@ -207,20 +207,18 @@ export function fetchOrdensSequenciadasLaser() {
                             <span class="badge bg-${badgeColor}">${statusLabel}</span>
                             <small><span class="badge bg-${badgeColorMaquina}">${ordem.grupo_maquina_display}</span></small>
                         </h5>
-                        <p class="card-text mb-1">
+                        <small><p class="card-text mb-1">
                             <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
-                        </p>
-                        <p class="card-text mb-1">
+                        </p></small>
+                        <small><p class="card-text mb-1">
                             <strong>Data Programação:</strong> ${ordem.data_programacao}
-                        </p>
-                        <p class="card-text mb-1">
-                            <strong>Data Programação:</strong> ${ordem.descricao_mp}
-                        </p>
-
-                        <p class="card-text mb-1">
-                            <strong>Data Programação:</strong> ${ordem.quantidade}
-                        </p>
-
+                        <small></p></small>
+                        <small><p class="card-text mb-1">
+                            <strong>Chapa:</strong> ${ordem.descricao_mp}
+                        </p></small>
+                        <small><p class="card-text mb-1">
+                            <strong>Qt. chapa:</strong> ${ordem.quantidade}
+                        </p></small>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center">
                         ${botoesAcao}
@@ -351,12 +349,18 @@ export function fetchOrdensSequenciadasPlasma() {
                             #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
                             <span class="badge bg-${badgeColor}">${statusLabel}</span>
                         </h5>
-                        <p class="card-text mb-1">
+                        <small><p class="card-text mb-1">
                             <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
-                        </p>
-                        <p class="card-text mb-1">
+                        </p></small>
+                        <small><p class="card-text mb-1">
                             <strong>Data Programação:</strong> ${ordem.data_programacao}
-                        </p>
+                        <small></p></small>
+                        <small><p class="card-text mb-1">
+                            <strong>Chapa:</strong> ${ordem.descricao_mp}
+                        </p></small>
+                        <small><p class="card-text mb-1">
+                            <strong>Qt. chapa:</strong> ${ordem.quantidade}
+                        </p></small>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center">
                         ${botoesAcao}
