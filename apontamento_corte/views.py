@@ -647,6 +647,7 @@ def api_ordens_finalizadas(request):
 
         # converte e formata a data no timezone local
         data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
+        espessura = propriedade.espessura.rstrip() if propriedade and propriedade.espessura else None
 
         for peca in ordem.ordem_pecas_corte.all():
             data.append({
@@ -659,7 +660,7 @@ def api_ordens_finalizadas(request):
                 ),
                 "qt_chapa": propriedade.quantidade if propriedade else None,
                 "aproveitamento": propriedade.aproveitamento if propriedade else None,
-                "espessura": propriedade.espessura if propriedade else None,
+                "espessura": espessura,
                 "qtd_morta": peca.qtd_morta,
                 "operador": operador,
                 "data_finalizacao": data_finalizacao,
@@ -681,6 +682,7 @@ def api_ordens_finalizadas_mp(request):
 
         # converte e formata a data no timezone local
         data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
+        espessura = propriedade.espessura.rstrip() if propriedade and propriedade.espessura else None
 
         data.append({
             "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
@@ -692,7 +694,7 @@ def api_ordens_finalizadas_mp(request):
             "qt_chapa": propriedade.quantidade if propriedade else None,
             "aproveitamento": propriedade.aproveitamento if propriedade else None,
             "descricao_chapa": propriedade.descricao_mp if propriedade else None,
-            "espessura": propriedade.espessura if propriedade else None,
+            "espessura": espessura,
             "maquina": ordem.maquina.nome if ordem.maquina else None,
             "tipo_chapa": propriedade.get_tipo_chapa_display() if propriedade else None,
             "retalho": "Sim" if propriedade and propriedade.retalho else "Não"
