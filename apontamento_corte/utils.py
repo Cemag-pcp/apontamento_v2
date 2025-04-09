@@ -106,19 +106,34 @@ def tratamento_planilha_laser2(df,df2):
 
     df2.columns = df2.iloc[0]
     df2 = df2[1:].reset_index(drop=True)
-    df2 = df2[['Part name','Amount:','Part size (mm*mm)']]
+    
+    # Define as possíveis variações
+    colunas_ingles = ['Part name', 'Amount:', 'Part size (mm*mm)']
+    colunas_portugues = ['Nome da peça', 'Quantia:', 'Tamanho da peça (mm*mm)']
 
+    # Verifica quais colunas estão presentes no DataFrame
+    if all(col in df2.columns for col in colunas_ingles):
+        df2 = df2[colunas_ingles]
+        df2.columns = ['peca', 'qtd_planejada', 'tamanho_peça']  # renomeia para padrão comum
+    elif all(col in df2.columns for col in colunas_portugues):
+        df2 = df2[colunas_portugues]
+        df2.columns = ['peca', 'qtd_planejada', 'tamanho_peça']  # renomeia para padrão comum
+    else:
+        raise ValueError("Nenhuma das combinações de colunas esperadas (inglês ou português) foi encontrada.")
+
+    # adiciona as colunas extras
     df2['espessura'] = espessura_df
     df2['aproveitamento'] = aproveitamento_df
     df2['tamanho da chapa'] = tamanho_chapa
     df2['qt. chapas'] = qt_chapa
-    # df2['op'] = n_op
     df2['Peso'] = ''
     df2['Tempo'] = ''
 
-    # reordenar colunas
-    df2 = df2[['Part name','Amount:','espessura','aproveitamento','tamanho da chapa', 'qt. chapas']]
-    df2.columns = ['peca', 'qtd_planejada','espessura', 'aproveitamento', 'tamanho_da_chapa', 'qt_chapas']
+    # reordenar colunas com base nos nomes padronizados
+    df2 = df2[['peca', 'qtd_planejada', 'espessura', 'aproveitamento', 'tamanho da chapa', 'qt. chapas']]
+
+    # renomear final, se quiser nomes mais "seguros" para código
+    df2.columns = ['peca', 'qtd_planejada', 'espessura', 'aproveitamento', 'tamanho_da_chapa', 'qt_chapas']
 
     df2['data criada'] = date.today().strftime('%d/%m/%Y')
     df2['Máquina'] = 'Laser JYF'

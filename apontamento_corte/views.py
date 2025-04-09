@@ -735,10 +735,18 @@ class ProcessarArquivoView(View):
             # Realizar o tratamento da planilha
             if tipo_maquina=='plasma':
                 excel_tratado,propriedades = tratamento_planilha_plasma(ordem_producao_excel)
-            elif tipo_maquina=='laser_2':
-                # apenas para o laser2
-                ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='AllPartsList')
-
+            elif tipo_maquina == 'laser_2':
+                try:
+                    # Tenta carregar a aba em inglês
+                    ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='AllPartsList')
+                except ValueError:
+                    try:
+                        # Se não achar, tenta a aba em português
+                        ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='Lista de Todas as Peças')
+                    except ValueError:
+                        # Se nenhuma das duas existir, levanta erro claro
+                        raise ValueError("Nenhuma das abas 'AllPartsList' ou 'Lista de Todas as Peças' foi encontrada na planilha.")
+                
                 excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2)
             # elif tipo_maquina=='laser_1':
 
