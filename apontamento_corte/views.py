@@ -378,9 +378,8 @@ def get_ordens_criadas_duplicar_ordem(request):
     #  Captura os parâmetros da requisição
     pecas = request.GET.get('pecas', '')  
     pecas = [unquote(p) for p in pecas.split('|')] if pecas else []
-    print(pecas)
     pecas = [re.match(r'\d+', p).group() for p in pecas if re.match(r'\d+', p)]
-    print(pecas)
+
     maquina = unquote(request.GET.get('maquina', ''))
     ordem = unquote(request.GET.get('ordem', ''))
 
@@ -656,6 +655,13 @@ def api_ordens_finalizadas(request):
 
     data = []
 
+    SIGLA_TIPO_CHAPA = {
+        'inox': 'Inox',
+        'anti_derrapante': 'A.D',
+        'alta_resistencia': 'A.R',
+        'aco_carbono': '',  # sem sigla
+    }
+
     ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-08").select_related(
         'propriedade', 'operador_final'
     ).prefetch_related('ordem_pecas_corte').order_by('ultima_atualizacao')
@@ -666,7 +672,12 @@ def api_ordens_finalizadas(request):
 
         # converte e formata a data no timezone local
         data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
-        espessura = propriedade.espessura.rstrip() if propriedade and propriedade.espessura else None
+        espessura = propriedade.espessura.rstrip() if propriedade and propriedade.espessura else ''
+
+        tipo_chapa = propriedade.tipo_chapa if propriedade and propriedade.tipo_chapa else ''
+        sigla = SIGLA_TIPO_CHAPA.get(tipo_chapa, '')
+
+        espessura_final = f"{espessura} {sigla}".strip()  # remove espaço extra se sigla for vazia
 
         for peca in ordem.ordem_pecas_corte.all():
             data.append({
@@ -679,7 +690,7 @@ def api_ordens_finalizadas(request):
                 ),
                 "qt_chapa": propriedade.quantidade if propriedade else None,
                 "aproveitamento": propriedade.aproveitamento if propriedade else None,
-                "espessura": espessura,
+                "espessura": espessura_final,
                 "qtd_morta": peca.qtd_morta,
                 "operador": operador,
                 "data_finalizacao": data_finalizacao,
