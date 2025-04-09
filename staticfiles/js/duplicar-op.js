@@ -1,5 +1,5 @@
-function carregarTabela(pagina) {
-    mostrarLoading(true); // 🔥 Exibe o spinner
+async function carregarTabela(pagina) {
+    mostrarLoading(true); // Exibe o spinner
 
     const selectElement = document.getElementById('filtro-peca');
 
@@ -7,19 +7,26 @@ function carregarTabela(pagina) {
     const ordemEscolhida = document.getElementById('filtro-ordem')?.value || '';
     const pecasSelecionadas = Array.from(selectElement.selectedOptions).map(option => option.value);
 
+    // Junta todas as peças com um delimitador seguro
     const filtros = {
-        pecas: pecasSelecionadas.map(encodeURIComponent),
+        pecas: encodeURIComponent(pecasSelecionadas.join('|')),
         maquina: encodeURIComponent(maquinaSelecionada),
         ordem: encodeURIComponent(ordemEscolhida),
     };
 
-    fetch(`api/ordens-criadas/?page=${pagina}&limit=10&pecas=${filtros.pecas}&maquina=${filtros.maquina}&ordem=${filtros.ordem}`)
-        .then(response => response.json())
-        .then(data => {
-            atualizarTabela(data.data);
-            atualizarPaginacao(data.recordsTotal, pagina);
-        })
-        .finally(() => mostrarLoading(false)); // 🔥 Oculta o spinner
+    console.log(filtros);
+
+    try {
+        const response = await fetch(`api/ordens-criadas/?page=${pagina}&limit=10&pecas=${filtros.pecas}&maquina=${filtros.maquina}&ordem=${filtros.ordem}`);
+        const data = await response.json();
+
+        atualizarTabela(data.data);
+        atualizarPaginacao(data.recordsTotal, pagina);
+    } catch (error) {
+        console.error('Erro ao carregar a tabela:', error);
+    } finally {
+        mostrarLoading(false); // Oculta o spinner
+    }
 }
 
 //  Atualiza a tabela
@@ -398,9 +405,15 @@ document.addEventListener('DOMContentLoaded', () => {
     duplicarOrdem();
 
     // Ação do botão de filtro
-    document.getElementById("filtro-form").addEventListener("submit", (event) => {
+    document.getElementById("filtro-form").addEventListener("submit", async (event) => {
         event.preventDefault();
-        carregarTabela(1);
+
+        const btnFiltrarDup = document.getElementById("btn-filtrar-duplicador");
+        btnFiltrarDup.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; // Exibe o ícone de carregamento
+        btnFiltrarDup.disabled = true; // Desabilita o botão enquanto carrega
+        await carregarTabela(1);
+        btnFiltrarDup.disabled = false; // Reabilita o botão após carregar
+        btnFiltrarDup.innerHTML = '<i class="bi bi-filter me-2"></i> Filtrar';
     });
 
     carregarTabela(1);

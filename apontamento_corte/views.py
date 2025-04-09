@@ -22,6 +22,7 @@ import re
 import json
 from urllib.parse import unquote
 from datetime import datetime
+from functools import reduce
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
@@ -376,10 +377,15 @@ def filtrar_ordens(request):
 def get_ordens_criadas_duplicar_ordem(request):
     #  Captura os parâmetros da requisição
     pecas = request.GET.get('pecas', '')  
-    pecas = [unquote(p) for p in pecas.split(',')] if pecas else []
-    
+    pecas = [unquote(p) for p in pecas.split('|')] if pecas else []
+    print(pecas)
+    pecas = [re.match(r'\d+', p).group() for p in pecas if re.match(r'\d+', p)]
+    print(pecas)
     maquina = unquote(request.GET.get('maquina', ''))
     ordem = unquote(request.GET.get('ordem', ''))
+
+    codigos = [re.match(r'\d+', p).group() for p in pecas if re.match(r'\d+', p)]
+    codigos_unicos = list(set(pecas))
 
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
@@ -394,11 +400,24 @@ def get_ordens_criadas_duplicar_ordem(request):
     )
 
     # otimização do Filtro de Peças
-    if pecas:
-        ordens_queryset = ordens_queryset.filter(
-            ordem_pecas_corte__peca__in=pecas,
-            ordem_pecas_corte__qtd_planejada__gt=0
-        ).distinct()
+    if codigos_unicos:
+        # Filtro composto para cada código usando startswith
+        filtros = reduce(
+            lambda acc, c: acc | Q(ordem_pecas_corte__peca__startswith=c),
+            codigos_unicos[1:],
+            Q(ordem_pecas_corte__peca__startswith=codigos_unicos[0])
+        )
+
+        # Aplica o filtro para buscar apenas ordens com todas as peças desejadas
+        ordens_queryset = ordens_queryset.filter(filtros).annotate(
+            pecas_encontradas=Count(
+                'ordem_pecas_corte__peca',
+                filter=Q(ordem_pecas_corte__qtd_planejada__gt=0) & filtros,
+                distinct=True
+            )
+        ).filter(
+            pecas_encontradas=len(codigos_unicos)
+        )
 
     # Filtra Máquina e Ordem se necessário
     if maquina:
