@@ -879,7 +879,7 @@ class SalvarArquivoView(View):
                 PropriedadesOrdem.objects.create(
                     ordem=nova_ordem,
                     descricao_mp=prop['descricao_mp'],
-                    espessura=prop['espessura'],
+                    espessura=prop['espessura'].rstrip(),
                     quantidade=prop['quantidade'],
                     aproveitamento=SalvarArquivoView.corrigir_aproveitamento(prop['aproveitamento']),
                     tipo_chapa=tipo_chapa,
