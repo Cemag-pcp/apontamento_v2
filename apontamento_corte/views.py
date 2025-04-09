@@ -835,7 +835,16 @@ class SalvarArquivoView(View):
         elif tipo_maquina_object.nome=='Laser 2 (JFY)':
 
             # apenas para o laser2
-            ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='AllPartsList')
+            try:
+                # Tenta carregar a aba em inglês
+                ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='AllPartsList')
+            except ValueError:
+                try:
+                    # Se não achar, tenta a aba em português
+                    ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='Lista de Todas as Peças')
+                except ValueError:
+                    # Se nenhuma das duas existir, levanta erro claro
+                    raise ValueError("Nenhuma das abas 'AllPartsList' ou 'Lista de Todas as Peças' foi encontrada na planilha.")
 
             excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2)
         elif tipo_maquina_object.nome=='Laser 1':
