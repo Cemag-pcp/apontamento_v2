@@ -680,22 +680,23 @@ def api_ordens_finalizadas(request):
         espessura_final = f"{espessura} {sigla}".strip()  # remove espaço extra se sigla for vazia
 
         for peca in ordem.ordem_pecas_corte.all():
-            data.append({
-                "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
-                "peca": peca.peca,
-                "qtd_planejada": peca.qtd_planejada,
-                "tamanho_chapa": (
-                    propriedade.tamanho if propriedade and propriedade.tamanho
-                    else propriedade.descricao_mp.split(' - ')[1] if propriedade and propriedade.descricao_mp else None
-                ),
-                "qt_chapa": propriedade.quantidade if propriedade else None,
-                "aproveitamento": propriedade.aproveitamento if propriedade else None,
-                "espessura": espessura_final,
-                "qtd_morta": peca.qtd_morta,
-                "operador": operador,
-                "data_finalizacao": data_finalizacao,
-                "total_produzido": peca.qtd_boa
-            })
+            if peca.qtd_boa > 0:
+                data.append({
+                    "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
+                    "peca": peca.peca,
+                    "qtd_planejada": peca.qtd_planejada,
+                    "tamanho_chapa": (
+                        propriedade.tamanho if propriedade and propriedade.tamanho
+                        else propriedade.descricao_mp.split(' - ')[1] if propriedade and propriedade.descricao_mp else None
+                    ),
+                    "qt_chapa": propriedade.quantidade if propriedade else None,
+                    "aproveitamento": propriedade.aproveitamento if propriedade else None,
+                    "espessura": espessura_final,
+                    "qtd_morta": peca.qtd_morta,
+                    "operador": operador,
+                    "data_finalizacao": data_finalizacao,
+                    "total_produzido": peca.qtd_boa
+                })
 
     return JsonResponse(data, safe=False)
 
