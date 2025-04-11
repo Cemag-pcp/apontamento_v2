@@ -1048,12 +1048,14 @@ def inspecionar_estamparia(request):
 
     if request.method == "POST":
 
+        print(request.POST)
+
         # Coletar dados simples do formulário
         dataInspecao = request.POST.get('dataInspecao')
         pecasProduzidas = int(request.POST.get('pecasProduzidas'))
         inspetor = request.POST.get('inspetor')
         numPecaDefeituosa = int(request.POST.get('numPecaDefeituosa', None)) if request.POST.get('numPecaDefeituosa', None) else 0
-        
+
         # Coletar causas de peças mortas (JSON convertido para lista)
         causasPecaMorta_raw = request.POST.get('causasPecaMorta')
         causasPecaMorta = json.loads(causasPecaMorta_raw) if causasPecaMorta_raw else []
@@ -1102,53 +1104,63 @@ def inspecionar_estamparia(request):
             # model: MedidasInspecaoEstamparia
             informacoes_adicionais_estamparia = get_object_or_404(InfoAdicionaisInspecaoEstamparia, pk=new_info_adicionais.pk)
 
+            # Dicionários para armazenar os valores dinamicamente
             medidas_raw = request.POST.get('medidas')
             medidas = json.loads(medidas_raw) if medidas_raw else []
 
-            cabecalho_medida_a = None
-            medida_a = None
-            cabecalho_medida_b = None
-            medida_b = None
-            cabecalho_medida_c = None
-            medida_c = None
-            cabecalho_medida_d = None
-            medida_d = None
+            for linha in medidas:
+                campos = {
+                    'informacoes_adicionais_estamparia': informacoes_adicionais_estamparia
+                }
 
-            if medidas:
-                primeira_linha = medidas[0]  # pega a primeira linha de medidas
+                for i in range(1, 5):
+                    chave = f'medida{i}'
+                    letra = chr(96 + i)  # 1→a, 2→b, etc.
 
-                if 'medida1' in primeira_linha:
-                    cabecalho_medida_a = primeira_linha['medida1']['nome']
-                    medida_a = primeira_linha['medida1']['valor']
-                
-                if 'medida2' in primeira_linha:
-                    cabecalho_medida_b = primeira_linha['medida2']['nome']
-                    medida_b = primeira_linha['medida2']['valor']
-                
-                if 'medida3' in primeira_linha:
-                    cabecalho_medida_c = primeira_linha['medida3']['nome']
-                    medida_c = primeira_linha['medida3']['valor']
-                
-                if 'medida4' in primeira_linha:
-                    cabecalho_medida_d = primeira_linha['medida4']['nome']
-                    medida_d = primeira_linha['medida4']['valor']
+                    if chave in linha:
+                        campos[f'cabecalho_medida_{letra}'] = linha[chave]['nome']
+                        campos[f'medida_{letra}'] = linha[chave]['valor']
+                    else:
+                        campos[f'cabecalho_medida_{letra}'] = None
+                        campos[f'medida_{letra}'] = None
 
-            new_medidas_inspecao=MedidasInspecaoEstamparia.objects.create(
-                informacoes_adicionais_estamparia=informacoes_adicionais_estamparia,
-                cabecalho_medida_a=cabecalho_medida_a,
-                medida_a=medida_a,
-                cabecalho_medida_b=cabecalho_medida_b,
-                medida_b=medida_b,
-                cabecalho_medida_c=cabecalho_medida_c,
-                medida_c=medida_c,
-                cabecalho_medida_d=cabecalho_medida_d,
-                medida_d=medida_d,
-            )
+                MedidasInspecaoEstamparia.objects.create(**campos)
+
+            # if medidas:
+            #     primeira_linha = medidas[0]  # pega a primeira linha de medidas
+
+            #     if 'medida1' in primeira_linha:
+            #         cabecalho_medida_a = primeira_linha['medida1']['nome']
+            #         medida_a = primeira_linha['medida1']['valor']
+                
+            #     if 'medida2' in primeira_linha:
+            #         cabecalho_medida_b = primeira_linha['medida2']['nome']
+            #         medida_b = primeira_linha['medida2']['valor']
+                
+            #     if 'medida3' in primeira_linha:
+            #         cabecalho_medida_c = primeira_linha['medida3']['nome']
+            #         medida_c = primeira_linha['medida3']['valor']
+                
+            #     if 'medida4' in primeira_linha:
+            #         cabecalho_medida_d = primeira_linha['medida4']['nome']
+            #         medida_d = primeira_linha['medida4']['valor']
+
+            # new_medidas_inspecao=MedidasInspecaoEstamparia.objects.create(
+            #     informacoes_adicionais_estamparia=informacoes_adicionais_estamparia,
+            #     cabecalho_medida_a=cabecalho_medida_a,
+            #     medida_a=medida_a,
+            #     cabecalho_medida_b=cabecalho_medida_b,
+            #     medida_b=medida_b,
+            #     cabecalho_medida_c=cabecalho_medida_c,
+            #     medida_c=medida_c,
+            #     cabecalho_medida_d=cabecalho_medida_d,
+            #     medida_d=medida_d,
+            # )
 
             # model: DadosNaoConformidade
             for nao_conformidade in nao_conformidades:
 
-                qt_nao_conformidade = int(nao_conformidade.get('quantidadeAfetada', 0))
+                qt_nao_conformidade = int(nao_conformidade.get('quantidadeAfetada')) if nao_conformidade.get('quantidadeAfetada') != '' else 0
                 destino = nao_conformidade.get('destino')
                 causas = nao_conformidade.get('causas', [])  # Recebe a lista de IDs das causas
                 imagens = request.FILES.getlist(f"fotoNaoConformidade{qt_nao_conformidade}")  # Pega as imagens enviadas
@@ -1180,6 +1192,7 @@ def inspecionar_estamparia(request):
                 reinspecao.save()
 
     return JsonResponse({"success": True, "message": "Inspeção realizada com sucesso!"}) 
+
 
 def get_itens_inspecao_estamparia(request):
     if request.method != "GET":

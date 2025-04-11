@@ -733,6 +733,40 @@ def api_ordens_finalizadas_mp(request):
 
     return JsonResponse(data, safe=False)
 
+def excluir_ordem(request):
+    """
+    API para excluir ordens apenas do corte.
+    """
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        ordem_id = data.get('ordem_id')
+        motivo_id = data.get('motivo')
+
+        ordem = get_object_or_404(Ordem, pk=ordem_id)
+        motivo = get_object_or_404(MotivoExclusao, pk=int(motivo_id))
+
+        # Atualiza os campos da ordem
+        ordem.sequenciada = None
+        ordem.excluida = True
+        ordem.status_atual = 'aguardando_iniciar'
+        ordem.motivo_retirar_sequenciada = motivo
+        ordem.save()
+
+        # Apaga os processos associados a essa ordem
+        OrdemProcesso.objects.filter(ordem=ordem).delete()
+
+        return JsonResponse({'success': 'Ordem excluída com sucesso.'}, status=201)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
 class ProcessarArquivoView(View):
     def post(self, request):
         

@@ -51,11 +51,17 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
                                     <i class="fa fa-check"></i>
                                 </button>
+                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
+                                    <i class="fa fa-trash"></i>
+                                </button>
                             `;
                         } else if (ordem.status_atual === 'aguardando_iniciar') {
                             botaoAcao += `
                                 <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
                                     <i class="fa fa-play"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
+                                    <i class="fa fa-trash"></i>
                                 </button>
                             `;
                         
@@ -107,6 +113,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonFinalizar = card.querySelector('.btn-finalizar');
                         const buttonRetornar = card.querySelector('.btn-retornar');
                         const buttonSequenciar = card.querySelector('.btn-sequenciar');
+                        const buttonExcluir= card.querySelector('.btn-excluir');
 
                         // Adiciona evento ao botão "Ver Peças", se existir
                         if (buttonVerPeca) {
@@ -147,6 +154,13 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         if (buttonSequenciar) {
                             buttonSequenciar.addEventListener('click', () => {
                                 mostrarModalResequenciar(ordem.id);
+                            });
+                        }
+
+                        // Adiciona evento ao botão "Excluir", se existir
+                        if (buttonExcluir) {
+                            buttonExcluir.addEventListener('click', () => {
+                                mostrarModalExcluir(ordem.id);
                             });
                         }
 
@@ -1047,6 +1061,78 @@ function mostrarModalResequenciar(ordemId, setor) {
     });
 }
 
+// Modal para "Excluir"
+function mostrarModalExcluir(ordemId, setor) {
+    const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+    const modalTitle = document.getElementById('modalExcluirLabel');
+    const formExcluir = document.getElementById('formExcluir');
+
+    modalTitle.innerHTML = `Excluir Ordem ${ordemId}`;
+    modal.show();
+
+    // Remove listeners antigos e adiciona novo
+    const clonedForm = formExcluir.cloneNode(true);
+    formExcluir.parentNode.replaceChild(clonedForm, formExcluir);
+
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(clonedForm);
+        const motivoExclusao = formData.get('motivoExclusao');
+
+        Swal.fire({
+            title: 'Excluindo...',
+            text: 'Por favor, aguarde enquanto a ordem está sendo excluída.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch(`api/excluir-ordem/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                ordem_id: ordemId,
+                motivo: motivoExclusao
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
+            }
+        })
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(({ status, body }) => {
+            if (status === 201) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: body.success,
+                });
+
+                modal.hide();
+
+                // Recarrega os dados chamando a função de carregamento
+                document.getElementById('ordens-container').innerHTML = '';
+                resetarCardsInicial();
+            } else {
+                // Exibe o erro vindo do backend
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: body.error || 'Erro ao excluir a ordem.',
+                });
+            }
+        })
+        .catch((error) => {
+            console.error('Erro:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
+            });
+        });
+    });
+}
 
 export function resetarCardsInicial(filtros = {}) {
     const container = document.getElementById('ordens-container');

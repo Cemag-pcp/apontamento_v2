@@ -31,7 +31,7 @@ class MedidasInspecaoEstamparia(models.Model):
 
     cabecalho_medida_a = models.CharField(max_length=10, null=True, blank=True)
     medida_a = models.FloatField(null=True, blank=True)
-
+    
     cabecalho_medida_b = models.CharField(max_length=10, null=True, blank=True)
     medida_b = models.FloatField(null=True, blank=True)
 

@@ -295,7 +295,6 @@ function controlarLinhasTabela() {
     // Número máximo de linhas exibidas na tabela (limitado a 3)
     const maxLinhas = 3;
     const linhasExibidas = Math.min(qtdParaAnalise, maxLinhas);
-    console.log(qtdParaAnalise);
     // Mostrar ou ocultar as linhas da tabela
     for (let i = 1; i <= maxLinhas; i++) {
         const linha = document.getElementById(`linhaMedicao${i}`);
@@ -810,19 +809,19 @@ function validarFormulario() {
         return false;
     }
 
-    Toast.fire({
-        icon: "success",
-        title: `Inspeção gravada com sucesso.`
-    });
-
     return true;
 }
 
 // Função para enviar os dados ao backend
 function enviarDadosInspecao() {
+    
     if (!validarFormulario()) {
         return; // Não enviar se a validação falhar
     }
+
+    const buttonSalvarInspecao = document.getElementById('saveInspection');
+    buttonSalvarInspecao.disabled = true; // Desabilitar o botão para evitar múltiplos cliques
+    buttonSalvarInspecao.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>';
 
     const formData = new FormData();
 
@@ -907,7 +906,14 @@ function enviarDadosInspecao() {
         Toast.fire({
             icon: "success",
             title: `Inspeção gravada com sucesso.`
-        });        
+        });     
+        
+        buscarItensInspecao(1);
+        const modalInspectionModal = bootstrap.Modal.getInstance(document.getElementById('inspectionModal'));
+        modalInspectionModal.hide();
+        buttonSalvarInspecao.disabled = false; // Reabilitar o botão
+        buttonSalvarInspecao.innerHTML = 'Salvar';
+
     })
     .catch(error => {
         Toast.fire({
@@ -925,10 +931,10 @@ document.getElementById('inspectionModal').addEventListener('hide.bs.modal', fun
     }
 });
 
-// Associar a função ao botão de salvar
+// salvar inspeçao
 document.getElementById('saveInspection').addEventListener('click', enviarDadosInspecao);
 
-// Validação e envio do formulário
+// faz a validacao
 document.getElementById('inspectionForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -947,13 +953,6 @@ document.getElementById('inspectionForm').addEventListener('submit', function(e)
             quantity: quantity,
             description: description
         });
-    });
-    
-    // Aqui você adicionaria o código para enviar os dados para o servidor
-    console.log('Dados de não conformidades:', nonConformityData);
-    Toast.fire({
-        icon: "success",
-        title: `Inspeção salva com sucesso!.`
     });
 
 });
