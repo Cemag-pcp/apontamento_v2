@@ -549,8 +549,8 @@ function addNonConformityItem() {
                 <label for="fotoNaoConformidade${nonConformityCounter}" class="custom-file-upload">
                     <i class="bi bi-camera me-2"></i>Clique para adicionar uma foto
                 </label>
-                <input type="file" id="fotoNaoConformidade${nonConformityCounter}" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview${nonConformityCounter}')">
-                <div id="imagePreview${nonConformityCounter}" class="mt-2 text-center"></div>
+                <input type="file" id="fotoNaoConformidade${nonConformityCounter}" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview${nonConformityCounter}')" multiple>
+                <div id="imagePreview${nonConformityCounter}" class="d-flex mt-2 gap-2"></div>
             </div>
         </div>
     `;
@@ -606,24 +606,35 @@ function removeAllNonConformityItems() {
 // Pré-visualizar imagem carregada
 function previewImage(input, previewId) {
     const preview = document.getElementById(previewId);
-    preview.innerHTML = '';
-    
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.className = 'file-preview';
-            preview.appendChild(img);
-            
-            const fileName = document.createElement('p');
-            fileName.className = 'mt-1 mb-0 text-muted small';
-            fileName.textContent = input.files[0].name;
-            preview.appendChild(fileName);
+    preview.innerHTML = ''; // Limpa previews anteriores
+    preview.style.flexWrap = 'wrap';
+
+    if (input.files && input.files.length > 0) {
+        for (let i = 0; i < input.files.length; i++) {
+            const file = input.files[i];
+
+            const reader = new FileReader();
+            const div = document.createElement('div');
+
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'file-preview'; // Você pode estilizar isso com CSS
+                div.appendChild(img);
+
+                const fileName = document.createElement('p');
+                fileName.className = 'mt-1 mb-3 text-muted small';
+                fileName.textContent = file.name;
+                fileName.style.whiteSpace = 'nowrap';
+                fileName.style.overflow = 'hidden';
+                fileName.style.textOverflow = 'ellipsis';
+                fileName.style.maxWidth = '150px'; // Ajuste o tamanho conforme necessário
+                div.appendChild(fileName);
+                preview.appendChild(div);
+            }
+
+            reader.readAsDataURL(file);
         }
-        
-        reader.readAsDataURL(input.files[0]);
     }
 }
 
@@ -832,7 +843,6 @@ function enviarDadosInspecao() {
     formData.append('inspetor', document.getElementById('inspetor').value);
     formData.append('numPecaDefeituosa', document.getElementById('numPecaDefeituosa').value);
     formData.append('inspecao_total', document.getElementById('inspecao_total').value);
-    formData.append('id-inspecao', document.getElementById('id-inspecao').value);
 
     // Coletando causas de peças mortas
     const causasPecaMorta = [];
@@ -887,9 +897,12 @@ function enviarDadosInspecao() {
         };
         
         // Coletando foto da não conformidade
-        const foto = document.getElementById(`fotoNaoConformidade${id}`).files[0];
+        const foto = document.getElementById(`fotoNaoConformidade${id}`).files;
+        console.log(foto)
         if (foto) {
-            formData.append(`fotoNaoConformidade${id}`, foto);
+            for (let i = 0; i < foto.length; i++) {
+                formData.append(`fotoNaoConformidade${id}`, foto[i]);
+            }
         }
 
         naoConformidades.push(naoConformidade);
@@ -899,6 +912,9 @@ function enviarDadosInspecao() {
     // Enviar dados para o backend
     fetch('/inspecao/api/envio-inspecao-estamparia/', {
         method: 'POST',
+        headers: {
+            "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
         body: formData
     })
     .then(response => response.json())

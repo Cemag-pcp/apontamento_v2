@@ -28,6 +28,8 @@ google_credentials_json={
 scope = ['https://www.googleapis.com/auth/spreadsheets',
          "https://www.googleapis.com/auth/drive"]
 
+google_credentials_json["private_key"] = google_credentials_json["private_key"].replace("\\n", "\n")
+
 credentials = service_account.Credentials.from_service_account_info(google_credentials_json, scopes=scope)
 
 sa = gspread.authorize(credentials)

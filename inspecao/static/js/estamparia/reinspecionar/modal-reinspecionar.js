@@ -1,0 +1,962 @@
+document.addEventListener("DOMContentLoaded", () => {
+    buscarItensInspecao(1); // Chama a função quando a página carrega, começando na página 1
+        
+    // Adicionar listeners para os radio buttons de conformidade
+    const conformityRadios = document.querySelectorAll('.conformity-radio-reinspecao');
+    conformityRadios.forEach(radio => {
+        radio.addEventListener('change', updateConformityCountsReinspecao);
+    });
+    
+    // Inicializar contagem de conformidades
+    updateConformityCountsReinspecao();
+
+    preencherCausas_1Reinspecao();
+
+});
+
+document.getElementById("btn-filtrar-reinspecao-estamparia").addEventListener("click", (event) => {
+    event.preventDefault();
+    buscarItensInspecao(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
+});
+
+document.getElementById("btn-limpar-reinspecao-estamparia").addEventListener("click", (event) => {
+    event.preventDefault(); // Evita o recarregamento da página caso esteja dentro de um formulário
+
+    // Seleciona todos os inputs dentro do formulário
+    const form = document.getElementById("form-filtrar-reinspecao");
+    form.querySelectorAll("input").forEach(input => {
+        if (input.type === "checkbox") {
+            input.checked = false; // Desmarca checkboxes
+        } else {
+            input.value = ""; // Limpa inputs de texto e data
+        }
+    });
+    buscarItensInspecao(1);
+});
+
+document.getElementById("numPecaDefeituosaReinspecao").addEventListener("change", (event) => {
+
+    // Verifica se o valor máximo é menor que o valor atual
+    const max = parseInt(event.target.max);
+    const value = parseInt(event.target.value);
+    if (value > max) {
+        Toast.fire({
+            icon: "warning",
+            title: "A quantidade de peça morta não pode exceder o total de peças produzidas."
+        });
+        event.target.value = '';  
+        return;
+    }
+
+    controlarLinhasTabelaReinspecao();
+
+    if ((value - max) === 0){
+        document.getElementById("medicoesTecnicasReinspecao").style.display = 'none';
+        document.getElementById("inspecao_total_reinspecao").value = 'Sim';
+    } else {
+        document.getElementById("medicoesTecnicasReinspecao").style.display = 'block';
+        document.getElementById("inspecao_total_reinspecao").value = '';
+    }
+
+});
+
+function buscarItensReinspecao(pagina) {
+    let cardsInspecao = document.getElementById("cards-reinspecao");
+    let qtdPendenteInspecao = document.getElementById("qtd-pendente-reinspecao");
+    let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-reinspecao");
+    let itensInspecionar = document.getElementById("itens-reinspecionar");
+    let itensFiltradosMaquina = document.getElementById("itens-filtrados-reinspecao-maquina");
+    let itensFiltradosData = document.getElementById("itens-filtrados-reinspecao-data");
+    let itensFiltradosPesquisa = document.getElementById("itens-filtrados-reinspecao-pesquisa");
+    let paginacao = document.getElementById("paginacao-reinspecao-estamparia");
+
+    // Limpa os cards antes de buscar novos
+    cardsInspecao.innerHTML = `<div class="text-center">
+                                    <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>`;
+    paginacao.innerHTML = "";
+
+    // Coletar os filtros aplicados
+    let maquinasSelecionadas = [];
+    document.querySelectorAll('.form-check-input-reinspecao-estamparia:checked').forEach(checkbox => {
+        maquinasSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
+    });
+
+    let dataSelecionada = document.getElementById('data-filtro-reinspecao').value;
+    let pesquisarInspecao = document.getElementById('pesquisar-peca-reinspecao').value;
+
+    // Monta os parâmetros de busca
+    let params = new URLSearchParams();
+    if (maquinasSelecionadas.length > 0) {
+        params.append("maquinas", maquinasSelecionadas.join(","));
+        itensFiltradosMaquina.style.display = "block";
+        itensFiltradosMaquina.textContent = "Máquinas: " + maquinasSelecionadas.join(", ");
+    } else {
+        itensFiltradosMaquina.style.display = "none";
+    }
+
+    if (dataSelecionada) {
+        params.append("data", dataSelecionada);
+        itensFiltradosData.style.display = "block";
+        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+    } else {
+        itensFiltradosData.style.display = "none";
+    }
+
+    if (pesquisarInspecao) {
+        params.append("pesquisar", pesquisarInspecao);
+        itensFiltradosPesquisa.style.display = "block";
+        itensFiltradosPesquisa.textContent = "Pesquisa: " + pesquisarInspecao;
+    } else {
+        itensFiltradosPesquisa.style.display = "none";
+    }
+
+    params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
+
+    fetch(`/inspecao/api/itens-reinspecao-estamparia/?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error(`Erro HTTP! Status: ${response.status}`);
+        }
+        return response.json();
+    }).then(items => {
+        cardsInspecao.innerHTML = "";
+
+        const quantidadeInspecoes = items.total;
+        const quantidadeFiltradaInspecoes = items.total_filtrado;
+
+        qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
+
+        if (params.size > 1) {
+            qtdFiltradaInspecao.style.display = 'block';
+        } else {
+            qtdFiltradaInspecao.style.display = 'none';
+        }
+
+        qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
+
+        items.dados.forEach(item => {
+
+            const cards = `
+            <div class="col-md-4 mb-4">
+                <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
+                    <h5> ${item.peca}</h5>
+                    <p>Inspecao #${item.id}</p>
+                    <p>
+                        <strong>📅 Data:</strong> ${item.data}<br>
+                        <strong>⚙️ Máquina:</strong> ${item.maquina}<br>
+                        <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
+                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
+                    </p>
+                    <hr>
+                    <button 
+                        data-id="${item.id}"
+                        data-data="${item.data}"
+                        data-qtd="${item.qtd_apontada}"
+                        data-peca="${item.peca}"
+                        data-maquina="${item.maquina}"
+                    class="btn btn-dark w-100 iniciar-inspecao" id="openModalButtonReinspecao">
+                    Iniciar Inspeção</button>
+                </div>
+            </div>`;
+
+            cardsInspecao.innerHTML += cards;
+
+            // Chamar modal ao clicar em "Iniciar Inspecao"
+            document.querySelectorAll('.iniciar-inspecao').forEach(button => {
+                button.addEventListener('click', function () {
+
+                    // Capturar dados do botão
+                    const itemId = this.getAttribute('data-id');
+                    const itemData = this.getAttribute('data-data');
+                    const itemQtd = this.getAttribute('data-qtd');
+                    const itemPeca = this.getAttribute('data-peca');
+                    const itemMaquina = this.getAttribute('data-maquina');
+                    
+                    // Remover itens anteriores e resetar o modal
+                    removeAllNonConformityItems();
+                    resetModal();
+                    
+                    const modalInspecao = document.getElementById('reinspectionModal');
+                    
+                    // Pegar a data atual formatada
+                    const currentDate = new Date();
+                    const formattedDate = currentDate.toISOString().split('T')[0];
+                    
+                    modalInspecao.querySelector('#dataReinspecao').value = formattedDate;
+                    modalInspecao.querySelector('#conjuntoNameReinspecao').value = itemPeca;
+                    modalInspecao.querySelector('#maquinaReinspecao').value = itemMaquina;
+                    modalInspecao.querySelector('#pecasProduzidasReinspecao').value = itemQtd;
+                    modalInspecao.querySelector('#id-reinspecao').value = itemId;
+
+                    // Desabilitar campos para edição
+                    modalInspecao.querySelector('#maquinaReinspecao').disabled = true;
+                    modalInspecao.querySelector('#pecasProduzidasReinspecao').disabled = true;
+                    modalInspecao.querySelector('#dataReinspecao').disabled = true;
+                    modalInspecao.querySelector('#conjuntoNameReinspecao').disabled = true;
+
+                    modalInspecao.querySelector('#numPecaDefeituosaReinspecao').setAttribute("max", itemQtd);
+
+                    controlarLinhasTabelaReinspecao();
+
+                    // Mostrar o modal
+                    new bootstrap.Modal(modalInspecao).show();
+                });
+            });
+        });
+
+        itensInspecionar.textContent = "Itens a Inspecionar";
+
+        if (items.total_paginas > 1) {
+            let paginacaoHTML = `<nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">`;
+
+            const paginaAtual = items.pagina_atual;
+            const totalPaginas = items.total_paginas;
+
+            // Função para adicionar um link de página
+            const adicionarLinkPagina = (i) => {
+                paginacaoHTML += `
+                    <li class="page-item ${i === paginaAtual ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="buscarItensReinspecao(${i})">${i}</a>
+                    </li>`;
+            };
+
+            // Mostrar a primeira página
+            adicionarLinkPagina(1);
+
+            // Mostrar reticências antes da página atual, se necessário
+            if (paginaAtual > 3) {
+                paginacaoHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+
+            // Mostrar páginas ao redor da página atual
+            for (let i = Math.max(2, paginaAtual - 1); i <= Math.min(totalPaginas - 1, paginaAtual + 1); i++) {
+                adicionarLinkPagina(i);
+            }
+
+            // Mostrar reticências após a página atual, se necessário
+            if (paginaAtual < totalPaginas - 2) {
+                paginacaoHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+
+            // Mostrar a última página
+            if (totalPaginas > 1) {
+                adicionarLinkPagina(totalPaginas);
+            }
+
+            paginacaoHTML += `</ul></nav>`;
+            paginacao.innerHTML = paginacaoHTML;
+        }
+    }).catch((error) => {
+        console.error(error);
+    });
+}
+
+function controlarLinhasTabelaReinspecao() { 
+    const qtdProduzida = parseInt(document.getElementById("pecasProduzidasReinspecao").value) || 0;
+    const qtdMorta = parseInt(document.getElementById("numPecaDefeituosaReinspecao").value) || 0;
+    
+    if (qtdProduzida <= 0) {
+        Toast.fire({
+            icon: "warning",
+            title: "Por favor, informe uma quantidade válida de peças produzidas."
+        });
+        return;
+    }
+
+    // A quantidade de peças válidas para análise é a quantidade produzida menos a quantidade de peças mortas.
+    const qtdParaAnalise = qtdProduzida - qtdMorta;
+
+    // if (qtdParaAnalise <= 0) {
+    //     alert("A quantidade de peças mortas é igual ou maior que a quantidade produzida. Não há peças para análise.");
+    //     return;
+    // }
+
+    // Número máximo de linhas exibidas na tabela (limitado a 3)
+    const maxLinhas = 3;
+    const linhasExibidas = Math.min(qtdParaAnalise, maxLinhas);
+    // Mostrar ou ocultar as linhas da tabela
+    for (let i = 1; i <= maxLinhas; i++) {
+        const linha = document.getElementById(`linhaMedicao${i}`);
+        if (i <= linhasExibidas) {
+            linha.style.display = ""; // Mostra a linha
+        } else {
+            linha.style.display = "none"; // Esconde a linha
+        }
+    }
+
+    if(qtdParaAnalise === 0){
+        document.getElementById("sectionMedicaoTecReinspecao").style.display = "none";
+    } else {
+        document.getElementById("sectionMedicaoTecReinspecao").style.display = "block";
+    } 
+}
+
+function togglePecaMortaSectionReinspecao(mostrar) {
+    const secao = document.getElementById('pecaMortaSectionReinspecao');
+    const statusBadge = document.getElementById('statusPecasDefeituosasReinspecao');
+    const qtMorta = document.getElementById('numPecaDefeituosaReinspecao');
+    
+    if (mostrar) {
+        secao.style.display = 'block';
+        statusBadge.textContent = 'Peças com defeito';
+        statusBadge.className = 'badge bg-danger text-white';
+    } else {
+        secao.style.display = 'none';
+        statusBadge.textContent = 'Sem defeitos';
+        statusBadge.className = 'badge bg-success text-white';
+        
+        // Limpa o valor do input e dispara a função de controle da tabela
+        qtMorta.value = "";
+        controlarLinhasTabelaReinspecao();
+    }
+
+    document.getElementById('medicoesTecnicasReinspecao').style.display = 'block';
+}
+
+async function buscarMotivosCausas() {
+    try {
+        const response = await fetch('/inspecao/api/motivos-causas/estamparia', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function preencherCausas_1Reinspecao() {
+    const dados_causas = await buscarMotivosCausas();  // Aguarda os dados serem carregados
+
+    if (!dados_causas || !dados_causas.motivos) {
+        console.error("Dados inválidos ou vazios retornados da API.");
+        return;
+    }
+
+    const causasContainer = document.getElementById('causasPecaMortaReinspecao');
+    causasContainer.innerHTML = '';  // Limpa o conteúdo anterior
+
+    dados_causas.motivos.forEach((motivoCausa, index) => {
+        const motivoId = `causa1_reinspecao_${index + 1}`;
+        const motivoDiv = document.createElement('div');
+        motivoDiv.className = 'form-check mb-2';
+
+        motivoDiv.innerHTML = `
+            <input class="form-check-input causa-checkbox" type="checkbox" id="${motivoId}" name="causas1" value="${motivoCausa.id}">
+            <label class="form-check-label" for="${motivoId}">${motivoCausa.nome}</label>
+        `;
+        
+        causasContainer.appendChild(motivoDiv);
+    });
+}
+
+// Função para resetar o modal
+function resetModal() {
+    // Limpa os campos de texto
+    document.getElementById('reinspectionForm').reset();
+
+    // Limpar o texto dos elementos de preview da imagem
+    document.querySelectorAll('.imagePreview').forEach(function(element) {
+        element.innerHTML = '';  // Limpa a visualização das imagens
+    });
+
+    // Limpar os radio buttons e checkboxes
+    document.querySelectorAll('.form-check-input').forEach(function(input) {
+        input.checked = false;  // Desmarca todos os checkboxes e radio buttons
+    });
+
+    // Reabilitar campos desabilitados, caso tenha sido desabilitado no fluxo
+    document.querySelectorAll('input[disabled], select[disabled]').forEach(function(input) {
+        input.disabled = false;
+    });
+
+    // Limpar as causas de peças mortas
+    preencherCausas_1Reinspecao();
+
+    // Resetar o valor do campo de quantidade de peças mortas
+    const qtMorta = document.getElementById('numPecaDefeituosaReinspecao');
+    if (qtMorta) qtMorta.value = '';
+
+    // Ocultar a seção de peças mortas (resetar para estado inicial)
+    const secaoPecaMorta = document.getElementById('pecaMortaSectionReinspecao');
+    if (secaoPecaMorta) secaoPecaMorta.style.display = 'none';
+
+    // Atualizar o status badge para o estado inicial
+    const statusBadge = document.getElementById('statusPecasDefeituosasReinspecao');
+    if (statusBadge) {
+        statusBadge.textContent = 'Não verificado';
+        statusBadge.className = 'badge bg-secondary text-dark';
+    }
+}
+
+// Verificar se algum checkbox "Outro" está marcado
+// function checkOutroCausa() {
+//     const outroCheckboxes = document.querySelectorAll('.outro-checkbox');
+//     const outroCampo = document.getElementById('outraCausa_estamparia');
+    
+//     let outroSelecionado = false;
+//     outroCheckboxes.forEach(checkbox => {
+//         if (checkbox.checked) {
+//             outroSelecionado = true;
+//         }
+//     });
+    
+//     if (outroSelecionado) {
+//         outroCampo.disabled = false;
+//         outroCampo.required = true;
+//     } else {
+//         outroCampo.disabled = true;
+//         outroCampo.required = false;
+//         outroCampo.value = '';
+//     }
+// }
+
+// Atualizar contagem de conformidades e não conformidades
+function updateConformityCountsReinspecao() {
+    const totalRadios = document.querySelectorAll('[name^="conformityReinspecao"]').length / 2;
+    let nonConformCount = 0;
+    
+    for (let i = 1; i <= totalRadios; i++) {
+        const nonConformRadio = document.getElementById(`nonConformingReinspecao${i}`);
+        if (nonConformRadio && nonConformRadio.checked) {
+            nonConformCount++;
+        }
+    }
+    
+    // Mostrar ou ocultar a seção de não conformidades
+    const nonConformitySection = document.getElementById('nonConformitySectionReinspecao');
+    if (nonConformCount > 0) {
+        nonConformitySection.style.display = 'block';
+    } else {
+        nonConformitySection.style.display = 'none';
+    }
+}
+
+async function preencherCausasCa(nonConformityCounterReinspecao) {
+    try {
+        const response = await fetch('/inspecao/api/motivos-causas/estamparia', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        const data = await response.json();
+        const motivos = data.motivos || [];
+
+        const causasContainer = document.getElementById(`causasContainerReinspecao${nonConformityCounterReinspecao}`);
+        causasContainer.innerHTML = '';  // Limpa o placeholder de carregamento
+
+        if (motivos.length === 0) {
+            causasContainer.innerHTML = '<p>Nenhuma causa encontrada.</p>';
+            return;
+        }
+
+        motivos.forEach((motivoCausa, index) => {
+            const motivoId = `causa_reinspecao${nonConformityCounterReinspecao}_${index + 1}`;
+            const motivoDiv = document.createElement('div');
+            motivoDiv.className = 'form-check';
+
+            motivoDiv.innerHTML = `
+                <input class="form-check-input causa-checkbox" type="checkbox" id="${motivoId}" name="causas${nonConformityCounterReinspecao}" value="${motivoCausa.id}">
+                <label class="form-check-label" for="${motivoId}">${motivoCausa.nome}</label>
+            `;
+            
+            causasContainer.appendChild(motivoDiv);
+        });
+    } catch (error) {
+        console.error('Erro ao buscar causas:', error);
+    }
+}
+
+// Função para atualizar o contador de não conformidade
+function atualizarnonConformityCounterReinspecao() {
+    const items = document.querySelectorAll('.non-conformity-item-reinspecao');
+    nonConformityCounterReinspecao = items.length;
+}
+
+let nonConformityCounterReinspecao = 1;
+
+// Adicionar novo item de não conformidade
+function addNonConformityItem() {
+
+    // Atualiza o contador com a quantidade atual de itens já existentes
+    atualizarnonConformityCounterReinspecao();
+
+    // Incrementa o contador
+    nonConformityCounterReinspecao++;
+    
+    const container = document.getElementById('containerNonConformityItemsReinspecao');
+    const newItem = document.createElement('div');
+    newItem.className = 'non-conformity-item';
+    newItem.id = `nonConformityItemReinspecao${nonConformityCounterReinspecao}`;
+    
+    newItem.innerHTML = `
+        <button type="button" class="btn btn-remove-nonconformity" onclick="removeNonConformityItemReinspecao(${nonConformityCounterReinspecao})">
+            <i class="bi bi-x"></i>
+        </button>
+        
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Causas da não conformidade (selecione todas aplicáveis)</label>
+                <div class="causes-container" id="causasContainerReinspecao${nonConformityCounterReinspecao}">
+                    <div class="spinner-border text-dark" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label for="quantidadeAfetadaReinspecao${nonConformityCounterReinspecao}" class="form-label">Quantidade afetada</label>
+                <input type="number" class="form-control" id="quantidadeAfetadaReinspecao${nonConformityCounterReinspecao}" min="1">
+
+                <!-- Select de Destino abaixo do Input -->
+                <label for="destinoReinspecao${nonConformityCounterReinspecao}" class="form-label mt-2">Destino</label>
+                <select id="destinoReinspecao${nonConformityCounterReinspecao}" class="form-select">
+                    <option value="">Selecione</option>
+                    <option value="sucata">Sucata</option>
+                    <option value="retrabalho">Retrabalho</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <label for="fotoNaoConformidadeReinspecao${nonConformityCounterReinspecao}" class="form-label">Foto da não conformidade</label>
+                <label for="fotoNaoConformidadeReinspecao${nonConformityCounterReinspecao}" class="custom-file-upload">
+                    <i class="bi bi-camera me-2"></i>Clique para adicionar uma foto
+                </label>
+                <input type="file" id="fotoNaoConformidadeReinspecao${nonConformityCounterReinspecao}" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreviewReinspecao${nonConformityCounterReinspecao}')" multiple>
+                <div id="imagePreview${nonConformityCounterReinspecao}" class="d-flex mt-2 gap-2"></div>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(newItem);
+
+    // Preencher as causas dinamicamente
+    preencherCausasCa(nonConformityCounterReinspecao);
+}
+
+// Remover item de não conformidade
+function removeNonConformityItemReinspecao(id) {
+    const item = document.getElementById(`nonConformityItem${id}`);
+    if (item) {
+        item.remove();
+    }
+    
+    // Se não houver mais itens, adicionar um novo
+    const container = document.getElementById('containerNonConformityItems');
+    if (container.children.length === 0) {
+        nonConformityCounterReinspecao = 0;
+        addNonConformityItem();
+    }
+    
+    // Verificar se ainda há algum checkbox "Outro" marcado
+    // checkOutroCausa();
+}
+
+function removeAllNonConformityItems() {
+    // Seleciona todos os elementos que começam com "nonConformityItem"
+    const items = document.querySelectorAll('[id^="nonConformityItem"]');
+    
+    if (items){
+        // Remove cada item encontrado
+        items.forEach(item => {
+            item.remove();
+        });
+        
+        // Resetar o contador (se necessário)
+        nonConformityCounterReinspecao = 1;  // Se você precisar reiniciar o contador
+        
+        // Adicionar um novo item de não conformidade se necessário
+        addNonConformityItem();  // Caso você queira garantir que ao remover tudo, um novo item seja adicionado.
+        
+        // Verificar se ainda há algum checkbox "Outro" marcado
+        // checkOutroCausa();
+
+        const nonConformitySection = document.getElementById('nonConformitySection');
+        nonConformitySection.style.display = 'none';
+    }
+}
+
+// Pré-visualizar imagem carregada
+function previewImage(input, previewId) {
+    const preview = document.getElementById(previewId);
+    preview.innerHTML = ''; // Limpa previews anteriores
+    preview.style.flexWrap = 'wrap';
+
+    if (input.files && input.files.length > 0) {
+        for (let i = 0; i < input.files.length; i++) {
+            const file = input.files[i];
+
+            const reader = new FileReader();
+            const div = document.createElement('div');
+
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'file-preview'; // Você pode estilizar isso com CSS
+                div.appendChild(img);
+
+                const fileName = document.createElement('p');
+                fileName.className = 'mt-1 mb-3 text-muted small';
+                fileName.textContent = file.name;
+                fileName.style.whiteSpace = 'nowrap';
+                fileName.style.overflow = 'hidden';
+                fileName.style.textOverflow = 'ellipsis';
+                fileName.style.maxWidth = '150px'; // Ajuste o tamanho conforme necessário
+                div.appendChild(fileName);
+                preview.appendChild(div);
+            }
+
+            reader.readAsDataURL(file);
+        }
+    }
+}
+
+// Coletar dados de causas selecionadas
+function getSelectedCauses(itemId) {
+    const causasContainer = document.getElementById(`causasContainer${itemId}`);
+    const checkboxes = causasContainer.querySelectorAll('input[type="checkbox"]:checked');
+    
+    const selectedCauses = [];
+    checkboxes.forEach(checkbox => {
+        selectedCauses.push(checkbox.value);
+    });
+    
+    return selectedCauses;
+}
+
+// Função para validar o formulário antes do envio
+function validarFormulario() {
+
+    const qtdProduzida = parseInt(document.getElementById("pecasProduzidas").value);
+
+    // Validação de inspetor
+    const inspetor = document.getElementById('inspetor').value;
+    if (inspetor === '') {
+        Toast.fire({
+            icon: "error",
+            title: "Por favor, informe o nome do inspetor."
+        });
+        return false;
+    }
+
+    // 1. Validação de peças mortas
+    const pecaMortaSim = document.getElementById("pecaMortaSim").checked;
+    let qtdPecaMorta = 0;
+    
+    if (pecaMortaSim) {
+        const quantidade = parseInt(document.getElementById("numPecaDefeituosa").value);
+        const causasSelecionadas = document.querySelectorAll("#causasPecaMorta .causa-checkbox:checked").length;
+
+        if (!quantidade || quantidade <= 0) {
+            Toast.fire({
+                icon: "error",
+                title: "Por favor, informe a quantidade de peças mortas."
+            });
+            return false;
+        }
+
+        if (causasSelecionadas === 0) {
+            Toast.fire({
+                icon: "error",
+                title: "Por favor, selecione pelo menos uma causa para as peças mortas."
+            });
+            return false;
+        }
+
+        qtdPecaMorta = quantidade; // Armazena a quantidade de peças mortas
+    }
+
+    // 2. Validação das medições técnicas conforme a quantidade produzida 
+    let linhasObrigatorias = Math.min(qtdProduzida-qtdPecaMorta, 3); // No máximo 3 linhas obrigatórias
+    let linhasPreenchidas = 0;
+
+    for (let i = 1; i <= 3; i++) {
+        let linhaPreenchida = false;
+        let algumCampoPreenchido = false;
+        let conformeMarcado = false;
+        let naoConformeMarcado = false;
+
+        // Verificar se pelo menos um campo da linha foi preenchido
+        for (let j = 1; j <= 4; j++) {
+            const valor = document.getElementById(`valor${i}_${j}`).value.trim();
+            if (valor !== "") { // Verifica se o campo possui algum valor
+                algumCampoPreenchido = true;
+            }
+        }
+
+        // Verificar se um dos botões de conformidade foi marcado
+        conformeMarcado = document.getElementById(`conforming${i}`).checked;
+        naoConformeMarcado = document.getElementById(`nonConforming${i}`).checked;
+
+        // A linha é considerada preenchida se pelo menos um campo tiver valor E uma conformidade for marcada
+        if (algumCampoPreenchido && (conformeMarcado || naoConformeMarcado)) {
+            linhaPreenchida = true;
+            linhasPreenchidas++;
+        }
+
+        // Verificar se a linha obrigatória não está preenchida corretamente
+        if (i <= linhasObrigatorias && !linhaPreenchida) {
+            Toast.fire({
+                icon: "error",
+                title: `Por favor, preencha pelo menos um campo e marque conformidade na linha ${i} da tabela de medições técnicas.`
+            });
+
+            return false;
+        }
+    }
+
+    // Verifica se o número de linhas preenchidas é suficiente
+    if (linhasPreenchidas < linhasObrigatorias) {
+        Toast.fire({
+            icon: "error",
+            title: `Por favor, preencha pelo menos ${linhasObrigatorias} linha(s) da tabela de medições técnicas.`
+        });
+        return false;
+    }
+
+    // 3. Validação inspeção 100%
+    const inspecao_total = document.getElementById("inspecao_total").value;
+    if (inspecao_total === '') {
+        Toast.fire({
+            icon: "error",
+            title: `Por favor, informe se será necessário inspeção 100%.`
+        });
+        return false;
+    }
+
+    // 4. Validação de conformidade (pelo menos um marcado)
+    const conformidadeMarcada = document.querySelectorAll('[name^="conformity"]:checked').length;
+    const quantidade = parseInt(document.getElementById("numPecaDefeituosa").value);
+
+    if (!((qtdProduzida - quantidade) === 0) && (conformidadeMarcada === 0)) {
+        Toast.fire({
+            icon: "error",
+            title: `Por favor, marque pelo menos uma opção de conformidade (Conforme ou Não Conforme).`
+        });
+        return false;
+    }
+
+    // 5. Validação de não conformidades (cada não conformidade deve ter quantidade e pelo menos uma causa)
+    let somaQuantidadesAfetadas = 0;
+
+    const naoConformidades = document.querySelectorAll('.non-conformity-item');
+    for (const item of naoConformidades) {
+        const id = item.id.replace('nonConformityItem', '');
+        const quantidade = parseInt(document.getElementById(`quantidadeAfetada${id}`).value);
+        const causasSelecionadas = document.querySelectorAll(`#causasContainer${id} .causa-checkbox:checked`).length;
+        const destinoSelecionado = document.getElementById(`destino${id}`).value;
+
+        // Verifica se essa não conformidade está relacionada a uma linha marcada como "Não Conforme"
+        const naoConformeMarcado = document.getElementById(`nonConforming${id}`).checked;
+        
+        // Só realiza a validação se a linha for marcada como "Não Conforme"
+        if (naoConformeMarcado) {
+            if (!quantidade || quantidade <= 0) {
+                Toast.fire({
+                    icon: "error",
+                    title: `Por favor, informe a quantidade afetada para a não conformidade #${id}.`
+                });
+                return false;
+            }
+
+            if (causasSelecionadas === 0) {
+                Toast.fire({
+                    icon: "error",
+                    title: `Por favor, selecione pelo menos uma causa para a não conformidade #${id}.`
+                });
+
+                return false;
+            }
+
+            if (destinoSelecionado === '') {
+                Toast.fire({
+                    icon: "error",
+                    title: `Por favor, selecione o destino correto para a não conformidade #${id}.`
+                });
+
+                return false;
+            }
+
+            // Acumular quantidade afetada das não conformidades
+            somaQuantidadesAfetadas += quantidade;
+        }
+    }
+
+    // 6. Verificar se a quantidade de peças mortas + quantidade afetada é maior que a quantidade produzida
+    const totalPecasProblema = qtdPecaMorta + somaQuantidadesAfetadas;
+    if (totalPecasProblema > qtdProduzida) {
+        Toast.fire({
+            icon: "error",
+            title: `A soma da quantidade de peças mortas e das quantidades afetadas por não conformidades não pode ultrapassar a quantidade produzida.`
+        });
+
+        return false;
+    }
+
+    return true;
+}
+
+// Função para enviar os dados ao backend
+function enviarDadosInspecao() {
+    
+    if (!validarFormulario()) {
+        return; // Não enviar se a validação falhar
+    }
+
+    const buttonSalvarInspecao = document.getElementById('saveInspection');
+    buttonSalvarInspecao.disabled = true; // Desabilitar o botão para evitar múltiplos cliques
+    buttonSalvarInspecao.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>';
+
+    const formData = new FormData();
+
+    // Coletando as informações básicas
+    formData.append('id-inspecao', document.getElementById('id-inspecao-reinspecao').value);
+    formData.append('dataInspecao', document.getElementById('dataInspecaoReinspecao').value);
+    formData.append('pecasProduzidas', document.getElementById('pecasProduzidasReinspecao').value);
+    formData.append('inspetor', document.getElementById('inspetorReinspecao').value);
+    formData.append('numPecaDefeituosa', document.getElementById('numPecaDefeituosaReinspecao').value);
+    formData.append('inspecao_total', document.getElementById('inspecao_total_reinspecao').value);
+
+    // Coletando causas de peças mortas
+    const causasPecaMorta = [];
+    document.querySelectorAll('.causas-morta-container .causa-checkbox:checked').forEach((checkbox) => {
+        causasPecaMorta.push(checkbox.value);
+    });
+    formData.append('causasPecaMortaReinspecao', JSON.stringify(causasPecaMorta));
+
+    // Coletando as medições técnicas
+    const medidas = [];
+
+    for (let i = 1; i <= 3; i++) {
+        const medida = {};
+        let algumCampoPreenchido = false;
+
+        for (let j = 1; j <= 4; j++) {
+            // Pega o nome da medida (cabeçalho)
+            const nomeMedida = document.getElementById(`medida_reinspecao${j}`).value.trim();
+
+            // Pega o valor da medida na linha atual
+            const valor = document.getElementById(`valor_reinspecao_${i}_${j}`).value.trim();
+
+            // Apenas coleta se o cabeçalho estiver preenchido e o valor do campo também
+            if (nomeMedida !== "" && valor !== "") {
+                medida[`medida${j}`] = { nome: nomeMedida, valor: valor };
+                algumCampoPreenchido = true; // Marca que existe pelo menos um campo válido
+            }
+        }
+
+        // Coletar conformidade apenas se algum campo da linha foi preenchido
+        if (algumCampoPreenchido) {
+            medida['conforme'] = document.getElementById(`conforming_reinspecao_${i}`).checked;
+            medidas.push(medida);
+        }
+    }
+
+    formData.append('medidas', JSON.stringify(medidas));
+
+    // Coletando as não conformidades
+    const naoConformidades = [];
+    document.querySelectorAll('.non-conformity-item-reinspecao').forEach((item) => {
+        const id = item.id.replace('nonConformityItemReinspecao', '');
+        const causas = [];
+        document.querySelectorAll(`#causasContainerReinspecao${id} .causa-checkbox:checked`).forEach((checkbox) => {
+            causas.push(checkbox.value);
+        });
+
+        const naoConformidade = {
+            quantidadeAfetada: document.getElementById(`quantidadeAfetadaReinspecao${id}`).value,
+            destino: document.getElementById(`destinoReinspecao${id}`).value,
+            causas: causas
+        };
+        
+        // Coletando foto da não conformidade
+        const foto = document.getElementById(`fotoNaoConformidadeReinspecao${id}`).files;
+        console.log(foto)
+        if (foto) {
+            for (let i = 0; i < foto.length; i++) {
+                formData.append(`fotoNaoConformidadeReinspecao${id}`, foto[i]);
+            }
+        }
+
+        naoConformidades.push(naoConformidade);
+    });
+    formData.append('naoConformidades', JSON.stringify(naoConformidades));
+
+    // Enviar dados para o backend
+    fetch('/inspecao/api/envio-inspecao-estamparia/', {
+        method: 'POST',
+        headers: {
+            "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        Toast.fire({
+            icon: "success",
+            title: `Inspeção gravada com sucesso.`
+        });     
+        
+        buscarItensInspecao(1);
+        const modalInspectionModal = bootstrap.Modal.getInstance(document.getElementById('reinspectionModal'));
+        modalInspectionModal.hide();
+        buttonSalvarInspecao.disabled = false; // Reabilitar o botão
+        buttonSalvarInspecao.innerHTML = 'Salvar';
+
+    })
+    .catch(error => {
+        Toast.fire({
+            icon: "error",
+            title: `Erro ao salvar inspeção.`
+        });           
+        console.error('Erro:', error);
+    });
+}
+
+document.getElementById('reinspectionModal').addEventListener('hide.bs.modal', function (event) {
+    // Remover o foco do elemento ativo
+    if (document.activeElement) {
+        document.activeElement.blur();
+    }
+});
+
+// salvar inspeçao
+document.getElementById('saveReinspection').addEventListener('click', enviarDadosInspecao);
+
+// faz a validacao
+document.getElementById('reinspectionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Coletar dados de todas as não conformidades
+    const nonConformityData = [];
+    const items = document.querySelectorAll('[id^="nonConformityItemReinspecao"]');
+    
+    items.forEach(item => {
+        const itemId = item.id.replace('nonConformityItemReinspecao', '');
+        const causes = getSelectedCauses(itemId);
+        const quantity = document.getElementById(`quantidadeAfetadaReinspecao${itemId}`).value;
+        const description = document.getElementById(`descricaoNaoConformidadeReinspecao${itemId}`).value;
+        
+        nonConformityData.push({
+            causes: causes,
+            quantity: quantity,
+            description: description
+        });
+    });
+
+});

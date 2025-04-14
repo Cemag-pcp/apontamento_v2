@@ -16,19 +16,19 @@
 
 <ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
     <li class="nav-item" style="width: 33%;">
-        <a id="itens-inspecionar" class="nav-link tab-active active text-center" style="font-size: 0.875rem;"  onclick="activeRow('inspecao-pintura','reinspecao-pintura','inspecionados-pintura', this)">
+        <a id="itens-inspecionar" class="nav-link tab-active active text-center" style="font-size: 0.875rem;"  onclick="activeRow('inspecao-estamparia','reinspecao-estamparia','inspecionados-estamparia', this)">
             <span class="mx-2"></span>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </a>
     </li>
     <li class="nav-item" style="width: 33%;">
-        <a id="itens-reinspecao" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('reinspecao-pintura','inspecao-pintura','inspecionados-pintura', this)">
+        <a id="itens-reinspecao" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('reinspecao-estamparia','inspecao-estamparia','inspecionados-estamparia', this)">
             <span class="mx-2"></span>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </a>
     </li>
     <li class="nav-item" style="width: 33%;">
-        <a id="itens-inspecionados" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-pintura','inspecao-pintura','reinspecao-pintura', this)">
+        <a id="itens-inspecionados" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-estamparia','inspecao-estamparia','reinspecao-estamparia', this)">
             <span class="mx-2"></span>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </a>
@@ -125,8 +125,8 @@
                         <input id="data-filtro-reinspecao" type="date" class="form-control">
                 
                         <div class="d-flex justify-content-between mt-3">
-                            <button id="btn-limpar-reinspecao" class="btn btn-outline-secondary">Limpar</button>
-                            <button id="btn-filtrar-reinspecao" class="btn btn-dark">Filtrar</button>
+                            <button id="btn-limpar-reinspecao-estamparia" class="btn btn-outline-secondary">Limpar</button>
+                            <button id="btn-filtrar-reinspecao-estamparia" class="btn btn-dark">Filtrar</button>
                         </div>
                     </div>
                 </form>
@@ -138,7 +138,7 @@
         <span id="qtd-filtrada-reinspecao" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
     <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
-        <span id="itens-filtrados-reinspecao-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-reinspecao-maquina" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
         <span id="itens-filtrados-reinspecao-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
         <span id="itens-filtrados-reinspecao-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
         <span id="itens-filtrados-reinspecao-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
@@ -477,7 +477,7 @@
                                             <label for="fotoNaoConformidade1" class="custom-file-upload form-control text-center py-2">
                                                 <i class="bi bi-camera me-2"></i>Clique para adicionar uma foto
                                             </label>
-                                            <input type="file" id="fotoNaoConformidade1" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview1')">
+                                            <input type="file" id="fotoNaoConformidade1" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview1')" multiple>
                                             <div id="imagePreview1" class="mt-2 text-center"></div>
                                         </div>
                                     </div>
@@ -501,10 +501,298 @@
     </div>
 </div>
 
+<div class="modal fade" id="reinspectionModal" tabindex="-1" aria-labelledby="reinspectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <input type="hidden" value="" id="id-reinspecao">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reinspectionModalLabel">Inspeção estamparia</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="reinspectionForm">
+                    <!-- Seção 1: Informações Básicas -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Informações Básicas</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="dataReinspecao" class="form-label">Data da inspeção</label>
+                                    <input type="date" class="form-control" id="dataReinspecao" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="conjuntoNameReinspecao" class="form-label">Conjunto</label>
+                                    <input type="text" class="form-control" id="conjuntoNameReinspecao" readonly>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="maquinaReinspecao" class="form-label">Máquina</label>
+                                    <input type="text" class="form-control" id="maquinaReinspecao" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="pecasProduzidasReinspecao" class="form-label">Peças Produzidas</label>
+                                    <input type="number" class="form-control" id="pecasProduzidasReinspecao" min="1" placeholder="Número de peças" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="inspetorReinspecao" class="form-label">Inspetor</label>
+                                    <select class="form-select" id="inspetorReinspecao" required>
+                                        <option value="">Selecione</option>
+                                        {% for inspetor in inspetores %}
+                                        <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção 2: Peças Defeituosas -->
+                    <div class="card mb-4 border-left-warning">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0 font-weight-bold text-dark">
+                                <i class="fas fa-exclamation-triangle text-warning me-2"></i>Análise de Peças Defeituosas
+                            </h6>
+                            <span class="badge bg-warning text-dark" id="statusPecasDefeituosasReinspecao">Não verificado</span>
+                        </div>
+                        <div class="card-body">
+                            <!-- Pergunta inicial com design melhorado -->
+                            <div class="row mb-4">
+                                <div class="col-md-12">
+                                    <label class="form-label fw-bold">Morreu alguma peça durante o processo?</label>
+                                    <div class="d-flex mt-2">
+                                        <div class="form-check form-check-inline me-4">
+                                            <input class="form-check-input" type="radio" id="pecaMortaSimReinspecao" name="pecaMortaReinspecao" value="sim" 
+                                                   onclick="togglePecaMortaSectionReinspecao(true)" style="transform: scale(1.2);">
+                                            <label class="form-check-label ms-1" for="pecaMortaSim">
+                                                <span class="badge bg-danger px-3 py-2">Sim</span>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" id="pecaMortaNaoReinspecao" name="pecaMortaReinspecao" value="nao" 
+                                                   onclick="togglePecaMortaSectionReinspecao(false)" checked style="transform: scale(1.2);">
+                                            <label class="form-check-label ms-1" for="pecaMortaNao">
+                                                <span class="badge bg-success px-3 py-2">Não</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Campos que só aparecem se o usuário marcar "Sim" -->
+                            <div id="pecaMortaSectionReinspecao" style="display: none;" class="animate__animated animate__fadeIn">
+                                <hr class="my-3">
+                                <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <div>
+                                        Por favor, forneça detalhes sobre as peças defeituosas para análise de qualidade.
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="numPecaDefeituosaReinspecao" class="form-label fw-bold">
+                                                <i class="fas fa-hashtag me-1 text-secondary"></i>
+                                                Quantidade de peças mortas
+                                            </label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control form-control-lg" id="numPecaDefeituosaReinspecao" min="1">
+                                                <span class="input-group-text bg-secondary text-white">unidades</span>
+                                            </div>
+                                            <small class="form-text text-muted">Informe o número total de peças com defeito</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">
+                                            <i class="fas fa-clipboard-list me-1 text-secondary"></i>
+                                            Causas de peças mortas
+                                        </label>
+                                        <div class="causas-morta-container border rounded p-3" id="causasPecaMortaReinspecao">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção 3: Medições Técnicas -->
+                    <div class="card mb-4" id="medicoesTecnicasReinspecao">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Medições Técnicas</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="sectionMedicaoTecReinspecao">
+                                <label class="form-label">Medidas especificadas em desenho técnico</label>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered inspection-table" >
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>
+                                                    <input type="text" placeholder="Medida 1" class="form-control" id="medida1">
+                                                </th>
+                                                <th>
+                                                    <input type="text" placeholder="Medida 2" class="form-control" id="medida2">
+                                                </th>
+                                                <th>
+                                                    <input type="text" placeholder="Medida 3" class="form-control" id="medida3">
+                                                </th>
+                                                <th>
+                                                    <input type="text" placeholder="Medida 4" class="form-control" id="medida4">
+                                                </th>
+                                                <th>Conforme</th>
+                                                <th>Não conforme</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr id="linhaMedicaoReinspecao1">
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_1">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_2">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_3">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_4">
+                                                </td>
+                                                <td>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity1" id="conforming1" value="conforming" checked>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity1" id="nonConforming1" value="nonConforming">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr id="linhaMedicaoReinspecao2">
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_1">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_2">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_3">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_4">
+                                                </td>
+                                                <td>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity2" id="conforming2" value="conforming" checked>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity2" id="nonConforming2" value="nonConforming">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr id="linhaMedicaoReinspecao3">
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_1">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_2">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_3">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_4">
+                                                </td>
+                                                <td>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity3" id="conforming3" value="conforming" checked>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity3" id="nonConforming3" value="nonConforming">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="row mb-3" id="inspecaoTotalReinspecao">
+                                <div class="col-sm-12">
+                                    <label for="inspecao_total_reinspecao">Necessita realizar a inspeção 100%?</label>
+                                    <select class="form-select" name="inspecao_total_reinspecao" id="inspecao_total_reinspecao">
+                                        <option value="" selected hidden disabled></option>
+                                        <option value="Não">Não</option>
+                                        <option value="Sim">Sim</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção 4: Não Conformidades - Inicialmente oculta -->
+                    <div id="nonConformitySectionReinspecao" class="card mb-4" style="display: none;">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0">Detalhes das Não Conformidades</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">Adicione informações sobre cada não conformidade encontrada.</p>
+                            
+                            <div id="containerNonConformityItemsReinspecao">
+                                <!-- Template para item de não conformidade -->
+                                <div class="non-conformity-item border rounded p-3 mb-3" id="nonConformityItemReinspecao1">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <h6 class="mb-0">Não Conformidade #1</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-nonconformity" onclick="removeNonConformityItem(1)">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-12">
+                                            <label for="fotoNaoConformidadeReinspecao1" class="form-label">Foto da não conformidade</label>
+                                            <label for="fotoNaoConformidadeReinspecao1" class="custom-file-upload form-control text-center py-2">
+                                                <i class="bi bi-camera me-2"></i>Clique para adicionar uma foto
+                                            </label>
+                                            <input type="file" id="fotoNaoConformidadeReinspecao1" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview1')" multiple>
+                                            <div id="imagePreviewReinspecao1" class="mt-2 text-center"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center mt-3">
+                                <button type="button" class="btn btn-outline-primary btn-add-nonconformity" onclick="addNonConformityItem()">
+                                    <i class="bi bi-plus-circle me-2"></i>Adicionar outra não conformidade
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary btn-inspection" id="saveReinspection">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script src="{% static 'js/estamparia/a-inspecionar-estamparia.js' %}"></script>
+<script src="{% static 'js/estamparia/inspecionados-estamparia.js' %}"></script>
+<script src="{% static 'js/estamparia/reinspecao-estamparia.js' %}"></script>
+<script src="{% static 'js/estamparia/reinspecionar/modal-reinspecionar.js' %}"></script>
 
 <script>
 
