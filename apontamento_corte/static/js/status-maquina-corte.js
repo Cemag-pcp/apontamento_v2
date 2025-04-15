@@ -252,6 +252,8 @@ export function fetchOrdensSequenciadasLaser() {
             } else {
                 container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
             }
+        
+
         })
         .catch(error => {
             console.error('Erro ao buscar ordens sequenciadas:', error);
@@ -277,7 +279,6 @@ export function fetchOrdensSequenciadasPlasma() {
     const container = document.getElementById('ordens-sequenciadas-plasma-container');
     const btnFiltrarOrdemSequenciadaPlasma = document.getElementById('btnPesquisarOrdemSequenciadaPlasma');
     const ordemPlasma = document.getElementById('pesquisarOrdemSequenciadaPlasma');
-    
     
     function carregarOrdens(url) {
         container.innerHTML = `
@@ -391,6 +392,10 @@ export function fetchOrdensSequenciadasPlasma() {
             } else {
                 container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
             }
+
+            // Habilita o Sortable depois dos cards serem carregados
+            inicializarSortable(container);
+
         })
         .catch(error => {
             console.error('Erro ao buscar ordens sequenciadas:', error);
@@ -648,4 +653,52 @@ function mostrarModalExcluir(ordemId, setor) {
             });
         });
     });
+}
+
+function inicializarSortable(containerId) {
+    const container = document.getElementById(containerId);
+    Sortable.create(container, {
+        animation: 300,         // tempo de animação aumentado para 300ms
+        onEnd: function (evt) {
+            atualizarOrdem();
+        }
+    });
+}
+
+function atualizarOrdem(containerId, grupo_maquina) {
+    const container = document.getElementById(containerId);
+    const cards = container.querySelectorAll('.card');
+
+    // Extraímos a nova ordem usando o atributo data-index
+    const novaOrdem = Array.from(cards).map(card => {
+        const btnRetirar = card.querySelector('.btn-retirar-sequenciamento');
+        return btnRetirar ? btnRetirar.getAttribute('data-index') : null;
+    }).filter(id => id !== null);
+
+    console.log("Nova ordem:", novaOrdem);
+
+    console.log("Grupo Máquina:", grupo_maquina);
+
+    // Envia a nova ordem para a API usando POST
+    // fetch('api/update-ordem-sequenciada', {
+    //     method: 'POST',
+    //     headers: {
+    //         'Content-Type': 'application/json'
+    //     },
+    //     body: JSON.stringify({ novaOrdem: novaOrdem, grupoMaquina: grupo_maquina  })
+    // })
+    // .then(response => {
+    //     if (!response.ok) {
+    //         throw new Error("Erro ao atualizar a ordem");
+    //     }
+    //     return response.json();
+    // })
+    // .then(data => {
+    //     console.log("Ordem atualizada com sucesso:", data);
+    //     // Aqui você pode tratar a resposta e notificar o usuário
+    // })
+    // .catch(error => {
+    //     console.error("Erro na atualização da ordem:", error);
+    //     // Exiba uma mensagem de erro para o usuário, se necessário
+    // });
 }

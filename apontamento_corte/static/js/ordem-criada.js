@@ -77,6 +77,9 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
                                     <i class="fa fa-redo"></i>
                                 </button>
+                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
+                                    <i class="fa fa-trash"></i>
+                                </button>
                             `;
                         }
 
@@ -1114,6 +1117,17 @@ function mostrarModalExcluir(ordemId, setor) {
                 // Recarrega os dados chamando a função de carregamento
                 document.getElementById('ordens-container').innerHTML = '';
                 resetarCardsInicial();
+
+                const containerIniciado = document.querySelector('.containerProcesso');
+                carregarOrdensIniciadas(containerIniciado);
+                
+                const containerInterrompido = document.querySelector('.containerInterrompido');
+                carregarOrdensInterrompidas(containerInterrompido);
+
+                fetchStatusMaquinas();
+                fetchOrdensSequenciadasLaser();
+                fetchOrdensSequenciadasPlasma();
+    
             } else {
                 // Exibe o erro vindo do backend
                 Swal.fire({

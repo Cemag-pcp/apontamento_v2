@@ -751,7 +751,6 @@ def excluir_ordem(request):
 
         # Atualiza os campos da ordem
         ordem.sequenciada = None
-        ordem.excluida = True
         ordem.status_atual = 'aguardando_iniciar'
         ordem.motivo_retirar_sequenciada = motivo
         ordem.save()
