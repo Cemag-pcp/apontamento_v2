@@ -14,6 +14,7 @@ from django.contrib.auth.decorators import login_required
 from .models import PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada
 from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operador, Setor, MotivoMaquinaParada, Maquina
+from apontamento_usinagem.utils import criar_ordem_usinagem
 
 import os
 import re
@@ -96,7 +97,6 @@ def atualizar_status_ordem(request):
                 # Parse do corpo da requisição
                 body = json.loads(request.body)
                 print(body)
-                
                 status = body['status']
                 ordem_id = body['ordem_id']
                 # grupo_maquina = body['grupo_maquina'].lower()
@@ -179,6 +179,22 @@ def atualizar_status_ordem(request):
                         peca_obj.qtd_boa = planejada
                         peca_obj.qtd_morta = mortas
                         peca_obj.save()
+
+                        # verifica se a peã tem passagem para usinagem
+                        peca_object = Pecas.objects.get(pk=peca_id)
+                        if peca_object.processo_1:
+                            
+                            dados_usinagem = {
+
+                                'observacoes': 'Gerado a partir da serra',
+                                'dataProgramacao': now().date(),
+                                'qtdPlanejada': planejada,
+                                'pecaSelect': peca_object.codigo,
+                                'maquina': peca_object.processo_1,
+                                'status_atual': 'agua_prox_proc'
+                            }
+
+                            nova_ordem = criar_ordem_usinagem(dados_usinagem)
 
                     ordem.status_prioridade = 3
 

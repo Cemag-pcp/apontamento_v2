@@ -1036,6 +1036,9 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 fetchStatusMaquinas();
                 fetchContagemStatusOrdens();
 
+                const containerInterrompido = document.querySelector('.containerInterrompido');
+                carregarOrdensInterrompidas(containerInterrompido);
+
             })
             .catch((error) => {
                 Swal.fire({

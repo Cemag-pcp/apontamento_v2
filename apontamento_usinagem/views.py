@@ -12,7 +12,7 @@ from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso, MaquinaParada
 from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada
-
+from .utils import criar_ordem_usinagem
 
 import pandas as pd
 import os
@@ -169,7 +169,7 @@ def atualizar_status_ordem(request):
                     ordem=ordem,
                     status=status,
                     data_inicio=now(),
-                    data_fim=now() if status == 'finalizada' or status == 'agua_prox_proc' else None,
+                    data_fim=now() if status == 'finalizada' else None,
                 )
 
                 # Atualiza o status da ordem para o novo status
@@ -493,24 +493,8 @@ def get_pecas(request):
 def planejar_ordem_usinagem(request):
 
     if request.method == 'POST':
-
-        with transaction.atomic():
-
-            nova_ordem = Ordem.objects.create(
-                obs=request.POST.get('observacoes'),
-                grupo_maquina='usinagem',
-                data_programacao=request.POST.get("dataProgramacao")
-            )
-
-            PecasOrdem.objects.create(
-                qtd_planejada=request.POST.get('qtdPlanejada'),
-                ordem=nova_ordem,
-                peca=get_object_or_404(Pecas, codigo=request.POST.get('pecaSelect')),
-            )
-
-        return JsonResponse({
-            'message': 'Status atualizado com sucesso.',
-        })
+        criar_ordem_usinagem(request.POST)
+        return JsonResponse({'message': 'Status atualizado com sucesso.'})
 
 def api_apontamentos_peca(request):
 
