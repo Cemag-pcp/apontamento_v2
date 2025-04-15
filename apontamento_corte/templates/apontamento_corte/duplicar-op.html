@@ -15,88 +15,86 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-4">
-    <!-- Header Section -->
-    <div class="text-center mb-5">
-        <h1 class="fw-bold text-primary mb-2">Duplicador de Ordem de Produção</h1>
-        <div class="border-bottom border-2 border-primary w-25 mx-auto mb-3"></div>
-        <p class="text-muted">Pesquise e duplique ordens de produção existentes</p>
+<!-- Header Section -->
+<div class="text-center mb-5">
+    <h1 class="fw-bold text-primary mb-2">Duplicador de Ordem de Produção</h1>
+    <div class="border-bottom border-2 border-primary w-25 mx-auto mb-3"></div>
+    <p class="text-muted">Pesquise e duplique ordens de produção existentes</p>
+</div>
+
+<!-- Search Container -->
+<div class="card shadow-sm mb-5 border-0 rounded-3">
+    <div class="card-header bg-light py-3 border-0">
+        <h5 class="mb-0 text-primary"><i class="bi bi-search me-2"></i>Pesquisar Ordem</h5>
     </div>
-
-    <!-- Search Container -->
-    <div class="card shadow-sm mb-5 border-0 rounded-3">
-        <div class="card-header bg-light py-3 border-0">
-            <h5 class="mb-0 text-primary"><i class="bi bi-search me-2"></i>Pesquisar Ordem</h5>
+    <div class="card-body p-4">
+        <!-- Search Form -->
+        <form id="filtro-form" class="mb-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <label for="filtro-ordem" class="form-label small text-muted">Número da Ordem</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-hash"></i></span>
+                        <input type="text" class="form-control border-start-0 bg-light" name="filtro-ordem" id="filtro-ordem" placeholder="Digite o número">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label for="filtro-peca" class="form-label small text-muted">Peça</label>
+                    <select id="filtro-peca" class="form-select bg-light" multiple="multiple"></select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filtro-maquina" class="form-label small text-muted">Máquina</label>
+                    <select class="form-select bg-light" name="filtro-maquina" id="filtro-maquina">
+                        <option class="text-muted" value="">Todas as máquinas</option>
+                        <option value="plasma">Plasma</option>
+                        <option value="laser_1">Laser 1 (Weller)</option>
+                        <option value="laser_2">Laser 2 (JFY)</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label d-block" style="visibility: hidden;">Filtrar</label>
+                    <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center" id="btn-filtrar-duplicador">
+                        <i class="bi bi-filter me-2"></i> Filtrar
+                    </button>
+                </div>
+            </div>
+        </form>
+    
+        <!-- Results Table -->
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-center">Ordem</th>
+                        <th class="text-center">Data de Criação</th>
+                        <th class="text-center">Máquina</th>
+                        <th class="text-center">Descrição MP</th>
+                        <th class="text-center">Aproveitamento</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-corpo">
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <div class="spinner-border text-primary me-2" role="status" style="width: 1rem; height: 1rem;"></div>
+                                <span>Carregando dados...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-        <div class="card-body p-4">
-            <!-- Search Form -->
-            <form id="filtro-form" class="mb-4">
-                <div class="row g-3 align-items-center">
-                    <div class="col-md-3">
-                        <label for="filtro-ordem" class="form-label small text-muted">Número da Ordem</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-hash"></i></span>
-                            <input type="text" class="form-control border-start-0 bg-light" name="filtro-ordem" id="filtro-ordem" placeholder="Digite o número">
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="filtro-peca" class="form-label small text-muted">Peça</label>
-                        <select id="filtro-peca" class="form-select bg-light" multiple="multiple"></select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="filtro-maquina" class="form-label small text-muted">Máquina</label>
-                        <select class="form-select bg-light" name="filtro-maquina" id="filtro-maquina">
-                            <option class="text-muted" value="">Todas as máquinas</option>
-                            <option value="plasma">Plasma</option>
-                            <option value="laser_1">Laser 1 (Weller)</option>
-                            <option value="laser_2">Laser 2 (JFY)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label d-block" style="visibility: hidden;">Filtrar</label>
-                        <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center" id="btn-filtrar-duplicador">
-                            <i class="bi bi-filter me-2"></i> Filtrar
-                        </button>
-                    </div>
-                </div>
-            </form>
-        
-            <!-- Results Table -->
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="text-center">Ordem</th>
-                            <th class="text-center">Data de Criação</th>
-                            <th class="text-center">Máquina</th>
-                            <th class="text-center">Descrição MP</th>
-                            <th class="text-center">Aproveitamento</th>
-                            <th class="text-center">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-corpo">
-                        <tr>
-                            <td colspan="6" class="text-center py-4">
-                                <div class="d-flex align-items-center justify-content-center">
-                                    <div class="spinner-border text-primary me-2" role="status" style="width: 1rem; height: 1rem;"></div>
-                                    <span>Carregando dados...</span>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
 
-            <!-- Pagination -->
-            <div class="pagination-container mt-4" id="paginacao-container"></div>
+        <!-- Pagination -->
+        <div class="pagination-container mt-4" id="paginacao-container"></div>
 
-            <!-- Loading Spinner -->
-            <div id="loading-spinner" class="text-center py-3 d-none">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Carregando...</span>
-                </div>
-                <p class="mt-2 text-primary">Carregando dados...</p>
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="text-center py-3 d-none">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
             </div>
+            <p class="mt-2 text-primary">Carregando dados...</p>
         </div>
     </div>
 </div>
@@ -120,15 +118,22 @@
                     </div>
 
                     <div class="row mb-3 align-items-center">
-                        <div class="col-sm-6">
+                        <div class="col-sm-4">
                             <label for="obsFinalizarCorte" class="form-label text-muted">Observação</label>
                             <textarea class="form-control bg-light" name="obsFinalizarCorte" id="obsFinalizarCorte" placeholder="Adicione comentários relevantes" rows="3"></textarea>
                         </div>    
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label for="dataProgramacao" class="form-label text-muted">Data de Programação</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar3"></i></span>
                                 <input type="date" id="dataProgramacao" name="dataProgramacao" class="form-control border-start-0 bg-light" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4" id="col-maquina">
+                            <label for="maquina" class="form-label text-muted">Máquina</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"></span>
+                                <select name="maquina" id="maquina" class="form-select"></select>
                             </div>
                         </div>
                     </div>

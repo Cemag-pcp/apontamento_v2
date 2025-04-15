@@ -209,6 +209,38 @@ function preencherModalDuplicacao(data,ordemId) {
     const bodyDuplicarOrdem = document.getElementById('bodyDuplicarOrdem');
 
     document.getElementById('modalDuplicarOrdem').setAttribute('data-ordem-id', ordemId);
+    
+    const maquinas = ['laser_1', 'laser_2']; // laser_1: 16, laser_2: 17
+    const maquina = data.propriedades.maquina;
+    const selectMaquina = document.getElementById('maquina');
+    const colMaquina = document.getElementById('col-maquina');
+    
+    // Mapeamento: nome da máquina => ID
+    const maquinaMap = {
+        'laser_1': '16',
+        'laser_2': '17'
+    };
+    
+    if (maquinas.includes(maquina)) {
+        colMaquina.style.display = 'block';
+        selectMaquina.required = true;
+    
+        // Preenche as opções
+        selectMaquina.innerHTML = `
+            <option value="">Selecione uma máquina</option>
+            <option value="16">Laser 1</option>
+            <option value="17">Laser 2 (JFY)</option>
+        `;
+    
+        // Seleciona automaticamente com base na máquina recebida
+        selectMaquina.value = maquinaMap[maquina];
+    
+    } else {
+        selectMaquina.innerHTML = `<option value="">Selecione uma máquina</option>`;
+        colMaquina.style.display = 'none';
+        selectMaquina.required = false;
+        selectMaquina.value = '';
+    }
 
     // Criando o conteúdo inicial do modal com a tabela da chapa
     bodyDuplicarOrdem.innerHTML = `
@@ -306,7 +338,6 @@ function duplicarOrdem() {
         // Obtém o ID da ordem armazenado no modal
         const modal = document.getElementById('modalDuplicarOrdem');
         const ordemId = modal.getAttribute('data-ordem-id');
-        console.log(ordemId);
 
         if (!ordemId) {
             Swal.fire({ icon: 'error', title: 'Erro!', text: 'ID da ordem não encontrado.' });
@@ -316,6 +347,7 @@ function duplicarOrdem() {
         // Captura os valores do formulário
         const obsDuplicar = document.getElementById('obsFinalizarCorte').value;
         const dataProgramacao = document.getElementById('dataProgramacao').value;
+        const maquina = document.getElementById('maquina').value;
         const quantidadeChapas = parseFloat(document.getElementById('quantidadeChapas').value) || 1;
 
         // Captura a lista de peças com as novas quantidades
@@ -332,6 +364,7 @@ function duplicarOrdem() {
             obs_duplicar: obsDuplicar,
             dataProgramacao: dataProgramacao,
             qtdChapa: quantidadeChapas,
+            maquina: maquina,
             pecas: pecas
         };
 
@@ -391,7 +424,6 @@ function duplicarOrdem() {
         });
     });
 }
-
 
 // Função para obter CSRF Token (caso necessário)
 function getCSRFToken() {

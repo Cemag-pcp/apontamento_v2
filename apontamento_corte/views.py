@@ -1,11 +1,11 @@
-from django.shortcuts import render
 from django.http import JsonResponse
 from django.views import View
 from django.conf import settings
 from django.db import transaction
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
+from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
 from django.db.models import Count, Q
 from django.forms.models import model_to_dict
@@ -477,6 +477,7 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
             'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
             'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
             'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+            'maquina': ordem.grupo_maquina,
         }
 
         # Peças relacionadas à ordem
@@ -509,10 +510,13 @@ def gerar_op_duplicada(request, pk_ordem):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
 
+    print(data)
+
     # Valida os campos necessários
     obs_duplicar = data.get('obs_duplicar')
     data_programacao = data.get('dataProgramacao')
     qtd_chapa = data.get('qtdChapa')
+    maquina = data.get('maquina', None)
     pecas = data.get('pecas', [])
 
     if not qtd_chapa or not pecas:
@@ -527,13 +531,18 @@ def gerar_op_duplicada(request, pk_ordem):
         # Busca a ordem original
         ordem_original = Ordem.objects.get(pk=pk_ordem)
 
+        if maquina:
+            maquina_ordem = maquina
+        else:
+            maquina_ordem = ordem_original.maquina if ordem_original.maquina in ['laser_1', 'laser_2'] else None
+
         with transaction.atomic():
             # Cria a nova ordem como duplicada
             nova_ordem = Ordem.objects.create(
                 ordem_pai=ordem_original,
                 duplicada=True,
                 grupo_maquina=ordem_original.grupo_maquina,
-                maquina=ordem_original.maquina if ordem_original.maquina in ['laser_1', 'laser_2'] else None,
+                maquina=maquina_ordem,
                 obs=obs_duplicar,
                 status_atual='aguardando_iniciar',
                 data_programacao=data_programacao
@@ -602,7 +611,7 @@ def get_ordens_sequenciadas(request):
         else:
             filtros['ordem'] = int(ordem)
 
-    ordens_sequenciadas = Ordem.objects.filter(~Q(status_atual='finalizada'), **filtros).select_related('propriedade')
+    ordens_sequenciadas = Ordem.objects.filter(~Q(status_atual='finalizada'), **filtros).order_by('ordem_prioridade').select_related('propriedade')
     
     # Converte cada objeto para dicionário e adiciona o display do grupo_maquina
     data = []
@@ -765,6 +774,44 @@ def excluir_ordem(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def definir_prioridade(request):
+    """
+    Define a prioridade de uma ordem de corte.
+    
+    - Se já existir uma ordem com a prioridade escolhida, ela terá a prioridade removida.
+    - A nova ordem recebe a prioridade definida.
+    """
+
+    try:
+        data = json.loads(request.body)
+        ordem_id = data.get('ordemId')
+        prioridade = data.get('prioridade')
+
+        if not ordem_id or not prioridade:
+            return JsonResponse({'error': 'Parâmetros ordemId e prioridade são obrigatórios.'}, status=400)
+
+        ordem = get_object_or_404(Ordem, pk=ordem_id)
+
+        with transaction.atomic():
+            # Remove a prioridade de outras ordens, se já atribuída
+            Ordem.objects.filter(ordem_prioridade=prioridade, grupo_maquina=ordem.grupo_maquina).exclude(pk=ordem_id).update(ordem_prioridade=None)
+
+            # Atualiza a ordem solicitada com a nova prioridade
+            ordem.ordem_prioridade = prioridade
+            ordem.save()
+
+        return JsonResponse({'success': 'Prioridade definida com sucesso.'}, status=201)
+
+    except Ordem.DoesNotExist:
+        return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Formato JSON inválido.'}, status=400)
+
+    except Exception as e:
+        return JsonResponse({'error': f'Ocorreu um erro inesperado: {str(e)}'}, status=500)
     
 class ProcessarArquivoView(View):
     def post(self, request):

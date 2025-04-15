@@ -201,12 +201,22 @@ export function fetchOrdensSequenciadasLaser() {
                     const card = document.createElement('div');
                     card.classList.add('card', 'mb-3');
                     card.innerHTML = `
-                    <div class="card-body">
-                        <h5 class="card-title">
+                    <div class="card-header d-flex align-items-center">
+                        <h5 class="card-title mb-0">
                             #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
                             <span class="badge bg-${badgeColor}">${statusLabel}</span>
                             <small><span class="badge bg-${badgeColorMaquina}">${ordem.grupo_maquina_display}</span></small>
                         </h5>
+                        <div class="ms-auto">
+                            <span class="badge bg-primary text-white prioridade-badge" 
+                                data-order-id="${ordem.id}" 
+                                style="cursor: pointer;" 
+                                title="Definir prioridade">
+                                ${ordem.ordem_prioridade || '-'}
+                            </span>
+                        </div>                    
+                    </div>
+                    <div class="card-body">
                         <small><p class="card-text mb-1">
                             <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
                         </p></small>
@@ -253,6 +263,21 @@ export function fetchOrdensSequenciadasLaser() {
                 container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
             }
         
+            container.querySelectorAll('.prioridade-badge').forEach(badge => {
+                badge.addEventListener('click', () => {
+                    const orderId = badge.dataset.orderId;
+                    document.getElementById('prioridadeOrderId').value = orderId;
+                    document.getElementById('inputPrioridade').value = badge.textContent !== '-' ? badge.textContent : '';
+                    const modal = new bootstrap.Modal(document.getElementById('modalPrioridade'));
+                    modal.show();
+                });
+            });
+
+            const btnSalvarPrioridade = document.getElementById('btnSalvarPrioridade');
+            if (btnSalvarPrioridade && !btnSalvarPrioridade.dataset.listenerAdded) {
+                btnSalvarPrioridade.addEventListener('click', salvarPrioridade);
+                btnSalvarPrioridade.dataset.listenerAdded = 'true';
+            }
 
         })
         .catch(error => {
@@ -346,14 +371,18 @@ export function fetchOrdensSequenciadasPlasma() {
                     card.classList.add('card', 'mb-3');
                     card.innerHTML = `
                     <div class="card-header d-flex align-items-center">
-                        <span class="handle" style="cursor: grab; margin-right: 10px;">
-                            <!-- Pode usar um ícone ou o caractere &#9776; -->
-                            <i class="fa fa-grip-lines"></i>
-                        </span>
                         <h5 class="card-title mb-0">
                             #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
                             <span class="badge bg-${badgeColor}">${statusLabel}</span>
                         </h5>
+                        <div class="ms-auto">
+                            <span class="badge bg-primary text-white prioridade-badge" 
+                                data-order-id="${ordem.id}" 
+                                style="cursor: pointer;" 
+                                title="Definir prioridade">
+                                ${ordem.ordem_prioridade || '-'}
+                            </span>
+                        </div>                    
                     </div>
                     <div class="card-body">
                         <small><p class="card-text mb-1">
@@ -398,9 +427,21 @@ export function fetchOrdensSequenciadasPlasma() {
             } else {
                 container.innerHTML = '<p class="text-center text-muted">Nenhuma ordem sequenciada encontrada.</p>';
             }
+            container.querySelectorAll('.prioridade-badge').forEach(badge => {
+                badge.addEventListener('click', () => {
+                    const orderId = badge.dataset.orderId;
+                    document.getElementById('prioridadeOrderId').value = orderId;
+                    document.getElementById('inputPrioridade').value = badge.textContent !== '-' ? badge.textContent : '';
+                    const modal = new bootstrap.Modal(document.getElementById('modalPrioridade'));
+                    modal.show();
+                });
+            });
 
-            // Habilita o Sortable depois dos cards serem carregados
-            inicializarSortable('ordens-sequenciadas-plasma-container', 'plasma');
+            const btnSalvarPrioridade = document.getElementById('btnSalvarPrioridade');
+            if (btnSalvarPrioridade && !btnSalvarPrioridade.dataset.listenerAdded) {
+                btnSalvarPrioridade.addEventListener('click', salvarPrioridade);
+                btnSalvarPrioridade.dataset.listenerAdded = 'true';
+            }
 
         })
         .catch(error => {
@@ -421,6 +462,60 @@ export function fetchOrdensSequenciadasPlasma() {
         });
         btnFiltrarOrdemSequenciadaPlasma.dataset.listenerAdded = 'true';
     }
+}
+
+function salvarPrioridade() {
+    const orderId = document.getElementById('prioridadeOrderId').value;
+    const prioridade = document.getElementById('inputPrioridade').value.trim();
+    const btnSalvarPrioridade = document.getElementById('btnSalvarPrioridade');
+
+    if (prioridade === '' || isNaN(prioridade) || Number(prioridade) < 1) {
+        alert('Informe uma prioridade válida');
+        return;
+    }
+    
+    btnSalvarPrioridade.innerHTML = `
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        <span class="visually-hidden">Salvando...</span>
+    `;
+
+    btnSalvarPrioridade.disabled = true;
+
+    fetch('api/salvar-prioridade/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ordemId: orderId, prioridade: Number(prioridade) })
+    })
+    .then(response => response.json().then(data => ({ status: response.status, body: data })))
+    .then(({ status, body }) => {
+        if (status === 201) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso',
+                text: body.success,
+            });
+
+            // Recarrega os dados chamando a função de carregamento
+            document.getElementById('ordens-container').innerHTML = '';
+            fetchOrdensSequenciadasLaser();
+            fetchOrdensSequenciadasPlasma();
+            resetarCardsInicial();
+            btnSalvarPrioridade.innerHTML = `Salvar`;
+            btnSalvarPrioridade.disabled = false;
+
+            // Fecha o modal
+            bootstrap.Modal.getInstance(document.getElementById('modalPrioridade')).hide(); 
+
+        } else {
+            // Exibe o erro vindo do backend
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: body.error || 'Erro ao salvar prioridade',
+            });
+        }
+    })
+    .catch(err => console.error('Erro ao salvar prioridade:', err));
 }
 
 async function fetchMaquinasDisponiveis() {
@@ -659,72 +754,4 @@ function mostrarModalExcluir(ordemId, setor) {
             });
         });
     });
-}
-
-function inicializarSortable(containerId, grupoMaquina) {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error("Elemento com id '" + containerId + "' não encontrado.");
-        return;
-    }
-
-    Sortable.create(container, {
-        animation: 150,
-        handle: '.handle',
-        // Impede qualquer drag se o usuário não tiver tocado no handle
-        touchStartThreshold: 0, // muito importante: torna o handle estritamente necessário no touch
-        onStart: function (evt) {
-            // extra: garante que o start só ocorra se for mesmo no handle
-            if (!evt.originalEvent.target.closest('.handle')) {
-                evt.preventDefault();
-                evt.cancel(); // importante para dispositivos touch
-            }
-        },
-        onMove: function (evt) {
-            if (!evt.originalEvent.target.closest('.handle')) {
-                return false;
-            }
-        },
-        onEnd: function (evt) {
-            atualizarOrdem(containerId, grupoMaquina);
-        }
-    });
-}
-
-function atualizarOrdem(containerId, grupoMaquina) {
-    const container = document.getElementById(containerId);
-    const cards = container.querySelectorAll('.card');
-
-    // Extraímos a nova ordem usando o atributo data-index
-    const novaOrdem = Array.from(cards).map(card => {
-        const btnRetirar = card.querySelector('.btn-retirar-sequenciamento');
-        return btnRetirar ? btnRetirar.getAttribute('data-index') : null;
-    }).filter(id => id !== null);
-
-    console.log("Nova ordem:", novaOrdem);
-
-    console.log("Grupo Máquina:", grupoMaquina);
-
-    // Envia a nova ordem para a API usando POST
-    // fetch('api/update-ordem-sequenciada', {
-    //     method: 'POST',
-    //     headers: {
-    //         'Content-Type': 'application/json'
-    //     },
-    //     body: JSON.stringify({ novaOrdem: novaOrdem, grupoMaquina: grupo_maquina  })
-    // })
-    // .then(response => {
-    //     if (!response.ok) {
-    //         throw new Error("Erro ao atualizar a ordem");
-    //     }
-    //     return response.json();
-    // })
-    // .then(data => {
-    //     console.log("Ordem atualizada com sucesso:", data);
-    //     // Aqui você pode tratar a resposta e notificar o usuário
-    // })
-    // .catch(error => {
-    //     console.error("Erro na atualização da ordem:", error);
-    //     // Exiba uma mensagem de erro para o usuário, se necessário
-    // });
 }

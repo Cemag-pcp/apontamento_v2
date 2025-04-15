@@ -97,7 +97,7 @@ class Ordem(models.Model):
     #Apenas para ordens de corte
     sequenciada = models.BooleanField(null=True, blank=True) # Ordens de corte automaticamente são sequenciadas
     motivo_retirar_sequenciada = models.ForeignKey(MotivoExclusao, on_delete=models.CASCADE, null=True, blank=True, related_name='motivo_retirar_sequenciada') # Caso retire a ordem de sequenciadas é ´necessário informar o motivo
-    # ordem_prioridade = models.IntegerField(default=0) # Ordem de prioridade para as ordens de corte, quanto menor o número, maior a prioridade
+    ordem_prioridade = models.IntegerField(null=True) # Ordem de prioridade para as ordens de corte, quanto menor o número, maior a prioridade
 
     #Campos para apontamento de montagem e pintura
     data_carga = models.DateField(null=True, blank=True)
@@ -206,7 +206,6 @@ class MaquinaParada(models.Model):
     data_inicio = models.DateTimeField(default=now)
     data_fim = models.DateTimeField(null=True, blank=True)
     motivo = models.ForeignKey(MotivoMaquinaParada, on_delete=models.CASCADE, null=True, blank=True)
-
 
 class RotaAcesso(models.Model):
 

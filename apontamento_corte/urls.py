@@ -36,5 +36,7 @@ urlpatterns = [
     path('api/apontamentos/mp', views.api_ordens_finalizadas_mp, name='api_ordens_finalizadas_mp'),
 
     path('api/excluir-ordem/', views.excluir_ordem, name='excluir_ordem'),
+    path('api/salvar-prioridade/', views.definir_prioridade, name='definir_prioridade'),
+
 
 ]
