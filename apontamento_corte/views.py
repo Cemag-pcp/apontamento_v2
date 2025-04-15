@@ -530,9 +530,9 @@ def gerar_op_duplicada(request, pk_ordem):
         ordem_original = Ordem.objects.get(pk=pk_ordem)
 
         if maquina:
-            maquina_ordem = maquina
+            maquina_ordem = get_object_or_404(Maquina, pk=maquina)
         else:
-            maquina_ordem = ordem_original.maquina if ordem_original.maquina in ['laser_1', 'laser_2'] else None
+            maquina_ordem = ordem_original.maquina.nome if ordem_original.maquina.nome in ['laser_1', 'laser_2'] else None
 
         with transaction.atomic():
             # Cria a nova ordem como duplicada
