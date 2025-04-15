@@ -345,11 +345,17 @@ export function fetchOrdensSequenciadasPlasma() {
                     const card = document.createElement('div');
                     card.classList.add('card', 'mb-3');
                     card.innerHTML = `
-                    <div class="card-body">
-                        <h5 class="card-title">
+                    <div class="card-header d-flex align-items-center">
+                        <span class="handle" style="cursor: grab; margin-right: 10px;">
+                            <!-- Pode usar um ícone ou o caractere &#9776; -->
+                            <i class="fa fa-grip-lines"></i>
+                        </span>
+                        <h5 class="card-title mb-0">
                             #${ordem.ordem ? ordem.ordem : ordem.ordem_duplicada}
                             <span class="badge bg-${badgeColor}">${statusLabel}</span>
                         </h5>
+                    </div>
+                    <div class="card-body">
                         <small><p class="card-text mb-1">
                             <strong>Observação:</strong> ${ordem.obs ? ordem.obs : 'Sem observação'}
                         </p></small>
@@ -657,10 +663,30 @@ function mostrarModalExcluir(ordemId, setor) {
 
 function inicializarSortable(containerId, grupoMaquina) {
     const container = document.getElementById(containerId);
+    if (!container) {
+        console.error("Elemento com id '" + containerId + "' não encontrado.");
+        return;
+    }
+
     Sortable.create(container, {
-        animation: 300,         // tempo de animação aumentado para 300ms
+        animation: 150,
+        handle: '.handle',
+        // Impede qualquer drag se o usuário não tiver tocado no handle
+        touchStartThreshold: 0, // muito importante: torna o handle estritamente necessário no touch
+        onStart: function (evt) {
+            // extra: garante que o start só ocorra se for mesmo no handle
+            if (!evt.originalEvent.target.closest('.handle')) {
+                evt.preventDefault();
+                evt.cancel(); // importante para dispositivos touch
+            }
+        },
+        onMove: function (evt) {
+            if (!evt.originalEvent.target.closest('.handle')) {
+                return false;
+            }
+        },
         onEnd: function (evt) {
-            atualizarOrdem(containerId, grupoMaquina); 
+            atualizarOrdem(containerId, grupoMaquina);
         }
     });
 }
