@@ -394,7 +394,7 @@ export function fetchOrdensSequenciadasPlasma() {
             }
 
             // Habilita o Sortable depois dos cards serem carregados
-            inicializarSortable(container);
+            inicializarSortable('ordens-sequenciadas-plasma-container', 'plasma');
 
         })
         .catch(error => {
@@ -655,17 +655,17 @@ function mostrarModalExcluir(ordemId, setor) {
     });
 }
 
-function inicializarSortable(containerId) {
+function inicializarSortable(containerId, grupoMaquina) {
     const container = document.getElementById(containerId);
     Sortable.create(container, {
         animation: 300,         // tempo de animação aumentado para 300ms
         onEnd: function (evt) {
-            atualizarOrdem();
+            atualizarOrdem(containerId, grupoMaquina); 
         }
     });
 }
 
-function atualizarOrdem(containerId, grupo_maquina) {
+function atualizarOrdem(containerId, grupoMaquina) {
     const container = document.getElementById(containerId);
     const cards = container.querySelectorAll('.card');
 
@@ -677,7 +677,7 @@ function atualizarOrdem(containerId, grupo_maquina) {
 
     console.log("Nova ordem:", novaOrdem);
 
-    console.log("Grupo Máquina:", grupo_maquina);
+    console.log("Grupo Máquina:", grupoMaquina);
 
     // Envia a nova ordem para a API usando POST
     // fetch('api/update-ordem-sequenciada', {
