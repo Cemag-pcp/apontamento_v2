@@ -510,8 +510,6 @@ def gerar_op_duplicada(request, pk_ordem):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
 
-    print(data)
-
     # Valida os campos necessários
     obs_duplicar = data.get('obs_duplicar')
     data_programacao = data.get('dataProgramacao')
@@ -739,6 +737,29 @@ def api_ordens_finalizadas_mp(request):
             "tipo_chapa": propriedade.get_tipo_chapa_display() if propriedade else None,
             "retalho": "Sim" if propriedade and propriedade.retalho else "Não"
         })
+
+    return JsonResponse(data, safe=False)
+
+def api_ordens_criadas(request):
+
+    data = []
+
+    ordens = Ordem.objects.filter(ultima_atualizacao__gte="2025-04-08").prefetch_related('ordem_pecas_corte').order_by('ultima_atualizacao')
+
+    for ordem in ordens:
+
+        # converte e formata a data no timezone local
+        data_criacao = localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M')
+
+        for peca in ordem.ordem_pecas_corte.all():
+            data.append({
+                "data_criacao": data_criacao,
+                "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
+                "peca": peca.peca,
+                "qtd_planejada": peca.qtd_planejada,
+                "status_atual":ordem.status_atual,
+                "maquina": ordem.maquina.nome if ordem.maquina else None,
+            })
 
     return JsonResponse(data, safe=False)
 
