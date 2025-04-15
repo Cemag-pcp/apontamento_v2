@@ -25,7 +25,9 @@ urlpatterns = [
     path('api/ordens-interrompidas/', views.get_ordens_interrompidas, name='get_ordens_interrompidas'),
     path('api/ordens-sequenciadas/', views.get_ordens_sequenciadas, name='get_ordens_sequenciadas'),
     path('api/resequenciar-ordem/', views.resequenciar_ordem, name='resequenciar_ordem'),
-    
+    path('api/excluir-ordem/', views.excluir_ordem, name='excluir_ordem'),
+    path('api/salvar-prioridade/', views.definir_prioridade, name='definir_prioridade'),
+
     # verificar se esse endpoint está sendo usado
     path('api/duplicador-ordem/filtrar/', views.filtrar_ordens, name='filtrar_ordens'),
 
@@ -34,9 +36,5 @@ urlpatterns = [
     # consumir dados via google sheets
     path('api/apontamentos/corte', views.api_ordens_finalizadas, name='api_ordens_finalizadas'),
     path('api/apontamentos/mp', views.api_ordens_finalizadas_mp, name='api_ordens_finalizadas_mp'),
-
-    path('api/excluir-ordem/', views.excluir_ordem, name='excluir_ordem'),
-    path('api/salvar-prioridade/', views.definir_prioridade, name='definir_prioridade'),
-
-
+    path('api/apontamentos/criadas', views.api_ordens_criadas, name='api_ordens_criadas'),
 ]
