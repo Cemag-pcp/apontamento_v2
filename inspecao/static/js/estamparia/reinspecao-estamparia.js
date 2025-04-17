@@ -27,7 +27,7 @@ function buscarItensReinspecao(pagina) {
     let qtdPendenteInspecao = document.getElementById("qtd-pendente-reinspecao");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-reinspecao");
     let itensInspecionar = document.getElementById("itens-reinspecao");
-    let itensFiltradosCor = document.getElementById("itens-filtrados-reinspecao-cor");
+    let itensFiltradosCor = document.getElementById("itens-filtrados-reinspecao-maquina");
     let itensFiltradosData = document.getElementById("itens-filtrados-reinspecao-data");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-reinspecao-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-reinspecao-pesquisa");
@@ -135,21 +135,19 @@ function buscarItensReinspecao(pagina) {
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
-                        <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🧮 Conformidade:</strong> ${item.conformidade}<br>
                         <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade}<br>
-                        <strong>🎨 Cor:</strong> ${item.cor}<br>
-                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
+                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
                     <button 
                         data-id="${item.id}"
                         data-data="${item.data}"
-                        data-tipo="${item.tipo}"
                         data-nao-conformidade="${item.nao_conformidade}"
                         data-conformidade="${item.conformidade}"
-                        data-cor="${item.cor}"
+                        data-qtd-total="${item.qtd_total}"
                         data-peca="${item.peca}"
+                        data-maquina="${item.maquina}"
                         class="btn btn-dark w-100 iniciar-reinspecao">
                         Iniciar Reinspeção
                     </button>

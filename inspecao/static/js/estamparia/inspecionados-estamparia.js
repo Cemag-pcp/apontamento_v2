@@ -27,7 +27,7 @@ function buscarItensInspecionados(pagina) {
     let qtdPendenteInspecao = document.getElementById("qtd-inspecionados");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecionados");
     let itensInspecionar = document.getElementById("itens-inspecionados");
-    let itensFiltradosCor = document.getElementById("itens-filtrados-inspecionados-cor");
+    let itensFiltradosCor = document.getElementById("itens-filtrados-inspecionados-maquina");
     let itensFiltradosData = document.getElementById("itens-filtrados-inspecionados-data");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
@@ -58,9 +58,9 @@ function buscarItensInspecionados(pagina) {
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
     if (coresSelecionadas.length > 0) {
-        params.append("cores", coresSelecionadas.join(","));
+        params.append("maquinas", coresSelecionadas.join(","));
         itensFiltradosCor.style.display = "block";
-        itensFiltradosCor.textContent = "Cores: " + coresSelecionadas.join(", ");
+        itensFiltradosCor.textContent = "Maquina: " + coresSelecionadas.join(", ");
     } else {
         itensFiltradosCor.style.display = "none";
     }
@@ -142,8 +142,7 @@ function buscarItensInspecionados(pagina) {
                     <p>Inspeção #${item.id}</p>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
-                        <strong>📍 Tipo:</strong> ${item.tipo}<br>
-                        <strong>🎨 Cor:</strong> ${item.cor}<br>
+                        <strong>📍 Máquina:</strong> ${item.maquina}<br>
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
@@ -159,7 +158,6 @@ function buscarItensInspecionados(pagina) {
                             data-tipo="${item.tipo}"
                             data-nao-conformidade="${item.nao_conformidade}"
                             data-conformidade="${item.conformidade}"
-                            data-cor="${item.cor}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
                         class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">              
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>

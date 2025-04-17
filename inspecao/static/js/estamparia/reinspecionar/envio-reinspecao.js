@@ -1,117 +1,64 @@
-document.getElementById("form-reinspecao").addEventListener("submit", function (event) {
-    event.preventDefault();
+document.getElementById('saveReinspection').addEventListener('click', function () {
+    const form = document.getElementById('reinspectionForm');
+    const formData = new FormData();
 
-    let modal = document.getElementById('modal-reinspecionar-estamparia');
-    let modalInstance = bootstrap.Modal.getInstance(modal); // Obter a instância existente
-    let buttonInspecionarEstamparia = document.getElementById("submit-reinspecionar-estamparia");
-    buttonInspecionarEstamparia.disabled = true;
-    buttonInspecionarEstamparia.querySelector(".spinner-border").style.display = "flex";
+    // Dados básicos
+    formData.append('idInspecao', document.getElementById('id-reinspecao').value);
+    formData.append('dataReinspecao', document.getElementById('dataReinspecao').value);
+    formData.append('conjuntoNameReinspecao', document.getElementById('conjuntoNameReinspecao').value);
+    formData.append('maquinaReinspecao', document.getElementById('maquinaReinspecao').value);
+    formData.append('pecasProduzidasReinspecao', document.getElementById('pecasProduzidasReinspecao').value);
+    formData.append('inspetorReinspecao', document.getElementById('inspetorReinspecao').value);
 
-    // Criar um objeto FormData para enviar os arquivos
-    const formData = new FormData(this); // Usar o formulário diretamente
+    // Medições Técnicas
+    formData.append('qtdConformidadeReinspecao', document.getElementById('qtdConformidadeReinspecao').value);
+    formData.append('qtdNaoConformidadeReinspecao', document.getElementById('qtdNaoConformidadeReinspecao').value);
 
-    // Adicionar os dados básicos ao FormData
-    const naoConformidade = document.getElementById("nao-conformidade-reinspecao-estamparia").value;
-    formData.append("nao-conformidade-reinspecao-estamparia", naoConformidade);
+    // Detalhes das não conformidades (clonados)
+    const nonConformities = document.querySelectorAll('.containerNonConformityItemsReinspecao');
+    nonConformities.forEach((container, index) => {
+        // Quantidade afetada
+        const quantidadeAfetada = container.querySelector('.quantidadeAfetada')?.value || 0;
+        formData.append(`quantidade_reinspecao_${index + 1}`, quantidadeAfetada);
 
-    let totalQuantidadeInput = 0;
-
-    // Adicionar causas, quantidades e imagens ao FormData
-    const selectContainerInspecao = document.querySelectorAll(".selectContainerReinspecao");
-    selectContainerInspecao.forEach((container, index) => {
-        const causaSelect = container.querySelector('select');
-        const quantidadeInput = container.querySelector('input[type="number"]');
-        const imagensInput = container.querySelector('input[type="file"]');
-        totalQuantidadeInput += parseFloat(quantidadeInput.value);
-        console.log(totalQuantidadeInput)
-
-        // Adicionar causas
-        Array.from(causaSelect.selectedOptions).forEach((option, i) => {
-            formData.append(`causas_reinspecao_${index + 1}[${i}]`, option.value);
+        // Causas selecionadas (checkboxes)
+        const causasSelecionadas = container.querySelectorAll('input[type="checkbox"]:checked');
+        causasSelecionadas.forEach((checkbox, cIndex) => {
+            formData.append(`causas_reinspecao_${index + 1}`, checkbox.value);
         });
 
-        // Adicionar quantidade
-        formData.append(`quantidade_reinspecao_${index + 1}`, quantidadeInput.value);
-
-        // Adicionar arquivos de imagem
-        Array.from(imagensInput.files).forEach((file, i) => {
-            formData.append(`imagens_reinspecao_${index + 1}[${i}]`, file); // Anexar o arquivo diretamente
-        });
+        // Imagens
+        const imagens = container.querySelector('.foto-nao-conformidade')?.files;
+        if (imagens) {
+            for (let i = 0; i < imagens.length; i++) {
+                formData.append(`imagens_reinspecao_${index + 1}`, imagens[i]);
+            }
+        }
     });
 
-    const naoConformidadeNum = parseFloat(naoConformidade);
+    formData.append('quantidade_total_causas', nonConformities.length)
 
-    if (naoConformidadeNum !== 0) {
-        const erroMensagem = naoConformidadeNum > 0 && totalQuantidadeInput !== naoConformidadeNum
-            ? 'Verifique se a soma dos campos de "Quantidade" está igual ao valor de "N° total de não conformidades"'
-            : naoConformidadeNum < 0
-            ? 'Verifique se o "N° total de conformidades" está com o valor correto'
-            : null;
-    
-        if (erroMensagem) {
-            Swal.fire({
-                icon: 'error',
-                title: erroMensagem,
-            });
-    
-            buttonInspecionarEstamparia.disabled = false;
-            buttonInspecionarEstamparia.querySelector(".spinner-border").style.display = "none";
-            return;
-        }
-    }
-
-    formData.append("quantidade-total-causas", selectContainerInspecao.length)
-
-    // Enviar os dados para o backend
-    fetch("/inspecao/api/envio-reinspecao-estamparia/", {
-        method: "POST",
+    // Enviar com Fetch
+    fetch('/inspecao/api/envio-reinspecao-estamparia/', {
+        method: 'POST',
         headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'X-CSRFToken':document.querySelector('[name=csrfmiddlewaretoken]').value,
         },
-        body: formData, // Usar FormData em vez de JSON
+        body: formData
     })
     .then(response => {
-        return response.json().then(data => {
-            if (!response.ok) {
-                throw new Error(data.error || `Erro na requisição HTTP. Status: ${response.status}`);
-            }
-            return data;
-        });
-    })
-    .then(data => {
-        if (modalInstance) {
-            modalInstance.hide();
+        if (response.ok) {
+            alert("Formulário enviado com sucesso!");
+            // Pode limpar ou fechar modal aqui
+            buscarItensInspecao(1);
+            buscarItensReinspecao(1);
+            buscarItensInspecionados(1);
+        } else {
+            alert("Erro ao enviar formulário.");
         }
-        const Toast = Swal.mixin({
-            toast: true,
-            position: "bottom-end",
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-            didOpen: (toast) => {
-              toast.onmouseenter = Swal.stopTimer;
-              toast.onmouseleave = Swal.resumeTimer;
-            }
-          });
-          Toast.fire({
-            icon: "success",
-            title: "Inspeção realizada com sucesso"
-          });
-        buscarItensInspecao(1);
-        buscarItensReinspecao(1);
-        buscarItensInspecionados(1);
     })
     .catch(error => {
-        console.error(error);
-    
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro no envio da inspeção',
-            text: error, // Exibe a mensagem do backend corretamente
-        });
-    })
-    .finally(() => {
-        buttonInspecionarEstamparia.disabled = false;
-        buttonInspecionarEstamparia.querySelector(".spinner-border").style.display = "none";
+        console.error('Erro:', error);
+        alert("Erro ao enviar.");
     });
 });

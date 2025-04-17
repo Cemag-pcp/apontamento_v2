@@ -28,6 +28,10 @@ urlpatterns = [
     path('api/itens-reinspecao-estamparia/', views.get_itens_reinspecao_estamparia, name='itens-reinspecao-estamparia'),
 
     path('api/envio-inspecao-estamparia/', views.inspecionar_estamparia, name='inspecionar_estamparia'),
+    path('api/envio-reinspecao-estamparia/', views.envio_reinspecao_estamparia, name='envio_reinspecao_estamparia'),
+
+    path('api/historico-estamparia/<int:id>', views.get_historico_estamparia, name='historico-estamparia'),
+    path('api/historico-causas-estamparia/<int:id>', views.get_historico_causas_estamparia, name='historico-causas-estamparia'),
 
     path('api/motivos-causas/<str:setor>/', views.motivos_causas, name='motivos_causas'),
 

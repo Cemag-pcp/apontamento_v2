@@ -2,8 +2,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("click", function(event) {
         if (event.target.classList.contains('historico-inspecao')) {
 
+            const buttonSeeDetails = document.querySelectorAll(".historico-inspecao");
             const button = event.target;
-            button.disabled = true;
+            buttonSeeDetails.forEach((detailsButton) => {
+                detailsButton.disabled = true;
+            })
             button.querySelector(".spinner-border").style.display = "flex";
             let listaTimeline = document.querySelector(".timeline");
             const id = event.target.getAttribute("data-id");
@@ -56,7 +59,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.error(error);
             })
             .finally(d => {
-                button.disabled = false;
+                buttonSeeDetails.forEach((detailsButton) => {
+                    detailsButton.disabled = false;
+                })
                 button.querySelector(".spinner-border").style.display = "none";
             })
         }

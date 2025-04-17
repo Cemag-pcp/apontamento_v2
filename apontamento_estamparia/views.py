@@ -266,13 +266,17 @@ def atualizar_status_ordem(request):
                 novo_processo.save()
                 ordem.status_prioridade = 2
 
-                PecasOrdem.objects.create(
+                nova_peca_ordem_parcial = PecasOrdem.objects.create(
                     ordem=ordem,
                     peca=peca.peca,
                     qtd_planejada=peca.qtd_planejada,
                     qtd_boa=int(qt_produzida),
                     qtd_morta=int(qt_mortas),
                     operador=operador_final
+                )
+
+                Inspecao.objects.create(
+                    pecas_ordem_estamparia=nova_peca_ordem_parcial
                 )
 
             ordem.save()
