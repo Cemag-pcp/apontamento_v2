@@ -216,13 +216,13 @@
 </div>
 
 <!-- Modal para inspecionar -->
-<div class="modal fade" id="inspectionModal" tabindex="-1" aria-labelledby="inspectionModalLabel" aria-hidden="true">
+<div class="modal fade" id="inspectionModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="inspectionModalLabel">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <input type="hidden" value="" id="id-inspecao">
             <div class="modal-header">
                 <h5 class="modal-title" id="inspectionModalLabel">Inspeção estamparia</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form id="inspectionForm">
@@ -494,20 +494,20 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary btn-inspection" id="saveInspection">Salvar</button>
+                <button type="button" class="btn btn-success" id="saveInspection">Salvar</button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="reinspectionModal" tabindex="-1" aria-labelledby="reinspectionModalLabel" aria-hidden="true">
+<div class="modal fade" id="reinspectionModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="reinspectionModalLabel">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <input type="hidden" value="" id="id-reinspecao">
+            <input type="hidden" value="" id="id-data-execucao">
             <div class="modal-header">
                 <h5 class="modal-title" id="reinspectionModalLabel">Inspeção estamparia</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form id="reinspectionForm">
@@ -619,8 +619,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary btn-inspection" id="saveReinspection">Salvar</button>
+                <button type="button" class="btn btn-success" id="saveReinspection">Salvar</button>
             </div>
         </div>
     </div>

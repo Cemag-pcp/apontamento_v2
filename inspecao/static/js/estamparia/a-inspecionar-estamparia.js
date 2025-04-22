@@ -298,10 +298,18 @@ function controlarLinhasTabela() {
     // Mostrar ou ocultar as linhas da tabela
     for (let i = 1; i <= maxLinhas; i++) {
         const linha = document.getElementById(`linhaMedicao${i}`);
+        const linhaInput = document.querySelectorAll(`#linhaMedicao${i} td input`)
+        const linhaCheckbox = document.querySelectorAll(`#linhaMedicao${i} .form-check input`)
         if (i <= linhasExibidas) {
             linha.style.display = ""; // Mostra a linha
         } else {
             linha.style.display = "none"; // Esconde a linha
+            linhaInput.forEach((input) => {
+                input.value = "";
+            })
+            linhaCheckbox.forEach((checkbox) => {
+                checkbox.checked = false;
+            })
         }
     }
 
@@ -829,8 +837,9 @@ function validarFormulario() {
 
         return false;
     }
+    
 
-    if (totalNaoConformidade !== somaQuantidadesAfetadas) {
+    if (totalNaoConformidade > 0 && totalNaoConformidade !== somaQuantidadesAfetadas) {
         Toast.fire({
             icon: "error",
             title: `A soma da quantidade de não conformidades tem que ser igual a soma das quantidades afetadas`

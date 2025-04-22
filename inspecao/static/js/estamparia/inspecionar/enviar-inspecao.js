@@ -7,7 +7,7 @@ function enviarDadosInspecao() {
 
     const buttonSalvarInspecao = document.getElementById('saveInspection');
     buttonSalvarInspecao.disabled = true; // Desabilitar o botão para evitar múltiplos cliques
-    buttonSalvarInspecao.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>';
+    buttonSalvarInspecao.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>';
 
     const formData = new FormData();
 
@@ -53,7 +53,6 @@ function enviarDadosInspecao() {
             medidas.push(medida);
         }
     }
-
     formData.append('medidas', JSON.stringify(medidas));
 
     // Coletando as não conformidades
@@ -73,7 +72,6 @@ function enviarDadosInspecao() {
         
         // Coletando foto da não conformidade
         const foto = document.getElementById(`fotoNaoConformidade${id}`).files;
-        console.log(foto)
         if (foto) {
             for (let i = 0; i < foto.length; i++) {
                 formData.append(`fotoNaoConformidade${id}`, foto[i]);
@@ -92,7 +90,14 @@ function enviarDadosInspecao() {
         },
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        return response.json().then(data => {
+            if (!response.ok) {
+                throw new Error(data.error || `Erro na requisição HTTP. Status: ${response.status}`);
+            }
+            return data;
+        });
+    })
     .then(data => {
         Toast.fire({
             icon: "success",
@@ -104,15 +109,17 @@ function enviarDadosInspecao() {
         buscarItensInspecionados(1);
         const modalInspectionModal = bootstrap.Modal.getInstance(document.getElementById('inspectionModal'));
         modalInspectionModal.hide();
-        buttonSalvarInspecao.disabled = false; // Reabilitar o botão
-        buttonSalvarInspecao.innerHTML = 'Salvar';
     })
     .catch(error => {
         Toast.fire({
             icon: "error",
-            title: `Erro ao salvar inspeção.`
-        });           
+            title: error.message
+        });
         console.error('Erro:', error);
+        location.reload();
+    }).finally(d => {
+        buttonSalvarInspecao.disabled = false; // Reabilitar o botão
+        buttonSalvarInspecao.innerHTML = 'Salvar';
     });
 }
 

@@ -15,6 +15,7 @@ import traceback
 from .models import PecasOrdem
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos
+from inspecao.models import Inspecao
 
 @csrf_exempt
 def criar_ordem(request):
@@ -276,13 +277,17 @@ def atualizar_status_ordem(request):
                     return JsonResponse({'error': 'Quantidade produzida maior que a quantidade planejada.'}, status=400)
 
                 # Criando o novo registro de apontamento
-                PecasOrdem.objects.create(
+                nova_peca_ordem = PecasOrdem.objects.create(
                     ordem=ordem,
                     peca=peca.peca,
                     qtd_planejada=peca.qtd_planejada,
                     qtd_boa=int(qt_produzida),
                     operador=operador_final,
                     processo_ordem=novo_processo
+                )
+
+                Inspecao.objects.create(
+                    pecas_ordem_montagem=nova_peca_ordem,
                 )
 
                 # Verificar novamente a quantidade finalizada após o novo registro

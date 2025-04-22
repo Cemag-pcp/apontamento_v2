@@ -1069,6 +1069,11 @@ def inspecionar_estamparia(request):
         print(request.POST)
         print(request.FILES)
 
+        itemInspecionado = DadosExecucaoInspecao.objects.filter(inspecao__id=request.POST.get("id-inspecao"))
+
+        if itemInspecionado:
+            return JsonResponse({"error": "Item já inspecionado!"}, status=400)
+
         # Coletar dados simples do formulário
         dataInspecao = request.POST.get("dataInspecao")
         pecasProduzidas = int(request.POST.get("pecasProduzidas"))
@@ -1202,7 +1207,7 @@ def inspecionar_estamparia(request):
 
             soma_qtd_nao_conformidade = 0
             # model: DadosNaoConformidade
-            for nao_conformidade in nao_conformidades:
+            for index, nao_conformidade in enumerate(nao_conformidades, start=1):
 
                 qt_nao_conformidade = (
                     int(nao_conformidade.get("quantidadeAfetada", 0))
@@ -1218,7 +1223,7 @@ def inspecionar_estamparia(request):
                     "causas", []
                 )  # Recebe a lista de IDs das causas
                 imagens = request.FILES.getlist(
-                    f"fotoNaoConformidade{qt_nao_conformidade}"
+                    f"fotoNaoConformidade{index}"
                 )  # Pega as imagens enviadas
 
                 # Criar o objeto principal da não conformidade
@@ -1659,6 +1664,7 @@ def envio_reinspecao_estamparia(request):
             print(request.POST)
             print(request.FILES)
             id_inspecao = request.POST.get("idInspecao")
+            id_execucao = request.POST.get("execucaoId")
             data_inspecao = request.POST.get("dataReinspecao")
             maquina = request.POST.get("maquinaReinspecao")
             pecas = request.POST.get("pecasProduzidasReinspecao")
