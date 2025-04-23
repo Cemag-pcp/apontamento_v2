@@ -14,4 +14,8 @@ class PecasOrdem(models.Model):
     operador=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_produzido_montagem', blank=True, null=True)
     data = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     processo_ordem = models.ForeignKey(OrdemProcesso, on_delete=models.CASCADE, related_name='processo_ordem_montagem', blank=True, null=True)
-    
+
+class ConjuntosInspecionados(models.Model):
+
+    codigo = models.CharField(max_length=55)
+    descricao = models.CharField(max_length=200)

@@ -10,6 +10,7 @@ from django.db.models import Value
 from django.db.models.functions import Concat
 
 from cadastro.models import PecasEstanqueidade
+from apontamento_montagem.models import ConjuntosInspecionados
 from apontamento_pintura.models import Retrabalho
 from .models import (
     Inspecao,
@@ -70,6 +71,64 @@ def inspecao_montagem(request):
         {"inspetores": lista_inspetores, "causas": list_causas, "maquinas": maquinas},
     )
 
+
+def conjuntos_inspecionados_montagem(request):
+
+    if request.method == "GET":
+
+        conjuntos = ConjuntosInspecionados.objects.all()
+
+        conjuntos_inspecionados = [
+            {"id":conjunto.id,"codigo": conjunto.codigo, "descricao": conjunto.descricao}
+            for conjunto in conjuntos
+        ]
+
+        return render(
+            request,
+            "conjuntos_inspecionados.html",
+            {"conjuntos": conjuntos_inspecionados},
+        )
+    else:
+        return JsonResponse({"error": "Método não permitido"}, status=403)
+
+
+def add_remove_conjuntos_inspecionados(request, codigo=None):
+
+    if request.method == 'DELETE':
+
+        try:
+            conjunto = ConjuntosInspecionados.objects.filter(codigo=codigo)
+            conjunto.delete()
+            return JsonResponse({'status': 'success'})
+        except ConjuntosInspecionados.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Conjunto não encontrado'}, status=404)
+        
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            codigo_peca = data.get('codigo')
+            descricao = data.get('descricao')
+
+            if not codigo_peca or not descricao:
+                return JsonResponse({"error": "Campos obrigatórios"}, status=400)
+
+            # Verificar se já existe o código
+            if ConjuntosInspecionados.objects.filter(codigo=codigo_peca).exists():
+                return JsonResponse({"error": "Código já existe"}, status=400)
+
+            novo_conjunto = ConjuntosInspecionados.objects.create(codigo=codigo_peca, descricao=descricao)
+
+            return JsonResponse({
+                "success": "Conjunto adicionado com sucesso",
+                "codigo": novo_conjunto.codigo,
+                "descricao": novo_conjunto.descricao
+            }, status=201)
+
+        except Exception as e:
+            print('Erro ao adicionar conjunto:', e)
+            return JsonResponse({"error": "Erro interno do servidor"}, status=500)
+    else:
+        return JsonResponse({"error":"Método não permitido"}, status=403)
 
 def inspecao_pintura(request):
 
@@ -227,8 +286,10 @@ def get_itens_reinspecao_pintura(request):
 
     dados = []
     for data in pagina_obj:
-        data_ajustada = data.data_inspecao - timedelta(hours=3)
-
+        data_ajustada = DadosExecucaoInspecao.objects.filter(
+            inspecao=data
+        ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
+        
         status_reinspecao = (
             Retrabalho.objects.filter(reinspecao__inspecao=data)
             .values_list("status", flat=True)
@@ -710,11 +771,13 @@ def get_itens_reinspecao_montagem(request):
     for data in pagina_obj:
         dados_execucao = data.dadosexecucaoinspecao_set.last()  # Já pré-carregado
 
+        data_ajustada = DadosExecucaoInspecao.objects.filter(
+            inspecao=data
+        ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
+
         item = {
             "id": data.id,
-            "data": (data.data_inspecao - timedelta(hours=3)).strftime(
-                "%d/%m/%Y %H:%M:%S"
-            ),
+            "data": data_ajustada,
             "peca": data.pecas_ordem_montagem.peca,  # Assumindo que peca é uma string ou tem __str__ definido
             "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
             "conformidade": dados_execucao.conformidade if dados_execucao else None,
@@ -814,7 +877,9 @@ def get_itens_inspecionados_montagem(request):
         de = dados_execucao_dict.get(data.id)
 
         if de:
-            data_ajustada = de.data_execucao - timedelta(hours=3)
+            data_ajustada = DadosExecucaoInspecao.objects.filter(
+                inspecao=data
+            ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
             possui_nao_conformidade = de.nao_conformidade > 0 or de.num_execucao > 0
 
             item = {
@@ -1069,7 +1134,9 @@ def inspecionar_estamparia(request):
         print(request.POST)
         print(request.FILES)
 
-        itemInspecionado = DadosExecucaoInspecao.objects.filter(inspecao__id=request.POST.get("id-inspecao"))
+        itemInspecionado = DadosExecucaoInspecao.objects.filter(
+            inspecao__id=request.POST.get("id-inspecao")
+        )
 
         if itemInspecionado:
             return JsonResponse({"error": "Item já inspecionado!"}, status=400)
@@ -1103,11 +1170,11 @@ def inspecionar_estamparia(request):
         for nao_conformidade in nao_conformidades:
             quantidade = (
                 int(nao_conformidade.get("quantidadeAfetada", 0))
-                if nao_conformidade.get("quantidadeAfetada", 0) 
+                if nao_conformidade.get("quantidadeAfetada", 0)
                 else 0
             )
             total_pecas_afetadas += quantidade  # Acumula a quantidade afetada
-        
+
         # model: DadosExecucaoInspecao
         tamanho_amostra = min(3, pecasProduzidas - numPecaDefeituosa)
 
@@ -1216,9 +1283,9 @@ def inspecionar_estamparia(request):
                 )
                 destino = nao_conformidade.get("destino")
 
-                if destino != 'sucata':
+                if destino != "sucata":
                     soma_qtd_nao_conformidade += qt_nao_conformidade
-            
+
                 causas = nao_conformidade.get(
                     "causas", []
                 )  # Recebe a lista de IDs das causas
@@ -1249,7 +1316,7 @@ def inspecionar_estamparia(request):
                 new_dados_nao_conformidade.save()
 
             # Reinspecao
-            if soma_qtd_nao_conformidade > 0 :
+            if soma_qtd_nao_conformidade > 0:
                 reinspecao = Reinspecao(inspecao=inspecao)
                 reinspecao.save()
 
@@ -1411,9 +1478,9 @@ def get_itens_reinspecao_estamparia(request):
         item["inspecao_id"]: item["total_conformidade"]
         for item in DadosExecucaoInspecao.objects.filter(
             inspecao_id__in=[inspecao.id for inspecao in pagina_obj]
-        ).values("inspecao_id").annotate(
-            total_conformidade=Sum("conformidade")
         )
+        .values("inspecao_id")
+        .annotate(total_conformidade=Sum("conformidade"))
     }
 
     # Otimização 4: Reduzir consultas no loop usando prefetch_related e valores já carregados
@@ -1423,30 +1490,44 @@ def get_itens_reinspecao_estamparia(request):
         first_dados_execucao = data.dadosexecucaoinspecao_set.first()
 
         try:
-            info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.get(dados_exec_inspecao=first_dados_execucao)
+            info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.get(
+                dados_exec_inspecao=first_dados_execucao
+            )
             qtd_mortas = info_adicionais.qtd_mortas if info_adicionais else 0
         except InfoAdicionaisInspecaoEstamparia.DoesNotExist:
             info_adicionais = None
             qtd_mortas = 0
 
-        qtd_total = data.pecas_ordem_estamparia.qtd_boa - conformidades_dict.get(data.id, 0) - qtd_mortas
+        qtd_total = (
+            data.pecas_ordem_estamparia.qtd_boa
+            - conformidades_dict.get(data.id, 0)
+            - qtd_mortas
+        )
 
         # Se houver info adicionais, buscar nao conformidades destino sucata
         if info_adicionais:
             dados_nao_conformidade = DadosNaoConformidade.objects.filter(
-                informacoes_adicionais_estamparia=info_adicionais,
-                destino="sucata"
+                informacoes_adicionais_estamparia=info_adicionais, destino="sucata"
             )
-            total_sucata = dados_nao_conformidade.aggregate(total=Sum('qt_nao_conformidade'))["total"] or 0
+            total_sucata = (
+                dados_nao_conformidade.aggregate(total=Sum("qt_nao_conformidade"))[
+                    "total"
+                ]
+                or 0
+            )
 
             qtd_total -= total_sucata  # Subtrair as sucatas
 
         item = {
             "id": data.id,
-            "data": (data.data_inspecao - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S"),
+            "data": (data.data_inspecao - timedelta(hours=3)).strftime(
+                "%d/%m/%Y %H:%M:%S"
+            ),
             "peca": f"{data.pecas_ordem_estamparia.peca.codigo} - {data.pecas_ordem_estamparia.peca.descricao}",
             "maquina": data.pecas_ordem_estamparia.ordem.maquina.nome,
-            "conformidade": last_dados_execucao.conformidade if last_dados_execucao else None,
+            "conformidade": (
+                last_dados_execucao.conformidade if last_dados_execucao else None
+            ),
             "qtd_total": qtd_total,
             "nao_conformidade": (
                 last_dados_execucao.nao_conformidade if last_dados_execucao else None
@@ -1510,22 +1591,22 @@ def get_itens_inspecionados_estamparia(request):
         )
 
     if data_filtrada:
-         datas = datas.annotate(
-            ultima_data_execucao=Max('dadosexecucaoinspecao__data_execucao')
-        ).filter(
-            ultima_data_execucao__date=data_filtrada
-        ).order_by('-ultima_data_execucao')
+        datas = (
+            datas.annotate(
+                ultima_data_execucao=Max("dadosexecucaoinspecao__data_execucao")
+            )
+            .filter(ultima_data_execucao__date=data_filtrada)
+            .order_by("-ultima_data_execucao")
+        )
 
     if pesquisa_filtrada:
         datas = datas.annotate(
             codigo_descricao=Concat(
-                'pecas_ordem_estamparia__peca__codigo',
-                Value(' - '),
-                'pecas_ordem_estamparia__peca__descricao'
+                "pecas_ordem_estamparia__peca__codigo",
+                Value(" - "),
+                "pecas_ordem_estamparia__peca__descricao",
             )
-        ).filter(
-            codigo_descricao__icontains=pesquisa_filtrada
-        )
+        ).filter(codigo_descricao__icontains=pesquisa_filtrada)
 
     if inspetores_filtrados:
         datas = datas.filter(
@@ -1558,9 +1639,10 @@ def get_itens_inspecionados_estamparia(request):
         de = dados_execucao_dict.get(data.id)
 
         if de:
-            data_ajustada = DadosExecucaoInspecao.objects.filter(inspecao=data).values_list(
-                "data_execucao", flat=True).last() - timedelta(hours=3)
-            
+            data_ajustada = DadosExecucaoInspecao.objects.filter(
+                inspecao=data
+            ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
+
             possui_nao_conformidade = de.nao_conformidade > 0 or de.num_execucao > 0
 
             item = {
@@ -1645,12 +1727,14 @@ def get_historico_causas_estamparia(request, id):
                     {"id": imagem.id, "url": imagem.imagem.url}
                     for imagem in dados.imagens.all()
                 ]
-            causas_dict[dados.id]["nomes"].extend([causa.nome for causa in dados.causas.all()])
+            causas_dict[dados.id]["nomes"].extend(
+                [causa.nome for causa in dados.causas.all()]
+            )
 
         causas_list = list(causas_dict.values())
 
         return JsonResponse({"causas": causas_list}, status=200)
-    
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
 
@@ -1693,7 +1777,9 @@ def envio_reinspecao_estamparia(request):
             )
 
             if int(nao_conformidade) > 0:
-                quantidade_total_causas = int(request.POST.get("quantidade_total_causas", 0))
+                quantidade_total_causas = int(
+                    request.POST.get("quantidade_total_causas", 0)
+                )
 
                 for i in range(1, quantidade_total_causas + 1):
                     causas_ids = request.POST.getlist(f"causas_reinspecao_{i}")

@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 import traceback
 
-from .models import PecasOrdem
+from .models import PecasOrdem, ConjuntosInspecionados
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos
 from inspecao.models import Inspecao
@@ -286,9 +286,17 @@ def atualizar_status_ordem(request):
                     processo_ordem=novo_processo
                 )
 
-                Inspecao.objects.create(
-                    pecas_ordem_montagem=nova_peca_ordem,
-                )
+                if "-" in peca.peca:
+                    codigo = peca.split(" - ", maxsplit=1)[0]
+                else:
+                    codigo = peca.peca
+                
+                conjuntos_inspecionados = ConjuntosInspecionados.objects.filter(codigo=codigo)
+
+                if conjuntos_inspecionados:
+                    Inspecao.objects.create(
+                        pecas_ordem_montagem=nova_peca_ordem,
+                    )
 
                 # Verificar novamente a quantidade finalizada após o novo registro
                 sum_pecas_finalizadas = PecasOrdem.objects.filter(ordem=ordem).aggregate(Sum('qtd_boa'))['qtd_boa__sum']

@@ -1,0 +1,42 @@
+<div class="modal fade" id="modal-conjuntos-inspecionar" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="conjuntos-inspecionar-label">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="conjuntos-inspecionar-title">Confirmar Remoção</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            Tem certeza de que deseja remover este conjunto?
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger abrir-modal-remover" id="remove-conjunto">Remover</button>
+        </div>
+      </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-adicionar-conjuntos" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="adicionar-conjuntos-inspecionar-label">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="adicionar-conjuntos-inspecionar-title">Adicionar Conjunto</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div class="row">
+                <div class="col-sm-6 mb-2">
+                    <label for="codigo">Código</label>
+                    <input class="form-control" type="text" id="codigo">
+                </div>
+                <div class="col-sm-6 mb-2">
+                    <label for="descricao">Descrição</label>
+                    <input class="form-control" type="text" id="descricao">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary abrir-modal-adicionar" id="adicionar-conjunto">Adicionar</button>
+        </div>
+      </div>
+    </div>
+</div>

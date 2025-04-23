@@ -108,7 +108,16 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'cadastro/static'),
 ]
 
-MEDIA_URL = '/media/'
+AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = env('AWS_S3_REGION_NAME')
+
+DEFAULT_FILE_STORAGE = env('DEFAULT_FILE_STORAGE')
+
+AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
 
 # Define o diretório onde os arquivos de mídia serão armazenados
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

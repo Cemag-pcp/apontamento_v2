@@ -5,7 +5,9 @@ app_name = "inspecao"
 
 urlpatterns = [
     path('montagem/', views.inspecao_montagem, name='inspecao-montagem'),
-    
+    path('conjuntos-inspecionados/', views.conjuntos_inspecionados_montagem, name='conjuntos-inspecionados-montagem'),
+    path('api/conjuntos-inspecionados/<str:codigo>/', views.add_remove_conjuntos_inspecionados, name='remover_conjunto'),
+    path('api/conjuntos-inspecionados/', views.add_remove_conjuntos_inspecionados, name='adicionar_conjunto'),
     path('estamparia/', views.inspecao_estamparia, name='inspecao-estamparia'),
 
     path('pintura/', views.inspecao_pintura, name='inspecao-pintura'),
