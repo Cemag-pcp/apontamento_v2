@@ -111,6 +111,11 @@ document.getElementById('saveReinspection').addEventListener('click', function (
     formData.append('qtdConformidadeReinspecao', quantidadeConformidade);
     formData.append('qtdNaoConformidadeReinspecao', document.getElementById('qtdNaoConformidadeReinspecao').value);
 
+    const imagem = document.getElementById('fichaReinspection').files[0];
+    if (imagem) {
+        formData.append('ficha_reinspecao', imagem);
+    }
+
     // Enviar com Fetch
     fetch('/inspecao/api/envio-reinspecao-estamparia/', {
         method: 'POST',
@@ -127,7 +132,7 @@ document.getElementById('saveReinspection').addEventListener('click', function (
             });
             const bootstrapModal = bootstrap.Modal.getInstance(reinspectionModal);
             bootstrapModal.hide();
-            // Pode limpar ou fechar modal aqui
+
             buscarItensInspecao(1);
             buscarItensReinspecao(1);
             buscarItensInspecionados(1);

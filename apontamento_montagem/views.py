@@ -287,7 +287,7 @@ def atualizar_status_ordem(request):
                 )
 
                 if "-" in peca.peca:
-                    codigo = peca.split(" - ", maxsplit=1)[0]
+                    codigo = peca.peca.split(" - ", maxsplit=1)[0]
                 else:
                     codigo = peca.peca
                 

@@ -3,6 +3,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target.classList.contains('iniciar-reinspecao')) {
 
             document.getElementById("form-reinspecao").reset();
+            $('.select2').val(null).trigger('change');
+
             const id = event.target.getAttribute("data-id");
             const data = event.target.getAttribute("data-data");
             const peca = event.target.getAttribute("data-peca");
@@ -13,7 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("id-reinspecao-montagem").value = id;
             document.getElementById("data-finalizada-reinspecao-montagem").value = data;
             document.getElementById("peca-reinspecao-montagem").value = peca;
-            document.getElementById("cor-reinspecao-montagem").value = `${cor} - ${tipo}`;
             document.getElementById("qtd-reinspecao-montagem").value = totalReinspecao;
 
             const modal = new bootstrap.Modal(document.getElementById("modal-reinspecionar-montagem"));

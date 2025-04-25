@@ -218,7 +218,7 @@ class InfoAdicionaisExecTubosCilindros(models.Model):
     nao_conformidade_refugo = models.IntegerField(null=False, blank=False)
     qtd_inspecionada = models.IntegerField(null=False, blank=False)
     observacao = models.CharField(max_length=100, null=True, blank=True)
-    ficha = models.ImageField(upload_to="ficha_tubos_cilindros/", null=True, blank=True)
+    ficha = models.ImageField(upload_to="ficha_estamparia/", null=True, blank=True)
 
 
 class CausasNaoConformidadeEstanqueidade(models.Model):

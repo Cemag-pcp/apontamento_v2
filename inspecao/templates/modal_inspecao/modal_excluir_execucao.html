@@ -1,0 +1,31 @@
+<div class="modal fade" id="modal-excluir-execucao" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="excluir-execucao-inspecionar-label">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="excluir-execucao-inspecionar-title">Confirmar Exclusão</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+          <div class="row">
+              <p id="descricao-exclusao">Tem certeza que deseja excluir esta execução?</p>
+              <div class="mb-2">
+                  <strong>Conformidade:</strong> <span id="modal-execucao-conformidade"></span>
+              </div>
+              <div class="mb-2">
+                  <strong>Não Conformidade:</strong> <span id="modal-execucao-nao-conformidade"></span>
+              </div>
+              <div class="mb-2">
+                  <strong>Data:</strong> <span id="modal-execucao-data"></span>
+              </div>
+          </div>
+      </div>
+      <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-danger d-flex align-items-center gap-2" id="confirmar-exclusao">              
+              <span class="spinner-border spinner-border-sm" style="display:none"></span>
+              <span role="status">Excluir</span>
+          </button>
+      </div>
+    </div>
+  </div>
+</div>

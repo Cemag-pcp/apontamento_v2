@@ -41,7 +41,13 @@ document.addEventListener("DOMContentLoaded", () => {
                             <i class="bi ${nao_conformidade == 0 ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
                         </span>
                         <div class="timeline-content">
-                            <h5>Execução #${element.num_execucao}</h5>
+                            <div class="d-flex justify-content-between">
+                                <h5>Execução #${element.num_execucao}</h5>
+                                <i class="bi bi-exclamation-circle exclamation-history" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    data-bs-custom-class="custom-tooltip"
+                                    data-bs-title="Deseja excluir a última execução inspecionada?">
+                                </i>
+                            </div>
                             <p class="date">${element.data_execucao}</p>
                             <p><strong>Inspetor:</strong> ${element.inspetor}</p>
                             <p class="text-muted"><strong>Conformidade:</strong> ${element.qtd_inspecionada - nao_conformidade}</p>
@@ -52,7 +58,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     </li>`;
                 });
                 
-                
+                const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+                tooltips.forEach(t => new bootstrap.Tooltip(t));
                 const modal = new bootstrap.Modal(document.getElementById("modal-historico-tubos-cilindros"));
                 modal.show();
             })

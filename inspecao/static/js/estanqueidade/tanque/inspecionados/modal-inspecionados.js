@@ -37,7 +37,13 @@ document.addEventListener("DOMContentLoaded", () => {
                                 <i class="bi ${element.vazamento === true ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
                             </span>
                             <div class="timeline-content">
-                                <h5>Execução #${element.num_execucao}</h5>
+                                <div class="d-flex justify-content-between">
+                                    <h5>Execução #${element.num_execucao}</h5>
+                                    <i class="bi bi-exclamation-circle exclamation-history" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        data-bs-custom-class="custom-tooltip"
+                                        data-bs-title="Deseja excluir a última execução inspecionada?">
+                                    </i>
+                                </div>
                                 <p class="date">${element.data_execucao}</p>
                                 <p><strong>Inspetor:</strong> ${element.inspetor || 'N/A'}</p>
                                 <p><strong>Pressão Inicial:</strong> ${element.pressao_inicial || 'N/A'}</p>
@@ -51,7 +57,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         </li>`;
                 });
                 
-                
+                const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+                tooltips.forEach(t => new bootstrap.Tooltip(t));
                 const modal = new bootstrap.Modal(document.getElementById("modal-historico-tanque"));
                 modal.show();
             })

@@ -60,6 +60,9 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("nonConformitySectionReinspecao").style.display = "none";
 
             const btn = event.target;
+            const containerImagem = document.getElementById('imagePreviewReinspection');
+            containerImagem.innerHTML = "";
+
             const itemId = btn.getAttribute('data-id');
             const itemData = btn.getAttribute('data-data');
             const itemQtd = btn.getAttribute('data-conformidade');

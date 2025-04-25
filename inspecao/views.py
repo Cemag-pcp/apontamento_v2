@@ -79,7 +79,11 @@ def conjuntos_inspecionados_montagem(request):
         conjuntos = ConjuntosInspecionados.objects.all()
 
         conjuntos_inspecionados = [
-            {"id":conjunto.id,"codigo": conjunto.codigo, "descricao": conjunto.descricao}
+            {
+                "id": conjunto.id,
+                "codigo": conjunto.codigo,
+                "descricao": conjunto.descricao,
+            }
             for conjunto in conjuntos
         ]
 
@@ -94,20 +98,22 @@ def conjuntos_inspecionados_montagem(request):
 
 def add_remove_conjuntos_inspecionados(request, codigo=None):
 
-    if request.method == 'DELETE':
+    if request.method == "DELETE":
 
         try:
             conjunto = ConjuntosInspecionados.objects.filter(codigo=codigo)
             conjunto.delete()
-            return JsonResponse({'status': 'success'})
+            return JsonResponse({"status": "success"})
         except ConjuntosInspecionados.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'Conjunto não encontrado'}, status=404)
-        
-    elif request.method == 'POST':
+            return JsonResponse(
+                {"status": "error", "message": "Conjunto não encontrado"}, status=404
+            )
+
+    elif request.method == "POST":
         try:
             data = json.loads(request.body)
-            codigo_peca = data.get('codigo')
-            descricao = data.get('descricao')
+            codigo_peca = data.get("codigo")
+            descricao = data.get("descricao")
 
             if not codigo_peca or not descricao:
                 return JsonResponse({"error": "Campos obrigatórios"}, status=400)
@@ -116,19 +122,25 @@ def add_remove_conjuntos_inspecionados(request, codigo=None):
             if ConjuntosInspecionados.objects.filter(codigo=codigo_peca).exists():
                 return JsonResponse({"error": "Código já existe"}, status=400)
 
-            novo_conjunto = ConjuntosInspecionados.objects.create(codigo=codigo_peca, descricao=descricao)
+            novo_conjunto = ConjuntosInspecionados.objects.create(
+                codigo=codigo_peca, descricao=descricao
+            )
 
-            return JsonResponse({
-                "success": "Conjunto adicionado com sucesso",
-                "codigo": novo_conjunto.codigo,
-                "descricao": novo_conjunto.descricao
-            }, status=201)
+            return JsonResponse(
+                {
+                    "success": "Conjunto adicionado com sucesso",
+                    "codigo": novo_conjunto.codigo,
+                    "descricao": novo_conjunto.descricao,
+                },
+                status=201,
+            )
 
         except Exception as e:
-            print('Erro ao adicionar conjunto:', e)
+            print("Erro ao adicionar conjunto:", e)
             return JsonResponse({"error": "Erro interno do servidor"}, status=500)
     else:
-        return JsonResponse({"error":"Método não permitido"}, status=403)
+        return JsonResponse({"error": "Método não permitido"}, status=403)
+
 
 def inspecao_pintura(request):
 
@@ -285,17 +297,19 @@ def get_itens_reinspecao_pintura(request):
     pagina_obj = paginador.get_page(pagina)
 
     dados = []
+    print(pagina_obj)
+
     for data in pagina_obj:
-        data_ajustada = DadosExecucaoInspecao.objects.filter(
-            inspecao=data
-        ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
-        
+        print(data)
+        data_ajustada = DadosExecucaoInspecao.objects.filter(inspecao=data).values_list(
+            "data_execucao", flat=True
+        ).last() - timedelta(hours=3)
+
         status_reinspecao = (
             Retrabalho.objects.filter(reinspecao__inspecao=data)
             .values_list("status", flat=True)
             .first()
         )
-        print(status_reinspecao)
 
         item = {
             "id": data.id,
@@ -436,6 +450,7 @@ def get_historico_pintura(request, id):
     list_history = [
         {
             "id": dado.id,
+            "id_inspecao": id,
             "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
                 "%d/%m/%Y %H:%M:%S"
             ),
@@ -753,7 +768,7 @@ def get_itens_reinspecao_montagem(request):
         .prefetch_related(
             "dadosexecucaoinspecao_set",
             "dadosexecucaoinspecao_set__inspetor",
-            "dadosexecuaoinspecao_set__inspetor__user",
+            "dadosexecucaoinspecao_set__inspetor__user",
         )
         .order_by("-id")
     )
@@ -771,13 +786,13 @@ def get_itens_reinspecao_montagem(request):
     for data in pagina_obj:
         dados_execucao = data.dadosexecucaoinspecao_set.last()  # Já pré-carregado
 
-        data_ajustada = DadosExecucaoInspecao.objects.filter(
-            inspecao=data
-        ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
+        data_ajustada = DadosExecucaoInspecao.objects.filter(inspecao=data).values_list(
+            "data_execucao", flat=True
+        ).last() - timedelta(hours=3)
 
         item = {
             "id": data.id,
-            "data": data_ajustada,
+            "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
             "peca": data.pecas_ordem_montagem.peca,  # Assumindo que peca é uma string ou tem __str__ definido
             "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
             "conformidade": dados_execucao.conformidade if dados_execucao else None,
@@ -921,6 +936,7 @@ def get_historico_montagem(request, id):
     list_history = [
         {
             "id": dado.id,
+            "id_inspecao": id,
             "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
                 "%d/%m/%Y %H:%M:%S"
             ),
@@ -1381,13 +1397,28 @@ def get_itens_inspecao_estamparia(request):
         if data.pecas_ordem_estamparia.operador:
             matricula_nome_operador = f"{data.pecas_ordem_estamparia.operador.matricula} - {data.pecas_ordem_estamparia.operador.nome}"
 
+        # Operador
+        if data.pecas_ordem_estamparia.operador:
+            matricula_nome_operador = f"{data.pecas_ordem_estamparia.operador.matricula} - {data.pecas_ordem_estamparia.operador.nome}"
+
+        # Peça
+        peca_info = ""
+        if data.pecas_ordem_estamparia.peca:
+            peca_info = f"{data.pecas_ordem_estamparia.peca.codigo} - {data.pecas_ordem_estamparia.peca.descricao}"
+
+        # Máquina
+        maquina_nome = None
+        if (
+            data.pecas_ordem_estamparia.ordem
+            and data.pecas_ordem_estamparia.ordem.maquina
+        ):
+            maquina_nome = data.pecas_ordem_estamparia.ordem.maquina.nome
+
         item = {
             "id": data.id,
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-            "peca": data.pecas_ordem_estamparia.peca.codigo
-            + " - "
-            + data.pecas_ordem_estamparia.peca.descricao,
-            "maquina": data.pecas_ordem_estamparia.ordem.maquina.nome,
+            "peca": peca_info,
+            "maquina": maquina_nome,
             "qtd_apontada": data.pecas_ordem_estamparia.qtd_boa,
             "operador": matricula_nome_operador,
         }
@@ -1683,6 +1714,7 @@ def get_historico_estamparia(request, id):
     list_history = [
         {
             "id": dado.id,
+            "id_inspecao": id,
             "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
                 "%d/%m/%Y %H:%M:%S"
             ),
@@ -1755,6 +1787,7 @@ def envio_reinspecao_estamparia(request):
             inspetor_id = request.POST.get("inspetorReinspecao")
             conformidade = request.POST.get("qtdConformidadeReinspecao")
             nao_conformidade = request.POST.get("qtdNaoConformidadeReinspecao")
+            ficha_reinspecao = request.FILES.get("ficha_reinspecao")
 
             data_convertida = timezone.make_aware(datetime.fromisoformat(data_inspecao))
 
@@ -1774,6 +1807,7 @@ def envio_reinspecao_estamparia(request):
             info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.create(
                 dados_exec_inspecao=dados_execucao,
                 inspecao_completa=True,
+                ficha=ficha_reinspecao,
             )
 
             if int(nao_conformidade) > 0:
@@ -3028,3 +3062,69 @@ def get_historico_tanque(request, id):
         )
 
     return JsonResponse({"history": list_history}, status=200)
+
+
+def delete_execution(request):
+
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    try:
+        with transaction.atomic():
+            id_execucao = request.GET.get("idDadosExecucao")
+            id_inspecao = request.GET.get("idInspecao")
+            primeira_execucao = request.GET.get("primeiraExecucao")
+
+            execucao = DadosExecucaoInspecao.objects.get(pk=id_execucao)
+            reinspecao = Reinspecao.objects.filter(inspecao=id_inspecao).first()
+
+            execucao.delete()
+
+            if primeira_execucao == "true" and reinspecao:
+                reinspecao.delete()
+            elif reinspecao:
+                reinspecao.reinspecionado = False
+                reinspecao.save()
+
+        return JsonResponse(
+            {"success": True, "message": "Execução deletada com sucesso"}
+        )
+
+    except DadosExecucaoInspecao.DoesNotExist:
+        return JsonResponse({"error": "Execução não encontrada"}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+def delete_execution_estanqueidade(request):
+
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    try:
+        with transaction.atomic():
+            id_execucao = request.GET.get("idDadosExecucao")
+            id_inspecao = request.GET.get("idInspecao")
+            primeira_execucao = request.GET.get("primeiraExecucao")
+
+            execucao = DadosExecucaoInspecao.objects.get(pk=id_execucao)
+            reinspecao = Reinspecao.objects.filter(inspecao=id_inspecao).first()
+
+            execucao.delete()
+
+            if primeira_execucao == "true" and reinspecao:
+                reinspecao.delete()
+            elif reinspecao:
+                reinspecao.reinspecionado = False
+                reinspecao.save()
+
+        return JsonResponse(
+            {"success": True, "message": "Execução deletada com sucesso"}
+        )
+
+    except DadosExecucaoInspecao.DoesNotExist:
+        return JsonResponse({"error": "Execução não encontrada"}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

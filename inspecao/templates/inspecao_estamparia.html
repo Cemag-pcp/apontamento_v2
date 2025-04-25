@@ -571,6 +571,17 @@
                         </div>
                     </div>
 
+                    <div class="row">
+                        <div class="col-md-12 mb-2">
+                            <label for="fichaReinspection" class="form-label">Envio da ficha de inspeção 100%</label>
+                            <label for="fichaReinspection" class="custom-file-upload">
+                                <i class="bi bi-camera me-2"></i>Clique para adicionar a ficha
+                            </label>
+                            <input type="file" id="fichaReinspection" name="ficha_inspecao"  accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreviewReinspection')">
+                            <div id="imagePreviewReinspection" class="d-flex mt-2 gap-2"></div>
+                        </div>
+                    </div>
+
                     <!-- Seção 4: Não Conformidades - Inicialmente oculta -->
                     <div id="nonConformitySectionReinspecao" class="card mb-4" style="display: none;">
                         <div class="card-header bg-warning text-dark">
@@ -626,6 +637,7 @@
 </div>
 
 {% include 'modal_inspecao/modal_inspecao_estamparia.html' %}
+{% include 'modal_inspecao/modal_excluir_execucao.html' %}
 
 {% endblock %}
 
@@ -637,6 +649,7 @@
 <script src="{% static 'js/estamparia/inspecionados/modal-inspecionados.js' %}"></script>
 <script src="{% static 'js/estamparia/reinspecionar/envio-reinspecao.js' %}"></script>
 <script src="{% static 'js/estamparia/inspecionar/enviar-inspecao.js' %}"></script>
+<script src="{% static 'js/estamparia/inspecionados/excluir-execucao.js' %}"></script>
 
 <script>
 

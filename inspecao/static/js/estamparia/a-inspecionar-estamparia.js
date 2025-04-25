@@ -786,12 +786,9 @@ function validarFormulario() {
         const quantidade = parseInt(document.getElementById(`quantidadeAfetada${id}`).value);
         const causasSelecionadas = document.querySelectorAll(`#causasContainer${id} .causa-checkbox:checked`).length;
         const destinoSelecionado = document.getElementById(`destino${id}`).value;
-
-        // Verifica se essa não conformidade está relacionada a uma linha marcada como "Não Conforme"
-        const naoConformeMarcado = document.getElementById(`nonConforming${id}`).checked;
         
-        // Só realiza a validação se a linha for marcada como "Não Conforme"
-        if (naoConformeMarcado) {
+
+        if (somaQuantidadeNaoConforme > 0){
             if (!quantidade || quantidade <= 0) {
                 Toast.fire({
                     icon: "error",
@@ -817,7 +814,6 @@ function validarFormulario() {
 
                 return false;
             }
-
         }
         // Acumular quantidade afetada das não conformidades
         somaQuantidadesAfetadas += quantidade;

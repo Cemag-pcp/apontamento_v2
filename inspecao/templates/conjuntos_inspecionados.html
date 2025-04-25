@@ -5,18 +5,36 @@
 {% block title %} <title>Inspeção Montagem</title> {% endblock %}
 
 {% block links %}
-
     <link rel="stylesheet" href="/static/css/inspecao.css">
     <link rel="stylesheet" href="/static/css/select2.css">
-
 {% endblock %}
 
 {% block content %}
-
-
 <div class="d-flex justify-content-between align-items-baseline">
     <h2 class="my-4">Conjuntos Inspecionados Montagem</h2>
     <button class="btn btn-primary" id="btn-abrir-modal-adicionar">Adicionar Conjunto</button>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form id="form-filtro">
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="filtro-codigo" class="form-label">Código</label>
+                    <input type="text" class="form-control" id="filtro-codigo" placeholder="Filtrar por código">
+                </div>
+                <div class="col-md-4">
+                    <label for="filtro-descricao" class="form-label">Descrição</label>
+                    <input type="text" class="form-control" id="filtro-descricao" placeholder="Filtrar por descrição">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="button" class="btn btn-primary me-2" id="btn-filtrar">Filtrar</button>
+                    <button type="button" class="btn btn-secondary" id="btn-limpar-filtros">Limpar</button>
+                </div>
+            </div>
+        </form>
+    </div>
 </div>
 
 <table class="table" id="tabela-conjuntos">
@@ -58,87 +76,11 @@
 {% endblock %}
 
 {% block scripts %}
-
-<script src="{% static 'js/montagem/conjunto-inspecionar.js' %}"></script>
+<script src="{% static 'js/montagem/conjuntos_inspecionados/conjunto-inspecionar.js' %}"></script>
+<script src="{% static 'js/montagem/conjuntos_inspecionados/filtro_paginacao.js' %}"></script>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const rows = document.querySelectorAll('#tabela-conjuntos tbody tr');
-        const rowsPerPage = 10;
-        const pagination = document.getElementById('pagination');
-        let currentPage = 1;
-        const totalPages = Math.ceil(rows.length / rowsPerPage);
-    
-        function showPage(page) {
-            currentPage = page;
-            const start = (page - 1) * rowsPerPage;
-            const end = start + rowsPerPage;
-    
-            rows.forEach((row, index) => {
-                row.style.display = (index >= start && index < end) ? '' : 'none';
-            });
-    
-            updatePagination();
-        }
-    
-        function updatePagination() {
-            pagination.innerHTML = '';
-    
-            function createPageItem(text, page = null, active = false, disabled = false) {
-                const li = document.createElement('li');
-                li.className = 'page-item' + (active ? ' active' : '') + (disabled ? ' disabled' : '');
-                const a = document.createElement('a');
-                a.className = 'page-link';
-                a.href = '#';
-                a.textContent = text;
-                if (page && !disabled) {
-                    a.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        showPage(page);
-                    });
-                }
-                li.appendChild(a);
-                pagination.appendChild(li);
-            }
-    
-            if (currentPage > 1) {
-                createPageItem('Anterior', currentPage - 1);
-            } else {
-                createPageItem('Anterior', null, false, true);
-            }
-    
-            let pageLinksToShow = 1; // quantas páginas vizinhas exibir
-    
-            if (currentPage > 1 + pageLinksToShow) {
-                createPageItem(1, 1);
-                if (currentPage > 2 + pageLinksToShow) {
-                    createPageItem('...');
-                }
-            }
-    
-            for (let i = currentPage - pageLinksToShow; i <= currentPage + pageLinksToShow; i++) {
-                if (i > 0 && i <= totalPages) {
-                    createPageItem(i, i, currentPage === i);
-                }
-            }
-    
-            if (currentPage < totalPages - pageLinksToShow) {
-                if (currentPage < totalPages - pageLinksToShow - 1) {
-                    createPageItem('...');
-                }
-                createPageItem(totalPages, totalPages);
-            }
-    
-            if (currentPage < totalPages) {
-                createPageItem('Próximo', currentPage + 1);
-            } else {
-                createPageItem('Próximo', null, false, true);
-            }
-        }
-    
-        showPage(1);
-    });
-    </script>
-    
+
+</script>
 
 {% endblock %}

@@ -60,4 +60,7 @@ urlpatterns = [
     path('api/itens-inspecionados-tanque/', views.get_itens_inspecionados_tanque, name='itens-inspecionados-tanque'),
 
     path('api/<int:id>/historico-tanque/', views.get_historico_tanque, name='historico-tanque'),
+
+    path('api/delete-execucao/', views.delete_execution, name='delete-execution'),
+    path('api/delete-execucao-estanqueidade/', views.delete_execution_estanqueidade, name='delete-execution-estanqueidade')
 ]
