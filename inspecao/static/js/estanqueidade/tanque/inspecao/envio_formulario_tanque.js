@@ -80,9 +80,8 @@ form.addEventListener('submit', async (event) => {
                 icon: "success",
                 title: "Inspeção registrada com sucesso!"
             });
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
+            buscarItensInspecionadosEstanqueidadeTanque(1);
+            buscarItensReinspecaoEstanqueidadeTanque(1);
         } else {
             // Se houver erro, mostre uma mensagem de erro
             const Toast = Swal.mixin({
@@ -100,9 +99,6 @@ form.addEventListener('submit', async (event) => {
                 icon: "error",
                 title: "Erro ao enviar os dados para o servidor!"
             });
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
         }
     } catch (error) {
         console.error('Erro ao enviar dados:', error);
@@ -124,6 +120,12 @@ form.addEventListener('submit', async (event) => {
         setTimeout(() => {
             location.reload();
         }, 2000);
+    } finally {
+        submitButton.disabled = false;
+        spinnerTanqueEstanqueidade.classList.add('d-none');
+        statusButtonTanqueEstanqueidade.innerText = 'Inspecionar';
+        const modal = bootstrap.Modal.getInstance(document.getElementById("modal-inspecao-tanque"));
+        modal.hide();
     }
 });
 

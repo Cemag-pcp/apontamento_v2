@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target.classList.contains('iniciar-reinspecao')) {
 
             document.getElementById("form-reinspecao").reset();
+            $('.select2').val(null).trigger('change');
             
             const causasContainerEstanqueidade = document.getElementById('causasContainerEstanqueidade');
             const motivoFichaRetrabalhoEstanqueidade = document.getElementById('motivo_ficha_retrabalho_estanqueidade');

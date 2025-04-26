@@ -114,7 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             buscarItensReinspecaoEstanqueidade(1);
             buscarItensInspecionadosEstanqueidade(1);
-            this.reset();
         })
         .catch(error => {
             console.error(error);

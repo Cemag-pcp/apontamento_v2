@@ -1519,6 +1519,10 @@ def get_itens_reinspecao_estamparia(request):
     for data in pagina_obj:
         last_dados_execucao = data.dadosexecucaoinspecao_set.last()
         first_dados_execucao = data.dadosexecucaoinspecao_set.first()
+        
+        data_ajustada = DadosExecucaoInspecao.objects.filter(inspecao=data).values_list(
+            "data_execucao", flat=True
+        ).last() - timedelta(hours=3)
 
         try:
             info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.get(
@@ -1551,7 +1555,7 @@ def get_itens_reinspecao_estamparia(request):
 
         item = {
             "id": data.id,
-            "data": (data.data_inspecao - timedelta(hours=3)).strftime(
+            "data": data_ajustada.strftime(
                 "%d/%m/%Y %H:%M:%S"
             ),
             "peca": f"{data.pecas_ordem_estamparia.peca.codigo} - {data.pecas_ordem_estamparia.peca.descricao}",
