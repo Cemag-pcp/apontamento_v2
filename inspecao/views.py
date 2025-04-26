@@ -2171,6 +2171,7 @@ def envio_inspecao_tubos_cilindros(request):
             quantidade_total_causas = int(
                 request.POST.get("quantidade-total-causas", 0)
             )
+            ficha_inspecao = request.FILES.get("ficha_inspecao")
             tipo_inspecao = request.POST.get("tipo_inspecao")  # "Cilindro" ou "Tubo"
             conformidade = (
                 quantidade_inspecionada - nao_conformidade - nao_conformidade_refugo
@@ -2206,6 +2207,7 @@ def envio_inspecao_tubos_cilindros(request):
                 nao_conformidade_refugo=nao_conformidade_refugo,
                 qtd_inspecionada=quantidade_inspecionada,
                 observacao=observacao,
+                ficha=ficha_inspecao,
             )
             informacoes_tubos_cilindros.save()
 
@@ -2275,6 +2277,7 @@ def envio_reinspecao_tubos_cilindros(request):
             quantidade_reinspecionada = int(
                 request.POST.get("quantidade_reinspecionada", 0)
             )
+            ficha_reinspecao = request.FILES.get("ficha_reinspecao")
 
             observacao = request.POST.get("observacao_reteste_estanqueidade")
 
@@ -2311,6 +2314,7 @@ def envio_reinspecao_tubos_cilindros(request):
                 nao_conformidade_refugo=nao_conformidade_tubo_refugo,
                 qtd_inspecionada=quantidade_reinspecionada,
                 observacao=observacao,
+                ficha=ficha_reinspecao,
             )
             informacoes_tubos_cilindros.save()
 
@@ -3029,37 +3033,22 @@ def get_historico_tanque(request, id):
     # Usa list comprehension para construir a lista de histórico
     list_history = []
     for dado in dados:
-        detalhes_pressao = dado.detalhespressaotanque_set.first()
-        list_history.append(
-            {
-                "id": dado.id,
-                "id_detalhes_pressao": (
-                    detalhes_pressao.id if detalhes_pressao else None
-                ),
-                "data_execucao": (dado.data_exec - timedelta(hours=3)).strftime(
-                    "%d/%m/%Y %H:%M:%S"
-                ),
-                "num_execucao": dado.num_execucao,
-                "inspetor": dado.inspetor.user.username if dado.inspetor else None,
-                "pressao_inicial": (
-                    detalhes_pressao.pressao_inicial if detalhes_pressao else None
-                ),
-                "pressao_final": (
-                    detalhes_pressao.pressao_final if detalhes_pressao else None
-                ),
-                "nao_conformidade": (
-                    detalhes_pressao.nao_conformidade if detalhes_pressao else None
-                ),
-                "tipo_teste": (
-                    detalhes_pressao.tipo_teste if detalhes_pressao else None
-                ),
-                "tempo_execucao": (
-                    detalhes_pressao.tempo_execucao.strftime("%H:%M:%S")
-                    if detalhes_pressao and detalhes_pressao.tempo_execucao
-                    else None
-                ),
-            }
-        )
+        detalhes_pressao_list = dado.detalhespressaotanque_set.all()
+        for detalhes_pressao in detalhes_pressao_list:
+            list_history.append(
+                {
+                    "id": dado.id,
+                    "id_detalhes_pressao": detalhes_pressao.id,
+                    "data_execucao": (dado.data_exec - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S"),
+                    "num_execucao": dado.num_execucao,
+                    "inspetor": dado.inspetor.user.username if dado.inspetor else None,
+                    "pressao_inicial": detalhes_pressao.pressao_inicial,
+                    "pressao_final": detalhes_pressao.pressao_final,
+                    "nao_conformidade": detalhes_pressao.nao_conformidade,
+                    "tipo_teste": detalhes_pressao.tipo_teste,
+                    "tempo_execucao": detalhes_pressao.tempo_execucao.strftime("%H:%M:%S") if detalhes_pressao.tempo_execucao else None,
+                }
+            )
 
     return JsonResponse({"history": list_history}, status=200)
 

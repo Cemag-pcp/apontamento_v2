@@ -3,6 +3,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target.classList.contains('iniciar-reinspecao')) {
 
             document.getElementById("form-reinspecao").reset();
+            
+            const causasContainerEstanqueidade = document.getElementById('causasContainerEstanqueidade');
+            const motivoFichaRetrabalhoEstanqueidade = document.getElementById('motivo_ficha_retrabalho_estanqueidade');
+            const addRemoveCauseReteste = document.getElementById('addRemoveContainerReteste');
+            const naoConformidadeTubos = document.getElementById('nao_conformidade_tubos');
+
             const id = event.target.getAttribute("data-id");
             const data = event.target.getAttribute("data-data");
             const peca = event.target.getAttribute("data-peca");
@@ -22,6 +28,10 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("data_inspecao_estanqueidade").value = data;
             document.getElementById("tipo_inspecao_estanqueidade").value = tipoInspecao;
             document.getElementById("qnt_reinspecao").value = totalReinspecao;
+            causasContainerEstanqueidade.style.display = "none";
+            motivoFichaRetrabalhoEstanqueidade.style.display = "none";
+            addRemoveCauseReteste.style.display = "none";
+            naoConformidadeTubos.innerHTML = "";
 
             const modal = new bootstrap.Modal(document.getElementById("modal-reteste-estanqueidade"));
             modal.show();

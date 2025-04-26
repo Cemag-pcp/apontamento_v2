@@ -6,6 +6,7 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     let modalInstance = bootstrap.Modal.getInstance(modal); // Obter a instância existente
     let buttonReinspecionarTubosCilindros = document.getElementById("submit-reinspecionar-tubos-cilindros");
     let tipoInspecaoEstanqueidade = document.getElementById("tipo_inspecao_estanqueidade").value;
+    let retesteStatus = document.getElementById("reteste_status_estanqueidade").value;
     let quantidadeReinspecao = document.getElementById("qnt_reinspecao").value;
     let dataReinspecao = document.getElementById("data_reinspecao_estanqueidade").value;
     buttonReinspecionarTubosCilindros.disabled = true;
@@ -39,7 +40,7 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
 
     let naoConformidadeNum = 0;
 
-    if (tipoInspecaoEstanqueidade == "tubo" && tipoInspecaoEstanqueidade == "Não Conforme") {
+    if (tipoInspecaoEstanqueidade == "tubo" && retesteStatus == "Não Conforme") {
         const naoConformidadeRetrabalho = document.getElementById("nao-conformidade-tubo-retrabalho").value;
         const naoConformidadeRefugo = document.getElementById("nao-conformidade-tubo-refugo").value;
         
@@ -65,6 +66,14 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
             buttonReinspecionarTubosCilindros.querySelector(".spinner-border").style.display = "none";
             return;
         }
+    } else if(naoConformidadeNum === 0 && retesteStatus == "Não Conforme") {
+        Swal.fire({
+            icon: 'error',
+            title: "Número de não conformidade não pode ser igual a zero caso tenha itens não conforme",
+        });
+        buttonReinspecionarTubosCilindros.disabled = false;
+        buttonReinspecionarTubosCilindros.querySelector(".spinner-border").style.display = "none";
+        return;
     }
 
     if(totalNaoConformidadeCilindro > 0) {
@@ -80,6 +89,11 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     formData.append("quantidade_reinspecionada", quantidadeReinspecao)
 
     formData.append("data_reinspecao", dataReinspecao)
+
+    const fichaInput = document.getElementById("ficha-reteste-estanqueidade");
+    if (fichaInput.files.length > 0) {
+        formData.append("ficha_reinspecao", fichaInput.files[0]);
+    }
 
     // Enviar os dados para o backend
     fetch("/inspecao/api/envio-reinspecao-tubos-cilindros/", {

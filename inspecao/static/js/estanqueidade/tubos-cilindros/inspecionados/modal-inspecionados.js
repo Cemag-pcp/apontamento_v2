@@ -30,7 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 console.log(data)
 
-                data.history.forEach(element => {
+                data.history.forEach((element, index) => {
+                    const isFirstItem = index === 0;
                     let nao_conformidade = element.nao_conformidade + element.nao_conformidade_refugo;
                     listaTimeline.innerHTML += `
                     <li class="timeline-item" style="cursor:pointer;" 
@@ -43,10 +44,25 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="timeline-content">
                             <div class="d-flex justify-content-between">
                                 <h5>Execução #${element.num_execucao}</h5>
-                                <i class="bi bi-exclamation-circle exclamation-history" data-bs-toggle="tooltip" data-bs-placement="top"
-                                    data-bs-custom-class="custom-tooltip"
-                                    data-bs-title="Deseja excluir a última execução inspecionada?">
-                                </i>
+                                ${isFirstItem ? `
+                                    <i class="bi bi-trash trash-history-last-execution" 
+                                        data-id="${element.id}" 
+                                        data-id-inspecao="${element.id_inspecao}"
+                                        data-nao-conformidade="${element.nao_conformidade}"
+                                        data-conformidade="${element.conformidade}" 
+                                        data-data="${element.data_execucao}"
+                                        data-primeira-execucao="${data.history.length - 1}"
+                                        data-bs-toggle="tooltip" 
+                                        data-bs-placement="top"
+                                        data-bs-custom-class="custom-tooltip"
+                                        data-bs-title="Deseja excluir esta execução?">
+                                    </i>
+                                ` : `<i class="bi bi-trash trash-history-others-execution" 
+                                        data-bs-toggle="tooltip" 
+                                        data-bs-placement="top"
+                                        data-bs-custom-class="custom-tooltip"
+                                        data-bs-title="Exclua a última execução para conseguir excluir a execução #${element.num_execucao}">
+                                    </i>`}
                             </div>
                             <p class="date">${element.data_execucao}</p>
                             <p><strong>Inspetor:</strong> ${element.inspetor}</p>
@@ -76,6 +92,40 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.addEventListener("click", function(event) {
+        if (event.target.closest('.bi-trash')) {
+            if(event.target.classList.contains('trash-history-last-execution')) {
+                const confirmModal = bootstrap.Modal.getInstance(document.getElementById("modal-historico-pintura"));
+                confirmModal.hide();
+
+                const id = event.target.getAttribute('data-id');
+                const idInspecao = event.target.getAttribute('data-id-inspecao');
+                const conformidade = event.target.getAttribute('data-conformidade');
+                const naoConformidade = event.target.getAttribute('data-nao-conformidade');
+                const dataExecucao = event.target.getAttribute('data-data');
+                const indexItem = event.target.getAttribute('data-primeira-execucao');
+
+                let textDescricao;
+                if (parseInt(indexItem) !== 0) {
+                    textDescricao = "Tem certeza que deseja excluir esta execução? Ao excluir o item será retornado para 'Itens a Reinspecionar'";
+                } else {
+                    textDescricao = "Tem certeza que deseja excluir esta execução? Ao excluir o item será retornado para 'Itens a Inspecionar'";
+                }
+                
+                // Preenche o modal com os dados
+                document.getElementById('modal-execucao-conformidade').textContent = conformidade;
+                document.getElementById('modal-execucao-nao-conformidade').textContent = naoConformidade;
+                document.getElementById('modal-execucao-data').textContent = dataExecucao;
+                document.getElementById('descricao-exclusao').textContent = textDescricao;
+
+                document.getElementById('confirmar-exclusao').setAttribute('data-execucao-id', id);
+                document.getElementById('confirmar-exclusao').setAttribute('data-inspecao-id', idInspecao);
+                document.getElementById('confirmar-exclusao').setAttribute('primeira-execucao', parseInt(indexItem) === 0);
+                
+                const modalExcluirExecution = new bootstrap.Modal(document.getElementById("modal-excluir-execucao"));
+                modalExcluirExecution.show();
+            }
+            return;
+        }
         if (event.target.closest(".timeline-item")) { 
 
             const naoConformidade = event.target.closest(".timeline-item").getAttribute("data-nao-conformidade");

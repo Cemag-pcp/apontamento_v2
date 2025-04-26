@@ -27,41 +27,79 @@ document.addEventListener("DOMContentLoaded", () => {
                 return response.json();
             })
             .then(data => {
-                
-                console.log(data)
-
+                console.log(data);
+            
+                // Primeiro, limpamos a timeline
+                listaTimeline.innerHTML = "";
+            
+                // Agrupar por número de execução
+                const execucoes = {};
+            
                 data.history.forEach(element => {
-                    listaTimeline.innerHTML += `
-                            <li class="timeline-item" style="cursor:pointer;">
-                            <span class="timeline-icon ${element.vazamento === true ? 'success' : 'danger'}">
-                                <i class="bi ${element.vazamento === true ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
-                            </span>
-                            <div class="timeline-content">
-                                <div class="d-flex justify-content-between">
-                                    <h5>Execução #${element.num_execucao}</h5>
-                                    <i class="bi bi-exclamation-circle exclamation-history" data-bs-toggle="tooltip" data-bs-placement="top"
-                                        data-bs-custom-class="custom-tooltip"
-                                        data-bs-title="Deseja excluir a última execução inspecionada?">
-                                    </i>
-                                </div>
-                                <p class="date">${element.data_execucao}</p>
-                                <p><strong>Inspetor:</strong> ${element.inspetor || 'N/A'}</p>
-                                <p><strong>Pressão Inicial:</strong> ${element.pressao_inicial || 'N/A'}</p>
-                                <p><strong>Pressão Final:</strong> ${element.pressao_final || 'N/A'}</p>
-                                <p><strong>Tipo de Teste:</strong> ${element.tipo_teste || 'N/A'}</p>
-                                <p><strong>Tempo de Execução:</strong> ${element.tempo_execucao || 'N/A'}</p>
-                                <p class="${element.vazamento === true ? 'text-success' : 'text-danger'}">
-                                    <strong>Não Conformidade:</strong> ${element.vazamento === true ? 'Não' : 'Sim'}
-                                </p>
-                            </div>
-                        </li>`;
+                    if (!execucoes[element.num_execucao]) {
+                        execucoes[element.num_execucao] = [];
+                    }
+                    execucoes[element.num_execucao].push(element);
                 });
-                
+            
+                // Obter as execuções em ordem decrescente
+                const execucaoKeys = Object.keys(execucoes).sort((a, b) => b - a);
+            
+                // Para cada execução, criar um carrossel
+                execucaoKeys.forEach(num_execucao => {
+                    const elementos = execucoes[num_execucao];
+            
+                    const carrosselId = `carouselExecucao${num_execucao}`;
+                    let carrosselInnerHTML = `
+                        <h5 class="text-center mb-3">Execução #${num_execucao}</h5>
+                        <div id="${carrosselId}" class="carousel slide" data-bs-ride="carousel">
+                            <div class="carousel-inner">
+                    `;
+            
+                    elementos.forEach((element, index) => {
+                        const isLastItem = parseInt(num_execucao) === parseInt(execucaoKeys[0]);
+                        carrosselInnerHTML += `
+                            <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                                <li class="timeline-item" style="cursor:pointer;">
+                                    <div class="timeline-content">
+                                        <p class="date">${element.data_execucao}</p>
+                                        <p><strong>Inspetor:</strong> ${element.inspetor || 'N/A'}</p>
+                                        <p><strong>Pressão Inicial:</strong> ${element.pressao_inicial || 'N/A'}</p>
+                                        <p><strong>Pressão Final:</strong> ${element.pressao_final || 'N/A'}</p>
+                                        <p><strong>Tipo de Teste:</strong> ${element.tipo_teste || 'N/A'}</p>
+                                        <p><strong>Tempo de Execução:</strong> ${element.tempo_execucao || 'N/A'}</p>
+                                        <p class="${element.nao_conformidade === true ? 'text-danger' : 'text-success'}">
+                                            <strong>Não Conformidade:</strong> ${element.nao_conformidade === true ? 'Sim' : 'Não'}
+                                        </p>
+                                    </div>
+                                </li>
+                            </div>
+                        `;
+                    });
+            
+                    carrosselInnerHTML += `
+                            </div>
+                            <button class="carousel-control-prev" type="button" data-bs-target="#${carrosselId}" data-bs-slide="prev">
+                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Anterior</span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#${carrosselId}" data-bs-slide="next">
+                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Próximo</span>
+                            </button>
+                        </div>
+                        <hr>
+                    `;
+            
+                    listaTimeline.innerHTML += carrosselInnerHTML;
+                });
+            
                 const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
                 tooltips.forEach(t => new bootstrap.Tooltip(t));
+            
                 const modal = new bootstrap.Modal(document.getElementById("modal-historico-tanque"));
                 modal.show();
-            })
+            })            
             .catch(error => {
                 console.error(error);
             })
@@ -71,106 +109,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
                 button.querySelector(".spinner-border").style.display = "none";
             })
-        }
-    });
-
-    document.addEventListener("click", function(event) {
-        if (event.target.closest(".timeline-item")) { 
-
-            const naoConformidade = event.target.closest(".timeline-item").getAttribute("data-nao-conformidade");
-            if(parseFloat(naoConformidade) > 0) {
-    
-                const modalHistorico = document.getElementById("modal-historico-tubos-cilindros");
-                const listaCausas = document.getElementById("causas-tubos-cilindros");
-                const confirmModal = bootstrap.Modal.getInstance(modalHistorico);
-                const id = event.target.closest(".timeline-item").getAttribute("data-id");
-                const dataExecucao = event.target.closest(".timeline-item").getAttribute("data-data");
-                confirmModal.hide();
-
-                listaCausas.innerHTML = `<div class="card" aria-hidden="true">
-                                            <img src="/static/img/fundo cinza.png" class="card-img-top" alt="Tela cinza">
-                                            <div class="card-body">
-                                                <h5 class="card-title placeholder-glow">
-                                                <span class="placeholder col-6"></span>
-                                                </h5>
-                                                <p class="card-text placeholder-glow">
-                                                    <span class="placeholder col-12"></span>
-                                                </p>
-                                                <p class="card-text placeholder-glow">
-                                                    <span class="placeholder col-4"></span>
-                                                </p>
-                                            </div>
-                                        </div>` 
-                                
-                const modalCausas = new bootstrap.Modal(document.getElementById("modal-causas-historico-tubos-cilindros"));
-                modalCausas.show();
-
-                fetch(`/inspecao/api/${id}/historico-causas-tubos-cilindros/`, {
-                    method:"GET",
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    },
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Erro na requisição HTTP. Status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    listaCausas.innerHTML = "";
-                    data.causas.forEach((causa, index) => {
-                        let causaHTML = 
-                        `<div class="row mb-3" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
-                            <div class="d-flex justify-content-between">
-                                <span class="label-modal text-end mb-3 mt-3">Quantidade: ${causa.quantidade}</span>
-                                <span class="label-modal text-end mb-3 mt-3">${index + 1}ª Causa</span>
-                            </div>`;
-                        
-                        if(causa.imagens.length > 0) {
-                            causa.imagens.forEach(imagem => {
-                                causaHTML += `<div class="card mb-3 p-0">
-                                                <img src="${imagem.url}" class="card-img-top" alt="...">
-                                                <div class="card-body">
-                                                    <h5 class="card-title">${causa.nomes.join(", ")}</h5>
-                                                    <p class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></p>
-                                                </div>
-                                            </div>`;
-                            });                            
-                        } else {
-                            causaHTML += `<div class="card mb-3 p-0">
-                                            <div class="card-body">
-                                                <h5 class="card-title">${causa.nomes.join(", ")}</h5>
-                                                <p class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></p>
-                                            </div>
-                                        </div>`;
-                        }
-                        causaHTML += `</div>`;
-                
-                        listaCausas.innerHTML += causaHTML;
-                    });
-                })
-                .catch(error => {
-                    console.error(error);
-                })
-            } else {
-                const Toast = Swal.mixin({
-                    toast: true,
-                    position: "top-end",
-                    showConfirmButton: false,
-                    timer: 3000,
-                    timerProgressBar: true,
-                    didOpen: (toast) => {
-                      toast.onmouseenter = Swal.stopTimer;
-                      toast.onmouseleave = Swal.resumeTimer;
-                    }
-                  });
-                  Toast.fire({
-                    icon: "info",
-                    title: "Não possui não conformidade"
-                  });
-            }
         }
     });
 });
