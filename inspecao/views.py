@@ -272,19 +272,19 @@ def get_itens_reinspecao_pintura(request):
     quantidade_total = datas.count()  # Total de itens sem filtro
 
     if cores_filtradas:
-        datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas)
+        datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas).distinct()
 
     if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada)
+        datas = datas.filter(data_inspecao__date=data_filtrada).distinct()
 
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
-        datas = datas.filter(pecas_ordem_pintura__peca__icontains=pesquisa_filtrada)
+        datas = datas.filter(pecas_ordem_pintura__peca__icontains=pesquisa_filtrada).distinct()
 
     if inspetores_filtrados:
         datas = datas.filter(
             dadosexecucaoinspecao__inspetor__user__username__in=inspetores_filtrados
-        )
+        ).distinct()
 
     datas = datas.select_related(
         "pecas_ordem_pintura",
@@ -373,18 +373,18 @@ def get_itens_inspecionados_pintura(request):
     quantidade_total = datas.count()  # Total de itens sem filtro
 
     if cores_filtradas:
-        datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas)
+        datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas).distinct()
 
     if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada)
+        datas = datas.filter(dadosexecucaoinspecao__data_execucao__date=data_filtrada).distinct()
 
     if pesquisa_filtrada:
-        datas = datas.filter(pecas_ordem_pintura__peca__icontains=pesquisa_filtrada)
+        datas = datas.filter(pecas_ordem_pintura__peca__icontains=pesquisa_filtrada).distinct()
 
     if inspetores_filtrados:
         datas = datas.filter(
             dadosexecucaoinspecao__inspetor__user__username__in=inspetores_filtrados
-        )
+        ).distinct()
 
     datas = datas.select_related(
         "pecas_ordem_pintura",
@@ -771,7 +771,7 @@ def get_itens_reinspecao_montagem(request):
             "dadosexecucaoinspecao_set__inspetor__user",
         )
         .order_by("-id")
-    )
+    ).distinct()
 
     quantidade_total = Inspecao.objects.filter(
         id__in=reinspecao_ids, pecas_ordem_montagem__isnull=False
@@ -855,18 +855,18 @@ def get_itens_inspecionados_montagem(request):
     if maquinas_filtradas:
         datas = datas.filter(
             pecas_ordem_montagem__ordem__maquina__nome__in=maquinas_filtradas
-        )
+        ).distinct()
 
     if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada)
+        datas = datas.filter(dadosexecucaoinspecao__data_execucao__date=data_filtrada).distinct()
 
     if pesquisa_filtrada:
-        datas = datas.filter(pecas_ordem_montagem__peca__icontains=pesquisa_filtrada)
+        datas = datas.filter(pecas_ordem_montagem__peca__icontains=pesquisa_filtrada).distinct()
 
     if inspetores_filtrados:
         datas = datas.filter(
             dadosexecucaoinspecao__inspetor__user__username__in=inspetores_filtrados
-        )
+        ).distinct()
 
     datas = datas.select_related(
         "pecas_ordem_montagem",
@@ -1469,7 +1469,11 @@ def get_itens_reinspecao_estamparia(request):
         query &= Q(pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas)
 
     if data_filtrada:
-        query &= Q(data_inspecao__date=data_filtrada)
+        try:
+            data_filtrada_date = datetime.strptime(data_filtrada, "%Y-%m-%d").date()
+            query &= Q(dadosexecucaoinspecao__data_execucao__date=data_filtrada_date)
+        except ValueError:
+            pass  # Data inválida, ignora o filtro ou trate como preferir
 
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
@@ -1495,7 +1499,7 @@ def get_itens_reinspecao_estamparia(request):
             "dadosexecucaoinspecao_set__inspetor__user",
         )
         .order_by("-id")
-    )
+    ).distinct()
 
     quantidade_total = Inspecao.objects.filter(
         id__in=reinspecao_ids, pecas_ordem_estamparia__isnull=False
@@ -1938,6 +1942,9 @@ def get_itens_reinspecao_tubos_cilindros(request):
         id__in=reinspecao_ids, peca__tipo__in=["tubo", "cilindro"]
     )
 
+    
+    quantidade_total = datas.count()  # Total de itens sem filtro
+
     # Aplicar filtros
     if data_filtrada:
         datas = datas.filter(data_inspecao__date=data_filtrada)
@@ -2011,7 +2018,8 @@ def get_itens_reinspecao_tubos_cilindros(request):
     return JsonResponse(
         {
             "dados": dados,
-            "total": paginador.count,  # Total de itens após filtro
+            "total": quantidade_total,  # Total de itens após filtro
+            "total_filtrado": paginador.count,  # Total de itens após filtro
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
         },
@@ -2050,7 +2058,7 @@ def get_itens_inspecionados_tubos_cilindros(request):
     quantidade_total = datas.count()
 
     if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada)
+        datas = datas.filter(dadosexecucaoinspecaoestanqueidade__data_exec__date=data_filtrada).distinct()
 
     if pesquisa_filtrada:
         if " - " in pesquisa_filtrada:
@@ -2060,17 +2068,17 @@ def get_itens_inspecionados_tubos_cilindros(request):
             datas = datas.filter(
                 Q(peca__codigo__icontains=codigo)
                 & Q(peca__descricao__icontains=descricao)
-            )
+            ).distinct()
         else:
             datas = datas.filter(
                 Q(peca__codigo__icontains=pesquisa_filtrada)
                 | Q(peca__descricao__icontains=pesquisa_filtrada)
-            )
+            ).distinct()
 
     if inspetores_filtrados:
         datas = datas.filter(
             dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
-        )
+        ).distinct()
 
     # Subconsulta para obter o maior num_execucao para cada inspecao_estanqueidade
     maior_num_execucao_subquery = (
@@ -2917,18 +2925,18 @@ def get_itens_inspecionados_tanque(request):
     quantidade_total = datas.count()
 
     if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada)
+        datas = datas.filter(dadosexecucaoinspecaoestanqueidade__data_exec__date=data_filtrada).distinct()
 
     if pesquisa_filtrada:
         datas = datas.filter(
             Q(peca__codigo__icontains=pesquisa_filtrada)
             | Q(peca__descricao__icontains=pesquisa_filtrada)
-        )
+        ).distinct()
 
     if inspetores_filtrados:
         datas = datas.filter(
             dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
-        )
+        ).distinct()
 
     datas = datas.select_related("peca").order_by("-id")
 
