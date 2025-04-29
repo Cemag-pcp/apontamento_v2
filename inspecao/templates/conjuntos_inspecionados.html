@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %} <title>Inspeção Montagem</title> {% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="/static/css/inspecao.css">
+    <link rel="stylesheet" href="/static/css/select2.css">
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-baseline">
+    <h2 class="my-4">Conjuntos Inspecionados Montagem</h2>
+    <button class="btn btn-primary" id="btn-abrir-modal-adicionar">Adicionar Conjunto</button>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form id="form-filtro">
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="filtro-codigo" class="form-label">Código</label>
+                    <input type="text" class="form-control" id="filtro-codigo" placeholder="Filtrar por código">
+                </div>
+                <div class="col-md-4">
+                    <label for="filtro-descricao" class="form-label">Descrição</label>
+                    <input type="text" class="form-control" id="filtro-descricao" placeholder="Filtrar por descrição">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="button" class="btn btn-primary me-2" id="btn-filtrar">Filtrar</button>
+                    <button type="button" class="btn btn-secondary" id="btn-limpar-filtros">Limpar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<table class="table" id="tabela-conjuntos">
+    <thead>
+        <tr>
+            <th>Código</th>
+            <th>Descrição</th>
+            <th>Remover</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for conjunto in conjuntos %}
+        <tr>
+            <td>{{ conjunto.codigo }}</td>
+            <td>{{ conjunto.descricao }}</td>
+            <td>
+                <div class="dropdown">
+                    <button class="btn btn-danger dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                      Remover
+                    </button>
+                    <ul class="dropdown-menu">
+                      <li><button class="dropdown-item abrir-modal-remover" type="button">Remover</button></li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Paginação aqui -->
+<nav aria-label="Navegação da tabela">
+    <ul class="pagination" id="pagination">
+    </ul>
+</nav>
+
+{% include 'modal_inspecao/modal_inspecao_conjuntos_inspecionados.html' %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/montagem/conjuntos_inspecionados/conjunto-inspecionar.js' %}"></script>
+<script src="{% static 'js/montagem/conjuntos_inspecionados/filtro_paginacao.js' %}"></script>
+
+<script>
+
+</script>
+
+{% endblock %}

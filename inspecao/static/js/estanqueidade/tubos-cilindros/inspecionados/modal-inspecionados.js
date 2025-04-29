@@ -30,7 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 console.log(data)
 
-                data.history.forEach(element => {
+                data.history.forEach((element, index) => {
+                    const isFirstItem = index === 0;
                     let nao_conformidade = element.nao_conformidade + element.nao_conformidade_refugo;
                     listaTimeline.innerHTML += `
                     <li class="timeline-item" style="cursor:pointer;" 
@@ -52,7 +53,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     </li>`;
                 });
                 
-                
+                const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+                tooltips.forEach(t => new bootstrap.Tooltip(t));
                 const modal = new bootstrap.Modal(document.getElementById("modal-historico-tubos-cilindros"));
                 modal.show();
             })

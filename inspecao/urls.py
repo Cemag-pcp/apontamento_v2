@@ -5,7 +5,9 @@ app_name = "inspecao"
 
 urlpatterns = [
     path('montagem/', views.inspecao_montagem, name='inspecao-montagem'),
-    
+    path('conjuntos-inspecionados/', views.conjuntos_inspecionados_montagem, name='conjuntos-inspecionados-montagem'),
+    path('api/conjuntos-inspecionados/<str:codigo>/', views.add_remove_conjuntos_inspecionados, name='remover_conjunto'),
+    path('api/conjuntos-inspecionados/', views.add_remove_conjuntos_inspecionados, name='adicionar_conjunto'),
     path('estamparia/', views.inspecao_estamparia, name='inspecao-estamparia'),
 
     path('pintura/', views.inspecao_pintura, name='inspecao-pintura'),
@@ -24,7 +26,14 @@ urlpatterns = [
     path('api/itens-reinspecao-montagem/', views.get_itens_reinspecao_montagem, name='itens-reinspecao-montagem'),
 
     path('api/itens-inspecao-estamparia/', views.get_itens_inspecao_estamparia, name='itens-inspecao-estamparia'),
+    path('api/itens-inspecionados-estamparia/', views.get_itens_inspecionados_estamparia, name='itens-inspecionados-estamparia'),
+    path('api/itens-reinspecao-estamparia/', views.get_itens_reinspecao_estamparia, name='itens-reinspecao-estamparia'),
+
     path('api/envio-inspecao-estamparia/', views.inspecionar_estamparia, name='inspecionar_estamparia'),
+    path('api/envio-reinspecao-estamparia/', views.envio_reinspecao_estamparia, name='envio_reinspecao_estamparia'),
+
+    path('api/historico-estamparia/<int:id>', views.get_historico_estamparia, name='historico-estamparia'),
+    path('api/historico-causas-estamparia/<int:id>', views.get_historico_causas_estamparia, name='historico-causas-estamparia'),
 
     path('api/motivos-causas/<str:setor>/', views.motivos_causas, name='motivos_causas'),
 
@@ -51,4 +60,7 @@ urlpatterns = [
     path('api/itens-inspecionados-tanque/', views.get_itens_inspecionados_tanque, name='itens-inspecionados-tanque'),
 
     path('api/<int:id>/historico-tanque/', views.get_historico_tanque, name='historico-tanque'),
+
+    path('api/delete-execucao/', views.delete_execution, name='delete-execution'),
+    path('api/delete-execucao-estanqueidade/', views.delete_execution_estanqueidade, name='delete-execution-estanqueidade')
 ]

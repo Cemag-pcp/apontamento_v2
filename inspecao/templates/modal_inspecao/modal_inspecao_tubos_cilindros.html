@@ -62,7 +62,7 @@
                           </div>
                           <div class="col-sm-12 mb-4">
                               <label class="label-modal">Imagens:</label>
-                              <input class="form-control" type="file" name="imagens_1" multiple>
+                              <input class="form-control" type="file" name="imagens_1" accept="image/*" multiple>
                           </div>
                         </div> 
                     </div>
@@ -79,7 +79,7 @@
                     <div class="row">
                         <div class="col-sm-12 mb-4">
                             <label class="label-modal">Ficha:</label>
-                            <input class="form-control" type="file">
+                            <input class="form-control" type="file" id="ficha-inspecao-cilindro" accept="image/*, application/pdf">
                         </div>
                     </div>
                 </div>
@@ -164,7 +164,7 @@
                           </div>
                           <div class="col-sm-12 mb-4">
                               <label class="label-modal">Imagens:</label>
-                              <input class="form-control" type="file" name="imagens_1" multiple>
+                              <input class="form-control" type="file" name="imagens_1" accept="image/*" multiple>
                           </div>
                         </div> 
                     </div>
@@ -179,7 +179,7 @@
                         </div>
                         <div class="col-sm-12 mb-4">
                             <label class="label-modal">Ficha:</label>
-                            <input class="form-control" type="file">
+                            <input class="form-control" type="file" id="ficha-inspecao-tubo" accept="image/*, application/pdf">
                         </div>
                     </div>
                 </div>
@@ -258,7 +258,7 @@
                           </div>
                           <div class="col-sm-12 mb-4">
                             <label class="label-modal">Imagens:</label>
-                            <input class="form-control" type="file" name="imagens_reinspecao_1" multiple>
+                            <input class="form-control" type="file" name="imagens_reinspecao_1" accept="image/*" multiple>
                           </div>
                         </div> 
                     </div>
@@ -272,7 +272,7 @@
                             <input type="text" class="form-control" name="observacao_reteste_estanqueidade" id="observacao_reteste_estanqueidade">
                         </div>
                         <div class="col-sm-6 mb-4 d-flex flex-column justify-content-end">                    
-                            <label class="label-modal" for="ficha_reteste_estanqueidade">Inspetor</label>
+                            <label class="label-modal" for="inspetor_reteste_estanqueidade">Inspetor</label>
                             <select class="form-control" name="inspetor_reteste_estanqueidade" id="inspetor_reteste_estanqueidade" required>
                                 <option value=""></option>
                                 {% for inspetor in inspetores %}
@@ -283,8 +283,8 @@
                     </div>
                     <div class="row" id="motivo_ficha_retrabalho_estanqueidade" style="display: none;">
                         <div class="col-sm-12 mb-4">
-                            <label class="label-modal" for="ficha_reteste_estanqueidade">Ficha de Inspeção</label>
-                            <input type="text" class="form-control" id="ficha_reteste_estanqueidade" disabled>
+                            <label class="label-modal" for="ficha-reteste-estanqueidade">Ficha de Inspeção</label>
+                            <input type="file" class="form-control" id="ficha-reteste-estanqueidade" accept="image/*, application/pdf">
                         </div>
                     </div>
                 </div>

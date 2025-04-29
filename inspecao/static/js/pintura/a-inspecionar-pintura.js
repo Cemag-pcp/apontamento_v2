@@ -142,7 +142,7 @@ function buscarItensInspecao(pagina) {
             cardsInspecao.innerHTML += cards;
         });
 
-        itensInspecionar.textContent = "Retrabalho";
+        itensInspecionar.textContent = "Itens a Inspecionar";
 
         // Adiciona a paginação
               // Adiciona a paginação com reticências

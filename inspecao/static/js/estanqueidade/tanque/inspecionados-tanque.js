@@ -134,11 +134,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
-                    <div class="d-flex justify-content-between">
-                        <div class="d-flex align-items-baseline gap-2">
-                            ${iconeNaoConformidade}
-                            <h4 style="font-size: 0.875rem; color:#71717a;">Possui não conformidade?</h4>
-                        </div>
+                    <div>
                         <button 
                             data-id="${item.id}"
                             data-data="${item.data}"
@@ -148,7 +144,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                             data-conformidade="${item.conformidade}"
                             data-cor="${item.cor}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
-                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">              
+                        class="btn btn-white historico-inspecao w-100 d-flex justify-content-center align-items-center gap-2">              
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>
                             Ver detalhes
                         </button>

@@ -23,6 +23,10 @@ document.addEventListener("DOMContentLoaded", () => {
         formData.append("nao_conformidade", document.getElementById("nao-conformidade-retrabalho-inspecao-tubo").value);
         formData.append("nao_conformidade_refugo", document.getElementById("nao-conformidade-refugo-inspecao-tubo").value);
         formData.append("observacao", document.getElementById("observacao-inspecao-tubo").value);
+        const fichaInput = document.getElementById("ficha-inspecao-tubo");
+        if (fichaInput.files.length > 0) {
+            formData.append("ficha_inspecao", fichaInput.files[0]);
+        }
 
         let totalQuantidadeInput = 0;
         // Adicionar causas, quantidades e imagens ao FormData
@@ -32,7 +36,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const quantidadeInput = container.querySelector('input[type="number"]');
             const imagensInput = container.querySelector('input[type="file"]');
             totalQuantidadeInput += parseFloat(quantidadeInput.value);
-            console.log(totalQuantidadeInput)
 
             // Adicionar causas
             Array.from(causaSelect.selectedOptions).forEach((option, i) => {
@@ -49,10 +52,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         const naoConformidadeNum = parseFloat(naoConformidadeRetrabalho) + parseFloat(naoConformidadeRefugo);
-
-        console.log(naoConformidadeNum)
-        console.log(totalQuantidadeInput)
-        console.log(formData)
 
         if (naoConformidadeNum !== 0) {
             const erroMensagem = naoConformidadeNum > 0 && totalQuantidadeInput !== naoConformidadeNum
@@ -115,7 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             buscarItensReinspecaoEstanqueidade(1);
             buscarItensInspecionadosEstanqueidade(1);
-            this.reset();
         })
         .catch(error => {
             console.error(error);
@@ -154,6 +152,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Adicionar os dados básicos ao FormData
         const naoConformidade = document.getElementById("nao-conformidade-inspecao-cilindro").value;
+        const fichaInput = document.getElementById("ficha-inspecao-cilindro");
+        if (fichaInput.files.length > 0) {
+            formData.append("ficha_inspecao", fichaInput.files[0]);
+        }
 
         let totalQuantidadeInput = 0;
         // Adicionar causas, quantidades e imagens ao FormData

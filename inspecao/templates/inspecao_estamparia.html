@@ -16,19 +16,19 @@
 
 <ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
     <li class="nav-item" style="width: 33%;">
-        <a id="itens-inspecionar" class="nav-link tab-active active text-center" style="font-size: 0.875rem;"  onclick="activeRow('inspecao-pintura','reinspecao-pintura','inspecionados-pintura', this)">
+        <a id="itens-inspecionar" class="nav-link tab-active active text-center" style="font-size: 0.875rem;"  onclick="activeRow('inspecao-estamparia','reinspecao-estamparia','inspecionados-estamparia', this)">
             <span class="mx-2"></span>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </a>
     </li>
     <li class="nav-item" style="width: 33%;">
-        <a id="itens-reinspecao" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('reinspecao-pintura','inspecao-pintura','inspecionados-pintura', this)">
+        <a id="itens-reinspecao" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('reinspecao-estamparia','inspecao-estamparia','inspecionados-estamparia', this)">
             <span class="mx-2"></span>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </a>
     </li>
     <li class="nav-item" style="width: 33%;">
-        <a id="itens-inspecionados" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-pintura','inspecao-pintura','reinspecao-pintura', this)">
+        <a id="itens-inspecionados" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-estamparia','inspecao-estamparia','reinspecao-estamparia', this)">
             <span class="mx-2"></span>
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </a>
@@ -125,8 +125,8 @@
                         <input id="data-filtro-reinspecao" type="date" class="form-control">
                 
                         <div class="d-flex justify-content-between mt-3">
-                            <button id="btn-limpar-reinspecao" class="btn btn-outline-secondary">Limpar</button>
-                            <button id="btn-filtrar-reinspecao" class="btn btn-dark">Filtrar</button>
+                            <button id="btn-limpar-reinspecao-estamparia" class="btn btn-outline-secondary">Limpar</button>
+                            <button id="btn-filtrar-reinspecao-estamparia" class="btn btn-dark">Filtrar</button>
                         </div>
                     </div>
                 </form>
@@ -138,7 +138,7 @@
         <span id="qtd-filtrada-reinspecao" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
     <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
-        <span id="itens-filtrados-reinspecao-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-reinspecao-maquina" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
         <span id="itens-filtrados-reinspecao-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
         <span id="itens-filtrados-reinspecao-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
         <span id="itens-filtrados-reinspecao-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
@@ -171,7 +171,7 @@
                             <div style="max-height: 160px; overflow-y: auto;">
                                 {% for maquina in maquinas %}
                                     <div class="form-check">
-                                        <input class="form-check-input-inspecionados-estamparia" id="{{maquina|lower}}-inspecionados" type="checkbox" value="">
+                                        <input class="form-check-input-inspecionados" id="{{maquina|lower}}-inspecionados" type="checkbox" value="">
                                         <label class="form-check-label" for="{{maquina|lower}}-inspecionados">{{maquina}}</label>
                                     </div>
                                 {% endfor %}
@@ -205,7 +205,7 @@
     </div>
 
     <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
-        <span id="itens-filtrados-inspecionados-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-inspecionados-maquina" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Maquina: </span>
         <span id="itens-filtrados-inspecionados-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
         <span id="itens-filtrados-inspecionados-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
         <span id="itens-filtrados-inspecionados-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
@@ -216,13 +216,13 @@
 </div>
 
 <!-- Modal para inspecionar -->
-<div class="modal fade" id="inspectionModal" tabindex="-1" aria-labelledby="inspectionModalLabel" aria-hidden="true">
+<div class="modal fade" id="inspectionModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="inspectionModalLabel">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <input type="hidden" value="" id="id-inspecao">
             <div class="modal-header">
                 <h5 class="modal-title" id="inspectionModalLabel">Inspeção estamparia</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form id="inspectionForm">
@@ -348,34 +348,34 @@
                                         <thead class="table-light">
                                             <tr>
                                                 <th>
-                                                    <input type="text" placeholder="Medida 1" class="form-control" id="medida1">
+                                                    <input type="text" placeholder="Medida 1" class="form-control" id="medida1" style="padding: 5px;">
                                                 </th>
                                                 <th>
-                                                    <input type="text" placeholder="Medida 2" class="form-control" id="medida2">
+                                                    <input type="text" placeholder="Medida 2" class="form-control" id="medida2" style="padding: 5px;">
                                                 </th>
                                                 <th>
-                                                    <input type="text" placeholder="Medida 3" class="form-control" id="medida3">
+                                                    <input type="text" placeholder="Medida 3" class="form-control" id="medida3" style="padding: 5px;">
                                                 </th>
                                                 <th>
-                                                    <input type="text" placeholder="Medida 4" class="form-control" id="medida4">
+                                                    <input type="text" placeholder="Medida 4" class="form-control" id="medida4" style="padding: 5px;">
                                                 </th>
-                                                <th>Conforme</th>
-                                                <th>Não conforme</th>
+                                                <th style="font-size: 11px;">Conforme</th>
+                                                <th style="font-size: 11px;">Não conforme</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr id="linhaMedicao1">
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_1">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_1" style="padding: 5px;">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_2">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_2" style="padding: 5px;">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_3">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_3" style="padding: 5px;">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_4">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_4" style="padding: 5px;">
                                                 </td>
                                                 <td>
                                                     <div class="form-check">
@@ -390,16 +390,16 @@
                                             </tr>
                                             <tr id="linhaMedicao2">
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_1">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_1" style="padding: 5px;">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_2">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_2" style="padding: 5px;">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_3">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_3" style="padding: 5px;">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_4">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_4" style="padding: 5px;">
                                                 </td>
                                                 <td>
                                                     <div class="form-check">
@@ -414,16 +414,16 @@
                                             </tr>
                                             <tr id="linhaMedicao3">
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_1">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_1" style="padding: 5px;">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_2">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_2" style="padding: 5px;">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_3">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_3" style="padding: 5px;">
                                                 </td>
                                                 <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_4">
+                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_4" style="padding: 5px;">
                                                 </td>
                                                 <td>
                                                     <div class="form-check">
@@ -477,7 +477,7 @@
                                             <label for="fotoNaoConformidade1" class="custom-file-upload form-control text-center py-2">
                                                 <i class="bi bi-camera me-2"></i>Clique para adicionar uma foto
                                             </label>
-                                            <input type="file" id="fotoNaoConformidade1" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview1')">
+                                            <input type="file" id="fotoNaoConformidade1" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview1')" multiple>
                                             <div id="imagePreview1" class="mt-2 text-center"></div>
                                         </div>
                                     </div>
@@ -494,17 +494,162 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary btn-inspection" id="saveInspection">Salvar</button>
+                <button type="button" class="btn btn-success" id="saveInspection">Salvar</button>
             </div>
         </div>
     </div>
 </div>
 
+<div class="modal fade" id="reinspectionModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="reinspectionModalLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <input type="hidden" value="" id="id-reinspecao">
+            <input type="hidden" value="" id="id-data-execucao">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reinspectionModalLabel">Inspeção estamparia</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="reinspectionForm">
+                    <!-- Seção 1: Informações Básicas -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Informações Básicas</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="dataReinspecao" class="form-label">Data da inspeção</label>
+                                    <input type="date" class="form-control" id="dataReinspecao" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="conjuntoNameReinspecao" class="form-label">Conjunto</label>
+                                    <input type="text" class="form-control" id="conjuntoNameReinspecao" readonly>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="maquinaReinspecao" class="form-label">Máquina</label>
+                                    <input type="text" class="form-control" id="maquinaReinspecao" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="pecasProduzidasReinspecao" class="form-label">Peças a inspecionar</label>
+                                    <input type="number" class="form-control" id="pecasProduzidasReinspecao" min="1" placeholder="Número de peças" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="inspetorReinspecao" class="form-label">Inspetor</label>
+                                    <select class="form-select" id="inspetorReinspecao" required>
+                                        <option value="">Selecione</option>
+                                        {% for inspetor in inspetores %}
+                                        <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>  
+                    </div>
+                    
+                    <!-- Seção 3: Medições Técnicas -->
+                    <div class="card mb-4" id="medicoesTecnicasReinspecao">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Medições Técnicas</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="sectionMedicaoTecReinspecao">
+                                <div class="row">
+                                    <div class="col-sm-6">
+                                        <label for="qtd-conformidade-reinspecao">Quantidade de conformidades</label>
+                                        <input class="form-control" type="number" id="qtdConformidadeReinspecao" min="0">
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <label for="qtd-nao-conformidade-reinspecao">Quantidade de não conformidades</label>
+                                        <input class="form-control" type="number" id="qtdNaoConformidadeReinspecao">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12 mb-2">
+                            <label for="fichaReinspection" class="form-label">Envio da ficha de inspeção 100%</label>
+                            <label for="fichaReinspection" class="custom-file-upload">
+                                <i class="bi bi-camera me-2"></i>Clique para adicionar a ficha
+                            </label>
+                            <input type="file" id="fichaReinspection" name="ficha_inspecao"  accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreviewReinspection')">
+                            <div id="imagePreviewReinspection" class="d-flex mt-2 gap-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- Seção 4: Não Conformidades - Inicialmente oculta -->
+                    <div id="nonConformitySectionReinspecao" class="card mb-4" style="display: none;">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0">Detalhes das Não Conformidades</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">Adicione informações sobre cada não conformidade encontrada.</p>
+                            
+                            <div class="containerNonConformityItemsReinspecao">
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-sm btn-outline-danger btn-remove-nonconformity">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Causas da não conformidade (selecione todas aplicáveis)</label>
+                                        <div class="causes-container" id="causasContainerReinspecao">
+
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Quantidade afetada</label>
+                                        <input type="number" class="form-control quantidadeAfetada" min="1">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <label for="fotoNaoConformidade" class="form-label">Foto da não conformidade</label>
+                                        <label class="custom-file-upload trigger-file-upload">
+                                            <i class="bi bi-camera me-2"></i>Clique para adicionar uma foto
+                                        </label>
+                                        <input type="file" class="foto-nao-conformidade" accept="image/*" style="display: none;" multiple>                                        
+                                        <div class="image-preview d-flex flex-wrap mt-2 gap-2"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center mt-3">
+                                <button type="button" class="btn btn-outline-primary btn-add-nonconformity-reinspecao" onclick="addNonConformityItemReinspecao()">
+                                    <i class="bi bi-plus-circle me-2"></i>Adicionar outra não conformidade
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" id="saveReinspection">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'modal_inspecao/modal_inspecao_estamparia.html' %}
+{% include 'modal_inspecao/modal_excluir_execucao.html' %}
+
 {% endblock %}
 
-{% block scripts %}
+{% block scripts %} 
 <script src="{% static 'js/estamparia/a-inspecionar-estamparia.js' %}"></script>
+<script src="{% static 'js/estamparia/inspecionados-estamparia.js' %}"></script>
+<script src="{% static 'js/estamparia/reinspecao-estamparia.js' %}"></script>
+<script src="{% static 'js/estamparia/reinspecionar/modal-reinspecionar.js' %}"></script>
+<script src="{% static 'js/estamparia/inspecionados/modal-inspecionados.js' %}"></script>
+<script src="{% static 'js/estamparia/reinspecionar/envio-reinspecao.js' %}"></script>
+<script src="{% static 'js/estamparia/inspecionar/enviar-inspecao.js' %}"></script>
+<script src="{% static 'js/estamparia/inspecionados/excluir-execucao.js' %}"></script>
 
 <script>
 

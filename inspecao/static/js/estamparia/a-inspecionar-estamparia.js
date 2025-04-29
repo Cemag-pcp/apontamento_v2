@@ -298,10 +298,18 @@ function controlarLinhasTabela() {
     // Mostrar ou ocultar as linhas da tabela
     for (let i = 1; i <= maxLinhas; i++) {
         const linha = document.getElementById(`linhaMedicao${i}`);
+        const linhaInput = document.querySelectorAll(`#linhaMedicao${i} td input`)
+        const linhaCheckbox = document.querySelectorAll(`#linhaMedicao${i} .form-check input`)
         if (i <= linhasExibidas) {
             linha.style.display = ""; // Mostra a linha
         } else {
             linha.style.display = "none"; // Esconde a linha
+            linhaInput.forEach((input) => {
+                input.value = "";
+            })
+            linhaCheckbox.forEach((checkbox) => {
+                checkbox.checked = false;
+            })
         }
     }
 
@@ -516,10 +524,11 @@ function addNonConformityItem() {
     newItem.id = `nonConformityItem${nonConformityCounter}`;
     
     newItem.innerHTML = `
-        <button type="button" class="btn btn-remove-nonconformity" onclick="removeNonConformityItem(${nonConformityCounter})">
-            <i class="bi bi-x"></i>
-        </button>
-        
+        <div class="d-flex justify-content-end">
+            <button type="button" class="btn btn-remove-nonconformity" onclick="removeNonConformityItem(${nonConformityCounter})">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
         <div class="row mb-3">
             <div class="col-md-6">
                 <label class="form-label">Causas da não conformidade (selecione todas aplicáveis)</label>
@@ -549,8 +558,8 @@ function addNonConformityItem() {
                 <label for="fotoNaoConformidade${nonConformityCounter}" class="custom-file-upload">
                     <i class="bi bi-camera me-2"></i>Clique para adicionar uma foto
                 </label>
-                <input type="file" id="fotoNaoConformidade${nonConformityCounter}" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview${nonConformityCounter}')">
-                <div id="imagePreview${nonConformityCounter}" class="mt-2 text-center"></div>
+                <input type="file" id="fotoNaoConformidade${nonConformityCounter}" accept="image/*" style="display: none;" onchange="previewImage(this, 'imagePreview${nonConformityCounter}')" multiple>
+                <div id="imagePreview${nonConformityCounter}" class="d-flex mt-2 gap-2"></div>
             </div>
         </div>
     `;
@@ -606,24 +615,35 @@ function removeAllNonConformityItems() {
 // Pré-visualizar imagem carregada
 function previewImage(input, previewId) {
     const preview = document.getElementById(previewId);
-    preview.innerHTML = '';
-    
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.className = 'file-preview';
-            preview.appendChild(img);
-            
-            const fileName = document.createElement('p');
-            fileName.className = 'mt-1 mb-0 text-muted small';
-            fileName.textContent = input.files[0].name;
-            preview.appendChild(fileName);
+    preview.innerHTML = ''; // Limpa previews anteriores
+    preview.style.flexWrap = 'wrap';
+
+    if (input.files && input.files.length > 0) {
+        for (let i = 0; i < input.files.length; i++) {
+            const file = input.files[i];
+
+            const reader = new FileReader();
+            const div = document.createElement('div');
+
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'file-preview'; // Você pode estilizar isso com CSS
+                div.appendChild(img);
+
+                const fileName = document.createElement('p');
+                fileName.className = 'mt-1 mb-3 text-muted small';
+                fileName.textContent = file.name;
+                fileName.style.whiteSpace = 'nowrap';
+                fileName.style.overflow = 'hidden';
+                fileName.style.textOverflow = 'ellipsis';
+                fileName.style.maxWidth = '150px'; // Ajuste o tamanho conforme necessário
+                div.appendChild(fileName);
+                preview.appendChild(div);
+            }
+
+            reader.readAsDataURL(file);
         }
-        
-        reader.readAsDataURL(input.files[0]);
     }
 }
 
@@ -685,6 +705,7 @@ function validarFormulario() {
     // 2. Validação das medições técnicas conforme a quantidade produzida 
     let linhasObrigatorias = Math.min(qtdProduzida-qtdPecaMorta, 3); // No máximo 3 linhas obrigatórias
     let linhasPreenchidas = 0;
+    let somaQuantidadeNaoConforme = 0;
 
     for (let i = 1; i <= 3; i++) {
         let linhaPreenchida = false;
@@ -703,6 +724,10 @@ function validarFormulario() {
         // Verificar se um dos botões de conformidade foi marcado
         conformeMarcado = document.getElementById(`conforming${i}`).checked;
         naoConformeMarcado = document.getElementById(`nonConforming${i}`).checked;
+
+        if(naoConformeMarcado){
+            somaQuantidadeNaoConforme += 1;
+        }
 
         // A linha é considerada preenchida se pelo menos um campo tiver valor E uma conformidade for marcada
         if (algumCampoPreenchido && (conformeMarcado || naoConformeMarcado)) {
@@ -761,12 +786,9 @@ function validarFormulario() {
         const quantidade = parseInt(document.getElementById(`quantidadeAfetada${id}`).value);
         const causasSelecionadas = document.querySelectorAll(`#causasContainer${id} .causa-checkbox:checked`).length;
         const destinoSelecionado = document.getElementById(`destino${id}`).value;
-
-        // Verifica se essa não conformidade está relacionada a uma linha marcada como "Não Conforme"
-        const naoConformeMarcado = document.getElementById(`nonConforming${id}`).checked;
         
-        // Só realiza a validação se a linha for marcada como "Não Conforme"
-        if (naoConformeMarcado) {
+
+        if (somaQuantidadeNaoConforme > 0){
             if (!quantidade || quantidade <= 0) {
                 Toast.fire({
                     icon: "error",
@@ -792,14 +814,17 @@ function validarFormulario() {
 
                 return false;
             }
-
-            // Acumular quantidade afetada das não conformidades
-            somaQuantidadesAfetadas += quantidade;
         }
+        // Acumular quantidade afetada das não conformidades
+        somaQuantidadesAfetadas += quantidade;
     }
 
     // 6. Verificar se a quantidade de peças mortas + quantidade afetada é maior que a quantidade produzida
     const totalPecasProblema = qtdPecaMorta + somaQuantidadesAfetadas;
+    const totalNaoConformidade = somaQuantidadeNaoConforme;
+    console.log(totalNaoConformidade)
+    console.log(somaQuantidadesAfetadas)
+
     if (totalPecasProblema > qtdProduzida) {
         Toast.fire({
             icon: "error",
@@ -808,120 +833,18 @@ function validarFormulario() {
 
         return false;
     }
-
-    return true;
-}
-
-// Função para enviar os dados ao backend
-function enviarDadosInspecao() {
     
-    if (!validarFormulario()) {
-        return; // Não enviar se a validação falhar
-    }
 
-    const buttonSalvarInspecao = document.getElementById('saveInspection');
-    buttonSalvarInspecao.disabled = true; // Desabilitar o botão para evitar múltiplos cliques
-    buttonSalvarInspecao.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>';
-
-    const formData = new FormData();
-
-    // Coletando as informações básicas
-    formData.append('id-inspecao', document.getElementById('id-inspecao').value);
-    formData.append('dataInspecao', document.getElementById('dataInspecao').value);
-    formData.append('pecasProduzidas', document.getElementById('pecasProduzidas').value);
-    formData.append('inspetor', document.getElementById('inspetor').value);
-    formData.append('numPecaDefeituosa', document.getElementById('numPecaDefeituosa').value);
-    formData.append('inspecao_total', document.getElementById('inspecao_total').value);
-    formData.append('id-inspecao', document.getElementById('id-inspecao').value);
-
-    // Coletando causas de peças mortas
-    const causasPecaMorta = [];
-    document.querySelectorAll('.causas-morta-container .causa-checkbox:checked').forEach((checkbox) => {
-        causasPecaMorta.push(checkbox.value);
-    });
-    formData.append('causasPecaMorta', JSON.stringify(causasPecaMorta));
-
-    // Coletando as medições técnicas
-    const medidas = [];
-
-    for (let i = 1; i <= 3; i++) {
-        const medida = {};
-        let algumCampoPreenchido = false;
-
-        for (let j = 1; j <= 4; j++) {
-            // Pega o nome da medida (cabeçalho)
-            const nomeMedida = document.getElementById(`medida${j}`).value.trim();
-
-            // Pega o valor da medida na linha atual
-            const valor = document.getElementById(`valor${i}_${j}`).value.trim();
-
-            // Apenas coleta se o cabeçalho estiver preenchido e o valor do campo também
-            if (nomeMedida !== "" && valor !== "") {
-                medida[`medida${j}`] = { nome: nomeMedida, valor: valor };
-                algumCampoPreenchido = true; // Marca que existe pelo menos um campo válido
-            }
-        }
-
-        // Coletar conformidade apenas se algum campo da linha foi preenchido
-        if (algumCampoPreenchido) {
-            medida['conforme'] = document.getElementById(`conforming${i}`).checked;
-            medidas.push(medida);
-        }
-    }
-
-    formData.append('medidas', JSON.stringify(medidas));
-
-    // Coletando as não conformidades
-    const naoConformidades = [];
-    document.querySelectorAll('.non-conformity-item').forEach((item) => {
-        const id = item.id.replace('nonConformityItem', '');
-        const causas = [];
-        document.querySelectorAll(`#causasContainer${id} .causa-checkbox:checked`).forEach((checkbox) => {
-            causas.push(checkbox.value);
-        });
-
-        const naoConformidade = {
-            quantidadeAfetada: document.getElementById(`quantidadeAfetada${id}`).value,
-            destino: document.getElementById(`destino${id}`).value,
-            causas: causas
-        };
-        
-        // Coletando foto da não conformidade
-        const foto = document.getElementById(`fotoNaoConformidade${id}`).files[0];
-        if (foto) {
-            formData.append(`fotoNaoConformidade${id}`, foto);
-        }
-
-        naoConformidades.push(naoConformidade);
-    });
-    formData.append('naoConformidades', JSON.stringify(naoConformidades));
-
-    // Enviar dados para o backend
-    fetch('/inspecao/api/envio-inspecao-estamparia/', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        Toast.fire({
-            icon: "success",
-            title: `Inspeção gravada com sucesso.`
-        });     
-        
-        buscarItensInspecao(1);
-        const modalInspectionModal = bootstrap.Modal.getInstance(document.getElementById('inspectionModal'));
-        modalInspectionModal.hide();
-        buttonSalvarInspecao.disabled = false; // Reabilitar o botão
-        buttonSalvarInspecao.innerHTML = 'Salvar';
-
-    })
-    .catch(error => {
+    if (totalNaoConformidade > 0 && totalNaoConformidade !== somaQuantidadesAfetadas) {
         Toast.fire({
             icon: "error",
-            title: `Erro ao salvar inspeção.`
-        });           
-        console.error('Erro:', error);
-    });
+            title: `A soma da quantidade de não conformidades tem que ser igual a soma das quantidades afetadas`
+        });
+
+        return false;
+    }
+
+    return true;
 }
 
 document.getElementById('inspectionModal').addEventListener('hide.bs.modal', function (event) {
@@ -930,9 +853,6 @@ document.getElementById('inspectionModal').addEventListener('hide.bs.modal', fun
         document.activeElement.blur();
     }
 });
-
-// salvar inspeçao
-document.getElementById('saveInspection').addEventListener('click', enviarDadosInspecao);
 
 // faz a validacao
 document.getElementById('inspectionForm').addEventListener('submit', function(e) {

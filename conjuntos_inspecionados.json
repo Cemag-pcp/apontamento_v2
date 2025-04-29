@@ -1,0 +1,1058 @@
+{
+"conjuntos_inspecionados": [
+	{
+		"id" : 1,
+		"codigo" : "030347",
+		"descricao" : "CHASSI 5000 SS"
+	},
+	{
+		"id" : 2,
+		"codigo" : "030340",
+		"descricao" : "PLATAFORMA M17 (3500\/5000) CBHM"
+	},
+	{
+		"id" : 3,
+		"codigo" : "031755",
+		"descricao" : "SUPORTE EIXO BALANCIM TANDEM - CBH\/CBHM 6T M20"
+	},
+	{
+		"id" : 4,
+		"codigo" : "024480",
+		"descricao" : "EIXO TANDEM CBHM 4T"
+	},
+	{
+		"id" : 5,
+		"codigo" : "025840",
+		"descricao" : "5° RODA - CBH\/CBHM 02 EIXOS"
+	},
+	{
+		"id" : 6,
+		"codigo" : "030493",
+		"descricao" : "CHASSI 2 EIXOS"
+	},
+	{
+		"id" : 7,
+		"codigo" : "031516",
+		"descricao" : "CHASSI CBH6,0T 7M³ SS"
+	},
+	{
+		"id" : 8,
+		"codigo" : "440000",
+		"descricao" : "FEIXE MOLA (8 LAM)"
+	},
+	{
+		"id" : 9,
+		"codigo" : "029656",
+		"descricao" : "FEIXE DE MOLAS 12 LAMINAS"
+	},
+	{
+		"id" : 10,
+		"codigo" : "031374",
+		"descricao" : "CAÇAMBA CBH7,0 - ABERTURA LATERAL"
+	},
+	{
+		"id" : 11,
+		"codigo" : "032361",
+		"descricao" : "CAÇAMBA SIMPLES \"ABERTURA LATERAL\" [CBH5,0 M21]"
+	},
+	{
+		"id" : 12,
+		"codigo" : "031197",
+		"descricao" : "CAÇAMBA SIMPLES CBH6,0 - 02 EIXOS RS\/RD M19 AB. LATERAL"
+	},
+	{
+		"id" : 13,
+		"codigo" : "031230",
+		"descricao" : "FECHAM. DIANT. SUPERIOR - CBH (M19)"
+	},
+	{
+		"id" : 14,
+		"codigo" : "031228",
+		"descricao" : "TAMPA TRASEIRA (ABERT. LATERAL) - CBH M19"
+	},
+	{
+		"id" : 15,
+		"codigo" : "030732",
+		"descricao" : "TAMPA LATERAL INFERIOR LD - CBH 6 AB LATERAL (M17)"
+	},
+	{
+		"id" : 16,
+		"codigo" : "030599",
+		"descricao" : "TAMPA LAT INF LE (FECHO RÁPIDO) - CBH 6 TON ABERTURA LAT."
+	},
+	{
+		"id" : 17,
+		"codigo" : "030587",
+		"descricao" : "TAMPA LATERAL SUPERIOR - CBH 6 (M17)"
+	},
+	{
+		"id" : 18,
+		"codigo" : "493193",
+		"descricao" : "GRADE LATERAL INF (4500) CBHM"
+	},
+	{
+		"id" : 19,
+		"codigo" : "493181",
+		"descricao" : "GRADE LATERAL SUP (4500) CBHM"
+	},
+	{
+		"id" : 20,
+		"codigo" : "030383",
+		"descricao" : "MACACO CBHM\/FA"
+	},
+	{
+		"id" : 21,
+		"codigo" : "031518",
+		"descricao" : "CAÇAMBA SIMPLES CBH6,0 7M³ M19 ABERTURA LATERAL"
+	},
+	{
+		"id" : 22,
+		"codigo" : "031255",
+		"descricao" : "FUEIRO DIANTEIRO DIREITO 0,90 - CBHM (TUBO)"
+	},
+	{
+		"id" : 23,
+		"codigo" : "031254",
+		"descricao" : "FUEIRO DIANTEIRO ESQUERDO 0,90 - CBHM (TUBO)"
+	},
+	{
+		"id" : 24,
+		"codigo" : "031289",
+		"descricao" : "FUEIRO LAD DIREITO - CBH (M19) ABERTURA LAT. (TUBO)"
+	},
+	{
+		"id" : 25,
+		"codigo" : "031290",
+		"descricao" : "FUEIRO LAD ESQUERDO - CBH (M19) ABERTURA LAT (TUBO)"
+	},
+	{
+		"id" : 26,
+		"codigo" : "031264",
+		"descricao" : "FUEIRO TRAS DIREITO 1,10m - CBHM 5000 (TUBO)"
+	},
+	{
+		"id" : 27,
+		"codigo" : "031265",
+		"descricao" : "FUEIRO TRAS ESQUERDO 1,10m - CBHM 5000 (TUBO)"
+	},
+	{
+		"id" : 28,
+		"codigo" : "460576",
+		"descricao" : "EIXO SS RD 5000"
+	},
+	{
+		"id" : 29,
+		"codigo" : "024776",
+		"descricao" : "EIXO TANDEM CBHM 6T"
+	},
+	{
+		"id" : 30,
+		"codigo" : "029661",
+		"descricao" : "ESTRUTURA PLATAFORMA M20 - S4,0M\/G4,0M - CARRETA F6 M17"
+	},
+	{
+		"id" : 31,
+		"codigo" : "029958",
+		"descricao" : "ESTRUTURA DA PLATAFORMA PISO MAD S3,2M"
+	},
+	{
+		"id" : 32,
+		"codigo" : "030467",
+		"descricao" : "EIXO TRAS CBH 6,0 02 EIXOS"
+	},
+	{
+		"id" : 33,
+		"codigo" : "029520",
+		"descricao" : "TUBO ESPAÇADOR AB LATERAL"
+	},
+	{
+		"id" : 34,
+		"codigo" : "031422",
+		"descricao" : "TAMPA LATERAL INFERIOR LD - CBH4,0T AB. LATERAL M19"
+	},
+	{
+		"id" : 35,
+		"codigo" : "031401",
+		"descricao" : "TAMPA LATERAL INFERIOR LE (FECHO RÁPIDO) - CBH4,0 TON M19"
+	},
+	{
+		"id" : 36,
+		"codigo" : "030792",
+		"descricao" : "CHASSI 2 EIXOS TANDEM"
+	},
+	{
+		"id" : 37,
+		"codigo" : "033054",
+		"descricao" : "CAÇAMBA SIMPLES FO [CBH7-2E M22]"
+	},
+	{
+		"id" : 38,
+		"codigo" : "032763",
+		"descricao" : "CHASSI F6 C\/M PARA TANQUE"
+	},
+	{
+		"id" : 39,
+		"codigo" : "029668",
+		"descricao" : "CHASSI F6 CS"
+	},
+	{
+		"id" : 40,
+		"codigo" : "029945",
+		"descricao" : "CHASSI F4 CS"
+	},
+	{
+		"id" : 41,
+		"codigo" : "029989",
+		"descricao" : "5ª RODA M17 F4\/6"
+	},
+	{
+		"id" : 42,
+		"codigo" : "462160",
+		"descricao" : "CAMENTO SIMPLES S\/F (M98) F4\/6"
+	},
+	{
+		"id" : 43,
+		"codigo" : "023565",
+		"descricao" : "ICAMENTO SIMPLES S\/F CBHM 2 EIXOS"
+	},
+	{
+		"id" : 44,
+		"codigo" : "030809",
+		"descricao" : "PLATAFORMA CBHM 6000 02 EIXOS M17"
+	},
+	{
+		"id" : 45,
+		"codigo" : "460400",
+		"descricao" : "GRADE DIANTEIRA INF 45CM (5000) CBHM"
+	},
+	{
+		"id" : 46,
+		"codigo" : "460382",
+		"descricao" : "GRADE DIANTEIRA SUP 45CM (5000) CBHM"
+	},
+	{
+		"id" : 47,
+		"codigo" : "025860",
+		"descricao" : "EIXO DIANT CBHM 6000 02 EIXOS"
+	},
+	{
+		"id" : 48,
+		"codigo" : "030468",
+		"descricao" : "EIXO DIANT CBH 6,0 02 EIXOS"
+	},
+	{
+		"id" : 49,
+		"codigo" : "032487",
+		"descricao" : "TANQUE SIMPLES 4300L \"02 SAÍDAS + ESCADA E GRADIL + SUP. P\/ KIT INCENDIO\""
+	},
+	{
+		"id" : 50,
+		"codigo" : "031737",
+		"descricao" : "SUPORTE EIXO BALANCIM TANDEM - CBH\/CBHM 4TON M20"
+	},
+	{
+		"id" : 51,
+		"codigo" : "031048",
+		"descricao" : "ESTRUTURA GRADE LATERAL INFERIOR ALT 0,45- G4,0MD"
+	},
+	{
+		"id" : 52,
+		"codigo" : "031020",
+		"descricao" : "ESTRUTURA GRADE LATERAL -ALT 0,45 - S 4MD"
+	},
+	{
+		"id" : 53,
+		"codigo" : "031052",
+		"descricao" : "ESTRUTURA GRADE TRASEIRA INFERIOR - G3,20\/4,0MD"
+	},
+	{
+		"id" : 54,
+		"codigo" : "031016",
+		"descricao" : "ESTRUTURA GRADE TRASEIRA ALT45 - S3,20\/4,0MD"
+	},
+	{
+		"id" : 55,
+		"codigo" : "031049",
+		"descricao" : "ESTRUTURA GRADE DIANTEIRA (GIGANTE) GRANELEIRA - G3,20\/4MD"
+	},
+	{
+		"id" : 56,
+		"codigo" : "031022",
+		"descricao" : "ESTRUTURA GRADE DIANTEIRA (GIGANTE) - S3,20\/4,0MD"
+	},
+	{
+		"id" : 57,
+		"codigo" : "466621",
+		"descricao" : "GRADE DIANT 0,60m (CBHM 3500\/10000)"
+	},
+	{
+		"id" : 58,
+		"codigo" : "030378",
+		"descricao" : "TAMPA LAT SUP - TAMPA LATERAL - CBH 4 (M17)"
+	},
+	{
+		"id" : 59,
+		"codigo" : "031503",
+		"descricao" : "CHASSI 6000 SS CAFEEIRA"
+	},
+	{
+		"id" : 60,
+		"codigo" : "025898",
+		"descricao" : "EIXO DIANT\/TRAS F6 CM"
+	},
+	{
+		"id" : 61,
+		"codigo" : "031232",
+		"descricao" : "FUEIRO TRASEIRO LE 60 CM CBHM 3500"
+	},
+	{
+		"id" : 62,
+		"codigo" : "031231",
+		"descricao" : "FUEIRO TRASEIRO LD 60 CM CBHM 3500"
+	},
+	{
+		"id" : 63,
+		"codigo" : "031234",
+		"descricao" : "FUEIRO DIANTEIRO LE 60 CM CBHM 3500"
+	},
+	{
+		"id" : 64,
+		"codigo" : "031235",
+		"descricao" : "FUEIRO DIANTEIRO LD 60 CM CBHM 3500"
+	},
+	{
+		"id" : 65,
+		"codigo" : "031250",
+		"descricao" : "FUEIRO CENTRAL LD CBHM 6000 (TUBO)"
+	},
+	{
+		"id" : 66,
+		"codigo" : "031251",
+		"descricao" : "FUEIRO CENTRAL LE CBHM 6000 (TUBO)"
+	},
+	{
+		"id" : 67,
+		"codigo" : "031540",
+		"descricao" : "TAMPA TRASEIRA 1,10m (5000) CBHM CAFEEIRA"
+	},
+	{
+		"id" : 68,
+		"codigo" : "466529",
+		"descricao" : "GRADE LATERAL 60CM (3500) CBHM"
+	},
+	{
+		"id" : 69,
+		"codigo" : "025045",
+		"descricao" : "TAMPA TRASEIRA 60cm (3500) CBHM (31 AGO 2012...\/T7113-08\/12...)"
+	},
+	{
+		"id" : 70,
+		"codigo" : "450789",
+		"descricao" : "PLATAFORMA (6000) CBHM"
+	},
+	{
+		"id" : 71,
+		"codigo" : "032471",
+		"descricao" : "PLATAFORMA UVA M21"
+	},
+	{
+		"id" : 72,
+		"codigo" : "024030",
+		"descricao" : "CHASSI C\/ BASE P\/ ENSILADEIRA"
+	},
+	{
+		"id" : 73,
+		"codigo" : "024041",
+		"descricao" : "ICAMENTO SIMPLES SS CBHF"
+	},
+	{
+		"id" : 74,
+		"codigo" : "453225",
+		"descricao" : "IÇAMENTO SIMPLES UVA"
+	},
+	{
+		"id" : 75,
+		"codigo" : "032490",
+		"descricao" : "TANQUE SIMPLES 6500L \"02 SAIDAS + ESCADA E GRADIL + SUP. P\/ KIT INCENDIO\""
+	},
+	{
+		"id" : 76,
+		"codigo" : "032366",
+		"descricao" : "TAMPA TRASEIRA \"USO GERAL\" [CBH M21]"
+	},
+	{
+		"id" : 77,
+		"codigo" : "025046",
+		"descricao" : "TAMPA TRASEIRA 90cm (4500) CBHM"
+	},
+	{
+		"id" : 78,
+		"codigo" : "425928",
+		"descricao" : "GRADE DIANTEIRA INF (4500) CBHM"
+	},
+	{
+		"id" : 79,
+		"codigo" : "464272",
+		"descricao" : "EIXO TANDEM C\/TRAVA UVA"
+	},
+	{
+		"id" : 80,
+		"codigo" : "019021",
+		"descricao" : "EIXO TANDEMS\/TRAVA UVA"
+	},
+	{
+		"id" : 81,
+		"codigo" : "032686",
+		"descricao" : "PLATAFORMA [FA2A M22]"
+	},
+	{
+		"id" : 82,
+		"codigo" : "031291",
+		"descricao" : "SUPORTE (TUBO) DO BALANCIM TANDEM UVA"
+	},
+	{
+		"id" : 83,
+		"codigo" : "032530",
+		"descricao" : "CHASSI CBH6,0 SS"
+	},
+	{
+		"id" : 84,
+		"codigo" : "032765",
+		"descricao" : "CHASSI F4 COM MOLA PARA TANQUE"
+	},
+	{
+		"id" : 85,
+		"codigo" : "032633",
+		"descricao" : "CAÇAMBA CBH6,0 - USO GERAL (NOVO)"
+	},
+	{
+		"id" : 86,
+		"codigo" : "031541",
+		"descricao" : "FUEIRO TRAS DIREITO 1,10m - CBHM 5000 C\/ CORRENTE (TUBO)"
+	},
+	{
+		"id" : 87,
+		"codigo" : "031542",
+		"descricao" : "FUEIRO TRAS ESQUERDO 1,10m - CBHM 5000 C\/ CORRENTE (TUBO)"
+	},
+	{
+		"id" : 88,
+		"codigo" : "031860",
+		"descricao" : "FECHAMENTO DIANTEIRO (GIGANTE) _ UVA M20"
+	},
+	{
+		"id" : 89,
+		"codigo" : "025048",
+		"descricao" : "TAMPA TRASEIRA 1,10m (5000) CBHM"
+	},
+	{
+		"id" : 90,
+		"codigo" : "032360",
+		"descricao" : "CAÇAMBA SIMPLES \"USO GERAL\" [CBH5,0 M21]"
+	},
+	{
+		"id" : 91,
+		"codigo" : "430468",
+		"descricao" : "CHASSI UVA"
+	},
+	{
+		"id" : 92,
+		"codigo" : "460825",
+		"descricao" : "FEIXE DE MOLAS 14 LAMINAS"
+	},
+	{
+		"id" : 93,
+		"codigo" : "477114",
+		"descricao" : "EIXO TRASEIRO F6"
+	},
+	{
+		"id" : 94,
+		"codigo" : "030637",
+		"descricao" : "CHASSI 5000 CS"
+	},
+	{
+		"id" : 95,
+		"codigo" : "477989",
+		"descricao" : "EIXO DIANT F6"
+	},
+	{
+		"id" : 96,
+		"codigo" : "032762",
+		"descricao" : "CHASSI F6 SS PARA TANQUE"
+	},
+	{
+		"id" : 97,
+		"codigo" : "032641",
+		"descricao" : "EIXO SS RD 6000"
+	},
+	{
+		"id" : 98,
+		"codigo" : "031002",
+		"descricao" : "ESTRUTURA GRADE TRASEIRA ALT60 - S3,20\/4,0MD (ALT60)"
+	},
+	{
+		"id" : 99,
+		"codigo" : "030994",
+		"descricao" : "ESTRUTURA GRADE LATERAIS ALT 0,60 - S4,0MD"
+	},
+	{
+		"id" : 100,
+		"codigo" : "030787",
+		"descricao" : "CHASSI F4 SS"
+	},
+	{
+		"id" : 101,
+		"codigo" : "030788",
+		"descricao" : "CHASSI F6 SS"
+	},
+	{
+		"id" : 102,
+		"codigo" : "031034",
+		"descricao" : "ESTRUTURA GRADE LATERAL ALT 0,45 - S3,20MD"
+	},
+	{
+		"id" : 103,
+		"codigo" : "030423",
+		"descricao" : "CHASSI 7000 SS"
+	},
+	{
+		"id" : 104,
+		"codigo" : "032390",
+		"descricao" : "CAÇAMBA CBH7,0 USO GERAL"
+	},
+	{
+		"id" : 105,
+		"codigo" : "464922",
+		"descricao" : "EIXO SC RD 5000"
+	},
+	{
+		"id" : 106,
+		"codigo" : "030716",
+		"descricao" : "CHASSI 5000 SC"
+	},
+	{
+		"id" : 107,
+		"codigo" : "025233",
+		"descricao" : "CHASSI FA6 SS"
+	},
+	{
+		"id" : 108,
+		"codigo" : "032260",
+		"descricao" : "PLATAFORMA [CBHL6000 M20]"
+	},
+	{
+		"id" : 109,
+		"codigo" : "032635",
+		"descricao" : "CAÇAMBA CBH6,0 - ABERTURA LATERAL (NOVO)"
+	},
+	{
+		"id" : 110,
+		"codigo" : "416356",
+		"descricao" : "ICAMENTO COMPL FA6 (APÓS JUNHO 2013)"
+	},
+	{
+		"id" : 111,
+		"codigo" : "034157",
+		"descricao" : "ESTRUTURA GRADE DIANTEIRA (GIGANTE) - S3,20\/4,0MD M23"
+	},
+	{
+		"id" : 112,
+		"codigo" : "479937",
+		"descricao" : "EIXO SS RD 7000"
+	},
+	{
+		"id" : 113,
+		"codigo" : "034163",
+		"descricao" : "ESTRUTURA GRADE TRASEIRA ALT45 - S3,20\/4,0MD M23"
+	},
+	{
+		"id" : 114,
+		"codigo" : "031501",
+		"descricao" : "PLATAFORMA - CBHM 6000 CAFFEIRA M19"
+	},
+	{
+		"id" : 115,
+		"codigo" : "030939",
+		"descricao" : "COMBOIO SIMPLES (M98) F6"
+	},
+	{
+		"id" : 116,
+		"codigo" : "025688",
+		"descricao" : "FECHAMENTO LATERAL (ALT60) ITAUEIRA - S4,5M"
+	},
+	{
+		"id" : 117,
+		"codigo" : "032764",
+		"descricao" : "CHASSI 4T F4 SS PARA TANQUE"
+	},
+	{
+		"id" : 118,
+		"codigo" : "031547",
+		"descricao" : "CHASSI 6000 SC CAFEEIRA"
+	},
+	{
+		"id" : 119,
+		"codigo" : "460722",
+		"descricao" : "EIXO CS RD 5000"
+	},
+	{
+		"id" : 120,
+		"codigo" : "030615",
+		"descricao" : "PLATAFORMA M17 CBHM (4500)"
+	},
+	{
+		"id" : 121,
+		"codigo" : "031544",
+		"descricao" : "TAMPA TRASEIRA 1,10m (5000) CBHM CAFEEIRA C\/ ABA LATERAL"
+	},
+	{
+		"id" : 122,
+		"codigo" : "425916",
+		"descricao" : "EIXO SS RD 4500"
+	},
+	{
+		"id" : 123,
+		"codigo" : "031257",
+		"descricao" : "FUEIRO TRAS ESQUERDO 0,90 - CBHM 4500 (TUBO)"
+	},
+	{
+		"id" : 124,
+		"codigo" : "031258",
+		"descricao" : "FUEIRO TRAS DIREITO 0,90 - CBHM 4500 (TUBO)"
+	},
+	{
+		"id" : 125,
+		"codigo" : "425930",
+		"descricao" : "GRADE DIANTEIRA SUP (4500) CBHM"
+	},
+	{
+		"id" : 126,
+		"codigo" : "031236",
+		"descricao" : "FUEIRO CENTRAL LE TUBULAR CBHM 10.000 (TUBO)"
+	},
+	{
+		"id" : 127,
+		"codigo" : "463061",
+		"descricao" : "ICAMENTO COMPL S\/F (M98) FAFB (Un)"
+	},
+	{
+		"id" : 128,
+		"codigo" : "436008",
+		"descricao" : "EIXO SS RS FA3,5\/4 FB"
+	},
+	{
+		"id" : 129,
+		"codigo" : "032774",
+		"descricao" : "CHASSI FA4 SS FIXO (M20) PARA TANQUE"
+	},
+	{
+		"id" : 130,
+		"codigo" : "033597",
+		"descricao" : "EIXO TRASEIRO [FT10500-2E M22]"
+	},
+	{
+		"id" : 131,
+		"codigo" : "032691",
+		"descricao" : "FECHAMENTO DIANTEIRO [FA2A M22] MANGA"
+	},
+	{
+		"id" : 132,
+		"codigo" : "487030",
+		"descricao" : "CHASSI FA3,5\/4 SS"
+	},
+	{
+		"id" : 133,
+		"codigo" : "031776",
+		"descricao" : "SUPORTE EIXO BALANCIM TANDEM C\/ FREIO - CBH\/CBHM 4TON M20"
+	},
+	{
+		"id" : 134,
+		"codigo" : "030216",
+		"descricao" : "EIXO TANDEM C\/ FREIO LD CBHM 4T"
+	},
+	{
+		"id" : 135,
+		"codigo" : "030246",
+		"descricao" : "EIXO TANDEM C\/ FREIO LE CBHM 4T"
+	},
+	{
+		"id" : 136,
+		"codigo" : "031249",
+		"descricao" : "FUEIRO CENTRAL LD TUBULAR CBHM 10.000 (TUBO)"
+	},
+	{
+		"id" : 137,
+		"codigo" : "030731",
+		"descricao" : "CHASSI 7000 SC"
+	},
+	{
+		"id" : 138,
+		"codigo" : "030854",
+		"descricao" : "TAMPA TRASEIRA SIMPL M17 (10.000) CBHM"
+	},
+	{
+		"id" : 139,
+		"codigo" : "031253",
+		"descricao" : "FUEIRO DIANTEIRO LD - CBHM 8000\/10000 (TUBO)"
+	},
+	{
+		"id" : 140,
+		"codigo" : "031252",
+		"descricao" : "FUEIRO DIANTEIRO LE - CBHM 8000\/10000 (TUBO)"
+	},
+	{
+		"id" : 141,
+		"codigo" : "031267",
+		"descricao" : "FUEIRO TRAS LE - CBHM 8000\/10000 (TUBO)"
+	},
+	{
+		"id" : 142,
+		"codigo" : "031266",
+		"descricao" : "FUEIRO TRAS LD - CBHM 8000\/10000 (TUBO)"
+	},
+	{
+		"id" : 143,
+		"codigo" : "493650",
+		"descricao" : "EIXO SC RD 7000"
+	},
+	{
+		"id" : 144,
+		"codigo" : "031498",
+		"descricao" : "PLATAFORMA PARA TRANSPORTE DE CAIXAS (4,00m X 1,90m)"
+	},
+	{
+		"id" : 145,
+		"codigo" : "031030",
+		"descricao" : "ESTRUTURA GRADE LATERAL ALT 0,60 - 3,20MD (ALT60)"
+	},
+	{
+		"id" : 146,
+		"codigo" : "034166",
+		"descricao" : "ESTRUTURA GRADE TRASEIRA ALT60 - S4,0MD (ALT60) M23"
+	},
+	{
+		"id" : 147,
+		"codigo" : "030408",
+		"descricao" : "PLATAFORMA CENOURA"
+	},
+	{
+		"id" : 148,
+		"codigo" : "017917",
+		"descricao" : "EIXO TRASEIRO (CEN-1,75)"
+	},
+	{
+		"id" : 149,
+		"codigo" : "017899",
+		"descricao" : "EIXO DIANT (CEN-1,75)"
+	},
+	{
+		"id" : 150,
+		"codigo" : "025910",
+		"descricao" : "EIXO DIANT\/TRAS F4 CM"
+	},
+	{
+		"id" : 151,
+		"codigo" : "460989",
+		"descricao" : "EIXO CC RD 5000"
+	},
+	{
+		"id" : 152,
+		"codigo" : "031062",
+		"descricao" : "ESTRUTURA GRADE TRASEIRA SUPERIOR - G3,20\/4,0MD"
+	},
+	{
+		"id" : 153,
+		"codigo" : "466906",
+		"descricao" : "EIXO SS RD FA4FB"
+	},
+	{
+		"id" : 154,
+		"codigo" : "031780",
+		"descricao" : "CHASSI FA4 SS FIXO (M20)"
+	},
+	{
+		"id" : 155,
+		"codigo" : "033289",
+		"descricao" : "5ª RODA [CBH12]"
+	},
+	{
+		"id" : 156,
+		"codigo" : "032363",
+		"descricao" : "SUPORTE DA TAMPA LD [CBH M21]"
+	},
+	{
+		"id" : 157,
+		"codigo" : "032364",
+		"descricao" : "SUPORTE DA TAMPA LE [CBH M21]"
+	},
+	{
+		"id" : 158,
+		"codigo" : "031777",
+		"descricao" : "SUPORTE EIXO BALANCIM TANDEM C\/FREIO - CBH\/CBHM 6T M20"
+	},
+	{
+		"id" : 159,
+		"codigo" : "030377",
+		"descricao" : "TAMPA LATERAL INFERIOR - CBH 4 (M17)"
+	},
+	{
+		"id" : 160,
+		"codigo" : "032070",
+		"descricao" : "CHASSI CBH6,0T 7M³ SC"
+	},
+	{
+		"id" : 161,
+		"codigo" : "032591",
+		"descricao" : "TANQUE SIMPLES 6500L NOVO M22"
+	},
+	{
+		"id" : 162,
+		"codigo" : "031053",
+		"descricao" : "ESTRUTURA GRADE LATERAL INFERIOR ALT 0,45 - G3,20MD"
+	},
+	{
+		"id" : 163,
+		"codigo" : "030995",
+		"descricao" : "ESTRUTURA GRADE DIANTEIRA (GIGANTE) ALT60 - S4,0MD (ALT60)"
+	},
+	{
+		"id" : 164,
+		"codigo" : "030938",
+		"descricao" : "CHASSI F6 SS BAG"
+	},
+	{
+		"id" : 165,
+		"codigo" : "440012",
+		"descricao" : "FEIXE MOLAS (9 LAM)"
+	},
+	{
+		"id" : 166,
+		"codigo" : "466657",
+		"descricao" : "EIXO COMPLETO SC RD (4500) CBHM"
+	},
+	{
+		"id" : 167,
+		"codigo" : "031381",
+		"descricao" : "EIXO DIANT\/TRAS COMPLETO C\/M - F6 EC"
+	},
+	{
+		"id" : 168,
+		"codigo" : "011319",
+		"descricao" : "FUEIRO DIANTEIRO LE 90 CM CBHM"
+	},
+	{
+		"id" : 169,
+		"codigo" : "016196",
+		"descricao" : "EIXO DIANT COMPLETO (CEN-2,00) F6SS"
+	},
+	{
+		"id" : 170,
+		"codigo" : "031551",
+		"descricao" : "FUEIRO TRASEIRO LD 1,10m CBHM 6000 C\/ CORRENTE"
+	},
+	{
+		"id" : 171,
+		"codigo" : "031552",
+		"descricao" : "FUEIRO TRASEIRO LE 1,10m CBHM 6000 C\/ CORRENTE"
+	},
+	{
+		"id" : 172,
+		"codigo" : "494513",
+		"descricao" : "FUEIRO DIANTEIRO LD 90 CM CBHM"
+	},
+	{
+		"id" : 173,
+		"codigo" : "032035",
+		"descricao" : "TAMPA TRASEIRA _ CBH 5,0T FORR M20"
+	},
+	{
+		"id" : 174,
+		"codigo" : "477783",
+		"descricao" : "EIXO BALAN COMPL SS CUBO FORJ(00) (M98)F4"
+	},
+	{
+		"id" : 175,
+		"codigo" : "477620",
+		"descricao" : "EIXO DIANT COMPL SS CUBO FORJ(00) (M98) F4"
+	},
+	{
+		"id" : 176,
+		"codigo" : "032486",
+		"descricao" : "TANQUE SIMPLES 4300L \"02 SAÍDAS + ESCADA E GRADIL\""
+	},
+	{
+		"id" : 177,
+		"codigo" : "032424",
+		"descricao" : "CAÇAMBA SIMPLES \"USO GERAL\" [CBH6,0 02 EIXOS M21]"
+	},
+	{
+		"id" : 178,
+		"codigo" : "032485",
+		"descricao" : "TANQUE SIMPLES 4300L \"01 SAIDA + ESCADA E GRADIL\""
+	},
+	{
+		"id" : 179,
+		"codigo" : "031593",
+		"descricao" : "EIXO DIANT COMPL SS F6 BAG M19"
+	},
+	{
+		"id" : 180,
+		"codigo" : "030800",
+		"descricao" : "EIXO COMPL BAL TANDEM C\/ FREIO LD CBHM 6 TON."
+	},
+	{
+		"id" : 181,
+		"codigo" : "030801",
+		"descricao" : "EIXO COMPL BAL TANDEM C\/ FREIO LE CBHM 6 TON."
+	},
+	{
+		"id" : 182,
+		"codigo" : "031528",
+		"descricao" : "ESTRUTURA GRADE DIANTEIRA (GIGANTE) - CENOURA M19 MD"
+	},
+	{
+		"id" : 183,
+		"codigo" : "016147",
+		"descricao" : "EIXO BAL COMPLETO (CEN-2,00) F6SS"
+	},
+	{
+		"id" : 184,
+		"codigo" : "031809",
+		"descricao" : "CHASSI FA4 SS FIXO C\/ MOLA (M20)"
+	},
+	{
+		"id" : 185,
+		"codigo" : "014357",
+		"descricao" : "FUEIRO TRAS LD M09 (10.000) CBHM"
+	},
+	{
+		"id" : 186,
+		"codigo" : "014369",
+		"descricao" : "FUEIRO TRAS LE M09 (10.000) CBHM"
+	},
+	{
+		"id" : 187,
+		"codigo" : "469002",
+		"descricao" : "FUEIRO CENTRAL LE (10.000) CBHM"
+	},
+	{
+		"id" : 188,
+		"codigo" : "469014",
+		"descricao" : "FUEIRO CENTRAL LD (10.000)"
+	},
+	{
+		"id" : 189,
+		"codigo" : "011290",
+		"descricao" : "FUEIRO DIANTEIRO LE (8000) CBHM"
+	},
+	{
+		"id" : 190,
+		"codigo" : "025669",
+		"descricao" : "ICAMENTO SIMPL C\/FREIO CBHF (M13) (Un)"
+	},
+	{
+		"id" : 191,
+		"codigo" : "030720",
+		"descricao" : "CHASSI 5000 CC"
+	},
+	{
+		"id" : 192,
+		"codigo" : "032726",
+		"descricao" : "CHASSI CBH6,0 SC"
+	},
+	{
+		"id" : 193,
+		"codigo" : "481658",
+		"descricao" : "FUEIRO CENTRAL LD (6000) CBHM"
+	},
+	{
+		"id" : 194,
+		"codigo" : "481660",
+		"descricao" : "FUEIRO CENTRAL LE (6000) CBHM"
+	},
+	{
+		"id" : 195,
+		"codigo" : "013249",
+		"descricao" : "FUEIRO TRASEIRO LE 1,10m (5000) CBHM"
+	},
+	{
+		"id" : 196,
+		"codigo" : "013237",
+		"descricao" : "FUEIRO TRASEIRO LD 1,10m (5000) CBHM"
+	},
+	{
+		"id" : 197,
+		"codigo" : "487338",
+		"descricao" : "CHASSI S\/M (MFI) FA3.5\/4"
+	},
+	{
+		"id" : 198,
+		"codigo" : "486851",
+		"descricao" : "FUEIRO DIANTEIRO LD (8000) CBHM"
+	},
+	{
+		"id" : 199,
+		"codigo" : "032549",
+		"descricao" : "Gigante BAG\/CENOURA"
+	},
+	{
+		"id" : 200,
+		"codigo" : "031591",
+		"descricao" : "EIXO TRASEIRO RD F6 BAG"
+	},
+	{
+		"id" : 201,
+		"codigo" : "025569",
+		"descricao" : "FECHAM TRASEIRO (FR) - S4,0M\/S3,2M"
+	},
+	{
+		"id" : 202,
+		"codigo" : "032489",
+		"descricao" : "TANQUE SIMPLES 6500L \"02 SAIDAS + ESCADA E GRADIL\""
+	},
+	{
+		"id" : 203,
+		"codigo" : "032690",
+		"descricao" : "PISO - PLATAFORMA - MANGA M22"
+	},
+	{
+		"id" : 204,
+		"codigo" : "032776",
+		"descricao" : "CHASSI F6 SS BAG PARA TANQUE"
+	},
+	{
+		"id" : 205,
+		"codigo" : "032729",
+		"descricao" : "EIXO SC RD 6000"
+	},
+	{
+		"id" : 206,
+		"codigo" : "030411",
+		"descricao" : "FECHAMENTO DIANTEIRO - CARR. METÁLICA CENOURA (4,0 X 2,10m)"
+	},
+	{
+		"id" : 207,
+		"codigo" : "030600",
+		"descricao" : "FUEIRO FORR CBH AB. LATERAL L.D."
+	},
+	{
+		"id" : 208,
+		"codigo" : "030606",
+		"descricao" : "FUEIRO FORR CBH AB. LATERAL L.E."
+	},
+	{
+		"id" : 209,
+		"codigo" : "034387",
+		"descricao" : "ESTRUTURA DA PLATAFORMA - F6C"
+	},
+	{
+		"id" : 210,
+		"codigo" : "033012",
+		"descricao" : "PLATAFORMA METÁLICA"
+	},
+	{
+		"id" : 211,
+		"codigo" : "033062",
+		"descricao" : "CHASSI 2 EIXOS P\/ CIL. TELESCÓPIO"
+	}
+]}

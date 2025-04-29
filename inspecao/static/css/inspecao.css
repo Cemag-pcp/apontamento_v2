@@ -8,6 +8,19 @@
     color: #747474; 
 }
 
+.trash-history-last-execution {
+    font-size: 25px;
+}
+
+.trash-history-last-execution:hover {
+    font-size: 25px;
+}
+
+.trash-history-others-execution {
+    font-size: 25px;
+    color: rgb(189, 189, 189);
+}
+
 .btn-white{
     background-color: white;
     border-color: #e4e4e7;
@@ -125,4 +138,12 @@
 .carousel-control-prev-icon,
 .carousel-control-next-icon {
     filter: brightness(0) saturate(100%);
+}
+
+#modal-execucao-id,
+#modal-execucao-conformidade,
+#modal-execucao-nao-conformidade,
+#modal-execucao-data {
+    color: #6c757d; /* Cor cinza para os dados */
+    margin-left: 5px;
 }

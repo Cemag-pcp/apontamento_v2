@@ -3,6 +3,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target.classList.contains('iniciar-reinspecao')) {
 
             document.getElementById("form-reinspecao").reset();
+            $('.select2').val(null).trigger('change');
+            
             const id = event.target.getAttribute("data-id");
             const data = event.target.getAttribute("data-data");
             const peca = event.target.getAttribute("data-peca");
