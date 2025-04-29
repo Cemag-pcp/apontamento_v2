@@ -1,3 +1,4 @@
+import { renderCallendar } from './full-calendar.js';
 
 function carregarBaseCarretas() {
     const dataInicio = document.getElementById('data-inicio').value;
@@ -96,6 +97,7 @@ function gerarPlanejamento() {
     })
     .then(data => {
         alert("Planejamento gerado com sucesso!");
+        renderCallendar();
     })
     .catch(error => {
         console.error("Erro ao criar ordens:", error);

@@ -1,4 +1,4 @@
-function renderCallendar() {
+export function renderCallendar() {
     var calendarEl = document.getElementById('calendario');
 
     var calendar = new FullCalendar.Calendar(calendarEl, {

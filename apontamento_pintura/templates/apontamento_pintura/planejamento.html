@@ -52,49 +52,53 @@
         </div>
     </div>
 
-    <div id="containerPlanejar" class="mb-5">
+    <div id="containerPlanejar">
         <!-- Painel de Ordens Criadas -->
-        <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
+        <h3 class="mb-4 text-center text-secondary">Painel de Ordens Criadas</h3>
     
         <!-- Formulário de Filtro -->
-        <form id="filtro-form" class="mb-3 p-3 border rounded bg-light">
-            <div class="row g-3 align-items-center">
+        <form id="filtro-form" class="mb-4 p-4 border rounded bg-light">
+            <div class="row g-3">
                 <!-- Filtro por Data -->
-                <div class="col-md-4">
-                    <label for="filtro-data-carga" class="form-label"><strong>Data da Carga</strong></label>
+                <div class="col-md-3">
+                    <label for="filtro-data-carga" class="form-label fw-bold">Data da Carga</label>
                     <input type="date" id="filtro-data-carga" class="form-control">
                 </div>
     
                 <!-- Filtro por Cor -->
-                <div class="col-md-4">
-                    <label for="filtro-cor" class="form-label"><strong>Cor</strong></label>
+                <div class="col-md-3">
+                    <label for="filtro-cor" class="form-label fw-bold">Cor</label>
                     <select class="form-select" name="filtro-cor" id="filtro-cor" disabled>
                         <option value="" selected>Escolha uma cor...</option>
                     </select>
                 </div>
+
+                <!-- Filtro por conjunto -->
+                <div class="col-md-3">
+                    <label for="filtro-conjunto" class="form-label fw-bold">Conjunto</label>
+                    <input type="text" id="filtro-conjunto" class="form-control">
+                </div>
     
                 <!-- Botão de Filtrar -->
-                <div class="col-md-4 d-flex align-items-end">
+                <div class="col-md-3 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary w-100">Filtrar</button>
                 </div>
             </div>
         </form>
     
         <!-- Botão Criar Cambão alinhado à direita -->
-        <div class="d-flex justify-content-end mb-3">
+        <div class="d-flex justify-content-end mb-4">
             <button id="btn-criar-cambao" class="btn btn-success" disabled>Criar Cambão</button>
         </div>
     
         <!-- Tabela de Ordens Criadas -->
         <div id="ordens-container" class="table-responsive">
-            <!-- Tabela de Ordens Criadas -->
             <div class="border rounded p-4 bg-white shadow-sm">
                 <div class="table-container">
-                    
+                    <!-- Tabela será gerada aqui -->
                 </div>
             </div>
         </div>
-
     </div>
 
     <!-- Container para Acompanhamento -->

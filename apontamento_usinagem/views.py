@@ -40,6 +40,14 @@ def planejamento(request):
 
     return render(request, 'apontamento_usinagem/planejamento.html', {'motivos':motivos,'operadores':operadores,'motivos_maquina_parada':motivos_maquina_parada,})
 
+def processos(request):
+
+    motivos = MotivoInterrupcao.objects.filter(setor__nome='usinagem', visivel=True)
+    operadores = Operador.objects.filter(setor__nome='usinagem')
+    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='estamparia').exclude(nome='Finalizada parcial')
+
+    return render(request, 'apontamento_usinagem/processos.html', {'motivos':motivos,'operadores':operadores,'motivos_maquina_parada':motivos_maquina_parada,})
+
 def get_pecas_ordem(request, pk_ordem):
     try:
         # Busca a ordem com os relacionamentos necessários
@@ -74,7 +82,7 @@ def get_ordens_criadas(request):
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
 
-    # Criamos uma subquery para obter a primeira peça associada à ordem
+    # obter a primeira peça associada à ordem
     primeira_peca = PecasOrdem.objects.filter(
         ordem=OuterRef('pk')
     ).order_by('id')[:1]
@@ -86,7 +94,7 @@ def get_ordens_criadas(request):
         peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
         peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
         peca_quantidade=Subquery(primeira_peca.values('qtd_planejada'))
-    ).order_by('-status_prioridade')
+    ).order_by('status_prioridade')
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
@@ -217,7 +225,7 @@ def atualizar_status_ordem(request):
                 elif status == 'agua_prox_proc':
                     try:
                         ordem.maquina = get_object_or_404(Maquina, pk=int(body['maquina_nome']))
-                        novo_processo.maquina=body['maquina_nome']
+                        novo_processo.maquina=get_object_or_404(Maquina, pk=int(body['maquina_nome']))
 
                         peca = PecasOrdem.objects.filter(ordem=ordem).first()
                         peca.qtd_planejada = int(body['qtd_prox_processo'])
@@ -276,11 +284,12 @@ def get_ordens_iniciadas(request):
     filtro_peca = request.GET.get('peca', '').strip()
 
     if filtro_ordem:
-        ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
+        ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem, grupo_maquina='usinagem')
     if filtro_peca:
         ordens_queryset = ordens_queryset.filter(
             ordem_pecas_usinagem__peca__codigo=filtro_peca
         )
+
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -343,6 +352,16 @@ def get_ordens_interrompidas(request):
     # Paginação (opcional)
     page = request.GET.get('page', 1)  # Obtém o número da página
     limit = request.GET.get('limit', 10)  # Define o limite padrão por página
+    filtro_ordem = request.GET.get('ordem', '').strip()
+    filtro_peca = request.GET.get('peca', '').strip()
+
+    if filtro_ordem:
+        ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem, grupo_maquina='usinagem')
+    if filtro_peca:
+        ordens_queryset = ordens_queryset.filter(
+            ordem_pecas_usinagem__peca__codigo=filtro_peca
+        )
+
     paginator = Paginator(ordens_queryset, limit)  # Aplica a paginação
     ordens_page = paginator.get_page(page)  # Obtém a página atual
 
@@ -397,12 +416,27 @@ def get_ordens_interrompidas(request):
 def get_ordens_ag_prox_proc(request):
     # Filtra as ordens com base no status 'agua_prox_proc' e prefetch da peça relacionada
     ordens_queryset = Ordem.objects.prefetch_related(
-        'ordem_pecas_usinagem'
+        'ordem_pecas_usinagem','processos'
     ).filter(grupo_maquina='usinagem', status_atual='agua_prox_proc')
 
     # Paginação
     page = int(request.GET.get('page', 1))  # Obtém o número da página
     limit = int(request.GET.get('limit', 10))  # Define o limite padrão por página
+    filtro_ordem = request.GET.get('ordem', '').strip()
+    filtro_peca = request.GET.get('peca', '').strip()
+    filtro_processo = request.GET.get('processo', '').strip()
+
+    if filtro_ordem:
+        ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem, grupo_maquina='usinagem')
+    if filtro_peca:
+        ordens_queryset = ordens_queryset.filter(
+            ordem_pecas_usinagem__peca__codigo=filtro_peca
+        )
+    if filtro_processo:
+        ordens_queryset = ordens_queryset.filter(
+            maquina_id=filtro_processo
+        )
+
     paginator = Paginator(ordens_queryset, limit)  # Aplica a paginação
     try:
         ordens_page = paginator.page(page)  # Obtém a página atual
@@ -416,6 +450,9 @@ def get_ordens_ag_prox_proc(request):
         total_qtd_boa = 0
         total_qtd_planejada = 0
         total_qtd_morta = 0
+
+        # Conta quantas vezes a ordem já teve 'agua_prox_proc'
+        qtd_processo_atual = ordem.processos.filter(status='agua_prox_proc').count() + 1
 
         # Itera sobre todas as peças relacionadas
         for peca_ordem in ordem.ordem_pecas_usinagem.all():
@@ -442,6 +479,7 @@ def get_ordens_ag_prox_proc(request):
             'maquina': ordem.maquina.nome,
             'maquina_id': ordem.maquina.id,
             'ultima_atualizacao': ordem.ultima_atualizacao,
+            'processo_atual': qtd_processo_atual, 
             'totais': {
                 'qtd_boa': total_qtd_boa,
                 'qtd_planejada': total_qtd_planejada,
