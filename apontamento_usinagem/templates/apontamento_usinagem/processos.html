@@ -90,189 +90,100 @@
 {% endblock %}
 
 {% block content %}
-<div>
 
-    <!-- Título Principal -->
-    <div class="text-center mb-5">
-        <h1 class="display-5">Apontamento de Usinagem</h1>
-        <p class="text-muted">Gerencie e acompanhe os processos de usinagem.</p>
+<!-- Container para Planejamento -->
+<div id="containerPlanejar" class="mb-5">
+    <!-- Título Planejamento -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="text-secondary"></h3>
     </div>
-
-    <!-- Container para Status de Máquina -->
-    <div class="mb-5">
-        <div class="row gx-4">
-            <!-- Coluna 1: Status de Máquina -->
-            <div class="col-md-4">
-                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
-                    Status de Máquina
-                    <button class="btn btn-sm" id="refresh-status-maquinas">
-                        🔄
-                    </button>
-                </h4>
-                <div class="border rounded p-3 bg-light">
-                    <div class="text-center mb-3">
-                        <div class="display-4 text-primary">-</div>
-                        <p class="text-muted">Máquinas em operação</p>
+    <!-- Formulário de Filtro -->
+    <div class="filter-card mb-4">
+        <div class="filter-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Painel de Ordens Criadas</h5>
+            <div class="d-flex gap-3">
+                <button type="button" class="btn btn-parada me-2" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
+                    <i class="bi bi-stop-circle"></i> Parada de máquina
+                </button>
+                <button type="button" class="btn btn-criar-op" data-bs-toggle="modal" data-bs-target="#modalUsinagem">
+                    <i class="bi bi-plus-circle"></i> Planejar 
+                </button>
+            </div>
+        </div>
+        <div class="filter-body">
+            <form id="filtro-form" class="mb-4">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-3 mb-2">
+                        <label for="filtro-ordem" class="form-label">Ordem</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="filtro-ordem" placeholder="Número da ordem">
+                        </div>
                     </div>
-                    <div class="border-top pt-2">
-                        <ul class="list-group list-group-flush" id="machine-status-list" style="overflow-y:auto; max-height: 150px;">
-                            <!-- Lista de status das máquinas -->
-                        </ul>
+                    <div class="col-md-3 mb-2">
+                        <label for="filtro-peca" class="form-label">Peça</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-box"></i>
+                            </span>
+                            <input type="text" class="form-control" id="filtro-peca" placeholder="Código ou nome da peça">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label for=""></label>
+                        <button type="submit" class="btn btn-primary w-100">Filtrar</button>
                     </div>
                 </div>
-                <!-- Legenda abaixo da coluna -->
-                <div class="text-center mt-3">
-                    <span class="legend">
-                        <span class="badge bg-warning rounded-circle" style="width: 15px; height: 15px; display: inline-block;"></span> Ocioso
-                        <span class="badge bg-danger rounded-circle" style="width: 15px; height: 15px; display: inline-block; margin-left: 10px;"></span> Parado
-                        <span class="badge bg-success rounded-circle" style="width: 15px; height: 15px; display: inline-block; margin-left: 10px;"></span> Em operação
-                    </span>
-                </div>
-            </div>
-            <!-- Coluna 2: Últimas peças produzidas -->
-            <div class="col-md-4">
-                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
-                    Últimas peças produzidas
-                    <button class="btn btn-sm" id="refresh-pecas">
-                        🔄
-                    </button>
-                </h4>
-                <div class="border rounded p-3 bg-light" style="height: auto; max-height: 400px; overflow-y: auto;">
-                    <ul class="list-group" id="ultimas-pecas-list"></ul>
-                </div>
-            </div>
-    
-            <!-- Coluna 3: Status de Ordens -->
-            <div class="col-md-4">
-                <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
-                    Status de Ordens
-                    <button class="btn btn-sm" id="refresh-ordens">
-                        🔄
-                    </button>
-                </h4>
-                <div class="border rounded p-3 bg-light" style="height: auto; max-height: 400px; overflow-y: auto;">
-                    <ul id="status-ordens-list" class="list-unstyled"></ul>
-                </div>
-            </div>
+            </form>
         </div>
     </div>
+</div>
 
-    <!-- Container para Planejamento -->
-    <div id="containerPlanejar" class="mb-5">
-        <!-- Título Planejamento -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3 class="text-secondary"></h3>
-        </div>
-        <!-- Formulário de Filtro -->
-        <div class="filter-card mb-4">
-            <div class="filter-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Painel de Ordens Criadas</h5>
-                <div class="d-flex gap-3">
-                    <button type="button" class="btn btn-parada me-2" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
-                        <i class="bi bi-stop-circle"></i> Parada de máquina
-                    </button>
-                    <button type="button" class="btn btn-criar-op" data-bs-toggle="modal" data-bs-target="#modalUsinagem">
-                        <i class="bi bi-plus-circle"></i> Planejar 
-                    </button>
-                </div>
-            </div>
-            <div class="filter-body">
-                <form id="filtro-form" class="mb-4">
-                    <div class="row g-3 align-items-center">
-                        <div class="col-md-3 mb-2">
-                            <label for="filtro-ordem" class="form-label">Ordem</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light">
-                                    <i class="bi bi-search"></i>
-                                </span>
-                                <input type="text" class="form-control" id="filtro-ordem" placeholder="Número da ordem">
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <label for="filtro-proc" class="form-label">Processo</label>
-                            <select class="form-select" name="filtro-processo" id="filtro-processo">
-                                <option class="text-muted" value="">Filtrar por processo</option>
-                                <option value="plasma">Plasma</option>
-                                <option value="laser_1">Laser 1</option>
-                                <option value="laser_2">Laser 2 (JFY)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <label for="filtro-peca" class="form-label">Peça</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light">
-                                    <i class="bi bi-box"></i>
-                                </span>
-                                <input type="text" class="form-control" id="filtro-peca" placeholder="Código ou nome da peça">
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-2">
-                            <label for="filtro-status" class="form-label">Status</label>
-                            <select class="form-select" id="filtro-status">
-                                <option class="text-muted" value="">Filtrar por status</option>
-                                <option value="aguardando_iniciar">Aguardando iniciar</option>
-                                <option value="iniciada">Iniciada</option>
-                                <option value="interrompida">Interrompida</option>
-                                <option value="finalizada">Finalizada</option>
-                                <option value="agua_prox_proc">Próximo processo</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <button type="submit" class="btn btn-primary w-100">Filtrar</button>
-                        </div>
+<!-- Container para Acompanhamento -->
+<div class="mb-5">
+    <div class="row gy-4">
+        <div class="col-md-4">
+            <h4 class="text-center text-secondary">Processos em Andamento</h4>
+            <div class="border rounded p-3 bg-light">
+                <div class="row row-cols-2 g-3 containerProcesso" style="max-height: 2000px; overflow-y: auto;">
+                    <div class="spinner-border text-dark" role="status">
+                        <span class="sr-only"></span>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
-        <!-- Container de Ordens -->
-        <div class="border rounded p-4 bg-light shadow-sm">
-            <div style="max-height: 650px; min-height: 250px; overflow-y: auto; overflow-x: hidden;">
-                <div id="ordens-container" class="row g-4 position-relative">
-                    <div class="loading-overlay" id="loading">
-                        <div class="spinner"></div>
+        <div class="col-md-4">
+            <h4 class="text-center text-secondary">Processos Interrompidos</h4>
+            <div class="border rounded p-3 bg-light">
+                <div class="row row-cols-2 g-3 containerInterrompido" style="max-height: 2000px; overflow-y: auto;">
+                    <div class="spinner-border text-dark" role="status">
+                        <span class="sr-only"></span>
                     </div>
                 </div>
-                <button class="btn btn-primary mt-3 w-100" id="loadMore" style="display: none;">Carregar mais</button>
             </div>
         </div>
-    </div>
-
-    <!-- Container para Acompanhamento -->
-    <div class="mb-5">
-        <div class="row gy-4">
-            <div class="col-md-4">
-                <h4 class="text-center text-secondary">Processos em Andamento</h4>
-                <div class="border rounded p-3 bg-light">
-                    <div class="row row-cols-2 g-3 containerProcesso" style="max-height: 400px; overflow-y: auto;">
-                        <div class="spinner-border text-dark" role="status">
-                            <span class="sr-only"></span>
-                        </div>
-                    </div>
+        <div class="col-md-4">
+            <h4 class="text-center text-secondary">Próximo processo</h4>
+            <div class="border rounded p-3 bg-light">
+                <div class="mb-2 d-flex gap-2">
+                    <select class="form-select" name="filtro-processo" id="filtro-processo">
+                        <option class="text-muted" value="">Filtrar por processo</option>
+                        <option value="20">Furar</option>
+                        <option value="21">Chanfrar</option>
+                        <option value="22">Tornear</option>
+                    </select>
+                    <button class="btn btn-primary" id="btn-filtrar-processo">Filtrar</button>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <h4 class="text-center text-secondary">Processos Interrompidos</h4>
-                <div class="border rounded p-3 bg-light">
-                    <div class="row row-cols-2 g-3 containerInterrompido" style="max-height: 400px; overflow-y: auto;">
-                        <div class="spinner-border text-dark" role="status">
-                            <span class="sr-only"></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <h4 class="text-center text-secondary">Próximo processo</h4>
-                <div class="border rounded p-3 bg-light">
-                    <div class="row row-cols-2 g-3 containerProxProcesso" style="max-height: 400px; overflow-y: auto;">
-                        <div class="spinner-border text-dark" role="status">
-                            <span class="sr-only"></span>
-                        </div>
+                <div class="row row-cols-2 g-3 containerProxProcesso" style="max-height: 2000px; overflow-y: auto;">
+                    <div class="spinner-border text-dark" role="status">
+                        <span class="sr-only"></span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
 </div>
 
 <!-- Modal Criar OP Usinagem -->

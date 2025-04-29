@@ -6,6 +6,7 @@ app_name = 'usinagem'
 
 urlpatterns = [
     path('', views.planejamento, name='planejamento'),
+    path('processos/', views.processos, name='processos'),
 
     path('api/ordens-criadas/', views.get_ordens_criadas, name='get_ordens_criadas'),
     path('api/ordens-criadas/<int:pk_ordem>/pecas/', views.get_pecas_ordem, name='get_pecas_ordem'),

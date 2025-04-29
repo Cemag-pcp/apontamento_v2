@@ -7,7 +7,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}`)
+        fetch(`/usinagem/api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -38,7 +38,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 statusBadge = '<span class="badge rounded-pill bg-danger badge-small ms-2">Interrompida</span>';
                                 break;
                             case 'agua_prox_proc':
-                                statusBadge = '<span class="badge rounded-pill bg-primary badge-small ms-2">Próximo processo</span>';
+                                statusBadge = '<span class="badge rounded-pill bg-prox-processo badge-small ms-2">Próximo processo</span>';
                                 break;
                             default:
                                 statusBadge = '<span class="badge rounded-pill bg-dark badge-small ms-2">Desconhecido</span>';
@@ -55,12 +55,9 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
                                     <i class="fa fa-check"></i>
                                 </button>
-                                <button class="btn btn-primary btn-sm btn-proximo-processo" title="Passar para o próximo processo">
+                                <button class="btn btn-sm btn-proximo-processo" title="Passar para o próximo processo">
                                     <i class="fa fa-arrow-right"></i>
                                 </button>  
-                                <button class="btn btn-info btn-sm btn-finalizar-parcial" title="Finalizar parcial">
-                                    <i class="fa fa-hourglass-half"></i>
-                                </button>
 
                             `;
                         } else if (ordem.status_atual === 'aguardando_iniciar') {
@@ -120,14 +117,14 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Interromper", se existir
                         if (buttonInterromper) {
                             buttonInterromper.addEventListener('click', () => {
-                                mostrarModalInterromper(ordem.id, ordem.maquina_id);
+                                mostrarModalInterromper(ordem.id, ordem.maquina_id, ordem.ordem);
                             });
                         }
 
                         // Adiciona evento ao botão "Finalizar", se existir
                         if (buttonFinalizar) {
                             buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.id);
+                                mostrarModalFinalizar(ordem.id, ordem.ordem);
                             });
                         }
 
@@ -155,7 +152,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão para enviar para proximo processo
                         if (buttonFinalizarParcial) {
                             buttonFinalizarParcial.addEventListener('click', () => {
-                                mostrarModalFinalizarParcial(ordem.id);
+                                mostrarModalFinalizarParcial(ordem.id, ordem.ordem);
                             });
                         }
 
@@ -214,7 +211,7 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
         <span class="sr-only">Loading...</span>
     </div>`;
 
-    fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`/usinagem/api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&processo=${filtros.processo || ''}`)
         .then(response => response.json())
         .then(data => {
             container.innerHTML = ''; // Limpa o container
@@ -233,12 +230,9 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                     <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
                         <i class="fa fa-check"></i>
                     </button>
-                    <button class="btn btn-primary btn-sm btn-proximo-processo" title="Passar para o próximo processo">
+                    <button class="btn btn-sm btn-proximo-processo" title="Passar para o próximo processo">
                         <i class="fa fa-arrow-right"></i>
                     </button>      
-                    <button class="btn btn-info btn-sm btn-finalizar-parcial" title="Finalizar parcial">
-                        <i class="fa fa-hourglass-half"></i>
-                    </button>
                 `;
 
                 // Calcula informações consolidadas das peças
@@ -286,14 +280,14 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
                     buttonInterromper.addEventListener('click', () => {
-                        mostrarModalInterromper(ordem.id, ordem.maquina_id);
+                        mostrarModalInterromper(ordem.id, ordem.maquina_id, ordem.ordem);
                     });
                 }
 
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        atualizarStatusOrdem(ordem.id, ordem.maquina_id, 'finalizada');
+                        mostrarModalFinalizar(ordem.id, ordem.ordem);
                     });
                 }
 
@@ -305,7 +299,7 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
 
                 if (buttonFinalizarParcial) {
                     buttonFinalizarParcial.addEventListener('click', () => {
-                        mostrarModalFinalizarParcial(ordem.id);
+                        mostrarModalFinalizarParcial(ordem.id, ordem.ordem);
                     });
                 }
 
@@ -325,7 +319,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
     </div>`;
 
     // Fetch para buscar ordens interrompidas
-    fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`/usinagem/api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar as ordens interrompidas.');
@@ -409,7 +403,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
         <span class="sr-only">Loading...</span>
     </div>`;
     
-    fetch(`api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`/usinagem/api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&processo=${filtros.processo || ''}`)
         .then(response => response.json())
         .then(data => {
             container.innerHTML = ''; // Limpa o container
@@ -428,7 +422,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                 `;
 
                 card.innerHTML = `
-                <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+                <div class="card shadow-lg bg-prox-processo border-0 rounded-3 mb-3 position-relative">
                     
                     <!-- Contador fixado no topo direito -->
                     <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
@@ -437,7 +431,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                         Carregando...
                     </span>
 
-                    <div class="card-header bg-warning text-white d-flex justify-content-between align-items-center p-3">
+                    <div class="card-header text-white d-flex justify-content-between align-items-center p-3">
                         <h6 class="card-title mb-0"><small>#${ordem.ordem} - ${ordem.maquina}</small></h6>
                         <small class="text-white">
                             Planejada: ${ordem.totais.qtd_planejada || 0} 
@@ -456,9 +450,8 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                     </div>
 
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
-                        <div class="d-flex gap-2">
-                            ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
-                        </div>
+                        ${botaoAcao} <!-- Botões dinâmicos -->
+                        <span class="text-muted">${ordem.processo_atual}º processo</span>
                     </div>
                 </div>`;
 
@@ -484,33 +477,33 @@ function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
 
-function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
-    switch (status) {
-        case 'iniciada':
-            mostrarModalIniciar(ordemId, grupoMaquina);
-            break;
-        case 'interrompida':
-            mostrarModalInterromper(ordemId, grupoMaquina);
-            break;
-        case 'finalizada':
-            mostrarModalFinalizar(ordemId, grupoMaquina);
-            break;
-        case 'agua_prox_proc':
-            mostrarModalIniciarProxProcesso(ordemId, grupoMaquina);
-            break;
+// function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
+//     switch (status) {
+//         case 'iniciada':
+//             mostrarModalIniciar(ordemId, grupoMaquina);
+//             break;
+//         case 'interrompida':
+//             mostrarModalInterromper(ordemId, grupoMaquina);
+//             break;
+//         case 'finalizada':
+//             mostrarModalFinalizar(ordemId, ordem_numero);
+//             break;
+//         case 'agua_prox_proc':
+//             mostrarModalIniciarProxProcesso(ordemId, grupoMaquina);
+//             break;
 
-        default:
-        alert('Status desconhecido.');
-    }
-}
+//         default:
+//         alert('Status desconhecido.');
+//     }
+// }
 
 // Modal para "Interromper"
-function mostrarModalInterromper(ordemId, grupoMaquina) {
+function mostrarModalInterromper(ordemId, grupoMaquina, ordem_numero) {
     const modal = new bootstrap.Modal(document.getElementById('modalInterromper'));
     const modalTitle = document.getElementById('modalInterromperLabel');
     const formInterromper = document.getElementById('formInterromperOrdemCorte');
 
-    modalTitle.innerHTML = `Interromper Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Interromper Ordem #${ordem_numero}`;
     modal.show();
 
     // Remove listeners antigos e adiciona novo
@@ -532,7 +525,7 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             }
         });
 
-        fetch(`api/ordens/atualizar-status/`, {
+        fetch(`/usinagem/api/ordens/atualizar-status/`, {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
@@ -564,7 +557,11 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             carregarOrdensInterrompidas(containerInterrompido);
 
             // Recarrega os dados chamando a função de carregamento
-            document.getElementById('ordens-container').innerHTML = '';
+            if (document.getElementById('ordens-container') === null) {
+                return;
+            } else {
+                document.getElementById('ordens-container').innerHTML = '';
+            }
             resetarCardsInicial();
 
             fetchStatusMaquinas();
@@ -638,7 +635,7 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
             },
         });
 
-        fetch(`api/ordens/atualizar-status/`, {
+        fetch(`/usinagem/api/ordens/atualizar-status/`, {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
@@ -674,7 +671,11 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 carregarOrdensIniciadas(containerIniciado);
 
                 // Recarrega os dados chamando a função de carregamento
-                document.getElementById('ordens-container').innerHTML = '';
+                if (document.getElementById('ordens-container') === null) {
+                    return;
+                } else {
+                    document.getElementById('ordens-container').innerHTML = '';
+                }
                 resetarCardsInicial();
 
                 fetchStatusMaquinas();
@@ -693,7 +694,7 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
 }
 
 // Modal para "Parcial"
-function mostrarModalFinalizarParcial(ordemId) {
+function mostrarModalFinalizarParcial(ordemId, ordem_numero) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizarParcial'));
     const modalTitle = document.getElementById('modalFinalizarParcialLabel');
     const formFinalizar = document.getElementById('formFinalizarParcial');
@@ -703,7 +704,7 @@ function mostrarModalFinalizarParcial(ordemId) {
     formFinalizar.parentNode.replaceChild(clonedForm, formFinalizar);
 
     // Configura título do modal
-    modalTitle.innerHTML = `Finalizar Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Finalizar Parcial #${ordem_numero}`;
     document.getElementById('bodyPecasFinalizarParcial').innerHTML = '<p class="text-center text-muted">Carregando informações...</p>';
 
     Swal.fire({
@@ -716,7 +717,7 @@ function mostrarModalFinalizarParcial(ordemId) {
     });
 
     // Fetch para buscar informações da ordem
-    fetch(`api/ordens-criadas/${ordemId}/pecas/`)
+    fetch(`/usinagem/api/ordens-criadas/${ordemId}/pecas/`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar informações da API');
@@ -765,7 +766,7 @@ function mostrarModalFinalizarParcial(ordemId) {
                 const operadorFinal = document.getElementById('operadorFinalizarParcial').value;
 
                 // Faz o fetch para finalizar a ordem
-                fetch(`api/ordens/atualizar-status/`, {
+                fetch(`/usinagem/api/ordens/atualizar-status/`, {
                     method: 'PATCH',
                     body: JSON.stringify({
                         ordem_id: ordemId,
@@ -803,7 +804,11 @@ function mostrarModalFinalizarParcial(ordemId) {
                     carregarOrdensInterrompidas(containerInterrompido);
 
                     // Recarrega os dados chamando a função de carregamento
-                    document.getElementById('ordens-container').innerHTML = '';
+                    if (document.getElementById('ordens-container') === null) {
+                        return;
+                    } else {
+                        document.getElementById('ordens-container').innerHTML = '';
+                    }
                     resetarCardsInicial();
 
                     modal.hide();
@@ -904,7 +909,7 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
             },
         });
 
-        fetch(`api/ordens/atualizar-status/`, {
+        fetch(`/usinagem/api/ordens/atualizar-status/`, {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
@@ -945,7 +950,11 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
                 carregarOrdensAgProProcesso(containerProxProcesso);
             
                 // Recarrega os dados chamando a função de carregamento
-                document.getElementById('ordens-container').innerHTML = '';
+                if (document.getElementById('ordens-container') === null) {
+                    return;
+                } else {
+                    document.getElementById('ordens-container').innerHTML = '';
+                }
                 resetarCardsInicial();
 
                 fetchStatusMaquinas();
@@ -1028,7 +1037,7 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
             },
         });
 
-        fetch(`api/ordens/atualizar-status/`, {
+        fetch(`/usinagem/api/ordens/atualizar-status/`, {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
@@ -1068,7 +1077,11 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
                 carregarOrdensAgProProcesso(containerProxProcesso);
 
                 // Recarrega os dados chamando a função de carregamento
-                document.getElementById('ordens-container').innerHTML = '';
+                if (document.getElementById('ordens-container') === null) {
+                    return;
+                } else {
+                    document.getElementById('ordens-container').innerHTML = '';
+                }
                 resetarCardsInicial();
 
                 colQtdProxProcesso.style.display = 'block';
@@ -1094,7 +1107,7 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
 }
 
 // Modal para "Finalizar"
-function mostrarModalFinalizar(ordemId) {
+function mostrarModalFinalizar(ordemId, ordem_numero) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     const modalTitle = document.getElementById('modalFinalizarLabel');
     const formFinalizar = document.getElementById('formFinalizarOrdemUsinagem');
@@ -1104,7 +1117,7 @@ function mostrarModalFinalizar(ordemId) {
     formFinalizar.parentNode.replaceChild(clonedForm, formFinalizar);
 
     // Configura título do modal
-    modalTitle.innerHTML = `Finalizar Ordem ${ordemId}`;
+    modalTitle.innerHTML = `Finalizar Ordem #${ordem_numero}`;
     document.getElementById('bodyPecasFinalizar').innerHTML = '<p class="text-center text-muted">Carregando informações...</p>';
 
     Swal.fire({
@@ -1117,7 +1130,7 @@ function mostrarModalFinalizar(ordemId) {
     });
 
     // Fetch para buscar informações da ordem
-    fetch(`api/ordens-criadas/${ordemId}/pecas/`)
+    fetch(`/usinagem/api/ordens-criadas/${ordemId}/pecas/`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar informações da API');
@@ -1167,7 +1180,7 @@ function mostrarModalFinalizar(ordemId) {
                 const obsFinalizar = document.getElementById('obsFinalizar').value;
 
                 // Faz o fetch para finalizar a ordem
-                fetch(`api/ordens/atualizar-status/`, {
+                fetch(`/usinagem/api/ordens/atualizar-status/`, {
                     method: 'PATCH',
                     body: JSON.stringify({
                         ordem_id: ordemId,
@@ -1202,7 +1215,11 @@ function mostrarModalFinalizar(ordemId) {
                     carregarOrdensIniciadas(containerIniciado);
 
                     // Recarrega os dados chamando a função de carregamento
-                    document.getElementById('ordens-container').innerHTML = '';
+                    if (document.getElementById('ordens-container') === null) {
+                        return;
+                    } else {
+                        document.getElementById('ordens-container').innerHTML = '';
+                    }
                     resetarCardsInicial();
 
                     modal.hide();
@@ -1257,7 +1274,7 @@ function mostrarModalRetornar(ordemId, maquina) {
 
         const formData = new FormData(clonedForm);
 
-        fetch(`api/ordens/atualizar-status/`, {
+        fetch(`/usinagem/api/ordens/atualizar-status/`, {
             method: 'PATCH',
             body: JSON.stringify({
                 ordem_id: ordemId,
@@ -1295,7 +1312,12 @@ function mostrarModalRetornar(ordemId, maquina) {
             carregarOrdensInterrompidas(containerInterrompido);
 
             // Recarrega os dados chamando a função de carregamento
-            document.getElementById('ordens-container').innerHTML = '';
+            if (document.getElementById('ordens-container') === null) {
+                return;
+            } else {
+                document.getElementById('ordens-container').innerHTML = '';
+            }
+        
             resetarCardsInicial();
 
             fetchStatusMaquinas();
@@ -1333,7 +1355,7 @@ function configurarFormulario() {
 
             try {
                 const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-                const response = await fetch('api/criar-ordem-usinagem/', {
+                const response = await fetch('/usinagem/api/criar-ordem-usinagem/', {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': csrfToken,
@@ -1356,7 +1378,11 @@ function configurarFormulario() {
                     form.reset();
 
                     // Recarrega os cards
-                    document.getElementById('ordens-container').innerHTML = '';
+                    if (document.getElementById('ordens-container') === null) {
+                        return;
+                    } else {
+                        document.getElementById('ordens-container').innerHTML = '';
+                    }
                     resetarCardsInicial();
 
                 } else {
@@ -1382,6 +1408,10 @@ function configurarFormulario() {
 }
 
 function resetarCardsInicial(filtros = {}) {
+    if (document.getElementById('ordens-container') === null) {
+        return;
+    }
+
     const container = document.getElementById('ordens-container');
     const loadMoreButton = document.getElementById('loadMore');
     let page = 1; // Página inicial
@@ -1438,6 +1468,17 @@ function resetarCardsInicial(filtros = {}) {
     };
 }
 
+function filtro_prox_processo(){
+    const btnFiltro = document.getElementById("btn-filtrar-processo");
+
+    btnFiltro.addEventListener("click", () => {
+        const filtroProcesso = document.getElementById("filtro-processo").value.trim();
+
+        const containerProxProcesso = document.querySelector('.containerProxProcesso');
+        carregarOrdensAgProProcesso(containerProxProcesso, { processo: filtroProcesso });
+    })
+}
+
 function filtro() {
     const form = document.getElementById('filtro-form');
 
@@ -1446,10 +1487,15 @@ function filtro() {
 
         // Captura os valores atualizados dos filtros
         const filtros = {
-            ordem: document.getElementById('filtro-ordem').value.trim(),
-            peca: document.getElementById('filtro-peca').value.trim(),
-            status: document.getElementById('filtro-status').value.trim(),
+            ordem: document.getElementById('filtro-ordem')?.value.trim() || '',
+            peca: document.getElementById('filtro-peca')?.value.trim() || '',
+            processo: document.getElementById('filtro-processo')?.value || '',
         };
+
+        const statusEl = document.getElementById('filtro-status');
+        if (statusEl) {
+            filtros.status = statusEl.value.trim();
+        }
 
         // Recarrega os resultados com os novos filtros
         resetarCardsInicial(filtros);
@@ -1477,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#pecaSelect').select2({
         placeholder: 'Selecione a peça',
         ajax: {
-            url: 'api/get-pecas/',
+            url: '/usinagem/api/get-pecas/',
             dataType: 'json',
             delay: 250,
             data: function (params) {
@@ -1515,5 +1561,7 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarOrdensAgProProcesso(containerProxProcesso);
 
     filtro();
+
+    filtro_prox_processo();
 
 });

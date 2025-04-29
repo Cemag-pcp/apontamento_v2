@@ -22,17 +22,36 @@ from inspecao.models import Inspecao
 def planejamento(request):
     return render(request, "apontamento_pintura/planejamento.html")
 
-
 def ordens_criadas(request):
-    data_carga = request.GET.get(
-        "data_carga", now().date()
-    )  # Garantindo que seja apenas a data
+    
+    filtros = {}
+    filtros_peca = {}
 
-    if not data_carga:
-        data_carga = now().date()
+    data_carga = request.GET.get("data_carga", None)
+
+    if data_carga:
+        try:
+            if data_carga and data_carga.strip():
+                data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
+                filtros['data_carga'] = data_carga
+            else:
+                data_carga = now().date()
+                filtros['data_carga'] = data_carga
+        except ValueError:
+            data_carga = now().date()
+            filtros['data_carga'] = data_carga
+
+    cor = request.GET.get("cor", '')
+    conjunto = request.GET.get("conjunto", '')
+
+    if cor:
+        filtros['cor'] = cor
+
+    if conjunto:
+        filtros_peca['peca__contains'] = conjunto
 
     # Subquery para obter a primeira peça associada à ordem
-    primeira_peca = PecasOrdem.objects.filter(ordem=OuterRef("pk")).order_by("id")
+    primeira_peca = PecasOrdem.objects.filter(ordem=OuterRef("pk"), **filtros_peca).order_by("id")
 
     # Subquery para calcular a soma total de `quantidade_pendurada` no cambão para essa ordem
     soma_qtd_pendurada = (
@@ -52,7 +71,7 @@ def ordens_criadas(request):
     # Query principal das ordens
     ordens_queryset = (
         Ordem.objects.filter(
-            grupo_maquina="pintura", excluida=False, data_carga=data_carga
+            grupo_maquina="pintura", excluida=False, **filtros
         )
         .annotate(
             peca_ordem_id=Subquery(
@@ -75,11 +94,10 @@ def ordens_criadas(request):
             - F("soma_qtd_pendurada")  # Subtração correta
         )
         .filter(qt_restante__gt=0)
-        .order_by("-status_prioridade")
+        .order_by("-status_prioridade", "data_programacao")
     )
 
     return JsonResponse({"ordens": list(ordens_queryset.values())})
-
 
 @csrf_exempt
 def criar_ordem(request):
@@ -316,7 +334,6 @@ def adicionar_pecas_cambao(request):
 
     return JsonResponse({"error": "Método não permitido!"}, status=405)
 
-
 @csrf_exempt
 def finalizar_cambao(request):
     """
@@ -432,7 +449,6 @@ def finalizar_cambao(request):
 
     return JsonResponse({"error": "Método não permitido!"}, status=405)
 
-
 def cambao_livre(request):
 
     tipo=request.GET.get('tipo')
@@ -440,7 +456,6 @@ def cambao_livre(request):
     cambao_livres = Cambao.objects.filter(status='livre', tipo=tipo)
 
     return JsonResponse({"cambao_livres": list(cambao_livres.values())})
-
 
 def cambao_em_processo(request):
     """
@@ -500,13 +515,11 @@ def cambao_em_processo(request):
 
     return JsonResponse({"cambao_em_processo": resultado})
 
-
 def listar_operadores(request):
 
     operadores = Operador.objects.filter(setor__nome="pintura")
 
     return JsonResponse({"operadores": list(operadores.values())})
-
 
 def listar_cores_carga(request):
     data_carga = request.GET.get(
@@ -525,12 +538,17 @@ def listar_cores_carga(request):
 
     return JsonResponse({"cores": list(cores)})  # Retorna lista simples de cores únicas
 
-
 def percentual_concluido_carga(request):
-    data_carga = request.GET.get(
-        "data_carga", now().date()
-    )  # Garantindo que seja apenas a data
+    data_carga_str = request.GET.get("data_carga", "").strip()
 
+    try:
+        if data_carga_str:
+            data_carga = datetime.strptime(data_carga_str, "%Y-%m-%d").date()
+        else:
+            data_carga = now().date()
+    except ValueError:
+        data_carga = now().date()
+    
     # Soma correta da quantidade planejada por peça e ordem (evitando duplicação)
     total_planejado = (
         PecasOrdem.objects.filter(
@@ -570,7 +588,6 @@ def percentual_concluido_carga(request):
             "total_finalizado": total_finalizado,
         }
     )
-
 
 def andamento_ultimas_cargas(request):
     # Obtém as últimas 5 datas de carga disponíveis para pintura
@@ -625,7 +642,6 @@ def andamento_ultimas_cargas(request):
 
     return JsonResponse({"andamento_cargas": andamento_cargas})
 
-
 def retrabalho_pintura(request):
 
     users = Profile.objects.filter(
@@ -643,7 +659,6 @@ def retrabalho_pintura(request):
         "retrabalho_pintura/retrabalho.html",
         {"inspetores": lista_inspetores, "cores": cores},
     )
-
 
 def get_itens_retrabalho_pintura(request):
 
@@ -741,7 +756,6 @@ def get_itens_retrabalho_pintura(request):
         status=200,
     )
 
-
 def get_itens_em_processo_pintura(request):
 
     if request.method != "GET":
@@ -833,7 +847,6 @@ def get_itens_em_processo_pintura(request):
         },
         status=200,
     )
-
 
 def get_itens_retrabalhados_pintura(request):
 
@@ -929,7 +942,6 @@ def get_itens_retrabalhados_pintura(request):
         status=200,
     )
 
-
 def confirmar_retrabalho_pintura(request):
 
     if request.method != "POST":
@@ -968,7 +980,6 @@ def confirmar_retrabalho_pintura(request):
         return JsonResponse(
             {"error": f"Erro interno do servidor: {str(e)}"}, status=500
         )
-
 
 def finalizar_retrabalho_pintura(request):
 

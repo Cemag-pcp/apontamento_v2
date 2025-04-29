@@ -31,6 +31,7 @@ function carregarTabela(pagina = 1) {
             const corPintura = document.getElementById('filtro-cor-pintura')?.value || '';
             const setorMontagem = document.getElementById('filtro-setor-montagem')?.value || '';
             const setor = document.getElementById('setor-selecionado').value;
+            const ordem = document.getElementById('filtro-ordem').value;
 
             const limiteRegistros = 10; // Define o limite de registros por página
 
@@ -38,10 +39,11 @@ function carregarTabela(pagina = 1) {
                 dataCargaEscolhida: encodeURIComponent(dataCargaEscolhida),
                 cor: encodeURIComponent(corPintura),
                 setor: encodeURIComponent(setorMontagem),
+                ordem: encodeURIComponent(ordem)
             };
 
             if (setor === 'montagem'){
-                fetch(`/cargas/api/historico-planejamento-montagem/?data_carga=${filtros.dataCargaEscolhida || ''}&setor=${filtros.setor || ''}&page=${pagina}&limit=${limiteRegistros}`)
+                fetch(`/cargas/api/historico-planejamento-montagem/?data_carga=${filtros.dataCargaEscolhida || ''}&setor=${filtros.setor || ''}&ordem=${filtros.ordem || ''}&page=${pagina}&limit=${limiteRegistros}`)
                     .then(response => response.json())
                     .then(data => {
                         atualizarTabela(data.ordens, setor);
@@ -53,7 +55,7 @@ function carregarTabela(pagina = 1) {
                         reject(error); // Rejeita a Promise em caso de erro
                     });
             } else {
-                fetch(`/cargas/api/historico-planejamento-pintura/?data_carga=${filtros.dataCargaEscolhida || ''}&cor=${filtros.cor || ''}&page=${pagina}&limit=${limiteRegistros}`)
+                fetch(`/cargas/api/historico-planejamento-pintura/?data_carga=${filtros.dataCargaEscolhida || ''}&cor=${filtros.cor || ''}&ordem=${filtros.ordem || ''}&page=${pagina}&limit=${limiteRegistros}`)
                     .then(response => response.json())
                     .then(data => {
                         atualizarTabela(data.ordens, setor);

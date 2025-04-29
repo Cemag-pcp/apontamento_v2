@@ -5,7 +5,7 @@ export const loadOrdens = (container, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] });
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&cor=${filtros.cor || ''}`)
+        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&cor=${filtros.cor || ''}&conjunto=${filtros.conjunto || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -22,14 +22,14 @@ export const loadOrdens = (container, filtros = {}) => {
                     table.innerHTML = `
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 5%; text-align: center;">
-                                    <input type="checkbox" id="select-all">
-                                </th>
                                 <th style="width: 10%;">Ch. Peça</th>
                                 <th style="width: 15%;">Código Peça</th>
                                 <th style="width: 15%;">Data Programação</th>
                                 <th style="width: 10%;">Cor</th>
                                 <th style="width: 10%;">Qtd. Disponível</th>
+                                <th style="width: 5%; text-align: center;">
+                                    <input type="checkbox" id="select-all">
+                                </th>
                                 <th style="width: 10%;">Qtd. a Pendurar</th>
                             </tr>
                         </thead>
@@ -43,26 +43,25 @@ export const loadOrdens = (container, filtros = {}) => {
                     const tabelaCorpo = document.getElementById('tabela-ordens-corpo');
 
                     ordens.forEach(ordem => {
-                        console.log(ordem);
                         const linha = document.createElement('tr');
                         linha.dataset.ordemId = ordem.id;
                         linha.dataset.pecaOrdem = ordem.peca_ordem_id;
                         linha.dataset.cor = ordem.cor; // Adiciona a cor da peça para controle
 
                         linha.innerHTML = `
-                            <td style="text-align: center;">
-                                <input type="checkbox" class="ordem-checkbox" data-ordem-id="${ordem.id}" data-cor="${ordem.cor}">
-                            </td>
                             <td>#${ordem.ordem}</td>
                             <td>
                                 <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca_codigo}" 
-                                   target="_blank" rel="noopener noreferrer">
-                                    ${ordem.peca_codigo}
+                                target="_blank" rel="noopener noreferrer">
+                                ${ordem.peca_codigo}
                                 </a>
                             </td>
                             <td>${ordem.data_programacao}</td>
                             <td>${ordem.cor}</td>
                             <td>${ordem.qt_restante}</td>
+                            <td style="text-align: center;">
+                                <input type="checkbox" class="ordem-checkbox" data-ordem-id="${ordem.id}" data-cor="${ordem.cor}">
+                            </td>
                             <td>
                                 <input type="number" class="form-control qt-produzida" min="1" max="${ordem.qt_restante}">
                             </td>
@@ -86,7 +85,7 @@ export const loadOrdens = (container, filtros = {}) => {
                                 const maxQtPermitida = parseInt(qtInput.getAttribute("max"), 10);
                                 const qtSelecionada = parseInt(qtInput.value, 10);
                     
-                                // ⚠ Verifica se o campo de quantidade foi preenchido corretamente
+                                // Verifica se o campo de quantidade foi preenchido corretamente
                                 if (!qtInput.value || qtSelecionada <= 0) {
                                     cb.checked = false; // Desmarca o checkbox inválido
                                     isValid = false;
@@ -164,6 +163,25 @@ export const loadOrdens = (container, filtros = {}) => {
                         // Verifica se há checkboxes válidos marcados
                         const algumSelecionado = [...checkboxes].some(cb => cb.checked);
                         document.getElementById("btn-criar-cambao").disabled = !algumSelecionado || !isValid;
+                    });
+
+                    // Evento para marcar checkbox ao digitar a quantidade
+                    document.querySelectorAll(".qt-produzida").forEach(input => {
+                        input.addEventListener("input", () => {
+                            const linha = input.closest('tr');
+                            const checkbox = linha.querySelector('.ordem-checkbox');
+                            const maxQtPermitida = parseInt(input.getAttribute("max"), 10);
+                            const qtSelecionada = parseInt(input.value, 10);
+
+                            if (input.value && qtSelecionada > 0 && qtSelecionada <= maxQtPermitida) {
+                                checkbox.checked = true;
+                            } else {
+                                checkbox.checked = false;
+                            }
+
+                            // Simula o evento de mudança para atualizar o botão
+                            checkbox.dispatchEvent(new Event('change'));
+                        });
                     });
 
                     resolve(data);
@@ -1472,10 +1490,12 @@ function resetarCardsInicial(filtros = {}) {
     // Obtém os filtros atualizados
     const filtroDataCarga = document.getElementById('filtro-data-carga');
     const filtroCor = document.getElementById('filtro-cor');
+    const filtroConjunto = document.getElementById('filtro-conjunto');
     
     const currentFiltros = {
         data_carga: filtroDataCarga.value,
         cor: filtroCor.value,
+        conjunto: filtroConjunto.value,
     };
 
     // Função para buscar e renderizar ordens sem paginação
@@ -1511,11 +1531,13 @@ function filtro() {
 
         const filtroDataCarga = document.getElementById('filtro-data-carga');
         const filtroCor = document.getElementById('filtro-cor');
+        const filtroConjunto = document.getElementById('filtro-conjunto');
 
         // Captura os valores atualizados dos filtros
         const filtros = {
             data_carga: filtroDataCarga.value,
             cor: filtroCor.value,
+            conjunto: filtroConjunto.value,
         };
 
         // Recarrega os resultados com os novos filtros

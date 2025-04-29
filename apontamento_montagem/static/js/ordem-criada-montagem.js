@@ -1276,10 +1276,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btnLimpar.addEventListener("click", function () {
-        localStorage.removeItem("filtroDataCarga");
+        // localStorage.removeItem("filtroDataCarga");
         localStorage.removeItem("filtroSetor");
 
-        document.getElementById("filtro-data-carga").value = "";
+        // document.getElementById("filtro-data-carga").value = "";
         document.getElementById("filtro-setor").value = "";
     });
 

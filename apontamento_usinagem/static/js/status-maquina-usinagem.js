@@ -1,6 +1,9 @@
 import { carregarOrdensIniciadas, carregarOrdensInterrompidas} from './ordem-criada-usinagem.js';
 
 export function fetchStatusMaquinas() {
+    if (!document.querySelector('.text-center.mb-3 .display-4')) {
+        return;
+    }
     // Seleciona os elementos do container
     const indicador = document.querySelector('.text-center.mb-3 .display-4');
     const descricao = document.querySelector('.text-center.mb-3 p');
@@ -94,6 +97,10 @@ export function fetchStatusMaquinas() {
 
 export function fetchUltimasPecasProduzidas() {
     // Seleciona o elemento da lista onde as peças serão adicionadas
+    if (!document.querySelector('#ultimas-pecas-list')) {
+        return;
+    };
+
     const listaPecas = document.querySelector('#ultimas-pecas-list');
     listaPecas.innerHTML = `
     <div class="spinner-border text-dark" role="status">
@@ -135,6 +142,11 @@ export function fetchUltimasPecasProduzidas() {
 }
 
 export function fetchContagemStatusOrdens() {
+
+    if (!document.querySelector('#status-ordens-list')) {
+        return;
+    }
+
     // Seleciona o elemento da lista onde os status serão adicionados
     const listaStatus = document.getElementById('status-ordens-list');
     listaStatus.innerHTML = `
@@ -355,20 +367,26 @@ document.addEventListener('DOMContentLoaded', function () {
     fetchContagemStatusOrdens();
 
     // Adiciona eventos de clique para atualizar manualmente
-    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
-        console.log("Atualizando Status de Máquinas...");
-        fetchStatusMaquinas(); // Chama a função existente
-    });
+    if (document.getElementById('refresh-status-maquinas')) {
+        document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
+            console.log("Atualizando Status de Máquinas...");
+            fetchStatusMaquinas(); // Chama a função existente
+        });
+    }
 
-    document.getElementById('refresh-pecas').addEventListener('click', function () {
-        console.log("Atualizando Últimas Peças Produzidas...");
-        fetchUltimasPecasProduzidas(); // Chama a função existente
-    });
+    if (document.getElementById('refresh-pecas')) {
+        document.getElementById('refresh-pecas').addEventListener('click', function () {
+            console.log("Atualizando Últimas Peças Produzidas...");
+            fetchUltimasPecasProduzidas(); // Chama a função existente
+        });
+    }
 
-    document.getElementById('refresh-ordens').addEventListener('click', function () {
-        console.log("Atualizando Status de Ordens...");
-        fetchContagemStatusOrdens(); // Chama a função existente
-    });
+    if (document.getElementById('refresh-ordens')) {
+        document.getElementById('refresh-ordens').addEventListener('click', function () {
+            console.log("Atualizando Status de Ordens...");
+            fetchContagemStatusOrdens(); // Chama a função existente
+        });
+    }
 
     document.getElementById('btnPararMaquina').addEventListener('click', () => {
         mostrarModalPararMaquina(); // Chama a função já existente

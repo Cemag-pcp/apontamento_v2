@@ -199,7 +199,7 @@ def atualizar_status_ordem(request):
                 ordem=ordem,
                 status=status,
                 data_inicio=now(),
-                data_fim=now() if status in ['finalizada', 'agua_prox_proc'] else None,
+                data_fim=now() if status == 'finalizada' else None,
             )
 
             # Atualiza o status da ordem
