@@ -1,17 +1,17 @@
 document.addEventListener("DOMContentLoaded", () => {
-    buscarItensInspecao(1); // Chama a função quando a página carrega, começando na página 1
+    buscarItensReinspecao(1); // Chama a função quando a página carrega, começando na página 1
 });
 
-document.getElementById("btn-filtrar-inspecao").addEventListener("click", (event) => {
-    event.preventDefault(); // Evita o recarregamento da página caso esteja dentro de um formulário
-    buscarItensInspecao(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
+document.getElementById("btn-filtrar-reinspecao-estamparia").addEventListener("click", (event) => {
+    event.preventDefault();
+    buscarItensReinspecao(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
 });
 
-document.getElementById("btn-limpar-inspecao").addEventListener("click", (event) => {
+document.getElementById("btn-limpar-reinspecao-estamparia").addEventListener("click", (event) => {
     event.preventDefault(); // Evita o recarregamento da página caso esteja dentro de um formulário
 
     // Seleciona todos os inputs dentro do formulário
-    const form = document.getElementById("form-filtrar-inspecao");
+    const form = document.getElementById("form-filtrar-reinspecao");
     form.querySelectorAll("input").forEach(input => {
         if (input.type === "checkbox") {
             input.checked = false; // Desmarca checkboxes
@@ -19,19 +19,19 @@ document.getElementById("btn-limpar-inspecao").addEventListener("click", (event)
             input.value = ""; // Limpa inputs de texto e data
         }
     });
-    buscarItensInspecao(1);
+    buscarItensReinspecao(1);
 });
 
-
-function buscarItensInspecao(pagina) {
-    let cardsInspecao = document.getElementById("cards-inspecao");
-    let qtdPendenteInspecao = document.getElementById("qtd-pendente-inspecao");
-    let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecao");
-    let itensInspecionar = document.getElementById("itens-inspecionar");
-    let itensFiltradosCor = document.getElementById("itens-filtrados-inspecao-cor");
-    let itensFiltradosData = document.getElementById("itens-filtrados-inspecao-data");
-    let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecao-pesquisa");
-    let paginacao = document.getElementById("paginacao-inspecao-pintura");
+function buscarItensReinspecao(pagina) {
+    let cardsInspecao = document.getElementById("cards-reinspecao");
+    let qtdPendenteInspecao = document.getElementById("qtd-pendente-reinspecao");
+    let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-reinspecao");
+    let itensInspecionar = document.getElementById("itens-reinspecao");
+    let itensFiltradosCor = document.getElementById("itens-filtrados-reinspecao-maquina");
+    let itensFiltradosData = document.getElementById("itens-filtrados-reinspecao-data");
+    let itensFiltradosInspetor = document.getElementById("itens-filtrados-reinspecao-inspetor");
+    let itensFiltradosPesquisa = document.getElementById("itens-filtrados-reinspecao-pesquisa");
+    let paginacao = document.getElementById("paginacao-reinspecao-estamparia");
 
     // Limpa os cards antes de buscar novos
     cardsInspecao.innerHTML = `<div class="text-center">
@@ -43,12 +43,17 @@ function buscarItensInspecao(pagina) {
 
     // Coletar os filtros aplicados
     let coresSelecionadas = [];
-    document.querySelectorAll('.form-check-input-inspecao:checked').forEach(checkbox => {
+    document.querySelectorAll('.form-check-input-reinspecao:checked').forEach(checkbox => {
         coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-inspecao').value;
-    let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
+    let inspetorSelecionado = [];
+    document.querySelectorAll('.form-check-input-reinspecao-inspetores:checked').forEach(checkbox => {
+        inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
+    });
+
+    let dataSelecionada = document.getElementById('data-filtro-reinspecao').value;
+    let pesquisarInspecao = document.getElementById('pesquisar-peca-reinspecao').value;
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
@@ -76,9 +81,17 @@ function buscarItensInspecao(pagina) {
         itensFiltradosPesquisa.style.display = "none";
     }
 
+    if (inspetorSelecionado.length > 0) {
+        params.append("inspetores", inspetorSelecionado.join(","));
+        itensFiltradosInspetor.style.display = "block";
+        itensFiltradosInspetor.textContent = "Inspetores: " + inspetorSelecionado.join(", ");
+    } else {
+        itensFiltradosInspetor.style.display = "none";
+    }
+
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
-    fetch(`/inspecao/api/itens-inspecao-pintura/?${params.toString()}`, {
+    fetch(`/inspecao/api/itens-reinspecao-estamparia/?${params.toString()}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -105,6 +118,7 @@ function buscarItensInspecao(pagina) {
 
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
+        
         items.dados.forEach(item => {
             let borderColors = {
                 "Laranja": "orange", "Verde": "green",
@@ -120,32 +134,32 @@ function buscarItensInspecao(pagina) {
                     <h5> ${item.peca}</h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
-                        <strong>📅 Dt. Produzida:</strong> ${item.data}<br>
-                        <strong>📍 Tipo:</strong> ${item.tipo}<br>
-                        <strong>🎨 Cor:</strong> ${item.cor}<br>
-                        <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
-                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
+                        <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
+                        <strong>🧮 Conformidade:</strong> ${item.conformidade}<br>
+                        <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade}<br>
+                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
                     <button 
                         data-id="${item.id}"
                         data-data="${item.data}"
-                        data-qtd="${item.qtd_apontada}"
-                        data-tipo="${item.tipo}"
-                        data-cor="${item.cor}"
+                        data-nao-conformidade="${item.nao_conformidade}"
+                        data-conformidade="${item.conformidade}"
+                        data-qtd-total="${item.qtd_total}"
                         data-peca="${item.peca}"
-                    class="btn btn-dark w-100 iniciar-inspecao">
-                    Iniciar Inspeção</button>
+                        data-maquina="${item.maquina}"
+                        class="btn btn-dark w-100 iniciar-reinspecao">
+                        Iniciar Reinspeção
+                    </button>
                 </div>
             </div>`;
 
             cardsInspecao.innerHTML += cards;
         });
 
-        itensInspecionar.textContent = "Itens a Inspecionar";
+        itensInspecionar.textContent = "Itens a Reinspecionar";
 
         // Adiciona a paginação
-              // Adiciona a paginação com reticências
         if (items.total_paginas > 1) {
             let paginacaoHTML = `<nav aria-label="Page navigation">
                 <ul class="pagination justify-content-center">`;
@@ -157,7 +171,7 @@ function buscarItensInspecao(pagina) {
             const adicionarLinkPagina = (i) => {
                 paginacaoHTML += `
                     <li class="page-item ${i === paginaAtual ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="buscarItensInspecao(${i})">${i}</a>
+                        <a class="page-link" href="#" onclick="buscarItensReinspecao(${i})">${i}</a>
                     </li>`;
             };
 
