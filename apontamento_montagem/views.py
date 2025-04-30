@@ -86,63 +86,6 @@ def criar_ordem(request):
         
         ordens_criadas = []
 
-        # with transaction.atomic():  # Garantir transação segura
-        #     for ordem_info in ordens_data:
-        #         grupo_maquina = ordem_info.get('grupo_maquina', 'montagem')
-        #         setor_conjunto = ordem_info.get('setor_conjunto')
-        #         obs = ordem_info.get('obs', '')
-        #         nome_peca = ordem_info.get('peca_nome')
-        #         qtd_planejada = ordem_info.get('qtd_planejada', 0)
-        #         data_carga_str = ordem_info.get('data_carga')
-
-        #         if not nome_peca:
-        #             return JsonResponse({'error': 'Nome da peça é obrigatório!'}, status=400)
-
-        #         if not setor_conjunto:
-        #             return JsonResponse({'error': 'Setor de conjunto é obrigatório!'}, status=400)
-
-        #         # Converter data_carga para datetime.date
-        #         try:
-        #             data_carga = datetime.strptime(data_carga_str, "%Y-%d-%m").date()
-        #         except ValueError:
-        #             return JsonResponse({'error': 'Data inválida. Use o formato YYYY-MM-DD.'}, status=400)
-
-        #         # Buscar a máquina/setor correspondente
-        #         try:
-        #             maquina = Maquina.objects.get(nome=setor_conjunto)
-        #         except ObjectDoesNotExist:
-        #             return JsonResponse({'error': f"Setor '{setor_conjunto}' não encontrado!"}, status=404)
-
-        #         # Criar objeto Ordem e salvar no banco
-        #         nova_ordem = Ordem(
-        #             grupo_maquina=grupo_maquina,
-        #             status_atual='aguardando_iniciar',
-        #             obs=obs,
-        #             data_criacao=now(),
-        #             data_carga=data_carga,
-        #             maquina=maquina  # Associação com a máquina correta
-        #         )
-
-        #         nova_ordem.save()  # Salva a ordem no banco
-
-        #         # Criar a peça associada à ordem
-        #         nova_peca = PecasOrdem(
-        #             ordem=nova_ordem,
-        #             peca=nome_peca,
-        #             qtd_planejada=qtd_planejada,
-        #             qtd_boa=0,
-        #             qtd_morta=0
-        #         )
-
-        #         nova_peca.save()  # Salva a peça no banco
-
-        #         # Adiciona ao JSON de retorno
-        #         ordens_criadas.append({
-        #             'id': nova_ordem.id,
-        #             'setor_conjunto': setor_conjunto,
-        #             'data_carga': nova_ordem.data_carga.strftime('%Y-%m-%d')
-        #         })
-
         with transaction.atomic():
             ordens_objs = []
             pecas_objs = []

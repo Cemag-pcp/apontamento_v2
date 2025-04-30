@@ -101,31 +101,6 @@ def ordens_criadas(request):
 
 @csrf_exempt
 def criar_ordem(request):
-    """
-    API para criar múltiplas ordens a partir de um JSON.
-    Exemplo de carga JSON esperada:
-    {
-        "ordens": [
-            {
-                "grupo_maquina": "pintura",
-                "cor": "Azul",
-                "obs": "testes",
-                "peca_nome": "123456",
-                "qtd_planejada": 5,
-                "data_carga": "2025-02-19"
-            },
-            {
-                "grupo_maquina": "pintura",
-                "cor": "Cinza",
-                "obs": "ordem cinza",
-                "peca_nome": "654321",
-                "qtd_planejada": 10,
-                "data_carga": "2025-02-20"
-            }
-        ]
-    }
-    """
-
     if request.method != 'POST':
         return JsonResponse({'error': 'Método não permitido!'}, status=405)
 
@@ -137,80 +112,83 @@ def criar_ordem(request):
         if not ordens_data:
             return JsonResponse({'error': 'Nenhuma ordem fornecida!'}, status=400)
 
-        #  Coletar todas as datas únicas na requisição
-        datas_requisicao = set()
-        for ordem_info in ordens_data:
-            data_carga_str = ordem_info.get('data_carga')
-            if data_carga_str:
-                try:
-                    data_carga = datetime.strptime(data_carga_str, "%Y-%m-%d").date()
-                    datas_requisicao.add(data_carga)
-                except ValueError:
-                    return JsonResponse({'error': 'Formato de data inválido! Use YYYY-MM-DD.'}, status=400)
+        # Coleta e valida datas
+        datas_requisicao = {
+            datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
+            for ordem in ordens_data
+            if 'data_carga' in ordem
+        }
 
-        #  Verifica se alguma das datas já tem carga alocada no banco
-        datas_existentes = set(Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina='pintura').values_list('data_carga', flat=True))
-        datas_bloqueadas = datas_existentes.intersection(datas_requisicao)
+        datas_existentes = set(
+            Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina='pintura')
+            .values_list('data_carga', flat=True)
+        )
+        datas_bloqueadas = datas_existentes & datas_requisicao
 
-        if not atualizacao_ordem:
-            if datas_bloqueadas:
-                return JsonResponse({'error': f"Não é possível adicionar novas ordens. Datas já possuem carga alocada: {', '.join(map(str, datas_bloqueadas))}"}, status=400)
+        if not atualizacao_ordem and datas_bloqueadas:
+            return JsonResponse({
+                'error': f"Não é possível adicionar novas ordens. Datas já possuem carga alocada: {', '.join(map(str, datas_bloqueadas))}"
+            }, status=400)
 
-        ordens_criadas = []
+        ordens_objs = []
+        pecas_objs = []
+        ordens_metadata = []
+
+        for ordem in ordens_data:
+            try:
+                data_carga = datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
+            except ValueError:
+                return JsonResponse({'error': 'Formato de data inválido! Use YYYY-MM-DD.'}, status=400)
+
+            if not ordem.get('peca_nome'):
+                return JsonResponse({'error': 'Nome da peça é obrigatório!'}, status=400)
+
+            nova_ordem = Ordem(
+                grupo_maquina=ordem.get('grupo_maquina', 'pintura'),
+                status_atual='aguardando_iniciar',
+                cor=ordem.get('cor'),
+                obs=ordem.get('obs', ''),
+                data_criacao=now(),
+                data_carga=data_carga
+            )
+            ordens_objs.append(nova_ordem)
+            ordens_metadata.append({
+                'peca_nome': ordem['peca_nome'],
+                'qtd_planejada': ordem.get('qtd_planejada', 0)
+            })
 
         with transaction.atomic():
-            for ordem_info in ordens_data:
-                grupo_maquina = ordem_info.get('grupo_maquina', 'pintura')
-                cor = ordem_info.get('cor')
-                obs = ordem_info.get('obs', '')
-                nome_peca = ordem_info.get('peca_nome')
-                qtd_planejada = ordem_info.get('qtd_planejada', 0)
-                data_carga_str = ordem_info.get('data_carga')
+            Ordem.objects.bulk_create(ordens_objs)
 
-                if not nome_peca:
-                    return JsonResponse({'error': 'Nome da peça é obrigatório!'}, status=400)
-
-                # Converter data_carga para datetime.date
-                data_carga = datetime.strptime(data_carga_str, "%Y-%m-%d").date()
-
-                # Criar objeto Ordem e salvar no banco
-                nova_ordem = Ordem(
-                    grupo_maquina=grupo_maquina,
-                    status_atual="aguardando_iniciar",
-                    cor=cor,
-                    obs=obs,
-                    data_criacao=now(),
-                    data_carga=data_carga
-                )
-
-                nova_ordem.save()  #  Salva a ordem no banco
-
-                # Criar a peça associada à ordem
-                nova_peca = PecasOrdem(
-                    ordem=nova_ordem,
-                    peca=nome_peca,
-                    qtd_planejada=qtd_planejada,
+            for ordem_obj, meta in zip(ordens_objs, ordens_metadata):
+                pecas_objs.append(PecasOrdem(
+                    ordem=ordem_obj,
+                    peca=meta['peca_nome'],
+                    qtd_planejada=meta['qtd_planejada'],
                     qtd_boa=0,
                     qtd_morta=0
-                )
+                ))
 
-                nova_peca.save()  #  Salva a peça no banco
-
-                # Adiciona ao JSON de retorno
-                ordens_criadas.append({
-                    'id': nova_ordem.id,
-                    'cor': nova_ordem.cor,
-                    'data_carga': nova_ordem.data_carga
-                })
+            PecasOrdem.objects.bulk_create(pecas_objs)
 
         return JsonResponse({
             'message': 'Ordens e peças criadas com sucesso!',
-            'ordens': ordens_criadas
-        }, safe=False)
+            'ordens': [
+                {
+                    'id': ordem.id,
+                    'cor': ordem.cor,
+                    'data_carga': ordem.data_carga
+                }
+                for ordem in ordens_objs
+            ]
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Erro ao processar JSON. Verifique o formato da requisição!'}, status=400)
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-        
+    
 @csrf_exempt
 def adicionar_pecas_cambao(request):
     """
