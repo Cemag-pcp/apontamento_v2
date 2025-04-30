@@ -531,7 +531,7 @@ function resetarCardsInicial(filtros = {}) {
 }
 
 // Função para exibir as peças no modal
-function mostrarPecas(ordemId, maquinaName) {
+function mostrarPecas(ordemId, maquinaName, mostrarDescricao = false) {
     const modalContent = document.getElementById('modalPecasContent');
 
     // Exibe SweetAlert de carregamento
@@ -556,13 +556,43 @@ function mostrarPecas(ordemId, maquinaName) {
             return response.json();
         })
         .then(data => {
-            Swal.close(); // Fecha o SweetAlert de carregamento
+            Swal.close();
             console.log(data);
             if (data.pecas.length === 0) {
                 modalContent.innerHTML = `<p class="text-center text-muted">Não há peças cadastradas para esta ordem.</p>`;
             } else {
+                let descricaoHTML = '';
+                
+                if (mostrarDescricao && data.propriedades && data.propriedades.descricao_mp) {
+                    descricaoHTML = `
+                        <div class="mb-3">
+                            <table class="table table-bordered table-sm">
+                                <tbody>
+                                    <tr>
+                                        <th class="table-light d-flex justify-content-center text-center">Matéria-Prima</th>
+                                        <td>${data.propriedades.descricao_mp}</td>
+                                    </tr>
+                                    ${data.propriedades.codigo_mp ? `
+                                    <tr>
+                                        <th class="table-light">Código</th>
+                                        <td>${data.propriedades.codigo_mp}</td>
+                                    </tr>
+                                    ` : ''}
+                                    ${data.propriedades.quantidade_mp ? `
+                                    <tr>
+                                        <th class="table-light">Quantidade</th>
+                                        <td>${data.propriedades.quantidade_mp}</td>
+                                    </tr>
+                                    ` : ''}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+
                 modalContent.innerHTML = `
-                    <h5 class="text-center">Peças da Ordem ${ordemId}</h5>
+                <h5 class="text-center">Peças da Ordem ${ordemId}</h5>
+                    ${descricaoHTML}
                     <table class="table table-bordered table-sm text-center">
                         <thead>
                             <tr class="table-light">
@@ -589,16 +619,31 @@ function mostrarPecas(ordemId, maquinaName) {
                             `).join('')}
                         </tbody>
                     </table>
+                    ${(mostrarDescricao && data.propriedades && data.propriedades.descricao_mp) ? `
+                    <div class="modal-footer text-end mt-3">
+                        <button id="btnIniciarOrdem" class="btn btn-success">
+                            <i class="fas fa-play-circle"></i> Iniciar
+                        </button>
+                    </div>
+                    ` : ''}
                 `;
             }
+            
 
-            // Exibe o modal
             const modal = new bootstrap.Modal(document.getElementById('modalPecas'));
             modal.show();
 
-            // Adiciona evento de exclusão corretamente com delegação
+
+            if (mostrarDescricao && data.propriedades && data.propriedades.descricao_mp) {
+                document.getElementById('btnIniciarOrdem').addEventListener('click', () => {
+                    mostrarModalIniciar(ordemId, maquinaName);
+                    const modalPecas = bootstrap.Modal.getInstance(document.getElementById("modalPecas"));
+                    modalPecas.hide();
+                });
+            }
+            
             document.getElementById('tabelaPecas').addEventListener('click', function (event) {
-                const button = event.target.closest('.btn-excluir-peca'); // Garante que pegamos o botão correto
+                const button = event.target.closest('.btn-excluir-peca');
                 if (button) {
                     const index = button.getAttribute('data-index');
                     excluirPeca(index, ordemId);
@@ -606,17 +651,14 @@ function mostrarPecas(ordemId, maquinaName) {
             });
         })
         .catch(error => {
-            Swal.close(); // Fecha o SweetAlert de carregamento
+            Swal.close();
             console.error('Erro ao buscar peças:', error);
-            
-            // Exibe mensagem de erro no SweetAlert
             Swal.fire({
                 icon: 'error',
                 title: 'Erro',
                 text: 'Erro ao carregar as peças. Por favor, tente novamente.',
             });
         });
-
 }
 
 // Função para excluir uma peça (mantendo ao menos uma)
@@ -1431,7 +1473,7 @@ function addPeca() {
     newPecaRow.innerHTML = `
         <div class="col-sm-6">
             <label for="pecaEscolhida_${index}" class="form-label">Peça:</label>
-            <select id="pecaEscolhida_${index}" class="form-select" name="pecaEscolhida_${index}" required>
+            <select id="pecaEscolhida_${index}" class="form-select pecasCriarOrdem" name="pecaEscolhida_${index}" required>
                 <option value="" disabled selected>Selecione a Peça</option>
             </select>
         </div>
@@ -1491,6 +1533,7 @@ function addPeca() {
     deleteButton.addEventListener('click', function () {
         // Remove a linha correspondente
         newPecaRow.remove();
+        verificarOrdemCriada();
     });
 }
 
@@ -1688,6 +1731,75 @@ function importarOrdensSerra() {
     });
 }
 
+function inicializarEventosOrdem() {
+
+    $('#mpEscolhida').on('change.select2', function () {
+        verificarOrdemCriada();
+    });
+
+    // Evento para todos os Select2 de peças
+    $(document).on('change', '.pecasCriarOrdem', function () {
+        verificarOrdemCriada();
+    });
+
+}
+
+function verificarOrdemCriada() {
+    const mpEscolhida = document.getElementById("mpEscolhida")?.value;
+    const pecasCriarOrdemElements = document.querySelectorAll(".pecasCriarOrdem");
+    const alertOp = document.getElementById("alert-op");
+    
+    // Resetar alerta
+    alertOp.style.display = "none";
+    alertOp.innerHTML = "";
+
+    const pecas = Array.from(pecasCriarOrdemElements)
+                      .map(el => el.value)
+                      .filter(value => value.trim() !== "");
+
+    const data = {
+        mp: mpEscolhida,
+        pecas: pecas,
+    };
+
+    fetch('api/verificar-dados-ordem/', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => { throw err; });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log(data)
+        if (data.status === "success") {
+            alertOp.style.display = "block";
+
+            const link = document.createElement('a');
+            link.className = 'alert-link';
+            link.style.cursor = 'pointer';
+            link.textContent = `OP #${data.ordem}`;
+            link.addEventListener('click', () => {
+                mostrarPecas(data.id_ordem, data.grupo_maquina, true);
+                const modalSerra = bootstrap.Modal.getInstance(document.getElementById("modalSerra"));
+                modalSerra.hide();
+            });
+            
+            alertOp.innerHTML = 'Os dados preenchidos já foram criados na ';
+            alertOp.appendChild(link);
+        } 
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         resetarCardsInicial();
@@ -1711,7 +1823,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         configurarSelect2('#filtro-mp', 'api/get-mp/', null, true);
         configurarSelect2('#filtro-peca', 'api/get-peca/', null, true);
 
-        // Executa outras funções de inicialização
+        inicializarEventosOrdem();
         criarOrdem();
         filtro();
         importarOrdensSerra();
