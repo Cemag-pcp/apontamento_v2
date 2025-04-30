@@ -1469,6 +1469,11 @@ function resetarCardsInicial(filtros = {}) {
 }
 
 function filtro_prox_processo(){
+
+    if (document.getElementById('btn-filtrar-processo') === null) {
+        return;
+    }
+
     const btnFiltro = document.getElementById("btn-filtrar-processo");
 
     btnFiltro.addEventListener("click", () => {
@@ -1514,6 +1519,26 @@ function filtro() {
 
     });
 }
+
+// async function carregarProcessos() {
+//     try {
+//         const response = await fetch('api/buscar-processos');
+//         const data = await response.json();
+
+//         const selectSetor = document.getElementById('filtro-processo');
+
+//         if (data.processos && Array.isArray(data.processos)) {
+//             data.processos.forEach(processo => {
+//                 const option = document.createElement('option');
+//                 option.value = processo.id;
+//                 option.textContent = processo.nome;
+//                 selectSetor.appendChild(option);
+//             });
+//         }
+//     } catch (error) {
+//         console.error('Erro ao carregar processos:', error);
+//     }
+// }
 
 document.addEventListener('DOMContentLoaded', () => {
 
