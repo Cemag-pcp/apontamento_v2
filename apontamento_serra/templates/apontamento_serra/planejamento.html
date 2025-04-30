@@ -216,9 +216,13 @@
                     </div>
                     <div class="mb-3">
                         <label for="descricao" class="form-label">Descrição:</label>
-                        <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="1"></textarea>
                     </div>
                     
+                    <div class="alert alert-warning" id="alert-op" role="alert" style="display: none;">
+                        Os dados preenchidos já foram criados na <a href="#" class="alert-link">OP #38</a>.
+                    </div>
+
                     <div class="mb-3">
                         <!-- Input escondido que mantém o índice -->
                         <input type="hidden" id="indexCont" value="1">
@@ -226,7 +230,7 @@
                         <div class="row">
                             <div class="col-sm-6">
                                 <label for="pecaEscolhida_0" class="form-label">Peça:</label>
-                                <select id="pecaEscolhida_0" class="form-select" name="pecaEscolhida_0" style="width: 100%;" required>
+                                <select id="pecaEscolhida_0" class="form-select pecasCriarOrdem" name="pecaEscolhida_0" style="width: 100%;" required>
                                     <option value="" disabled selected>Selecione a Peça</option>
                                 </select>
                             </div>

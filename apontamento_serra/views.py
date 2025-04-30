@@ -671,6 +671,65 @@ def importar_ordens_serra(request):
 
     return JsonResponse({'status': 'error', 'message': 'Método não permitido.'}, status=405)
 
+def verificar_mp_pecas_na_ordem(request):
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "Método não permitido"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        mp_codigo = data.get("mp")
+        pecas_codigos = data.get("pecas", [])
+        
+        if not mp_codigo or not pecas_codigos:
+            return JsonResponse({
+                "status": "warning",
+                "message": "Código de MP e lista de peças são obrigatórios."
+            }, status=400)
+
+        # Converte para set para operações mais eficientes
+        pecas_filter = set(pecas_codigos)
+        
+        # Otimização: Filtra por status e usa prefetch_related com Prefetch
+        ordens_com_mp = Ordem.objects.filter(
+            propriedade__mp_codigo__codigo=mp_codigo,
+            status_atual='aguardando_iniciar'  # Filtro adicional por status
+        ).prefetch_related(
+            Prefetch(
+                'ordem_pecas_serra',
+                queryset=PecasOrdem.objects.filter(peca__codigo__in=pecas_filter),
+                to_attr='pecas_relevantes'
+            )
+        )
+
+        if not ordens_com_mp.exists():
+            return JsonResponse({
+                "status": "warning",
+                "message": "Matéria-prima não encontrada em ordens aguardando iniciar."
+            }, status=404)
+
+        # Verifica cada ordem de forma otimizada
+        for ordem in ordens_com_mp:
+            pecas_da_ordem = {p.peca.codigo for p in ordem.pecas_relevantes}
+            if pecas_filter.issubset(pecas_da_ordem):
+                return JsonResponse({
+                    "status": "success",
+                    "ordem": ordem.ordem,
+                    "id_ordem": ordem.id,
+                    "grupo_maquina": ordem.grupo_maquina,
+                    "mp": mp_codigo,
+                    "pecas": pecas_codigos
+                })
+
+        return JsonResponse({
+            "status": "warning", 
+            "message": "MP e peças não estão associadas à mesma ordem com status 'aguardando_iniciar'."
+        }, status=404)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "JSON inválido"}, status=400)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+    
 def api_apontamentos_peca(request):
     ordens = (
         Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra', excluida=False)
