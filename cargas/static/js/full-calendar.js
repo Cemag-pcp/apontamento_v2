@@ -66,7 +66,7 @@ export function renderCallendar() {
                         });
                     } else {
                         let ordensTexto = data.ordens_a_serem_atualizadas.length > 0
-                            ? data.ordens_a_serem_atualizadas.map(ordem => `Ordem ${ordem[0]} - Status: ${ordem[6]}`).join("<br>")
+                            ? data.ordens_a_serem_atualizadas.map(ordem => `Ordem ${ordem[0]}`).join("<br>")
                             : "Nenhuma ordem precisa ser atualizada manualmente.";
 
                         Swal.fire({

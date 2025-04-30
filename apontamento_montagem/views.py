@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
-from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg
+from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q
 from django.db import transaction, models, IntegrityError
 from django.shortcuts import get_object_or_404
 from django.db.models.functions import Coalesce
@@ -563,7 +563,11 @@ def listar_operadores(request):
     return JsonResponse({"operadores": list(operadores.values())})
 
 def percentual_concluido_carga(request):
-    data_carga = request.GET.get('data_carga', now().date())  # Garantindo que seja apenas a data
+    data_carga = request.GET.get('data_carga')  # Garantindo que seja apenas a data
+    
+
+    if data_carga == '':
+        data_carga = now().date()
 
     # Soma correta da quantidade planejada por peça e ordem (evitando duplicação)
     total_planejado = PecasOrdem.objects.filter(
@@ -646,6 +650,22 @@ def buscar_maquinas(request):
 
     return JsonResponse({"maquinas":list(maquinas)})
 
+def listar_conjuntos(request):
+    """
+    API para listar os conjuntos disponíveis para o setor de montagem.
+    Aceita um parâmetro de busca opcional: ?termo=texto
+    """
+    termo = request.GET.get('termo', '').strip()
+
+    if termo:
+        conjuntos = Conjuntos.objects.filter(
+            Q(codigo__icontains=termo) | Q(descricao__icontains=termo)
+        ).values('id', 'codigo', 'descricao')
+    else:
+        conjuntos = Conjuntos.objects.values('id', 'codigo', 'descricao')
+
+    return JsonResponse({"conjuntos": list(conjuntos)})
+
 def listar_pecas_disponiveis(request):
 
     conjunto = request.GET.get('conjunto')
@@ -655,3 +675,58 @@ def listar_pecas_disponiveis(request):
     pecas_disponiveis = Pecas.objects.filter(conjunto=conjunto_object)
 
     return JsonResponse({'pecas':list(pecas_disponiveis.values())})
+
+@csrf_exempt
+def criar_ordem_fora_sequenciamento(request):
+
+    """
+    API para criar uma ordem fora do sequenciamento.
+    Verifica se o conjunto escolhido ja tem na data de carga escolhida.
+    Caso tenha, apenas acrescenta na quantidade planejada.
+    Caso não tenha, cria uma nova ordem com a quantidade planejada.
+    """
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    data = json.loads(request.body)
+
+    conjunto = data.get('peca')
+    codigo_conjunto = data.get('peca').split(" - ", maxsplit=1)[0]  # Pega apenas o código do conjunto
+    quantidade_planejada = data.get('quantidade')
+    maquina = data.get('setor')
+    data_carga = data.get('dataCarga')
+    obs = data.get('observacao')
+
+    ordens_existentes = Ordem.objects.filter(
+        data_carga=data_carga,
+        grupo_maquina='montagem',
+        ordem_pecas_montagem__peca__contains=codigo_conjunto
+    ).values_list('id', flat=True)
+
+    if ordens_existentes:
+        ordem = Ordem.objects.get(id=ordens_existentes[0])
+        ordem.status_atual = 'aguardando_iniciar' if ordem.status_atual == 'finalizada' else ordem.status_atual
+        ordem.save()
+        pecas = PecasOrdem.objects.filter(ordem=ordem, peca__contains=codigo_conjunto)
+        for peca in pecas:
+            peca.qtd_planejada += int(quantidade_planejada)
+            peca.save()
+        return JsonResponse({'message': 'Quantidade planejada atualizada com sucesso!'})
+
+    else:
+        maquina = get_object_or_404(Maquina, pk=maquina)
+        ordem = Ordem.objects.create(
+            grupo_maquina='montagem',
+            status_atual='aguardando_iniciar',
+            data_carga=datetime.strptime(data_carga, '%Y-%m-%d').date(),
+            maquina=maquina
+        )  
+        PecasOrdem.objects.create(
+            ordem=ordem,
+            peca=conjunto,
+            qtd_planejada=quantidade_planejada,
+            qtd_boa=0,
+            qtd_morta=0
+        )
+        return JsonResponse({'message': 'Ordem criada com sucesso!'})

@@ -36,7 +36,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 statusBadge = '<span class="badge rounded-pill bg-danger badge-small ms-2">Interrompida</span>';
                                 break;
                             case 'agua_prox_proc':
-                                statusBadge = '<span class="badge rounded-pill bg-primary badge-small ms-2">Próximo processo</span>';
+                                statusBadge = '<span class="badge rounded-pill bg-prox-processo badge-small ms-2">Próximo processo</span>';
                                 break;
                             default:
                                 statusBadge = '<span class="badge rounded-pill bg-dark badge-small ms-2">Desconhecido</span>';
@@ -56,9 +56,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-primary btn-sm btn-proximo-processo" title="Passar para o próximo processo">
                                     <i class="fa fa-arrow-right"></i>
                                 </button>  
-                                <button class="btn btn-info btn-sm btn-finalizar-parcial" title="Finalizar parcial">
-                                    <i class="fa fa-hourglass-half"></i>
-                                </button>
 
                             `;
                         } else if (ordem.status_atual === 'aguardando_iniciar') {
@@ -109,7 +106,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonRetornar = card.querySelector('.btn-retornar');
                         const buttonProxProcesso = card.querySelector('.btn-iniciar-proximo-processo');
                         const buttonMandarProxProcesso = card.querySelector('.btn-proximo-processo')
-                        const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
+                        // const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
                         const buttonExcluir= card.querySelector('.btn-excluir');
 
                         // Adiciona evento ao botão "Iniciar", se existir
@@ -155,11 +152,11 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         }
 
                         // Adiciona evento ao botão para enviar para proximo processo
-                        if (buttonFinalizarParcial) {
-                            buttonFinalizarParcial.addEventListener('click', () => {
-                                mostrarModalFinalizarParcial(ordem.id, ordem.grupo_maquina);
-                            });
-                        }
+                        // if (buttonFinalizarParcial) {
+                        //     buttonFinalizarParcial.addEventListener('click', () => {
+                        //         mostrarModalFinalizarParcial(ordem.id, ordem.grupo_maquina);
+                        //     });
+                        // }
 
                         // Adiciona evento ao botão "Excluir", se existir
                         if (buttonExcluir) {
@@ -244,9 +241,6 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                     <button class="btn btn-primary btn-sm btn-proximo-processo" title="Passar para o próximo processo">
                         <i class="fa fa-arrow-right"></i>
                     </button>      
-                    <button class="btn btn-info btn-sm btn-finalizar-parcial" title="Finalizar parcial">
-                        <i class="fa fa-hourglass-half"></i>
-                    </button>
                 `;
 
                 // Calcula informações consolidadas das peças
@@ -288,7 +282,7 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                 const buttonInterromper = card.querySelector('.btn-interromper');
                 const buttonFinalizar = card.querySelector('.btn-finalizar');
                 const buttonProxProcesso = card.querySelector('.btn-proximo-processo');
-                const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
+                // const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
 
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
@@ -310,11 +304,11 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                     });
                 }
 
-                if (buttonFinalizarParcial) {
-                    buttonFinalizarParcial.addEventListener('click', () => {
-                        mostrarModalFinalizarParcial(ordem.id, ordem.grupo_maquina);
-                    });
-                }
+                // if (buttonFinalizarParcial) {
+                //     buttonFinalizarParcial.addEventListener('click', () => {
+                //         mostrarModalFinalizarParcial(ordem.id, ordem.grupo_maquina);
+                //     });
+                // }
 
                 container.appendChild(card);
 
@@ -437,7 +431,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
 
                 card.innerHTML = `
 
-                <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
+                <div class="card shadow-lg bg-prox-processo border-0 rounded-3 mb-3 position-relative">
                     <!-- Contador fixado no topo direito -->
                     <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
                         id="contador-${ordem.ordem}" 
@@ -445,7 +439,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                         Carregando...
                     </span>
 
-                    <div class="card-header bg-warning text-white d-flex justify-content-between align-items-center p-3">
+                    <div class="card-header bg-prox-processo text-white d-flex justify-content-between align-items-center p-3">
                         <h6 class="card-title mb-0"><small>#${ordem.ordem} - ${ordem.maquina}</small></h6>
                         <small class="text-white">
                             Planejada: ${ordem.totais.qtd_planejada || 0} 

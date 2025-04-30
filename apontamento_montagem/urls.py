@@ -18,7 +18,8 @@ urlpatterns = [
     path('api/andamento-ultimas-cargas/', views.andamento_ultimas_cargas, name='andamento_ultimas_cargas'),
     path('api/listar-pecas-disponiveis/', views.listar_pecas_disponiveis, name='listar_pecas_disponiveis'),
     path('api/buscar-maquinas/', views.buscar_maquinas, name='buscar_maquinas'),
-
+    path('api/listar-conjuntos/', views.listar_conjuntos, name='listar_conjuntos'),
+    path('api/criar-ordem-fora-sequenciamento/', views.criar_ordem_fora_sequenciamento, name='criar_ordem_fora_sequenciamento'),
 
 ]
 

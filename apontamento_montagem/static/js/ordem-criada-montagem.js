@@ -15,7 +15,6 @@ export const loadOrdens = (container, filtros = {}) => {
                 const setorContainer = document.getElementById("setor-container");
                 setorContainer.innerHTML = ""; // Limpa os botões antes de popular
 
-
                 if (ordens.length > 0) {
                     // Criar cabeçalho da tabela
                     const tableWrapper = document.createElement("div");
@@ -212,6 +211,15 @@ document.getElementById('confirmStartButton').addEventListener('click', function
 });
 
 function iniciarOrdem(ordemId) {
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
+
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
+    
     Swal.fire({
         title: 'Iniciando...',
         text: 'Por favor, aguarde enquanto a ordem está sendo iniciada.',
@@ -221,7 +229,7 @@ function iniciarOrdem(ordemId) {
         },
     });
 
-    fetch("http://127.0.0.1:8000/montagem/api/ordens/atualizar-status/", {
+    fetch("api/ordens/atualizar-status/", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -251,8 +259,8 @@ function iniciarOrdem(ordemId) {
             title: 'Sucesso!',
             text: 'A ordem foi iniciada com sucesso.'
         }).then(() => {
-            resetarCardsInicial();
-            carregarOrdensIniciadas();
+            resetarCardsInicial(filtros);
+            carregarOrdensIniciadas(filtros);
         });
 
     })
@@ -533,7 +541,14 @@ function carregarPecasDisponiveis(codigoConjunto) {
 function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveisSelect, modal, maquinaId, dataCarga) {
     const motivoSelecionado = motivoInterrupcaoSelect.val(); // Pegando o valor do select corretamente via jQuery
     const pecaSelecionada = pecasDisponiveisSelect.val(); // Pegando a peça selecionada
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
 
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
     // **Verificação segura para evitar erro caso não haja seleção**
     const motivoTexto = motivoInterrupcaoSelect.find(":selected").text() ?? 'N/A';
 
@@ -589,8 +604,8 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
         Swal.fire({ icon: 'success', title: 'Sucesso', text: 'Ordem interrompida com sucesso.' })
         .then(() => {
             modal.hide();
-            carregarOrdensIniciadas();
-            carregarOrdensInterrompidas();
+            carregarOrdensIniciadas(filtros);
+            carregarOrdensInterrompidas(filtros);
             fetchStatusMaquinas();
         });
     })
@@ -645,6 +660,15 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
     const obsFinalizar = document.getElementById('obsFinalizar').value;
     const qtMaxima = qtRealizada.getAttribute('max');
     
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
+
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
+
     // Validação: A quantidade realizada não pode ser maior que a máxima
     if (parseInt(qtRealizada.value) > parseInt(qtMaxima)) {
         Swal.fire({
@@ -692,8 +716,8 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
     .then(response => response.json())
     .then(data => {
 
-        carregarOrdensIniciadas();
-        resetarCardsInicial();
+        carregarOrdensIniciadas(filtros);
+        resetarCardsInicial(filtros);
 
         // Fechar o modal após a finalização bem-sucedida
         const modalElement = document.getElementById('finalizarModal');
@@ -730,6 +754,15 @@ function mostrarModalRetornar(ordemId) {
 // Função para enviar requisição de retorno da ordem
 function confirmarRetorno(ordemId, modal) {
     
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
+
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
+
     Swal.fire({
         title: 'Retornando...',
         text: 'Por favor, aguarde enquanto a ordem está sendo retornada.',
@@ -767,9 +800,9 @@ function confirmarRetorno(ordemId, modal) {
         }).then(() => {
             Swal.close();
             modal.hide(); // Fecha o modal corretamente após confirmação
-            carregarOrdensInterrompidas();
-            carregarOrdensIniciadas();
-            resetarCardsInicial();
+            carregarOrdensInterrompidas(filtros);
+            carregarOrdensIniciadas(filtros);
+            resetarCardsInicial(filtros);
             fetchStatusMaquinas();
         });
 
@@ -784,7 +817,7 @@ function confirmarRetorno(ordemId, modal) {
     });
 }
 
-function resetarCardsInicial(filtros = {}) {
+export function resetarCardsInicial(filtros = {}) {
     const container = document.getElementById('ordens-container');
     let isLoading = false; // Flag para evitar chamadas simultâneas
 
@@ -822,7 +855,7 @@ function resetarCardsInicial(filtros = {}) {
     fetchOrdens();
 }
 
-function filtro() {
+export function filtro() {
     const form = document.getElementById('filtro-form');
 
     form.addEventListener('submit', (event) => {
@@ -1153,7 +1186,14 @@ function retornarMaquina(maquina) {
 //  Função separada para submissão do formulário de parar maquina
 async function handleFormSubmit(event) {
     event.preventDefault();
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
 
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
     Swal.fire({
         title: 'Parando...',
         text: 'Por favor, aguarde enquanto a máquina está sendo parada.',
@@ -1188,9 +1228,9 @@ async function handleFormSubmit(event) {
         });
 
         fetchStatusMaquinas();
-        resetarCardsInicial();
-        carregarOrdensIniciadas();
-        carregarOrdensInterrompidas();
+        resetarCardsInicial(filtros);
+        carregarOrdensIniciadas(filtros);
+        carregarOrdensInterrompidas(filtros);
 
     } catch (error) {
         console.error('Erro:', error);
@@ -1206,7 +1246,14 @@ function selecionarSetor() {
     const setorButtons = document.querySelectorAll(".setor-btn");
     const filtroSetorInput = document.getElementById("filtro-setor");
     const limparFiltroBtn = document.getElementById("limpar-filtro");
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
 
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
     setorButtons.forEach(button => {
         button.addEventListener("click", function () {
             // Remove a seleção de todos os botões
@@ -1236,9 +1283,9 @@ function selecionarSetor() {
         // Resetar o campo oculto
         filtroSetorInput.value = "";
 
-        resetarCardsInicial();
-        carregarOrdensIniciadas();
-        carregarOrdensInterrompidas();
+        resetarCardsInicial(filtros);
+        carregarOrdensIniciadas(filtros);
+        carregarOrdensInterrompidas(filtros);
         
     });
 }
@@ -1283,10 +1330,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById("filtro-setor").value = "";
     });
 
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
+
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
+
     // Outras funções do sistema
-    resetarCardsInicial();
-    carregarOrdensIniciadas();
-    carregarOrdensInterrompidas();
+    resetarCardsInicial(filtros);
+    carregarOrdensIniciadas(filtros);
+    carregarOrdensInterrompidas(filtros);
     filtro();
     atualizarUltimasCargas();
     selecionarSetor();

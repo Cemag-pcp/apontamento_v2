@@ -15,7 +15,7 @@ function carregarTabela(pagina = 1) {
             const tbody = document.getElementById("tabela-corpo");
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center py-5">
+                    <td colspan="8" class="text-center py-5">
                         <div class="d-flex flex-column align-items-center justify-content-center">
                             <div class="spinner-border text-primary mb-3" role="status">
                                 <span class="visually-hidden">Carregando...</span>
@@ -58,6 +58,7 @@ function carregarTabela(pagina = 1) {
                 fetch(`/cargas/api/historico-planejamento-pintura/?data_carga=${filtros.dataCargaEscolhida || ''}&cor=${filtros.cor || ''}&ordem=${filtros.ordem || ''}&page=${pagina}&limit=${limiteRegistros}`)
                     .then(response => response.json())
                     .then(data => {
+                        console.log(data);
                         atualizarTabela(data.ordens, setor);
                         atualizarPaginacao(data.total_ordens, pagina, data.total_paginas);
                         resolve(); // Resolve a Promise após o sucesso
@@ -79,7 +80,7 @@ function atualizarTabela(ordens, setor) {
     tabelaCorpo.innerHTML = "";
 
     if (ordens.length === 0) {
-        tabelaCorpo.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhum dado encontrado.</td></tr>`;
+        tabelaCorpo.innerHTML = `<tr><td colspan="8" class="text-center text-muted">Nenhum dado encontrado.</td></tr>`;
         return;
     }
 
@@ -103,6 +104,11 @@ function atualizarTabela(ordens, setor) {
             <td>
                 <input type="number" class="form-control qtd-plan-input" 
                     data-id="${ordem.ordem}" value="${ordem.total_planejada}" 
+                    disabled>
+            </td>
+            <td>
+                <input type="number" class="form-control" 
+                    data-id="${ordem.ordem}" value="${ordem.total_produzido}" 
                     disabled>
             </td>
             <td>

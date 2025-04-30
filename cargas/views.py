@@ -453,6 +453,9 @@ def historico_ordens_montagem(request):
     ).annotate(
         total_planejada=Coalesce(
             Avg('qtd_planejada'), Value(0.0, output_field=models.FloatField())
+        ),
+        total_produzido=Coalesce(
+            Sum('qtd_boa'), Value(0.0, output_field=models.FloatField())
         )
     )
 
@@ -540,7 +543,11 @@ def historico_ordens_pintura(request):
     ).annotate(
         total_planejada=Coalesce(
             Avg('qtd_planejada'), Value(0.0, output_field=models.FloatField())
+        ),
+        total_produzido=Coalesce(
+            Sum('qtd_boa'), Value(0.0, output_field=models.FloatField())
         )
+
     )
 
     # Aplicando a paginação
@@ -587,37 +594,29 @@ def editar_planejamento(request):
         else:
             atualizar_ordens = POPintura.objects.filter(ordem=ordem)
 
-        # Verifica se há conflito antes de atualizar a data de carga
         if nova_data_carga:
             try:
                 nova_data_carga = datetime.strptime(nova_data_carga, "%Y-%m-%d").date()
             except ValueError:
                 return JsonResponse({"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
 
-            # Obtém todas as peças associadas à ordem atual
             pecas_ordem = atualizar_ordens.values_list('peca', flat=True)
 
             if setor == 'montagem':
-            # Verifica se já existe outra ordem com a mesma peça para a nova data
                 conflito = Ordem.objects.filter(
                     data_carga=nova_data_carga,
                     ordem_pecas_montagem__peca__in=pecas_ordem
                 ).exclude(id=ordem_id).exists()
-
-            else:
+            else:  # pintura
                 conflito = Ordem.objects.filter(
                     data_carga=nova_data_carga,
-                    ordem_pecas_montagem__peca__in=pecas_ordem,
+                    ordem_pecas_pintura__peca__in=pecas_ordem,
+                    cor=ordem.cor
                 ).exclude(id=ordem_id).exists()
-
-            # Se for pintura, verifica também a cor da ordem
-            if setor == 'pintura':
-                conflito = conflito.filter(cor=ordem.cor)
 
             if conflito:
                 return JsonResponse({"erro": "Já existe uma ordem com o mesmo conjunto para essa data!"}, status=400)
 
-            # Atualiza a data da ordem
             ordem.data_carga = nova_data_carga
             ordem.save()
 

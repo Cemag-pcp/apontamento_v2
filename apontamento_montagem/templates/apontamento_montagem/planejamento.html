@@ -27,6 +27,9 @@
             <div class="col-md-4">
                 <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
                     Status de Máquina
+                    <button type="button" class="btn" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina" title="Parada de máquina">
+                        <i class="fas fa-stop-circle"></i> <small>Máquina parada</small>
+                    </button>
                     <button class="btn btn-sm" id="refresh-status-maquinas">
                         🔄
                     </button>
@@ -67,7 +70,7 @@
             <!-- Coluna 3: Status de cargas 5 dias -->
             <div class="col-md-4">
                 <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
-                    Andamento das últimas 5 cargas
+                    Últimas 5 cargas
                     <button class="btn btn-sm" id="refresh-pecas">
                         🔄
                     </button>
@@ -82,17 +85,16 @@
 
     <div id="containerPlanejar" class="mb-5">
 
-        <div class="d-flex justify-content-end gap-3 mb-4">
-            <button type="button" class="btn btn-primary" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
-                Parada de máquina
-            </button>
-        </div>
-
         <!-- Painel de Ordens Criadas -->
         <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
     
         <!-- Formulário de Filtro -->
         <form id="filtro-form" class="mb-4 p-4 border rounded bg-light shadow-sm">
+            <div class="d-flex justify-content-end gap-3 mb-4">
+                <small><button type="button" class="btn btn-success" id="btnForaSequenciamento" data-bs-toggle="modal" data-bs-target="#modalForaSequenciamento">
+                    Produção fora do sequenciamento
+                </button></small>
+            </div>
             <div class="row g-3 align-items-end">
                 <!-- Filtro por Data -->
                 <div class="col-md-4">
@@ -298,9 +300,84 @@
     </div>
 </div>
 
+<!-- Modal para gerar fora sequenciamento -->
+<div class="modal fade" id="modalForaSequenciamento" tabindex="-1" aria-labelledby="formModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="formModalLabel">Formulário de Peças</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="pecasForm">
+                    <input type="hidden" id="conjuntoId" name="conjuntoId">
+
+                    <!-- Seção principal - Peça e Quantidade -->
+                    <div class="row mb-3">
+                        
+                        <!-- Campo de Peça com autocomplete -->
+                        <div class="col-md-10 position-relative">
+                            <label for="pecaSelect" class="form-label fw-bold">Peça</label>
+                            <div class="input-group mb-0">
+                                <input type="text" class="form-control" id="pecaSelect" placeholder="Digite para buscar peças" autocomplete="off" aria-describedby="basic-addon2">
+                                <div class="input-group-append">
+                                    <button class="btn btn-outline-secondary" type="button" id="btnLimparInput" title="Limpar campo">
+                                        <i class="fas fa-times-circle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        
+                            <!-- Lista de sugestões posicionada abaixo -->
+                            <div id="pecasSugeridas" class="list-group position-absolute mt-1"
+                                 style="z-index: 1000; width: 100%; max-height: 200px; overflow-y: auto;"></div>
+                        </div>
+
+                        <!-- Campo de Quantidade -->
+                        <div class="col-md-2">
+                            <label for="quantidade" class="form-label fw-bold">Quantidade</label>
+                            <input type="number" class="form-control" id="quantidade" min="1" required>
+                        </div>
+                    </div>
+
+                    <!-- Seção secundária - Data e Setor -->
+                    <div class="row mb-3">
+                        <!-- Campo de Data de Carga -->
+                        <div class="col-md-6">
+                            <label for="dataCarga" class="form-label fw-bold">Data de Carga</label>
+                            <input type="date" class="form-control" id="dataCarga" required>
+                        </div>
+                        
+                        <!-- Campo de Setor -->
+                        <div class="col-md-6">
+                            <label for="setor" class="form-label fw-bold">Setor</label>
+                            <select class="form-select" id="setor" required>
+                                <option value="" selected disabled>Selecione um setor</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Seção de Observações -->
+                    <div class="row">
+                        <div class="col-12">
+                            <label for="observacao" class="form-label fw-bold">Observação</label>
+                            <textarea class="form-control" id="observacao" rows="4" placeholder="Adicione informações adicionais aqui..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-primary" id="btnSalvar">
+                    <i class="bi bi-check-circle me-1"></i>Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script type="module" src="{% static 'js/ordem-criada-montagem.js' %}"></script>
+<script type="module" src="{% static 'js/ordem-fora-sequenciamento.js' %}"></script>
 {% endblock %}
 
