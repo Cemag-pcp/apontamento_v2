@@ -14,6 +14,7 @@ from apontamento_montagem.models import PecasOrdem as POMontagem
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura
 
 import pandas as pd
 import os
@@ -88,6 +89,7 @@ def gerar_dados_sequenciamento(request):
     """
     Chama a API 'criar_ordem'.
     """
+
     data_inicio = request.GET.get('data_inicio')
     data_final = request.GET.get('data_fim')
     setor = request.GET.get('setor')
@@ -106,8 +108,6 @@ def gerar_dados_sequenciamento(request):
 
     # Gerar os arquivos e a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_final, setor)
-
-    print(tabela_completa)
 
     if setor == 'pintura':
         tabela_completa.drop_duplicates(subset=['Código','Datas','cor'], inplace=True)
@@ -131,23 +131,16 @@ def gerar_dados_sequenciamento(request):
             "setor_conjunto" : row["Célula"]
         })
 
-    # Obtém os cookies da sessão atual
-    session_cookies = request.COOKIES.get("sessionid")
+    if setor.lower() == 'montagem':
+        resultado = processar_ordens_montagem(ordens, grupo_maquina=setor.lower())
+    else:
+        resultado = processar_ordens_pintura(ordens, grupo_maquina=setor.lower())
 
-    url_criar_ordem = request.build_absolute_uri(reverse("pintura:criar_ordem")) if setor == 'pintura' else request.build_absolute_uri(reverse("montagem:criar_ordem"))
+    if "error" in resultado:
+        return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
 
-    # Chamar API de criar ordem
-    response_ordem = requests.post(
-        url_criar_ordem,
-        json={"ordens": ordens},
-        headers={"Content-Type": "application/json"},
-        cookies={"sessionid": session_cookies},  # Inclui o cookie da sessão
-    )
+    return JsonResponse({"message": "Sequenciamento gerado com sucesso!", "detalhes": resultado})
 
-    if response_ordem.status_code != 200:
-        return HttpResponse(f"Erro ao criar ordens: {response_ordem.text}", status=500)
-
-    return JsonResponse({"message": "Sequenciamento gerado com sucesso!"})
 
 @csrf_exempt
 def atualizar_ordem_existente(request):

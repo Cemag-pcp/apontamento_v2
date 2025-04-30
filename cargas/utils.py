@@ -1136,3 +1136,176 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
         tab_completa = pd.concat([tab_completa, tab_completa], ignore_index=True)
     
     return tab_completa
+
+
+
+from datetime import datetime
+from django.utils.timezone import now
+from django.db import transaction
+from apontamento_montagem.models import Ordem, PecasOrdem
+from cadastro.models import Maquina
+
+def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
+
+    if not ordens_data:
+        return {"error": "Nenhuma ordem fornecida!", "status": 400}
+
+    # Coletar datas únicas e validar
+    try:
+        datas_requisicao = {
+            datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
+            for o in ordens_data if o.get("data_carga")
+        }
+    except ValueError:
+        return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
+
+    # Verifica datas já com carga
+    datas_existentes = set(
+        Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina=grupo_maquina)
+        .values_list("data_carga", flat=True)
+    )
+    datas_bloqueadas = datas_existentes & datas_requisicao
+    if not atualizacao_ordem and datas_bloqueadas:
+        return {
+            "error": f"Datas já com carga alocada: {', '.join(map(str, datas_bloqueadas))}",
+            "status": 400
+        }
+
+    # Verifica máquinas existentes
+    maquinas_requisicao = {o.get("setor_conjunto") for o in ordens_data if o.get("setor_conjunto")}
+    maquinas_existentes = set(Maquina.objects.filter(nome__in=maquinas_requisicao).values_list("nome", flat=True))
+    maquinas_faltantes = maquinas_requisicao - maquinas_existentes
+    if maquinas_faltantes:
+        return {
+            "error": f"Máquinas não cadastradas: {', '.join(maquinas_faltantes)}",
+            "status": 400
+        }
+
+    # Criação em lote
+    with transaction.atomic():
+        ordens_objs = []
+        ordens_metadata = []
+        for o in ordens_data:
+            data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
+            maquina = Maquina.objects.get(nome=o["setor_conjunto"])
+            ordem = Ordem(
+                grupo_maquina=grupo_maquina,
+                status_atual="aguardando_iniciar",
+                obs=o.get("obs", ""),
+                cor=o.get("cor"),
+                data_criacao=now(),
+                data_carga=data_carga,
+                maquina=maquina
+            )
+            ordens_objs.append(ordem)
+            ordens_metadata.append({
+                "peca_nome": o["peca_nome"],
+                "qtd_planejada": o.get("qtd_planejada", 0),
+                "setor_conjunto": o["setor_conjunto"],
+                "data_carga": data_carga
+            })
+
+        Ordem.objects.bulk_create(ordens_objs)
+
+        pecas_objs = [
+            PecasOrdem(
+                ordem=ordem,
+                peca=meta["peca_nome"],
+                qtd_planejada=meta["qtd_planejada"],
+                qtd_boa=0,
+                qtd_morta=0
+            ) for ordem, meta in zip(ordens_objs, ordens_metadata)
+        ]
+        PecasOrdem.objects.bulk_create(pecas_objs)
+
+        return {
+            "message": "Ordens criadas com sucesso.",
+            "ordens": [
+                {
+                    "id": ordem.id,
+                    "setor_conjunto": meta["setor_conjunto"],
+                    "data_carga": meta["data_carga"].strftime("%Y-%m-%d")
+                } for ordem, meta in zip(ordens_objs, ordens_metadata)
+            ]
+        }
+
+def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina="pintura"):
+    if not ordens_data:
+        return {"error": "Nenhuma ordem fornecida!", "status": 400}
+
+    # Coletar datas únicas e validar
+    try:
+        formato_data = "%Y-%d-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
+        datas_requisicao = {
+            datetime.strptime(o["data_carga"], formato_data).date()
+            for o in ordens_data if o.get("data_carga")
+        }
+    except ValueError:
+        return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
+
+    # Verifica datas já com carga
+    datas_existentes = set(
+        Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina=grupo_maquina)
+        .values_list("data_carga", flat=True)
+    )
+    datas_bloqueadas = datas_existentes & datas_requisicao
+    if not atualizacao_ordem and datas_bloqueadas:
+        return {
+            "error": f"Datas já com carga alocada: {', '.join(map(str, datas_bloqueadas))}",
+            "status": 400
+        }
+
+    ordens_objs = []
+    ordens_metadata = []
+    pecas_objs = []
+
+    with transaction.atomic():
+        for o in ordens_data:
+            data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+            nova_ordem = Ordem(
+                grupo_maquina=grupo_maquina,
+                status_atual="aguardando_iniciar",
+                obs=o.get("obs", ""),
+                cor=o.get("cor"),
+                data_criacao=now(),
+                data_carga=data_carga
+            )
+
+            if grupo_maquina == "montagem":
+                try:
+                    maquina = Maquina.objects.get(nome=o["setor_conjunto"])
+                    nova_ordem.maquina = maquina
+                except Maquina.DoesNotExist:
+                    return {"error": f"Máquina '{o['setor_conjunto']}' não cadastrada.", "status": 400}
+
+            ordens_objs.append(nova_ordem)
+            ordens_metadata.append({
+                "peca_nome": o["peca_nome"],
+                "qtd_planejada": o.get("qtd_planejada", 0),
+                "data_carga": data_carga,
+                "cor": o.get("cor")
+            })
+
+        Ordem.objects.bulk_create(ordens_objs)
+
+        pecas_objs = [
+            PecasOrdem(
+                ordem=ordem,
+                peca=meta["peca_nome"],
+                qtd_planejada=meta["qtd_planejada"],
+                qtd_boa=0,
+                qtd_morta=0
+            ) for ordem, meta in zip(ordens_objs, ordens_metadata)
+        ]
+        PecasOrdem.objects.bulk_create(pecas_objs)
+
+    return {
+        "message": "Ordens criadas com sucesso.",
+        "ordens": [
+            {
+                "id": ordem.id,
+                "cor": meta["cor"],
+                "data_carga": meta["data_carga"].strftime("%Y-%m-%d")
+            } for ordem, meta in zip(ordens_objs, ordens_metadata)
+        ]
+    }
