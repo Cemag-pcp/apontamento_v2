@@ -256,11 +256,6 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                         style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
                         Carregando...
                     </span>
-    
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
-                        <h6 class="card-title mb-0">#${ordem.ordem} - ${ordem.maquina}</h6>
-                        <small class="text-white">Planejada: ${totalQtdPlanejada || 0} Realizada: ${totalQtdBoa}</small>
-                    </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
                             <strong>Observação:</strong> ${ordem.obs || 'Sem observações'}
@@ -439,13 +434,6 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                         Carregando...
                     </span>
 
-                    <div class="card-header bg-prox-processo text-white d-flex justify-content-between align-items-center p-3">
-                        <h6 class="card-title mb-0"><small>#${ordem.ordem} - ${ordem.maquina}</small></h6>
-                        <small class="text-white">
-                            Planejada: ${ordem.totais.qtd_planejada || 0} 
-                            Realizada: ${ordem.totais.qtd_boa || 0} 
-                        </small>
-                    </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
                             <strong>Observação:</strong> ${ordem.obs || 'Sem observações'}
