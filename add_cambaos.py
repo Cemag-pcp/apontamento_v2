@@ -13,7 +13,6 @@ django.setup()
 
 from apontamento_pintura.models import Cambao
 
-
 registros = [
     (9, "Cinza", "livre", "PÓ", "Único 4"),
     (10, "Cinza", "livre", "PÓ", "Único 5"),
