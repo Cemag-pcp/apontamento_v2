@@ -36,7 +36,6 @@ def criar_ordem(request):
     }
     """
 
-
     if request.method != 'POST':
         return JsonResponse({'error': 'Método não permitido!'}, status=405)
     try:
@@ -53,7 +52,7 @@ def criar_ordem(request):
             data_carga_str = ordem_info.get('data_carga')
             if data_carga_str:
                 try:
-                    data_carga = datetime.strptime(data_carga_str, "%Y-%m-%d").date()
+                    data_carga = datetime.strptime(data_carga_str, "%Y-%d-%m").date()
                     datas_requisicao.add(data_carga)
                 except ValueError:
                     return JsonResponse({'error': 'Formato de data inválido! Use YYYY-MM-DD.'}, status=400)
@@ -104,7 +103,7 @@ def criar_ordem(request):
 
                 # Converter data_carga para datetime.date
                 try:
-                    data_carga = datetime.strptime(data_carga_str, "%Y-%m-%d").date()
+                    data_carga = datetime.strptime(data_carga_str, "%Y-%d-%m").date()
                 except ValueError:
                     return JsonResponse({'error': 'Data inválida. Use o formato YYYY-MM-DD.'}, status=400)
 

@@ -36,3 +36,4 @@ for _, row in df.iterrows():
         )
     except IntegrityError as e:
         continue
+    

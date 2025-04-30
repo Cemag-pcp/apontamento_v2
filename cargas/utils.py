@@ -667,6 +667,8 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
         base_carretas = base_carretas_original.copy()
         base_carga = base_carga_original.copy()
 
+        print(data_escolhida)
+
         if setor == 'pintura':
 
             base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
