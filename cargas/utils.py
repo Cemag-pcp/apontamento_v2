@@ -12,6 +12,7 @@ from django.utils.timezone import now
 from django.db import transaction
 from apontamento_montagem.models import Ordem, PecasOrdem
 from cadastro.models import Maquina
+from django.conf import settings
 
 # Carregar variáveis do arquivo .env
 load_dotenv()
@@ -606,7 +607,8 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 while start_index < len(filtrar):
                     # Criar um novo Workbook para cada conjunto de 21 linhas
                     wb = Workbook()
-                    wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_montagem.xlsx')
+                    # wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_montagem.xlsx')
+                    caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelos', 'modelo_op_montagem.xlsx')
                     ws = wb.active
 
                     # Define o limite superior para as linhas deste arquivo
