@@ -10,10 +10,13 @@ from dotenv import load_dotenv
 
 from django.utils.timezone import now
 from django.db import transaction
-from apontamento_montagem.models import Ordem, PecasOrdem
+from apontamento_montagem.models import PecasOrdem as POM
+from apontamento_pintura.models import PecasOrdem as POP
+from core.models import Ordem
 from cadastro.models import Maquina
 from django.conf import settings
 from django.contrib.staticfiles import finders
+from django.db.models import Max
 
 # Carregar variáveis do arquivo .env
 load_dotenv()
@@ -1242,34 +1245,59 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
             "status": 400
         }
 
+    # Coletar datas únicas e validar
+    try:
+        formato_data = "%Y-%d-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
+        datas_requisicao = {
+            datetime.strptime(o["data_carga"], formato_data).date()
+            for o in ordens_data if o.get("data_carga")
+        }
+    except ValueError:
+        return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
+
     # Criação em lote
+    # Pega a última ordem atual no banco
+    ultimo_numero = Ordem.objects.filter(grupo_maquina=grupo_maquina).aggregate(Max('ordem'))['ordem__max'] or 0
+
     with transaction.atomic():
         ordens_objs = []
         ordens_metadata = []
-        for o in ordens_data:
-            data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
-            maquina = Maquina.objects.get(nome=o["setor_conjunto"])
-            ordem = Ordem(
+
+        for i, o in enumerate(ordens_data):
+            data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+
+            nova_ordem = Ordem(
                 grupo_maquina=grupo_maquina,
                 status_atual="aguardando_iniciar",
                 obs=o.get("obs", ""),
                 cor=o.get("cor"),
                 data_criacao=now(),
                 data_carga=data_carga,
-                maquina=maquina
+                ordem=ultimo_numero + i + 1  # atribui manualmente a ordem
             )
-            ordens_objs.append(ordem)
+
+            try:
+                maquina = Maquina.objects.get(nome=o["setor_conjunto"])
+                nova_ordem.maquina = maquina
+                # calcula data_programacao manualmente
+                nova_ordem.data_programacao = data_carga - timedelta(days=3)
+                while nova_ordem.data_programacao.weekday() in [5, 6]:
+                    nova_ordem.data_programacao -= timedelta(days=1)
+            except Maquina.DoesNotExist:
+                return {"error": f"Máquina '{o['setor_conjunto']}' não cadastrada.", "status": 400}
+
+            ordens_objs.append(nova_ordem)
             ordens_metadata.append({
                 "peca_nome": o["peca_nome"],
                 "qtd_planejada": o.get("qtd_planejada", 0),
-                "setor_conjunto": o["setor_conjunto"],
-                "data_carga": data_carga
+                "data_carga": data_carga,
+                "cor": o.get("cor")
             })
 
         Ordem.objects.bulk_create(ordens_objs)
 
         pecas_objs = [
-            PecasOrdem(
+            POM(
                 ordem=ordem,
                 peca=meta["peca_nome"],
                 qtd_planejada=meta["qtd_planejada"],
@@ -1277,20 +1305,21 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
                 qtd_morta=0
             ) for ordem, meta in zip(ordens_objs, ordens_metadata)
         ]
-        PecasOrdem.objects.bulk_create(pecas_objs)
 
+        POM.objects.bulk_create(pecas_objs)
+    
         return {
             "message": "Ordens criadas com sucesso.",
             "ordens": [
                 {
                     "id": ordem.id,
-                    "setor_conjunto": meta["setor_conjunto"],
                     "data_carga": meta["data_carga"].strftime("%Y-%m-%d")
                 } for ordem, meta in zip(ordens_objs, ordens_metadata)
             ]
         }
 
 def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina="pintura"):
+
     if not ordens_data:
         return {"error": "Nenhuma ordem fornecida!", "status": 400}
 
@@ -1316,28 +1345,32 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
             "status": 400
         }
 
-    ordens_objs = []
-    ordens_metadata = []
     pecas_objs = []
 
+    ultimo_numero = Ordem.objects.filter(grupo_maquina=grupo_maquina).aggregate(
+        Max('ordem')
+    )['ordem__max'] or 0
+
     with transaction.atomic():
-        for o in ordens_data:
+        ordens_objs = []
+        ordens_metadata = []
+
+        for i, o in enumerate(ordens_data):
             data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+
             nova_ordem = Ordem(
                 grupo_maquina=grupo_maquina,
                 status_atual="aguardando_iniciar",
                 obs=o.get("obs", ""),
                 cor=o.get("cor"),
                 data_criacao=now(),
-                data_carga=data_carga
+                data_carga=data_carga,
+                ordem=ultimo_numero + i + 1  # aqui é o número da ordem
             )
 
-            if grupo_maquina == "montagem":
-                try:
-                    maquina = Maquina.objects.get(nome=o["setor_conjunto"])
-                    nova_ordem.maquina = maquina
-                except Maquina.DoesNotExist:
-                    return {"error": f"Máquina '{o['setor_conjunto']}' não cadastrada.", "status": 400}
+            nova_ordem.data_programacao = data_carga - timedelta(days=1)
+            while nova_ordem.data_programacao.weekday() in [5, 6]:
+                nova_ordem.data_programacao -= timedelta(days=1)
 
             ordens_objs.append(nova_ordem)
             ordens_metadata.append({
@@ -1350,7 +1383,7 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
         Ordem.objects.bulk_create(ordens_objs)
 
         pecas_objs = [
-            PecasOrdem(
+            POP(
                 ordem=ordem,
                 peca=meta["peca_nome"],
                 qtd_planejada=meta["qtd_planejada"],
@@ -1358,15 +1391,16 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
                 qtd_morta=0
             ) for ordem, meta in zip(ordens_objs, ordens_metadata)
         ]
-        PecasOrdem.objects.bulk_create(pecas_objs)
 
-    return {
-        "message": "Ordens criadas com sucesso.",
-        "ordens": [
-            {
-                "id": ordem.id,
-                "cor": meta["cor"],
-                "data_carga": meta["data_carga"].strftime("%Y-%m-%d")
-            } for ordem, meta in zip(ordens_objs, ordens_metadata)
-        ]
-    }
+        POP.objects.bulk_create(pecas_objs)
+
+        return {
+            "message": "Ordens criadas com sucesso.",
+            "ordens": [
+                {
+                    "id": ordem.id,
+                    "cor": meta["cor"],
+                    "data_carga": meta["data_carga"].strftime("%Y-%m-%d")
+                } for ordem, meta in zip(ordens_objs, ordens_metadata)
+            ]
+        }
