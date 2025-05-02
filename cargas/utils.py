@@ -13,6 +13,7 @@ from django.db import transaction
 from apontamento_montagem.models import Ordem, PecasOrdem
 from cadastro.models import Maquina
 from django.conf import settings
+from django.contrib.staticfiles import finders
 
 # Carregar variáveis do arquivo .env
 load_dotenv()
@@ -408,7 +409,10 @@ def gerar_arquivos(data_inicial, data_final, setor):
                     # Criar um novo Workbook para cada conjunto de 21 linhas
                     # wb = Workbook()
                     # caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', 'modelo_op_montagem.xlsx')
-                    caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelo_excel', 'modelo_op_montagem.xlsx')
+                    caminho_modelo = finders.find('modelo_excel/modelo_op_pintura.xlsx')
+                    if not caminho_modelo:
+                        raise FileNotFoundError("Arquivo não encontrado via staticfiles finder")
+
                     wb = load_workbook(caminho_modelo)
                     ws = wb.active
 
