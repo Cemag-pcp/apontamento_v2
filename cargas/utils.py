@@ -8,6 +8,11 @@ from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 
+from django.utils.timezone import now
+from django.db import transaction
+from apontamento_montagem.models import Ordem, PecasOrdem
+from cadastro.models import Maquina
+
 # Carregar variáveis do arquivo .env
 load_dotenv()
 
@@ -645,6 +650,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
 def gerar_sequenciamento(data_inicial, data_final, setor):
     filenames = []
     resultado = criar_array_datas(data_inicial, data_final)
+    print(resultado)
     base_carretas_original, base_carga_original = get_data_from_sheets()
 
     base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
@@ -662,12 +668,12 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
     base_carga_original.dropna(inplace=True)
     base_carga_original.reset_index(drop=True)
 
+    tab_resultado = pd.DataFrame() 
+
     for idx, data_escolhida in enumerate(resultado):
         data_nome_planilha = data_escolhida.replace("/","-")[:5]
         base_carretas = base_carretas_original.copy()
         base_carga = base_carga_original.copy()
-
-        print(data_escolhida)
 
         if setor == 'pintura':
 
@@ -1133,17 +1139,9 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             # Chamar a função de inserção
             # insert_montagem(data_formatada, data_insert_sql, check_atualizar_base_carga)
 
-        tab_completa = pd.concat([tab_completa, tab_completa], ignore_index=True)
+        tab_resultado = pd.concat([tab_completa, tab_resultado], ignore_index=True)
     
-    return tab_completa
-
-
-
-from datetime import datetime
-from django.utils.timezone import now
-from django.db import transaction
-from apontamento_montagem.models import Ordem, PecasOrdem
-from cadastro.models import Maquina
+    return tab_resultado
 
 def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
 

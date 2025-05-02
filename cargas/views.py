@@ -141,7 +141,6 @@ def gerar_dados_sequenciamento(request):
 
     return JsonResponse({"message": "Sequenciamento gerado com sucesso!", "detalhes": resultado})
 
-
 @csrf_exempt
 def atualizar_ordem_existente(request):
     

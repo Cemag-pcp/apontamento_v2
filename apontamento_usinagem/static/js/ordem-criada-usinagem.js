@@ -435,7 +435,6 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                         <h6 class="card-title mb-0"><small>#${ordem.ordem} - ${ordem.maquina}</small></h6>
                         <small class="text-white">
                             Planejada: ${ordem.totais.qtd_planejada || 0} 
-                            Realizada: ${ordem.totais.qtd_boa || 0} 
                         </small>
                     </div>
                     <div class="card-body bg-light">
