@@ -181,7 +181,7 @@ def atualizar_ordem_existente(request):
         Ordem.objects.annotate(
             total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
         ).filter(
-            total_produzido=0,  # Apenas ordens SEM apontamento
+            Q(total_produzido=0) | Q(total_produzido__isnull=True),
             data_carga__in=intervalo_datas_formatado
         ).delete()
 

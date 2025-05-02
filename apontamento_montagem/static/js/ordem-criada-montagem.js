@@ -66,7 +66,7 @@ export const loadOrdens = (container, filtros = {}) => {
                             <td data-label="Código Conjunto">
                                 <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca}" 
                                 target="_blank" rel="noopener noreferrer">
-                                ${truncateText(ordem.peca, 15)}
+                                ${truncateText(ordem.peca, 100)}
                                 </a>
                             </td>
                             <td data-label="Status"><span class="${badgeClass}">${ordem.ordem__status_atual.replace("_", " ")}</span></td>
