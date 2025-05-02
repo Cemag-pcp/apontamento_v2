@@ -406,8 +406,9 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 filtrar = filtrar.reset_index(drop=True)
                 while start_index < len(filtrar):
                     # Criar um novo Workbook para cada conjunto de 21 linhas
-                    wb = Workbook()
-                    wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_pintura.xlsx')
+                    # wb = Workbook()
+                    caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelos', 'modelo_op_pintura.xlsx')
+                    wb = load_workbook(caminho_modelo)
                     ws = wb.active
 
                     k = 9  # Início da linha no Excel
@@ -606,9 +607,9 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
                 while start_index < len(filtrar):
                     # Criar um novo Workbook para cada conjunto de 21 linhas
-                    wb = Workbook()
-                    # wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_montagem.xlsx')
+                    # wb = Workbook()
                     caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelos', 'modelo_op_montagem.xlsx')
+                    wb = load_workbook(caminho_modelo)
                     ws = wb.active
 
                     # Define o limite superior para as linhas deste arquivo
