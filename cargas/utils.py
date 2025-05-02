@@ -407,7 +407,8 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 while start_index < len(filtrar):
                     # Criar um novo Workbook para cada conjunto de 21 linhas
                     # wb = Workbook()
-                    caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelos', 'modelo_op_pintura.xlsx')
+                    # caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', 'modelo_op_montagem.xlsx')
+                    caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelo_excel', 'modelo_op_montagem.xlsx')
                     wb = load_workbook(caminho_modelo)
                     ws = wb.active
 
@@ -608,7 +609,8 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 while start_index < len(filtrar):
                     # Criar um novo Workbook para cada conjunto de 21 linhas
                     # wb = Workbook()
-                    caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelos', 'modelo_op_montagem.xlsx')
+                    # caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', 'modelo_op_montagem.xlsx')
+                    caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelo_excel', 'modelo_op_montagem.xlsx')
                     wb = load_workbook(caminho_modelo)
                     ws = wb.active
 
