@@ -21,16 +21,13 @@ export const loadOrdens = (container, filtros = {}) => {
                     tableWrapper.classList.add("table-container");
     
                     const table = document.createElement('table');
-                    table.classList.add('table', 'table-bordered', 'table-striped', 'header-fixed');
+                    table.classList.add('table', 'table-bordered', 'table-striped', 'header-fixed', 'responsive-table');
 
                     table.innerHTML = `
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 10%;">Ch. Ordem</th>
-                                <th style="width: 15%;">Data Programação</th>
                                 <th style="width: 15%;">Código Conjunto</th>
                                 <th style="width: 10%;">Status</th>
-                                <th style="width: 10%;">Máquina</th>
                                 <th style="width: 10%;">Qtd. a Fazer</th>
                                 <th style="width: 10%;">Qtd. Feita</th>
                                 <th style="width: 10%;">Ação</th>
@@ -66,19 +63,16 @@ export const loadOrdens = (container, filtros = {}) => {
                         }
 
                         linha.innerHTML = `
-                            <td>#${ordem.ordem}</td>
-                            <td>${ordem.ordem__data_programacao}</td>
-                            <td>
+                            <td data-label="Código Conjunto">
                                 <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca}" 
                                 target="_blank" rel="noopener noreferrer">
-                                    ${ordem.peca}
+                                ${truncateText(ordem.peca, 100)}
                                 </a>
                             </td>
-                            <td><span class="${badgeClass}">${ordem.ordem__status_atual.replace("_", " ")}</span></td>
-                            <td>${ordem.ordem__maquina__nome}</td>
-                            <td>${ordem.restante}</td>
-                            <td>${ordem.total_boa}</td>
-                            <td><button class="btn btn-sm btn-primary btn-start">Iniciar</button></td>
+                            <td data-label="Status"><span class="${badgeClass}">${ordem.ordem__status_atual.replace("_", " ")}</span></td>
+                            <td data-label="Qtd. a Fazer">${ordem.restante}</td>
+                            <td data-label="Qtd. Feita">${ordem.total_boa}</td>
+                            <td data-label="Ação"><button class="btn btn-sm btn-primary btn-start">Iniciar</button></td>
                         `;
 
                         tabelaCorpo.appendChild(linha);
@@ -134,6 +128,10 @@ export const loadOrdens = (container, filtros = {}) => {
 };
 
 let currentOrdemId = null;
+
+function truncateText(text, maxLength) {
+    return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
+}
 
 // Usando delegação de eventos para capturar o clique no botão "Iniciar"
 document.addEventListener('click', function(e) {

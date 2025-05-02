@@ -179,15 +179,15 @@ def atualizar_status_ordem(request):
 
         with transaction.atomic():  # Entra na transação somente após garantir que todos os objetos existem
             # Verifica se já existe uma ordem iniciada na mesma máquina
-            if status == 'iniciada' and maquina_nome:
-                ordem_em_andamento = Ordem.objects.filter(
-                    maquina=maquina_nome, status_atual='iniciada'
-                ).exclude(id=ordem.id).exists()
+            # if status == 'iniciada' and maquina_nome:
+            #     ordem_em_andamento = Ordem.objects.filter(
+            #         maquina=maquina_nome, status_atual='iniciada'
+            #     ).exclude(id=ordem.id).exists()
 
-                if ordem_em_andamento:
-                    return JsonResponse({
-                        'error': f'Já existe uma ordem iniciada para essa máquina ({maquina_nome}).'
-                    }, status=400)
+            #     if ordem_em_andamento:
+            #         return JsonResponse({
+            #             'error': f'Já existe uma ordem iniciada para essa máquina ({maquina_nome}).'
+            #         }, status=400)
 
             # Finaliza o processo atual (se existir)
             processo_atual = ordem.processos.filter(data_fim__isnull=True).first()

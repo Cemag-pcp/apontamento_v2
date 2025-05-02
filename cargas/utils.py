@@ -8,6 +8,16 @@ from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 
+from django.utils.timezone import now
+from django.db import transaction
+from apontamento_montagem.models import PecasOrdem as POM
+from apontamento_pintura.models import PecasOrdem as POP
+from core.models import Ordem
+from cadastro.models import Maquina
+from django.conf import settings
+from django.contrib.staticfiles import finders
+from django.db.models import Max
+
 # Carregar variáveis do arquivo .env
 load_dotenv()
 
@@ -398,10 +408,41 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 ).sum().reset_index()
                 filtrar.sort_values(by=['Célula'], inplace=True)
                 filtrar = filtrar.reset_index(drop=True)
+
+                arquivo_modelo = 'modelo_excel/modelo_op_pintura.xlsx'
+
                 while start_index < len(filtrar):
-                    # Criar um novo Workbook para cada conjunto de 21 linhas
-                    wb = Workbook()
-                    wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_pintura.xlsx')
+                # Criar um novo Workbook para cada conjunto de 21 linhas
+                # Tente encontrar o arquivo usando finders
+                    caminho_modelo = finders.find(arquivo_modelo)
+                    print(f"Caminho retornado pelo finder: {caminho_modelo}")
+                    
+                    # Se não encontrou, vamos verificar o caminho manualmente
+                    if not caminho_modelo:
+                        # Tente construir caminhos alternativos para localizar o arquivo
+                        caminhos_possiveis = [
+                            os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                            os.path.join(settings.STATIC_ROOT, 'modelo_excel', os.path.basename(arquivo_modelo)) if hasattr(settings, 'STATIC_ROOT') else None,
+                            os.path.join(settings.BASE_DIR, 'staticfiles', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                        ]
+                        
+                        # Filtra para remover caminhos None
+                        caminhos_possiveis = [p for p in caminhos_possiveis if p]
+                        
+                        # Tente cada um dos caminhos possíveis
+                        for caminho in caminhos_possiveis:
+                            print(f"Verificando caminho: {caminho}")
+                            if os.path.exists(caminho):
+                                caminho_modelo = caminho
+                                print(f"Arquivo encontrado em: {caminho_modelo}")
+                                break
+                    
+                    # Se ainda não encontrou, levante erro personalizado
+                    if not caminho_modelo:
+                        raise FileNotFoundError(f"Arquivo {arquivo_modelo} não encontrado em nenhum caminho conhecido")
+                    
+                    # Carrega o workbook
+                    wb = load_workbook(caminho_modelo)
                     ws = wb.active
 
                     k = 9  # Início da linha no Excel
@@ -598,10 +639,40 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 # Índice inicial para controle de divisão em blocos
                 start_index = 0
 
+                arquivo_modelo = 'modelo_excel/modelo_op_montagem.xlsx'
+
                 while start_index < len(filtrar):
                     # Criar um novo Workbook para cada conjunto de 21 linhas
-                    wb = Workbook()
-                    wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_montagem.xlsx')
+                    # Tente encontrar o arquivo usando finders
+                    caminho_modelo = finders.find(arquivo_modelo)
+                    print(f"Caminho retornado pelo finder: {caminho_modelo}")
+                    
+                    # Se não encontrou, vamos verificar o caminho manualmente
+                    if not caminho_modelo:
+                        # Tente construir caminhos alternativos para localizar o arquivo
+                        caminhos_possiveis = [
+                            os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                            os.path.join(settings.STATIC_ROOT, 'modelo_excel', os.path.basename(arquivo_modelo)) if hasattr(settings, 'STATIC_ROOT') else None,
+                            os.path.join(settings.BASE_DIR, 'staticfiles', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                        ]
+                        
+                        # Filtra para remover caminhos None
+                        caminhos_possiveis = [p for p in caminhos_possiveis if p]
+                        
+                        # Tente cada um dos caminhos possíveis
+                        for caminho in caminhos_possiveis:
+                            print(f"Verificando caminho: {caminho}")
+                            if os.path.exists(caminho):
+                                caminho_modelo = caminho
+                                print(f"Arquivo encontrado em: {caminho_modelo}")
+                                break
+                    
+                    # Se ainda não encontrou, levante erro personalizado
+                    if not caminho_modelo:
+                        raise FileNotFoundError(f"Arquivo {arquivo_modelo} não encontrado em nenhum caminho conhecido")
+                    
+                    # Carrega o workbook
+                    wb = load_workbook(caminho_modelo)
                     ws = wb.active
 
                     # Define o limite superior para as linhas deste arquivo
@@ -645,6 +716,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
 def gerar_sequenciamento(data_inicial, data_final, setor):
     filenames = []
     resultado = criar_array_datas(data_inicial, data_final)
+    print(resultado)
     base_carretas_original, base_carga_original = get_data_from_sheets()
 
     base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
@@ -661,6 +733,8 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
                                             'PED_QUANTIDADE': 'Qtde'})
     base_carga_original.dropna(inplace=True)
     base_carga_original.reset_index(drop=True)
+
+    tab_resultado = pd.DataFrame() 
 
     for idx, data_escolhida in enumerate(resultado):
         data_nome_planilha = data_escolhida.replace("/","-")[:5]
@@ -1131,6 +1205,202 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             # Chamar a função de inserção
             # insert_montagem(data_formatada, data_insert_sql, check_atualizar_base_carga)
 
-        tab_completa = pd.concat([tab_completa, tab_completa], ignore_index=True)
+        tab_resultado = pd.concat([tab_completa, tab_resultado], ignore_index=True)
     
-    return tab_completa
+    return tab_resultado
+
+def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
+
+    if not ordens_data:
+        return {"error": "Nenhuma ordem fornecida!", "status": 400}
+
+    # Coletar datas únicas e validar
+    try:
+        datas_requisicao = {
+            datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
+            for o in ordens_data if o.get("data_carga")
+        }
+    except ValueError:
+        return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
+
+    # Verifica datas já com carga
+    datas_existentes = set(
+        Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina=grupo_maquina)
+        .values_list("data_carga", flat=True)
+    )
+    datas_bloqueadas = datas_existentes & datas_requisicao
+    if not atualizacao_ordem and datas_bloqueadas:
+        return {
+            "error": f"Datas já com carga alocada: {', '.join(map(str, datas_bloqueadas))}",
+            "status": 400
+        }
+
+    # Verifica máquinas existentes
+    maquinas_requisicao = {o.get("setor_conjunto") for o in ordens_data if o.get("setor_conjunto")}
+    maquinas_existentes = set(Maquina.objects.filter(nome__in=maquinas_requisicao).values_list("nome", flat=True))
+    maquinas_faltantes = maquinas_requisicao - maquinas_existentes
+    if maquinas_faltantes:
+        return {
+            "error": f"Máquinas não cadastradas: {', '.join(maquinas_faltantes)}",
+            "status": 400
+        }
+
+    # Coletar datas únicas e validar
+    try:
+        formato_data = "%Y-%d-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
+        datas_requisicao = {
+            datetime.strptime(o["data_carga"], formato_data).date()
+            for o in ordens_data if o.get("data_carga")
+        }
+    except ValueError:
+        return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
+
+    # Criação em lote
+    # Pega a última ordem atual no banco
+    ultimo_numero = Ordem.objects.filter(grupo_maquina=grupo_maquina).aggregate(Max('ordem'))['ordem__max'] or 0
+
+    with transaction.atomic():
+        ordens_objs = []
+        ordens_metadata = []
+
+        for i, o in enumerate(ordens_data):
+            data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+
+            nova_ordem = Ordem(
+                grupo_maquina=grupo_maquina,
+                status_atual="aguardando_iniciar",
+                obs=o.get("obs", ""),
+                cor=o.get("cor"),
+                data_criacao=now(),
+                data_carga=data_carga,
+                ordem=ultimo_numero + i + 1  # atribui manualmente a ordem
+            )
+
+            try:
+                maquina = Maquina.objects.get(nome=o["setor_conjunto"])
+                nova_ordem.maquina = maquina
+                # calcula data_programacao manualmente
+                nova_ordem.data_programacao = data_carga - timedelta(days=3)
+                while nova_ordem.data_programacao.weekday() in [5, 6]:
+                    nova_ordem.data_programacao -= timedelta(days=1)
+            except Maquina.DoesNotExist:
+                return {"error": f"Máquina '{o['setor_conjunto']}' não cadastrada.", "status": 400}
+
+            ordens_objs.append(nova_ordem)
+            ordens_metadata.append({
+                "peca_nome": o["peca_nome"],
+                "qtd_planejada": o.get("qtd_planejada", 0),
+                "data_carga": data_carga,
+                "cor": o.get("cor")
+            })
+
+        Ordem.objects.bulk_create(ordens_objs)
+
+        pecas_objs = [
+            POM(
+                ordem=ordem,
+                peca=meta["peca_nome"],
+                qtd_planejada=meta["qtd_planejada"],
+                qtd_boa=0,
+                qtd_morta=0
+            ) for ordem, meta in zip(ordens_objs, ordens_metadata)
+        ]
+
+        POM.objects.bulk_create(pecas_objs)
+    
+        return {
+            "message": "Ordens criadas com sucesso.",
+            "ordens": [
+                {
+                    "id": ordem.id,
+                    "data_carga": meta["data_carga"].strftime("%Y-%m-%d")
+                } for ordem, meta in zip(ordens_objs, ordens_metadata)
+            ]
+        }
+
+def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina="pintura"):
+
+    if not ordens_data:
+        return {"error": "Nenhuma ordem fornecida!", "status": 400}
+
+    # Coletar datas únicas e validar
+    try:
+        formato_data = "%Y-%d-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
+        datas_requisicao = {
+            datetime.strptime(o["data_carga"], formato_data).date()
+            for o in ordens_data if o.get("data_carga")
+        }
+    except ValueError:
+        return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
+
+    # Verifica datas já com carga
+    datas_existentes = set(
+        Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina=grupo_maquina)
+        .values_list("data_carga", flat=True)
+    )
+    datas_bloqueadas = datas_existentes & datas_requisicao
+    if not atualizacao_ordem and datas_bloqueadas:
+        return {
+            "error": f"Datas já com carga alocada: {', '.join(map(str, datas_bloqueadas))}",
+            "status": 400
+        }
+
+    pecas_objs = []
+
+    ultimo_numero = Ordem.objects.filter(grupo_maquina=grupo_maquina).aggregate(
+        Max('ordem')
+    )['ordem__max'] or 0
+
+    with transaction.atomic():
+        ordens_objs = []
+        ordens_metadata = []
+
+        for i, o in enumerate(ordens_data):
+            data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+
+            nova_ordem = Ordem(
+                grupo_maquina=grupo_maquina,
+                status_atual="aguardando_iniciar",
+                obs=o.get("obs", ""),
+                cor=o.get("cor"),
+                data_criacao=now(),
+                data_carga=data_carga,
+                ordem=ultimo_numero + i + 1  # aqui é o número da ordem
+            )
+
+            nova_ordem.data_programacao = data_carga - timedelta(days=1)
+            while nova_ordem.data_programacao.weekday() in [5, 6]:
+                nova_ordem.data_programacao -= timedelta(days=1)
+
+            ordens_objs.append(nova_ordem)
+            ordens_metadata.append({
+                "peca_nome": o["peca_nome"],
+                "qtd_planejada": o.get("qtd_planejada", 0),
+                "data_carga": data_carga,
+                "cor": o.get("cor")
+            })
+
+        Ordem.objects.bulk_create(ordens_objs)
+
+        pecas_objs = [
+            POP(
+                ordem=ordem,
+                peca=meta["peca_nome"],
+                qtd_planejada=meta["qtd_planejada"],
+                qtd_boa=0,
+                qtd_morta=0
+            ) for ordem, meta in zip(ordens_objs, ordens_metadata)
+        ]
+
+        POP.objects.bulk_create(pecas_objs)
+
+        return {
+            "message": "Ordens criadas com sucesso.",
+            "ordens": [
+                {
+                    "id": ordem.id,
+                    "cor": meta["cor"],
+                    "data_carga": meta["data_carga"].strftime("%Y-%m-%d")
+                } for ordem, meta in zip(ordens_objs, ordens_metadata)
+            ]
+        }
