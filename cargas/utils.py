@@ -405,14 +405,40 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 ).sum().reset_index()
                 filtrar.sort_values(by=['Célula'], inplace=True)
                 filtrar = filtrar.reset_index(drop=True)
-                while start_index < len(filtrar):
-                    # Criar um novo Workbook para cada conjunto de 21 linhas
-                    # wb = Workbook()
-                    # caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', 'modelo_op_montagem.xlsx')
-                    caminho_modelo = finders.find('modelo_excel/modelo_op_pintura.xlsx')
-                    if not caminho_modelo:
-                        raise FileNotFoundError("Arquivo não encontrado via staticfiles finder")
 
+                arquivo_modelo = 'modelo_excel/modelo_op_pintura.xlsx'
+
+                while start_index < len(filtrar):
+                # Criar um novo Workbook para cada conjunto de 21 linhas
+                # Tente encontrar o arquivo usando finders
+                    caminho_modelo = finders.find(arquivo_modelo)
+                    print(f"Caminho retornado pelo finder: {caminho_modelo}")
+                    
+                    # Se não encontrou, vamos verificar o caminho manualmente
+                    if not caminho_modelo:
+                        # Tente construir caminhos alternativos para localizar o arquivo
+                        caminhos_possiveis = [
+                            os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                            os.path.join(settings.STATIC_ROOT, 'modelo_excel', os.path.basename(arquivo_modelo)) if hasattr(settings, 'STATIC_ROOT') else None,
+                            os.path.join(settings.BASE_DIR, 'staticfiles', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                        ]
+                        
+                        # Filtra para remover caminhos None
+                        caminhos_possiveis = [p for p in caminhos_possiveis if p]
+                        
+                        # Tente cada um dos caminhos possíveis
+                        for caminho in caminhos_possiveis:
+                            print(f"Verificando caminho: {caminho}")
+                            if os.path.exists(caminho):
+                                caminho_modelo = caminho
+                                print(f"Arquivo encontrado em: {caminho_modelo}")
+                                break
+                    
+                    # Se ainda não encontrou, levante erro personalizado
+                    if not caminho_modelo:
+                        raise FileNotFoundError(f"Arquivo {arquivo_modelo} não encontrado em nenhum caminho conhecido")
+                    
+                    # Carrega o workbook
                     wb = load_workbook(caminho_modelo)
                     ws = wb.active
 
@@ -610,11 +636,39 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 # Índice inicial para controle de divisão em blocos
                 start_index = 0
 
+                arquivo_modelo = 'modelo_excel/modelo_op_montagem.xlsx'
+
                 while start_index < len(filtrar):
                     # Criar um novo Workbook para cada conjunto de 21 linhas
-                    # wb = Workbook()
-                    # caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', 'modelo_op_montagem.xlsx')
-                    caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelo_excel', 'modelo_op_montagem.xlsx')
+                    # Tente encontrar o arquivo usando finders
+                    caminho_modelo = finders.find(arquivo_modelo)
+                    print(f"Caminho retornado pelo finder: {caminho_modelo}")
+                    
+                    # Se não encontrou, vamos verificar o caminho manualmente
+                    if not caminho_modelo:
+                        # Tente construir caminhos alternativos para localizar o arquivo
+                        caminhos_possiveis = [
+                            os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                            os.path.join(settings.STATIC_ROOT, 'modelo_excel', os.path.basename(arquivo_modelo)) if hasattr(settings, 'STATIC_ROOT') else None,
+                            os.path.join(settings.BASE_DIR, 'staticfiles', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                        ]
+                        
+                        # Filtra para remover caminhos None
+                        caminhos_possiveis = [p for p in caminhos_possiveis if p]
+                        
+                        # Tente cada um dos caminhos possíveis
+                        for caminho in caminhos_possiveis:
+                            print(f"Verificando caminho: {caminho}")
+                            if os.path.exists(caminho):
+                                caminho_modelo = caminho
+                                print(f"Arquivo encontrado em: {caminho_modelo}")
+                                break
+                    
+                    # Se ainda não encontrou, levante erro personalizado
+                    if not caminho_modelo:
+                        raise FileNotFoundError(f"Arquivo {arquivo_modelo} não encontrado em nenhum caminho conhecido")
+                    
+                    # Carrega o workbook
                     wb = load_workbook(caminho_modelo)
                     ws = wb.active
 
