@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/verificar-dados-ordem/', views.verificar_mp_pecas_na_ordem, name='verificar_ordem'),
     path('api/duplicar-ordem/', views.duplicar_ordem, name='duplicar_ordem'),
     path('api/excluir-peca-ordem/', views.excluir_peca_ordem, name='excluir_peca_ordem'),
+    path('api/retornar-processo/', views.retornar_processo, name='retornar_processo'),
 
     path('atualizar-propriedades/', views.atualizar_propriedades_ordem, name='atualizar_propriedades_ordem'),
     path('atualizar-pecas/', views.atualizar_pecas_ordem, name='atualizar_pecas_ordem'),
