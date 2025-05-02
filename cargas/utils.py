@@ -8,10 +8,12 @@ from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 
+from django.db.models import Max
 from django.utils.timezone import now
 from django.db import transaction
 from apontamento_montagem.models import Ordem, PecasOrdem
 from cadastro.models import Maquina
+from django.conf import settings
 
 # Carregar variáveis do arquivo .env
 load_dotenv()
@@ -606,7 +608,10 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 while start_index < len(filtrar):
                     # Criar um novo Workbook para cada conjunto de 21 linhas
                     wb = Workbook()
-                    wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_montagem.xlsx')
+                    # wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_montagem.xlsx')
+                    caminho_modelo = os.path.join(settings.BASE_DIR, 'cargas', 'modelos', 'modelo_op_montagem.xlsx')
+                    wb = load_workbook(caminho_modelo)
+
                     ws = wb.active
 
                     # Define o limite superior para as linhas deste arquivo
@@ -1183,9 +1188,20 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
     with transaction.atomic():
         ordens_objs = []
         ordens_metadata = []
-        for o in ordens_data:
+
+        # Busca o último número de ordem para o grupo atual
+        ultimo_numero = Ordem.objects.filter(grupo_maquina=grupo_maquina).aggregate(
+            Max('ordem')
+        )['ordem__max'] or 0
+
+        for index, o in enumerate(ordens_data):
             data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
             maquina = Maquina.objects.get(nome=o["setor_conjunto"])
+
+            numero_ordem = None
+            if grupo_maquina not in ['laser_1', 'laser_2', 'plasma']:
+                numero_ordem = ultimo_numero + index + 1  # incrementa baseado na posição
+
             ordem = Ordem(
                 grupo_maquina=grupo_maquina,
                 status_atual="aguardando_iniciar",
@@ -1193,8 +1209,21 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
                 cor=o.get("cor"),
                 data_criacao=now(),
                 data_carga=data_carga,
-                maquina=maquina
+                maquina=maquina,
+                ordem=numero_ordem
             )
+
+            # Define data_programacao manualmente se aplicável
+            if grupo_maquina == 'montagem':
+                ordem.data_programacao = data_carga - timedelta(days=3)
+                while ordem.data_programacao.weekday() in [5, 6]:
+                    ordem.data_programacao -= timedelta(days=1)
+
+            elif grupo_maquina == 'pintura':
+                ordem.data_programacao = data_carga - timedelta(days=1)
+                while ordem.data_programacao.weekday() in [5, 6]:
+                    ordem.data_programacao -= timedelta(days=1)
+
             ordens_objs.append(ordem)
             ordens_metadata.append({
                 "peca_nome": o["peca_nome"],
@@ -1260,13 +1289,23 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
     with transaction.atomic():
         for o in ordens_data:
             data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+
+            # Geração manual do número da ordem se necessário
+            ordem_num = None
+            if grupo_maquina not in ['laser_1', 'laser_2', 'plasma']:
+                ultimo_numero = Ordem.objects.filter(grupo_maquina=grupo_maquina).aggregate(
+                    Max('ordem')
+                )['ordem__max'] or 0
+                ordem_num = ultimo_numero + len(ordens_objs) + 1  # +1 por ser nova, +len(ordens_objs) para evitar repetição em loop
+
             nova_ordem = Ordem(
                 grupo_maquina=grupo_maquina,
                 status_atual="aguardando_iniciar",
                 obs=o.get("obs", ""),
                 cor=o.get("cor"),
                 data_criacao=now(),
-                data_carga=data_carga
+                data_carga=data_carga,
+                ordem=ordem_num
             )
 
             if grupo_maquina == "montagem":
@@ -1275,6 +1314,17 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
                     nova_ordem.maquina = maquina
                 except Maquina.DoesNotExist:
                     return {"error": f"Máquina '{o['setor_conjunto']}' não cadastrada.", "status": 400}
+
+            # Lógica para data_programacao sem save()
+            if grupo_maquina == 'montagem' and data_carga:
+                nova_ordem.data_programacao = data_carga - timedelta(days=3)
+                while nova_ordem.data_programacao.weekday() in [5, 6]:
+                    nova_ordem.data_programacao -= timedelta(days=1)
+
+            elif grupo_maquina == 'pintura' and data_carga:
+                nova_ordem.data_programacao = data_carga - timedelta(days=1)
+                while nova_ordem.data_programacao.weekday() in [5, 6]:
+                    nova_ordem.data_programacao -= timedelta(days=1)
 
             ordens_objs.append(nova_ordem)
             ordens_metadata.append({

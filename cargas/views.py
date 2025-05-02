@@ -238,24 +238,10 @@ def atualizar_ordem_existente(request):
                 "setor_conjunto": row["Célula"]
             })
 
-    # # Obtém os cookies da sessão atual
-    # session_cookies = request.COOKIES.get("sessionid")
-
-    # # Chamar API de criar ordem com as novas ordens
-    # response_ordem = requests.post(
-    #     request.build_absolute_uri(reverse("pintura:criar_ordem")) if setor == "pintura" else request.build_absolute_uri(reverse("montagem:criar_ordem")),
-    #     json={"ordens": ordens, "atualizacao_ordem": True},
-    #     headers={"Content-Type": "application/json"},
-    #     cookies={"sessionid": session_cookies},  # Inclui o cookie da sessão
-    # )
-
-    # if response_ordem.status_code != 200:
-    #     return HttpResponse("Erro ao criar ordens.", status=500)
-
     if setor.lower() == 'montagem':
-        resultado = processar_ordens_montagem(ordens, grupo_maquina=setor.lower())
+        resultado = processar_ordens_montagem(ordens, atualizacao_ordem=True, grupo_maquina=setor.lower())
     else:
-        resultado = processar_ordens_pintura(ordens, grupo_maquina=setor.lower())
+        resultado = processar_ordens_pintura(ordens, atualizacao_ordem=True, grupo_maquina=setor.lower())
 
     if "error" in resultado:
         return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
@@ -517,7 +503,7 @@ def historico_ordens_pintura(request):
     if data_carga:
         try:
             data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
-            filtros_ordem['data_carga'] = data_carga  # Removida a vírgula extra
+            filtros_ordem['data_carga'] = data_carga
         except ValueError:
             return JsonResponse({"error": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
     if cor:
