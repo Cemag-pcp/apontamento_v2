@@ -646,7 +646,7 @@ def planejamento(request):
 
 def buscar_maquinas(request):
 
-    maquinas = Maquina.objects.filter(setor__nome='montagem').values('id','nome')
+    maquinas = Maquina.objects.filter(setor__nome='montagem', tipo='maquina').values('id','nome')
 
     return JsonResponse({"maquinas":list(maquinas)})
 
