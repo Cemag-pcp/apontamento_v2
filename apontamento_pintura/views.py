@@ -1,6 +1,6 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.utils.timezone import now
+from django.utils.timezone import now,localtime
 from django.core.paginator import Paginator
 from django.db.models import Sum, Q, Prefetch, Count, OuterRef, Subquery, F, Value, Avg
 from core.models import Profile
@@ -1000,3 +1000,30 @@ def finalizar_retrabalho_pintura(request):
         return JsonResponse(
             {"error": f"Erro interno do servidor: {str(e)}"}, status=500
         )
+
+def api_ordens_finalizadas(request):
+
+    data = []
+
+    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-08"
+                                  ).prefetch_related('ordem_pecas_pintura').order_by('ultima_atualizacao')
+
+    for ordem in ordens:
+        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
+
+        # converte e formata a data no timezone local
+        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
+
+        for peca in ordem.ordem_pecas_pintura.all():
+            if peca.qtd_boa > 0:
+                data.append({
+                    "ordem": ordem.ordem,
+                    "peca": peca.peca,
+                    "qtd_planejada": peca.qtd_planejada,
+                    "qtd_morta": peca.qtd_morta,
+                    "operador": operador,
+                    "data_finalizacao": data_finalizacao,
+                    "total_produzido": peca.qtd_boa
+                })
+
+    return JsonResponse(data, safe=False)
