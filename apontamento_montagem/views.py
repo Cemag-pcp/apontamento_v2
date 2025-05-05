@@ -730,9 +730,13 @@ def api_ordens_finalizadas(request):
 
     data = []
 
-    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-08"
-                                  ).prefetch_related('ordem_pecas_montagem').order_by('ultima_atualizacao')
-
+    ordens = Ordem.objects.filter(
+        status_atual='finalizada',
+        ultima_atualizacao__gte="2025-04-08"
+    ).select_related('operador_final') \
+    .prefetch_related('ordem_pecas_montagem') \
+    .order_by('ultima_atualizacao')
+    
     for ordem in ordens:
         operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
 
