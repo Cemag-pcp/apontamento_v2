@@ -1,6 +1,6 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.utils.timezone import now
+from django.utils.timezone import now,localtime
 from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q
 from django.db import transaction, models, IntegrityError
 from django.shortcuts import get_object_or_404
@@ -48,11 +48,12 @@ def criar_ordem(request):
 
         # Coletar todas as datas únicas na requisição
         datas_requisicao = set()
+
         for ordem_info in ordens_data:
             data_carga_str = ordem_info.get('data_carga')
             if data_carga_str:
                 try:
-                    data_carga = datetime.strptime(data_carga_str, "%Y-%d-%m").date()
+                    data_carga = datetime.strptime(data_carga_str, "%d/%m/%Y").date()
                     datas_requisicao.add(data_carga)
                 except ValueError:
                     return JsonResponse({'error': 'Formato de data inválido! Use YYYY-MM-DD.'}, status=400)
@@ -270,6 +271,9 @@ def atualizar_status_ordem(request):
                 # Se a nova quantidade ultrapassar a planejada, retorna erro
                 if total_apontado > peca.qtd_planejada:
                     return JsonResponse({'error': 'Quantidade produzida maior que a quantidade planejada.'}, status=400)
+                
+                if total_apontado <= 0:
+                    return JsonResponse({'error': 'Quantidade produzida tem que ser maior que zero.'}, status=400)
 
                 # Criando o novo registro de apontamento
                 nova_peca_ordem = PecasOrdem.objects.create(
@@ -725,3 +729,35 @@ def criar_ordem_fora_sequenciamento(request):
             qtd_morta=0
         )
         return JsonResponse({'message': 'Ordem criada com sucesso!'})
+
+def api_ordens_finalizadas(request):
+
+    data = []
+
+    ordens = Ordem.objects.filter(
+        status_atual='finalizada',
+        ultima_atualizacao__gte="2025-04-08"
+    ).select_related('operador_final') \
+    .prefetch_related('ordem_pecas_montagem') \
+    .order_by('ultima_atualizacao')
+
+    for ordem in ordens:
+        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
+
+        # converte e formata a data no timezone local
+        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
+
+        for peca in ordem.ordem_pecas_montagem.all():
+            if peca.qtd_boa > 0:
+                data.append({
+                    "ordem": ordem.ordem,
+                    "maquina": ordem.maquina.nome,
+                    "codigo": peca.peca.split(" - ", maxsplit=1)[0],  # código do conjunto
+                    "descricao": peca.peca.split(" - ", maxsplit=1)[1],  # descrição do conjunto
+                    "total_produzido": peca.qtd_boa,
+                    "data_carga": ordem.data_carga.strftime('%d/%m/%Y'),
+                    "operador": operador,
+                    "data_finalizacao": data_finalizacao,
+                })
+
+    return JsonResponse(data, safe=False)

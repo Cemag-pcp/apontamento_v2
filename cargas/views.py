@@ -86,6 +86,7 @@ def gerar_arquivos_sequenciamento(request):
     return response
     
 def gerar_dados_sequenciamento(request):
+
     """
     Chama a API 'criar_ordem'.
     """

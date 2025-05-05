@@ -2,6 +2,7 @@
 
 import json
 import os
+
 from django.core.management.base import BaseCommand
 from apontamento_montagem.models import ConjuntosInspecionados
 from django.conf import settings
