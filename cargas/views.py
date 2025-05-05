@@ -167,7 +167,8 @@ def atualizar_ordem_existente(request):
             total_produzido=Sum('ordem_pecas_montagem__qtd_boa')
         ).filter(
             total_produzido=0,  # Apenas ordens SEM apontamento
-            data_carga__in=intervalo_datas_formatado
+            data_carga__in=intervalo_datas_formatado,
+            grupo_maquina=setor
         ).delete()
 
         # Filtra ordens que ja possuem apontamentos
@@ -175,7 +176,8 @@ def atualizar_ordem_existente(request):
             total_produzido=Sum('ordem_pecas_montagem__qtd_boa')
         ).filter(
             total_produzido__gt=0,  # (qtd_boa > 0)
-            data_carga__in=intervalo_datas_formatado
+            data_carga__in=intervalo_datas_formatado,
+            grupo_maquina=setor
         )
     # para pintura
     else:
@@ -183,7 +185,8 @@ def atualizar_ordem_existente(request):
             total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
         ).filter(
             Q(total_produzido=0) | Q(total_produzido__isnull=True),
-            data_carga__in=intervalo_datas_formatado
+            data_carga__in=intervalo_datas_formatado,
+            grupo_maquina=setor
         ).delete()
 
         # Filtra ordens que ja possuem apontamentos
@@ -191,7 +194,8 @@ def atualizar_ordem_existente(request):
             total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
         ).filter(
             total_produzido__gt=0,  # (qtd_boa > 0)
-            data_carga__in=intervalo_datas_formatado
+            data_carga__in=intervalo_datas_formatado,
+            grupo_maquina=setor
         )
 
     # Gerar os arquivos e a tabela completa
