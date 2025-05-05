@@ -271,6 +271,9 @@ def atualizar_status_ordem(request):
                 # Se a nova quantidade ultrapassar a planejada, retorna erro
                 if total_apontado > peca.qtd_planejada:
                     return JsonResponse({'error': 'Quantidade produzida maior que a quantidade planejada.'}, status=400)
+                
+                if total_apontado <= 0:
+                    return JsonResponse({'error': 'Quantidade produzida tem que ser maior que zero.'}, status=400)
 
                 # Criando o novo registro de apontamento
                 nova_peca_ordem = PecasOrdem.objects.create(
