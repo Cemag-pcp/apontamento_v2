@@ -18,6 +18,9 @@ from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.db.models import Max
 
+import warnings
+warnings.filterwarnings("ignore")
+
 # Carregar variáveis do arquivo .env
 load_dotenv()
 
@@ -715,8 +718,8 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
 def gerar_sequenciamento(data_inicial, data_final, setor):
     filenames = []
+
     resultado = criar_array_datas(data_inicial, data_final)
-    print(resultado)
     base_carretas_original, base_carga_original = get_data_from_sheets()
 
     base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
@@ -1217,7 +1220,7 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
     # Coletar datas únicas e validar
     try:
         datas_requisicao = {
-            datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
+            datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
             for o in ordens_data if o.get("data_carga")
         }
     except ValueError:
@@ -1247,9 +1250,9 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
 
     # Coletar datas únicas e validar
     try:
-        formato_data = "%Y-%d-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
+        # formato_data = "%Y-%m-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
         datas_requisicao = {
-            datetime.strptime(o["data_carga"], formato_data).date()
+            datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
             for o in ordens_data if o.get("data_carga")
         }
     except ValueError:
@@ -1264,7 +1267,10 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
         ordens_metadata = []
 
         for i, o in enumerate(ordens_data):
-            data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+            try:
+                data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
+            except:
+                data_carga = datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
 
             nova_ordem = Ordem(
                 grupo_maquina=grupo_maquina,

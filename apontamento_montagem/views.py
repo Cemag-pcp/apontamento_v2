@@ -48,11 +48,12 @@ def criar_ordem(request):
 
         # Coletar todas as datas únicas na requisição
         datas_requisicao = set()
+
         for ordem_info in ordens_data:
             data_carga_str = ordem_info.get('data_carga')
             if data_carga_str:
                 try:
-                    data_carga = datetime.strptime(data_carga_str, "%Y-%d-%m").date()
+                    data_carga = datetime.strptime(data_carga_str, "%d/%m/%Y").date()
                     datas_requisicao.add(data_carga)
                 except ValueError:
                     return JsonResponse({'error': 'Formato de data inválido! Use YYYY-MM-DD.'}, status=400)
@@ -736,7 +737,7 @@ def api_ordens_finalizadas(request):
     ).select_related('operador_final') \
     .prefetch_related('ordem_pecas_montagem') \
     .order_by('ultima_atualizacao')
-    
+
     for ordem in ordens:
         operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
 
@@ -747,12 +748,13 @@ def api_ordens_finalizadas(request):
             if peca.qtd_boa > 0:
                 data.append({
                     "ordem": ordem.ordem,
-                    "peca": peca.peca,
-                    "qtd_planejada": peca.qtd_planejada,
-                    "qtd_morta": peca.qtd_morta,
+                    "maquina": ordem.maquina.nome,
+                    "codigo": peca.peca.split(" - ", maxsplit=1)[0],  # código do conjunto
+                    "descricao": peca.peca.split(" - ", maxsplit=1)[1],  # descrição do conjunto
+                    "total_produzido": peca.qtd_boa,
+                    "data_carga": ordem.data_carga.strftime('%d/%m/%Y'),
                     "operador": operador,
                     "data_finalizacao": data_finalizacao,
-                    "total_produzido": peca.qtd_boa
                 })
 
     return JsonResponse(data, safe=False)

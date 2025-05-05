@@ -136,7 +136,7 @@ def criar_ordem(request):
 
         for ordem in ordens_data:
             try:
-                data_carga = datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
+                data_carga = datetime.strptime(ordem['data_carga'], "%d/%m/%Y").date()
             except ValueError:
                 return JsonResponse({'error': 'Formato de data inválido! Use YYYY-MM-DD.'}, status=400)
 
