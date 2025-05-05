@@ -315,13 +315,8 @@ def adicionar_pecas_cambao(request):
 @csrf_exempt
 def finalizar_cambao(request):
     """
-    Finaliza um cambão, registrando as peças e liberando-o para novo uso.
+    Finaliza um cambão, registrando as peças e liberando para novo uso.
 
-    Exemplo de JSON esperado:
-    {
-        "cambao_id": 2,
-        "operador": 1
-    }
     """
 
     if request.method == "POST":
@@ -1002,28 +997,39 @@ def finalizar_retrabalho_pintura(request):
         )
 
 def api_ordens_finalizadas(request):
-
     data = []
 
-    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-08"
-                                  ).prefetch_related('ordem_pecas_pintura').order_by('ultima_atualizacao')
+    ordens = Ordem.objects.filter(
+        ultima_atualizacao__gte="2025-04-08"
+    ).select_related('operador_final') \
+     .prefetch_related('ordem_pecas_pintura') \
+     .order_by('ultima_atualizacao')
 
     for ordem in ordens:
-        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
-
-        # converte e formata a data no timezone local
         data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
 
         for peca in ordem.ordem_pecas_pintura.all():
+            print(peca)
             if peca.qtd_boa > 0:
+                # Busca o operador de início pelo primeiro cambão da peça
+                cambao_peca = CambaoPecas.objects.filter(peca_ordem=peca).order_by('data_pendura').first()
+                operador_inicio = (
+                    f"{cambao_peca.operador_inicio.matricula} - {cambao_peca.operador_inicio.nome}"
+                    if cambao_peca and cambao_peca.operador_inicio else None
+                )
+
                 data.append({
                     "ordem": ordem.ordem,
-                    "peca": peca.peca,
+                    "codigo": peca.peca.split(" - ", maxsplit=1)[0],
+                    "descricao": peca.peca.split(" - ", maxsplit=1)[1],
                     "qtd_planejada": peca.qtd_planejada,
-                    "qtd_morta": peca.qtd_morta,
-                    "operador": operador,
+                    "cor": ordem.cor,
+                    "total_produzido": peca.qtd_boa,
+                    "tipo": peca.tipo,
+                    "data_carga": ordem.data_carga.strftime('%d/%m/%Y'),
                     "data_finalizacao": data_finalizacao,
-                    "total_produzido": peca.qtd_boa
+                    "operador_inicial": operador_inicio,
+                    "operador_final": f"{peca.operador_fim.matricula} - {peca.operador_fim.nome}" if peca.operador_fim else None,
                 })
 
     return JsonResponse(data, safe=False)

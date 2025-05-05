@@ -735,7 +735,7 @@ def api_ordens_finalizadas(request):
     data = []
 
     ordens = Ordem.objects.filter(
-        status_atual='finalizada',
+        # status_atual='finalizada',
         ultima_atualizacao__gte="2025-04-08"
     ).select_related('operador_final') \
     .prefetch_related('ordem_pecas_montagem') \
@@ -756,8 +756,9 @@ def api_ordens_finalizadas(request):
                     "descricao": peca.peca.split(" - ", maxsplit=1)[1],  # descrição do conjunto
                     "total_produzido": peca.qtd_boa,
                     "data_carga": ordem.data_carga.strftime('%d/%m/%Y'),
-                    "operador": operador,
                     "data_finalizacao": data_finalizacao,
+                    "operador": operador,
+                    "obs": ordem.obs_operador,
                 })
 
     return JsonResponse(data, safe=False)
