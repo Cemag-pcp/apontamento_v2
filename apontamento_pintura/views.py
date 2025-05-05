@@ -1009,10 +1009,11 @@ def api_ordens_finalizadas(request):
         data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
 
         for peca in ordem.ordem_pecas_pintura.all():
-            print(peca)
             if peca.qtd_boa > 0:
-                # Busca o operador de início pelo primeiro cambão da peça
-                cambao_peca = CambaoPecas.objects.filter(peca_ordem=peca).order_by('data_pendura').first()
+
+                # Busca operador no CambaoPecas vinculado à primeira ocorrência
+                cambao_peca = CambaoPecas.objects.filter(peca_ordem__ordem=ordem).order_by('data_pendura').first()
+
                 operador_inicio = (
                     f"{cambao_peca.operador_inicio.matricula} - {cambao_peca.operador_inicio.nome}"
                     if cambao_peca and cambao_peca.operador_inicio else None

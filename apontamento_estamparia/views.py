@@ -611,13 +611,14 @@ def api_ordens_finalizadas(request):
             if peca.qtd_boa > 0:
                 data.append({
                     "ordem": ordem.ordem,
-                    "maquina": ordem.maquina.nome,
+                    "maquina": ordem.maquina.nome if ordem.maquina else None,
                     "peca": peca.peca.codigo,
                     "descricao": peca.peca.descricao,
                     "total_produzido": peca.qtd_boa,
                     "data_programacao": ordem.data_programacao.strftime('%d/%m/%Y %H:%M') if ordem.data_programacao else None,
                     "data_finalizacao": data_finalizacao,
                     "operador": operador,
+                    "obs": ordem.obs_operador
                 })
 
     return JsonResponse(data, safe=False)
