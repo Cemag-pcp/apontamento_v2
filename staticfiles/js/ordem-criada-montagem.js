@@ -711,7 +711,14 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         },
         body: JSON.stringify(payload)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Erro ao finalizar a ordem.');
+            });
+        }
+        return response.json();
+    })
     .then(data => {
 
         carregarOrdensIniciadas(filtros);
@@ -725,9 +732,11 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
 
     })
     .catch(error => {
-        console.error('Erro ao finalizar a ordem:', error);
-        alert("Erro ao finalizar a ordem. Tente novamente.");
-        Swal.close();
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message || 'Erro ao finalizar a ordem. Tente novamente.'
+        });
     });
 });
 
