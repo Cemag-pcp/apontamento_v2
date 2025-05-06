@@ -1012,12 +1012,23 @@ def api_ordens_finalizadas(request):
                     if cambao_peca and cambao_peca.operador_inicio else None
                 )
 
+                mapa_cor = {
+                    'Laranja': 'LC',
+                    'Amarelo': 'AV',
+                    'Verde': 'VJ',
+                    'Cinza': 'CO',
+                    'Azul': 'AN',
+                    'Vermelho': 'VM',
+                }
+
+                cor_peca = mapa_cor.get(ordem.cor, ordem.cor)
+
                 data.append({
                     "ordem": ordem.ordem,
                     "codigo": peca.peca.split(" - ", maxsplit=1)[0],
                     "descricao": peca.peca.split(" - ", maxsplit=1)[1],
                     "qtd_planejada": peca.qtd_planejada,
-                    "cor": ordem.cor,
+                    "cor": cor_peca,
                     "total_produzido": peca.qtd_boa,
                     "cambao": cambao_peca.cambao.nome if cambao_peca else None,
                     "tipo": peca.tipo,
