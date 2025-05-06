@@ -87,7 +87,7 @@ def get_ordens_criadas(request):
     limit = int(request.GET.get('limit', 10))
 
     # Filtra as ordens com base nos parâmetros
-    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).order_by('status_prioridade','-data_criacao')
+    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).order_by('-ultima_atualizacao', '-status_prioridade')
 
     if filtro_ordem:
         if '.' in filtro_ordem or 'dup' in filtro_ordem:
@@ -621,9 +621,11 @@ def get_ordens_sequenciadas(request):
         if propriedade:
             ordem_dict['descricao_mp'] = propriedade.descricao_mp if propriedade.descricao_mp else None
             ordem_dict['quantidade'] = propriedade.quantidade
+            ordem_dict['tipo_chapa'] = propriedade.get_tipo_chapa_display() if hasattr(propriedade, 'tipo_chapa') else None
         else:
             ordem_dict['descricao_mp'] = None
             ordem_dict['quantidade'] = None
+            ordem_dict['tipo_chapa'] = None
 
         data.append(ordem_dict)
 
