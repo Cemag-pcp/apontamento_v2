@@ -239,7 +239,7 @@ def adicionar_pecas_cambao(request):
             #         {"error": "Cambão já está em uso! Escolha outro."}, status=400
             #     )
 
-            if cambao.cor != cor:
+            if cambao.cor != '' and cambao.cor != cor:
                 return JsonResponse(
                     {"error": "A cor do cambão não corresponde à cor da peça!"}, status=400
                 )
@@ -405,6 +405,7 @@ def finalizar_cambao(request):
                     item.save()
 
                 cambao.status = "livre"
+                cambao.cor = ''  # Limpa a cor do cambão
                 cambao.data_fim = now()
                 cambao.save()
 
