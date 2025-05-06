@@ -1011,30 +1011,29 @@ def api_ordens_finalizadas(request):
      .prefetch_related('ordem_pecas_pintura') \
      .order_by('ultima_atualizacao')
 
+    mapa_cor = {
+        'Laranja': 'LC',
+        'Amarelo': 'AV',
+        'Verde': 'VJ',
+        'Cinza': 'CO',
+        'Azul': 'AN',
+        'Vermelho': 'VM',
+    }
+
     for ordem in ordens:
         data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
+        cor_peca = mapa_cor.get(ordem.cor, ordem.cor)
 
         for peca in ordem.ordem_pecas_pintura.all():
             if peca.qtd_boa > 0:
-
-                # Busca operador no CambaoPecas vinculado à primeira ocorrência
                 cambao_peca = CambaoPecas.objects.filter(peca_ordem__ordem=ordem).order_by('data_pendura').first()
 
-                operador_inicio = (
-                    f"{cambao_peca.operador_inicio.matricula} - {cambao_peca.operador_inicio.nome}"
-                    if cambao_peca and cambao_peca.operador_inicio else None
-                )
-
-                mapa_cor = {
-                    'Laranja': 'LC',
-                    'Amarelo': 'AV',
-                    'Verde': 'VJ',
-                    'Cinza': 'CO',
-                    'Azul': 'AN',
-                    'Vermelho': 'VM',
-                }
-
-                cor_peca = mapa_cor.get(ordem.cor, ordem.cor)
+                operador_inicio = None
+                try:
+                    if cambao_peca and cambao_peca.operador_inicio:
+                        operador_inicio = f"{cambao_peca.operador_inicio.matricula} - {cambao_peca.operador_inicio.nome}"
+                except Exception:
+                    operador_inicio = None  # ignora caso não consiga acessar
 
                 data.append({
                     "ordem": ordem.ordem,
