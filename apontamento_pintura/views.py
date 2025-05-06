@@ -316,7 +316,6 @@ def adicionar_pecas_cambao(request):
 def finalizar_cambao(request):
     """
     Finaliza um cambão, registrando as peças e liberando para novo uso.
-
     """
 
     if request.method == "POST":
@@ -336,17 +335,13 @@ def finalizar_cambao(request):
                     {"error": "ID do operador é obrigatório!"}, status=400
                 )
 
-            # Buscar o cambão
             cambao = get_object_or_404(Cambao, id=cambao_id)
 
-            # O cambão deve estar em uso para ser finalizado
             if cambao.status != "em uso":
                 return JsonResponse(
-                    {"error": "Apenas cambões em uso podem ser finalizados!"},
-                    status=400,
+                    {"error": "Apenas cambões em uso podem ser finalizados!"}, status=400
                 )
 
-            # Recupera todas as peças penduradas no cambão
             pecas_no_cambao = CambaoPecas.objects.filter(
                 cambao=cambao, status="pendurada"
             )
@@ -358,32 +353,33 @@ def finalizar_cambao(request):
 
             operador = get_object_or_404(Operador, id=operador_id)
 
+            # Pré-validação de todas as peças antes da transação
+            for item in pecas_no_cambao:
+                peca_ordem_original = item.peca_ordem
+
+                qtd_finalizadas = (
+                    PecasOrdem.objects.filter(
+                        ordem=peca_ordem_original.ordem,
+                        peca=peca_ordem_original.peca,
+                    ).aggregate(Sum("qtd_boa"))["qtd_boa__sum"]
+                    or 0
+                )
+
+                qtd_restante = peca_ordem_original.qtd_planejada - qtd_finalizadas
+
+                if item.quantidade_pendurada > qtd_restante:
+                    return JsonResponse(
+                        {
+                            "error": f"A quantidade finalizada ({item.quantidade_pendurada}) excede o planejado ({qtd_restante})."
+                        },
+                        status=400,
+                    )
+
+            # Se passou pela validação, executa a finalização em bloco atômico
             with transaction.atomic():
-                # Criar novas entradas em PecasOrdem para cada peça finalizada
                 for item in pecas_no_cambao:
                     peca_ordem_original = item.peca_ordem
 
-                    # Soma total de peças já finalizadas
-                    qtd_finalizadas = (
-                        PecasOrdem.objects.filter(
-                            ordem=peca_ordem_original.ordem,
-                            peca=peca_ordem_original.peca,
-                        ).aggregate(Sum("qtd_boa"))["qtd_boa__sum"]
-                        or 0
-                    )
-
-                    qtd_restante = peca_ordem_original.qtd_planejada - qtd_finalizadas
-
-                    # Garantir que a quantidade finalizada não ultrapasse o total planejado
-                    if item.quantidade_pendurada > qtd_restante:
-                        return JsonResponse(
-                            {
-                                "error": f"A quantidade finalizada ({item.quantidade_pendurada}) excede o planejado ({qtd_restante})."
-                            },
-                            status=400,
-                        )
-
-                    # Criar um novo registro em PecasOrdem para registrar o apontamento do cambão
                     nova_peca_ordem = PecasOrdem.objects.create(
                         ordem=peca_ordem_original.ordem,
                         peca=peca_ordem_original.peca,
@@ -395,17 +391,14 @@ def finalizar_cambao(request):
                         operador_fim=operador,
                     )
 
-                    # Cria uma inspeção para a peça
                     Inspecao.objects.create(
                         pecas_ordem_pintura=nova_peca_ordem,
                     )
 
-                    # Atualizar o status da peça no cambão para "finalizada"
                     item.status = "finalizada"
                     item.data_fim = now()
                     item.save()
 
-                # Atualizar status do cambão para "finalizado"
                 cambao.status = "livre"
                 cambao.data_fim = now()
                 cambao.save()
