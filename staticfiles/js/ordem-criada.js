@@ -719,7 +719,7 @@ function mostrarModalFinalizar(ordemId) {
                         <tr>
                             <td>${data.propriedades.descricao_mp || 'N/A'}</td>
                             <td>${data.propriedades.espessura || 'N/A'}</td>
-                            <td>
+                            <td style='display: flex; justify-content: center; align-items: center;'>
                                 <input 
                                     type="number" 
                                     min="1" 
@@ -730,7 +730,14 @@ function mostrarModalFinalizar(ordemId) {
                                     value="${data.propriedades.quantidade}" 
                                     style="width: 100px; text-align: center;">
                             </td>
-                            <td>${data.propriedades.tipo_chapa || 'N/A'}</td>
+                            <td>
+                                <select name="tipo_chapa" class="form-select form-select-sm">
+                                    <option value="aco_carbono" ${data.propriedades.tipo_chapa === 'Aço carbono' ? 'selected' : ''}>Aço carbono</option>
+                                    <option value="anti_derrapante" ${data.propriedades.tipo_chapa === 'Anti derrapante' ? 'selected' : ''}>Anti derrapante</option>
+                                    <option value="inox" ${data.propriedades.tipo_chapa === 'Inox' ? 'selected' : ''}>Inox</option>
+                                    <option value="alta_resistencia" ${data.propriedades.tipo_chapa === 'Alta resistência' ? 'selected' : ''}>Alta resistência</option>
+                                </select>
+                            </td>
                             <td>${data.propriedades.aproveitamento || 'N/A'}</td>
                         </tr>
                     </tbody>
@@ -831,6 +838,7 @@ function mostrarModalFinalizar(ordemId) {
             }
         });
 
+        const tipoChapa = document.querySelector('[name="tipo_chapa"]').value;
         const obsFinal = document.getElementById('obsFinalizarCorte').value;
         const operadorFinal=document.getElementById('operadorFinal').value;
         const inputsMortas = document.querySelectorAll('.input-mortas');
@@ -863,7 +871,8 @@ function mostrarModalFinalizar(ordemId) {
                 pecas_mortas: pecasMortas,
                 qtdChapas: qtdChapas,
                 operadorFinal: operadorFinal,
-                obsFinal: obsFinal
+                obsFinal: obsFinal,
+                tipoChapa: tipoChapa,
             }),
             headers: {
                 'Content-Type': 'application/json',
