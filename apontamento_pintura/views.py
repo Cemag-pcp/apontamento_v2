@@ -234,11 +234,16 @@ def adicionar_pecas_cambao(request):
                     {"error": "O cambão informado não existe!"}, status=400
                 )
 
-            if cambao.status != "livre":
-                return JsonResponse(
-                    {"error": "Cambão já está em uso! Escolha outro."}, status=400
-                )
+            # if cambao.status != "livre":
+            #     return JsonResponse(
+            #         {"error": "Cambão já está em uso! Escolha outro."}, status=400
+            #     )
 
+            if cambao.cor != cor:
+                return JsonResponse(
+                    {"error": "A cor do cambão não corresponde à cor da peça!"}, status=400
+                )
+            
             cambao.cor = cor  # Atualiza a cor caso necessário
             cambao.tipo = tipo_tinta
 
@@ -416,12 +421,19 @@ def finalizar_cambao(request):
     return JsonResponse({"error": "Método não permitido!"}, status=405)
 
 def cambao_livre(request):
+    tipo = request.GET.get('tipo')
+    cambao_livres = Cambao.objects.filter(tipo=tipo)
 
-    tipo=request.GET.get('tipo')
+    resultado = []
+    for c in cambao_livres:
+        if c.status == "livre":
+            nome_formatado = f"{c.nome} - livre"
+        else:
+            nome_formatado = f"{c.nome} - {c.status} - {c.cor}"
 
-    cambao_livres = Cambao.objects.filter(status='livre', tipo=tipo)
+        resultado.append({"nome": nome_formatado, "id": c.id})
 
-    return JsonResponse({"cambao_livres": list(cambao_livres.values())})
+    return JsonResponse({"cambao_livres": resultado})
 
 def cambao_em_processo(request):
     """
