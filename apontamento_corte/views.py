@@ -145,6 +145,8 @@ def atualizar_status_ordem(request):
                 pecas_geral = body.get('pecas_mortas', [])
                 qtd_chapas = body.get('qtdChapas', None)
                 maquina_request = body.get('maquina')
+                tipo_chapa = body.get('tipoChapa')
+
                 if maquina_request:
                     maquina_nome = get_object_or_404(Maquina, pk=int(maquina_request))
 
@@ -194,6 +196,9 @@ def atualizar_status_ordem(request):
                     # Verifica se a quantidade de chapas mudaram
                     if int(qtd_chapas) != ordem.propriedade.quantidade:
                         ordem.propriedade.quantidade = int(qtd_chapas)
+                        ordem.propriedade.save()
+                    if tipo_chapa is not None and tipo_chapa != ordem.propriedade.tipo_chapa:
+                        ordem.propriedade.tipo_chapa = tipo_chapa
                         ordem.propriedade.save()
 
                     for peca in pecas_geral:
