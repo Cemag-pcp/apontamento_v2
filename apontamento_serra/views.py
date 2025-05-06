@@ -12,7 +12,7 @@ from django.db.models.functions import Concat
 from django.contrib.auth.decorators import login_required
 
 from .models import PecasOrdem
-from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada
+from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada, Profile
 from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operador, Setor, MotivoMaquinaParada, Maquina
 from apontamento_usinagem.utils import criar_ordem_usinagem
 
@@ -304,6 +304,9 @@ def get_ordens_criadas(request):
 
 @require_GET
 def get_ordens_iniciadas(request):
+
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     # Filtra as ordens com base no status 'iniciada'
     ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_serra', 'propriedade') \
         .filter(grupo_maquina='serra',status_atual='iniciada')
@@ -371,6 +374,7 @@ def get_ordens_iniciadas(request):
 
     # Retorna os dados paginados como JSON
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
@@ -379,6 +383,9 @@ def get_ordens_iniciadas(request):
 
 @require_GET
 def get_ordens_interrompidas(request):
+
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     # Filtra as ordens com base no status 'interrompida'
     ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_serra', 'propriedade') \
         .filter(grupo_maquina='serra',status_atual='interrompida')
@@ -442,6 +449,7 @@ def get_ordens_interrompidas(request):
 
     # Retorna os dados paginados como JSON
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,

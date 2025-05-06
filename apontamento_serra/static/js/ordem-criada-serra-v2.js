@@ -248,9 +248,10 @@ export function carregarOrdensIniciadas(container, filtros={}) {
                 if (ordem.status_atual === 'iniciada') {
                     botaoAcao = `
                         <div class="d-flex flex-wrap justify-content-center">
-                            <button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Deletar">
-                                <i class="bi bi-arrow-left-right"></i>
-                            </button>
+                            ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                            ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Deletar">
+                                 <i class="bi bi-arrow-left-right"></i>
+                               </button>`: ""}
                             <button class="btn btn-warning btn-sm btn-interromper m-2" title="Interromper">
                                 <i class="fa fa-stop"></i>
                             </button>
@@ -385,9 +386,10 @@ export function carregarOrdensInterrompidas(container, filtros={}) {
                 
                 // Define os botões dinamicamente
                 const botaoAcao = `
-                    <button class="btn btn-danger btn-sm btn-deletar m-2" title="Deletar">
-                        <i class="bi bi-arrow-left-right"></i>
-                    </button>   
+                ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                    ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Deletar">
+                            <i class="bi bi-arrow-left-right"></i>
+                    </button>`: ""}  
                     <button class="btn btn-warning btn-sm btn-retornar m-2" title="Retornar">
                         <i class="fa fa-undo"></i>
                     </button>
