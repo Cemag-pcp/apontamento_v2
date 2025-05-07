@@ -1003,14 +1003,6 @@ def finalizar_retrabalho_pintura(request):
         )
 
 def api_ordens_finalizadas(request):
-    data = []
-
-    ordens = Ordem.objects.filter(
-        ultima_atualizacao__gte="2025-04-08"
-    ).select_related('operador_final') \
-     .prefetch_related('ordem_pecas_pintura') \
-     .order_by('ultima_atualizacao')
-
     mapa_cor = {
         'Laranja': 'LC',
         'Amarelo': 'AV',
@@ -1020,31 +1012,58 @@ def api_ordens_finalizadas(request):
         'Vermelho': 'VM',
     }
 
+    # Busque todos os CambaoPecas de uma vez, e os relacione com as PecasOrdem
+    cambao_por_peca = {}
+    for c in CambaoPecas.objects.select_related('cambao', 'peca_ordem').order_by('data_pendura'):
+        key = c.peca_ordem_id
+        if key not in cambao_por_peca:
+            cambao_por_peca[key] = c  # pega só o primeiro por data_pendura
+
+    ordens = Ordem.objects.filter(
+        ultima_atualizacao__gte="2025-04-08"
+    ).select_related('operador_final') \
+     .prefetch_related(
+         Prefetch('ordem_pecas_pintura', queryset=PecasOrdem.objects.select_related('operador_fim'))
+     ).order_by('ultima_atualizacao')
+
+    data = []
+
     for ordem in ordens:
         data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
         cor_peca = mapa_cor.get(ordem.cor, ordem.cor)
+        data_carga = ordem.data_carga.strftime('%d/%m/%Y') if ordem.data_carga else None
 
         for peca in ordem.ordem_pecas_pintura.all():
-            if peca.qtd_boa > 0:
-                cambao_peca = CambaoPecas.objects.filter(peca_ordem__ordem=ordem).order_by('data_pendura').first()
+            if peca.qtd_boa <= 0:
+                continue
 
-                data.append({
-                    "ordem": ordem.ordem,
-                    "codigo": peca.peca.split(" - ", maxsplit=1)[0],
-                    "descricao": peca.peca.split(" - ", maxsplit=1)[1],
-                    "qtd_planejada": peca.qtd_planejada,
-                    "cor": cor_peca,
-                    "total_produzido": peca.qtd_boa,
-                    "cambao": cambao_peca.cambao.nome if cambao_peca else None,
-                    "tipo": peca.tipo,
-                    "data_carga": ordem.data_carga.strftime('%d/%m/%Y'),
-                    "data_finalizacao": data_finalizacao,
-                    "coluna1": "",
-                    "coluna2": "",
-                    "coluna3": "",
-                    "coluna4": "",
-                    "operador_inicial":f"{peca.operador_fim.matricula} - {peca.operador_fim.nome}" if peca.operador_fim else None,
-                    "operador_final": f"{peca.operador_fim.matricula} - {peca.operador_fim.nome}" if peca.operador_fim else None,
-                })
+            cambao = cambao_por_peca.get(peca.id)
+            cambao_nome = cambao.cambao.nome if cambao and cambao.cambao else None
+
+            operador = peca.operador_fim
+            operador_nome = f"{operador.matricula} - {operador.nome}" if operador else None
+
+            codigo_desc = peca.peca.split(" - ", maxsplit=1)
+            codigo = codigo_desc[0]
+            descricao = codigo_desc[1] if len(codigo_desc) > 1 else ""
+
+            data.append({
+                "ordem": ordem.ordem,
+                "codigo": codigo,
+                "descricao": descricao,
+                "qtd_planejada": peca.qtd_planejada,
+                "cor": cor_peca,
+                "total_produzido": peca.qtd_boa,
+                "cambao": cambao_nome,
+                "tipo": peca.tipo,
+                "data_carga": data_carga,
+                "data_finalizacao": data_finalizacao,
+                "coluna1": "",
+                "coluna2": "",
+                "coluna3": "",
+                "coluna4": "",
+                "operador_inicial": operador_nome,
+                "operador_final": operador_nome,
+            })
 
     return JsonResponse(data, safe=False)
