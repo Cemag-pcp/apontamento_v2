@@ -1013,11 +1013,11 @@ def api_ordens_finalizadas(request):
     }
 
     # Busque todos os CambaoPecas de uma vez, e os relacione com as PecasOrdem
-    cambao_por_peca = {}
-    for c in CambaoPecas.objects.select_related('cambao', 'peca_ordem').order_by('data_pendura'):
-        key = c.peca_ordem_id
-        if key not in cambao_por_peca:
-            cambao_por_peca[key] = c  # pega só o primeiro por data_pendura
+    # cambao_por_peca = {}
+    # for c in CambaoPecas.objects.select_related('cambao', 'peca_ordem').order_by('data_pendura'):
+    #     key = c.peca_ordem_id
+    #     if key not in cambao_por_peca:
+    #         cambao_por_peca[key] = c  # pega só o primeiro por data_pendura
 
     ordens = Ordem.objects.filter(
         ultima_atualizacao__gte="2025-04-08"
@@ -1037,8 +1037,8 @@ def api_ordens_finalizadas(request):
             if peca.qtd_boa <= 0:
                 continue
 
-            cambao = cambao_por_peca.get(peca.id)
-            cambao_nome = cambao.cambao.nome if cambao and cambao.cambao else None
+            # cambao = cambao_por_peca.get(peca.id)
+            # cambao_nome = cambao.cambao.nome if cambao and cambao.cambao else None
 
             operador = peca.operador_fim
             operador_nome = f"{operador.matricula} - {operador.nome}" if operador else None
@@ -1054,7 +1054,7 @@ def api_ordens_finalizadas(request):
                 "qtd_planejada": peca.qtd_planejada,
                 "cor": cor_peca,
                 "total_produzido": peca.qtd_boa,
-                "cambao": cambao_nome,
+                "cambao": "",
                 "tipo": peca.tipo,
                 "data_carga": data_carga,
                 "data_finalizacao": data_finalizacao,
