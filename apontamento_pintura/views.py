@@ -1028,13 +1028,6 @@ def api_ordens_finalizadas(request):
             if peca.qtd_boa > 0:
                 cambao_peca = CambaoPecas.objects.filter(peca_ordem__ordem=ordem).order_by('data_pendura').first()
 
-                operador_inicio = None
-                try:
-                    if cambao_peca and cambao_peca.operador_inicio:
-                        operador_inicio = f"{cambao_peca.operador_inicio.matricula} - {cambao_peca.operador_inicio.nome}"
-                except Exception:
-                    operador_inicio = None  # ignora caso não consiga acessar
-
                 data.append({
                     "ordem": ordem.ordem,
                     "codigo": peca.peca.split(" - ", maxsplit=1)[0],
@@ -1050,7 +1043,7 @@ def api_ordens_finalizadas(request):
                     "coluna2": "",
                     "coluna3": "",
                     "coluna4": "",
-                    "operador_inicial": operador_inicio,
+                    "operador_inicial":f"{peca.operador_fim.matricula} - {peca.operador_fim.nome}" if peca.operador_fim else None,
                     "operador_final": f"{peca.operador_fim.matricula} - {peca.operador_fim.nome}" if peca.operador_fim else None,
                 })
 
