@@ -240,6 +240,17 @@ def atualizar_status_ordem(request):
                 # Atualiza o status da ordem
                 ordem.status_atual = status
 
+                peca = PecasOrdem.objects.filter(ordem=ordem).first()
+
+                nova_peca_ordem = PecasOrdem.objects.create(
+                    ordem=ordem,
+                    peca=peca.peca,
+                    qtd_planejada=peca.qtd_planejada,
+                    qtd_boa=0,
+                    operador=None,
+                    processo_ordem=novo_processo
+                )
+
             elif status == 'retorno':
                 
                 maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
@@ -276,14 +287,12 @@ def atualizar_status_ordem(request):
                     return JsonResponse({'error': 'Quantidade produzida tem que ser maior que zero.'}, status=400)
 
                 # Criando o novo registro de apontamento
-                nova_peca_ordem = PecasOrdem.objects.create(
-                    ordem=ordem,
-                    peca=peca.peca,
-                    qtd_planejada=peca.qtd_planejada,
-                    qtd_boa=int(qt_produzida),
-                    operador=operador_final,
-                    processo_ordem=novo_processo
-                )
+                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
+                ultimo_peca_ordem.qtd_boa=int(qt_produzida)
+                ultimo_peca_ordem.processo_ordem=novo_processo
+                ultimo_peca_ordem.operador=operador_final
+                
+                ultimo_peca_ordem.save()
 
                 if "-" in peca.peca:
                     codigo = peca.peca.split(" - ", maxsplit=1)[0]
@@ -327,6 +336,11 @@ def atualizar_status_ordem(request):
 
                 # Atualiza o status da ordem
                 ordem.status_atual = status
+
+                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
+                ultimo_peca_ordem.processo_ordem=novo_processo
+                
+                ultimo_peca_ordem.save()
 
             ordem.save()
 

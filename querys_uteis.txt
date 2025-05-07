@@ -1,0 +1,20 @@
+-- etapa de cada processo por peça feita
+-- mostra status e tempo decorrido por status
+SELECT 
+  o.id as id_ordem,
+  o.ordem AS ordem,
+  po.peca AS codigo,
+  po.peca AS descricao,
+  op.data_inicio,
+  op.data_fim,
+  o.data_carga,
+  po.qtd_planejada AS qt_planejada,
+  m.nome AS celula,
+  op.status,
+  po.qtd_boa AS qt_boa
+FROM apontamento_v2_testes.core_ordem o
+LEFT JOIN apontamento_v2_testes.core_ordemprocesso op ON op.ordem_id = o.id
+LEFT JOIN apontamento_v2_testes.apontamento_montagem_pecasordem po ON po.processo_ordem_id = op.id
+LEFT JOIN apontamento_v2_testes.cadastro_maquina m ON o.maquina_id = m.id
+WHERE o.grupo_maquina = 'montagem' and o.id = 29385 ;
+

@@ -178,6 +178,7 @@ def atualizar_status_ordem(request):
             return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
 
         with transaction.atomic():  # Entra na transação somente após garantir que todos os objetos existem
+            ###NÃO VERIFICA MAIS SE A MÁQUINA JA ESTÁ SENDO UTILIZADA, USUARIO PODE INICIAR OUTRA PEÇA NA MESMA MÁQUINA###
             # Verifica se já existe uma ordem iniciada na mesma máquina
             # if status == 'iniciada' and maquina_nome:
             #     ordem_em_andamento = Ordem.objects.filter(
