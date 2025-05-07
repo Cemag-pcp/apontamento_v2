@@ -574,7 +574,7 @@ def andamento_ultimas_cargas(request):
         Ordem.objects.filter(grupo_maquina="pintura")
         .order_by("-data_carga")
         .values_list("data_carga", flat=True)
-        .distinct()[:5]
+        .distinct()[:10]
     )
 
     andamento_cargas = []

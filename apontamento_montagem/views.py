@@ -608,11 +608,11 @@ def percentual_concluido_carga(request):
     })
 
 def andamento_ultimas_cargas(request):
-    # Obtém as últimas 5 datas de carga disponíveis para pintura
+    # Obtém as últimas 10 datas de carga disponíveis para pintura
     ultimas_cargas = Ordem.objects.filter(grupo_maquina='montagem')\
         .order_by('-data_carga')\
         .values_list('data_carga', flat=True)\
-        .distinct()[:5]
+        .distinct()[:10]
 
     andamento_cargas = []
     
