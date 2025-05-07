@@ -38,6 +38,17 @@
     justify-content: center;
 }
 
+.btn-inspection {
+    background-color: var(--pastel-green);
+    border: none;
+    color: #155724;
+}
+
+.btn-inspection:hover {
+    background-color: #a1d1a1;
+    color: #155724;
+}
+
 .non-conformity-container {
     background-color: #f9f9f9;
     border-radius: 8px;
@@ -67,7 +78,6 @@
 }
 
 .btn-remove-nonconformity {
-    position: absolute;
     top: 10px;
     right: 10px;
     background-color: var(--pastel-red);
