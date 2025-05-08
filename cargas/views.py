@@ -508,7 +508,7 @@ def historico_ordens_pintura(request):
     if data_carga:
         try:
             data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
-            filtros_ordem['data_carga'] = data_carga  # Removida a vírgula extra
+            filtros_ordem['data_carga'] = data_carga
         except ValueError:
             return JsonResponse({"error": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
     if cor:

@@ -87,7 +87,7 @@ def get_ordens_criadas(request):
     limit = int(request.GET.get('limit', 10))
 
     # Filtra as ordens com base nos parâmetros
-    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).order_by('status_prioridade','-data_criacao')
+    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).order_by('-ultima_atualizacao', '-status_prioridade')
 
     if filtro_ordem:
         if '.' in filtro_ordem or 'dup' in filtro_ordem:
@@ -145,6 +145,8 @@ def atualizar_status_ordem(request):
                 pecas_geral = body.get('pecas_mortas', [])
                 qtd_chapas = body.get('qtdChapas', None)
                 maquina_request = body.get('maquina')
+                tipo_chapa = body.get('tipoChapa')
+
                 if maquina_request:
                     maquina_nome = get_object_or_404(Maquina, pk=int(maquina_request))
 
@@ -194,6 +196,9 @@ def atualizar_status_ordem(request):
                     # Verifica se a quantidade de chapas mudaram
                     if int(qtd_chapas) != ordem.propriedade.quantidade:
                         ordem.propriedade.quantidade = int(qtd_chapas)
+                        ordem.propriedade.save()
+                    if tipo_chapa is not None and tipo_chapa != ordem.propriedade.tipo_chapa:
+                        ordem.propriedade.tipo_chapa = tipo_chapa
                         ordem.propriedade.save()
 
                     for peca in pecas_geral:
@@ -628,9 +633,11 @@ def get_ordens_sequenciadas(request):
         if propriedade:
             ordem_dict['descricao_mp'] = propriedade.descricao_mp if propriedade.descricao_mp else None
             ordem_dict['quantidade'] = propriedade.quantidade
+            ordem_dict['tipo_chapa'] = propriedade.get_tipo_chapa_display() if hasattr(propriedade, 'tipo_chapa') else None
         else:
             ordem_dict['descricao_mp'] = None
             ordem_dict['quantidade'] = None
+            ordem_dict['tipo_chapa'] = None
 
         data.append(ordem_dict)
 

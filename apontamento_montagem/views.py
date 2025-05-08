@@ -240,6 +240,17 @@ def atualizar_status_ordem(request):
                 # Atualiza o status da ordem
                 ordem.status_atual = status
 
+                peca = PecasOrdem.objects.filter(ordem=ordem).first()
+
+                nova_peca_ordem = PecasOrdem.objects.create(
+                    ordem=ordem,
+                    peca=peca.peca,
+                    qtd_planejada=peca.qtd_planejada,
+                    qtd_boa=0,
+                    operador=None,
+                    processo_ordem=novo_processo
+                )
+
             elif status == 'retorno':
                 
                 maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
@@ -276,14 +287,12 @@ def atualizar_status_ordem(request):
                     return JsonResponse({'error': 'Quantidade produzida tem que ser maior que zero.'}, status=400)
 
                 # Criando o novo registro de apontamento
-                nova_peca_ordem = PecasOrdem.objects.create(
-                    ordem=ordem,
-                    peca=peca.peca,
-                    qtd_planejada=peca.qtd_planejada,
-                    qtd_boa=int(qt_produzida),
-                    operador=operador_final,
-                    processo_ordem=novo_processo
-                )
+                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
+                ultimo_peca_ordem.qtd_boa=int(qt_produzida)
+                ultimo_peca_ordem.processo_ordem=novo_processo
+                ultimo_peca_ordem.operador=operador_final
+                
+                ultimo_peca_ordem.save()
 
                 if "-" in peca.peca:
                     codigo = peca.peca.split(" - ", maxsplit=1)[0]
@@ -327,6 +336,11 @@ def atualizar_status_ordem(request):
 
                 # Atualiza o status da ordem
                 ordem.status_atual = status
+
+                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
+                ultimo_peca_ordem.processo_ordem=novo_processo
+                
+                ultimo_peca_ordem.save()
 
             ordem.save()
 
@@ -594,11 +608,11 @@ def percentual_concluido_carga(request):
     })
 
 def andamento_ultimas_cargas(request):
-    # Obtém as últimas 5 datas de carga disponíveis para pintura
+    # Obtém as últimas 10 datas de carga disponíveis para pintura
     ultimas_cargas = Ordem.objects.filter(grupo_maquina='montagem')\
         .order_by('-data_carga')\
         .values_list('data_carga', flat=True)\
-        .distinct()[:5]
+        .distinct()[:10]
 
     andamento_cargas = []
     
@@ -735,7 +749,7 @@ def api_ordens_finalizadas(request):
     data = []
 
     ordens = Ordem.objects.filter(
-        status_atual='finalizada',
+        # status_atual='finalizada',
         ultima_atualizacao__gte="2025-04-08"
     ).select_related('operador_final') \
     .prefetch_related('ordem_pecas_montagem') \
@@ -756,8 +770,9 @@ def api_ordens_finalizadas(request):
                     "descricao": peca.peca.split(" - ", maxsplit=1)[1],  # descrição do conjunto
                     "total_produzido": peca.qtd_boa,
                     "data_carga": ordem.data_carga.strftime('%d/%m/%Y'),
-                    "operador": operador,
                     "data_finalizacao": data_finalizacao,
+                    "operador": operador,
+                    "obs": ordem.obs_operador,
                 })
 
     return JsonResponse(data, safe=False)

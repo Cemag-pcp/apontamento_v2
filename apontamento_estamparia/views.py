@@ -178,6 +178,7 @@ def atualizar_status_ordem(request):
             return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
 
         with transaction.atomic():  # Entra na transação somente após garantir que todos os objetos existem
+            ###NÃO VERIFICA MAIS SE A MÁQUINA JA ESTÁ SENDO UTILIZADA, USUARIO PODE INICIAR OUTRA PEÇA NA MESMA MÁQUINA###
             # Verifica se já existe uma ordem iniciada na mesma máquina
             # if status == 'iniciada' and maquina_nome:
             #     ordem_em_andamento = Ordem.objects.filter(
@@ -594,8 +595,12 @@ def api_ordens_finalizadas(request):
 
     data = []
 
-    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-08"
-                                  ).prefetch_related('ordem_pecas_estamparia').order_by('ultima_atualizacao')
+    ordens = Ordem.objects.filter(
+        status_atual='finalizada',
+        ultima_atualizacao__gte="2025-04-08"
+    ).select_related('operador_final') \
+    .prefetch_related('ordem_pecas_estamparia') \
+    .order_by('ultima_atualizacao')
 
     for ordem in ordens:
         operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
@@ -607,12 +612,14 @@ def api_ordens_finalizadas(request):
             if peca.qtd_boa > 0:
                 data.append({
                     "ordem": ordem.ordem,
-                    "peca": peca.peca,
-                    "qtd_planejada": peca.qtd_planejada,
-                    "qtd_morta": peca.qtd_morta,
-                    "operador": operador,
+                    "maquina": ordem.maquina.nome if ordem.maquina else None,
+                    "peca": peca.peca.codigo,
+                    "descricao": peca.peca.descricao,
+                    "total_produzido": peca.qtd_boa,
+                    "data_programacao": ordem.data_programacao.strftime('%d/%m/%Y %H:%M') if ordem.data_programacao else None,
                     "data_finalizacao": data_finalizacao,
-                    "total_produzido": peca.qtd_boa
+                    "operador": operador,
+                    "obs": ordem.obs_operador
                 })
 
     return JsonResponse(data, safe=False)

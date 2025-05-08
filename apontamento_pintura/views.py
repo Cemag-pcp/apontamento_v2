@@ -234,11 +234,16 @@ def adicionar_pecas_cambao(request):
                     {"error": "O cambão informado não existe!"}, status=400
                 )
 
-            if cambao.status != "livre":
-                return JsonResponse(
-                    {"error": "Cambão já está em uso! Escolha outro."}, status=400
-                )
+            # if cambao.status != "livre":
+            #     return JsonResponse(
+            #         {"error": "Cambão já está em uso! Escolha outro."}, status=400
+            #     )
 
+            if cambao.cor != '' and cambao.cor != cor:
+                return JsonResponse(
+                    {"error": "A cor do cambão não corresponde à cor da peça!"}, status=400
+                )
+            
             cambao.cor = cor  # Atualiza a cor caso necessário
             cambao.tipo = tipo_tinta
 
@@ -315,13 +320,7 @@ def adicionar_pecas_cambao(request):
 @csrf_exempt
 def finalizar_cambao(request):
     """
-    Finaliza um cambão, registrando as peças e liberando-o para novo uso.
-
-    Exemplo de JSON esperado:
-    {
-        "cambao_id": 2,
-        "operador": 1
-    }
+    Finaliza um cambão, registrando as peças e liberando para novo uso.
     """
 
     if request.method == "POST":
@@ -341,17 +340,13 @@ def finalizar_cambao(request):
                     {"error": "ID do operador é obrigatório!"}, status=400
                 )
 
-            # Buscar o cambão
             cambao = get_object_or_404(Cambao, id=cambao_id)
 
-            # O cambão deve estar em uso para ser finalizado
             if cambao.status != "em uso":
                 return JsonResponse(
-                    {"error": "Apenas cambões em uso podem ser finalizados!"},
-                    status=400,
+                    {"error": "Apenas cambões em uso podem ser finalizados!"}, status=400
                 )
 
-            # Recupera todas as peças penduradas no cambão
             pecas_no_cambao = CambaoPecas.objects.filter(
                 cambao=cambao, status="pendurada"
             )
@@ -363,32 +358,33 @@ def finalizar_cambao(request):
 
             operador = get_object_or_404(Operador, id=operador_id)
 
+            # Pré-validação de todas as peças antes da transação
+            for item in pecas_no_cambao:
+                peca_ordem_original = item.peca_ordem
+
+                qtd_finalizadas = (
+                    PecasOrdem.objects.filter(
+                        ordem=peca_ordem_original.ordem,
+                        peca=peca_ordem_original.peca,
+                    ).aggregate(Sum("qtd_boa"))["qtd_boa__sum"]
+                    or 0
+                )
+
+                qtd_restante = peca_ordem_original.qtd_planejada - qtd_finalizadas
+
+                if item.quantidade_pendurada > qtd_restante:
+                    return JsonResponse(
+                        {
+                            "error": f"A quantidade finalizada ({item.quantidade_pendurada}) excede o planejado ({qtd_restante})."
+                        },
+                        status=400,
+                    )
+
+            # Se passou pela validação, executa a finalização em bloco atômico
             with transaction.atomic():
-                # Criar novas entradas em PecasOrdem para cada peça finalizada
                 for item in pecas_no_cambao:
                     peca_ordem_original = item.peca_ordem
 
-                    # Soma total de peças já finalizadas
-                    qtd_finalizadas = (
-                        PecasOrdem.objects.filter(
-                            ordem=peca_ordem_original.ordem,
-                            peca=peca_ordem_original.peca,
-                        ).aggregate(Sum("qtd_boa"))["qtd_boa__sum"]
-                        or 0
-                    )
-
-                    qtd_restante = peca_ordem_original.qtd_planejada - qtd_finalizadas
-
-                    # Garantir que a quantidade finalizada não ultrapasse o total planejado
-                    if item.quantidade_pendurada > qtd_restante:
-                        return JsonResponse(
-                            {
-                                "error": f"A quantidade finalizada ({item.quantidade_pendurada}) excede o planejado ({qtd_restante})."
-                            },
-                            status=400,
-                        )
-
-                    # Criar um novo registro em PecasOrdem para registrar o apontamento do cambão
                     nova_peca_ordem = PecasOrdem.objects.create(
                         ordem=peca_ordem_original.ordem,
                         peca=peca_ordem_original.peca,
@@ -400,18 +396,16 @@ def finalizar_cambao(request):
                         operador_fim=operador,
                     )
 
-                    # Cria uma inspeção para a peça
                     Inspecao.objects.create(
                         pecas_ordem_pintura=nova_peca_ordem,
                     )
 
-                    # Atualizar o status da peça no cambão para "finalizada"
                     item.status = "finalizada"
                     item.data_fim = now()
                     item.save()
 
-                # Atualizar status do cambão para "finalizado"
                 cambao.status = "livre"
+                cambao.cor = ''  # Limpa a cor do cambão
                 cambao.data_fim = now()
                 cambao.save()
 
@@ -428,12 +422,19 @@ def finalizar_cambao(request):
     return JsonResponse({"error": "Método não permitido!"}, status=405)
 
 def cambao_livre(request):
+    tipo = request.GET.get('tipo')
+    cambao_livres = Cambao.objects.filter(tipo=tipo)
 
-    tipo=request.GET.get('tipo')
+    resultado = []
+    for c in cambao_livres:
+        if c.status == "livre":
+            nome_formatado = f"{c.nome} - livre"
+        else:
+            nome_formatado = f"{c.nome} - {c.status} - {c.cor}"
 
-    cambao_livres = Cambao.objects.filter(status='livre', tipo=tipo)
+        resultado.append({"nome": nome_formatado, "id": c.id})
 
-    return JsonResponse({"cambao_livres": list(cambao_livres.values())})
+    return JsonResponse({"cambao_livres": resultado})
 
 def cambao_em_processo(request):
     """
@@ -573,7 +574,7 @@ def andamento_ultimas_cargas(request):
         Ordem.objects.filter(grupo_maquina="pintura")
         .order_by("-data_carga")
         .values_list("data_carga", flat=True)
-        .distinct()[:5]
+        .distinct()[:10]
     )
 
     andamento_cargas = []
@@ -1002,28 +1003,67 @@ def finalizar_retrabalho_pintura(request):
         )
 
 def api_ordens_finalizadas(request):
+    mapa_cor = {
+        'Laranja': 'LC',
+        'Amarelo': 'AV',
+        'Verde': 'VJ',
+        'Cinza': 'CO',
+        'Azul': 'AN',
+        'Vermelho': 'VM',
+    }
+
+    # Busque todos os CambaoPecas de uma vez, e os relacione com as PecasOrdem
+    # cambao_por_peca = {}
+    # for c in CambaoPecas.objects.select_related('cambao', 'peca_ordem').order_by('data_pendura'):
+    #     key = c.peca_ordem_id
+    #     if key not in cambao_por_peca:
+    #         cambao_por_peca[key] = c  # pega só o primeiro por data_pendura
+
+    ordens = Ordem.objects.filter(
+        ultima_atualizacao__gte="2025-04-08"
+    ).select_related('operador_final') \
+     .prefetch_related(
+         Prefetch('ordem_pecas_pintura', queryset=PecasOrdem.objects.select_related('operador_fim'))
+     ).order_by('ultima_atualizacao')
 
     data = []
 
-    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-08"
-                                  ).prefetch_related('ordem_pecas_pintura').order_by('ultima_atualizacao')
-
     for ordem in ordens:
-        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
-
-        # converte e formata a data no timezone local
         data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
+        cor_peca = mapa_cor.get(ordem.cor, ordem.cor)
+        data_carga = ordem.data_carga.strftime('%d/%m/%Y') if ordem.data_carga else None
 
         for peca in ordem.ordem_pecas_pintura.all():
-            if peca.qtd_boa > 0:
-                data.append({
-                    "ordem": ordem.ordem,
-                    "peca": peca.peca,
-                    "qtd_planejada": peca.qtd_planejada,
-                    "qtd_morta": peca.qtd_morta,
-                    "operador": operador,
-                    "data_finalizacao": data_finalizacao,
-                    "total_produzido": peca.qtd_boa
-                })
+            if peca.qtd_boa <= 0:
+                continue
+
+            # cambao = cambao_por_peca.get(peca.id)
+            # cambao_nome = cambao.cambao.nome if cambao and cambao.cambao else None
+
+            operador = peca.operador_fim
+            operador_nome = f"{operador.matricula} - {operador.nome}" if operador else None
+
+            codigo_desc = peca.peca.split(" - ", maxsplit=1)
+            codigo = codigo_desc[0]
+            descricao = codigo_desc[1] if len(codigo_desc) > 1 else ""
+
+            data.append({
+                "ordem": ordem.ordem,
+                "codigo": codigo,
+                "descricao": descricao,
+                "qtd_planejada": peca.qtd_planejada,
+                "cor": cor_peca,
+                "total_produzido": peca.qtd_boa,
+                "cambao": "",
+                "tipo": peca.tipo,
+                "data_carga": data_carga,
+                "data_finalizacao": data_finalizacao,
+                "coluna1": "",
+                "coluna2": "",
+                "coluna3": "",
+                "coluna4": "",
+                "operador_inicial": operador_nome,
+                "operador_final": operador_nome,
+            })
 
     return JsonResponse(data, safe=False)

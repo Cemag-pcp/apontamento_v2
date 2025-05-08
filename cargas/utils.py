@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 
+from django.db.models import Max
 from django.utils.timezone import now
 from django.db import transaction
 from apontamento_montagem.models import PecasOrdem as POM
@@ -1377,6 +1378,17 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
             nova_ordem.data_programacao = data_carga - timedelta(days=1)
             while nova_ordem.data_programacao.weekday() in [5, 6]:
                 nova_ordem.data_programacao -= timedelta(days=1)
+
+            # Lógica para data_programacao sem save()
+            if grupo_maquina == 'montagem' and data_carga:
+                nova_ordem.data_programacao = data_carga - timedelta(days=3)
+                while nova_ordem.data_programacao.weekday() in [5, 6]:
+                    nova_ordem.data_programacao -= timedelta(days=1)
+
+            elif grupo_maquina == 'pintura' and data_carga:
+                nova_ordem.data_programacao = data_carga - timedelta(days=1)
+                while nova_ordem.data_programacao.weekday() in [5, 6]:
+                    nova_ordem.data_programacao -= timedelta(days=1)
 
             ordens_objs.append(nova_ordem)
             ordens_metadata.append({
