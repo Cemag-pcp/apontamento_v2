@@ -293,6 +293,10 @@ export function carregarOrdensIniciadas(filtros = {}) {
                 let botaoAcao = '';
 
                 botaoAcao = `
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                    ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
+                            <i class="bi bi-arrow-left-right"></i>
+                        </button>`: ""}
                     <button class="btn btn-danger btn-sm btn-interromper" title="Interromper">
                         <i class="fa fa-stop"></i>
                     </button>

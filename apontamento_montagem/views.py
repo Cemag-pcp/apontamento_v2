@@ -13,7 +13,7 @@ from datetime import datetime
 import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados
-from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada
+from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos
 from inspecao.models import Inspecao
 
@@ -453,6 +453,8 @@ def ordens_iniciadas(request):
     trazendo informações da ordem, peças relacionadas (sem repetição), soma das quantidades planejadas/boas e processos em andamento.
     """
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     maquina_param = request.GET.get('setor', '')
 
     filtros_ordem = {
@@ -507,7 +509,7 @@ def ordens_iniciadas(request):
             ]
         })
 
-    return JsonResponse({"ordens": resultado}, safe=False)
+    return JsonResponse({"ordens": resultado,'usuario_tipo_acesso': usuario_tipo}, safe=False)
 
 def ordens_interrompidas(request):
     """
@@ -827,3 +829,54 @@ def api_tempos(request):
                     last_by_ordem[ordem_id][field] = row[field]
 
     return JsonResponse(results, safe=False)
+
+def retornar_processo(request):
+    if request.method != 'POST':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Método não permitido'}, 
+            status=405
+        )
+
+    try:
+        data = json.loads(request.body)
+        ordem_id = data.get('ordemId')
+        
+        if not ordem_id:
+            return JsonResponse(
+                {'status': 'error', 'message': 'ordemId não fornecido'}, 
+                status=400
+            )
+
+        with transaction.atomic():
+            deleted_count, _ = OrdemProcesso.objects.filter(ordem_id=ordem_id).last().delete()
+            
+            updated_count = Ordem.objects.filter(id=ordem_id).update(
+                maquina=None,
+                status_atual='aguardando_iniciar'
+            )
+            
+            if updated_count == 0:
+                raise Ordem.DoesNotExist(f"Ordem com id {ordem_id} não encontrada")
+            
+            PecasOrdem.objects.filter(ordem_id=ordem_id).last().delete()
+
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Processo retornado com sucesso'
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {'status': 'error', 'message': 'JSON inválido'}, 
+            status=400
+        )
+    except Ordem.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ordem não encontrada'}, 
+            status=404
+        )
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': str(e)}, 
+            status=500
+        )
