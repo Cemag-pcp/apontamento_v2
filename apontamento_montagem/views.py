@@ -303,7 +303,7 @@ def atualizar_status_ordem(request):
 
                 if conjuntos_inspecionados:
                     Inspecao.objects.create(
-                        pecas_ordem_montagem=nova_peca_ordem,
+                        pecas_ordem_montagem=ultimo_peca_ordem,
                     )
 
                 # Verificar novamente a quantidade finalizada após o novo registro
@@ -776,3 +776,30 @@ def api_ordens_finalizadas(request):
                 })
 
     return JsonResponse(data, safe=False)
+
+def api_tempos(request):
+
+    """
+    
+    """
+
+    dados = PecasOrdem.objects.select_related(
+        'ordem',                    # o.*
+        'processo_ordem',           # op.*
+        'ordem__maquina'            # m.*
+    ).filter(
+        ordem__grupo_maquina='montagem',
+        ordem_id=29385
+    ).values(
+        'ordem__id',                         # id_ordem
+        'ordem__ordem',                      # ordem
+        'peca',                              # codigo
+        'peca',                              # descricao (se quiser dividir, posso te ajudar)
+        'processo_ordem__data_inicio',      # data_inicio
+        'processo_ordem__data_fim',         # data_fim
+        'ordem__data_carga',                # data_carga
+        'qtd_planejada',                    # qt_planejada
+        'ordem__maquina__nome',             # celula (m.nome)
+        'processo_ordem__status',           # status
+        'qtd_boa',                          # qt_boa
+    )
