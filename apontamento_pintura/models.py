@@ -36,7 +36,7 @@ class Cambao(models.Model):
 
 class CambaoPecas(models.Model):
     cambao = models.ForeignKey(Cambao, on_delete=models.CASCADE, related_name='pecas_no_cambao')
-    peca_ordem = models.ForeignKey(PecasOrdem, on_delete=models.CASCADE, related_name='cambao_peca_ordem_pintura')
+    peca_ordem = models.ForeignKey(PecasOrdem, on_delete=models.CASCADE, related_name='cambao_peca_ordem_pintura', null=True)
     quantidade_pendurada = models.FloatField(default=0)
     data_pendura = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, default='pendurada')  # 'pendurada', 'finalizada'

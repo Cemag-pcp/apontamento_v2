@@ -401,6 +401,7 @@ def finalizar_cambao(request):
                     )
 
                     item.status = "finalizada"
+                    item.peca_ordem = nova_peca_ordem
                     item.data_fim = now()
                     item.save()
 
@@ -1054,3 +1055,6 @@ def api_ordens_finalizadas(request):
         })
 
     return JsonResponse(resultado, safe=False)
+
+# def api_tempos_pintura(request):
+
