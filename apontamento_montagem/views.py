@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
 from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q
-from django.db import transaction, models, IntegrityError
+from django.db import transaction, models, IntegrityError, connection
 from django.shortcuts import get_object_or_404
 from django.db.models.functions import Coalesce
 from django.shortcuts import render
@@ -776,3 +776,54 @@ def api_ordens_finalizadas(request):
                 })
 
     return JsonResponse(data, safe=False)
+
+def api_tempos(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT 
+                o.id as id_ordem,
+                o.ordem AS ordem,
+                po.peca AS codigo,
+                po.peca AS descricao,
+                op.data_inicio,
+                op.data_fim,
+                o.data_carga,
+                po.qtd_planejada AS qt_planejada,
+                m.nome AS celula,
+                op.status,
+                po.qtd_boa AS qt_boa
+            FROM apontamento_v2.core_ordem o
+            LEFT JOIN apontamento_v2.core_ordemprocesso op ON op.ordem_id = o.id
+            LEFT JOIN apontamento_v2.apontamento_montagem_pecasordem po ON po.processo_ordem_id = op.id
+            LEFT JOIN apontamento_v2.cadastro_maquina m ON o.maquina_id = m.id
+            WHERE o.grupo_maquina = 'montagem' AND op.data_inicio IS NOT NULL
+            ORDER BY o.ordem, op.data_inicio
+        """)
+        columns = [col[0] for col in cursor.description]
+        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    # Reverso: de baixo pra cima
+    last_by_ordem = {}
+
+    for i in reversed(range(len(results))):
+        row = results[i]
+        ordem_id = row['id_ordem']
+
+        if ordem_id not in last_by_ordem:
+            # Armazena os últimos dados conhecidos (mais abaixo na lista)
+            last_by_ordem[ordem_id] = {
+                'codigo': row['codigo'],
+                'descricao': row['descricao'],
+                'qt_planejada': row['qt_planejada'],
+                'qt_boa': row['qt_boa'],
+            }
+        else:
+            # Preenche se estiver nulo
+            for field in ['codigo', 'descricao', 'qt_planejada', 'qt_boa']:
+                if row[field] in (None, ''):
+                    row[field] = last_by_ordem[ordem_id][field]
+                else:
+                    # Atualiza valor "mais recente"
+                    last_by_ordem[ordem_id][field] = row[field]
+
+    return JsonResponse(results, safe=False)
