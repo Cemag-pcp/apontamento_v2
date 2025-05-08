@@ -102,6 +102,7 @@ def get_ordens_criadas(request):
     if status_atual:
         ordens_queryset = ordens_queryset.filter(status_atual=status_atual)
 
+
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
     try:
