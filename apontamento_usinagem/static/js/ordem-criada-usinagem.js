@@ -218,6 +218,8 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
             data.ordens.forEach(ordem => {
 
                 const card = document.createElement('div');
+                card.classList.add("col-xl-6");
+                card.classList.add("col-md-12");
                 card.dataset.ordemId = ordem.id;
 
                 // Defina os botões dinamicamente com base no status
@@ -331,6 +333,8 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
             data.ordens.forEach(ordem => {
                 // Cria o card
                 const card = document.createElement('div');
+                card.classList.add("col-xl-6");
+                card.classList.add("col-md-12");
                 card.dataset.ordemId = ordem.id;
             
                 // Cria a lista de peças em formato simplificado
@@ -410,6 +414,8 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
             data.ordens.forEach(ordem => {
 
                 const card = document.createElement('div');
+                card.classList.add("col-xl-6");
+                card.classList.add("col-md-12");
                 card.dataset.ordemId = ordem.id;
 
                 // Defina os botões dinamicamente com base no status

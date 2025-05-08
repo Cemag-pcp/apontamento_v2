@@ -363,7 +363,7 @@ def get_itens_inspecionados_pintura(request):
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
-    itens_por_pagina = 12  # Itens por página
+    itens_por_pagina = 6  # Itens por página
 
     # Filtra os dados
     datas = Inspecao.objects.filter(

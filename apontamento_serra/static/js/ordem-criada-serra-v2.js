@@ -249,7 +249,7 @@ export function carregarOrdensIniciadas(container, filtros={}) {
                     botaoAcao = `
                         <div class="d-flex flex-wrap justify-content-center">
                             ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
-                            ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Deletar">
+                            ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
                                  <i class="bi bi-arrow-left-right"></i>
                                </button>`: ""}
                             <button class="btn btn-warning btn-sm btn-interromper m-2" title="Interromper">
@@ -799,7 +799,7 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
             submitButton.disabled = true;
             submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
             
-            const response = await fetch('api/retornar-processo/', {
+            const response = await fetch('/core/api/retornar-processo/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

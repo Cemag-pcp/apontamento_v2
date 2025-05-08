@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/usuarios/", views.api_listar_usuarios, name="listar_usuarios"),
     path("api/listar-acessos/<int:user_id>/", views.api_listar_acessos, name="listar_acessos_usuarios"),
     path("api/atualizar-acessos/<int:user_id>/update", views.api_atualizar_acessos, name="atualizar_acessos"),
+    path('api/retornar-processo/', views.retornar_processo, name='retornar_processo'),
 
     path('api/retornar-maquina/', views.retornar_maquina, name='retornar_maquina'),
     path('api/parar-maquina/', views.parar_maquina, name='parar_maquina'),

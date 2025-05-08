@@ -431,3 +431,52 @@ def api_atualizar_acessos(request, user_id):
         return JsonResponse({"error": "Perfil não encontrado!"}, status=404)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+def retornar_processo(request):
+    if request.method != 'POST':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Método não permitido'}, 
+            status=405
+        )
+
+    try:
+        data = json.loads(request.body)
+        ordem_id = data.get('ordemId')
+        
+        if not ordem_id:
+            return JsonResponse(
+                {'status': 'error', 'message': 'ordemId não fornecido'}, 
+                status=400
+            )
+
+        with transaction.atomic():
+            deleted_count, _ = OrdemProcesso.objects.filter(ordem_id=ordem_id).delete()
+            
+            updated_count = Ordem.objects.filter(id=ordem_id).update(
+                maquina=None,
+                status_atual='aguardando_iniciar'
+            )
+            
+            if updated_count == 0:
+                raise Ordem.DoesNotExist(f"Ordem com id {ordem_id} não encontrada")
+
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Processo retornado com sucesso'
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {'status': 'error', 'message': 'JSON inválido'}, 
+            status=400
+        )
+    except Ordem.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ordem não encontrada'}, 
+            status=404
+        )
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': str(e)}, 
+            status=500
+        )

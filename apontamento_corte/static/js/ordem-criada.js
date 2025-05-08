@@ -229,13 +229,16 @@ export function carregarOrdensIniciadas(container) {
 
                 if (ordem.status_atual === 'iniciada') {
                     botaoAcao = `
-                        <button class="btn btn-danger btn-sm btn-interromper me-2" title="Interromper">
+                        ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                        ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
+                            <i class="bi bi-arrow-left-right"></i>
+                        </button>`: ""}
+                        <button class="btn btn-warning btn-sm btn-interromper m-2" title="Interromper">
                             <i class="fa fa-stop"></i>
                         </button>
-                        <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
+                        <button class="btn btn-success btn-sm btn-finalizar m-2" title="Finalizar">
                             <i class="fa fa-check"></i>
                         </button>
-                        
                     `;
                 } else if (ordem.status_atual === 'aguardando_iniciar') {
                     botaoAcao = `
@@ -277,13 +280,14 @@ export function carregarOrdensIniciadas(container) {
                         <button class="btn btn-outline-primary btn-sm btn-ver-peca">
                             Ver Peças
                         </button>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex flex-wrap justify-content-center gap-2">
                             ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
                         </div>
                     </div>
                 </div>`;
 
                 const buttonVerPeca = card.querySelector('.btn-ver-peca');
+                const buttonDeletar = card.querySelector('.btn-deletar');
                 const buttonInterromper = card.querySelector('.btn-interromper');
                 const buttonFinalizar = card.querySelector('.btn-finalizar');
 
@@ -298,6 +302,12 @@ export function carregarOrdensIniciadas(container) {
                 if (buttonInterromper) {
                     buttonInterromper.addEventListener('click', () => {
                         mostrarModalInterromper(ordem.id);
+                    });
+                }
+
+                if (buttonDeletar) {
+                    buttonDeletar.addEventListener('click', () => {
+                        mostrarModalRetornarOrdemIniciada(ordem.id);
                     });
                 }
 
@@ -336,10 +346,15 @@ export function carregarOrdensInterrompidas(container) {
                 // Cria o card de forma dinâmica
                 const card = document.createElement('div');
                 card.dataset.ordemId = ordem.id;
+                console.log(data.usuario_tipo_acesso)
                 
                 // Define os botões dinamicamente
                 const botaoAcao = `
-                    <button class="btn btn-warning btn-sm btn-retornar me-2" title="Retornar">
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                    ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Deletar">
+                            <i class="bi bi-arrow-left-right"></i>
+                    </button>`: ""} 
+                    <button class="btn btn-warning btn-sm btn-retornar m-2" title="Retornar">
                         <i class="fa fa-undo"></i>
                     </button>
                 `;
@@ -380,6 +395,7 @@ export function carregarOrdensInterrompidas(container) {
                 // Adiciona eventos aos botões
                 const buttonVerPeca = card.querySelector('.btn-ver-peca');
                 const buttonRetornar = card.querySelector('.btn-retornar');
+                const buttonDeletar = card.querySelector('.btn-deletar');
 
                 // Evento para "Ver Peças"
                 if (buttonVerPeca) {
@@ -392,6 +408,12 @@ export function carregarOrdensInterrompidas(container) {
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
                         mostrarModalRetornar(ordem.id, ordem.maquina_id);
+                    });
+                }
+
+                if (buttonDeletar) {
+                    buttonDeletar.addEventListener('click', function() {
+                        mostrarModalRetornarOrdemIniciada(ordem.id);
                     });
                 }
 
@@ -665,6 +687,62 @@ export function mostrarModalIniciar(ordemId, grupoMaquina) {
                 });
             });
     });
+}
+
+function mostrarModalRetornarOrdemIniciada(ordemId) {
+    const modalRetornarProcessoIniciado = new bootstrap.Modal(document.getElementById('modalRetornarProcessoIniciado'));
+    const textRetorno = document.getElementById('text-confirm');
+    const modalTitle = document.getElementById("modalExcluirRetorno");
+    const form = document.getElementById('formRetornarProcessoIniciado');
+    
+    modalTitle.textContent = `#${ordemId}`;
+    textRetorno.textContent = `Você tem certeza que deseja retornar a Ordem #${ordemId} para o status "Aguardando Iniciar"?`;
+    
+    // Remove todos os listeners de submit existentes
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    
+    // Adiciona o novo listener
+    newForm.addEventListener('submit', async function handleSubmit(event) {
+        event.preventDefault();
+        
+        try {
+            const submitButton = document.getElementById('retornar-aguardando-iniciar');
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+            
+            const response = await fetch('/core/api/retornar-processo/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ ordemId: ordemId })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                modalRetornarProcessoIniciado.hide();
+                carregarOrdensIniciadas(document.querySelector('.containerProcesso'));
+                carregarOrdensInterrompidas(document.querySelector('.containerInterrompido'));
+                resetarCardsInicial();
+            } else {
+                throw new Error(data.message || 'Erro ao retornar a ordem');
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            alert(error.message || 'Ocorreu um erro ao processar sua solicitação');
+        } finally {
+            const submitButton = document.getElementById('retornar-aguardando-iniciar');
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Retornar';
+            }
+        }
+    });
+    
+    modalRetornarProcessoIniciado.show();
 }
 
 // Modal para "Finalizar"
