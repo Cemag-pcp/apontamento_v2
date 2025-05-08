@@ -251,6 +251,8 @@ def atualizar_status_ordem(request):
                     processo_ordem=novo_processo
                 )
 
+                nova_peca_ordem.save()
+
             elif status == 'retorno':
                 
                 maquinas_paradas = MaquinaParada.objects.filter(maquina=ordem.maquina, data_fim__isnull=True)
@@ -262,6 +264,11 @@ def atualizar_status_ordem(request):
 
                 # Atualiza o status da ordem
                 ordem.status_atual = 'iniciada'
+
+                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
+                ultimo_peca_ordem.processo_ordem=novo_processo
+                
+                ultimo_peca_ordem.save()
 
             elif status == 'finalizada':
                 operador_final = get_object_or_404(Operador, pk=int(body.get('operador_final')))
