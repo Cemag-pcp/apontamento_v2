@@ -1045,7 +1045,7 @@ def api_ordens_finalizadas(request):
             'col5': '',
             'tipo': d.tipo,
             'data_carga': d.ordem.data_carga,
-            'data_apontamento': d.data - timedelta(hours=3),
+            'data_apontamento': (d.data - timedelta(hours=3)).date(),
             'col1': '',
             'col2': '',
             'col3': '',
