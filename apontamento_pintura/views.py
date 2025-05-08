@@ -2,11 +2,11 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
 from django.core.paginator import Paginator
-from django.db.models import Sum, Q, Prefetch, Count, OuterRef, Subquery, F, Value, Avg
+from django.db.models import Sum, Q, Prefetch, Count, OuterRef, Subquery, F, Value, Avg, Value, CharField
 from core.models import Profile
 from apontamento_pintura.models import Retrabalho
 from inspecao.models import Reinspecao, DadosExecucaoInspecao, Inspecao
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Concat
 from django.db import transaction, models
 from django.shortcuts import get_object_or_404, render
 
@@ -1012,58 +1012,45 @@ def api_ordens_finalizadas(request):
         'Vermelho': 'VM',
     }
 
-    # Busque todos os CambaoPecas de uma vez, e os relacione com as PecasOrdem
-    # cambao_por_peca = {}
-    # for c in CambaoPecas.objects.select_related('cambao', 'peca_ordem').order_by('data_pendura'):
-    #     key = c.peca_ordem_id
-    #     if key not in cambao_por_peca:
-    #         cambao_por_peca[key] = c  # pega só o primeiro por data_pendura
+    dados = PecasOrdem.objects.select_related(
+        'ordem',
+        'operador_fim',
+    ).filter(
+        qtd_boa__gt=0,
+        operador_fim__isnull=False
+    ).annotate(
+        ordem_numero=F('ordem__ordem'),
+        codigo=F('peca'),
+        descricao=F('peca'),
+        cor=F('ordem__cor'),
+        data_carga=F('ordem__data_carga'),
+        data_apontamento=F('data'),
+        operador_nome=Concat(
+            F('operador_fim__matricula'),
+            Value(' - '),
+            F('operador_fim__nome'),
+            output_field=CharField()
+        ),
+    ).order_by('data_apontamento')
 
-    ordens = Ordem.objects.filter(
-        ultima_atualizacao__gte="2025-04-08"
-    ).select_related('operador_final') \
-     .prefetch_related(
-         Prefetch('ordem_pecas_pintura', queryset=PecasOrdem.objects.select_related('operador_fim'))
-     ).order_by('ultima_atualizacao')
+    resultado = []
+    for d in dados:
+        resultado.append({
+            'ordem': d.ordem.ordem,
+            'codigo': d.peca.split(" - ")[0],
+            'descricao': d.peca.split(" - ")[1],
+            'qtd_planejada': d.qtd_planejada,
+            'cor': mapa_cor.get(d.ordem.cor, d.ordem.cor),
+            'qtd_boa': d.qtd_boa,
+            'col5': '',
+            'tipo': d.tipo,
+            'data_carga': d.ordem.data_carga,
+            'data_apontamento': d.data - timedelta(hours=3),
+            'col1': '',
+            'col2': '',
+            'col3': '',
+            'col4': '',
+            'operador': f"{d.operador_fim.matricula} - {d.operador_fim.nome}" if d.operador_fim else '',
+        })
 
-    data = []
-
-    for ordem in ordens:
-        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
-        cor_peca = mapa_cor.get(ordem.cor, ordem.cor)
-        data_carga = ordem.data_carga.strftime('%d/%m/%Y') if ordem.data_carga else None
-
-        for peca in ordem.ordem_pecas_pintura.all():
-            if peca.qtd_boa <= 0:
-                continue
-
-            # cambao = cambao_por_peca.get(peca.id)
-            # cambao_nome = cambao.cambao.nome if cambao and cambao.cambao else None
-
-            operador = peca.operador_fim
-            operador_nome = f"{operador.matricula} - {operador.nome}" if operador else None
-
-            codigo_desc = peca.peca.split(" - ", maxsplit=1)
-            codigo = codigo_desc[0]
-            descricao = codigo_desc[1] if len(codigo_desc) > 1 else ""
-
-            data.append({
-                "ordem": ordem.ordem,
-                "codigo": codigo,
-                "descricao": descricao,
-                "qtd_planejada": peca.qtd_planejada,
-                "cor": cor_peca,
-                "total_produzido": peca.qtd_boa,
-                "cambao": "",
-                "tipo": peca.tipo,
-                "data_carga": data_carga,
-                "data_finalizacao": data_finalizacao,
-                "coluna1": "",
-                "coluna2": "",
-                "coluna3": "",
-                "coluna4": "",
-                "operador_inicial": operador_nome,
-                "operador_final": operador_nome,
-            })
-
-    return JsonResponse(data, safe=False)
+    return JsonResponse(resultado, safe=False)
