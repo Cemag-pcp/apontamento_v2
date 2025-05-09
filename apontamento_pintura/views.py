@@ -3,17 +3,18 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
 from django.core.paginator import Paginator
 from django.db.models import Sum, Q, Prefetch, Count, OuterRef, Subquery, F, Value, Avg, Value, CharField
-from core.models import Profile
-from apontamento_pintura.models import Retrabalho
-from inspecao.models import Reinspecao, DadosExecucaoInspecao, Inspecao
 from django.db.models.functions import Coalesce, Concat
 from django.db import transaction, models
 from django.shortcuts import get_object_or_404, render
+from django.db import transaction, models, IntegrityError, connection
 
 import json
 from datetime import datetime, timedelta
 from pytz import timezone
 
+from core.models import Profile
+from apontamento_pintura.models import Retrabalho
+from inspecao.models import Reinspecao, DadosExecucaoInspecao, Inspecao
 from .models import PecasOrdem, CambaoPecas, Cambao
 from core.models import Ordem
 from cadastro.models import Operador
@@ -1056,5 +1057,53 @@ def api_ordens_finalizadas(request):
 
     return JsonResponse(resultado, safe=False)
 
-# def api_tempos_pintura(request):
+def api_tempos(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                o.ordem,                              
+                po.peca AS conjunto,                   
+                po.qtd_planejada AS qtd_plan,        
+                o.cor,                                
+                cp.quantidade_pendurada,             
+                apc.nome as cambao,    
+                po.tipo,                              
+                o.data_carga,                         
+                cp.data_fim,                          
+                concat(co_inicio.matricula, ' - ', co_inicio.nome) AS operador_inicio,
+                concat(co_fim.matricula, ' - ', co_fim.nome) AS operador_fim,
+                cp.data_pendura                       
+            FROM apontamento_v2.core_ordem o
+            INNER JOIN apontamento_v2.apontamento_pintura_pecasordem po ON po.ordem_id = o.id
+            INNER JOIN apontamento_v2.apontamento_pintura_cambaopecas cp ON cp.peca_ordem_id = po.id
+            INNER JOIN apontamento_v2.apontamento_pintura_cambao apc ON apc.id = cp.cambao_id
+            LEFT JOIN apontamento_v2.cadastro_operador co_fim ON co_fim.id = po.operador_fim_id
+            LEFT JOIN apontamento_v2.cadastro_operador co_inicio ON co_inicio.id = cp.operador_inicio_id
+            ORDER BY o.ordem, cp.data_pendura;
+        """)
+        columns = [col[0] for col in cursor.description]
+        results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    # Tratamento de conjunto → código + descrição
+    results = []
+    for row in results_raw:
+        conjunto = row.get('conjunto', '')
+        partes = conjunto.split(' - ', maxsplit=1)
+
+        # Quando tem pelo menos um código e uma descrição
+        if len(partes) == 2:
+            codigo = partes[0].strip()
+            descricao = partes[1].strip()
+            # Se ainda tiver repetições, corta de novo
+            if descricao.startswith(codigo):
+                descricao = descricao[len(codigo):].strip(" -")
+        else:
+            codigo = conjunto.strip()
+            descricao = ""
+
+        row['codigo'] = codigo
+        row['descricao'] = descricao
+        results.append(row)
+
+    return JsonResponse(results, safe=False)
 
