@@ -9,7 +9,7 @@ from django.shortcuts import render
 from django.core.exceptions import ObjectDoesNotExist
 
 import json
-from datetime import datetime
+from datetime import datetime, date
 import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados
@@ -756,37 +756,66 @@ def criar_ordem_fora_sequenciamento(request):
         return JsonResponse({'message': 'Ordem criada com sucesso!'})
 
 def api_ordens_finalizadas(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT 
+                o.ordem,
+                m.nome AS maquina,
+                po.peca AS conjunto,
+                po.qtd_boa AS total_produzido,
+                o.data_carga,
+                o.ultima_atualizacao AS data_finalizacao,
+                concat(op.matricula, ' - ', op.nome) AS operador,
+                o.obs_operador AS obs
+            FROM apontamento_v2.core_ordem o
+            LEFT JOIN apontamento_v2.cadastro_maquina m ON m.id = o.maquina_id
+            LEFT JOIN apontamento_v2.cadastro_operador op ON op.id = o.operador_final_id
+            INNER JOIN apontamento_v2.apontamento_montagem_pecasordem po ON po.ordem_id = o.id
+            WHERE 
+                o.ultima_atualizacao >= '2025-04-08'
+                AND po.qtd_boa > 0
+            ORDER BY o.ultima_atualizacao;
+        """)
+        columns = [col[0] for col in cursor.description]
+        results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-    data = []
+    def format_data(dt):
+        if isinstance(dt, (datetime, date)):
+            return dt.strftime("%d/%m/%Y")
+        return ""
 
-    ordens = Ordem.objects.filter(
-        # status_atual='finalizada',
-        ultima_atualizacao__gte="2025-04-08"
-    ).select_related('operador_final') \
-    .prefetch_related('ordem_pecas_montagem') \
-    .order_by('ultima_atualizacao')
+    def format_data_hora(dt):
+        if isinstance(dt, (datetime, date)):
+            return dt.strftime("%d/%m/%Y %H:%M")
+        return ""
 
-    for ordem in ordens:
-        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
+    final_results = []
+    for row in results_raw:
+        conjunto = row.get('conjunto', '')
+        partes = conjunto.split(' - ', maxsplit=1)
 
-        # converte e formata a data no timezone local
-        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
+        if len(partes) == 2:
+            codigo = partes[0].strip()
+            descricao = partes[1].strip()
+            if descricao.startswith(codigo):
+                descricao = descricao[len(codigo):].strip(" -")
+        else:
+            codigo = conjunto.strip()
+            descricao = ""
 
-        for peca in ordem.ordem_pecas_montagem.all():
-            if peca.qtd_boa > 0:
-                data.append({
-                    "ordem": ordem.ordem,
-                    "maquina": ordem.maquina.nome,
-                    "codigo": peca.peca.split(" - ", maxsplit=1)[0],  # código do conjunto
-                    "descricao": peca.peca.split(" - ", maxsplit=1)[1],  # descrição do conjunto
-                    "total_produzido": peca.qtd_boa,
-                    "data_carga": ordem.data_carga.strftime('%d/%m/%Y'),
-                    "data_finalizacao": data_finalizacao,
-                    "operador": operador,
-                    "obs": ordem.obs_operador,
-                })
+        final_results.append({
+            'ordem': row.get('ordem'),
+            'maquina': row.get('maquina'),
+            'codigo': codigo,
+            'descricao': descricao,
+            'total_produzido': row.get('total_produzido'),
+            'data_carga': format_data(row.get('data_carga')),
+            'data_finalizacao': format_data_hora(row.get('data_finalizacao')),
+            'operador': row.get('operador'),
+            'obs': row.get('obs'),
+        })
 
-    return JsonResponse(data, safe=False)
+    return JsonResponse(final_results, safe=False)
 
 def api_tempos(request):
     with connection.cursor() as cursor:
