@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, render
 from django.db import transaction, models, IntegrityError, connection
 
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pytz import timezone
 
 from core.models import Profile
@@ -1109,7 +1109,7 @@ def api_tempos(request):
 
     # Trata os dados para saída final
     def format_data(dt):
-        if isinstance(dt, datetime):
+        if isinstance(dt, (datetime, date)):
             return dt.strftime("%d/%m/%Y")
         return ""
 
