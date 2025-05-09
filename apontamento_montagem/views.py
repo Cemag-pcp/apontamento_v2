@@ -9,7 +9,7 @@ from django.shortcuts import render
 from django.core.exceptions import ObjectDoesNotExist
 
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados
@@ -786,7 +786,8 @@ def api_ordens_finalizadas(request):
 
     def format_data_hora(dt):
         if isinstance(dt, (datetime, date)):
-            return dt.strftime("%d/%m/%Y %H:%M")
+            data_final = dt - timedelta(hours=3) 
+            return data_final.strftime("%d/%m/%Y %H:%M")
         return ""
 
     final_results = []
