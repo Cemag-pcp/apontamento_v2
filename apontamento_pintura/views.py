@@ -1058,12 +1058,35 @@ def api_ordens_finalizadas(request):
     return JsonResponse(resultado, safe=False)
 
 def api_tempos(request):
+    """
+    formatos de datas para saida: dd/mm/yyyy
+
+    ordem
+    codigo
+    descricao
+    qt_planejada
+    cor
+    quantidade_pendurada
+    cambao
+    tipo
+    data_carga
+    data_fim
+    col1 (em branco)
+    col2 (em branco)
+    col3 (em branco)
+    col4 (em branco)
+    operador_inicio
+    operador_fim
+    col5 (em branco)
+    data_pendura
+    """
+
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT
-                o.ordem,                              
+                o.id AS ordem,                              
                 po.peca AS conjunto,                   
-                po.qtd_planejada AS qtd_plan,        
+                po.qtd_planejada AS qt_planejada,        
                 o.cor,                                
                 cp.quantidade_pendurada,             
                 apc.nome as cambao,    
@@ -1076,7 +1099,7 @@ def api_tempos(request):
             FROM apontamento_v2.core_ordem o
             INNER JOIN apontamento_v2.apontamento_pintura_pecasordem po ON po.ordem_id = o.id
             INNER JOIN apontamento_v2.apontamento_pintura_cambaopecas cp ON cp.peca_ordem_id = po.id
-            INNER JOIN apontamento_v2.apontamento_pintura_cambao apc ON apc.id = cp.cambao_id
+            INNER JOIN apontamento_v2.apontamento_pintura_cambao apc on apc.id = cp.cambao_id
             LEFT JOIN apontamento_v2.cadastro_operador co_fim ON co_fim.id = po.operador_fim_id
             LEFT JOIN apontamento_v2.cadastro_operador co_inicio ON co_inicio.id = cp.operador_inicio_id
             ORDER BY o.ordem, cp.data_pendura;
@@ -1084,26 +1107,46 @@ def api_tempos(request):
         columns = [col[0] for col in cursor.description]
         results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-    # Tratamento de conjunto → código + descrição
-    results = []
+    # Trata os dados para saída final
+    def format_data(dt):
+        if isinstance(dt, datetime):
+            return dt.strftime("%d/%m/%Y")
+        return ""
+
+    final_results = []
     for row in results_raw:
         conjunto = row.get('conjunto', '')
         partes = conjunto.split(' - ', maxsplit=1)
 
-        # Quando tem pelo menos um código e uma descrição
         if len(partes) == 2:
             codigo = partes[0].strip()
             descricao = partes[1].strip()
-            # Se ainda tiver repetições, corta de novo
             if descricao.startswith(codigo):
                 descricao = descricao[len(codigo):].strip(" -")
         else:
             codigo = conjunto.strip()
             descricao = ""
 
-        row['codigo'] = codigo
-        row['descricao'] = descricao
-        results.append(row)
+        final_results.append({
+            'ordem': row.get('ordem'),
+            'codigo': codigo,
+            'descricao': descricao,
+            'qt_planejada': row.get('qt_planejada'),
+            'cor': row.get('cor'),
+            'quantidade_pendurada': row.get('quantidade_pendurada'),
+            'cambao': row.get('cambao'),
+            'tipo': row.get('tipo'),
+            'data_carga': format_data(row.get('data_carga')),
+            'data_fim': format_data(row.get('data_fim')),
+            'col1': '',
+            'col2': '',
+            'col3': '',
+            'col4': '',
+            'operador_inicio': row.get('operador_inicio') or '',
+            'operador_fim': row.get('operador_fim') or '',
+            'col5': '',
+            'data_pendura': format_data(row.get('data_pendura')),
+        })
 
-    return JsonResponse(results, safe=False)
+    return JsonResponse(final_results, safe=False)
 
