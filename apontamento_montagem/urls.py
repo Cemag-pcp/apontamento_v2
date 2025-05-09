@@ -20,7 +20,7 @@ urlpatterns = [
     path('api/buscar-maquinas/', views.buscar_maquinas, name='buscar_maquinas'),
     path('api/listar-conjuntos/', views.listar_conjuntos, name='listar_conjuntos'),
     path('api/criar-ordem-fora-sequenciamento/', views.criar_ordem_fora_sequenciamento, name='criar_ordem_fora_sequenciamento'),
-
+    path('api/retornar-processo/', views.retornar_processo, name='retornar_processo'),
 ]
 
 # templates

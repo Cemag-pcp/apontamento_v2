@@ -517,6 +517,8 @@ def ordens_interrompidas(request):
     trazendo informações da ordem, peças relacionadas (sem repetição), soma das quantidades planejadas/boas e processos em andamento.
     """
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     maquina_param = request.GET.get('setor', '')
 
     filtros_ordem = {
@@ -569,7 +571,7 @@ def ordens_interrompidas(request):
             ]
         })
 
-    return JsonResponse({"ordens": resultado}, safe=False)
+    return JsonResponse({"ordens": resultado, 'usuario_tipo_acesso': usuario_tipo}, safe=False)
 
 def listar_operadores(request):
 
@@ -848,17 +850,16 @@ def retornar_processo(request):
             )
 
         with transaction.atomic():
-            deleted_count, _ = OrdemProcesso.objects.filter(ordem_id=ordem_id).last().delete()
+            ordem_process = OrdemProcesso.objects.filter(ordem_id=ordem_id).last()
+
+            ordem_process.delete()
             
             updated_count = Ordem.objects.filter(id=ordem_id).update(
-                maquina=None,
                 status_atual='aguardando_iniciar'
             )
             
             if updated_count == 0:
                 raise Ordem.DoesNotExist(f"Ordem com id {ordem_id} não encontrada")
-            
-            PecasOrdem.objects.filter(ordem_id=ordem_id).last().delete()
 
         return JsonResponse({
             'status': 'success', 
