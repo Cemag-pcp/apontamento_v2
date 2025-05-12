@@ -110,7 +110,7 @@ class Pecas(models.Model):
     comprimento = models.FloatField(blank=True, null=True)
     setor = models.ManyToManyField(Setor, related_name='pecas_setor', blank=True)
     apelido = models.CharField(max_length=255, blank=True, null=True)
-    conjunto = models.ForeignKey(Conjuntos, on_delete=models.CASCADE, related_name='peca_conjunto')
+    conjunto = models.ForeignKey(Conjuntos, on_delete=models.CASCADE, related_name='peca_conjunto', null=True, blank=True)
     # caso tenha processo preestabelecido para peça
     processo_1 = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='processo_maquina_1', blank=True, null=True)
 
