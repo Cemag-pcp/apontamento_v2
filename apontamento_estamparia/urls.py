@@ -27,4 +27,5 @@ urlpatterns = [
 # Google sheets
 urlpatterns += [
     path('api/ordem-finalizadas', views.api_ordens_finalizadas, name='api_ordens_finalizadas'),
+    path('api/ordem-finalizadas-v2', views.api_ordens_finalizadas_v2, name='api_ordens_finalizadas_v2'),
 ]

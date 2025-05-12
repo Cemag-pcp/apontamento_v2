@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.db import transaction
+from django.db import transaction, connection
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
@@ -623,3 +623,34 @@ def api_ordens_finalizadas(request):
                 })
 
     return JsonResponse(data, safe=False)
+
+def api_ordens_finalizadas_v2(request):
+    
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT 
+                o.ordem AS ordem,
+                m.nome AS maquina,
+                p.codigo AS peca,
+                p.descricao AS descricao,
+                ope.qtd_boa AS total_produzido,
+                TO_CHAR(o.data_programacao, 'DD/MM/YYYY HH24:MI') AS data_programacao,
+                TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
+                CONCAT(f.matricula, ' - ', f.nome) AS operador,
+                o.obs_operador AS obs
+            FROM apontamento_v2.core_ordem o
+            JOIN apontamento_v2.apontamento_estamparia_pecasordem ope ON ope.ordem_id = o.id
+            JOIN apontamento_v2.cadastro_pecas p ON ope.peca_id = p.id
+            LEFT JOIN apontamento_v2.cadastro_maquina m ON o.maquina_id = m.id
+            LEFT JOIN apontamento_v2.cadastro_operador f ON o.operador_final_id = f.id
+            WHERE 
+                o.status_atual = 'finalizada'
+                AND o.ultima_atualizacao >= '2025-04-08'
+                AND ope.qtd_boa > 0
+            ORDER BY o.ultima_atualizacao;
+        """)
+        columns = [col[0] for col in cursor.description]
+        results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+
+    return JsonResponse(results_raw, safe=False)
