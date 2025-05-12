@@ -21,7 +21,7 @@ urlpatterns = [
     path('atualizar-pecas/', views.atualizar_pecas_ordem, name='atualizar_pecas_ordem'),
 
     path('api/apontamentos-peca/estamparia', views.api_apontamentos_peca, name='api_apontamentos_peca'),
-
+    path('api/retornar-processo/', views.retornar_processo, name='retornar_processo')
 ]
 
 # Google sheets
