@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.views import View
 from django.conf import settings
-from django.db import transaction
+from django.db import transaction, connection
 from django.shortcuts import get_object_or_404, render
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
@@ -673,109 +673,119 @@ def resequenciar_ordem(request):
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
 
 def api_ordens_finalizadas(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT 
+                COALESCE(o.ordem::TEXT, o.ordem_duplicada) AS ordem,
+                poc.peca,
+                poc.qtd_planejada,
+                
+                -- tamanho_chapa: prioridade para tamanho, senão extrai da descricao_mp
+                CASE 
+                    WHEN p.tamanho IS NOT NULL THEN p.tamanho
+                    WHEN p.descricao_mp IS NOT NULL THEN SPLIT_PART(p.descricao_mp, ' - ', 2)
+                    ELSE NULL
+                END AS tamanho_chapa,
 
-    data = []
+                p.quantidade AS qt_chapa,
+                p.aproveitamento,
 
-    SIGLA_TIPO_CHAPA = {
-        'inox': 'Inox',
-        'anti_derrapante': 'A.D',
-        'alta_resistencia': 'A.R',
-        'aco_carbono': '',  # sem sigla
-    }
+                -- espessura_final = espessura + sigla tipo_chapa
+                TRIM(
+                    TRIM(COALESCE(p.espessura, '')) || 
+                    CASE p.tipo_chapa
+                        WHEN 'inox' THEN ' Inox'
+                        WHEN 'anti_derrapante' THEN ' A.D'
+                        WHEN 'alta_resistencia' THEN ' A.R'
+                        ELSE ''
+                    END
+                ) AS espessura,
 
-    ordens = Ordem.objects.filter(status_atual='finalizada', ultima_atualizacao__gte="2025-04-08").select_related(
-        'propriedade', 'operador_final'
-    ).prefetch_related('ordem_pecas_corte').order_by('ultima_atualizacao')
+                poc.qtd_morta,
+                CONCAT(op.matricula, ' - ', op.nome) AS operador,
+                TO_CHAR(o.ultima_atualizacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
+                poc.qtd_boa AS total_produzido
+            FROM apontamento_v2.core_ordem o
+            INNER JOIN apontamento_v2.apontamento_corte_pecasordem poc ON poc.ordem_id = o.id
+            LEFT JOIN apontamento_v2.core_propriedadesordem p ON o.id = p.ordem_id
+            LEFT JOIN apontamento_v2.cadastro_operador op ON op.id = o.operador_final_id
+            WHERE 
+                o.status_atual = 'finalizada'
+                AND o.ultima_atualizacao >= '2025-04-08'
+                AND poc.qtd_boa > 0
+            ORDER BY o.ultima_atualizacao;
+        """)
+        columns = [col[0] for col in cursor.description]
+        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-    for ordem in ordens:
-        propriedade = getattr(ordem, 'propriedade', None)
-        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
-
-        # converte e formata a data no timezone local
-        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
-        espessura = propriedade.espessura.rstrip() if propriedade and propriedade.espessura else ''
-
-        tipo_chapa = propriedade.tipo_chapa if propriedade and propriedade.tipo_chapa else ''
-        sigla = SIGLA_TIPO_CHAPA.get(tipo_chapa, '')
-
-        espessura_final = f"{espessura} {sigla}".strip()  # remove espaço extra se sigla for vazia
-
-        for peca in ordem.ordem_pecas_corte.all():
-            if peca.qtd_boa > 0:
-                data.append({
-                    "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
-                    "peca": peca.peca,
-                    "qtd_planejada": peca.qtd_planejada,
-                    "tamanho_chapa": (
-                        propriedade.tamanho if propriedade and propriedade.tamanho
-                        else propriedade.descricao_mp.split(' - ')[1] if propriedade and propriedade.descricao_mp else None
-                    ),
-                    "qt_chapa": propriedade.quantidade if propriedade else None,
-                    "aproveitamento": propriedade.aproveitamento if propriedade else None,
-                    "espessura": espessura_final,
-                    "qtd_morta": peca.qtd_morta,
-                    "operador": operador,
-                    "data_finalizacao": data_finalizacao,
-                    "total_produzido": peca.qtd_boa
-                })
-
-    return JsonResponse(data, safe=False)
+    return JsonResponse(results, safe=False)
 
 def api_ordens_finalizadas_mp(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+        SELECT 
+            COALESCE(o.ordem::TEXT, o.ordem_duplicada) AS ordem,
+            TO_CHAR(o.ultima_atualizacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
 
-    data = []
+            -- tamanho_chapa: usa 'tamanho', senão usa split da descricao_mp
+            CASE 
+                WHEN p.tamanho IS NOT NULL THEN p.tamanho
+                WHEN p.descricao_mp IS NOT NULL THEN SPLIT_PART(p.descricao_mp, ' - ', 2)
+                ELSE NULL
+            END AS tamanho_chapa,
 
-    ordens = Ordem.objects.filter(status_atual='finalizada', grupo_maquina__in=['laser_1','laser_2','plasma'], ultima_atualizacao__gte="2025-04-08").select_related(
-        'propriedade', 'maquina'
-    ).order_by('ultima_atualizacao')
+            p.quantidade AS qt_chapa,
+            p.aproveitamento,
+            p.descricao_mp AS descricao_chapa,
+            TRIM(p.espessura) AS espessura,
+            m.nome AS maquina,
+            CASE p.tipo_chapa
+                WHEN 'inox' THEN ' Inox'
+                WHEN 'anti_derrapante' THEN ' A.D'
+                WHEN 'alta_resistencia' THEN ' A.R'
+                ELSE ''
+            END
+            AS tipo_chapa,
+            CASE 
+                WHEN p.retalho THEN 'Sim'
+                ELSE 'Não'
+                END AS retalho
 
-    for ordem in ordens:
-        propriedade = getattr(ordem, 'propriedade', None)
+            FROM apontamento_v2.core_ordem o
+            LEFT JOIN apontamento_v2.core_propriedadesordem p ON o.id = p.ordem_id
+            LEFT JOIN apontamento_v2.cadastro_maquina m ON o.maquina_id = m.id
+        WHERE 
+            o.status_atual = 'finalizada'
+        AND o.grupo_maquina IN ('laser_1', 'laser_2', 'plasma')
+        AND o.ultima_atualizacao >= '2025-04-08'
+        ORDER BY o.ultima_atualizacao;
+        """)
 
-        # converte e formata a data no timezone local
-        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
-        espessura = propriedade.espessura.rstrip() if propriedade and propriedade.espessura else None
+        columns = [col[0] for col in cursor.description]
+        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        data.append({
-            "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
-            "data_finalizacao": data_finalizacao,
-            "tamanho_chapa": (
-                propriedade.tamanho if propriedade and propriedade.tamanho
-                else propriedade.descricao_mp.split(' - ')[1] if propriedade and propriedade.descricao_mp else None
-            ),
-            "qt_chapa": propriedade.quantidade if propriedade else None,
-            "aproveitamento": propriedade.aproveitamento if propriedade else None,
-            "descricao_chapa": propriedade.descricao_mp if propriedade else None,
-            "espessura": espessura,
-            "maquina": ordem.maquina.nome if ordem.maquina else None,
-            "tipo_chapa": propriedade.get_tipo_chapa_display() if propriedade else None,
-            "retalho": "Sim" if propriedade and propriedade.retalho else "Não"
-        })
-
-    return JsonResponse(data, safe=False)
+    return JsonResponse(results, safe=False)
 
 def api_ordens_criadas(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT 
+                TO_CHAR(o.data_criacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS data_criacao,
+                COALESCE(o.ordem::TEXT, o.ordem_duplicada) AS ordem,
+                poc.peca,
+                poc.qtd_planejada,
+                o.status_atual,
+                m.nome AS maquina
+            FROM apontamento_v2.core_ordem o
+            INNER JOIN apontamento_v2.apontamento_corte_pecasordem poc ON poc.ordem_id = o.id
+            LEFT JOIN apontamento_v2.cadastro_maquina m ON m.id = o.maquina_id
+            WHERE o.ultima_atualizacao >= '2025-04-08'
+            ORDER BY o.ultima_atualizacao;
+        """)
+        columns = [col[0] for col in cursor.description]
+        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-    data = []
-
-    ordens = Ordem.objects.filter(ultima_atualizacao__gte="2025-04-08").prefetch_related('ordem_pecas_corte').order_by('ultima_atualizacao')
-
-    for ordem in ordens:
-
-        # converte e formata a data no timezone local
-        data_criacao = localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M')
-
-        for peca in ordem.ordem_pecas_corte.all():
-            data.append({
-                "data_criacao": data_criacao,
-                "ordem": ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
-                "peca": peca.peca,
-                "qtd_planejada": peca.qtd_planejada,
-                "status_atual":ordem.status_atual,
-                "maquina": ordem.maquina.nome if ordem.maquina else None,
-            })
-
-    return JsonResponse(data, safe=False)
+    return JsonResponse(results, safe=False)
 
 def excluir_ordem(request):
     """
