@@ -764,17 +764,18 @@ def api_ordens_finalizadas(request):
                 po.peca AS conjunto,
                 po.qtd_boa AS total_produzido,
                 o.data_carga,
-                o.ultima_atualizacao AS data_finalizacao,
+                co.data_fim AS data_finalizacao,
                 concat(op.matricula, ' - ', op.nome) AS operador,
                 o.obs_operador AS obs
             FROM apontamento_v2.core_ordem o
             LEFT JOIN apontamento_v2.cadastro_maquina m ON m.id = o.maquina_id
             LEFT JOIN apontamento_v2.cadastro_operador op ON op.id = o.operador_final_id
-            INNER JOIN apontamento_v2.apontamento_montagem_pecasordem po ON po.ordem_id = o.id
+            INNER JOIN apontamento_v2.apontamento_montagem_pecasordem po ON o.id = po.ordem_id
+            INNER JOIN apontamento_v2.core_ordemprocesso co on co.id = po.processo_ordem_id 
             WHERE 
-                o.ultima_atualizacao >= '2025-04-08'
+                co.data_fim >= '2025-04-08'
                 AND po.qtd_boa > 0
-            ORDER BY o.ultima_atualizacao;
+            ORDER BY co.data_fim;
         """)
         columns = [col[0] for col in cursor.description]
         results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
