@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.db import transaction
+from django.db import transaction, connection
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
@@ -604,37 +604,35 @@ def atualizar_pecas_ordem(request):
     return JsonResponse({'status':'success'})
 
 def api_ordens_finalizadas(request):
+    
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT 
+                o.ordem AS ordem,
+                m.nome AS maquina,
+                p.codigo AS peca,
+                p.descricao AS descricao,
+                ope.qtd_boa AS total_produzido,
+                TO_CHAR(o.data_programacao, 'DD/MM/YYYY HH24:MI') AS data_programacao,
+                TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
+                CONCAT(f.matricula, ' - ', f.nome) AS operador,
+                o.obs_operador AS obs
+            FROM apontamento_v2.core_ordem o
+            JOIN apontamento_v2.apontamento_estamparia_pecasordem ope ON ope.ordem_id = o.id
+            JOIN apontamento_v2.cadastro_pecas p ON ope.peca_id = p.id
+            LEFT JOIN apontamento_v2.cadastro_maquina m ON o.maquina_id = m.id
+            LEFT JOIN apontamento_v2.cadastro_operador f ON o.operador_final_id = f.id
+            WHERE 
+                o.status_atual = 'finalizada'
+                AND o.ultima_atualizacao >= '2025-04-08'
+                AND ope.qtd_boa > 0
+            ORDER BY o.ultima_atualizacao;
+        """)
+        columns = [col[0] for col in cursor.description]
+        results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-    data = []
 
-    ordens = Ordem.objects.filter(
-        status_atual='finalizada',
-        ultima_atualizacao__gte="2025-04-08"
-    ).select_related('operador_final') \
-    .prefetch_related('ordem_pecas_estamparia') \
-    .order_by('ultima_atualizacao')
-
-    for ordem in ordens:
-        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
-
-        # converte e formata a data no timezone local
-        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
-
-        for peca in ordem.ordem_pecas_estamparia.all():
-            if peca.qtd_boa > 0:
-                data.append({
-                    "ordem": ordem.ordem,
-                    "maquina": ordem.maquina.nome if ordem.maquina else None,
-                    "peca": peca.peca.codigo,
-                    "descricao": peca.peca.descricao,
-                    "total_produzido": peca.qtd_boa,
-                    "data_programacao": ordem.data_programacao.strftime('%d/%m/%Y %H:%M') if ordem.data_programacao else None,
-                    "data_finalizacao": data_finalizacao,
-                    "operador": operador,
-                    "obs": ordem.obs_operador
-                })
-
-    return JsonResponse(data, safe=False)
+    return JsonResponse(results_raw, safe=False)
 
 def retornar_processo(request):
     if request.method != 'POST':
