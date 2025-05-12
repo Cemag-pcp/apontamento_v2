@@ -232,13 +232,17 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                 let botaoAcao = '';
 
                 botaoAcao = `
-                    <button class="btn btn-danger btn-sm btn-interromper" title="Interromper">
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                    ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
+                        <i class="bi bi-arrow-left-right"></i>
+                    </button>`: ""}
+                    <button class="btn btn-warning btn-sm btn-interromper m-2" title="Interromper">
                         <i class="fa fa-stop"></i>
                     </button>
-                    <button class="btn btn-success btn-sm btn-finalizar" title="Finalizar">
+                    <button class="btn btn-success btn-sm btn-finalizar m-2" title="Finalizar">
                         <i class="fa fa-check"></i>
                     </button>
-                    <button class="btn btn-primary btn-sm btn-proximo-processo" title="Passar para o próximo processo">
+                    <button class="btn btn-primary btn-sm btn-proximo-processo m-2" title="Passar para o próximo processo">
                         <i class="fa fa-arrow-right"></i>
                     </button>      
                 `;
@@ -272,16 +276,23 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                     </div>
 
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
-                        <div class="d-flex gap-2">
+                        <div class="d-flex flex-wrap justify-content-center gap-2">
                             ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
                         </div>
                     </div>
                 </div>`;
 
+                const buttonDeletar = card.querySelector('.btn-deletar');
                 const buttonInterromper = card.querySelector('.btn-interromper');
                 const buttonFinalizar = card.querySelector('.btn-finalizar');
                 const buttonProxProcesso = card.querySelector('.btn-proximo-processo');
                 // const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
+                
+                if (buttonDeletar) {
+                    buttonDeletar.addEventListener('click', function() {
+                        mostrarModalRetornarOrdemIniciada(ordem.id);
+                    });
+                }
 
                 // Adiciona evento ao botão "Interromper", se existir
                 if (buttonInterromper) {
@@ -349,7 +360,11 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
             
                 // Botões de ação
                 const botaoAcao = `
-                    <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                    ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
+                        <i class="bi bi-arrow-left-right"></i>
+                    </button>`: ""}
+                    <button class="btn btn-warning btn-sm btn-retornar m-2" title="Retornar">
                         <i class="fa fa-undo"></i>
                     </button>
                 `;
@@ -377,7 +392,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
                             </p>
                         </div>
                         <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
-                            <div class="d-flex gap-2">
+                            <div class="d-flex flex-wrap justify-content-center gap-2">
                                 ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
                             </div>
                         </div>
@@ -385,9 +400,17 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
             
                 // Adiciona eventos aos botões
                 const buttonRetornar = card.querySelector('.btn-retornar');
+                const buttonDeletar = card.querySelector('.btn-deletar');
+
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
                         mostrarModalRetornar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
+                    });
+                }
+
+                if (buttonDeletar) {
+                    buttonDeletar.addEventListener('click', function() {
+                        mostrarModalRetornarOrdemIniciada(ordem.id);
                     });
                 }
             
@@ -423,7 +446,11 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                 let botaoAcao = '';
 
                 botaoAcao = `
-                    <button class="btn btn-warning btn-sm btn-iniciar-proximo-processo" title="Iniciar próximo processo">
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                    ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
+                        <i class="bi bi-arrow-left-right"></i>
+                    </button>`: ""}
+                    <button class="btn btn-warning btn-sm btn-iniciar-proximo-processo m-2" title="Iniciar próximo processo">
                         <i class="fa fa-play"></i>
                     </button>
                 `;
@@ -453,18 +480,25 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
                     </div>
 
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
-                        <div class="d-flex gap-2">
+                        <div class="d-flex flex-wrap justify-content-center gap-2">
                             ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
                         </div>
                     </div>
                 </div>`;
 
                 const buttonProxProcesso = card.querySelector('.btn-iniciar-proximo-processo');
+                const buttonDeletar = card.querySelector('.btn-deletar');
 
                 // Adiciona evento ao botão para iniciar proximo processo
                 if (buttonProxProcesso) {
                     buttonProxProcesso.addEventListener('click', () => {
                         mostrarModalIniciarProxProcesso(ordem.id, ordem.grupo_maquina);
+                    });
+                }
+
+                if (buttonDeletar) {
+                    buttonDeletar.addEventListener('click', function() {
+                        mostrarModalRetornarOrdemIniciada(ordem.id);
                     });
                 }
 
@@ -573,6 +607,63 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
             alert('Erro ao interromper a ordem.');
         });
     });
+}
+
+function mostrarModalRetornarOrdemIniciada(ordemId) {
+    const modalRetornarProcessoIniciado = new bootstrap.Modal(document.getElementById('modalRetornarProcessoIniciado'));
+    const textRetorno = document.getElementById('text-confirm');
+    const modalTitle = document.getElementById("modalExcluirRetorno");
+    const form = document.getElementById('formRetornarProcessoIniciado');
+    
+    modalTitle.textContent = `#${ordemId}`;
+    textRetorno.textContent = `Você tem certeza que deseja retornar a Ordem #${ordemId} para o status "Aguardando Iniciar"?`;
+    
+    // Remove todos os listeners de submit existentes
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    
+    // Adiciona o novo listener
+    newForm.addEventListener('submit', async function handleSubmit(event) {
+        event.preventDefault();
+        
+        try {
+            const submitButton = document.getElementById('retornar-aguardando-iniciar');
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+            
+            const response = await fetch('api/retornar-processo/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ ordemId: ordemId })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                modalRetornarProcessoIniciado.hide();
+                carregarOrdensIniciadas(document.querySelector('.containerProcesso'));
+                carregarOrdensInterrompidas(document.querySelector('.containerInterrompido'));
+                carregarOrdensAgProProcesso(document.querySelector('.containerProxProcesso'))
+                resetarCardsInicial();
+            } else {
+                throw new Error(data.message || 'Erro ao retornar a ordem');
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            alert(error.message || 'Ocorreu um erro ao processar sua solicitação');
+        } finally {
+            const submitButton = document.getElementById('retornar-aguardando-iniciar');
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Retornar';
+            }
+        }
+    });
+    
+    modalRetornarProcessoIniciado.show();
 }
 
 // Modal para "Iniciar"

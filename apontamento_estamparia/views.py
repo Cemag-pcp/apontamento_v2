@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import Ordem,PecasOrdem
-from core.models import OrdemProcesso,MaquinaParada
+from core.models import OrdemProcesso,MaquinaParada, Profile
 from cadastro.models import MotivoInterrupcao, Pecas, Operador, MotivoMaquinaParada, MotivoExclusao, Maquina
 from inspecao.models import Inspecao, DadosExecucaoInspecao
 
@@ -296,6 +296,9 @@ def atualizar_status_ordem(request):
     
 @require_GET
 def get_ordens_iniciadas(request):
+
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     # Filtra as ordens baseadas no status e no grupo da máquina
     ordens_queryset = Ordem.objects.filter(
         grupo_maquina='estamparia',
@@ -361,6 +364,7 @@ def get_ordens_iniciadas(request):
                 })
 
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': list(ordens_dict.values()),  # Retorna apenas valores únicos
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
@@ -369,6 +373,9 @@ def get_ordens_iniciadas(request):
 
 @require_GET
 def get_ordens_interrompidas(request):
+
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     # Filtra as ordens com base no status 'interrompida'
     ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_estamparia').filter(status_atual='interrompida', grupo_maquina='estamparia')
 
@@ -419,6 +426,7 @@ def get_ordens_interrompidas(request):
 
     # Retorna os dados paginados como JSON
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
@@ -427,6 +435,9 @@ def get_ordens_interrompidas(request):
 
 @require_GET
 def get_ordens_ag_prox_proc(request):
+
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     # Filtra as ordens com base no status 'agua_prox_proc' e prefetch da peça relacionada
     ordens_queryset = Ordem.objects.prefetch_related(
         'ordem_pecas_estamparia'
@@ -484,6 +495,7 @@ def get_ordens_ag_prox_proc(request):
 
     # Retorna os dados paginados como JSON
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
@@ -623,3 +635,54 @@ def api_ordens_finalizadas(request):
                 })
 
     return JsonResponse(data, safe=False)
+
+def retornar_processo(request):
+    if request.method != 'POST':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Método não permitido'}, 
+            status=405
+        )
+
+    try:
+        data = json.loads(request.body)
+        ordem_id = data.get('ordemId')
+        
+        if not ordem_id:
+            return JsonResponse(
+                {'status': 'error', 'message': 'ordemId não fornecido'}, 
+                status=400
+            )
+
+        with transaction.atomic():
+            ordem_process = OrdemProcesso.objects.filter(ordem_id=ordem_id)
+
+            ordem_process.delete()
+            
+            updated_count = Ordem.objects.filter(id=ordem_id).update(
+                maquina=None,
+                status_atual='aguardando_iniciar'
+            )
+            
+            if updated_count == 0:
+                raise Ordem.DoesNotExist(f"Ordem com id {ordem_id} não encontrada")
+
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Processo retornado com sucesso'
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {'status': 'error', 'message': 'JSON inválido'}, 
+            status=400
+        )
+    except Ordem.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ordem não encontrada'}, 
+            status=404
+        )
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': str(e)}, 
+            status=500
+        )
