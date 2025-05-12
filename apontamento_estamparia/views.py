@@ -592,39 +592,6 @@ def atualizar_pecas_ordem(request):
     return JsonResponse({'status':'success'})
 
 def api_ordens_finalizadas(request):
-
-    data = []
-
-    ordens = Ordem.objects.filter(
-        status_atual='finalizada',
-        ultima_atualizacao__gte="2025-04-08"
-    ).select_related('operador_final') \
-    .prefetch_related('ordem_pecas_estamparia') \
-    .order_by('ultima_atualizacao')
-
-    for ordem in ordens:
-        operador = f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None
-
-        # converte e formata a data no timezone local
-        data_finalizacao = localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M')
-
-        for peca in ordem.ordem_pecas_estamparia.all():
-            if peca.qtd_boa > 0:
-                data.append({
-                    "ordem": ordem.ordem,
-                    "maquina": ordem.maquina.nome if ordem.maquina else None,
-                    "peca": peca.peca.codigo,
-                    "descricao": peca.peca.descricao,
-                    "total_produzido": peca.qtd_boa,
-                    "data_programacao": ordem.data_programacao.strftime('%d/%m/%Y %H:%M') if ordem.data_programacao else None,
-                    "data_finalizacao": data_finalizacao,
-                    "operador": operador,
-                    "obs": ordem.obs_operador
-                })
-
-    return JsonResponse(data, safe=False)
-
-def api_ordens_finalizadas_v2(request):
     
     with connection.cursor() as cursor:
         cursor.execute("""
