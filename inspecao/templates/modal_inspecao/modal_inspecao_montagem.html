@@ -71,11 +71,15 @@
             <div class="row">
                 <div class="col-sm-6 mb-4">
                     <label class="label-modal">Inspetor:</label>
-                    <select name="inspetor-inspecao-montagem" id="inspetor-inspecao-montagem" class="form-control" required>
+                    <select name="inspetor-inspecao-montagem" id="inspetor-inspecao-montagem" class="form-control" aria-readonly="true" required>
                         <option value="" selected hidden disabled></option>
-                        {% for inspetor in inspetores %}
-                          <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
-                        {% endfor %}
+                        {% if not inspetor_logado %}
+                          {% for inspetor in inspetores %}
+                            <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                          {% endfor %}
+                        {% else %}
+                          <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                        {% endif %}
                     </select>
                 </div>
                 <div class="col-sm-6 mb-4">
@@ -168,11 +172,15 @@
             <div class="row">
                 <div class="col-sm-6 mb-4">
                     <label for="inspetor-reinspecao-montagem" class="label-modal">Inspetor:</label>
-                    <select name="inspetor-reinspecao-montagem" id="inspetor-reinspecao-montagem" class="form-control" required>
+                    <select name="inspetor-reinspecao-montagem" id="inspetor-reinspecao-montagem" class="form-control" aria-readonly="true" required>
                         <option value="" selected hidden disabled></option>
-                        {% for inspetor in inspetores %}
-                          <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
-                        {% endfor %}
+                        {% if not inspetor_logado %}
+                          {% for inspetor in inspetores %}
+                            <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                          {% endfor %}
+                        {% else %}
+                          <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                        {% endif %}
                     </select>
                 </div>
                 <div class="col-sm-6 mb-4">
