@@ -51,6 +51,7 @@ def inspecao_montagem(request):
     users = Profile.objects.filter(
         tipo_acesso="inspetor", permissoes__nome="inspecao/montagem"
     )
+
     causas = Causas.objects.filter(setor="montagem")
 
     maquinas = list(
@@ -65,10 +66,20 @@ def inspecao_montagem(request):
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
     ]
 
+    user_profile = Profile.objects.filter(user=request.user).first()
+    if user_profile and user_profile.tipo_acesso == "inspetor" and user_profile.permissoes.filter(nome="inspecao/montagem").exists():
+        inspetor_logado = {
+            "nome_usuario": request.user.username,
+            "id": request.user.id
+        }
+    else:
+        inspetor_logado = None
+
     return render(
         request,
         "inspecao_montagem.html",
-        {"inspetores": lista_inspetores, "causas": list_causas, "maquinas": maquinas},
+        {"inspetor_logado":inspetor_logado, "inspetores": lista_inspetores, 
+         "causas": list_causas, "maquinas": maquinas},
     )
 
 
@@ -297,7 +308,6 @@ def get_itens_reinspecao_pintura(request):
     pagina_obj = paginador.get_page(pagina)
 
     dados = []
-    print(pagina_obj)
 
     for data in pagina_obj:
         print(data)
