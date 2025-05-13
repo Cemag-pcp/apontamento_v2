@@ -1563,7 +1563,8 @@ def get_itens_reinspecao_estamparia(request):
                 "%d/%m/%Y %H:%M:%S"
             ),
             "peca": f"{data.pecas_ordem_estamparia.peca.codigo} - {data.pecas_ordem_estamparia.peca.descricao}",
-            "maquina": data.pecas_ordem_estamparia.ordem.maquina.nome,
+            "maquina": data.pecas_ordem_estamparia.ordem.maquina.nome if data.pecas_ordem_estamparia.ordem.maquina
+            else "Não identificada",
             "conformidade": (
                 last_dados_execucao.conformidade if last_dados_execucao else None
             ),
@@ -1689,7 +1690,8 @@ def get_itens_inspecionados_estamparia(request):
                 "id_dados_execucao": de.id,
                 "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                 "peca": f"{data.pecas_ordem_estamparia.peca.codigo} - {data.pecas_ordem_estamparia.peca.descricao}",
-                "maquina": data.pecas_ordem_estamparia.ordem.maquina.nome,
+                "maquina": data.pecas_ordem_estamparia.ordem.maquina.nome if data.pecas_ordem_estamparia.ordem.maquina
+                else "Não identificada",
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
             }
