@@ -72,24 +72,35 @@ export const loadOrdens = (container, filtros = {}) => {
 
                     // Evento para habilitar/desabilitar o botão ao marcar checkboxes e verificar cor e quantidade preenchida
                     const checkboxes = document.querySelectorAll(".ordem-checkbox");
+                    
 
                     checkboxes.forEach(checkbox => {
                         checkbox.addEventListener("change", () => {
                             const selecionados = [...checkboxes].filter(cb => cb.checked);
                             const corSelecionada = selecionados.length > 0 ? selecionados[0].dataset.cor : null;
-                            let isValid = true;
-                    
+                            let isValid = true;                        
+                            const qtdPendurarMax = checkbox.closest('tr').querySelector('.qt-produzida');
+
                             selecionados.forEach(cb => {
+                                //Preenche o campo de quantidade com o valor máximo
                                 const linha = cb.closest('tr');
                                 const qtInput = linha.querySelector('.qt-produzida');
                                 const maxQtPermitida = parseInt(qtInput.getAttribute("max"), 10);
                                 const qtSelecionada = parseInt(qtInput.value, 10);
+                                const qtdProduzida = cb.closest('tr').querySelector('.qt-produzida');
+
+                                if (qtSelecionada > maxQtPermitida || (qtSelecionada == 0 || isNaN(qtSelecionada))){  
+                                    qtdProduzida.value = maxQtPermitida;
+                                }
                     
                                 // Verifica se o campo de quantidade foi preenchido corretamente
-                                if (!qtInput.value || qtSelecionada <= 0) {
+                                if (qtSelecionada <= 0) {
                                     cb.checked = false; // Desmarca o checkbox inválido
-                                    isValid = false;
-                    
+                                    if (selecionados.length == 1) {
+                                        isValid = false;
+                                    }
+                                    
+
                                     Swal.fire({
                                         icon: "warning",
                                         title: "Quantidade Inválida",
@@ -98,19 +109,37 @@ export const loadOrdens = (container, filtros = {}) => {
                                     });
                                     return;
                                 }
+                                // if (!qtInput.value || qtSelecionada <= 0) {
+                                //     cb.checked = false; // Desmarca o checkbox inválido
+                                //     isValid = false;
+                    
+                                //     Swal.fire({
+                                //         icon: "warning",
+                                //         title: "Quantidade Inválida",
+                                //         text: "Você precisa preencher a quantidade antes de selecionar esta ordem!",
+                                //         confirmButtonText: "OK"
+                                //     });
+                                //     return;
+                                // }
                     
                                 // ⚠ Verifica se a quantidade ultrapassa o permitido
                                 if (qtSelecionada > maxQtPermitida) {
-                                    cb.checked = false; // Desmarca a seleção inválida
-                                    isValid = false;
-                    
+                                    cb.checked = false; // Desmarca o checkbox inválido
+                                    if (selecionados.length == 1) {
+                                        isValid = false;
+                                    }
+
                                     Swal.fire({
                                         icon: "warning",
                                         title: "Quantidade Excedida",
                                         text: `O valor máximo permitido é ${maxQtPermitida}.`,
                                         confirmButtonText: "OK"
                                     });
-                                    return;
+
+                                }
+
+                                if (qtSelecionada > maxQtPermitida || (qtSelecionada == 0 || isNaN(qtSelecionada))){  
+                                    qtdProduzida.value = maxQtPermitida;
                                 }
                             });
                     
@@ -118,7 +147,9 @@ export const loadOrdens = (container, filtros = {}) => {
                             const coresDiferentes = selecionados.some(cb => cb.dataset.cor !== corSelecionada);
                             if (coresDiferentes) {
                                 checkbox.checked = false;
-                                isValid = false;
+                                if (selecionados.length == 1) {
+                                    isValid = false;
+                                }
                     
                                 Swal.fire({
                                     icon: "warning",
@@ -126,38 +157,113 @@ export const loadOrdens = (container, filtros = {}) => {
                                     text: "Todas as peças do cambão devem ter a mesma cor!",
                                     confirmButtonText: "OK"
                                 });
+                                qtdPendurarMax.value = ''; // Limpa o campo de quantidade
                             }
+
+                            
                     
                             // ✅ Habilita o botão apenas se houver seleções válidas
                             document.getElementById("btn-criar-cambao").disabled = selecionados.length === 0 || !isValid;
                         });
                     });
 
+                    // // Evento para selecionar todos os checkboxes (somente se todas forem da mesma cor e com quantidade preenchida)
+                    // document.getElementById("select-all").addEventListener("change", (e) => {
+                    //     const isChecked = e.target.checked;
+                    //     const primeiraCor = checkboxes[0]?.dataset.cor;
+                    //     let isValid = true;
+
+                    //     checkboxes.forEach(cb => {
+                    //         const linha = cb.closest('tr');
+                    //         const qtInput = linha.querySelector('.qt-produzida');
+
+                    //         if (cb.dataset.cor === primeiraCor && qtInput.value && parseInt(qtInput.value) > 0) {
+                    //             cb.checked = isChecked;
+                    //         } else {
+                    //             cb.checked = false;
+                    //             isValid = false;
+                    //         }
+                    //     });
+
+                    //     if (!isValid) {
+                    //         Swal.fire({
+                    //             icon: "warning",
+                    //             title: "Seleção Inválida",
+                    //             text: "Verifique se todas as ordens possuem a mesma cor e quantidade preenchida corretamente!",
+                    //             confirmButtonText: "OK"
+                    //         });
+                    //     }
+
+                    //     // Verifica se há checkboxes válidos marcados
+                    //     const algumSelecionado = [...checkboxes].some(cb => cb.checked);
+                    //     document.getElementById("btn-criar-cambao").disabled = !algumSelecionado || !isValid;
+                    // });
+
                     // Evento para selecionar todos os checkboxes (somente se todas forem da mesma cor e com quantidade preenchida)
                     document.getElementById("select-all").addEventListener("change", (e) => {
+                        // Passo 1: Verificar se as cores do filtro são iguais
                         const isChecked = e.target.checked;
+                        if (!isChecked) {
+                            checkboxes.forEach(cb => {
+                                cb.checked = false;
+                                const linha = cb.closest('tr');
+                                const qtInput = linha.querySelector('.qt-produzida');
+                                qtInput.value = '';
+                            });
+                            document.getElementById("btn-criar-cambao").disabled = true;
+                            return;
+                        }
                         const primeiraCor = checkboxes[0]?.dataset.cor;
                         let isValid = true;
 
                         checkboxes.forEach(cb => {
                             const linha = cb.closest('tr');
                             const qtInput = linha.querySelector('.qt-produzida');
+                            const maxQtPermitida = parseInt(qtInput.getAttribute("max"), 10);
 
-                            if (cb.dataset.cor === primeiraCor && qtInput.value && parseInt(qtInput.value) > 0) {
+                            if (cb.dataset.cor === primeiraCor && isChecked){
+                                qtInput.value = maxQtPermitida;
                                 cb.checked = isChecked;
-                            } else {
+                            }else {
+                                qtInput.value = '';
                                 cb.checked = false;
                                 isValid = false;
                             }
+                            
+
+                            // if (cb.dataset.cor === primeiraCor && qtInput.value && parseInt(qtInput.value) > 0) {
+                            //     cb.checked = isChecked;
+                            // } else {
+                            //     cb.checked = false;
+                            //     isValid = false;
+                            // }
                         });
 
+                        // if (!isValid) {
+                        //     Swal.fire({
+                        //         icon: "warning",
+                        //         title: "Seleção Inválida",
+                        //         text: "Verifique se todas as ordens possuem a mesma cor e quantidade preenchida corretamente!",
+                        //         confirmButtonText: "OK"
+                        //     });
+                        // }
                         if (!isValid) {
+                            checkboxes.forEach(cb => {
+                                cb.checked = false;
+                                const linha = cb.closest('tr');
+                                const qtInput = linha.querySelector('.qt-produzida');
+                                qtInput.value = '';
+                                document.getElementById("btn-criar-cambao").disabled = true;
+                            });
+
                             Swal.fire({
                                 icon: "warning",
                                 title: "Seleção Inválida",
-                                text: "Verifique se todas as ordens possuem a mesma cor e quantidade preenchida corretamente!",
+                                text: "Verifique os filtros garatindo que seja estabelecido apenas uma cor!",
                                 confirmButtonText: "OK"
                             });
+
+                            
                         }
 
                         // Verifica se há checkboxes válidos marcados
