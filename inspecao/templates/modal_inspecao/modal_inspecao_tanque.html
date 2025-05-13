@@ -21,9 +21,13 @@ aria-labelledby="tubosModalLabel" style="overflow-y: auto;">
                         <label class="label-modal">Inspetor</label>
                         <select class="form-control" name="inspetores_estanqueidade_tanque" id="inspetores_estanqueidade_tanque" required>
                             <option value="" hidden selected disabled></option>
-                            {% for inspetor in inspetores %}
-                                <option value="{{inspetor.id}}">{{inspetor.nome_usuario}}</option>
-                            {% endfor %}
+                            {% if not inspetor_logado %}
+                                {% for inspetor in inspetores %}
+                                    <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                            {% endif %}
                         </select>
                     </div>
                     <div class="col-sm-12 mb-4">
@@ -237,9 +241,13 @@ aria-labelledby="tubosModalLabel" style="overflow-y: auto;">
                             <label class="label-modal">Inspetor</label>
                             <select class="form-control" name="inspetores_estanqueidade_tanque" id="inspetores_estanqueidade_tanque_reinspecao">
                                 <option value="" hidden selected disabled></option>
-                                {% for inspetor in inspetores %}
-                                    <option value="{{inspetor.id}}">{{inspetor.nome_usuario}}</option>
-                                {% endfor %}
+                                {% if not inspetor_logado %}
+                                    {% for inspetor in inspetores %}
+                                        <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                                {% endif %}
                             </select>
                         </div>
                     </div>
