@@ -17,9 +17,13 @@
                             <label class="label-modal">Inspetor</label>
                             <select class="form-control select2" name="inspetores-inspecao-cilindro" id="inspetores-inspecao-cilindro" required>
                                 <option value="" selected hidden disabled></option>
-                                {% for inspetor in inspetores %}
-                                  <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
-                                {% endfor %}
+                                {% if not inspetor_logado %}
+                                    {% for inspetor in inspetores %}
+                                        <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                                {% endif %}
                             </select>
                         </div>
                     </div>
@@ -114,9 +118,13 @@
                             <label class="label-modal">Inspetor</label>
                             <select class="form-control select2" id="inspetor-inspecao-tubo" style="font-size: 14px;" required>
                                 <option value="" disabled hidden selected></option>
-                                {% for inspetor in inspetores %}
-                                    <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
-                                {% endfor %}
+                                {% if not inspetor_logado %}
+                                    {% for inspetor in inspetores %}
+                                        <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                                {% endif %}
                             </select>
                         </div>
                     </div>
@@ -275,9 +283,13 @@
                             <label class="label-modal" for="inspetor_reteste_estanqueidade">Inspetor</label>
                             <select class="form-control" name="inspetor_reteste_estanqueidade" id="inspetor_reteste_estanqueidade" required>
                                 <option value=""></option>
-                                {% for inspetor in inspetores %}
-                                    <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
-                                {% endfor %}
+                                {% if not inspetor_logado %}
+                                    {% for inspetor in inspetores %}
+                                        <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                                {% endif %}
                             </select>
                         </div>
                     </div>
