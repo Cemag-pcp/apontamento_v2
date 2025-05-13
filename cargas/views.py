@@ -320,6 +320,19 @@ def parse_iso_date(date_str):
 def andamento_cargas(request):
     """ Retorna as cargas de um setor dentro do intervalo solicitado pelo FullCalendar """
 
+    # Algumas máquinas que não precisam está na contagem de montagem
+    maquinas_excluidas = ['PLAT. TANQUE. CAÇAM. 2','QUALIDADE','FORJARIA','ESTAMPARIA','QUALIDADE']
+
+    # Máquinas a excluir da contagem
+    maquinas_excluidas = [
+        'PLAT. TANQUE. CAÇAM. 2',
+        'QUALIDADE',
+        'FORJARIA',
+        'ESTAMPARIA'
+    ]
+
+    maquinas_excluidas_ids = Maquina.objects.filter(nome__in=maquinas_excluidas).values_list('id', flat=True)
+
     # Obtém os parâmetros da requisição
     start_date = request.GET.get('start')
     end_date = request.GET.get('end')
@@ -350,14 +363,16 @@ def andamento_cargas(request):
             total_planejado = modelo.objects.filter(
                 ordem__data_carga=data,
                 ordem__grupo_maquina=setor
-            ).values('ordem', 'peca').distinct().aggregate(
+            ).exclude(ordem__maquina__id__in=maquinas_excluidas_ids) \
+            .values('ordem', 'peca').distinct().aggregate(
                 total_planejado=Coalesce(Sum('qtd_planejada', output_field=models.FloatField()), Value(0.0))
             )["total_planejado"]
 
             total_finalizado = modelo.objects.filter(
                 ordem__data_carga=data,
                 ordem__grupo_maquina=setor
-            ).aggregate(
+            ).exclude(ordem__maquina__id__in=maquinas_excluidas_ids) \
+            .aggregate(
                 total_finalizado=Coalesce(Sum('qtd_boa', output_field=models.FloatField()), Value(0.0))
             )["total_finalizado"]
 
