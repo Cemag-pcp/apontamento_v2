@@ -588,24 +588,33 @@ def listar_operadores(request):
 
 def percentual_concluido_carga(request):
     data_carga = request.GET.get('data_carga')  # Garantindo que seja apenas a data
-    
 
-    if data_carga == '':
-        data_carga = now().date()
+    # Algumas máquinas que não precisam está na contagem
+    maquinas_excluidas = ['PLAT. TANQUE. CAÇAM. 2','QUALIDADE','FORJARIA','ESTAMPARIA','QUALIDADE']
 
-    # Soma correta da quantidade planejada por peça e ordem (evitando duplicação)
+    # Máquinas a excluir da contagem
+    maquinas_excluidas = [
+        'PLAT. TANQUE. CAÇAM. 2',
+        'QUALIDADE',
+        'FORJARIA',
+        'ESTAMPARIA'
+    ]
+    maquinas_excluidas_ids = Maquina.objects.filter(nome__in=maquinas_excluidas).values_list('id', flat=True)
+
+    # Total planejado sem duplicidade de peça e ordem, excluindo certas máquinas
     total_planejado = PecasOrdem.objects.filter(
         ordem__data_carga=data_carga,
         ordem__grupo_maquina='montagem'
-    ).values('ordem', 'peca').distinct().aggregate(
-        total_planejado=Coalesce(Sum('qtd_planejada', output_field=FloatField()), Value(0.0))
-    )["total_planejado"]
+    ).exclude(ordem__maquina__id__in=maquinas_excluidas_ids) \
+    .values('ordem', 'peca').distinct() \
+    .aggregate(total_planejado=Coalesce(Sum('qtd_planejada', output_field=FloatField()), Value(0.0)))["total_planejado"]
 
     # Soma total da quantidade boa produzida
     total_finalizado = PecasOrdem.objects.filter(
         ordem__data_carga=data_carga,
         ordem__grupo_maquina='montagem'
-    ).aggregate(
+    ).exclude(ordem__maquina__id__in=maquinas_excluidas_ids) \
+    .aggregate(
         total_finalizado=Coalesce(Sum('qtd_boa', output_field=FloatField()), Value(0.0))
     )["total_finalizado"]
 
@@ -619,6 +628,16 @@ def percentual_concluido_carga(request):
     })
 
 def andamento_ultimas_cargas(request):
+
+    # Máquinas a excluir da contagem
+    maquinas_excluidas = [
+        'PLAT. TANQUE. CAÇAM. 2',
+        'QUALIDADE',
+        'FORJARIA',
+        'ESTAMPARIA'
+    ]
+    maquinas_excluidas_ids = Maquina.objects.filter(nome__in=maquinas_excluidas).values_list('id', flat=True)
+
     # Obtém as últimas 10 datas de carga disponíveis para pintura
     ultimas_cargas = Ordem.objects.filter(grupo_maquina='montagem')\
         .order_by('-data_carga')\
@@ -632,7 +651,8 @@ def andamento_ultimas_cargas(request):
         total_planejado = PecasOrdem.objects.filter(
             ordem__data_carga=data,
             ordem__grupo_maquina='montagem'
-        ).values('ordem', 'peca').distinct().aggregate(
+        ).exclude(ordem__maquina__id__in=maquinas_excluidas_ids) \
+        .values('ordem', 'peca').distinct().aggregate(
             total_planejado=Coalesce(Sum('qtd_planejada', output_field=models.FloatField()), Value(0.0))
         )["total_planejado"]
 
@@ -640,7 +660,8 @@ def andamento_ultimas_cargas(request):
         total_finalizado = PecasOrdem.objects.filter(
             ordem__data_carga=data,
             ordem__grupo_maquina='montagem'
-        ).aggregate(
+        ).exclude(ordem__maquina__id__in=maquinas_excluidas_ids) \
+        .aggregate(
             total_finalizado=Coalesce(Sum('qtd_boa', output_field=models.FloatField()), Value(0.0))
         )["total_finalizado"]
 
