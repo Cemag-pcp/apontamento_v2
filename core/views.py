@@ -283,8 +283,16 @@ def get_contagem_status_ordem(request):
 def get_status_maquinas(request):
     setor = request.GET.get('setor', '')
 
+    # Máquinas a excluir da contagem
+    maquinas_excluidas = [
+        'PLAT. TANQUE. CAÇAM. 2',
+        'QUALIDADE',
+        'FORJARIA',
+        'ESTAMPARIA'
+    ]
+
     if setor:    
-        maquinas = Maquina.objects.filter(setor__nome=setor, tipo='maquina').values_list('id', 'nome')
+        maquinas = Maquina.objects.filter(setor__nome=setor, tipo='maquina').exclude(nome__in=maquinas_excluidas).values_list('id', 'nome')
     else:
         return JsonResponse({'error': 'Setor inválido'}, status=400)
 

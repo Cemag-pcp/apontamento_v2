@@ -364,6 +364,7 @@ def atualizar_status_ordem(request):
         return JsonResponse({'error': str(e)}, status=500)
     
 def ordens_criadas(request):
+   
     """
     View que agrega os dados de PecasOrdem (por ordem) e junta com a model Ordem,
     trazendo algumas colunas da Ordem e calculando o saldo:
@@ -374,6 +375,7 @@ def ordens_criadas(request):
       - maquina: nome da máquina (opcional)
       - status: status da ordem (opcional)
     """
+
     data_carga = request.GET.get('data_carga')
     maquina_param = request.GET.get('setor', '')
     status_param = request.GET.get('status', '')
@@ -418,7 +420,15 @@ def ordens_criadas(request):
         )
     )
 
-    maquinas = Ordem.objects.filter(id__in=ordem_ids).values('maquina__nome','maquina__id').distinct()
+    # Máquinas a excluir da contagem
+    maquinas_excluidas = [
+        'PLAT. TANQUE. CAÇAM. 2',
+        'QUALIDADE',
+        'FORJARIA',
+        'ESTAMPARIA'
+    ]
+
+    maquinas = Ordem.objects.filter(id__in=ordem_ids).exclude(maquina__nome__in=maquinas_excluidas).values('maquina__nome','maquina__id').distinct()
 
     return JsonResponse({"ordens": list(pecas_ordem_agg),
                          "maquinas":list(maquinas)})
