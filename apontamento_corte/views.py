@@ -482,6 +482,10 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
         # Busca a ordem com os relacionamentos necessários
         ordem = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').get(pk=pk_ordem)
 
+        espessuras = [espessura.nome for espessura in Espessura.objects.all()]
+
+        tipos_chapas = [tipo[1] for tipo in PropriedadesOrdem.TIPO_CHAPA_CHOICES]
+
         # Propriedades da ordem
         propriedades = {
             'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
@@ -499,7 +503,8 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
             if peca.qtd_planejada > 0
         ]
 
-        return JsonResponse({'pecas': pecas, 'propriedades': propriedades})
+        return JsonResponse({'pecas': pecas, 'propriedades': propriedades, 
+                             'espessuras': espessuras, 'tipos_chapas':tipos_chapas})
 
     except Ordem.DoesNotExist:
         return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
@@ -526,6 +531,8 @@ def gerar_op_duplicada(request, pk_ordem):
     obs_duplicar = data.get('obs_duplicar')
     data_programacao = data.get('dataProgramacao')
     qtd_chapa = data.get('qtdChapa')
+    tipo_chapa = data.get('tipoChapa')
+    espessura = data.get('espessura')
     maquina = data.get('maquina', None)
     pecas = data.get('pecas', [])
 
@@ -561,14 +568,21 @@ def gerar_op_duplicada(request, pk_ordem):
             # Duplica as propriedades associadas
             if hasattr(ordem_original, 'propriedade'):
                 propriedade_original = ordem_original.propriedade
+
+                if espessura == None:
+                    espessura = propriedade_original.espessura
+
+                if tipo_chapa == None:
+                    tipo_chapa = propriedade_original.tipo_chapa
+
                 PropriedadesOrdem.objects.create(
                     ordem=nova_ordem,  # Associa a nova ordem
                     descricao_mp=propriedade_original.descricao_mp,
                     tamanho=propriedade_original.tamanho,
-                    espessura=propriedade_original.espessura,
+                    espessura=espessura,
                     quantidade=qtd_chapa,
                     aproveitamento=propriedade_original.aproveitamento,
-                    tipo_chapa=propriedade_original.tipo_chapa,
+                    tipo_chapa=tipo_chapa,
                     retalho=propriedade_original.retalho,
                 )
 

@@ -260,15 +260,31 @@ function preencherModalDuplicacao(data,ordemId) {
                 <tr>
                     <td>${ordemId}</td> 
                     <td>${data.propriedades?.descricao_mp || 'N/A'}</td>
-                    <td>${data.propriedades?.espessura || 'N/A'}</td>
+                    <td>
+                        <select class="form-select form-select-sm" id="selectEspessura" style="width: 120px;">
+                            ${data.espessuras.map(espessura => 
+                                `<option value="${espessura}" ${data.propriedades?.espessura === espessura ? 'selected' : ''}>
+                                    ${espessura}
+                                </option>`
+                            ).join('')}
+                        </select>
+                    </td>
                     <td>
                         <input type="number" id="quantidadeChapas" 
-                               class="form-control form-control-sm" 
-                               data-value-original="${data.propriedades?.quantidade || 1}" 
-                               value="${data.propriedades?.quantidade || 1}" 
-                               min="1" style="width: 80px;">
+                            class="form-control form-control-sm" 
+                            data-value-original="${data.propriedades?.quantidade || 1}" 
+                            value="${data.propriedades?.quantidade || 1}" 
+                            min="1" style="width: 80px;">
                     </td>
-                    <td>${data.propriedades?.tipo_chapa || 'N/A'}</td>
+                    <td>
+                        <select class="form-select form-select-sm" id="selectTipoChapa" style="width: 150px;">
+                            ${data.tipos_chapas.map(tipo => 
+                                `<option value="${tipo}" ${data.propriedades?.tipo_chapa === tipo ? 'selected' : ''}>
+                                    ${tipo}
+                                </option>`
+                            ).join('')}
+                        </select>
+                    </td>
                     <td>${data.propriedades?.aproveitamento || 'N/A'}</td>
                 </tr>
             </tbody>
@@ -348,6 +364,8 @@ function duplicarOrdem() {
         const obsDuplicar = document.getElementById('obsFinalizarCorte').value;
         const dataProgramacao = document.getElementById('dataProgramacao').value;
         const maquina = document.getElementById('maquina').value;
+        const espessura = document.getElementById('selectEspessura').value;
+        const tipoChapa = document.getElementById('selectTipoChapa').value;
         const quantidadeChapas = parseFloat(document.getElementById('quantidadeChapas').value) || 1;
 
         // Captura a lista de peças com as novas quantidades
@@ -365,7 +383,9 @@ function duplicarOrdem() {
             dataProgramacao: dataProgramacao,
             qtdChapa: quantidadeChapas,
             maquina: maquina,
-            pecas: pecas
+            pecas: pecas,
+            espessura: espessura,
+            tipoChapa: tipoChapa
         };
 
         // Exibe o Swal de carregamento
