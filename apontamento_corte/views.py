@@ -21,7 +21,7 @@ import tempfile
 import re
 import json
 from urllib.parse import unquote
-from datetime import datetime
+from datetime import datetime, time
 from functools import reduce
 
 # Caminho para a pasta temporária dentro do projeto
@@ -82,6 +82,7 @@ def get_ordens_criadas(request):
     filtro_maquina = request.GET.get('maquina', '').strip()
     filtro_status = request.GET.get('status', '')
     filtro_peca = request.GET.get('peca', '').strip()
+    filtro_turno = request.GET.get('turno', '')
 
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
@@ -101,6 +102,19 @@ def get_ordens_criadas(request):
         ordens_queryset = ordens_queryset.filter(status_atual=filtro_status)
     if filtro_peca:
         ordens_queryset = ordens_queryset.filter(ordem_pecas_corte__peca__icontains=filtro_peca)
+    if filtro_turno:
+        if filtro_turno == 'turnoA':
+            # Filtra entre 07:00 e 18:00
+            ordens_queryset = ordens_queryset.filter(
+                ultima_atualizacao__time__gte=time(7, 0),
+                ultima_atualizacao__time__lte=time(18, 0),
+            )
+        elif filtro_turno == 'turnoB':
+            # Filtra entre 21:00 e 07:00 do dia seguinte
+            ordens_queryset = ordens_queryset.filter(
+                Q(ultima_atualizacao__time__gte=time(21, 0)) |
+                Q(ultima_atualizacao__time__lte=time(7, 0))
+            )
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
