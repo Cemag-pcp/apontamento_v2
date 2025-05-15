@@ -269,6 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filtroMaquina = document.getElementById('filtro-maquina');
     const filtroStatus = document.getElementById('filtro-status');
     const filtroPeca = document.getElementById('filtro-peca');
+    const filtroTurno = document.getElementById('filtro-turno');
 
     // Função para resetar dados e carregar com filtros
     const resetAndLoad = () => {
@@ -282,7 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ordem: filtroOrdem.value,
             maquina: filtroMaquina.value,
             status: filtroStatus.value,
-            peca: filtroPeca.value
+            peca: filtroPeca.value,
+            turno: filtroTurno.value
         });
 
     };
