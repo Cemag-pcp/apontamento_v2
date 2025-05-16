@@ -140,7 +140,8 @@ def get_ordens_criadas(request):
             'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade.tipo_chapa else None,
             'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade.aproveitamento else None,
             'retalho': 'Sim' if ordem.propriedade.retalho else None,
-        }
+        },
+        'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M') if ordem.status_atual == 'finalizada' else None,
     } for ordem in ordens_page]
 
     return JsonResponse({'ordens': data})
