@@ -109,18 +109,6 @@ export const loadOrdens = (container, filtros = {}) => {
                                     });
                                     return;
                                 }
-                                // if (!qtInput.value || qtSelecionada <= 0) {
-                                //     cb.checked = false; // Desmarca o checkbox inválido
-                                //     isValid = false;
-                    
-                                //     Swal.fire({
-                                //         icon: "warning",
-                                //         title: "Quantidade Inválida",
-                                //         text: "Você precisa preencher a quantidade antes de selecionar esta ordem!",
-                                //         confirmButtonText: "OK"
-                                //     });
-                                //     return;
-                                // }
                     
                                 // ⚠ Verifica se a quantidade ultrapassa o permitido
                                 if (qtSelecionada > maxQtPermitida) {
@@ -167,38 +155,6 @@ export const loadOrdens = (container, filtros = {}) => {
                         });
                     });
 
-                    // // Evento para selecionar todos os checkboxes (somente se todas forem da mesma cor e com quantidade preenchida)
-                    // document.getElementById("select-all").addEventListener("change", (e) => {
-                    //     const isChecked = e.target.checked;
-                    //     const primeiraCor = checkboxes[0]?.dataset.cor;
-                    //     let isValid = true;
-
-                    //     checkboxes.forEach(cb => {
-                    //         const linha = cb.closest('tr');
-                    //         const qtInput = linha.querySelector('.qt-produzida');
-
-                    //         if (cb.dataset.cor === primeiraCor && qtInput.value && parseInt(qtInput.value) > 0) {
-                    //             cb.checked = isChecked;
-                    //         } else {
-                    //             cb.checked = false;
-                    //             isValid = false;
-                    //         }
-                    //     });
-
-                    //     if (!isValid) {
-                    //         Swal.fire({
-                    //             icon: "warning",
-                    //             title: "Seleção Inválida",
-                    //             text: "Verifique se todas as ordens possuem a mesma cor e quantidade preenchida corretamente!",
-                    //             confirmButtonText: "OK"
-                    //         });
-                    //     }
-
-                    //     // Verifica se há checkboxes válidos marcados
-                    //     const algumSelecionado = [...checkboxes].some(cb => cb.checked);
-                    //     document.getElementById("btn-criar-cambao").disabled = !algumSelecionado || !isValid;
-                    // });
-
                     // Evento para selecionar todos os checkboxes (somente se todas forem da mesma cor e com quantidade preenchida)
                     document.getElementById("select-all").addEventListener("change", (e) => {
                         // Passo 1: Verificar se as cores do filtro são iguais
@@ -230,23 +186,8 @@ export const loadOrdens = (container, filtros = {}) => {
                                 isValid = false;
                             }
                             
-
-                            // if (cb.dataset.cor === primeiraCor && qtInput.value && parseInt(qtInput.value) > 0) {
-                            //     cb.checked = isChecked;
-                            // } else {
-                            //     cb.checked = false;
-                            //     isValid = false;
-                            // }
                         });
 
-                        // if (!isValid) {
-                        //     Swal.fire({
-                        //         icon: "warning",
-                        //         title: "Seleção Inválida",
-                        //         text: "Verifique se todas as ordens possuem a mesma cor e quantidade preenchida corretamente!",
-                        //         confirmButtonText: "OK"
-                        //     });
-                        // }
                         if (!isValid) {
                             checkboxes.forEach(cb => {
                                 cb.checked = false;
