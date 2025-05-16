@@ -222,9 +222,17 @@
                                 <option value="finalizada">Finalizada</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                        <div class="col-md-3 mb-2">
+                            <label for="filtro-turno" class="form-label">Turno</label>
+                            <select class="form-select" id="filtro-turno">
+                                <option class="text-muted" value="">Filtrar por turno: A ou B</option>
+                                <option value="turnoA">Turno A: Manhã/Tarde (07:00 - 18:00)</option>
+                                <option value="turnoB">Turno B: Noite (21:00 - 07:00)</option>
+                            </select>
                         </div>
+                    </div>
+                    <div class="col-md-4 mt-4">
+                        <button type="submit" class="btn btn-primary w-100">Filtrar</button>
                     </div>
                 </form>
             </div>

@@ -7,7 +7,8 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${encodeURIComponent(filtros.ordem || '')}&maquina=${filtros.maquina || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}`)
+
+        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${encodeURIComponent(filtros.ordem || '')}&maquina=${filtros.maquina || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}&turno=${filtros.turno || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -1248,13 +1249,17 @@ export function resetarCardsInicial(filtros = {}) {
     const filtroMaquina = document.getElementById('filtro-maquina');
     const filtroStatus = document.getElementById('filtro-status');
     const filtroPeca = document.getElementById('filtro-peca');
+    const filtroTurno = document.getElementById('filtro-turno');
 
     const currentFiltros = {
         ordem: filtros.ordem || filtroOrdem.value.trim(),
         maquina: filtros.maquina || filtroMaquina.value,
         status: filtros.status || filtroStatus.value,
-        peca: filtros.peca || filtroPeca.value
+        peca: filtros.peca || filtroPeca.value,
+        turno: filtros.turno || filtroTurno.value
     };
+
+    console.log(currentFiltros)
 
     // Função principal para buscar e renderizar ordens
     const fetchOrdens = () => {
@@ -1299,11 +1304,13 @@ export function resetarCardsInicial(filtros = {}) {
         const filtroMaquina = document.getElementById('filtro-maquina');
         const filtroStatus = document.getElementById('filtro-status');
         const filtroPeca = document.getElementById('filtro-peca');
+        const filtroTurno = document.getElementById('filtro-turno');
 
         currentFiltros.ordem = filtroOrdem.value.trim();
         currentFiltros.maquina = filtroMaquina.value;
         currentFiltros.status = filtroStatus.value;
         currentFiltros.peca = filtroPeca.value;
+        currentFiltros.turno = filtroTurno.value;
     
         loadMoreButton.disabled = true;
         loadMoreButton.innerHTML = `                    
