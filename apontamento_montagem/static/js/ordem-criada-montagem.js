@@ -352,7 +352,7 @@ export function carregarOrdensIniciadas(filtros = {}) {
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        mostrarModalFinalizar(ordem.ordem_id, ordem.grupo_maquina, ordem.qtd_restante);
+                        mostrarModalFinalizar(ordem.ordem_id, ordem.maquina, ordem.qtd_restante);
                     });
                 }
 
@@ -693,17 +693,33 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
 }
 
 // Modal para "Finalizar"
-function mostrarModalFinalizar(ordemId, grupoMaquina, max_itens) {
+function mostrarModalFinalizar(ordemId, maquina, max_itens) {
     const modal = new bootstrap.Modal(document.getElementById('finalizarModal'));
 
     const operadorSelect = document.getElementById('operadorFinal');
-    const qtRealizadaInput = document.getElementById('qtRealizada')
-    
+    const qtRealizadaInput = document.getElementById('qtRealizada');
+    const labelOperadores = document.getElementById('labelOperadores');
+
+    const todosOperadorFinal = document.getElementById('todosOperadorFinal');
+    const descricaoBotaoVoltar = document.getElementById('descricaoBotaoVoltar');
+    const descricaoBotaoLista = document.getElementById('descricaoBotaoLista');
+
+    operadorSelect.style.display = 'block';
+    descricaoBotaoLista.style.display = 'block';
+
+    todosOperadorFinal.style.display = 'none';
+    descricaoBotaoVoltar.style.display = 'none';
+    labelOperadores.textContent = `Operador - ${maquina}` 
+
     document.getElementById('ordemIdFinalizar').value = ordemId;
     
+    labelOperadores.setAttribute('data-maquina', maquina)
     qtRealizadaInput.setAttribute('max', max_itens);
 
-    fetch("api/listar-operadores/")
+    operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
+    todosOperadorFinal.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
+
+    fetch(`api/listar-operadores/?maquina=${maquina}`)
     .then(response => {
         if (!response.ok) {
             throw new Error("Erro ao buscar operadores");
@@ -711,28 +727,77 @@ function mostrarModalFinalizar(ordemId, grupoMaquina, max_itens) {
         return response.json();
     })
     .then(data => {
-        operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`;
-        
-        if (data.operadores.length === 0) {
+    
+        if (data.operadores_maquina.length === 0) {
             operadorSelect.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
         } else {
-            data.operadores.forEach(operador => {
+            data.operadores_maquina.forEach(operador => {
                 operadorSelect.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
             });
             operadorSelect.disabled = false; // Habilita o select após carregar os dados
+        }
+
+        if (data.operadores.length === 0) {
+            todosOperadorFinal.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
+        } else {
+            data.operadores.forEach(operador => {
+                todosOperadorFinal.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+            });
+            todosOperadorFinal.disabled = false; // Habilita o select após carregar os dados
         }
     })
     .catch(error => {
         console.error("Erro ao carregar operadores:", error);
         operadorSelect.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
+        todosOperadorFinal.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
     });
     
     modal.show();
 }
 
+document.getElementById('direcionarTodosOperadores').addEventListener('click', function () {
+    const operadorFinal = document.getElementById('operadorFinal');
+    const todosOperadorFinal = document.getElementById('todosOperadorFinal');
+    const labelOperadores = document.getElementById('labelOperadores');
+
+    const descricaoBotaoVoltar = document.getElementById('descricaoBotaoVoltar');
+    const descricaoBotaoLista = document.getElementById('descricaoBotaoLista');
+    
+    labelOperadores.textContent = `Todos os Operadores` 
+
+    operadorFinal.style.display = 'none';
+    operadorFinal.setAttribute('data-active', 'false');
+    todosOperadorFinal.style.display = 'block';
+    todosOperadorFinal.setAttribute('data-active', 'true');
+
+    descricaoBotaoVoltar.style.display = 'block';
+    descricaoBotaoLista.style.display = 'none';
+});
+
+document.getElementById('botaoVoltarOperadoresMaquina').addEventListener('click', function () {
+    const operadorFinal = document.getElementById('operadorFinal');
+    const todosOperadorFinal = document.getElementById('todosOperadorFinal');
+    const labelOperadores = document.getElementById('labelOperadores');
+
+    const descricaoBotaoLista = document.getElementById('descricaoBotaoLista');
+    const descricaoBotaoVoltar = document.getElementById('descricaoBotaoVoltar');
+
+    const maquina = labelOperadores.getAttribute('data-maquina')
+    labelOperadores.textContent = `Operadores - ${maquina}` 
+
+    todosOperadorFinal.style.display = 'none';
+    todosOperadorFinal.setAttribute('data-active', 'false');
+    operadorFinal.style.display = 'block';
+    operadorFinal.setAttribute('data-active', 'true');
+
+    descricaoBotaoLista.style.display = 'block';
+    descricaoBotaoVoltar.style.display = 'none';
+});
+
 document.getElementById('confirmFinalizar').addEventListener('click', function () {
     const ordemId = document.getElementById('ordemIdFinalizar').value;
-    const operadorFinal = document.getElementById('operadorFinal').value;
+    const operadorFinal = document.getElementById('operadorFinal');
+    const todosOperadorFinal = document.getElementById('todosOperadorFinal');
     const qtRealizada = document.getElementById('qtRealizada');
     const obsFinalizar = document.getElementById('obsFinalizar').value;
     const qtMaxima = qtRealizada.getAttribute('max');
@@ -753,15 +818,46 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
             title: 'Erro',
             text: 'A quantidade realizada não pode ser maior que a quantidade máxima permitida.'
         });
-        return; // Impede que continue com a requisição
+        return;
     }
 
-    // Validação: Campos obrigatórios
-    if (!operadorFinal || !qtRealizada.value) {
+    // Determinar qual select está ativo e obter o valor do operador
+    let operadorId;
+    if (operadorFinal.style.display !== 'none' && operadorFinal.getAttribute('data-active') === 'true') {
+        if (!operadorFinal.value || operadorFinal.value === "") {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Por favor, selecione um operador da máquina.'
+            });
+            return;
+        }
+        operadorId = operadorFinal.value;
+    } else if (todosOperadorFinal.style.display !== 'none' && todosOperadorFinal.getAttribute('data-active') === 'true') {
+        if (!todosOperadorFinal.value || todosOperadorFinal.value === "") {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Por favor, selecione um operador da lista geral.'
+            });
+            return;
+        }
+        operadorId = todosOperadorFinal.value;
+    } else {
         Swal.fire({
             icon: 'warning',
             title: 'Atenção',
-            text: 'Por favor, preencha todos os campos obrigatórios.'
+            text: 'Por favor, selecione um operador válido.'
+        });
+        return;
+    }
+
+    // Validação: Quantidade realizada é obrigatória
+    if (!qtRealizada.value) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Por favor, informe a quantidade realizada.'
         });
         return;
     }
@@ -778,7 +874,7 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
     const payload = {
         status: "finalizada",
         ordem_id: parseInt(ordemId),
-        operador_final: parseInt(operadorFinal),
+        operador_final: parseInt(operadorId),
         obs_finalizar: obsFinalizar,
         qt_realizada: parseInt(qtRealizada.value)
     };
@@ -799,7 +895,6 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         return response.json();
     })
     .then(data => {
-
         carregarOrdensIniciadas(filtros);
         resetarCardsInicial(filtros);
 
@@ -808,7 +903,6 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         const finalizarModal = bootstrap.Modal.getInstance(modalElement);
         finalizarModal.hide();
         Swal.close();
-
     })
     .catch(error => {
         Swal.fire({

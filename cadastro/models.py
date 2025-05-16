@@ -52,7 +52,9 @@ class Operador(models.Model):
 
     matricula = models.CharField(max_length=10)
     nome = models.CharField(max_length=20)
-    setor = models.ForeignKey(Setor, on_delete=models.CASCADE ,related_name='operador_setor')
+    setor = models.ForeignKey(Setor, on_delete=models.CASCADE, related_name='operador_setor')
+    maquina = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='operador_maquina', 
+                                default=None, blank=True, null=True)
 
     class Meta:
         constraints = [
