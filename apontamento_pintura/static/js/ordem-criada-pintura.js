@@ -1593,9 +1593,43 @@ function filtro() {
     });
 }
 
+
+// selectTipo.addEventListener("change", async () => {
+//     const selectCambao = document.getElementById("cambaoSelecionado");
+//     const tipoPintura = selectTipo.value;   
+
+//     selectCambao.disabled = true;
+
+//     // Atualiza o select para indicar carregamento
+//     selectCambao.innerHTML = `<option value="">Carregando...</option>`;
+
+//     // Buscar cambões disponíveis da API
+//     try {
+//         const response = await fetch(`api/cambao-livre/?tipo=${encodeURIComponent(tipoPintura)}`);
+//         const data = await response.json();
+
+//         if (data.cambao_livres.length > 0) {
+
+//             selectCambao.disabled = false;
+
+//             selectCambao.innerHTML = `<option value="">Selecione um cambão...</option>`;
+//             data.cambao_livres.forEach(cambao => {
+//                 selectCambao.innerHTML += `<option value="${cambao.id}">Cambão ${cambao.nome}</option>`;
+//             });
+//         } else {
+            
+//             selectCambao.innerHTML = `<option value="">Nenhum cambão disponível</option>`;
+//         }
+//     } catch (error) {
+//         console.error("Erro ao buscar cambões:", error);
+//         selectCambao.innerHTML = `<option value="">Erro ao carregar cambões</option>`;
+//         Swal.close();
+//     }
+// });
 // Registra o listener apenas uma vez, fora da função abrirModalCambao
 const selectTipo = document.getElementById("tipoPintura");
-selectTipo.addEventListener("change", async () => {
+// Função para atualizar os cambões disponíveis - reaproveitando-a para a abertura do modal de criação
+async function atualizarCamboesDisponiveis(){
     const selectCambao = document.getElementById("cambaoSelecionado");
     const tipoPintura = selectTipo.value;   
 
@@ -1626,7 +1660,12 @@ selectTipo.addEventListener("change", async () => {
         selectCambao.innerHTML = `<option value="">Erro ao carregar cambões</option>`;
         Swal.close();
     }
-});
+}
+
+let modalCriarCambao = document.getElementById("modalCriarCambao");
+
+selectTipo.addEventListener("change", async () => atualizarCamboesDisponiveis()); // Atualiza os cambões disponíveis quando o tipo de pintura muda
+modalCriarCambao.addEventListener("show.bs.modal", async() => atualizarCamboesDisponiveis());
 
 async function abrirModalCambao() {
     const checkboxes = document.querySelectorAll(".ordem-checkbox:checked");
