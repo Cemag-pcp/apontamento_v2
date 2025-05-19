@@ -592,9 +592,16 @@ def ordens_interrompidas(request):
 
 def listar_operadores(request):
 
-    operadores = Operador.objects.filter(setor__nome='montagem')
+    maquina_id = request.GET.get('maquina')
 
-    return JsonResponse({"operadores": list(operadores.values())})
+    operadores = Operador.objects.filter(setor__nome='montagem')
+    
+    operadores_maquina = Operador.objects.filter(setor__nome='montagem', maquina__nome=maquina_id)
+
+    print(operadores_maquina)
+
+    return JsonResponse({"operadores": list(operadores.values()),
+                         "operadores_maquina": list(operadores_maquina.values())})
 
 def percentual_concluido_carga(request):
     data_carga = request.GET.get('data_carga')  # Garantindo que seja apenas a data
