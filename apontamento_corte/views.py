@@ -1017,7 +1017,6 @@ class SalvarArquivoView(View):
         tipo_maquina_object = get_object_or_404(Maquina, nome__contains=tipo_maquina_tratada) if tipo_maquina in ['laser_1','laser_2'] else None
 
         if tipo_maquina =='plasma':
-            # Exibir os dados lidos no console para depuração
             excel_tratado,propriedades = tratamento_planilha_plasma(ordem_producao_excel)
         elif tipo_maquina_object.nome=='Laser 2 (JFY)':
 
