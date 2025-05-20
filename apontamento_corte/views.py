@@ -497,7 +497,21 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
         # Busca a ordem com os relacionamentos necessários
         ordem = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').get(pk=pk_ordem)
 
-        espessuras = [espessura.nome for espessura in Espessura.objects.all()]
+        espessuras_distintas = PropriedadesOrdem.objects.exclude(
+            espessura__isnull=True
+        ).exclude(
+            espessura__exact=''
+        ).values_list(
+            'espessura', flat=True
+        ).distinct().order_by('espessura')
+        
+        valores_remover = {'nan', 'Selecione', ''}
+        espessuras = [
+            esp for esp in espessuras_distintas 
+            if str(esp) not in valores_remover and esp is not None
+        ]
+
+        print(espessuras)
 
         tipos_chapas = [tipo[1] for tipo in PropriedadesOrdem.TIPO_CHAPA_CHOICES]
 
@@ -1017,7 +1031,6 @@ class SalvarArquivoView(View):
         tipo_maquina_object = get_object_or_404(Maquina, nome__contains=tipo_maquina_tratada) if tipo_maquina in ['laser_1','laser_2'] else None
 
         if tipo_maquina =='plasma':
-            # Exibir os dados lidos no console para depuração
             excel_tratado,propriedades = tratamento_planilha_plasma(ordem_producao_excel)
         elif tipo_maquina_object.nome=='Laser 2 (JFY)':
 

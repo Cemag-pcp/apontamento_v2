@@ -1,5 +1,6 @@
 import pandas as pd
 from datetime import date
+import re
 
 def tratamento_planilha_plasma(df):
 
@@ -37,8 +38,11 @@ def tratamento_planilha_plasma(df):
     aproveitamento_list = aproveitamento_df.values.tolist()
 
     # espessura
-
     espessura_list = espessura_df.values.tolist()
+    espessura_original = espessura_list[0][0]
+
+    # limpa deixando so até até "mm"
+    espessura = re.sub(r'(mm).*', r'\1', espessura_original, flags=re.IGNORECASE).strip()
 
     # cabeçalho da tabela
 
@@ -57,7 +61,7 @@ def tratamento_planilha_plasma(df):
         pass
 
     df['Unnamed: 19'] = df['Unnamed: 19'].astype(int)
-    df['espessura'] = espessura_list[0][0]
+    df['espessura'] = espessura
     df['aproveitamento'] = aproveitamento_list[0]
     df['tamanho da chapa'] = tamanho_chapa_list[0][0]
     df['qt. chapas'] = int(qt_chapa_list[0][0])
@@ -88,9 +92,9 @@ def tratamento_planilha_plasma(df):
     })
 
     propriedades = [{
-        'descricao_mp':espessura_list[0][0] + " - " +tamanho_chapa_list[0][0],
+        'descricao_mp':espessura + " - " +tamanho_chapa_list[0][0],
         'tamanho':tamanho_chapa_list[0][0],
-        'espessura':espessura_list[0][0],
+        'espessura':espessura,
         'quantidade':qt_chapa_list[0][0],
         'aproveitamento':aproveitamento_list[0],
     }]
