@@ -479,6 +479,7 @@ def cambao_em_processo(request):
                 "peca_ordem_id": peca.peca_ordem.id,
                 "peca": peca.peca_ordem.peca,
                 "quantidade_pendurada": peca.quantidade_pendurada,
+                "data_carga": peca.peca_ordem.ordem.data_carga,
             }
             for peca in cambao.pecas_no_cambao.all()
         ]
@@ -490,7 +491,7 @@ def cambao_em_processo(request):
             "data_pendura": cambao.pecas_no_cambao.first().data_pendura if pecas else None,
             "status": "pendurada",
             "tipo": cambao.tipo,
-            "nome": cambao.nome
+            "nome": cambao.nome,
             # "data_fim": cambao.data_fim
         })
 
