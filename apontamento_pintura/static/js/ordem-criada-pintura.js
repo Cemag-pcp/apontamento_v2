@@ -1993,6 +1993,7 @@ async function cambaoProcesso() {
                                                     ${peca.peca.length > maxLength ? peca.peca.substring(0, maxLength) + "..." : peca.peca}
                                                 </strong>
                                             </span> 
+                                            <span>Data Carga: <strong>${new Intl.DateTimeFormat('pt-BR').format(new Date(peca.data_carga+"T00:00:00"))}</strong></span>
                                             <span>Qtd: <strong>${peca.quantidade_pendurada}</strong></span>
                                         </li>
                                     `).join('')}
