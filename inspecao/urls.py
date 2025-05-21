@@ -4,13 +4,9 @@ from . import views
 app_name = "inspecao"
 
 urlpatterns = [
-    path('montagem/', views.inspecao_montagem, name='inspecao-montagem'),
-    path('conjuntos-inspecionados/', views.conjuntos_inspecionados_montagem, name='conjuntos-inspecionados-montagem'),
     path('api/conjuntos-inspecionados/<str:codigo>/', views.add_remove_conjuntos_inspecionados, name='remover_conjunto'),
     path('api/conjuntos-inspecionados/', views.add_remove_conjuntos_inspecionados, name='adicionar_conjunto'),
-    path('estamparia/', views.inspecao_estamparia, name='inspecao-estamparia'),
 
-    path('pintura/', views.inspecao_pintura, name='inspecao-pintura'),
     path('api/itens-inspecao-pintura/', views.get_itens_inspecao_pintura, name='itens-inspecao-pintura'),
     path('api/itens-inspecionados-pintura/', views.get_itens_inspecionados_pintura, name='itens-inspecionados-pintura'),
     path('api/itens-reinspecao-pintura/', views.get_itens_reinspecao_pintura, name='itens-reinspecao-pintura'),
@@ -43,7 +39,6 @@ urlpatterns = [
     path('api/envio-inspecao-montagem/', views.envio_inspecao_montagem, name='envio-inspecao-montagem'),
     path('api/envio-reinspecao-montagem/', views.envio_reinspecao_montagem, name='envio-reinspecao-montagem'),
 
-    path('tubos-cilindros/', views.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),
     path('api/itens-reinspecao-tubos-cilindros/', views.get_itens_reinspecao_tubos_cilindros, name='itens-reinspecao-tubos-cilindros'),
     path('api/itens-inspecionados-tubos-cilindros/', views.get_itens_inspecionados_tubos_cilindros, name='itens-inspecionados-tubos-cilindros'),
     path('api/envio-inspecao-tubos-cilindros/', views.envio_inspecao_tubos_cilindros, name='envio-inspecao-tubos-cilindros'),
@@ -63,4 +58,23 @@ urlpatterns = [
 
     path('api/delete-execucao/', views.delete_execution, name='delete-execution'),
     path('api/delete-execucao-estanqueidade/', views.delete_execution_estanqueidade, name='delete-execution-estanqueidade')
+]
+
+# templates
+urlpatterns += [
+    path('montagem/', views.inspecao_montagem, name='inspecao-montagem'),
+    path('conjuntos-inspecionados/', views.conjuntos_inspecionados_montagem, name='conjuntos-inspecionados-montagem'),
+    path('estamparia/', views.inspecao_estamparia, name='inspecao-estamparia'),
+    path('pintura/', views.inspecao_pintura, name='inspecao-pintura'),
+    path('tubos-cilindros/', views.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),
+    path('dashboard/pintura/', views.dashboard_pintura, name='dasdashboard_pinturahboard'),
+]
+
+# dashboard
+urlpatterns += [
+    path('pintura/api/indicador-pintura-analise-temporal/', views.indicador_pintura_analise_temporal, name='indicador_pintura_analise_temporal'),
+    path('pintura/api/indicador-pintura-resumo-analise-temporal/', views.indicador_pintura_resumo_analise_temporal, name='indicador_pintura_resumo_analise_temporal'),
+    path('pintura/api/causas-nao-conformidade/', views.causas_nao_conformidade_mensal, name='causas_nao_conformidade_mensal'),
+    path('pintura/api/imagens-nao-conformidade/', views.imagens_nao_conformidade_pintura, name='imagens_nao_conformidade_pintura'),
+    path('pintura/api/causas-nao-conformidade-tipo/', views.causas_nao_conformidade_por_tipo, name='causas_nao_conformidade_por_tipo'),
 ]
