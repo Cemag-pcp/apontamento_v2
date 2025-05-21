@@ -40,7 +40,7 @@ class Inspecao(models.Model):
 class DadosExecucaoInspecao(models.Model):
 
     inspecao = models.ForeignKey(
-        Inspecao, on_delete=models.CASCADE, null=False, blank=False, related_name="dados_execucao"
+        Inspecao, on_delete=models.CASCADE, null=False, blank=False
     )
     inspetor = models.ForeignKey(
         Profile, on_delete=models.SET_NULL, null=True, blank=True
