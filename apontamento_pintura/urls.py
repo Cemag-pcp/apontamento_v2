@@ -37,3 +37,4 @@ urlpatterns += [
     path('api/ordem-finalizadas', views.api_ordens_finalizadas, name='api_ordens_finalizadas'),
     path('api/tempos', views.api_tempos, name='api_tempos'),
 ]
+
