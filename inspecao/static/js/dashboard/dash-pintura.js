@@ -82,8 +82,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) throw new Error('Erro ao buscar imagens de não conformidade.');
             const imagens = await response.json();
 
-            console.log(imagens);
-
             const carouselInner = document.querySelector('#imageCarousel .carousel-inner');
             carouselInner.innerHTML = ''; // Limpa itens antigos
 
