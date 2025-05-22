@@ -3235,8 +3235,8 @@ def indicador_pintura_analise_temporal(request):
     queryset = queryset.annotate(
         mes=Cast(TruncMonth('data_inspecao'), output_field=CharField()),
         qtd_boa=F('pecas_ordem_pintura__qtd_boa'),
-        conformidade=F('dados_execucao__conformidade'),
-        nao_conformidade=F('dados_execucao__nao_conformidade'),
+        conformidade=F('dadosexecucaoinspecao__conformidade'),
+        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
     ).values('mes').annotate(
         qtd_peca_produzida=Sum('qtd_boa'),
         qtd_peca_inspecionada=Sum(
@@ -3291,10 +3291,10 @@ def indicador_pintura_resumo_analise_temporal(request):
         ano=ExtractYear('data_inspecao'),
         mes_num=ExtractMonth('data_inspecao'),
         qtd_boa=F('pecas_ordem_pintura__qtd_boa'),
-        conformidade=F('dados_execucao__conformidade'),
-        nao_conformidade=F('dados_execucao__nao_conformidade'),
+        conformidade=F('dadosexecucaoinspecao__conformidade'),
+        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
         qtd_inspecionada=ExpressionWrapper(
-            F('dados_execucao__conformidade') + F('dados_execucao__nao_conformidade'),
+            F('dadosexecucaoinspecao__conformidade') + F('dadosexecucaoinspecao__nao_conformidade'),
             output_field=FloatField()
         )
     ).values('ano', 'mes_num').annotate(
@@ -3519,8 +3519,8 @@ def indicador_montagem_analise_temporal(request):
     queryset = queryset.annotate(
         mes=Cast(TruncMonth('data_inspecao'), output_field=CharField()),
         qtd_boa=F('pecas_ordem_montagem__qtd_boa'),
-        conformidade=F('dados_execucao__conformidade'),
-        nao_conformidade=F('dados_execucao__nao_conformidade'),
+        conformidade=F('dadosexecucaoinspecao__conformidade'),
+        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
     ).values('mes').annotate(
         qtd_peca_produzida=Sum('qtd_boa'),
         qtd_peca_inspecionada=Sum(
@@ -3575,10 +3575,10 @@ def indicador_montagem_resumo_analise_temporal(request):
         ano=ExtractYear('data_inspecao'),
         mes_num=ExtractMonth('data_inspecao'),
         qtd_boa=F('pecas_ordem_montagem__qtd_boa'),
-        conformidade=F('dados_execucao__conformidade'),
-        nao_conformidade=F('dados_execucao__nao_conformidade'),
+        conformidade=F('dadosexecucaoinspecao__conformidade'),
+        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
         qtd_inspecionada=ExpressionWrapper(
-            F('dados_execucao__conformidade') + F('dados_execucao__nao_conformidade'),
+            F('dadosexecucaoinspecao__conformidade') + F('dadosexecucaoinspecao__nao_conformidade'),
             output_field=FloatField()
         )
     ).values('ano', 'mes_num').annotate(
