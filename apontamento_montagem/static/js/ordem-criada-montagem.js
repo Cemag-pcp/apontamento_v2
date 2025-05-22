@@ -712,7 +712,10 @@ function mostrarModalFinalizar(ordemId, maquina, max_itens) {
     labelOperadores.textContent = `Operador - ${maquina}` 
 
     document.getElementById('ordemIdFinalizar').value = ordemId;
-    
+
+    operadorSelect.setAttribute('data-active', 'true');
+    todosOperadorFinal.setAttribute('data-active', 'false');
+
     labelOperadores.setAttribute('data-maquina', maquina)
     qtRealizadaInput.setAttribute('max', max_itens);
 
