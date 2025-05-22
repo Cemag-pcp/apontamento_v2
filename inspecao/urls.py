@@ -68,6 +68,7 @@ urlpatterns += [
     path('pintura/', views.inspecao_pintura, name='inspecao-pintura'),
     path('tubos-cilindros/', views.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),
     path('dashboard/pintura/', views.dashboard_pintura, name='dasdashboard_pinturahboard'),
+    path('dashboard/montagem/', views.dashboard_montagem, name='dasdashboard_montagemhboard'),
 ]
 
 # dashboard
@@ -77,4 +78,9 @@ urlpatterns += [
     path('pintura/api/causas-nao-conformidade/', views.causas_nao_conformidade_mensal, name='causas_nao_conformidade_mensal'),
     path('pintura/api/imagens-nao-conformidade/', views.imagens_nao_conformidade_pintura, name='imagens_nao_conformidade_pintura'),
     path('pintura/api/causas-nao-conformidade-tipo/', views.causas_nao_conformidade_por_tipo, name='causas_nao_conformidade_por_tipo'),
+
+    path('montagem/api/indicador-montagem-analise-temporal/', views.indicador_montagem_analise_temporal, name='indicador_montagem_analise_temporal'),
+    path('montagem/api/indicador-montagem-resumo-analise-temporal/', views.indicador_montagem_resumo_analise_temporal, name='indicador_montagem_resumo_analise_temporal'),
+    path('montagem/api/causas-nao-conformidade/', views.causas_nao_conformidade_mensal_montagem, name='causas_nao_conformidade_mensal'),
+    path('montagem/api/imagens-nao-conformidade/', views.imagens_nao_conformidade_montagem, name='imagens_nao_conformidade_montagem'),
 ]
