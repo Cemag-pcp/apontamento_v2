@@ -3235,8 +3235,8 @@ def indicador_pintura_analise_temporal(request):
     queryset = queryset.annotate(
         mes=Cast(TruncMonth('data_inspecao'), output_field=CharField()),
         qtd_boa=F('pecas_ordem_pintura__qtd_boa'),
-        conformidade=F('dados_execucao__conformidade'),
-        nao_conformidade=F('dados_execucao__nao_conformidade'),
+        conformidade=F('dadosexecucaoinspecao__conformidade'),
+        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
     ).values('mes').annotate(
         qtd_peca_produzida=Sum('qtd_boa'),
         qtd_peca_inspecionada=Sum(
@@ -3291,10 +3291,10 @@ def indicador_pintura_resumo_analise_temporal(request):
         ano=ExtractYear('data_inspecao'),
         mes_num=ExtractMonth('data_inspecao'),
         qtd_boa=F('pecas_ordem_pintura__qtd_boa'),
-        conformidade=F('dados_execucao__conformidade'),
-        nao_conformidade=F('dados_execucao__nao_conformidade'),
+        conformidade=F('dadosexecucaoinspecao__conformidade'),
+        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
         qtd_inspecionada=ExpressionWrapper(
-            F('dados_execucao__conformidade') + F('dados_execucao__nao_conformidade'),
+            F('dadosexecucaoinspecao__conformidade') + F('dadosexecucaoinspecao__nao_conformidade'),
             output_field=FloatField()
         )
     ).values('ano', 'mes_num').annotate(
@@ -3462,5 +3462,234 @@ def causas_nao_conformidade_por_tipo(request):
         }
         for (data, causa, tipo), total in sorted(agrupado.items())
     ]
+
+    return JsonResponse(resultado, safe=False)
+
+
+def dashboard_montagem(request):
+
+    return render(request, "dashboard/montagem.html")
+
+def indicador_montagem_analise_temporal(request):
+
+    """
+    select
+        id.data_execucao as data_inspecao,
+        id.conformidade,
+        id.nao_conformidade,
+        ii.data_inspecao as data_producao,
+        ii.pecas_ordem_pintura_id,
+        app.peca,
+        app.tipo,
+        app.qtd_boa,
+        ic2.nome as nome_conformidade
+    from apontamento_v2.inspecao_inspecao ii
+    left join apontamento_v2.inspecao_dadosexecucaoinspecao id on ii.id = id.inspecao_id 
+    left join apontamento_v2.apontamento_pintura_pecasordem app on app.id = ii.pecas_ordem_pintura_id
+    left join apontamento_v2.inspecao_causasnaoconformidade ic on ic.dados_execucao_id = id.id
+    left join apontamento_v2.inspecao_causasnaoconformidade_causa icc on icc.causasnaoconformidade_id = ic.id
+    left join apontamento_v2.inspecao_causas ic2 on ic2.id = icc.causas_id 
+    where ii.pecas_ordem_pintura_id notnull
+    order by id.data_execucao desc;
+    """
+
+    # Recebe os parâmetros de data
+    setor = request.GET.get('setor')
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d')
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    # Filtra somente as produções com peça ligada (mesmo sem inspeção)
+    queryset = Inspecao.objects.filter(
+        pecas_ordem_montagem__isnull=False
+    )
+
+    if data_inicio:
+        queryset = queryset.filter(data_inspecao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(data_inspecao__lte=data_fim)
+
+    queryset = queryset.annotate(
+        mes=Cast(TruncMonth('data_inspecao'), output_field=CharField()),
+        qtd_boa=F('pecas_ordem_montagem__qtd_boa'),
+        conformidade=F('dadosexecucaoinspecao__conformidade'),
+        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
+    ).values('mes').annotate(
+        qtd_peca_produzida=Sum('qtd_boa'),
+        qtd_peca_inspecionada=Sum(
+            ExpressionWrapper(
+                F('conformidade') + F('nao_conformidade'),
+                output_field=FloatField()
+            )
+        ),
+        soma_conformidade=Sum('conformidade'),
+        soma_nao_conformidade=Sum('nao_conformidade'),
+    ).order_by('mes')
+
+    resultado = []
+    for item in queryset:
+        conformidade = item['soma_conformidade'] or 0
+        nao_conformidade = item['soma_nao_conformidade'] or 0
+        taxa_nc = (nao_conformidade / conformidade) if conformidade else 0
+
+        resultado.append({
+            'mes': item['mes'][:7],  # YYYY-MM
+            'qtd_peca_produzida': item['qtd_peca_produzida'] or 0,
+            'qtd_peca_inspecionada': item['qtd_peca_inspecionada'] or 0,
+            'taxa_nao_conformidade': round(taxa_nc, 4),
+        })
+
+    return JsonResponse(resultado, safe=False)
+
+def indicador_montagem_resumo_analise_temporal(request):
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d')
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    # Query principal
+    queryset = Inspecao.objects.filter(
+        pecas_ordem_montagem__isnull=False
+    )
+
+    if data_inicio:
+        queryset = queryset.filter(data_inspecao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(data_inspecao__lte=data_fim)
+
+    # Anotações e agregações
+    queryset = queryset.annotate(
+        ano=ExtractYear('data_inspecao'),
+        mes_num=ExtractMonth('data_inspecao'),
+        qtd_boa=F('pecas_ordem_montagem__qtd_boa'),
+        conformidade=F('dadosexecucaoinspecao__conformidade'),
+        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
+        qtd_inspecionada=ExpressionWrapper(
+            F('dadosexecucaoinspecao__conformidade') + F('dadosexecucaoinspecao__nao_conformidade'),
+            output_field=FloatField()
+        )
+    ).values('ano', 'mes_num').annotate(
+        total_produzida=Sum('qtd_boa'),
+        total_inspecionada=Sum('qtd_inspecionada'),
+        total_nao_conforme=Sum('nao_conformidade'),
+    ).order_by('ano', 'mes_num')
+
+    # Monta JSON
+    resultado = []
+    for item in queryset:
+        mes_formatado = f"{item['ano']}-{item['mes_num']}"
+
+        total_prod = item['total_produzida'] or 0
+        total_insp = item['total_inspecionada'] or 0
+        total_nc = item['total_nao_conforme'] or 0
+
+        perc_insp = (total_insp / total_prod) * 100 if total_prod else 0
+
+        resultado.append({
+            "Data": mes_formatado,
+            "N° de peças produzidas": int(total_prod),
+            "N° de inspeções": int(total_insp),
+            "N° de não conformidades": int(total_nc),
+            "% de inspeção": f"{perc_insp:.2f} %"
+        })
+
+    return JsonResponse(resultado, safe=False)
+
+def causas_nao_conformidade_mensal_montagem(request):
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d')
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    queryset = CausasNaoConformidade.objects.filter(
+        dados_execucao__data_execucao__isnull=False,
+        dados_execucao__inspecao__pecas_ordem_montagem__isnull=False
+    ).prefetch_related('causa')
+
+    if data_inicio:
+        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+
+    # Estrutura para agrupar manualmente por mês e causa
+    resultado_temp = {}
+    for item in queryset:
+        ano = item.dados_execucao.data_execucao.year
+        mes = item.dados_execucao.data_execucao.month
+        mes_formatado = f"{ano}-{mes}"
+
+        for causa in item.causa.all():
+            chave = (mes_formatado, causa.nome)
+            if chave not in resultado_temp:
+                resultado_temp[chave] = 0
+            resultado_temp[chave] += item.quantidade
+
+    # Formata para JSON
+    resultado = [
+        {
+            "Data": chave[0],
+            "Causa": chave[1],
+            "Soma do N° Total de não conformidades": total
+        }
+        for chave, total in sorted(resultado_temp.items())
+    ]
+
+    return JsonResponse(resultado, safe=False)
+
+def imagens_nao_conformidade_montagem(request):
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    queryset = CausasNaoConformidade.objects.filter(
+        dados_execucao__data_execucao__isnull=False,
+        dados_execucao__inspecao__pecas_ordem_montagem__isnull=False  # filtro para montagem
+    ).prefetch_related('causa', 'arquivos')
+
+    if data_inicio:
+        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+
+    resultado = []
+    for item in queryset:
+        date = item.dados_execucao.data_execucao - timedelta(hours=3)
+        data_execucao = date.strftime('%Y-%m-%d %H:%M:%S')
+        causas = [c.nome for c in item.causa.all()]
+        arquivos = [arquivo.arquivo.url for arquivo in item.arquivos.all() if arquivo.arquivo]
+
+        for url in arquivos:
+            resultado.append({
+                "data_execucao": data_execucao,
+                "causas": causas,
+                "quantidade": item.quantidade,
+                "arquivo_url": url
+            })
 
     return JsonResponse(resultado, safe=False)

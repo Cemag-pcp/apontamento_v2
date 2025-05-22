@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (startDate) queryParams.append('data_inicio', startDate);
         if (endDate) queryParams.append('data_fim', endDate);
 
-        const url = `/inspecao/pintura/api/indicador-pintura-analise-temporal/?${queryParams.toString()}`;
+        const url = `/inspecao/montagem/api/indicador-montagem-analise-temporal/?${queryParams.toString()}`;
 
         try {
             const response = await fetch(url);
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarGraficoCausas(startDate, endDate) {
 
-        let url = '/inspecao/pintura/api/causas-nao-conformidade/';
+        let url = '/inspecao/montagem/api/causas-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarCarrosselImagens(startDate, endDate) {
 
-        let url = '/inspecao/pintura/api/imagens-nao-conformidade/';
+        let url = '/inspecao/montagem/api/imagens-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -81,8 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(url);
             if (!response.ok) throw new Error('Erro ao buscar imagens de não conformidade.');
             const imagens = await response.json();
-
-            console.log(imagens);
 
             const carouselInner = document.querySelector('#imageCarousel .carousel-inner');
             carouselInner.innerHTML = ''; // Limpa itens antigos
@@ -117,88 +115,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function carregarTabelasPorTipo(startDate, endDate) {
-
-        let url = '/inspecao/pintura/api/causas-nao-conformidade-tipo/';
-        const params = [];
-        if (startDate) params.push(`data_inicio=${startDate}`);
-        if (endDate) params.push(`data_fim=${endDate}`);
-        if (params.length) url += '?' + params.join('&');
-
-        try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Erro ao buscar causas por tipo.');
-
-            const data = await response.json();
-
-            const tabelaPU = document.querySelector('#table-pu tbody');
-            const tabelaPO = document.querySelector('#table-po tbody');
-
-            tabelaPU.innerHTML = '';
-            tabelaPO.innerHTML = '';
-
-            // Se não houver nenhum dado, exibe mensagem nas duas tabelas
-            if (data.length === 0) {
-                tabelaPU.innerHTML = `
-                    <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
-                    </tr>
-                `;
-                tabelaPO.innerHTML = `
-                    <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
-                    </tr>
-                `;
-                return;
-            }
-
-            // Se houver dados, separa por tipo
-            let temPU = false;
-            let temPO = false;
-
-            data.forEach(item => {
-                const rowHTML = `
-                    <tr>
-                        <td>${item.Data}</td>
-                        <td>${item.Causa}</td>
-                        <td>${item["N° Total de não conformidades"]}</td>
-                    </tr>
-                `;
-
-                if (item.Tipo === 'PU') {
-                    tabelaPU.insertAdjacentHTML('beforeend', rowHTML);
-                    temPU = true;
-                } else if (item.Tipo === 'PÓ') {
-                    tabelaPO.insertAdjacentHTML('beforeend', rowHTML);
-                    temPO = true;
-                }
-            });
-
-            // Se um dos tipos não veio na resposta, exibe aviso individual
-            if (!temPU) {
-                tabelaPU.innerHTML = `
-                    <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhum dado do tipo PU encontrado.</td>
-                    </tr>
-                `;
-            }
-            if (!temPO) {
-                tabelaPO.innerHTML = `
-                    <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhum dado do tipo PÓ encontrado.</td>
-                    </tr>
-                `;
-            }
-
-        } catch (error) {
-            console.error('Erro ao carregar tabelas por tipo:', error);
-            alert('Erro ao carregar dados de não conformidades por tipo.');
-        }
-    }
-
     async function carregarTabelaCausas(startDate, endDate) {
 
-        let url = '/inspecao/pintura/api/causas-nao-conformidade/';
+        let url = '/inspecao/montagem/api/causas-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -240,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarTabelaProducao(startDate, endDate) {
 
-        let url = '/inspecao/pintura/api/indicador-pintura-resumo-analise-temporal/';
+        let url = '/inspecao/montagem/api/indicador-montagem-resumo-analise-temporal/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -308,7 +227,6 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarGraficoProducao(startDate, endDate);
         carregarGraficoCausas(startDate, endDate);
         carregarCarrosselImagens(startDateInput.value, endDateInput.value);
-        carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
         carregarTabelaCausas(startDateInput.value, endDateInput.value);
         carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
@@ -322,7 +240,6 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarGraficoProducao(startDateInput.value, endDateInput.value);
         carregarGraficoCausas(startDateInput.value, endDateInput.value);
         carregarCarrosselImagens(startDateInput.value, endDateInput.value);
-        carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
         carregarTabelaCausas(startDateInput.value, endDateInput.value);
         carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
@@ -332,7 +249,6 @@ document.addEventListener('DOMContentLoaded', function() {
     carregarGraficoProducao(startDateInput.value, endDateInput.value);
     carregarGraficoCausas(startDateInput.value, endDateInput.value);
     carregarCarrosselImagens(startDateInput.value, endDateInput.value);
-    carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
     carregarTabelaCausas(startDateInput.value, endDateInput.value);
     carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
