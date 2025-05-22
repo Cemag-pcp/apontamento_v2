@@ -69,6 +69,7 @@ urlpatterns += [
     path('tubos-cilindros/', views.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),
     path('dashboard/pintura/', views.dashboard_pintura, name='dasdashboard_pinturahboard'),
     path('dashboard/montagem/', views.dashboard_montagem, name='dasdashboard_montagemhboard'),
+    path('dashboard/estamparia/', views.dashboard_estamparia, name='dasdashboard_estampariahboard'),
 ]
 
 # dashboard
@@ -83,4 +84,10 @@ urlpatterns += [
     path('montagem/api/indicador-montagem-resumo-analise-temporal/', views.indicador_montagem_resumo_analise_temporal, name='indicador_montagem_resumo_analise_temporal'),
     path('montagem/api/causas-nao-conformidade/', views.causas_nao_conformidade_mensal_montagem, name='causas_nao_conformidade_mensal'),
     path('montagem/api/imagens-nao-conformidade/', views.imagens_nao_conformidade_montagem, name='imagens_nao_conformidade_montagem'),
+
+    path('estamparia/api/indicador-estamparia-analise-temporal/', views.indicador_estamparia_analise_temporal, name='indicador_estamparia_analise_temporal'),
+    path('estamparia/api/indicador-estamparia-resumo-analise-temporal/', views.indicador_estamparia_resumo_analise_temporal, name='indicador_estamparia_resumo_analise_temporal'),
+    path('estamparia/api/causas-nao-conformidade/', views.causas_nao_conformidade_mensal_estamparia, name='causas_nao_conformidade_mensal'),
+    path('estamparia/api/imagens-nao-conformidade/', views.imagens_nao_conformidade_estamparia, name='imagens_nao_conformidade_estamparia'),
+    path('estamparia/api/fichas-inspecao/', views.ficha_inspecao_estamparia, name='ficha_inspecao_estamparia'),
 ]
