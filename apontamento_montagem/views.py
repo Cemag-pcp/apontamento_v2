@@ -425,7 +425,13 @@ def ordens_criadas(request):
         'PLAT. TANQUE. CAÇAM. 2',
         'QUALIDADE',
         'FORJARIA',
-        'ESTAMPARIA'
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'SERRALHERIA',
+        'TRANSBORDO',
+        'ROÇADEIRA'
+
     ]
 
     maquinas = Ordem.objects.filter(id__in=ordem_ids).exclude(maquina__nome__in=maquinas_excluidas).values('maquina__nome','maquina__id').distinct()
@@ -614,15 +620,18 @@ def percentual_concluido_carga(request):
     data_carga = request.GET.get('data_carga')  # Garantindo que seja apenas a data
 
     # Algumas máquinas que não precisam está na contagem
-    maquinas_excluidas = ['PLAT. TANQUE. CAÇAM. 2','QUALIDADE','FORJARIA','ESTAMPARIA','QUALIDADE']
-
-    # Máquinas a excluir da contagem
     maquinas_excluidas = [
         'PLAT. TANQUE. CAÇAM. 2',
         'QUALIDADE',
         'FORJARIA',
-        'ESTAMPARIA'
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'SERRALHERIA',
+        'TRANSBORDO',
+        'ROÇADEIRA'
     ]
+
     maquinas_excluidas_ids = Maquina.objects.filter(nome__in=maquinas_excluidas).values_list('id', flat=True)
 
     # Total planejado sem duplicidade de peça e ordem, excluindo certas máquinas
@@ -658,8 +667,14 @@ def andamento_ultimas_cargas(request):
         'PLAT. TANQUE. CAÇAM. 2',
         'QUALIDADE',
         'FORJARIA',
-        'ESTAMPARIA'
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'SERRALHERIA',
+        'TRANSBORDO',
+        'ROÇADEIRA'
     ]
+
     maquinas_excluidas_ids = Maquina.objects.filter(nome__in=maquinas_excluidas).values_list('id', flat=True)
 
     # Obtém as últimas 10 datas de carga disponíveis para pintura

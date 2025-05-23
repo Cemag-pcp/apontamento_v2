@@ -288,8 +288,14 @@ def get_status_maquinas(request):
         'PLAT. TANQUE. CAÇAM. 2',
         'QUALIDADE',
         'FORJARIA',
-        'ESTAMPARIA'
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'SERRALHERIA',
+        'TRANSBORDO',
+        'ROÇADEIRA'
     ]
+
 
     if setor:    
         maquinas = Maquina.objects.filter(setor__nome=setor, tipo='maquina').exclude(nome__in=maquinas_excluidas).values_list('id', 'nome')

@@ -321,14 +321,16 @@ def andamento_cargas(request):
     """ Retorna as cargas de um setor dentro do intervalo solicitado pelo FullCalendar """
 
     # Algumas máquinas que não precisam está na contagem de montagem
-    maquinas_excluidas = ['PLAT. TANQUE. CAÇAM. 2','QUALIDADE','FORJARIA','ESTAMPARIA','QUALIDADE']
-
-    # Máquinas a excluir da contagem
     maquinas_excluidas = [
         'PLAT. TANQUE. CAÇAM. 2',
         'QUALIDADE',
         'FORJARIA',
-        'ESTAMPARIA'
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'SERRALHERIA',
+        'TRANSBORDO',
+        'ROÇADEIRA'
     ]
 
     maquinas_excluidas_ids = Maquina.objects.filter(nome__in=maquinas_excluidas).values_list('id', flat=True)
