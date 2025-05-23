@@ -103,6 +103,7 @@ document.getElementById("form-inspecao").addEventListener("submit", async functi
         buscarItensInspecao(1);
         buscarItensReinspecao(1);
         buscarItensInspecionados(1);
+        verificarPendenciasInspecao();
     })
     .catch(error => {
         console.error("Erro completo:", error);

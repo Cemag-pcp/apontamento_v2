@@ -181,6 +181,27 @@ def inspecao_pintura(request):
          "causas": list_causas, "cores": cores},
     )
 
+def alerta_itens_pintura(request):
+
+    finalizados_nao_reinspecionados = Retrabalho.objects.filter(
+        status='finalizado',
+        reinspecao__reinspecionado=False,
+        reinspecao__inspecao__pecas_ordem_pintura__isnull=False
+    ).count()
+
+    em_processo_e_retrabalhar = Retrabalho.objects.filter(
+        Q(status='a retrabalhar') | Q(status='em processo'),
+        reinspecao__inspecao__pecas_ordem_pintura__isnull=False
+    ).count()
+
+    data = {
+        'finalizados_nao_reinspecionados':finalizados_nao_reinspecionados,
+        'em_processo_e_retrabalhar':em_processo_e_retrabalhar,
+        'exibir_alerta': finalizados_nao_reinspecionados > 0 or em_processo_e_retrabalhar > 0
+    }
+
+    return JsonResponse(data)
+
 
 def get_itens_inspecao_pintura(request):
     if request.method != "GET":
@@ -257,108 +278,107 @@ def get_itens_inspecao_pintura(request):
         status=200,
     )
 
-
 def get_itens_reinspecao_pintura(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    reinspecao_ids = set(
-        Reinspecao.objects.filter(
-            reinspecionado=False  # Mantém o filtro original
-        ).values_list("inspecao", flat=True)
-    )
+    # 1. Pré-filtrar reinspeções não realizadas
+    reinspecao_ids = Reinspecao.objects.filter(
+        reinspecionado=False
+    ).values_list("inspecao", flat=True)
 
-    # Captura os filtros enviados pela URL
-    cores_filtradas = (
-        request.GET.get("cores", "").split(",") if request.GET.get("cores") else []
-    )
-    inspetores_filtrados = (
-        request.GET.get("inspetores", "").split(",")
-        if request.GET.get("inspetores")
-        else []
-    )
-    data_filtrada = request.GET.get("data", None)
-    pesquisa_filtrada = request.GET.get("pesquisar", None)
-    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
-    itens_por_pagina = 12  # Itens por página
+    # 2. Capturar parâmetros de filtro uma vez
+    params = {
+        "cores": request.GET.get("cores", "").split(",") if request.GET.get("cores") else [],
+        "inspetores": request.GET.get("inspetores", "").split(",") if request.GET.get("inspetores") else [],
+        "data": request.GET.get("data"),
+        "pesquisa": request.GET.get("pesquisar"),
+        "pagina": int(request.GET.get("pagina", 1)),
+        "itens_por_pagina": 12
+    }
 
-    # Filtra os dados
-    datas = Inspecao.objects.filter(
-        id__in=reinspecao_ids, pecas_ordem_pintura__isnull=False
-    )
-
-    quantidade_total = datas.count()  # Total de itens sem filtro
-
-    if cores_filtradas:
-        datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas).distinct()
-
-    if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada).distinct()
-
-    if pesquisa_filtrada:
-        pesquisa_filtrada = pesquisa_filtrada.lower()
-        datas = datas.filter(pecas_ordem_pintura__peca__icontains=pesquisa_filtrada).distinct()
-
-    if inspetores_filtrados:
-        datas = datas.filter(
-            dadosexecucaoinspecao__inspetor__user__username__in=inspetores_filtrados
-        ).distinct()
-
-    datas = datas.select_related(
-        "pecas_ordem_pintura",
+    # 3. Construir a consulta base com select_related e prefetch_related
+    queryset = Inspecao.objects.filter(
+        id__in=reinspecao_ids,
+        pecas_ordem_pintura__isnull=False
+    ).select_related(
         "pecas_ordem_pintura__ordem",
-        "pecas_ordem_pintura__operador_fim",
+        "pecas_ordem_pintura__operador_fim"
+    ).prefetch_related(
+        "dadosexecucaoinspecao_set",
+        "reinspecao_set__retrabalho_set"
     ).order_by("-id")
 
-    # Paginação
-    paginador = Paginator(datas, itens_por_pagina)
-    pagina_obj = paginador.get_page(pagina)
+    # 4. Aplicar filtros de forma otimizada
+    if params["cores"]:
+        queryset = queryset.filter(
+            pecas_ordem_pintura__ordem__cor__in=params["cores"]
+        ).distinct()
 
-    dados = []
+    if params["data"]:
+        queryset = queryset.filter(
+            data_inspecao__date=params["data"]
+        ).distinct()
 
-    for data in pagina_obj:
-        print(data)
-        data_ajustada = DadosExecucaoInspecao.objects.filter(inspecao=data).values_list(
-            "data_execucao", flat=True
-        ).last() - timedelta(hours=3)
+    if params["pesquisa"]:
+        pesquisa = params["pesquisa"].lower()
+        queryset = queryset.filter(
+            pecas_ordem_pintura__peca__icontains=pesquisa
+        ).distinct()
 
-        status_reinspecao = (
-            Retrabalho.objects.filter(reinspecao__inspecao=data)
-            .values_list("status", flat=True)
-            .first()
+    if params["inspetores"]:
+        queryset = queryset.filter(
+            dadosexecucaoinspecao__inspetor__user__username__in=params["inspetores"]
+        ).distinct()
+
+    # 5. Contagem total antes da paginação
+    quantidade_total = queryset.count()
+
+    # 6. Paginação mais eficiente
+    paginador = Paginator(queryset, params["itens_por_pagina"])
+    pagina_obj = paginador.get_page(params["pagina"])
+
+    # 7. Pré-carregar dados relacionados para evitar N+1 queries
+    dados_execucao = {
+        item.inspecao_id: item 
+        for item in DadosExecucaoInspecao.objects.filter(
+            inspecao_id__in=[i.id for i in pagina_obj]
+        ).select_related('inspetor__user')
+    }
+
+    status_reinspecoes = {
+        item.reinspecao.inspecao_id: item.status
+        for item in Retrabalho.objects.filter(
+            reinspecao__inspecao_id__in=[i.id for i in pagina_obj]
         )
+    }
+
+    # 8. Construir resposta de forma otimizada
+    dados = []
+    for data in pagina_obj:
+        dados_exec = dados_execucao.get(data.id)
+        data_ajustada = (dados_exec.data_execucao - timedelta(hours=3)) if dados_exec else None
 
         item = {
             "id": data.id,
-            "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+            "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S") if data_ajustada else None,
             "peca": data.pecas_ordem_pintura.peca,
             "cor": data.pecas_ordem_pintura.ordem.cor,
             "tipo": data.pecas_ordem_pintura.tipo,
-            "conformidade": DadosExecucaoInspecao.objects.filter(inspecao=data)
-            .values_list("conformidade", flat=True)
-            .last(),
-            "nao_conformidade": DadosExecucaoInspecao.objects.filter(inspecao=data)
-            .values_list("nao_conformidade", flat=True)
-            .last(),
-            "inspetor": DadosExecucaoInspecao.objects.filter(inspecao=data)
-            .values_list("inspetor__user__username", flat=True)
-            .last(),
-            "status_reinspecao": status_reinspecao,
+            "conformidade": dados_exec.conformidade if dados_exec else None,
+            "nao_conformidade": dados_exec.nao_conformidade if dados_exec else None,
+            "inspetor": dados_exec.inspetor.user.username if dados_exec and dados_exec.inspetor else None,
+            "status_reinspecao": status_reinspecoes.get(data.id),
         }
-
         dados.append(item)
 
-    return JsonResponse(
-        {
-            "dados": dados,
-            "total": quantidade_total,
-            "total_filtrado": paginador.count,  # Total de itens após filtro
-            "pagina_atual": pagina_obj.number,
-            "total_paginas": paginador.num_pages,
-        },
-        status=200,
-    )
-
+    return JsonResponse({
+        "dados": dados,
+        "total": quantidade_total,
+        "total_filtrado": paginador.count,
+        "pagina_atual": pagina_obj.number,
+        "total_paginas": paginador.num_pages,
+    }, status=200)
 
 def get_itens_inspecionados_pintura(request):
     if request.method != "GET":

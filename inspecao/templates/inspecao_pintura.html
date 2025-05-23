@@ -13,7 +13,25 @@
 
 {% block content %}
 
-<h2 class="my-4">Inspeção Pintura</h2>
+<div>
+    <h2 class="my-4">Inspeção Pintura</h2>
+    <div id="alerta-reinspecao" style="display: none;">
+        <div class="alert d-flex align-items-start justify-content-between border border-danger" role="alert">
+            <div>
+                <h4 class="alert-heading d-flex align-items-center" style="color: red;">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> Itens a Reinspecionar
+                </h4>
+                <p class="mb-2">
+                    Existem <strong id="total-pendencias" style="color: red;">0 itens</strong> com pendências no processo de inspeção. Por favor, siga as orientações abaixo:
+                </p>
+
+                <p id="p-inspetor" class="mb-1"><strong>Inspetor:</strong> Reinspecione os <strong id="aguardando-reinspecao" style="color: red;">0 itens</strong> que estão aguardando reinspeção.</p>
+                <p id="p-supervisor" class="mb-1">Alerte ao <strong>supervisor de pintura </strong> a realizar o retrabalho dos <strong id="pendentes-retrabalho" style="color: red;">0 itens</strong> pendentes para liberar a reinspeção.</p>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
 
 <ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
     <li class="nav-item" style="width: 33%;">
@@ -234,6 +252,7 @@
 <script src="{% static 'js/pintura/reinspecionar/envio-reinspecao.js' %}"></script>
 <script src="{% static 'js/pintura/inspecionados/modal-inspecionados.js' %}"></script>
 <script src="{% static 'js/pintura/inspecionados/excluir-execucao.js' %}"></script>
+<script src="{% static 'js/pintura/alerta-reinspecao.js' %}"></script>
 
 <script>
 
