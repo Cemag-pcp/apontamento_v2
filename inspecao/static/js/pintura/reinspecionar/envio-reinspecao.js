@@ -100,6 +100,7 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
         buscarItensInspecao(1);
         buscarItensReinspecao(1);
         buscarItensInspecionados(1);
+        verificarPendenciasInspecao();
     })
     .catch(error => {
         console.error(error);
