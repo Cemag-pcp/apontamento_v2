@@ -1286,7 +1286,26 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
 
         for i, o in enumerate(ordens_data):
             data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+            peca_nome = o["peca_nome"]
+            cor = o["cor"]
 
+            # Tenta encontrar ordem existente com essa peça e data
+            ordem_existente = Ordem.objects.filter(
+                grupo_maquina=grupo_maquina,
+                data_carga=data_carga,
+                ordem_pecas_pintura__peca=peca_nome
+            ).first()
+
+            if ordem_existente:
+                # Atualiza a qtd_planejada na peça vinculada
+                POP.objects.filter(
+                    ordem=ordem_existente,
+                    peca=peca_nome
+                ).update(qtd_planejada=o.get("qtd_planejada", 0))
+
+                continue  # Não cria nova ordem, já atualizou
+
+            # Cria nova ordem
             nova_ordem = Ordem(
                 grupo_maquina=grupo_maquina,
                 status_atual="aguardando_iniciar",
@@ -1294,23 +1313,12 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
                 cor=o.get("cor"),
                 data_criacao=now(),
                 data_carga=data_carga,
-                ordem=ultimo_numero + i + 1  # aqui é o número da ordem
+                ordem=ultimo_numero + i + 1
             )
 
             nova_ordem.data_programacao = data_carga - timedelta(days=1)
             while nova_ordem.data_programacao.weekday() in [5, 6]:
                 nova_ordem.data_programacao -= timedelta(days=1)
-
-            # Lógica para data_programacao sem save()
-            if grupo_maquina == 'montagem' and data_carga:
-                nova_ordem.data_programacao = data_carga - timedelta(days=3)
-                while nova_ordem.data_programacao.weekday() in [5, 6]:
-                    nova_ordem.data_programacao -= timedelta(days=1)
-
-            elif grupo_maquina == 'pintura' and data_carga:
-                nova_ordem.data_programacao = data_carga - timedelta(days=1)
-                while nova_ordem.data_programacao.weekday() in [5, 6]:
-                    nova_ordem.data_programacao -= timedelta(days=1)
 
             ordens_objs.append(nova_ordem)
             ordens_metadata.append({
