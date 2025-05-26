@@ -111,6 +111,7 @@ def gerar_dados_sequenciamento(request):
     tabela_completa = gerar_sequenciamento(data_inicio, data_final, setor)
 
     if setor == 'pintura':
+        tabela_completa = tabela_completa.groupby(['Código', 'Peca', 'Célula', 'Datas','Recurso_cor','cor']).agg({'Qtde_total': 'sum'}).reset_index()
         tabela_completa.drop_duplicates(subset=['Código','Datas','cor'], inplace=True)
         tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
         tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
@@ -201,7 +202,9 @@ def atualizar_ordem_existente(request):
     # Gerar os arquivos e a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_inicio, setor)
     
+
     if setor == 'pintura':
+        tabela_completa = tabela_completa.groupby(['Código', 'Peca', 'Célula', 'Datas','Recurso_cor','cor']).agg({'Qtde_total': 'sum'}).reset_index()
         tabela_completa.drop_duplicates(subset=['Código','Datas','cor'], inplace=True)
         tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
         tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")

@@ -335,8 +335,6 @@ def gerar_arquivos(data_inicial, data_final, setor):
             # tab_completa.drop(tab_completa.loc[tab_completa['Célula']=='EIXO SIMPLES'].index, inplace=True)
             tab_completa.reset_index(inplace=True, drop=True)
 
-            tab_completa['Etapa5'].unique()
-
             # Normaliza os valores da coluna 'Etapa5' para identificar corretamente as cores
             tab_completa.loc[tab_completa['Etapa5'].str.contains('CINZA', na=False), 'Etapa5'] = 'CINZA'
             tab_completa.loc[tab_completa['Etapa5'].str.contains('COLORIDO', na=False), 'Etapa5'] = 'COLORIDO'
@@ -912,30 +910,9 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             tab_completa['Recurso_cor'] = tab_completa.apply(lambda row: definir_recurso_cor(row, 'PRETO', 'Preto'), axis=1)
             tab_completa['cor'] = tab_completa.apply(lambda row: definir_cor(row, 'PRETO', 'Preto'), axis=1)
 
-            # Consumo de tinta
-
-            # tab_completa = tab_completa.merge(df_consumo_pu[['Codigo item','Consumo Pó (kg)','Consumo PU (L)','Consumo Catalisador (L)']], left_on='Código', right_on='Codigo item', how='left').fillna(0)
             
-            # tab_completa['Consumo Pó (kg)'] = tab_completa['Consumo Pó (kg)'] * tab_completa['Qtde_total']
-            # tab_completa['Consumo PU (L)'] = tab_completa['Consumo PU (L)'] * tab_completa['Qtde_total']
-            # tab_completa['Consumo Catalisador (L)'] = tab_completa['Consumo Catalisador (L)'] * tab_completa['Qtde_total']
-
-            # consumo_po = sum(tab_completa['Consumo Pó (kg)'])
-            # consumo_po = f'{round(consumo_po / 25, 2)} caixa(s)'
-
-            # consumo_pu_litros = sum(tab_completa['Consumo Pó (kg)'])
-            # consumo_pu_latas = round(consumo_pu_litros / 3.08, 2)
-            # consumo_pu = f'{consumo_pu_latas} lata(s)'
-
-            # consumo_catalisador_litros = sum(tab_completa['Consumo Catalisador (L)'])
-            # consumo_catalisador_latas = round(consumo_catalisador_litros * 1000 / 400, 2)
-            # consumo_cata = f'{consumo_catalisador_latas} lata(s)'
-
-            # diluente = f'{round((consumo_pu_litros * 0.80) / 5, 2)} lata(s)'
-
             ###########################################################################################
 
-            cor_unique = tab_completa['cor'].unique()
             # if idx == 0:
             #     st.write("Arquivos para download")
 
@@ -943,62 +920,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
             
             tab_completa = tab_completa.reset_index(drop=True)
-
-            # carga_unique = tab_completa['Carga'].unique()
-            file_counter = 1
-            rows_per_file = 21
             
-            # # for carga in carga_unique:
-            # for i in range(len(cor_unique)):
-
-            #     start_index = 0
-                
-            #     filtro_excel = (tab_completa['cor'] == cor_unique[i])
-            #     filtrar = tab_completa.loc[filtro_excel]
-            #     filtrar = filtrar.reset_index(drop=True)
-            #     filtrar = filtrar.groupby(
-            #         ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor']
-            #     ).sum().reset_index()
-            #     filtrar.sort_values(by=['Célula'], inplace=True)
-            #     filtrar = filtrar.reset_index(drop=True)
-            #     while start_index < len(filtrar):
-            #         # Criar um novo Workbook para cada conjunto de 21 linhas
-            #         wb = Workbook()
-            #         wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_pintura.xlsx')
-            #         ws = wb.active
-
-            #         k = 9  # Início da linha no Excel
-
-            #         # Define o limite superior para as linhas deste arquivo
-            #         end_index = min(start_index + rows_per_file, len(filtrar))
-
-            #         # Escreve os dados no Excel para as linhas entre start_index e end_index
-            #         for j in range(start_index, end_index):
-                        
-            #             cor_nome = filtrar['cor'][j]
-            #             sigla_cor = nome_cor_para_sigla.get(cor_nome, 'sem_cor')
-
-            #             ws['F5'] = cor_unique[i]  # nome da coluna é '0'
-            #             ws['AD5'] = datetime.now()  # data de hoje
-            #             ws['M4'] = data_escolhida  # data da carga
-            #             ws['B' + str(k)] = f"{str(filtrar['Código'][j])}{sigla_cor}"
-            #             ws['G' + str(k)] = filtrar['Peca'][j]
-            #             ws['AD' + str(k)] = filtrar['Qtde_total'][j]
-            #             ws['K3'] = "N/A"
-            #             ws['Q3'] = "N/A"
-            #             ws['AE3'] = "N/A"
-            #             ws['AN3'] = "N/A"
-            #             k += 1
-
-            #         # Salvar o arquivo com numeração sequencial
-            #         file_name = f"Pintura {cor_unique[i]} {data_nome_planilha} {file_counter}.xlsx"
-            #         wb.save(file_name)
-            #         filenames.append(file_name)
-                    
-            #         # Incrementar índice e contador de arquivos
-            #         start_index = end_index
-            #         file_counter += 1
-
         if setor == 'montagem':
 
             base_carretas['Código'] = base_carretas['Código'].astype(str)
