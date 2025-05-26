@@ -111,7 +111,7 @@ def consultar_carretas(data_inicial, data_final):
     dados_carreta['Recurso'] = dados_carreta['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
 
-    sufixos_para_remover = ['AV', 'VM', 'VJ', 'AN', 'AS']
+    sufixos_para_remover = ['AV', 'VM', 'VJ', 'AN', 'AS','CO','LC']
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(
         lambda x: x[:-2].rstrip() if str(x)[-2:] in sufixos_para_remover else x
     )
@@ -178,6 +178,16 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
     base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
     base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
+    
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AM', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AN', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VJ', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('LC', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VM', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AV', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('CO', '')
+
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
 
     base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
     base_carga_original['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
