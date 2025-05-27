@@ -71,6 +71,7 @@ urlpatterns += [
     path('dashboard/pintura/', views.dashboard_pintura, name='dasdashboard_pinturahboard'),
     path('dashboard/montagem/', views.dashboard_montagem, name='dasdashboard_montagemhboard'),
     path('dashboard/estamparia/', views.dashboard_estamparia, name='dasdashboard_estampariahboard'),
+    path('dashboard/tanque/', views.dashboard_tanque, name='dashboard-tanque')
 ]
 
 # dashboard
@@ -91,4 +92,8 @@ urlpatterns += [
     path('estamparia/api/causas-nao-conformidade/', views.causas_nao_conformidade_mensal_estamparia, name='causas_nao_conformidade_mensal'),
     path('estamparia/api/imagens-nao-conformidade/', views.imagens_nao_conformidade_estamparia, name='imagens_nao_conformidade_estamparia'),
     path('estamparia/api/fichas-inspecao/', views.ficha_inspecao_estamparia, name='ficha_inspecao_estamparia'),
+
+    path('tanque/api/indicador-tanque-analise-temporal/', views.indicador_tanque_analise_temporal, name='indicador_tanque_analise_temporal'),
+    path('tanque/api/indicador-tanque-resumo-analise-temporal/', views.indicador_tanque_resumo_analise_temporal, name='indicador_tanque_resumo_analise_temporal'),
+    path('tanque/api/causas-nao-conformidade/', views.causas_nao_conformidade_mensal_tanque, name='causas_nao_conformidade_mensal'),
 ]
