@@ -11,6 +11,7 @@ from django.utils.timezone import now
 from django.db import transaction
 from django.db.models import Prefetch, Count
 from django.contrib.auth.models import User
+from django.contrib import messages
 
 from .models import Ordem, Versao
 from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina
@@ -82,6 +83,12 @@ class CustomLoginView(LoginView):
 
         return super().form_valid(form)
 
+    def form_invalid(self, form):
+        # Mensagem de erro 
+        messages.error(self.request, "Usuário ou senha incorretos.",extra_tags='danger')
+
+        return super().form_invalid(form)
+        
 def home(request):
     return render(request, 'home/home.html')  
 
