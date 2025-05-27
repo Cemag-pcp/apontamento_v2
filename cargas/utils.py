@@ -209,6 +209,15 @@ def gerar_arquivos(data_inicial, data_final, setor):
         if setor == 'pintura':
 
             base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
+            base_carga['Recurso'] = base_carga['Recurso'].astype(str)
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
 
             base_carretas.drop(['Etapa', 'Etapa3', 'Etapa4'], axis=1, inplace=True)
 
@@ -756,6 +765,16 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
         if setor == 'pintura':
 
             base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
+
+            base_carga['Recurso'] = base_carga['Recurso'].astype(str)
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
 
             base_carretas.drop(['Etapa', 'Etapa3', 'Etapa4'], axis=1, inplace=True)
 
