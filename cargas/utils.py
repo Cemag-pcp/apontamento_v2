@@ -111,7 +111,7 @@ def consultar_carretas(data_inicial, data_final):
     dados_carreta['Recurso'] = dados_carreta['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
 
-    sufixos_para_remover = ['AV', 'VM', 'VJ', 'AN', 'AS']
+    sufixos_para_remover = ['AV', 'VM', 'VJ', 'AN', 'AS','CO','LC']
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(
         lambda x: x[:-2].rstrip() if str(x)[-2:] in sufixos_para_remover else x
     )
@@ -178,6 +178,16 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
     base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
     base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
+    
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AM', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AN', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VJ', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('LC', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VM', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AV', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('CO', '')
+
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
 
     base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
     base_carga_original['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
@@ -334,8 +344,6 @@ def gerar_arquivos(data_inicial, data_final, setor):
             # linha abaixo exclui eixo simples do sequenciamento da pintura
             # tab_completa.drop(tab_completa.loc[tab_completa['Célula']=='EIXO SIMPLES'].index, inplace=True)
             tab_completa.reset_index(inplace=True, drop=True)
-
-            tab_completa['Etapa5'].unique()
 
             # Normaliza os valores da coluna 'Etapa5' para identificar corretamente as cores
             tab_completa.loc[tab_completa['Etapa5'].str.contains('CINZA', na=False), 'Etapa5'] = 'CINZA'
@@ -912,30 +920,9 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             tab_completa['Recurso_cor'] = tab_completa.apply(lambda row: definir_recurso_cor(row, 'PRETO', 'Preto'), axis=1)
             tab_completa['cor'] = tab_completa.apply(lambda row: definir_cor(row, 'PRETO', 'Preto'), axis=1)
 
-            # Consumo de tinta
-
-            # tab_completa = tab_completa.merge(df_consumo_pu[['Codigo item','Consumo Pó (kg)','Consumo PU (L)','Consumo Catalisador (L)']], left_on='Código', right_on='Codigo item', how='left').fillna(0)
             
-            # tab_completa['Consumo Pó (kg)'] = tab_completa['Consumo Pó (kg)'] * tab_completa['Qtde_total']
-            # tab_completa['Consumo PU (L)'] = tab_completa['Consumo PU (L)'] * tab_completa['Qtde_total']
-            # tab_completa['Consumo Catalisador (L)'] = tab_completa['Consumo Catalisador (L)'] * tab_completa['Qtde_total']
-
-            # consumo_po = sum(tab_completa['Consumo Pó (kg)'])
-            # consumo_po = f'{round(consumo_po / 25, 2)} caixa(s)'
-
-            # consumo_pu_litros = sum(tab_completa['Consumo Pó (kg)'])
-            # consumo_pu_latas = round(consumo_pu_litros / 3.08, 2)
-            # consumo_pu = f'{consumo_pu_latas} lata(s)'
-
-            # consumo_catalisador_litros = sum(tab_completa['Consumo Catalisador (L)'])
-            # consumo_catalisador_latas = round(consumo_catalisador_litros * 1000 / 400, 2)
-            # consumo_cata = f'{consumo_catalisador_latas} lata(s)'
-
-            # diluente = f'{round((consumo_pu_litros * 0.80) / 5, 2)} lata(s)'
-
             ###########################################################################################
 
-            cor_unique = tab_completa['cor'].unique()
             # if idx == 0:
             #     st.write("Arquivos para download")
 
@@ -943,62 +930,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
             
             tab_completa = tab_completa.reset_index(drop=True)
-
-            # carga_unique = tab_completa['Carga'].unique()
-            file_counter = 1
-            rows_per_file = 21
             
-            # # for carga in carga_unique:
-            # for i in range(len(cor_unique)):
-
-            #     start_index = 0
-                
-            #     filtro_excel = (tab_completa['cor'] == cor_unique[i])
-            #     filtrar = tab_completa.loc[filtro_excel]
-            #     filtrar = filtrar.reset_index(drop=True)
-            #     filtrar = filtrar.groupby(
-            #         ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor']
-            #     ).sum().reset_index()
-            #     filtrar.sort_values(by=['Célula'], inplace=True)
-            #     filtrar = filtrar.reset_index(drop=True)
-            #     while start_index < len(filtrar):
-            #         # Criar um novo Workbook para cada conjunto de 21 linhas
-            #         wb = Workbook()
-            #         wb = load_workbook(r'cargas\static\modelo_excel\modelo_op_pintura.xlsx')
-            #         ws = wb.active
-
-            #         k = 9  # Início da linha no Excel
-
-            #         # Define o limite superior para as linhas deste arquivo
-            #         end_index = min(start_index + rows_per_file, len(filtrar))
-
-            #         # Escreve os dados no Excel para as linhas entre start_index e end_index
-            #         for j in range(start_index, end_index):
-                        
-            #             cor_nome = filtrar['cor'][j]
-            #             sigla_cor = nome_cor_para_sigla.get(cor_nome, 'sem_cor')
-
-            #             ws['F5'] = cor_unique[i]  # nome da coluna é '0'
-            #             ws['AD5'] = datetime.now()  # data de hoje
-            #             ws['M4'] = data_escolhida  # data da carga
-            #             ws['B' + str(k)] = f"{str(filtrar['Código'][j])}{sigla_cor}"
-            #             ws['G' + str(k)] = filtrar['Peca'][j]
-            #             ws['AD' + str(k)] = filtrar['Qtde_total'][j]
-            #             ws['K3'] = "N/A"
-            #             ws['Q3'] = "N/A"
-            #             ws['AE3'] = "N/A"
-            #             ws['AN3'] = "N/A"
-            #             k += 1
-
-            #         # Salvar o arquivo com numeração sequencial
-            #         file_name = f"Pintura {cor_unique[i]} {data_nome_planilha} {file_counter}.xlsx"
-            #         wb.save(file_name)
-            #         filenames.append(file_name)
-                    
-            #         # Incrementar índice e contador de arquivos
-            #         start_index = end_index
-            #         file_counter += 1
-
         if setor == 'montagem':
 
             base_carretas['Código'] = base_carretas['Código'].astype(str)
@@ -1364,7 +1296,26 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
 
         for i, o in enumerate(ordens_data):
             data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+            peca_nome = o["peca_nome"]
+            cor = o["cor"]
 
+            # Tenta encontrar ordem existente com essa peça e data
+            ordem_existente = Ordem.objects.filter(
+                grupo_maquina=grupo_maquina,
+                data_carga=data_carga,
+                ordem_pecas_pintura__peca=peca_nome
+            ).first()
+
+            if ordem_existente:
+                # Atualiza a qtd_planejada na peça vinculada
+                POP.objects.filter(
+                    ordem=ordem_existente,
+                    peca=peca_nome
+                ).update(qtd_planejada=o.get("qtd_planejada", 0))
+
+                continue  # Não cria nova ordem, já atualizou
+
+            # Cria nova ordem
             nova_ordem = Ordem(
                 grupo_maquina=grupo_maquina,
                 status_atual="aguardando_iniciar",
@@ -1372,23 +1323,12 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
                 cor=o.get("cor"),
                 data_criacao=now(),
                 data_carga=data_carga,
-                ordem=ultimo_numero + i + 1  # aqui é o número da ordem
+                ordem=ultimo_numero + i + 1
             )
 
             nova_ordem.data_programacao = data_carga - timedelta(days=1)
             while nova_ordem.data_programacao.weekday() in [5, 6]:
                 nova_ordem.data_programacao -= timedelta(days=1)
-
-            # Lógica para data_programacao sem save()
-            if grupo_maquina == 'montagem' and data_carga:
-                nova_ordem.data_programacao = data_carga - timedelta(days=3)
-                while nova_ordem.data_programacao.weekday() in [5, 6]:
-                    nova_ordem.data_programacao -= timedelta(days=1)
-
-            elif grupo_maquina == 'pintura' and data_carga:
-                nova_ordem.data_programacao = data_carga - timedelta(days=1)
-                while nova_ordem.data_programacao.weekday() in [5, 6]:
-                    nova_ordem.data_programacao -= timedelta(days=1)
 
             ordens_objs.append(nova_ordem)
             ordens_metadata.append({

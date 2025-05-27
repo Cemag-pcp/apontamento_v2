@@ -111,6 +111,7 @@ def gerar_dados_sequenciamento(request):
     tabela_completa = gerar_sequenciamento(data_inicio, data_final, setor)
 
     if setor == 'pintura':
+        tabela_completa = tabela_completa.groupby(['Código', 'Peca', 'Célula', 'Datas','Recurso_cor','cor']).agg({'Qtde_total': 'sum'}).reset_index()
         tabela_completa.drop_duplicates(subset=['Código','Datas','cor'], inplace=True)
         tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
         tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
@@ -144,9 +145,13 @@ def gerar_dados_sequenciamento(request):
 
 @csrf_exempt
 def atualizar_ordem_existente(request):
-    
     """
-    Chama a API 'criar_ordem'.
+    Atualiza as ordens de um dia específico:
+    - Remove ordens sem apontamento que foram retiradas do sequenciamento
+    - Mantém ordens que já têm apontamentos
+    - Atualiza `qtd_planejada` de ordens já existentes
+    - Cria novas ordens para itens adicionados
+    - Retorna as ordens que não puderam ser removidas
     """
 
     data_inicio = request.GET.get('data_inicio')
@@ -155,107 +160,109 @@ def atualizar_ordem_existente(request):
     if not data_inicio or not setor:
         return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)
 
-    intervalo_datas = criar_array_datas(data_inicio, data_inicio)
+    intervalo_datas_formatado = [
+        datetime.strptime(data_inicio, "%Y-%m-%d").strftime("%Y-%m-%d")
+    ]
 
-    # formatando data string
-    intervalo_datas_formatado = [datetime.strptime(data, "%d/%m/%Y").strftime("%Y-%m-%d") for data in intervalo_datas]
+    # Filtra ordens existentes do dia
+    ordens_existentes_qs = Ordem.objects.filter(
+        data_carga__in=intervalo_datas_formatado,
+        grupo_maquina=setor
+    )
 
-    # Para montagem
-    # Excluir ordens que ainda não possuem apontamentos registrados
+    # Separar ordens que já têm apontamentos
     if setor == 'montagem':
-        Ordem.objects.annotate(
+        ordens_com_apontamentos = ordens_existentes_qs.annotate(
             total_produzido=Sum('ordem_pecas_montagem__qtd_boa')
-        ).filter(
-            total_produzido=0,  # Apenas ordens SEM apontamento
-            data_carga__in=intervalo_datas_formatado,
-            grupo_maquina=setor
-        ).delete()
-
-        # Filtra ordens que ja possuem apontamentos
-        ordens_com_apontamentos = Ordem.objects.annotate(
-            total_produzido=Sum('ordem_pecas_montagem__qtd_boa')
-        ).filter(
-            total_produzido__gt=0,  # (qtd_boa > 0)
-            data_carga__in=intervalo_datas_formatado,
-            grupo_maquina=setor
-        )
-    # para pintura
+        ).filter(total_produzido__gt=0)
     else:
-        Ordem.objects.annotate(
+        ordens_com_apontamentos = ordens_existentes_qs.annotate(
             total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
-        ).filter(
-            Q(total_produzido=0) | Q(total_produzido__isnull=True),
-            data_carga__in=intervalo_datas_formatado,
-            grupo_maquina=setor
-        ).delete()
+        ).filter(total_produzido__gt=0)
 
-        # Filtra ordens que ja possuem apontamentos
-        ordens_com_apontamentos = Ordem.objects.annotate(
-            total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
-        ).filter(
-            total_produzido__gt=0,  # (qtd_boa > 0)
-            data_carga__in=intervalo_datas_formatado,
-            grupo_maquina=setor
-        )
+    ordens_com_apontamentos_ids = set(ordens_com_apontamentos.values_list('id', flat=True))
 
-    # Gerar os arquivos e a tabela completa
+    # Gerar a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_inicio, setor)
-    
-    if setor == 'pintura':
-        tabela_completa.drop_duplicates(subset=['Código','Datas','cor'], inplace=True)
-        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
-        tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
-    else:
-        tabela_completa.drop_duplicates(subset=['Código','Datas','Célula'], inplace=True)
-        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%Y-%d-%m", errors="coerce")
-        tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
 
-    # Criar a carga para a API de criar ordem
-    ordens = []
+    if setor == 'pintura':
+        tabela_completa = tabela_completa.groupby(['Código', 'Peca', 'Célula', 'Datas','Recurso_cor','cor']).agg({'Qtde_total': 'sum'}).reset_index()
+        tabela_completa.drop_duplicates(subset=['Código', 'Datas', 'cor'], inplace=True)
+        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce").dt.strftime("%Y-%m-%d")
+    else:
+        tabela_completa.drop_duplicates(subset=['Código', 'Datas', 'Célula'], inplace=True)
+        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%Y-%d-%m", errors="coerce").dt.strftime("%Y-%m-%d")
+
+    # Conjunto de peças atuais
+    pecas_atualizadas = set(
+        f"{str(row['Código'])} - {row['Peca']}" for _, row in tabela_completa.iterrows()
+    )
+
+    # Identificar ordens sem apontamento que não existem mais no sequenciamento
+    if setor == 'montagem':
+        ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
+            ~Q(ordem_pecas_montagem__peca__in=pecas_atualizadas)
+        )
+    else:
+        ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
+            ~Q(ordem_pecas_pintura__peca__in=pecas_atualizadas)
+        )
+
+    # Remove essas ordens
+    ordens_sem_apontamento.delete()
+
+    # Preparar lista para criar novas ordens
+    ordens_a_criar = []
+
     for _, row in tabela_completa.iterrows():
-        
-        # para montagem
-        if setor=='montagem':
-        
+        peca_nome = f"{str(row['Código'])} - {row['Peca']}"
+        data_carga = row["Datas"]
+
+        if setor == 'montagem':
             ordem_existente = Ordem.objects.filter(
-                grupo_maquina=setor.lower(),
-                data_carga=row["Datas"],
-                ordem_pecas_montagem__peca=str(row["Código"]) + " - " + row["Peca"]
-            ).exists()
-        
-        # para pintura
+                grupo_maquina=setor,
+                data_carga=data_carga,
+                ordem_pecas_montagem__peca=peca_nome
+            ).first()
         else:
-            
             ordem_existente = Ordem.objects.filter(
-                grupo_maquina=setor.lower(),
-                data_carga=row["Datas"],
-                ordem_pecas_pintura__peca=str(row["Código"]) + " - " + row["Peca"]
-            ).exists()
-       
-        if not ordem_existente:  # Evita duplicatas
-            ordens.append({
+                grupo_maquina=setor,
+                data_carga=data_carga,
+                ordem_pecas_pintura__peca=peca_nome
+            ).first()
+
+        if ordem_existente:
+            # Atualizar qtd_planejada na peça vinculada
+            if setor == 'montagem':
+                ordem_existente.ordem_pecas_montagem.filter(peca=peca_nome).update(qtd_planejada=int(row["Qtde_total"]))
+            else:
+                ordem_existente.ordem_pecas_pintura.filter(peca=peca_nome).update(qtd_planejada=int(row["Qtde_total"]))
+        else:
+            # Criar nova ordem
+            ordens_a_criar.append({
                 "grupo_maquina": setor.lower(),
                 "cor": row["cor"] if setor == 'pintura' else '',
                 "obs": "Ordem gerada automaticamente",
-                "peca_nome": str(row["Código"]) + " - " + row["Peca"],
+                "peca_nome": peca_nome,
                 "qtd_planejada": int(row["Qtde_total"]),
-                "data_carga": row["Datas"],
+                "data_carga": data_carga,
                 "setor_conjunto": row["Célula"]
             })
 
-    if setor.lower() == 'montagem':
-        resultado = processar_ordens_montagem(ordens, atualizacao_ordem=True, grupo_maquina=setor.lower())
+    # Processar novas ordens
+    if setor == 'montagem':
+        resultado = processar_ordens_montagem(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
     else:
-        resultado = processar_ordens_pintura(ordens, atualizacao_ordem=True, grupo_maquina=setor.lower())
+        resultado = processar_ordens_pintura(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
 
     if "error" in resultado:
         return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
 
-    # Retornar JSON com informações sobre ordens que precisam ser atualizadas manualmente
+    # Retorno final
     return JsonResponse({
         "message": "Ordens atualizadas com sucesso!",
-        "ordens_a_serem_atualizadas": list(ordens_com_apontamentos.values_list()),  # Converte QuerySet em lista
-        "novas_ordens_criadas": len(ordens),  # Quantidade de novas ordens adicionadas
+        "ordens_com_apontamentos": list(ordens_com_apontamentos.values('id', 'data_carga', 'grupo_maquina')),
+        "novas_ordens_criadas": len(ordens_a_criar),
     })
 
 @csrf_exempt
@@ -321,14 +328,16 @@ def andamento_cargas(request):
     """ Retorna as cargas de um setor dentro do intervalo solicitado pelo FullCalendar """
 
     # Algumas máquinas que não precisam está na contagem de montagem
-    maquinas_excluidas = ['PLAT. TANQUE. CAÇAM. 2','QUALIDADE','FORJARIA','ESTAMPARIA','QUALIDADE']
-
-    # Máquinas a excluir da contagem
     maquinas_excluidas = [
         'PLAT. TANQUE. CAÇAM. 2',
         'QUALIDADE',
         'FORJARIA',
-        'ESTAMPARIA'
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'SERRALHERIA',
+        'TRANSBORDO',
+        'ROÇADEIRA'
     ]
 
     maquinas_excluidas_ids = Maquina.objects.filter(nome__in=maquinas_excluidas).values_list('id', flat=True)
