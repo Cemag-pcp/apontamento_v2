@@ -4009,7 +4009,6 @@ def dashboard_tanque(request):
 
     return render(request, "dashboard/tanque.html")
 
-
 def indicador_tanque_analise_temporal(request):
     """
     Endpoint para análise temporal de inspeções de estanqueidade - APENAS TANQUES
@@ -4168,3 +4167,222 @@ def causas_nao_conformidade_mensal_tanque(request):
     print(resposta)
 
     return JsonResponse(resposta, safe=False)
+
+
+def dashboard_tubos_cilindros(request):
+
+    return render(request, 'dashboard/tubos-cilindros.html')
+
+def indicador_tubos_cilindros_analise_temporal(request):
+
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    # Filtra somente as produções com peça ligada e do tipo especificado
+    queryset = InspecaoEstanqueidade.objects.filter(
+        Q(peca__tipo='tubo') | Q(peca__tipo='cilindro')
+    )
+
+    if data_inicio:
+        queryset = queryset.filter(data_inspecao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(data_inspecao__lte=data_fim)
+
+    queryset = queryset.annotate(
+        mes=Cast(TruncMonth('data_inspecao'), output_field=CharField()),
+        qtd_inspecionada=F('dadosexecucaoinspecaoestanqueidade__infoadicionaisexectuboscilindros__qtd_inspecionada'),
+        nao_conformidade=F('dadosexecucaoinspecaoestanqueidade__infoadicionaisexectuboscilindros__nao_conformidade'),
+    ).values('mes').annotate(
+        soma_nao_conformidade=Sum('nao_conformidade'),
+        soma_qtd_inspecionada=Sum('qtd_inspecionada'),
+    ).order_by('mes')
+
+    resultado = []
+    for item in queryset:
+        qtd_inspecionada = item['soma_qtd_inspecionada'] or 0
+        nao_conformidade = item['soma_nao_conformidade'] or 0
+        taxa_nc = (nao_conformidade / qtd_inspecionada) if qtd_inspecionada else 0
+
+        resultado.append({
+            'mes': item['mes'][:7],  # YYYY-MM
+            'qtd_peca_inspecionada': item['soma_qtd_inspecionada'] or 0,
+            'taxa_nao_conformidade': round(taxa_nc, 4),
+        })
+
+    return JsonResponse(resultado, safe=False)
+
+def indicador_tubos_cilindros_resumo_analise_temporal(request):
+
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    # Query principal
+    queryset = InspecaoEstanqueidade.objects.filter(
+        Q(peca__tipo='tubo') | Q(peca__tipo='cilindro'),
+        peca__isnull=False
+    )
+
+    print(queryset)
+    print(len(queryset))
+
+    if data_inicio:
+        queryset = queryset.filter(data_inspecao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(data_inspecao__lte=data_fim)
+
+    # Anotações e agregações
+    queryset = queryset.annotate(
+        ano=ExtractYear('data_inspecao'),
+        mes_num=ExtractMonth('data_inspecao'),
+        qtd_inspecionada=F('dadosexecucaoinspecaoestanqueidade__infoadicionaisexectuboscilindros__qtd_inspecionada'),
+        nao_conformidade=F('dadosexecucaoinspecaoestanqueidade__infoadicionaisexectuboscilindros__nao_conformidade'),
+        nao_conformidade_refugo=F('dadosexecucaoinspecaoestanqueidade__infoadicionaisexectuboscilindros__nao_conformidade_refugo'),
+    ).values('ano', 'mes_num').annotate(
+        total_nc=Sum('nao_conformidade'),
+        total_refugo=Sum('nao_conformidade_refugo'),
+        total_nao_conforme=ExpressionWrapper(
+            F('total_nc') + F('total_refugo'),
+            output_field=IntegerField()
+        ),
+        total_qtd_inspecionada=Sum('qtd_inspecionada'),
+    ).order_by('ano', 'mes_num')
+
+    print(queryset)
+    # Monta JSON
+    resultado = []
+    for item in queryset:
+
+        mes_formatado = f"{item['ano']}-{item['mes_num']}"
+
+        total_nc = item['total_nao_conforme'] or 0
+        total_qtd_insp = item['total_qtd_inspecionada'] or 0
+
+        taxa_nc = (total_nc / total_qtd_insp) * 100 if total_qtd_insp else 0
+
+        resultado.append({
+            "Data": mes_formatado,
+            "N° de inspeções": int(total_qtd_insp),
+            "N° de não conformidades": int(total_nc),
+            "% de não conformidade": f"{taxa_nc:.2f} %"
+        })
+
+
+    return JsonResponse(resultado, safe=False)
+
+def causas_nao_conformidade_mensal_tubos_cilindros(request):
+
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    queryset = CausasNaoConformidadeEstanqueidade.objects.filter(
+        info_tubos_cilindros__dados_exec_inspecao__data_exec__isnull=False,
+        info_tubos_cilindros__dados_exec_inspecao__inspecao_estanqueidade__peca__isnull=False,
+        causa__isnull=False  # Filtra registros sem causa antes da agregação
+    )
+    
+    if data_inicio:
+        queryset = queryset.filter(info_tubos_cilindros__dados_exec_inspecao__data_exec__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(info_tubos_cilindros__dados_exec_inspecao__data_exec__lte=data_fim)
+    
+    resultados = queryset.annotate(
+        ano=ExtractYear('info_tubos_cilindros__dados_exec_inspecao__data_exec'),
+        mes=ExtractMonth('info_tubos_cilindros__dados_exec_inspecao__data_exec'),
+        mes_formatado=Concat(
+            ExtractYear('info_tubos_cilindros__dados_exec_inspecao__data_exec'),
+            Value('-'),
+            ExtractMonth('info_tubos_cilindros__dados_exec_inspecao__data_exec'),
+            output_field=CharField()
+        )
+    ).values('mes_formatado', 'causa__nome').annotate(
+        total_nao_conformidades=Sum('quantidade')
+    ).order_by('mes_formatado', 'causa__nome')
+
+    # Formatação final
+    resultado = [
+        {
+            "Data": item['mes_formatado'],
+            "Causa": item['causa__nome'],
+            "Soma do N° Total de não conformidades": item['total_nao_conformidades']
+        }
+        for item in resultados
+    ]
+    
+    return JsonResponse(resultado, safe=False)
+
+def imagens_nao_conformidade_tubos_cilindros(request):
+
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    # Query otimizada com select_related e prefetch_related específicos
+    queryset = CausasNaoConformidadeEstanqueidade.objects.filter(
+        info_tubos_cilindros__dados_exec_inspecao__data_exec__isnull=False,
+        info_tubos_cilindros__dados_exec_inspecao__inspecao_estanqueidade__peca__isnull=False
+    ).select_related(
+        'info_tubos_cilindros',
+        'info_tubos_cilindros__dados_exec_inspecao',
+        'info_tubos_cilindros__dados_exec_inspecao__inspecao_estanqueidade'
+    ).prefetch_related(
+        'causa',
+        Prefetch('arquivos_estanqueidade', queryset=ArquivoCausaEstanqueidade.objects.only('arquivos'))
+    )
+
+    if data_inicio:
+        queryset = queryset.filter(info_tubos_cilindros__dados_exec_inspecao__data_exec__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(info_tubos_cilindros__dados_exec_inspecao__data_exec__lte=data_fim)
+
+    # Pré-carrega todos os dados relacionados de uma vez
+    dados_completos = list(queryset)
+
+    resultado = []
+    for item in dados_completos:
+        date = item.info_tubos_cilindros.dados_exec_inspecao.data_exec - timedelta(hours=3)
+        data_execucao = date.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Acessa os dados já pré-carregados
+        causas = [c.nome for c in item.causa.all()]
+        imagens = [arquivo.arquivos.url for arquivo in item.arquivos_estanqueidade.all() if hasattr(arquivo, 'arquivos')]
+
+        for url in imagens:
+            resultado.append({
+                "data_execucao": data_execucao,
+                "causas": causas,
+                "quantidade": item.quantidade,
+                "imagem_url": url
+            })
+            
+    return JsonResponse(resultado, safe=False)
