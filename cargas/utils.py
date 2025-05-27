@@ -111,7 +111,7 @@ def consultar_carretas(data_inicial, data_final):
     dados_carreta['Recurso'] = dados_carreta['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
 
-    sufixos_para_remover = ['AV', 'VM', 'VJ', 'AN', 'AS','CO','LC']
+    sufixos_para_remover = ['AV', 'VM', 'VJ', 'AN','CO','LC']
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(
         lambda x: x[:-2].rstrip() if str(x)[-2:] in sufixos_para_remover else x
     )
@@ -171,7 +171,7 @@ def criar_array_datas(data_inicial, data_final):
     
     return array_datas
 
-def gerar_arquivos(data_inicial, data_final, setor):
+def gerar_arquivos(data_inicial='2025-05-31', data_final='2025-05-31', setor='pintura'):
     filenames = []
     resultado = criar_array_datas(data_inicial, data_final)
     base_carretas_original, base_carga_original = get_data_from_sheets()
@@ -200,6 +200,9 @@ def gerar_arquivos(data_inicial, data_final, setor):
                                             'PED_QUANTIDADE': 'Qtde'})
     base_carga_original.dropna(inplace=True)
     base_carga_original.reset_index(drop=True)
+
+    # base_carga_original[base_carga_original['Recurso'] == 'CHASSI F6 CS M17']
+    # base_carretas_original[base_carretas_original['Recurso'] == 'CHASSI F6 CS M17']
 
     for idx, data_escolhida in enumerate(resultado):
         data_nome_planilha = data_escolhida.replace("/","-")[:5]
@@ -247,12 +250,12 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             base_carga = base_carga.reset_index(drop=True)
 
-            df_cores = pd.DataFrame({'Recurso_cor': ['AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'sem_cor', 'AS', 'CO'],
-                                    'cor': ['Azul', 'Verde', 'Laranja Jacto', 'Laranja', 'Vermelho', 'Amarelo', 'Laranja', 'Azul Sm.', 'Cinza']})
+            df_cores = pd.DataFrame({'Recurso_cor': ['AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'sem_cor', 'CO'],
+                                    'cor': ['Azul', 'Verde', 'Laranja Jacto', 'Laranja', 'Vermelho', 'Amarelo', 'Laranja', 'Cinza']})
 
             nome_cor_para_sigla = dict(zip(df_cores['cor'], df_cores['Recurso_cor']))
 
-            cores = ['AM', 'AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'AS', 'CO']
+            cores = ['AM', 'AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'CO']
 
             base_carga = base_carga.astype(str)
 
@@ -280,8 +283,8 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 'VM', '')  # Vermelho
             base_carga['Recurso'] = base_carga['Recurso'].str.replace(
                 'AV', '')  # Amarelo
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace(
-                'AS', '')  # Amarelo
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace(
+            #     'AS', '')  # Amarelo
 
             base_carga['Recurso'] = base_carga['Recurso'].str.strip()
 
@@ -804,12 +807,12 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
 
             base_carga = base_carga.reset_index(drop=True)
 
-            df_cores = pd.DataFrame({'Recurso_cor': ['AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'sem_cor', 'AS', 'CO'],
-                                    'cor': ['Azul', 'Verde', 'Laranja Jacto', 'Laranja', 'Vermelho', 'Amarelo', 'Laranja', 'Azul Sm.', 'Cinza']})
+            df_cores = pd.DataFrame({'Recurso_cor': ['AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'sem_cor', 'CO'],
+                                    'cor': ['Azul', 'Verde', 'Laranja Jacto', 'Laranja', 'Vermelho', 'Amarelo', 'Laranja', 'Cinza']})
 
             nome_cor_para_sigla = dict(zip(df_cores['cor'], df_cores['Recurso_cor']))
 
-            cores = ['AM', 'AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'AS', 'CO']
+            cores = ['AM', 'AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'CO']
 
             base_carga = base_carga.astype(str)
 
@@ -837,8 +840,8 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
                 'VM', '')  # Vermelho
             base_carga['Recurso'] = base_carga['Recurso'].str.replace(
                 'AV', '')  # Amarelo
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace(
-                'AS', '')  # Amarelo
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace(
+            #     'AS', '')  # Amarelo
 
             base_carga['Recurso'] = base_carga['Recurso'].str.strip()
 
