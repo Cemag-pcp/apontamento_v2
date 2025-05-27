@@ -1,7 +1,10 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Q, Prefetch, OuterRef, Subquery, Max, Sum, F, FloatField, ExpressionWrapper, Func, Value, CharField, Count
+from django.db.models import (
+    Q, Prefetch, OuterRef, Subquery, Max, Sum, F, FloatField, 
+    IntegerField,ExpressionWrapper, Func, Value, CharField, Count, Case, When
+)
 from django.db import transaction
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -4001,3 +4004,167 @@ def ficha_inspecao_estamparia(request):
                 })
     
     return JsonResponse(resultados, safe=False)
+
+def dashboard_tanque(request):
+
+    return render(request, "dashboard/tanque.html")
+
+
+def indicador_tanque_analise_temporal(request):
+    """
+    Endpoint para análise temporal de inspeções de estanqueidade - APENAS TANQUES
+    """
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    # Filtra somente as inspeções de estanqueidade para tanques
+    queryset = InspecaoEstanqueidade.objects.filter(peca__tipo='tanque')
+
+    if data_inicio:
+        queryset = queryset.filter(data_inspecao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(data_inspecao__lte=data_fim)
+
+    # Dados de pressão dos tanques
+    tanques_pressao = DetalhesPressaoTanque.objects.filter(
+        dados_exec_inspecao__inspecao_estanqueidade__in=queryset
+    ).annotate(
+        mes=Cast(TruncMonth('dados_exec_inspecao__data_exec'), output_field=CharField()),
+        nc_calculada=Case(  # Mudei o nome da anotação para evitar conflito
+            When(nao_conformidade=True, then=1),
+            default=0,
+            output_field=IntegerField()
+        )
+    ).values('mes').annotate(
+        qtd_inspecionada=Count('id'),
+        soma_nao_conformidade=Sum('nc_calculada')  # Usando o novo nome aqui
+    ).order_by('mes')
+
+    resultado = []
+    for item in tanques_pressao:
+        total_inspecionada = item['qtd_inspecionada'] or 0
+        total_nc = item['soma_nao_conformidade'] or 0
+        taxa_nc = (total_nc / total_inspecionada) if total_inspecionada else 0
+
+        resultado.append({
+            'mes': item['mes'][:7],  # YYYY-MM
+            'qtd_peca_inspecionada': total_inspecionada,
+            'taxa_nao_conformidade': round(taxa_nc, 4),
+        })
+
+    return JsonResponse(resultado, safe=False)
+
+def indicador_tanque_resumo_analise_temporal(request):
+    """
+    Endpoint para resumo temporal de inspeções - APENAS TANQUES
+    """
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    # Query para tanques (pressão)
+    tanques_pressao = DetalhesPressaoTanque.objects.filter(
+        dados_exec_inspecao__inspecao_estanqueidade__peca__tipo='tanque',
+        dados_exec_inspecao__data_exec__isnull=False
+    )
+    
+    if data_inicio:
+        tanques_pressao = tanques_pressao.filter(dados_exec_inspecao__data_exec__gte=data_inicio)
+    if data_fim:
+        tanques_pressao = tanques_pressao.filter(dados_exec_inspecao__data_exec__lte=data_fim)
+
+    # Agregações
+    tanques_agg = tanques_pressao.annotate(
+        ano=ExtractYear('dados_exec_inspecao__data_exec'),
+        mes_num=ExtractMonth('dados_exec_inspecao__data_exec'),
+        nc=Case(
+            When(nao_conformidade=True, then=1),
+            default=0,
+            output_field=IntegerField()
+        )
+    ).values('ano', 'mes_num').annotate(
+        total_inspecionada=Count('id'),
+        total_nc=Sum('nc')
+    ).order_by('ano', 'mes_num')
+
+    resultado = []
+    for item in tanques_agg:
+        mes_formatado = f"{item['ano']}-{item['mes_num']}"
+        
+        resultado.append({
+            "Data": mes_formatado,
+            "N° de inspeções": int(item['total_inspecionada']),
+            "N° de não conformidades": int(item['total_nc'] or 0),
+        })
+
+    return JsonResponse(resultado, safe=False)
+
+def causas_nao_conformidade_mensal_tanque(request):
+
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    # Filtra as não conformidades de tanques na primeira execução (num_execucao=0)
+    nao_conformidades = DetalhesPressaoTanque.objects.filter(
+        nao_conformidade=True,
+        dados_exec_inspecao__inspecao_estanqueidade__peca__tipo='tanque'
+    )
+
+    # Aplica filtros de data se fornecidos
+    if data_inicio:
+        nao_conformidades = nao_conformidades.filter(
+            dados_exec_inspecao__data_exec__gte=data_inicio
+        )
+    if data_fim:
+        nao_conformidades = nao_conformidades.filter(
+            dados_exec_inspecao__data_exec__lte=data_fim
+        )
+
+    # Agrupa por mês e conta as ocorrências
+    resultados = nao_conformidades.annotate(
+        mes_formatado=Concat(
+            ExtractYear('dados_exec_inspecao__data_exec'),
+            Value('-'),
+            ExtractMonth('dados_exec_inspecao__data_exec'),
+            output_field=CharField()
+        )
+    ).values('mes_formatado').annotate(
+        quantidade=Count('id')
+    ).order_by('mes_formatado')
+
+    # Formata a resposta conforme solicitado
+    resposta = [
+        {
+            "data": item['mes_formatado'],
+            "causa": "Vazamento",
+            "quantidade": item['quantidade']
+        }
+        for item in resultados
+    ]
+
+    print(resposta)
+
+    return JsonResponse(resposta, safe=False)
