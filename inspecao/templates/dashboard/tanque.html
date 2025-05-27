@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %} <title>Tanque</title> {% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="/static/css/dashboard/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+{% endblock %}
+
+{% block content %}
+
+<!-- Filtro de Datas -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                Filtrar por Período
+            </div>
+            <div class="card-body">
+                <form class="row g-3">
+                    <div class="col-md-4">
+                        <label for="startDate" class="form-label">Data Inicial</label>
+                        <input type="date" class="form-control" id="startDate">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="endDate" class="form-label">Data Final</label>
+                        <input type="date" class="form-control" id="endDate">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="button" class="btn btn-primary" id="filterBtn">Aplicar Filtro</button>
+                        <button type="button" class="btn btn-outline-secondary ms-2" id="resetBtn">Limpar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráfico -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                Gráfico de Produção e Inspeção
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="productionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Produção -->
+<div class="row mb-4">
+    <div class="col-8">
+        <div class="card">
+            <div class="card-header">
+                Dados de Produção e Inspeção
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="table-producao">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>N° de inspeções</th>
+                                <th>N° de não conformidades</th>
+                                <th>% de não conformidade</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card">
+            <div class="card-header">
+                Causas de Não Conformidades
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="table-causas">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Causa</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                         
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/dashboard/dash-tanque.js' %}"></script>
+{% endblock %}
