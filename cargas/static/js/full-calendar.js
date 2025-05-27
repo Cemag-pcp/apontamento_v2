@@ -30,11 +30,11 @@ export function renderCallendar() {
             let escolhaModal = new bootstrap.Modal(document.getElementById("modalEscolha"));
             escolhaModal.show();
 
-            document.getElementById("btnRemanejar").onclick = function () {
-                escolhaModal.hide();
-                let modalRemanejar = new bootstrap.Modal(document.getElementById("modalRemanejar"));
-                modalRemanejar.show();
-            };
+            // document.getElementById("btnRemanejar").onclick = function () {
+            //     escolhaModal.hide();
+            //     let modalRemanejar = new bootstrap.Modal(document.getElementById("modalRemanejar"));
+            //     modalRemanejar.show();
+            // };
 
             document.getElementById("btnAtualizar").onclick = function () {
                 Swal.fire({
