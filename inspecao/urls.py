@@ -71,7 +71,8 @@ urlpatterns += [
     path('dashboard/pintura/', views.dashboard_pintura, name='dasdashboard_pinturahboard'),
     path('dashboard/montagem/', views.dashboard_montagem, name='dasdashboard_montagemhboard'),
     path('dashboard/estamparia/', views.dashboard_estamparia, name='dasdashboard_estampariahboard'),
-    path('dashboard/tanque/', views.dashboard_tanque, name='dashboard-tanque')
+    path('dashboard/tanque/', views.dashboard_tanque, name='dashboard-tanque'),
+    path('dashboard/tubos-cilindros/', views.dashboard_tubos_cilindros, name='dashboard-tubos-cilindros')
 ]
 
 # dashboard
@@ -96,4 +97,9 @@ urlpatterns += [
     path('tanque/api/indicador-tanque-analise-temporal/', views.indicador_tanque_analise_temporal, name='indicador_tanque_analise_temporal'),
     path('tanque/api/indicador-tanque-resumo-analise-temporal/', views.indicador_tanque_resumo_analise_temporal, name='indicador_tanque_resumo_analise_temporal'),
     path('tanque/api/causas-nao-conformidade/', views.causas_nao_conformidade_mensal_tanque, name='causas_nao_conformidade_mensal'),
+
+    path('tubos-cilindros/api/indicador-tubos-cilindros-analise-temporal/', views.indicador_tubos_cilindros_analise_temporal, name='indicador_tubos_cilindros_analise_temporal'),
+    path('tubos-cilindros/api/indicador-tubos-cilindros-resumo-analise-temporal/', views.indicador_tubos_cilindros_resumo_analise_temporal, name='indicador_tubos_cilindros_resumo_analise_temporal'),
+    path('tubos-cilindros/api/imagens-nao-conformidade/', views.imagens_nao_conformidade_tubos_cilindros, name='imagens_nao_conformidade_tubos_cilindros'),
+    path('tubos-cilindros/api/causas-nao-conformidade/', views.causas_nao_conformidade_mensal_tubos_cilindros, name='causas_nao_conformidade_mensal'),
 ]
