@@ -57,6 +57,7 @@ export function renderCallendar() {
                 })
                 .then(response => response.json())
                 .then(data => {
+
                     if (data.error) {
                         Swal.fire({
                             icon: 'error',
@@ -65,9 +66,18 @@ export function renderCallendar() {
                             confirmButtonText: 'OK'
                         });
                     } else {
-                        let ordensTexto = data.ordens_a_serem_atualizadas.length > 0
-                            ? data.ordens_a_serem_atualizadas.map(ordem => `Ordem ${ordem[0]}`).join("<br>")
+                        
+                        let ordensTexto = "";
+
+                        if (Array.isArray(data.ordens_com_apontamentos)) {
+                        ordensTexto = data.ordens_com_apontamentos.length > 0
+                            ? data.ordens_com_apontamentos.map(ordem =>
+                                `Chave: ${ordem.id || "indefinido"} | Data: ${ordem.data_carga || "indefinida"} | Grupo Máquina: ${ordem.grupo_maquina || "indefinido"}`
+                            ).join("<br>")
                             : "Nenhuma ordem precisa ser atualizada manualmente.";
+                        } else {
+                        ordensTexto = "Nenhuma ordem precisa ser atualizada manualmente.";
+                        }
 
                         Swal.fire({
                             icon: 'success',

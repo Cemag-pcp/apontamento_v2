@@ -113,12 +113,12 @@ def gerar_dados_sequenciamento(request):
     if setor == 'pintura':
         tabela_completa = tabela_completa.groupby(['Código', 'Peca', 'Célula', 'Datas','Recurso_cor','cor']).agg({'Qtde_total': 'sum'}).reset_index()
         tabela_completa.drop_duplicates(subset=['Código','Datas','cor'], inplace=True)
-        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
-        tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
+        # tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
+        # tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
     else:
         tabela_completa.drop_duplicates(subset=['Código','Datas','Célula'], inplace=True)
-        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
-        tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
+        # tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
+        # tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
 
     # Criar a carga para a API de criar ordem
     ordens = []
@@ -129,7 +129,7 @@ def gerar_dados_sequenciamento(request):
             "obs": "Ordem gerada automaticamente",
             "peca_nome": str(row["Código"]) + " - " + row["Peca"],
             "qtd_planejada": int(row["Qtde_total"]),
-            "data_carga" : row["Datas"],#.strftime("%Y-%m-%d") if isinstance(row["Datas"], pd.Timestamp) else datetime.strptime(str(row["Datas"]), "%d/%m/%Y").strftime("%Y-%m-%d")
+            "data_carga" : str(row["Datas"].date()) if setor == 'montagem' else row["Datas"],#.strftime("%Y-%m-%d") if isinstance(row["Datas"], pd.Timestamp) else datetime.strptime(str(row["Datas"]), "%d/%m/%Y").strftime("%Y-%m-%d")
             "setor_conjunto" : row["Célula"]
         })
 
@@ -188,10 +188,10 @@ def atualizar_ordem_existente(request):
     if setor == 'pintura':
         tabela_completa = tabela_completa.groupby(['Código', 'Peca', 'Célula', 'Datas','Recurso_cor','cor']).agg({'Qtde_total': 'sum'}).reset_index()
         tabela_completa.drop_duplicates(subset=['Código', 'Datas', 'cor'], inplace=True)
-        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce").dt.strftime("%Y-%m-%d")
+        # tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce").dt.strftime("%Y-%m-%d")
     else:
         tabela_completa.drop_duplicates(subset=['Código', 'Datas', 'Célula'], inplace=True)
-        tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%Y-%d-%m", errors="coerce").dt.strftime("%Y-%m-%d")
+        # tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%Y-%d-%m", errors="coerce").dt.strftime("%Y-%m-%d")
 
     # Conjunto de peças atuais
     pecas_atualizadas = set(
@@ -450,7 +450,7 @@ def historico_ordens_montagem(request):
     if status_param:
         filtros_ordem['status_atual'] = status_param
     if ordem_param:
-        filtros_ordem['ordem'] = ordem_param
+        filtros_ordem['id'] = ordem_param
 
     # Recupera os IDs das ordens que atendem aos filtros
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
