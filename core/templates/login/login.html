@@ -10,7 +10,7 @@
     <div class="container d-flex justify-content-center align-items-center vh-100">
         <div class="card shadow-sm p-4" style="width: 100%; max-width: 400px;">
             <h3 class="text-center mb-4">Login</h3>
-            <form method="post">
+            <form method="post" id="loginForm">
                 {% csrf_token %}
                 <div class="mb-3">
                     <label for="username" class="form-label">Usuário</label>
@@ -20,9 +20,20 @@
                     <label for="password" class="form-label">Senha</label>
                     <input type="password" name="password" id="password" class="form-control" required>
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Entrar</button>
+                <button type="submit" id="loginButton"class="btn btn-primary w-100">Entrar</button>
             </form>
+
+            {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} mt-3" style="padding: 5px 10px;" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+            {% endif %}
         </div>
     </div>
+
+<script src="../../static/js/scripts_login.js"></script>
+<script src="https://use.fontawesome.com/releases/v6.3.0/js/all.js" crossorigin="anonymous"></script>
 </body>
 </html>
