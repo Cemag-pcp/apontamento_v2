@@ -6,18 +6,21 @@ async function carregarTabela(pagina) {
     const maquinaSelecionada = document.getElementById('filtro-maquina')?.value || '';
     const ordemEscolhida = document.getElementById('filtro-ordem')?.value || '';
     const pecasSelecionadas = Array.from(selectElement.selectedOptions).map(option => option.value);
+    const dataCriacao = document.getElementById('filtro-data-criacao')?.value || '';
+
 
     // Junta todas as peças com um delimitador seguro
     const filtros = {
         pecas: encodeURIComponent(pecasSelecionadas.join('|')),
         maquina: encodeURIComponent(maquinaSelecionada),
         ordem: encodeURIComponent(ordemEscolhida),
+        dataCriacao: encodeURIComponent(dataCriacao)
     };
 
     console.log(filtros);
 
     try {
-        const response = await fetch(`api/ordens-criadas/?page=${pagina}&limit=10&pecas=${filtros.pecas}&maquina=${filtros.maquina}&ordem=${filtros.ordem}`);
+        const response = await fetch(`api/ordens-criadas/?page=${pagina}&limit=10&pecas=${filtros.pecas}&maquina=${filtros.maquina}&ordem=${filtros.ordem}&dataCriacao=${filtros.dataCriacao}`);
         const data = await response.json();
 
         atualizarTabela(data.data);
