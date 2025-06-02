@@ -413,6 +413,8 @@ def get_ordens_criadas_duplicar_ordem(request):
     codigos = [re.match(r'\d+', p).group() for p in pecas if re.match(r'\d+', p)]
     codigos_unicos = list(set(pecas))
 
+    dataCriacao = request.GET.get('dataCriacao','')
+
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
     draw = int(request.GET.get('draw', 1))
@@ -450,6 +452,10 @@ def get_ordens_criadas_duplicar_ordem(request):
         ordens_queryset = ordens_queryset.filter(grupo_maquina=maquina)
     if ordem:
         ordens_queryset = ordens_queryset.filter(ordem=ordem)
+    
+    # Filtra Data Criação
+    if dataCriacao:
+        ordens_queryset = ordens_queryset.filter(data_criacao__date=date.fromisoformat(dataCriacao))
 
     # Contagem de Registros para Paginação
     # records_total = Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).count()

@@ -31,18 +31,18 @@
         <!-- Search Form -->
         <form id="filtro-form" class="mb-4">
             <div class="row g-3 align-items-center">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="filtro-ordem" class="form-label small text-muted">Número da Ordem</label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0"><i class="bi bi-hash"></i></span>
                         <input type="text" class="form-control border-start-0 bg-light" name="filtro-ordem" id="filtro-ordem" placeholder="Digite o número">
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="filtro-peca" class="form-label small text-muted">Peça</label>
                     <select id="filtro-peca" class="form-select bg-light" multiple="multiple"></select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="filtro-maquina" class="form-label small text-muted">Máquina</label>
                     <select class="form-select bg-light" name="filtro-maquina" id="filtro-maquina">
                         <option class="text-muted" value="">Todas as máquinas</option>
@@ -50,6 +50,10 @@
                         <option value="laser_1">Laser 1 (Weller)</option>
                         <option value="laser_2">Laser 2 (JFY)</option>
                     </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filtro-data-criacao" class="form-label small text-muted">Data de Criação</label>
+                    <input type="date" id="filtro-data-criacao" class="form-control">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label d-block" style="visibility: hidden;">Filtrar</label>
