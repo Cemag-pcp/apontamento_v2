@@ -11,6 +11,8 @@ def tratamento_planilha_plasma(df):
 
     nome_coluna_1 = df[df.columns[0]].name
     aproveitamento_df = df['Unnamed: 16'][4:5]
+    
+    print(df.iloc[:,18:])
 
     df = df[17:df.shape[0]-2]
 
