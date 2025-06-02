@@ -1,19 +1,68 @@
 import pandas as pd
 from datetime import date
 import re
+import numpy as np
+
+def padronizar_medida_plasma(s):
+    padroes = [1200, 1500, 2550]
+    tolerancia = 100
+
+    try:
+        comprimento_str, largura_str = s.replace("mm", "").split("x")
+        comprimento = comprimento_str.strip()#.replace(",", ".")
+        largura = float(largura_str.strip().replace(",", "."))
+    except Exception as e:
+        print("Formato inválido:", e)
+        return s
+    
+    # Verifica se a largura está dentro de ±100mm de algum padrão
+    largura_padrao = largura
+    for p in padroes:
+        if abs(largura - p) <= tolerancia:
+            largura_padrao = p
+            break
+
+    # Monta a string final (mantendo a ordem comprimento x largura)
+    largura_str_ajustada = f"{largura_padrao:.2f}".replace(".", ",")
+    resultado = f"{comprimento} x {largura_str_ajustada} mm"
+    return resultado
+
+def padronizar_medida_laser_2(s):
+    padroes = [1200, 1500, 2550]
+    tolerancia = 100
+
+    try:
+        largura_str, comprimento_str = s.replace("mm", "").split("×")
+        comprimento = comprimento_str.strip()#.replace(",", ".")
+        largura = float(largura_str.strip().replace(",", "."))
+    except Exception as e:
+        print("Formato inválido:", e)
+        return s
+    
+    # Verifica se a largura está dentro de ±100mm de algum padrão
+    largura_padrao = largura
+    for p in padroes:
+        if abs(largura - p) <= tolerancia:
+            largura_padrao = p
+            break
+
+    # Monta a string final (mantendo a ordem comprimento x largura)
+    largura_str_ajustada = f"{largura_padrao:.2f}".replace(".", ",")
+    resultado = f"{comprimento} x {largura_str_ajustada} mm"
+    return resultado
 
 def tratamento_planilha_plasma(df):
 
     df = df.dropna(how='all')
 
-    tamanho_chapa = df[df.columns[16:17]][9:10].replace('×', 'x')
+    tamanho_chapa = df[df.columns[24:25]][9:10].values.tolist()[0][0].replace('×', 'x')
     qt_chapa = df[df.columns[2:3]][9:10]
 
-    nome_coluna_1 = df[df.columns[0]].name
-    aproveitamento_df = df['Unnamed: 16'][4:5]
-    
-    print(df.iloc[:,18:])
+    tamanho_chapa = padronizar_medida_plasma(tamanho_chapa)
 
+    nome_coluna_1 = df[df.columns[0]].name
+    aproveitamento_df = df['Unnamed: 22'][4:5]
+    
     df = df[17:df.shape[0]-2]
 
     df = df[[nome_coluna_1, 'Unnamed: 19', 'Unnamed: 20',
@@ -33,7 +82,7 @@ def tratamento_planilha_plasma(df):
 
     # tamanho da chapa
 
-    tamanho_chapa_list = tamanho_chapa.values.tolist()
+    # tamanho_chapa_list = tamanho_chapa.values.tolist()
 
     # aproveitamento
 
@@ -65,7 +114,7 @@ def tratamento_planilha_plasma(df):
     df['Unnamed: 19'] = df['Unnamed: 19'].astype(int)
     df['espessura'] = espessura
     df['aproveitamento'] = aproveitamento_list[0]
-    df['tamanho da chapa'] = tamanho_chapa_list[0][0]
+    df['tamanho da chapa'] = tamanho_chapa
     df['qt. chapas'] = int(qt_chapa_list[0][0])
     df['op'] = 1
 
@@ -94,8 +143,8 @@ def tratamento_planilha_plasma(df):
     })
 
     propriedades = [{
-        'descricao_mp':espessura + " - " +tamanho_chapa_list[0][0],
-        'tamanho':tamanho_chapa_list[0][0],
+        'descricao_mp':espessura + " - " +tamanho_chapa,
+        'tamanho':tamanho_chapa,
         'espessura':espessura,
         'quantidade':qt_chapa_list[0][0],
         'aproveitamento':aproveitamento_list[0],
@@ -103,12 +152,18 @@ def tratamento_planilha_plasma(df):
 
     return df, propriedades
 
-def tratamento_planilha_laser2(df,df2):
+def tratamento_planilha_laser2(df,df2,df3):
 
     tamanho_chapa = df['Unnamed: 2'][6].replace(".",",").replace("*","×") + " mm"
     qt_chapa = df['Unnamed: 3'][6:len(df)-1].sum()
     aproveitamento_df = df['Unnamed: 5'][6:len(df)-1].mean()
     espessura_df = str(df['Unnamed: 2'][2]).replace(".",",") + " mm"
+
+    # Encontrar a linha que contém "SlabSize(mm*mm):"
+    index_tamanho_chapa_real = np.where(df3 == 'SlabSize(mm*mm):')[0][0]
+    tamanho_chapa_real = df3['Unnamed: 4'][index_tamanho_chapa_real + 1]
+    tamanho_chapa_real = tamanho_chapa_real.replace(".",",").replace("*","×") + " mm"
+    tamanho_chapa_real = padronizar_medida_laser_2(tamanho_chapa_real)
 
     df2.columns = df2.iloc[0]
     df2 = df2[1:].reset_index(drop=True)
@@ -130,7 +185,7 @@ def tratamento_planilha_laser2(df,df2):
     # adiciona as colunas extras
     df2['espessura'] = espessura_df
     df2['aproveitamento'] = aproveitamento_df
-    df2['tamanho da chapa'] = tamanho_chapa
+    df2['tamanho da chapa'] = tamanho_chapa_real
     df2['qt. chapas'] = qt_chapa
     df2['Peso'] = ''
     df2['Tempo'] = ''
@@ -147,8 +202,8 @@ def tratamento_planilha_laser2(df,df2):
     df2['opp'] = 'opp'
 
     propriedades = [{
-        'descricao_mp':espessura_df + " - " + tamanho_chapa,
-        'tamanho':tamanho_chapa,
+        'descricao_mp':espessura_df + " - " + tamanho_chapa_real,
+        'tamanho':tamanho_chapa_real,
         'espessura':espessura_df,
         'quantidade':qt_chapa,
         'aproveitamento':aproveitamento_df,

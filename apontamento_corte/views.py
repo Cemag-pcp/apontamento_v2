@@ -940,15 +940,17 @@ class ProcessarArquivoView(View):
                 try:
                     # Tenta carregar a aba em inglês
                     ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='AllPartsList')
+                    ordem_producao_excel_3 = pd.read_excel(uploaded_file, sheet_name='Cost List')
                 except ValueError:
                     try:
                         # Se não achar, tenta a aba em português
                         ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='Lista de Todas as Peças')
+                        ordem_producao_excel_3 = pd.read_excel(uploaded_file, sheet_name='Lista de custos')
                     except ValueError:
                         # Se nenhuma das duas existir, levanta erro claro
                         raise ValueError("Nenhuma das abas 'AllPartsList' ou 'Lista de Todas as Peças' foi encontrada na planilha.")
                 
-                excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2)
+                excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2,ordem_producao_excel_3)
             # elif tipo_maquina=='laser_1':
 
             #     comprimento = request.POST.get('comprimento')
@@ -1038,15 +1040,17 @@ class SalvarArquivoView(View):
             try:
                 # Tenta carregar a aba em inglês
                 ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='AllPartsList')
+                ordem_producao_excel_3 = pd.read_excel(uploaded_file, sheet_name='Cost List')
             except ValueError:
                 try:
                     # Se não achar, tenta a aba em português
                     ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='Lista de Todas as Peças')
+                    ordem_producao_excel_3 = pd.read_excel(uploaded_file, sheet_name='Lista de custos')
                 except ValueError:
                     # Se nenhuma das duas existir, levanta erro claro
                     raise ValueError("Nenhuma das abas 'AllPartsList' ou 'Lista de Todas as Peças' foi encontrada na planilha.")
 
-            excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2)
+            excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2,ordem_producao_excel_3)
         elif tipo_maquina_object.nome=='Laser 1':
 
             comprimento = request.POST.get('comprimento')
