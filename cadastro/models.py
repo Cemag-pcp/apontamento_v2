@@ -69,6 +69,9 @@ class Mp(models.Model):
     descricao = models.CharField(max_length=255)
     setor = models.ForeignKey(Setor, on_delete=models.CASCADE, related_name='setor')
 
+    def __str__(self):
+        return f'{self.codigo} - {self.descricao}'
+
 class Espessura(models.Model):
 
     nome=models.CharField(max_length=10, unique=True)
