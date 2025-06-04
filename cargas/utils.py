@@ -7,6 +7,7 @@ from openpyxl import Workbook, load_workbook
 from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from dotenv import load_dotenv
+from datetime import datetime, date
 
 from django.db.models import Max
 from django.utils.timezone import now
@@ -171,33 +172,50 @@ def criar_array_datas(data_inicial, data_final):
     
     return array_datas
 
-def gerar_arquivos(data_inicial='2025-05-31', data_final='2025-05-31', setor='pintura'):
+def gerar_arquivos(data_inicial, data_final, setor):
     filenames = []
+
     resultado = criar_array_datas(data_inicial, data_final)
     base_carretas_original, base_carga_original = get_data_from_sheets()
 
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
+    resultado = pd.to_datetime(resultado, dayfirst=True, errors='coerce')
+
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(
+        lambda x: "0" + str(x) if len(str(x)) == 5 else str(x)
+    )
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(
+        lambda x: "0" + str(x) if len(str(x)) == 5 else str(x)
+    )
     
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AM', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AN', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VJ', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('LC', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VM', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AV', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('CO', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AM', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AN', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VJ', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('LC', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VM', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AV', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('CO', '')
 
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
-
+    # Ajusta colunas
     base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
+
+    # Converte para datetime
     base_carga_original['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
-        base_carga_original['PED_PREVISAOEMISSAODOC'], format='%d/%m/%Y', errors='coerce')
-    base_carga_original['Ano'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.strftime('%Y')
-    base_carga_original['PED_PREVISAOEMISSAODOC'] = base_carga_original.PED_PREVISAOEMISSAODOC.dt.strftime(
-        '%d/%m/%Y')
-    base_carga_original = base_carga_original.rename(columns={'PED_PREVISAOEMISSAODOC': 'Datas',
-                                            'PED_RECURSO.CODIGO': 'Recurso',
-                                            'PED_QUANTIDADE': 'Qtde'})
+        base_carga_original['PED_PREVISAOEMISSAODOC'], format='%d/%m/%Y', dayfirst=True, errors='coerce'
+    )
+
+    # Pega apenas o ano ANTES de formatar para string
+    base_carga_original['Ano'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.year.astype(str)
+
+    # Formata final para o formato desejado
+    # base_carga_original['PED_PREVISAOEMISSAODOC'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.strftime('%d/%m/%Y')
+
+    # Renomeia
+    base_carga_original = base_carga_original.rename(columns={
+        'PED_PREVISAOEMISSAODOC': 'Datas',
+        'PED_RECURSO.CODIGO': 'Recurso',
+        'PED_QUANTIDADE': 'Qtde'
+    })
+
     base_carga_original.dropna(inplace=True)
     base_carga_original.reset_index(drop=True)
 
@@ -205,7 +223,7 @@ def gerar_arquivos(data_inicial='2025-05-31', data_final='2025-05-31', setor='pi
     # base_carretas_original[base_carretas_original['Recurso'] == 'CHASSI F6 CS M17']
 
     for idx, data_escolhida in enumerate(resultado):
-        data_nome_planilha = data_escolhida.replace("/","-")[:5]
+        data_nome_planilha = str(data_escolhida.date()).replace("/","-")
         base_carretas = base_carretas_original.copy()
         base_carga = base_carga_original.copy()
 
@@ -214,13 +232,13 @@ def gerar_arquivos(data_inicial='2025-05-31', data_final='2025-05-31', setor='pi
             base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
             base_carga['Recurso'] = base_carga['Recurso'].astype(str)
 
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
 
             base_carretas.drop(['Etapa', 'Etapa3', 'Etapa4'], axis=1, inplace=True)
 
@@ -290,7 +308,7 @@ def gerar_arquivos(data_inicial='2025-05-31', data_final='2025-05-31', setor='pi
 
             datas_unique = pd.DataFrame(base_carga['Datas'].unique())
 
-            escolha_data = (base_carga['Datas'] == data_escolhida)
+            escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
             filtro_data = base_carga.loc[escolha_data]
             # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
 
@@ -539,13 +557,13 @@ def gerar_arquivos(data_inicial='2025-05-31', data_final='2025-05-31', setor='pi
 
             #### criando código único#####
 
-            codigo_unico = data_escolhida[:2] + data_escolhida[3:5] + data_escolhida[6:10]
+            codigo_unico = str(data_escolhida.date())[:2] + str(data_escolhida.date())[3:5] + str(data_escolhida.date())[6:10]
 
             #### filtrando data da carga#####
 
             datas_unique = pd.DataFrame(base_carga['Datas'].unique())
 
-            escolha_data = (base_carga['Datas'] == data_escolhida)
+            escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
             filtro_data = base_carga.loc[escolha_data]
             filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
 
@@ -631,7 +649,7 @@ def gerar_arquivos(data_inicial='2025-05-31', data_final='2025-05-31', setor='pi
             hoje1 = hoje.strftime('%d%m%Y')
 
             controle_seq = tab_completa
-            controle_seq["codigo"] = hoje1 + data_escolhida
+            controle_seq["codigo"] = hoje1 + data_escolhida.strftime('%d%m%Y')
 
             k = 9
 
@@ -743,25 +761,43 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
     resultado = criar_array_datas(data_inicial, data_final)
     base_carretas_original, base_carga_original = get_data_from_sheets()
 
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
+    resultado = pd.to_datetime(resultado, dayfirst=True, errors='coerce')
 
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(
+        lambda x: "0" + str(x) if len(str(x)) == 5 else str(x)
+    )
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(
+        lambda x: "0" + str(x) if len(str(x)) == 5 else str(x)
+    )
+
+    # Ajusta colunas
     base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
+
+    # Converte para datetime
     base_carga_original['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
-        base_carga_original['PED_PREVISAOEMISSAODOC'], format='%d/%m/%Y', errors='coerce')
-    base_carga_original['Ano'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.strftime('%Y')
-    base_carga_original['PED_PREVISAOEMISSAODOC'] = base_carga_original.PED_PREVISAOEMISSAODOC.dt.strftime(
-        '%d/%m/%Y')
-    base_carga_original = base_carga_original.rename(columns={'PED_PREVISAOEMISSAODOC': 'Datas',
-                                            'PED_RECURSO.CODIGO': 'Recurso',
-                                            'PED_QUANTIDADE': 'Qtde'})
+        base_carga_original['PED_PREVISAOEMISSAODOC'], format='%d/%m/%Y', dayfirst=True, errors='coerce'
+    )
+
+    # Pega apenas o ano ANTES de formatar para string
+    base_carga_original['Ano'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.year.astype(str)
+
+    # Formata final para o formato desejado
+    # base_carga_original['PED_PREVISAOEMISSAODOC'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.strftime('%d/%m/%Y')
+
+    # Renomeia
+    base_carga_original = base_carga_original.rename(columns={
+        'PED_PREVISAOEMISSAODOC': 'Datas',
+        'PED_RECURSO.CODIGO': 'Recurso',
+        'PED_QUANTIDADE': 'Qtde'
+    })
+
     base_carga_original.dropna(inplace=True)
     base_carga_original.reset_index(drop=True)
 
     tab_resultado = pd.DataFrame() 
 
     for idx, data_escolhida in enumerate(resultado):
-        data_nome_planilha = data_escolhida.replace("/","-")[:5]
+        # data_nome_planilha = data_escolhida.replace("/","-")[:5]
         base_carretas = base_carretas_original.copy()
         base_carga = base_carga_original.copy()
 
@@ -771,13 +807,13 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
 
             base_carga['Recurso'] = base_carga['Recurso'].astype(str)
 
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
+            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
 
             base_carretas.drop(['Etapa', 'Etapa3', 'Etapa4'], axis=1, inplace=True)
 
@@ -830,24 +866,19 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             base_carga = pd.merge(base_carga, df_cores, on=[
                                 'Recurso_cor'], how='left')
 
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace(
-                'AN', '')  # Azul
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace(
-                'VJ', '')  # Verde
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace(
-                'LC', '')  # Laranja
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace(
-                'VM', '')  # Vermelho
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace(
-                'AV', '')  # Amarelo
-            # base_carga['Recurso'] = base_carga['Recurso'].str.replace(
-            #     'AS', '')  # Amarelo
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
 
             base_carga['Recurso'] = base_carga['Recurso'].str.strip()
 
             datas_unique = pd.DataFrame(base_carga['Datas'].unique())
 
-            escolha_data = (base_carga['Datas'] == data_escolhida)
+            escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
             filtro_data = base_carga.loc[escolha_data]
             # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
 
@@ -991,15 +1022,15 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
 
             #### criando código único#####
 
-            codigo_unico = data_escolhida[:2] + data_escolhida[3:5] + data_escolhida[6:10]
+            # codigo_unico = data_escolhida[:2] + data_escolhida[3:5] + data_escolhida[6:10]
 
             #### filtrando data da carga#####
 
-            datas_unique = pd.DataFrame(base_carga['Datas'].unique())
+            # datas_unique = pd.DataFrame(base_carga['Datas'].unique())
 
-            escolha_data = (base_carga['Datas'] == data_escolhida)
+            escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
             filtro_data = base_carga.loc[escolha_data]
-            filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
+            # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
 
             filtro_data = filtro_data.reset_index(drop=True)
             filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
@@ -1083,7 +1114,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             hoje1 = hoje.strftime('%d%m%Y')
 
             controle_seq = tab_completa
-            controle_seq["codigo"] = hoje1 + data_escolhida
+            controle_seq["codigo"] = hoje1 + data_escolhida.strftime('%d%m%Y')
 
             k = 9
 
@@ -1174,11 +1205,21 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
 
     # Coletar datas únicas e validar
     try:
-        datas_requisicao = {
-            datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
-            for o in ordens_data if o.get("data_carga")
-        }
-    except ValueError:
+        datas_requisicao = set()
+        for o in ordens_data:
+            data_carga = o.get("data_carga")
+            if data_carga:
+                if isinstance(data_carga, str):
+                    # Se for string, converte usando strptime
+                    data_obj = datetime.strptime(data_carga, "%Y-%m-%d").date()
+                elif isinstance(data_carga, (datetime, date)):
+                    # Se já for datetime ou date, converte para date (se necessário)
+                    data_obj = data_carga.date() if isinstance(data_carga, datetime) else data_carga
+                else:
+                    raise ValueError(f"Tipo inválido de data: {type(data_carga)}")
+                datas_requisicao.add(data_obj)
+    except Exception as e:
+        print(f"Erro ao processar datas: {e}")
         return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
 
     # Verifica datas já com carga
@@ -1186,6 +1227,7 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
         Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina=grupo_maquina)
         .values_list("data_carga", flat=True)
     )
+
     datas_bloqueadas = datas_existentes & datas_requisicao
     if not atualizacao_ordem and datas_bloqueadas:
         return {
@@ -1204,14 +1246,14 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
         }
 
     # Coletar datas únicas e validar
-    try:
-        # formato_data = "%Y-%m-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
-        datas_requisicao = {
-            datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
-            for o in ordens_data if o.get("data_carga")
-        }
-    except ValueError:
-        return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
+    # try:
+    #     # formato_data = "%Y-%m-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
+    #     datas_requisicao = {
+    #         datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
+    #         for o in ordens_data if o.get("data_carga")
+    #     }
+    # except ValueError:
+    #     return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
 
     # Criação em lote
     # Pega a última ordem atual no banco
@@ -1222,10 +1264,18 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
         ordens_metadata = []
 
         for i, o in enumerate(ordens_data):
-            try:
-                data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
-            except:
-                data_carga = datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
+            # try:
+            #     data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
+            # except:
+            # data_carga pode ser str, datetime ou date
+            if isinstance(data_carga, str):
+                data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
+            elif isinstance(data_carga, datetime):
+                data_carga = data_carga.date()
+            elif isinstance(data_carga, date):
+                data_carga = data_carga
+            else:
+                raise ValueError(f"Tipo inválido para data_carga: {type(data_carga)}")
 
             nova_ordem = Ordem(
                 grupo_maquina=grupo_maquina,
@@ -1274,7 +1324,7 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
             "ordens": [
                 {
                     "id": ordem.id,
-                    "data_carga": meta["data_carga"].strftime("%Y-%m-%d")
+                    "data_carga": meta["data_carga"]#.strftime("%Y-%m-%d")
                 } for ordem, meta in zip(ordens_objs, ordens_metadata)
             ]
         }
@@ -1288,7 +1338,7 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
     try:
         formato_data = "%Y-%d-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
         datas_requisicao = {
-            datetime.strptime(o["data_carga"], formato_data).date()
+            datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
             for o in ordens_data if o.get("data_carga")
         }
     except ValueError:
@@ -1317,7 +1367,7 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
         ordens_metadata = []
 
         for i, o in enumerate(ordens_data):
-            data_carga = datetime.strptime(o["data_carga"], formato_data).date()
+            data_carga = datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
             peca_nome = o["peca_nome"]
             cor = o["cor"]
 

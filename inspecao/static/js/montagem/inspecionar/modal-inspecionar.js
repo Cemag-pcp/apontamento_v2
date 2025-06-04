@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("id-inspecao-montagem").value = id;
             document.getElementById("data-finalizada-inspecao-montagem").value = data;
             document.getElementById("peca-inspecao-montagem").value = peca;
-            document.getElementById("qtd-inspecao-montagem").value = apontada;
+            document.getElementById("qtd-produzida-montagem").value = apontada;
 
             const modal = new bootstrap.Modal(document.getElementById("modal-inspecionar-montagem"));
             modal.show();
@@ -22,6 +22,51 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("conformidade-inspecao-montagem").addEventListener("input", function() {
         const qtdInspecao = parseFloat(document.getElementById("qtd-inspecao-montagem").value) || 0;
         const conformidade = parseFloat(this.value) || 0;
+        const naoConformidade = qtdInspecao - conformidade;
+        const containerInspecao = document.getElementById("containerInspecao");
+        const addRemoveContainer = document.getElementById("addRemoveContainer");
+    
+        
+        document.getElementById("nao-conformidade-inspecao-montagem").value = naoConformidade;
+        
+        if (naoConformidade <= 0) {
+            containerInspecao.style.display = "none";
+            addRemoveContainer.style.display = "none";
+    
+            // Remove o atributo 'required' de todos os inputs (exceto file) e selects dentro do containerInspecao
+            const inputs = containerInspecao.querySelectorAll('input');
+            const selects = containerInspecao.querySelectorAll('select');
+
+            inputs.forEach(input => {
+                if (input.type !== 'file') { // Ignora inputs do tipo file
+                    input.removeAttribute('required');
+                }
+                input.value = "";
+            });
+            selects.forEach(select => {
+                select.value = "";
+                select.removeAttribute('required');
+            });
+        } else {
+            containerInspecao.style.display = "block";
+            addRemoveContainer.style.display = "flex";
+    
+            // Adiciona o atributo 'required' de volta a todos os inputs (exceto file) e selects dentro do containerInspecao
+            const inputs = containerInspecao.querySelectorAll('input');
+            const selects = containerInspecao.querySelectorAll('select');
+    
+            inputs.forEach(input => {
+                if (input.type !== 'file') { // Ignora inputs do tipo file
+                    input.setAttribute('required', 'required');
+                }
+            });
+            selects.forEach(select => select.setAttribute('required', 'required'));
+        }
+    });
+
+    document.getElementById("qtd-inspecao-montagem").addEventListener("input", function() {
+        const qtdInspecao = parseFloat(this.value) || 0;
+        const conformidade = parseFloat(document.getElementById("conformidade-inspecao-montagem").value) || 0;
         const naoConformidade = qtdInspecao - conformidade;
         const containerInspecao = document.getElementById("containerInspecao");
         const addRemoveContainer = document.getElementById("addRemoveContainer");

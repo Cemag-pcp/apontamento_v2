@@ -3360,20 +3360,20 @@ def causas_nao_conformidade_mensal(request):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
     queryset = CausasNaoConformidade.objects.filter(
-        dados_execucao__data_execucao__isnull=False,
+        dados_execucao__inspecao__data_inspecao__isnull=False,
         dados_execucao__inspecao__pecas_ordem_pintura__isnull=False  # garante que é pintura
     ).prefetch_related('causa')
 
     if data_inicio:
-        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
+        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__gte=data_inicio)
     if data_fim:
-        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__lte=data_fim)
 
     # Estrutura para agrupar manualmente por mês e causa
     resultado_temp = {}
     for item in queryset:
-        ano = item.dados_execucao.data_execucao.year
-        mes = item.dados_execucao.data_execucao.month
+        ano = item.dados_execucao.inspecao.data_inspecao.year
+        mes = item.dados_execucao.inspecao.data_inspecao.month
         mes_formatado = f"{ano}-{mes}"
 
         for causa in item.causa.all():
@@ -3418,7 +3418,7 @@ def imagens_nao_conformidade_pintura(request):
 
     resultado = []
     for item in queryset:
-        date = item.dados_execucao.data_execucao - timedelta(hours=3)
+        date = item.dados_execucao.inspecao.data_inspecao - timedelta(hours=3)
         data_execucao = date.strftime('%Y-%m-%d %H:%M:%S')
         causas = [c.nome for c in item.causa.all()]
         arquivos = [arquivo.arquivo.url for arquivo in item.arquivos.all() if arquivo.arquivo]
@@ -3446,14 +3446,14 @@ def causas_nao_conformidade_por_tipo(request):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
     queryset = CausasNaoConformidade.objects.filter(
-        dados_execucao__data_execucao__isnull=False,
+        dados_execucao__inspecao__data_inspecao__isnull=False,
         dados_execucao__inspecao__pecas_ordem_pintura__isnull=False  # filtra apenas pintura
     ).prefetch_related('causa', 'dados_execucao__inspecao__pecas_ordem_pintura')
 
     if data_inicio:
-        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
+        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__gte=data_inicio)
     if data_fim:
-        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__lte=data_fim)
 
     # Acumula resultados agrupados
     agrupado = defaultdict(int)
@@ -3466,8 +3466,8 @@ def causas_nao_conformidade_por_tipo(request):
         if not peca or not peca.tipo:
             continue
 
-        mes = execucao.data_execucao.month
-        ano = execucao.data_execucao.year
+        mes = execucao.inspecao.data_inspecao.month
+        ano = execucao.inspecao.data_inspecao.year
         mes_formatado = f"{ano}-{mes}"
         tipo_tinta = peca.tipo.upper()
 
@@ -3551,7 +3551,7 @@ def indicador_montagem_analise_temporal(request):
                 F('conformidade') + F('nao_conformidade'),
                 output_field=FloatField()
             )
-        ),
+        ) / 2.5,
         soma_conformidade=Sum('conformidade'),
         soma_nao_conformidade=Sum('nao_conformidade'),
     ).order_by('mes')
@@ -3564,8 +3564,8 @@ def indicador_montagem_analise_temporal(request):
 
         resultado.append({
             'mes': item['mes'][:7],  # YYYY-MM
-            'qtd_peca_produzida': item['qtd_peca_produzida'] or 0,
-            'qtd_peca_inspecionada': item['qtd_peca_inspecionada'] or 0,
+            'qtd_peca_produzida': int(item['qtd_peca_produzida']) or 0,
+            'qtd_peca_inspecionada': int(item['qtd_peca_inspecionada']) or 0,
             'taxa_nao_conformidade': round(taxa_nc, 4),
         })
 
@@ -3606,7 +3606,7 @@ def indicador_montagem_resumo_analise_temporal(request):
         )
     ).values('ano', 'mes_num').annotate(
         total_produzida=Sum('qtd_boa'),
-        total_inspecionada=Sum('qtd_inspecionada'),
+        total_inspecionada=Sum('qtd_inspecionada') / 2.5,
         total_nao_conforme=Sum('nao_conformidade'),
     ).order_by('ano', 'mes_num')
 
@@ -3644,20 +3644,20 @@ def causas_nao_conformidade_mensal_montagem(request):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
     queryset = CausasNaoConformidade.objects.filter(
-        dados_execucao__data_execucao__isnull=False,
+        dados_execucao__inspecao__data_inspecao__isnull=False,
         dados_execucao__inspecao__pecas_ordem_montagem__isnull=False
     ).prefetch_related('causa')
 
     if data_inicio:
-        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
+        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__gte=data_inicio)
     if data_fim:
-        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__lte=data_fim)
 
     # Estrutura para agrupar manualmente por mês e causa
     resultado_temp = {}
     for item in queryset:
-        ano = item.dados_execucao.data_execucao.year
-        mes = item.dados_execucao.data_execucao.month
+        ano = item.dados_execucao.inspecao.data_inspecao.year
+        mes = item.dados_execucao.inspecao.data_inspecao.month
         mes_formatado = f"{ano}-{mes}"
 
         for causa in item.causa.all():
@@ -3830,7 +3830,10 @@ def indicador_estamparia_resumo_analise_temporal(request):
     ).values('ano', 'mes_num').annotate(
         total_produzida=Count('id'),
         total_inspecionada=Count('dadosexecucaoinspecao__id'),
-        total_nao_conforme=Sum('nao_conformidade'),
+        total_nao_conforme=Count(
+            'dadosexecucaoinspecao__id',
+            filter=Q(nao_conformidade__gt=0)
+        ),
     ).order_by('ano', 'mes_num')
 
     # Monta JSON
@@ -3867,23 +3870,23 @@ def causas_nao_conformidade_mensal_estamparia(request):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
     queryset = DadosNaoConformidade.objects.filter(
-        informacoes_adicionais_estamparia__dados_exec_inspecao__data_execucao__isnull=False,
+        informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao__isnull=False,
         informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__isnull=False,
         causas__isnull=False  # Filtra registros sem causa antes da agregação
     )
     
     if data_inicio:
-        queryset = queryset.filter(informacoes_adicionais_estamparia__dados_exec_inspecao__data_execucao__gte=data_inicio)
+        queryset = queryset.filter(informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao__gte=data_inicio)
     if data_fim:
-        queryset = queryset.filter(informacoes_adicionais_estamparia__dados_exec_inspecao__data_execucao__lte=data_fim)
+        queryset = queryset.filter(informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao__lte=data_fim)
     
     resultados = queryset.annotate(
-        ano=ExtractYear('informacoes_adicionais_estamparia__dados_exec_inspecao__data_execucao'),
-        mes=ExtractMonth('informacoes_adicionais_estamparia__dados_exec_inspecao__data_execucao'),
+        ano=ExtractYear('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao'),
+        mes=ExtractMonth('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao'),
         mes_formatado=Concat(
-            ExtractYear('informacoes_adicionais_estamparia__dados_exec_inspecao__data_execucao'),
+            ExtractYear('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao'),
             Value('-'),
-            ExtractMonth('informacoes_adicionais_estamparia__dados_exec_inspecao__data_execucao'),
+            ExtractMonth('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao'),
             output_field=CharField()
         )
     ).values('mes_formatado', 'causas__nome').annotate(
