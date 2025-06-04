@@ -26,17 +26,24 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col-sm-4 mb-4">
-                    <label class="label-modal">Quantidade Inspecionada:</label>
-                    <input id="qtd-inspecao-montagem" type="number" name="qtd-inspecao-montagem" value=""
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Quantidade Produzida:</label>
+                    <input id="qtd-produzida-montagem" type="number" name="qtd-produzida-montagem" value=""
                         class="form-control" disabled>
                 </div>
-                <div class="col-sm-4 mb-4">
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Quantidade Inspecionada:</label>
+                    <input id="qtd-inspecao-montagem" type="number" name="qtd-inspecao-montagem" value="1"
+                        class="form-control" min="1">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6 mb-4">
                     <label class="label-modal">N° total de conformidades:</label>
                     <input type="number" id="conformidade-inspecao-montagem" min="0" name="conformidade-inspecao-montagem" value=""
                         class="form-control" required>
                 </div>
-                <div class="col-sm-4 mb-4">
+                <div class="col-sm-6 mb-4">
                     <label class="label-modal">N° total de não conformidades:</label>
                     <input type="number" id="nao-conformidade-inspecao-montagem" name="nao-conformidade-inspecao-montagem" value=""
                         class="form-control" disabled>
