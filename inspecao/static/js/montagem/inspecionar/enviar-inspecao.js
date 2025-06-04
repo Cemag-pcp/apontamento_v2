@@ -12,6 +12,8 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
 
     // Adicionar os dados básicos ao FormData
     const naoConformidade = document.getElementById("nao-conformidade-inspecao-montagem").value;
+    const qtdProduzida = document.getElementById("qtd-produzida-montagem").value;
+    const qtdInspecionada = document.getElementById("qtd-inspecao-montagem").value;
     formData.append("nao-conformidade-inspecao-montagem", naoConformidade);
 
     let totalQuantidadeInput = 0;
@@ -39,6 +41,17 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
     });
 
     const naoConformidadeNum = parseFloat(naoConformidade);
+
+    if (parseFloat(qtdInspecionada) > parseFloat(qtdProduzida)) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Quantidade Inspecionada não pode ser maior que a quantidade Produzida',
+        });
+
+        buttonInspecionarMontagem.disabled = false;
+        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+        return;
+    }
 
     if (naoConformidadeNum !== 0) {
         const erroMensagem = naoConformidadeNum > 0 && totalQuantidadeInput !== naoConformidadeNum
