@@ -9,7 +9,6 @@ class RotaAccessMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Obtém o caminho da requisição, removendo "/" inicial e final
         #  Se a URL contém "api/", libera automaticamente
         if "/api/" in request.path or request.path.startswith("api/"):
             return self.get_response(request)
@@ -47,6 +46,8 @@ class RotaAccessMiddleware:
 
         # Se a rota **não existir no banco**, bloqueia o acesso
         if not rota:
+            if path == "":
+                return redirect("core:home")
             return render(request, 'home/erro-acesso.html', status=403)
 
         # Se a rota for do tipo API, sempre permite o acesso (apenas por segurança extra)
