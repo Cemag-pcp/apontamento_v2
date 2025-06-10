@@ -8,7 +8,7 @@ from django.db.models import (
 from django.db import transaction
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models.functions import Concat, Cast, TruncMonth, ExtractYear, ExtractMonth
+from django.db.models.functions import Concat, Cast, TruncMonth, ExtractYear, ExtractMonth, TruncDate
 
 from cadastro.models import PecasEstanqueidade
 from apontamento_montagem.models import ConjuntosInspecionados
@@ -3348,9 +3348,10 @@ def indicador_pintura_resumo_analise_temporal(request):
     return JsonResponse(resultado, safe=False)
 
 def causas_nao_conformidade_mensal(request):
+    # Obtém parâmetros de data da requisição
     data_inicio = request.GET.get('data_inicio')
     data_fim = request.GET.get('data_fim')
-
+    
     try:
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
@@ -3359,40 +3360,45 @@ def causas_nao_conformidade_mensal(request):
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
+    # Filtra os dados para o setor de pintura
     queryset = CausasNaoConformidade.objects.filter(
-        dados_execucao__inspecao__data_inspecao__isnull=False,
-        dados_execucao__inspecao__pecas_ordem_pintura__isnull=False  # garante que é pintura
+        dados_execucao__inspecao__pecas_ordem_pintura__isnull=False,
+        causa__setor='pintura'
+    ).select_related(
+        'dados_execucao',
+        'dados_execucao__inspecao',
+        'dados_execucao__inspecao__pecas_ordem_pintura'
     ).prefetch_related('causa')
 
+    # Aplica filtros de data se fornecidos
     if data_inicio:
         queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__gte=data_inicio)
     if data_fim:
         queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__lte=data_fim)
 
-    # Estrutura para agrupar manualmente por mês e causa
-    resultado_temp = {}
-    for item in queryset:
-        ano = item.dados_execucao.inspecao.data_inspecao.year
-        mes = item.dados_execucao.inspecao.data_inspecao.month
-        mes_formatado = f"{ano}-{mes}"
+    # Agrupa por mês/ano, peça e causa, somando as quantidades
+    resultados = queryset.annotate(
+        data_mes=TruncMonth('dados_execucao__inspecao__data_inspecao')  # Agrupa por mês/ano
+    ).values(
+        'data_mes',
+        'dados_execucao__inspecao__pecas_ordem_pintura__peca',
+        'causa__nome'
+    ).annotate(
+        quantidade_total=Sum('quantidade')
+    ).order_by('data_mes')
 
-        for causa in item.causa.all():
-            chave = (mes_formatado, causa.nome)
-            if chave not in resultado_temp:
-                resultado_temp[chave] = 0
-            resultado_temp[chave] += item.quantidade
+    # Formata os resultados para JSON
+    dados_formatados = []
+    for item in resultados:
+        dados_formatados.append({
+            'data_execucao': item['data_mes'].strftime('%Y-%m') if item['data_mes'] else None,
+            'peca': item['dados_execucao__inspecao__pecas_ordem_pintura__peca'],
+            'nome_causa': item['causa__nome'],
+            'quantidade': item['quantidade_total'],
+            'setor': 'pintura'
+        })
 
-    # Formata para JSON
-    resultado = [
-        {
-            "Data": chave[0],
-            "Causa": chave[1],
-            "Soma do N° Total de não conformidades": total
-        }
-        for chave, total in sorted(resultado_temp.items())
-    ]
-
-    return JsonResponse(resultado, safe=False)
+    return JsonResponse(dados_formatados, safe=False)
 
 def imagens_nao_conformidade_pintura(request):
     data_inicio = request.GET.get('data_inicio')
@@ -3447,15 +3453,17 @@ def causas_nao_conformidade_por_tipo(request):
 
     queryset = CausasNaoConformidade.objects.filter(
         dados_execucao__inspecao__data_inspecao__isnull=False,
-        dados_execucao__inspecao__pecas_ordem_pintura__isnull=False  # filtra apenas pintura
-    ).prefetch_related('causa', 'dados_execucao__inspecao__pecas_ordem_pintura')
+        dados_execucao__inspecao__pecas_ordem_pintura__isnull=False
+    ).select_related(
+        'dados_execucao__inspecao__pecas_ordem_pintura'
+    ).prefetch_related('causa')
 
     if data_inicio:
         queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__gte=data_inicio)
     if data_fim:
         queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__lte=data_fim)
 
-    # Acumula resultados agrupados
+    # Agora a chave inclui também o nome da peça
     agrupado = defaultdict(int)
 
     for item in queryset:
@@ -3466,13 +3474,15 @@ def causas_nao_conformidade_por_tipo(request):
         if not peca or not peca.tipo:
             continue
 
-        mes = execucao.inspecao.data_inspecao.month
-        ano = execucao.inspecao.data_inspecao.year
-        mes_formatado = f"{ano}-{mes}"
+        mes = inspecao.data_inspecao.month
+        ano = inspecao.data_inspecao.year
+        mes_formatado = f"{ano}-{mes:02d}"
         tipo_tinta = peca.tipo.upper()
+        nome_peca = peca.peca
 
         for causa in item.causa.all():
-            chave = (mes_formatado, causa.nome, tipo_tinta)
+            # Chave agora inclui nome_peca para separar por peça
+            chave = (mes_formatado, causa.nome, tipo_tinta, nome_peca)
             agrupado[chave] += item.quantidade
 
     # Monta JSON de saída
@@ -3481,9 +3491,10 @@ def causas_nao_conformidade_por_tipo(request):
             "Data": data,
             "Causa": causa,
             "Tipo": tipo,
-            "N° Total de não conformidades": total
+            "Peça": peca,
+            "Quantidade": total
         }
-        for (data, causa, tipo), total in sorted(agrupado.items())
+        for (data, causa, tipo, peca), total in sorted(agrupado.items())
     ]
 
     return JsonResponse(resultado, safe=False)
@@ -3632,9 +3643,10 @@ def indicador_montagem_resumo_analise_temporal(request):
     return JsonResponse(resultado, safe=False)
 
 def causas_nao_conformidade_mensal_montagem(request):
+    # Obtém parâmetros de data da requisição
     data_inicio = request.GET.get('data_inicio')
     data_fim = request.GET.get('data_fim')
-
+    
     try:
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
@@ -3643,40 +3655,45 @@ def causas_nao_conformidade_mensal_montagem(request):
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
+    # Filtra os dados para o setor de montagem
     queryset = CausasNaoConformidade.objects.filter(
-        dados_execucao__inspecao__data_inspecao__isnull=False,
-        dados_execucao__inspecao__pecas_ordem_montagem__isnull=False
+        dados_execucao__inspecao__pecas_ordem_montagem__isnull=False,
+        causa__setor='montagem'  # Filtra apenas causas do setor de montagem
+    ).select_related(
+        'dados_execucao',
+        'dados_execucao__inspecao',
+        'dados_execucao__inspecao__pecas_ordem_montagem'
     ).prefetch_related('causa')
 
+    # Aplica filtros de data se fornecidos
     if data_inicio:
-        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__gte=data_inicio)
+        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
     if data_fim:
-        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__lte=data_fim)
+        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
 
-    # Estrutura para agrupar manualmente por mês e causa
-    resultado_temp = {}
-    for item in queryset:
-        ano = item.dados_execucao.inspecao.data_inspecao.year
-        mes = item.dados_execucao.inspecao.data_inspecao.month
-        mes_formatado = f"{ano}-{mes}"
+    # Agrupa por mês/ano, peça e causa, somando as quantidades
+    resultados = queryset.annotate(
+        data_mes=TruncMonth('dados_execucao__data_execucao')  # Agrupa por mês/ano
+    ).values(
+        'data_mes',
+        'dados_execucao__inspecao__pecas_ordem_montagem__peca',  # Campo da peça de montagem
+        'causa__nome'
+    ).annotate(
+        quantidade_total=Sum('quantidade')
+    ).order_by('data_mes')
 
-        for causa in item.causa.all():
-            chave = (mes_formatado, causa.nome)
-            if chave not in resultado_temp:
-                resultado_temp[chave] = 0
-            resultado_temp[chave] += item.quantidade
+    # Formata os resultados para JSON
+    dados_formatados = []
+    for item in resultados:
+        dados_formatados.append({
+            'data': item['data_mes'].strftime('%Y-%m') if item['data_mes'] else None,  # Formata como YYYY-MM
+            'peca': item['dados_execucao__inspecao__pecas_ordem_montagem__peca'],
+            'causa': item['causa__nome'],
+            'quantidade': item['quantidade_total'],
+            'setor': 'montagem'
+        })
 
-    # Formata para JSON
-    resultado = [
-        {
-            "Data": chave[0],
-            "Causa": chave[1],
-            "Soma do N° Total de não conformidades": total
-        }
-        for chave, total in sorted(resultado_temp.items())
-    ]
-
-    return JsonResponse(resultado, safe=False)
+    return JsonResponse(dados_formatados, safe=False)
 
 def imagens_nao_conformidade_montagem(request):
     data_inicio = request.GET.get('data_inicio')
@@ -3872,7 +3889,7 @@ def causas_nao_conformidade_mensal_estamparia(request):
     queryset = DadosNaoConformidade.objects.filter(
         informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao__isnull=False,
         informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__isnull=False,
-        causas__isnull=False  # Filtra registros sem causa antes da agregação
+        causas__isnull=False
     )
     
     if data_inicio:
@@ -3881,15 +3898,24 @@ def causas_nao_conformidade_mensal_estamparia(request):
         queryset = queryset.filter(informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao__lte=data_fim)
     
     resultados = queryset.annotate(
-        ano=ExtractYear('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao'),
-        mes=ExtractMonth('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao'),
         mes_formatado=Concat(
             ExtractYear('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao'),
             Value('-'),
             ExtractMonth('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao'),
             output_field=CharField()
+        ),
+        peca_info=Concat(
+            F('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__peca__codigo'),
+            Value(' - '),
+            F('informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__peca__descricao'),
+            output_field=CharField()
         )
-    ).values('mes_formatado', 'causas__nome').annotate(
+    ).values(
+        'mes_formatado', 
+        'causas__nome',
+        'destino',
+        'peca_info'  # Usando a anotação que criamos
+    ).annotate(
         total_nao_conformidades=Sum('qt_nao_conformidade')
     ).order_by('mes_formatado', 'causas__nome')
 
@@ -3898,6 +3924,8 @@ def causas_nao_conformidade_mensal_estamparia(request):
         {
             "Data": item['mes_formatado'],
             "Causa": item['causas__nome'],
+            "Destino": item['destino'],
+            "Peça": item['peca_info'],  # Formato "codigo - descricao"
             "Soma do N° Total de não conformidades": item['total_nao_conformidades']
         }
         for item in resultados
