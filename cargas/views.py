@@ -8,6 +8,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.views.decorators.http import require_POST
 
 from apontamento_pintura.models import PecasOrdem as POPintura
 from apontamento_montagem.models import PecasOrdem as POMontagem
@@ -647,4 +648,61 @@ def editar_planejamento(request):
     except Exception as e:
         return JsonResponse({"erro": f"Ocorreu um erro: {str(e)}"}, status=500)    
 
+@csrf_exempt
+@require_POST
+def excluir_ordens_dia_setor(request):
+    """
+    Exclui ordens de um dia e setor específicos via POST,
+    somente se não houver apontamentos associados.
     
+    Espera JSON no corpo da requisição com:
+    {
+        "data": "2025-06-03",
+        "setor": "montagem"  # ou "pintura"
+    }
+    """
+
+    try:
+        payload = json.loads(request.body)
+        data = payload.get('data')
+        setor = payload.get('setor')
+    except Exception:
+        return JsonResponse({"error": "Erro ao ler o corpo da requisição. Envie JSON válido."}, status=400)
+
+    if not data or not setor:
+        return JsonResponse({"error": "Campos 'data' e 'setor' são obrigatórios."}, status=400)
+
+    try:
+        data_formatada = datetime.strptime(data, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"error": "Formato de data inválido. Use 'yyyy-mm-dd'."}, status=400)
+
+    ordens_qs = Ordem.objects.filter(data_carga=data_formatada, grupo_maquina=setor)
+
+    if setor == 'montagem':
+        ordens_com_apontamentos = ordens_qs.annotate(
+            total_apontado=Sum('ordem_pecas_montagem__qtd_boa')
+        ).filter(total_apontado__gt=0)
+    elif setor == 'pintura':
+        ordens_com_apontamentos = ordens_qs.annotate(
+            total_apontado=Sum('ordem_pecas_pintura__qtd_boa')
+        ).filter(total_apontado__gt=0)
+    else:
+        return JsonResponse({"error": "Setor inválido. Use 'montagem' ou 'pintura'."}, status=400)
+
+    ordens_bloqueadas_ids = set(ordens_com_apontamentos.values_list('id', flat=True))
+
+    if ordens_bloqueadas_ids:
+        return JsonResponse({
+            "error": "Existe ordens ja apontadas, retire elas dessa data."
+        })   
+
+    ordens_para_excluir = ordens_qs.exclude(id__in=ordens_bloqueadas_ids)
+    total_excluidas = ordens_para_excluir.count()
+
+    ordens_para_excluir.delete()
+
+    return JsonResponse({
+        "message": f"{total_excluidas} ordens excluídas com sucesso.",
+        "ordens_bloqueadas": list(ordens_com_apontamentos.values("id", "data_carga", "grupo_maquina")),
+    })    

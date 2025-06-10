@@ -36,6 +36,83 @@ export function renderCallendar() {
             //     modalRemanejar.show();
             // };
 
+            document.getElementById("btnExcluirCarga").onclick = function () {
+                escolhaModal.hide();
+                let modalExcluirCarga = new bootstrap.Modal(document.getElementById("modalExcluirCarga"));
+                modalExcluirCarga.show();
+            };
+
+            document.getElementById("confirmarExclusao").onclick = function () {
+
+                let setor = document.getElementById('setor').value;
+                let dataAtual = document.getElementById('dataAtual').value;
+
+                const modalElement = document.getElementById("modalExcluirCarga");
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+
+                Swal.fire({
+                    title: 'Aguarde...',
+                    text: 'Excluindo planejamento...',
+                    allowOutsideClick: false,
+                    showConfirmButton: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                fetch(`api/excluir-planejamento/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        data: dataAtual,   // ex: "2025-06-03"
+                        setor: setor       // ex: "montagem"
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error("Erro ao excluir ordens");
+                    return response.json();
+                })
+                .then(data => {
+
+                    if (data.error) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro!',
+                            text: data.error,
+                            confirmButtonText: 'OK'
+                        });
+                    } else {
+                        
+                        renderCallendar();
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Planejamento excluido com sucesso!',
+                            // html: `
+                            //     <p><strong>${data.novas_ordens_criadas}</strong> novas ordens foram criadas com sucesso!</p>
+                            //     <p><strong>Ordens que precisam ser atualizadas manualmente:</strong></p>
+                            //     <p>${ordensTexto}</p>
+                            // `,
+                            confirmButtonText: 'OK'
+                        });
+                    }
+                })
+                .catch(error => {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: 'Não foi possível excluir o planejamento. Tente novamente.',
+                        confirmButtonText: 'OK'
+                    });
+                });
+
+            };
+
             document.getElementById("btnAtualizar").onclick = function () {
                 Swal.fire({
                     title: 'Aguarde...',
@@ -115,6 +192,8 @@ export function renderCallendar() {
 
     calendar.render();
 
+
+
     document.getElementById('confirmarRemanejamento').addEventListener('click', function () {
         let eventId = document.getElementById('eventId').value;
         let setor = document.getElementById('setor').value;
@@ -137,7 +216,6 @@ export function renderCallendar() {
 
         var modal = bootstrap.Modal.getInstance(document.getElementById('modalRemanejar'));
         modal.hide();
-
         
     });
 }

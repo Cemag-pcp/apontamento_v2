@@ -52,6 +52,30 @@
     </div>
 </div>
 
+<!-- Modal para excluir carga do dia -->
+<div class="modal fade" id="modalExcluirCarga" tabindex="-1" aria-labelledby="modalExcluirCargaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-exchange-alt"></i> Excluir Carga</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                
+                <h5>Atenção!! Ao excluir não será possível reverter. Caso tenha alguma ordem em processo, será excluída também.</h5>
+                
+                <input type="hidden" id="eventId"> <!-- ID do evento (opcional) -->
+                <input type="hidden" id="setor" readonly>
+                <input type="hidden" id="dataAtual" readonly>
+
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" id="confirmarExclusao"><i class="fas fa-check"></i> Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal para geração de relatório -->
 <div class="modal fade" id="modalGerarRelatorio" tabindex="-1" aria-labelledby="modalGerarRelatorioLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -159,6 +183,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <!-- <button type="button" class="btn btn-warning" id="btnRemanejar">Remanejar</button> -->
+                <button type="button" class="btn btn-warning" id="btnExcluirCarga">Excluir</button>
                 <button type="button" class="btn btn-success" id="btnAtualizar">Atualizar</button>
             </div>
         </div>

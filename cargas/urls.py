@@ -17,5 +17,6 @@ urlpatterns = [
     path('api/historico-planejamento-montagem/', views.historico_ordens_montagem, name="historico_ordens_montagem"),
     path('api/editar-planejamento/', views.editar_planejamento, name="editar_planejamento"),
     path('api/historico-planejamento-pintura/', views.historico_ordens_pintura, name="historico_ordens_pintura"),
+    path('api/excluir-planejamento/', views.excluir_ordens_dia_setor, name="excluir_ordens_dia_setor"),
 
 ]
