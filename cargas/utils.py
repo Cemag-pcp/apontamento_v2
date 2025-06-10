@@ -14,6 +14,7 @@ from django.utils.timezone import now
 from django.db import transaction
 from apontamento_montagem.models import PecasOrdem as POM
 from apontamento_pintura.models import PecasOrdem as POP
+from apontamento_solda.models import PecasOrdem as POS
 from core.models import Ordem
 from cadastro.models import Maquina
 from django.conf import settings
@@ -751,6 +752,238 @@ def gerar_arquivos(data_inicial, data_final, setor):
                     start_index = end_index
                     file_counter += 1
 
+        if setor == 'solda':
+
+            base_carretas['Código'] = base_carretas['Código'].astype(str)
+            base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
+
+            ####### retirando cores dos códigos######
+
+            base_carga['Recurso'] = base_carga['Recurso'].astype(str)
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
+
+            ###### retirando espaco em branco####
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.strip()
+
+            ##### excluindo colunas e linhas#####
+
+            base_carretas.drop(['Etapa2', 'Etapa', 'Etapa4',
+                            'Etapa5'], axis=1, inplace=True)
+
+            # & (base_carretas['Unit_Price'] < 600)].index, inplace=True)
+            base_carretas.drop(
+                base_carretas[(base_carretas['Etapa3'] == '')].index, inplace=True)
+            
+            base_carretas = base_carretas.reset_index(drop=True)
+            
+            for i in range(len(base_carretas)):
+                if len(base_carretas['Recurso'][i]) == 5:
+                    base_carretas['Recurso'][i] = "0" + base_carretas['Recurso'][i]
+
+            #### criando código único#####
+
+            codigo_unico = str(data_escolhida.date())[:2] + str(data_escolhida.date())[3:5] + str(data_escolhida.date())[6:10]
+
+            #### filtrando data da carga#####
+
+            datas_unique = pd.DataFrame(base_carga['Datas'].unique())
+
+            escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
+            filtro_data = base_carga.loc[escolha_data]
+            filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
+
+            filtro_data = filtro_data.reset_index(drop=True)
+            filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
+
+            for i in range(len(filtro_data)):
+                if filtro_data['Recurso'][i][0] == '0':
+                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+                if len(filtro_data['Recurso'][i]) == 5:
+                    filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
+            
+            ##### juntando planilhas de acordo com o recurso#######
+
+            tab_completa = pd.merge(filtro_data, base_carretas[[
+                                    'Recurso', 'Código', 'Peca', 'Qtde', 'Célula']], on=['Recurso'], how='left')
+            tab_completa = tab_completa.dropna(axis=0)
+
+            # base_carretas[base_carretas['Recurso'] == '034538M21']
+
+            # carretas_agrupadas = filtro_data[['Recurso','Qtde']]
+            # carretas_agrupadas = pd.DataFrame(filtro_data.groupby('Recurso').sum())
+            # carretas_agrupadas = carretas_agrupadas[['Qtde']]
+
+            # st.dataframe(carretas_agrupadas)
+
+            tab_completa['Código'] = tab_completa['Código'].astype(str)
+
+            tab_completa.reset_index(inplace=True, drop=True)
+
+            celulas_unique = pd.DataFrame(tab_completa['Célula'].unique())
+            celulas_unique = celulas_unique.dropna(axis=0)
+            celulas_unique.reset_index(inplace=True)
+
+            recurso_unique = pd.DataFrame(tab_completa['Recurso'].unique())
+            recurso_unique = recurso_unique.dropna(axis=0)
+
+            # criando coluna de quantidade total de itens
+
+            try:
+                tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(
+                    ',', '.')
+            except:
+                pass
+
+            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(float)
+            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
+
+            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(float)
+            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)
+
+            tab_completa['Qtde_total'] = tab_completa['Qtde_x'] * \
+                tab_completa['Qtde_y']
+
+            tab_completa = tab_completa.drop(
+                columns=['Recurso', 'Qtde_x', 'Qtde_y'])
+
+            tab_completa = tab_completa.groupby(
+                ['Código', 'Peca', 'Célula', 'Datas']).sum()
+
+            # tab_completa1 = tab_completa[['Código','Peca','Célula','Datas','Carga','Qtde_total']]
+
+            # tab_completa = tab_completa.groupby(
+            #     ['Código', 'Peca', 'Célula', 'Datas','Carga']).sum()
+
+            # tab_completa = tab_completa.drop_duplicates()
+
+            tab_completa.reset_index(inplace=True)
+
+            # tratando coluna de código e recurso
+
+            for d in range(0, tab_completa.shape[0]):
+
+                if len(tab_completa['Código'][d]) == 5:
+                    tab_completa['Código'][d] = '0' + tab_completa['Código'][d]
+
+            # criando coluna de código para arquivar
+
+            hoje = datetime.now()
+
+            ts = pd.Timestamp(hoje)
+
+            hoje1 = hoje.strftime('%d%m%Y')
+
+            controle_seq = tab_completa
+            controle_seq["codigo"] = hoje1 + data_escolhida.strftime('%d%m%Y')
+
+            k = 9
+
+            # if carga_escolhida != 'Selecione':
+            #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
+            
+            # print(tab_completa.columns)
+            # tab_completa = tab_completa.groupby(
+            #     ['Código', 'Peca', 'Célula', 'Datas', 'Carga', 'PED_CHCRIACAO', 'Ano', 'codigo']).sum()
+        
+            tab_completa = tab_completa.reset_index(drop=True)
+
+            # carga_unique = tab_completa['Carga'].unique()
+
+            # for carga in carga_unique:
+            file_counter = 1  # Contador de arquivos
+            rows_per_file = 21  # Número máximo de linhas por arquivo
+            k = 9  # Posição inicial no Excel
+
+            for i in range(0, len(celulas_unique)):
+                # Filtrar os dados para a célula atual
+                filtro_excel = (tab_completa['Célula'] == celulas_unique[0][i])
+                filtrar = tab_completa.loc[filtro_excel].reset_index(drop=True)
+
+                # Verificar se o DataFrame está vazio
+                if filtrar.empty:
+                    continue
+
+                # Índice inicial para controle de divisão em blocos
+                start_index = 0
+
+                arquivo_modelo = 'modelo_excel/modelo_op_solda.xlsx'
+
+                while start_index < len(filtrar):
+                    # Criar um novo Workbook para cada conjunto de 21 linhas
+                    # Tente encontrar o arquivo usando finders
+                    caminho_modelo = finders.find(arquivo_modelo)
+                    print(f"Caminho retornado pelo finder: {caminho_modelo}")
+                    
+                    # Se não encontrou, vamos verificar o caminho manualmente
+                    if not caminho_modelo:
+                        # Tente construir caminhos alternativos para localizar o arquivo
+                        caminhos_possiveis = [
+                            os.path.join(settings.BASE_DIR, 'cargas', 'static', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                            os.path.join(settings.STATIC_ROOT, 'modelo_excel', os.path.basename(arquivo_modelo)) if hasattr(settings, 'STATIC_ROOT') else None,
+                            os.path.join(settings.BASE_DIR, 'staticfiles', 'modelo_excel', os.path.basename(arquivo_modelo)),
+                        ]
+                        
+                        # Filtra para remover caminhos None
+                        caminhos_possiveis = [p for p in caminhos_possiveis if p]
+                        
+                        # Tente cada um dos caminhos possíveis
+                        for caminho in caminhos_possiveis:
+                            print(f"Verificando caminho: {caminho}")
+                            if os.path.exists(caminho):
+                                caminho_modelo = caminho
+                                print(f"Arquivo encontrado em: {caminho_modelo}")
+                                break
+                    
+                    # Se ainda não encontrou, levante erro personalizado
+                    if not caminho_modelo:
+                        raise FileNotFoundError(f"Arquivo {arquivo_modelo} não encontrado em nenhum caminho conhecido")
+                    
+                    # Carrega o workbook
+                    wb = load_workbook(caminho_modelo)
+                    ws = wb.active
+
+                    # Define o limite superior para as linhas deste arquivo
+                    end_index = min(start_index + rows_per_file, len(filtrar))
+                    k = 9  # Reseta a linha inicial para cada novo arquivo
+
+                    # Escreve os dados no Excel para as linhas entre start_index e end_index
+                    for j in range(start_index, end_index):
+                        ws['G5'] = celulas_unique[0][i]  # Nome da célula
+                        ws['AD5'] = hoje  # Data de hoje
+
+                        # Gerar código único baseado na célula
+                        if celulas_unique[0][i] == "EIXO COMPLETO":
+                            ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico + "C"
+                        elif celulas_unique[0][i] == "EIXO SIMPLES":
+                            ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico + "S"
+                        else:
+                            ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico
+
+                        # Preenchimento das células do Excel
+                        ws['M4'] = data_escolhida  # Data da carga
+                        ws['B' + str(k)] = filtrar['Código'][j]
+                        ws['G' + str(k)] = filtrar['Peca'][j]
+                        ws['AD' + str(k)] = filtrar['Qtde_total'][j]
+                        k += 1
+
+                    # Salvar o arquivo com numeração sequencial
+                    file_name = f"Solda {celulas_unique[0][i]} {data_nome_planilha} {file_counter}.xlsx"
+                    wb.template = False
+                    wb.save(file_name)
+                    filenames.append(file_name)
+
+                    # Incrementar o índice de início e o contador de arquivos
+                    start_index = end_index
+                    file_counter += 1
+
         tab_completa = pd.concat([tab_completa, tab_completa], ignore_index=True)
     
     return filenames
@@ -1194,6 +1427,216 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             # Chamar a função de inserção
             # insert_montagem(data_formatada, data_insert_sql, check_atualizar_base_carga)
 
+        if setor == 'solda':
+
+            base_carretas['Código'] = base_carretas['Código'].astype(str)
+            base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
+
+            ####### retirando cores dos códigos######
+
+            base_carga['Recurso'] = base_carga['Recurso'].astype(str)
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
+
+            ###### retirando espaco em branco####
+
+            base_carga['Recurso'] = base_carga['Recurso'].str.strip()
+
+            ##### excluindo colunas e linhas#####
+
+            base_carretas.drop(['Etapa2', 'Etapa', 'Etapa4',
+                            'Etapa5'], axis=1, inplace=True)
+
+            # & (base_carretas['Unit_Price'] < 600)].index, inplace=True)
+            base_carretas.drop(
+                base_carretas[(base_carretas['Etapa3'] == '')].index, inplace=True)
+            
+            base_carretas = base_carretas.reset_index(drop=True)
+            
+            for i in range(len(base_carretas)):
+                if len(base_carretas['Recurso'][i]) == 5:
+                    base_carretas['Recurso'][i] = "0" + base_carretas['Recurso'][i]
+
+            #### criando código único#####
+
+            # codigo_unico = data_escolhida[:2] + data_escolhida[3:5] + data_escolhida[6:10]
+
+            #### filtrando data da carga#####
+
+            # datas_unique = pd.DataFrame(base_carga['Datas'].unique())
+
+            escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
+            filtro_data = base_carga.loc[escolha_data]
+            # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
+
+            filtro_data = filtro_data.reset_index(drop=True)
+            filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
+
+            for i in range(len(filtro_data)):
+                if filtro_data['Recurso'][i][0] == '0':
+                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+                if len(filtro_data['Recurso'][i]) == 5:
+                    filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
+            
+            ##### juntando planilhas de acordo com o recurso#######
+
+            tab_completa = pd.merge(filtro_data, base_carretas[[
+                                    'Recurso', 'Código', 'Peca', 'Qtde', 'Célula']], on=['Recurso'], how='left')
+            tab_completa = tab_completa.dropna(axis=0)
+
+            # base_carretas[base_carretas['Recurso'] == '034538M21']
+
+            # carretas_agrupadas = filtro_data[['Recurso','Qtde']]
+            # carretas_agrupadas = pd.DataFrame(filtro_data.groupby('Recurso').sum())
+            # carretas_agrupadas = carretas_agrupadas[['Qtde']]
+
+            # st.dataframe(carretas_agrupadas)
+
+            tab_completa['Código'] = tab_completa['Código'].astype(str)
+
+            tab_completa.reset_index(inplace=True, drop=True)
+
+            celulas_unique = pd.DataFrame(tab_completa['Célula'].unique())
+            celulas_unique = celulas_unique.dropna(axis=0)
+            celulas_unique.reset_index(inplace=True)
+
+            recurso_unique = pd.DataFrame(tab_completa['Recurso'].unique())
+            recurso_unique = recurso_unique.dropna(axis=0)
+
+            # criando coluna de quantidade total de itens
+
+            try:
+                tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(
+                    ',', '.')
+            except:
+                pass
+
+            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(float)
+            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
+
+            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(float)
+            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)
+
+            tab_completa['Qtde_total'] = tab_completa['Qtde_x'] * \
+                tab_completa['Qtde_y']
+
+            tab_completa = tab_completa.drop(
+                columns=['Recurso', 'Qtde_x', 'Qtde_y'])
+
+            tab_completa = tab_completa.groupby(
+                ['Código', 'Peca', 'Célula', 'Datas']).sum()
+
+            # tab_completa1 = tab_completa[['Código','Peca','Célula','Datas','Carga','Qtde_total']]
+
+            # tab_completa = tab_completa.groupby(
+            #     ['Código', 'Peca', 'Célula', 'Datas','Carga']).sum()
+
+            # tab_completa = tab_completa.drop_duplicates()
+
+            tab_completa.reset_index(inplace=True)
+
+            # tratando coluna de código e recurso
+
+            for d in range(0, tab_completa.shape[0]):
+
+                if len(tab_completa['Código'][d]) == 5:
+                    tab_completa['Código'][d] = '0' + tab_completa['Código'][d]
+
+            # criando coluna de código para arquivar
+
+            hoje = datetime.now()
+
+            ts = pd.Timestamp(hoje)
+
+            hoje1 = hoje.strftime('%d%m%Y')
+
+            controle_seq = tab_completa
+            controle_seq["codigo"] = hoje1 + data_escolhida.strftime('%d%m%Y')
+
+            k = 9
+
+            # if carga_escolhida != 'Selecione':
+            #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
+            
+            # print(tab_completa.columns)
+            # tab_completa = tab_completa.groupby(
+            #     ['Código', 'Peca', 'Célula', 'Datas', 'Carga', 'PED_CHCRIACAO', 'Ano', 'codigo']).sum()
+        
+            tab_completa = tab_completa.reset_index(drop=True)
+
+            # carga_unique = tab_completa['Carga'].unique()
+
+            # for carga in carga_unique:
+            file_counter = 1  # Contador de arquivos
+            rows_per_file = 21  # Número máximo de linhas por arquivo
+            k = 9  # Posição inicial no Excel
+
+            # for i in range(0, len(celulas_unique)):
+            #     # Filtrar os dados para a célula atual
+            #     filtro_excel = (tab_completa['Célula'] == celulas_unique[0][i])
+            #     filtrar = tab_completa.loc[filtro_excel].reset_index(drop=True)
+
+            #     # Verificar se o DataFrame está vazio
+            #     if filtrar.empty:
+            #         continue
+
+            #     # Índice inicial para controle de divisão em blocos
+            #     start_index = 0
+
+            #     while start_index < len(filtrar):
+            #         # Criar um novo Workbook para cada conjunto de 21 linhas
+            #         wb = Workbook()
+            #         wb = load_workbook('modelo_op_montagem.xlsx')
+            #         ws = wb.active
+
+            #         # Define o limite superior para as linhas deste arquivo
+            #         end_index = min(start_index + rows_per_file, len(filtrar))
+            #         k = 9  # Reseta a linha inicial para cada novo arquivo
+
+            #         # Escreve os dados no Excel para as linhas entre start_index e end_index
+            #         for j in range(start_index, end_index):
+            #             ws['G5'] = celulas_unique[0][i]  # Nome da célula
+            #             ws['AD5'] = hoje  # Data de hoje
+
+            #             # Gerar código único baseado na célula
+            #             if celulas_unique[0][i] == "EIXO COMPLETO":
+            #                 ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico + "C"
+            #             elif celulas_unique[0][i] == "EIXO SIMPLES":
+            #                 ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico + "S"
+            #             else:
+            #                 ws['AK4'] = celulas_unique[0][i][0:3] + codigo_unico
+
+            #             # Preenchimento das células do Excel
+            #             ws['M4'] = data_escolhida  # Data da carga
+            #             ws['B' + str(k)] = filtrar['Código'][j]
+            #             ws['G' + str(k)] = filtrar['Peca'][j]
+            #             ws['AD' + str(k)] = filtrar['Qtde_total'][j]
+            #             k += 1
+
+            #         # Salvar o arquivo com numeração sequencial
+            #         file_name = f"Montagem {celulas_unique[0][i]} {data_nome_planilha} {file_counter}.xlsx"
+            #         wb.template = False
+            #         wb.save(file_name)
+            #         filenames.append(file_name)
+
+            #         # Incrementar o índice de início e o contador de arquivos
+            #         start_index = end_index
+            #         file_counter += 1
+
+            # Preparar os dados para inserção no banco de dados
+            # data_formatada = datetime.strptime(data_escolhida, '%d/%m/%Y').strftime('%Y-%m-%d')
+            # tab_completa['Datas'] = data_formatada
+            # data_insert_sql = tab_completa[['Célula', 'Código', 'Peca', 'Qtde_total', 'Datas']].values.tolist()
+
+            # Chamar a função de inserção
+            # insert_montagem(data_formatada, data_insert_sql, check_atualizar_base_carga)
+
         tab_resultado = pd.concat([tab_completa, tab_resultado], ignore_index=True)
     
     return tab_resultado
@@ -1336,7 +1779,7 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
 
     # Coletar datas únicas e validar
     try:
-        formato_data = "%Y-%d-%m" if grupo_maquina == "montagem" else "%Y-%m-%d"
+        formato_data = "%Y-%d-%m" if grupo_maquina == "montagem" or "solda" else "%Y-%m-%d"
         datas_requisicao = {
             datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
             for o in ordens_data if o.get("data_carga")
@@ -1431,6 +1874,127 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
                     "id": ordem.id,
                     "cor": meta["cor"],
                     "data_carga": meta["data_carga"].strftime("%Y-%m-%d")
+                } for ordem, meta in zip(ordens_objs, ordens_metadata)
+            ]
+        }
+
+def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='solda'):
+
+    if not ordens_data:
+        return {"error": "Nenhuma ordem fornecida!", "status": 400}
+
+    # Coletar datas únicas e validar
+    try:
+        datas_requisicao = set()
+        for o in ordens_data:
+            data_carga = o.get("data_carga")
+            if data_carga:
+                if isinstance(data_carga, str):
+                    # Se for string, converte usando strptime
+                    data_obj = datetime.strptime(data_carga, "%Y-%m-%d").date()
+                elif isinstance(data_carga, (datetime, date)):
+                    # Se já for datetime ou date, converte para date (se necessário)
+                    data_obj = data_carga.date() if isinstance(data_carga, datetime) else data_carga
+                else:
+                    raise ValueError(f"Tipo inválido de data: {type(data_carga)}")
+                datas_requisicao.add(data_obj)
+    except Exception as e:
+        print(f"Erro ao processar datas: {e}")
+        return {"error": "Formato de data inválido! Use YYYY-MM-DD.", "status": 400}
+
+    # Verifica datas já com carga
+    datas_existentes = set(
+        Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina=grupo_maquina)
+        .values_list("data_carga", flat=True)
+    )
+
+    datas_bloqueadas = datas_existentes & datas_requisicao
+    if not atualizacao_ordem and datas_bloqueadas:
+        return {
+            "error": f"Datas já com carga alocada: {', '.join(map(str, datas_bloqueadas))}",
+            "status": 400
+        }
+
+    # Verifica máquinas existentes
+    maquinas_requisicao = {o.get("setor_conjunto") for o in ordens_data if o.get("setor_conjunto")}
+    maquinas_existentes = set(Maquina.objects.filter(nome__in=maquinas_requisicao).values_list("nome", flat=True))
+    maquinas_faltantes = maquinas_requisicao - maquinas_existentes
+    if maquinas_faltantes:
+        return {
+            "error": f"Máquinas não cadastradas: {', '.join(maquinas_faltantes)}",
+            "status": 400
+        }
+
+    # Criação em lote
+    # Pega a última ordem atual no banco
+    ultimo_numero = Ordem.objects.filter(grupo_maquina=grupo_maquina).aggregate(Max('ordem'))['ordem__max'] or 0
+
+    with transaction.atomic():
+        ordens_objs = []
+        ordens_metadata = []
+
+        for i, o in enumerate(ordens_data):
+            # try:
+            #     data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
+            # except:
+            # data_carga pode ser str, datetime ou date
+            if isinstance(data_carga, str):
+                data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
+            elif isinstance(data_carga, datetime):
+                data_carga = data_carga.date()
+            elif isinstance(data_carga, date):
+                data_carga = data_carga
+            else:
+                raise ValueError(f"Tipo inválido para data_carga: {type(data_carga)}")
+
+            nova_ordem = Ordem(
+                grupo_maquina=grupo_maquina,
+                status_atual="aguardando_iniciar",
+                obs=o.get("obs", ""),
+                cor=o.get("cor"),
+                data_criacao=now(),
+                data_carga=data_carga,
+                ordem=ultimo_numero + i + 1  # atribui manualmente a ordem
+            )
+
+            try:
+                maquina = Maquina.objects.get(nome=o["setor_conjunto"])
+                nova_ordem.maquina = maquina
+                # calcula data_programacao manualmente
+                nova_ordem.data_programacao = data_carga - timedelta(days=3)
+                while nova_ordem.data_programacao.weekday() in [5, 6]:
+                    nova_ordem.data_programacao -= timedelta(days=1)
+            except Maquina.DoesNotExist:
+                return {"error": f"Máquina '{o['setor_conjunto']}' não cadastrada.", "status": 400}
+
+            ordens_objs.append(nova_ordem)
+            ordens_metadata.append({
+                "peca_nome": o["peca_nome"],
+                "qtd_planejada": o.get("qtd_planejada", 0),
+                "data_carga": data_carga,
+                "cor": o.get("cor")
+            })
+
+        Ordem.objects.bulk_create(ordens_objs)
+
+        pecas_objs = [
+            POS(
+                ordem=ordem,
+                peca=meta["peca_nome"],
+                qtd_planejada=meta["qtd_planejada"],
+                qtd_boa=0,
+                qtd_morta=0
+            ) for ordem, meta in zip(ordens_objs, ordens_metadata)
+        ]
+
+        POS.objects.bulk_create(pecas_objs)
+    
+        return {
+            "message": "Ordens criadas com sucesso.",
+            "ordens": [
+                {
+                    "id": ordem.id,
+                    "data_carga": meta["data_carga"]#.strftime("%Y-%m-%d")
                 } for ordem, meta in zip(ordens_objs, ordens_metadata)
             ]
         }

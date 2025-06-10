@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'apontamento_estamparia',
     'apontamento_pintura',
     'apontamento_montagem',
+    'apontamento_solda',
     'cargas',
     'storages',
 ]
@@ -101,6 +102,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'apontamento_prod_especiais/static'),
     os.path.join(BASE_DIR, 'apontamento_estamparia/static'),
     os.path.join(BASE_DIR, 'apontamento_montagem/static'),
+    os.path.join(BASE_DIR, 'apontamento_solda/static'),
     os.path.join(BASE_DIR, 'apontamento_pintura/static'),
     os.path.join(BASE_DIR, 'cargas/static'),
 

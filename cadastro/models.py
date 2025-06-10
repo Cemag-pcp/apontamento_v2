@@ -15,9 +15,14 @@ class Processo(models.Model):
 
 class Maquina(models.Model):
 
-    nome = models.CharField(max_length=100, unique=True)
+    nome = models.CharField(max_length=100)
     setor = models.ForeignKey(Setor, related_name='maquina_setor', on_delete=models.CASCADE)
     tipo = models.CharField(max_length=20)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['nome','setor'], name='unique_nome_setor_maquina')
+        ]
 
     def __str__(self):
         return self.nome
