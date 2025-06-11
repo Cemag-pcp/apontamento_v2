@@ -12,10 +12,12 @@ from django.views.decorators.http import require_POST
 
 from apontamento_pintura.models import PecasOrdem as POPintura
 from apontamento_montagem.models import PecasOrdem as POMontagem
+from apontamento_solda.models import PecasOrdem as POSolda
+
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
-from cargas.utils import processar_ordens_montagem, processar_ordens_pintura
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda
 
 import pandas as pd
 import os
@@ -130,14 +132,16 @@ def gerar_dados_sequenciamento(request):
             "obs": "Ordem gerada automaticamente",
             "peca_nome": str(row["Código"]) + " - " + row["Peca"],
             "qtd_planejada": int(row["Qtde_total"]),
-            "data_carga" : str(row["Datas"].date()) if setor == 'montagem' else row["Datas"],#.strftime("%Y-%m-%d") if isinstance(row["Datas"], pd.Timestamp) else datetime.strptime(str(row["Datas"]), "%d/%m/%Y").strftime("%Y-%m-%d")
+            "data_carga" : str(row["Datas"].date()) if setor == 'montagem' or 'solda' else row["Datas"],#.strftime("%Y-%m-%d") if isinstance(row["Datas"], pd.Timestamp) else datetime.strptime(str(row["Datas"]), "%d/%m/%Y").strftime("%Y-%m-%d")
             "setor_conjunto" : row["Célula"]
         })
 
     if setor.lower() == 'montagem':
         resultado = processar_ordens_montagem(ordens, grupo_maquina=setor.lower())
-    else:
+    elif setor.lower() == 'pintura':
         resultado = processar_ordens_pintura(ordens, grupo_maquina=setor.lower())
+    else:
+        resultado = processar_ordens_solda(ordens, grupo_maquina=setor.lower())
 
     if "error" in resultado:
         return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
@@ -176,9 +180,13 @@ def atualizar_ordem_existente(request):
         ordens_com_apontamentos = ordens_existentes_qs.annotate(
             total_produzido=Sum('ordem_pecas_montagem__qtd_boa')
         ).filter(total_produzido__gt=0)
-    else:
+    elif setor == 'pintura':
         ordens_com_apontamentos = ordens_existentes_qs.annotate(
             total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
+        ).filter(total_produzido__gt=0)
+    else:
+        ordens_com_apontamentos = ordens_existentes_qs.annotate(
+            total_produzido=Sum('ordem_pecas_solda__qtd_boa')
         ).filter(total_produzido__gt=0)
 
     ordens_com_apontamentos_ids = set(ordens_com_apontamentos.values_list('id', flat=True))
@@ -204,9 +212,13 @@ def atualizar_ordem_existente(request):
         ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
             ~Q(ordem_pecas_montagem__peca__in=pecas_atualizadas)
         )
-    else:
+    elif setor == 'pintura':
         ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
             ~Q(ordem_pecas_pintura__peca__in=pecas_atualizadas)
+        )
+    else:
+        ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
+            ~Q(ordem_pecas_solda__peca__in=pecas_atualizadas)
         )
 
     # Remove essas ordens
@@ -225,11 +237,17 @@ def atualizar_ordem_existente(request):
                 data_carga=data_carga,
                 ordem_pecas_montagem__peca=peca_nome
             ).first()
-        else:
+        elif setor == 'pintura':
             ordem_existente = Ordem.objects.filter(
                 grupo_maquina=setor,
                 data_carga=data_carga,
                 ordem_pecas_pintura__peca=peca_nome
+            ).first()
+        else:
+            ordem_existente = Ordem.objects.filter(
+                grupo_maquina=setor,
+                data_carga=data_carga,
+                ordem_pecas_solda__peca=peca_nome
             ).first()
 
         if ordem_existente:
@@ -253,8 +271,10 @@ def atualizar_ordem_existente(request):
     # Processar novas ordens
     if setor == 'montagem':
         resultado = processar_ordens_montagem(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
-    else:
+    elif setor == 'pintura':
         resultado = processar_ordens_pintura(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
+    else:
+        resultado = processar_ordens_solda(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
 
     if "error" in resultado:
         return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
@@ -337,7 +357,6 @@ def andamento_cargas(request):
         'Carpintaria',
         'FEIXE DE MOLAS',
         'SERRALHERIA',
-        'TRANSBORDO',
         'ROÇADEIRA'
     ]
 
@@ -354,14 +373,25 @@ def andamento_cargas(request):
     if not start_date or not end_date:
         return JsonResponse({"error": "Parâmetros 'start' e 'end' são obrigatórios"}, status=400)
     
-    setores = ["pintura", "montagem"]
+    setores = ["pintura", "montagem", "solda"]
     andamento_cargas = []
 
     for setor in setores:
 
         # Define as cores e modelos conforme o setor
-        modelo = POPintura if setor == "pintura" else POMontagem
-        cor = "#28a745" if setor == "pintura" else "#007bff"
+        if setor == "pintura":
+            modelo = POPintura
+        elif setor == "montagem":
+            modelo = POMontagem
+        else:
+            modelo = POSolda
+        
+        if setor == "pintura":
+            cor = "#28a745"
+        elif setor == "montagem":
+            cor = "#007bff"
+        else:
+            cor = "#ffc107" 
 
         # Filtra apenas as ordens dentro do intervalo solicitado
         cargas = Ordem.objects.filter(

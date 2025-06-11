@@ -429,7 +429,6 @@ def ordens_criadas(request):
         'Carpintaria',
         'FEIXE DE MOLAS',
         'SERRALHERIA',
-        'TRANSBORDO',
         'ROÇADEIRA'
 
     ]
@@ -628,7 +627,6 @@ def percentual_concluido_carga(request):
         'Carpintaria',
         'FEIXE DE MOLAS',
         'SERRALHERIA',
-        'TRANSBORDO',
         'ROÇADEIRA'
     ]
 
@@ -671,7 +669,6 @@ def andamento_ultimas_cargas(request):
         'Carpintaria',
         'FEIXE DE MOLAS',
         'SERRALHERIA',
-        'TRANSBORDO',
         'ROÇADEIRA'
     ]
 

@@ -299,7 +299,6 @@ def get_status_maquinas(request):
         'Carpintaria',
         'FEIXE DE MOLAS',
         'SERRALHERIA',
-        'TRANSBORDO',
         'ROÇADEIRA'
     ]
 
