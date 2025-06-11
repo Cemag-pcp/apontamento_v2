@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models.functions import Concat, Cast, TruncMonth, ExtractYear, ExtractMonth
+from django.db import connection
 
 from cadastro.models import PecasEstanqueidade
 from apontamento_montagem.models import ConjuntosInspecionados
@@ -3210,30 +3211,6 @@ def dashboard_pintura(request):
 ### dashboard pintura ###
 
 def indicador_pintura_analise_temporal(request):
-
-    """
-    select
-        id.data_execucao as data_inspecao,
-        id.conformidade,
-        id.nao_conformidade,
-        ii.data_inspecao as data_producao,
-        ii.pecas_ordem_pintura_id,
-        app.peca,
-        app.tipo,
-        app.qtd_boa,
-        ic2.nome as nome_conformidade
-    from apontamento_v2.inspecao_inspecao ii
-    left join apontamento_v2.inspecao_dadosexecucaoinspecao id on ii.id = id.inspecao_id 
-    left join apontamento_v2.apontamento_pintura_pecasordem app on app.id = ii.pecas_ordem_pintura_id
-    left join apontamento_v2.inspecao_causasnaoconformidade ic on ic.dados_execucao_id = id.id
-    left join apontamento_v2.inspecao_causasnaoconformidade_causa icc on icc.causasnaoconformidade_id = ic.id
-    left join apontamento_v2.inspecao_causas ic2 on ic2.id = icc.causas_id 
-    where ii.pecas_ordem_pintura_id notnull
-    order by id.data_execucao desc;
-    """
-
-    # Recebe os parâmetros de data
-    setor = request.GET.get('setor')
     data_inicio = request.GET.get('data_inicio')
     data_fim = request.GET.get('data_fim')
 
@@ -3245,43 +3222,39 @@ def indicador_pintura_analise_temporal(request):
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
-    # Filtra somente as produções com peça ligada (mesmo sem inspeção)
-    queryset = Inspecao.objects.filter(
-        pecas_ordem_pintura__isnull=False
-    )
+    sql = """
+    SELECT
+        TO_CHAR(i.data_inspecao, 'YYYY-MM') AS mes,
+        SUM(pop.qtd_boa) AS qtd_peca_produzida,
+        SUM(COALESCE(de.conformidade, 0) + COALESCE(de.nao_conformidade, 0)) AS qtd_peca_inspecionada,
+        SUM(COALESCE(de.conformidade, 0)) AS soma_conformidade,
+        SUM(COALESCE(de.nao_conformidade, 0)) AS soma_nao_conformidade
+    FROM apontamento_v2.inspecao_inspecao i
+    JOIN apontamento_v2.apontamento_pintura_pecasordem pop ON i.pecas_ordem_pintura_id = pop.id
+    LEFT JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON de.inspecao_id = i.id
+    WHERE i.pecas_ordem_pintura_id IS NOT NULL
+    AND i.data_inspecao >= %(data_inicio)s
+    AND i.data_inspecao < %(data_fim)s
+    GROUP BY mes
+    ORDER BY mes;
+    """
 
-    if data_inicio:
-        queryset = queryset.filter(data_inspecao__gte=data_inicio)
-    if data_fim:
-        queryset = queryset.filter(data_inspecao__lte=data_fim)
-
-    queryset = queryset.annotate(
-        mes=Cast(TruncMonth('data_inspecao'), output_field=CharField()),
-        qtd_boa=F('pecas_ordem_pintura__qtd_boa'),
-        conformidade=F('dadosexecucaoinspecao__conformidade'),
-        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
-    ).values('mes').annotate(
-        qtd_peca_produzida=Sum('qtd_boa'),
-        qtd_peca_inspecionada=Sum(
-            ExpressionWrapper(
-                F('conformidade') + F('nao_conformidade'),
-                output_field=FloatField()
-            )
-        ),
-        soma_conformidade=Sum('conformidade'),
-        soma_nao_conformidade=Sum('nao_conformidade'),
-    ).order_by('mes')
+    with connection.cursor() as cursor:
+        cursor.execute(sql, {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+        })
+        rows = cursor.fetchall()
 
     resultado = []
-    for item in queryset:
-        conformidade = item['soma_conformidade'] or 0
-        nao_conformidade = item['soma_nao_conformidade'] or 0
-        taxa_nc = (nao_conformidade / conformidade) if conformidade else 0
+    for row in rows:
+        mes, qtd_produzida, qtd_inspecionada, soma_conformidade, soma_nao_conformidade = row
+        taxa_nc = (soma_nao_conformidade / soma_conformidade) if soma_conformidade else 0
 
         resultado.append({
-            'mes': item['mes'][:7],  # YYYY-MM
-            'qtd_peca_produzida': item['qtd_peca_produzida'] or 0,
-            'qtd_peca_inspecionada': item['qtd_peca_inspecionada'] or 0,
+            'mes': mes,
+            'qtd_peca_produzida': qtd_produzida or 0,
+            'qtd_peca_inspecionada': qtd_inspecionada or 0,
             'taxa_nao_conformidade': round(taxa_nc, 4),
         })
 
@@ -3299,49 +3272,40 @@ def indicador_pintura_resumo_analise_temporal(request):
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
-    # Query principal
-    queryset = Inspecao.objects.filter(
-        pecas_ordem_pintura__isnull=False
-    )
+    sql = """
+    SELECT
+        EXTRACT(YEAR FROM i.data_inspecao) AS ano,
+        EXTRACT(MONTH FROM i.data_inspecao) AS mes_num,
+        SUM(pop.qtd_boa) AS total_produzida,
+        SUM(COALESCE(de.conformidade, 0) + COALESCE(de.nao_conformidade, 0)) AS total_inspecionada,
+        SUM(COALESCE(de.nao_conformidade, 0)) AS total_nao_conforme
+    FROM apontamento_v2.inspecao_inspecao i
+    JOIN apontamento_v2.apontamento_pintura_pecasordem pop ON i.pecas_ordem_pintura_id = pop.id
+    LEFT JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON de.inspecao_id = i.id
+    WHERE i.pecas_ordem_pintura_id IS NOT NULL
+    AND i.data_inspecao >= %(data_inicio)s
+    AND i.data_inspecao < %(data_fim)s
+    GROUP BY ano, mes_num
+    ORDER BY ano, mes_num;
+    """
 
-    if data_inicio:
-        queryset = queryset.filter(data_inspecao__gte=data_inicio)
-    if data_fim:
-        queryset = queryset.filter(data_inspecao__lte=data_fim)
+    with connection.cursor() as cursor:
+        cursor.execute(sql, {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+        })
+        rows = cursor.fetchall()
 
-    # Anotações e agregações
-    queryset = queryset.annotate(
-        ano=ExtractYear('data_inspecao'),
-        mes_num=ExtractMonth('data_inspecao'),
-        qtd_boa=F('pecas_ordem_pintura__qtd_boa'),
-        conformidade=F('dadosexecucaoinspecao__conformidade'),
-        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
-        qtd_inspecionada=ExpressionWrapper(
-            F('dadosexecucaoinspecao__conformidade') + F('dadosexecucaoinspecao__nao_conformidade'),
-            output_field=FloatField()
-        )
-    ).values('ano', 'mes_num').annotate(
-        total_produzida=Sum('qtd_boa'),
-        total_inspecionada=Sum('qtd_inspecionada'),
-        total_nao_conforme=Sum('nao_conformidade'),
-    ).order_by('ano', 'mes_num')
-
-    # Monta JSON
     resultado = []
-    for item in queryset:
-        mes_formatado = f"{item['ano']}-{item['mes_num']}"
-
-        total_prod = item['total_produzida'] or 0
-        total_insp = item['total_inspecionada'] or 0
-        total_nc = item['total_nao_conforme'] or 0
-
+    for row in rows:
+        ano, mes_num, total_prod, total_insp, total_nc = row
         perc_insp = (total_insp / total_prod) * 100 if total_prod else 0
 
         resultado.append({
-            "Data": mes_formatado,
-            "N° de peças produzidas": int(total_prod),
-            "N° de inspeções": int(total_insp),
-            "N° de não conformidades": int(total_nc),
+            "Data": f"{int(ano)}-{int(mes_num):02}",
+            "N° de peças produzidas": int(total_prod or 0),
+            "N° de inspeções": int(total_insp or 0),
+            "N° de não conformidades": int(total_nc or 0),
             "% de inspeção": f"{perc_insp:.2f} %"
         })
 
@@ -3359,37 +3323,38 @@ def causas_nao_conformidade_mensal(request):
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
-    queryset = CausasNaoConformidade.objects.filter(
-        dados_execucao__inspecao__data_inspecao__isnull=False,
-        dados_execucao__inspecao__pecas_ordem_pintura__isnull=False  # garante que é pintura
-    ).prefetch_related('causa')
+    sql = """
+    SELECT
+        TO_CHAR(i.data_inspecao, 'YYYY-MM') AS mes,
+        c.nome AS causa,
+        SUM(cnc.quantidade) AS total_nao_conformidades
+    FROM apontamento_v2.inspecao_causasnaoconformidade cnc
+    JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
+    JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
+    JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c ON cnc.id = cnc_c.causasnaoconformidade_id
+    JOIN apontamento_v2.inspecao_causas c ON c.id = cnc_c.causas_id 
+    WHERE i.data_inspecao IS NOT NULL
+    AND i.pecas_ordem_pintura_id IS NOT NULL
+    AND i.data_inspecao >= %(data_inicio)s
+    AND i.data_inspecao < %(data_fim)s
+    GROUP BY mes, c.nome
+    ORDER BY mes ASC, c.nome ASC;
+    """
 
-    if data_inicio:
-        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__gte=data_inicio)
-    if data_fim:
-        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__lte=data_fim)
+    with connection.cursor() as cursor:
+        cursor.execute(sql, {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+        })
+        rows = cursor.fetchall()
 
-    # Estrutura para agrupar manualmente por mês e causa
-    resultado_temp = {}
-    for item in queryset:
-        ano = item.dados_execucao.inspecao.data_inspecao.year
-        mes = item.dados_execucao.inspecao.data_inspecao.month
-        mes_formatado = f"{ano}-{mes}"
-
-        for causa in item.causa.all():
-            chave = (mes_formatado, causa.nome)
-            if chave not in resultado_temp:
-                resultado_temp[chave] = 0
-            resultado_temp[chave] += item.quantidade
-
-    # Formata para JSON
     resultado = [
         {
-            "Data": chave[0],
-            "Causa": chave[1],
-            "Soma do N° Total de não conformidades": total
+            "Data": row[0],
+            "Causa": row[1],
+            "Soma do N° Total de não conformidades": row[2]
         }
-        for chave, total in sorted(resultado_temp.items())
+        for row in rows
     ]
 
     return JsonResponse(resultado, safe=False)
@@ -3406,30 +3371,42 @@ def imagens_nao_conformidade_pintura(request):
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
-    queryset = CausasNaoConformidade.objects.filter(
-        dados_execucao__data_execucao__isnull=False,
-        dados_execucao__inspecao__pecas_ordem_pintura__isnull=False  # filtro para pintura
-    ).prefetch_related('causa', 'arquivos')
+    sql = """
+        SELECT
+            (i.data_inspecao - INTERVAL '3 hour') AS data_execucao,
+            cnc.quantidade,
+            a.arquivo AS arquivo_url,
+            ARRAY_AGG(c.nome) AS causas
+        FROM apontamento_v2.inspecao_causasnaoconformidade cnc
+        JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
+        JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
+        LEFT JOIN apontamento_v2.inspecao_arquivocausa a ON a.causa_nao_conformidade_id = cnc.id
+        LEFT JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c ON cnc.id = cnc_c.causasnaoconformidade_id
+        LEFT JOIN apontamento_v2.inspecao_causas c ON cnc_c.causas_id  = c.id
+        WHERE de.data_execucao IS NOT NULL
+        AND i.pecas_ordem_pintura_id IS NOT NULL
+        AND de.data_execucao >= %(data_inicio)s
+        AND de.data_execucao < %(data_fim)s
+        AND a.arquivo IS NOT NULL
+        GROUP BY cnc.id, i.data_inspecao, a.arquivo, cnc.quantidade
+        ORDER BY i.data_inspecao DESC;
+    """
 
-    if data_inicio:
-        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
-    if data_fim:
-        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+    with connection.cursor() as cursor:
+        cursor.execute(sql, {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+        })
+        rows = cursor.fetchall()
 
     resultado = []
-    for item in queryset:
-        date = item.dados_execucao.inspecao.data_inspecao - timedelta(hours=3)
-        data_execucao = date.strftime('%Y-%m-%d %H:%M:%S')
-        causas = [c.nome for c in item.causa.all()]
-        arquivos = [arquivo.arquivo.url for arquivo in item.arquivos.all() if arquivo.arquivo]
-
-        for url in arquivos:
-            resultado.append({
-                "data_execucao": data_execucao,
-                "causas": causas,
-                "quantidade": item.quantidade,
-                "arquivo_url": url
-            })
+    for data_execucao, quantidade, arquivo_url, causas in rows:
+        resultado.append({
+            "data_execucao": data_execucao.strftime('%Y-%m-%d %H:%M:%S'),
+            "quantidade": quantidade,
+            "arquivo_url": arquivo_url,
+            "causas": causas
+        })
 
     return JsonResponse(resultado, safe=False)
 
@@ -3488,6 +3465,7 @@ def causas_nao_conformidade_por_tipo(request):
 
     return JsonResponse(resultado, safe=False)
 
+### dashboard montagem ###
 
 def dashboard_montagem(request):
 
@@ -3716,6 +3694,8 @@ def imagens_nao_conformidade_montagem(request):
             })
 
     return JsonResponse(resultado, safe=False)
+
+### dashboard estamparia ###
 
 def dashboard_estamparia(request):
 
@@ -4007,6 +3987,8 @@ def ficha_inspecao_estamparia(request):
                 })
     
     return JsonResponse(resultados, safe=False)
+
+### dashboard tanque ###
 
 def dashboard_tanque(request):
 
