@@ -3325,20 +3325,22 @@ def causas_nao_conformidade_mensal(request):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
     sql = """
-    SELECT
+        SELECT
         TO_CHAR(i.data_inspecao, 'YYYY-MM') AS mes,
         c.nome AS causa,
-        SUM(cnc.quantidade) AS total_nao_conformidades
+        SUM(cnc.quantidade) AS total_nao_conformidades,
+        app.peca as peca
     FROM apontamento_v2.inspecao_causasnaoconformidade cnc
     JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
     JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
     JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c ON cnc.id = cnc_c.causasnaoconformidade_id
     JOIN apontamento_v2.inspecao_causas c ON c.id = cnc_c.causas_id 
+    join apontamento_v2.apontamento_pintura_pecasordem app on app.id = i.pecas_ordem_pintura_id 
     WHERE i.data_inspecao IS NOT NULL
     AND i.pecas_ordem_pintura_id IS NOT NULL
     AND i.data_inspecao >= %(data_inicio)s
     AND i.data_inspecao < %(data_fim)s
-    GROUP BY mes, c.nome
+    GROUP BY mes, c.nome, app.peca
     ORDER BY mes ASC, c.nome ASC;
     """
 
@@ -3351,9 +3353,10 @@ def causas_nao_conformidade_mensal(request):
 
     resultado = [
         {
-            "Data": row[0],
-            "Causa": row[1],
-            "Soma do N° Total de não conformidades": row[2]
+            "data_execucao": row[0],
+            "nome_causa": row[1],
+            "quantidade": row[2],
+            "peca": row[3]
         }
         for row in rows
     ]

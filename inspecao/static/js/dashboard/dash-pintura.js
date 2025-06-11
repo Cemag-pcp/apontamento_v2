@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.length === 0) {
                 tabela.innerHTML = `
                     <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
+                        <td colspan="4" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
                     </tr>
                 `;
                 return;
