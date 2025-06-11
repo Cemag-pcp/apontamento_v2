@@ -86,3 +86,14 @@ body {
     border-radius: 5px;
     font-size: 1rem;
 }
+
+.table-container {
+    height: 300px; /* ajuste conforme necessário */
+    overflow-y: auto;
+}
+
+.table-fixed-header thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}

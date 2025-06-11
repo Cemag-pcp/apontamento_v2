@@ -53,8 +53,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Agrupar por causa
             const causesCount = {};
             causesData.forEach(item => {
-                const causa = item.Causa;
-                const total = item["Soma do N° Total de não conformidades"];
+                const causa = item.causa;
+                const total = item.quantidade;
                 causesCount[causa] = (causesCount[causa] || 0) + total;
             });
 
@@ -143,9 +143,10 @@ document.addEventListener('DOMContentLoaded', function() {
             data.forEach(item => {
                 const row = `
                     <tr>
-                        <td>${item.Data}</td>
-                        <td>${item.Causa}</td>
-                        <td>${item["Soma do N° Total de não conformidades"]}</td>
+                        <td>${item.data}</td>
+                        <td>${item.peca}</td>
+                        <td>${item.causa}</td>
+                        <td>${item.quantidade}</td>
                     </tr>
                 `;
                 tabela.insertAdjacentHTML('beforeend', row);
