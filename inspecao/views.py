@@ -3223,20 +3223,36 @@ def indicador_pintura_analise_temporal(request):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
     sql = """
-    SELECT
-        TO_CHAR(i.data_inspecao, 'YYYY-MM') AS mes,
-        SUM(pop.qtd_boa) AS qtd_peca_produzida,
-        SUM(COALESCE(de.conformidade, 0) + COALESCE(de.nao_conformidade, 0)) AS qtd_peca_inspecionada,
-        SUM(COALESCE(de.conformidade, 0)) AS soma_conformidade,
-        SUM(COALESCE(de.nao_conformidade, 0)) AS soma_nao_conformidade
-    FROM apontamento_v2.inspecao_inspecao i
-    JOIN apontamento_v2.apontamento_pintura_pecasordem pop ON i.pecas_ordem_pintura_id = pop.id
-    LEFT JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON de.inspecao_id = i.id
-    WHERE i.pecas_ordem_pintura_id IS NOT NULL
-    AND i.data_inspecao >= %(data_inicio)s
-    AND i.data_inspecao < %(data_fim)s
-    GROUP BY mes
-    ORDER BY mes;
+    WITH producao_total AS (
+        SELECT 
+            EXTRACT(YEAR FROM data) AS ano,
+            EXTRACT(MONTH FROM data) AS mes,
+            SUM(qtd_boa) AS total_produzido
+        FROM apontamento_v2.apontamento_pintura_pecasordem
+        WHERE qtd_boa IS NOT NULL
+            AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+        GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
+    ),
+    inspecoes_total AS (
+        SELECT
+            EXTRACT(YEAR FROM app.data) AS ano,
+            EXTRACT(MONTH FROM app.data) AS mes,
+            SUM(dei.conformidade) AS total_conforme,
+            SUM(dei.nao_conformidade) AS total_nao_conforme
+        FROM apontamento_v2.apontamento_pintura_pecasordem app
+        INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_pintura_id = app.id
+        INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
+        WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
+    )
+    SELECT 
+        concat(p.ano, '-', p.mes) as mes,
+        p.total_produzido,
+        (COALESCE(i.total_conforme, 0) - COALESCE(i.total_nao_conforme, 0)) AS total_conforme,
+        COALESCE(i.total_nao_conforme, 0) AS total_nao_conforme
+    FROM producao_total p
+    LEFT JOIN inspecoes_total i ON p.ano = i.ano AND p.mes = i.mes
+    ORDER BY p.ano, p.mes;
     """
 
     with connection.cursor() as cursor:
@@ -3248,7 +3264,8 @@ def indicador_pintura_analise_temporal(request):
 
     resultado = []
     for row in rows:
-        mes, qtd_produzida, qtd_inspecionada, soma_conformidade, soma_nao_conformidade = row
+        mes, qtd_produzida, soma_conformidade, soma_nao_conformidade = row
+        qtd_inspecionada = soma_conformidade + soma_nao_conformidade
         taxa_nc = (soma_nao_conformidade / soma_conformidade) if soma_conformidade else 0
 
         resultado.append({
@@ -3273,20 +3290,37 @@ def indicador_pintura_resumo_analise_temporal(request):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
     sql = """
-    SELECT
-        EXTRACT(YEAR FROM i.data_inspecao) AS ano,
-        EXTRACT(MONTH FROM i.data_inspecao) AS mes_num,
-        SUM(pop.qtd_boa) AS total_produzida,
-        SUM(COALESCE(de.conformidade, 0) + COALESCE(de.nao_conformidade, 0)) AS total_inspecionada,
-        SUM(COALESCE(de.nao_conformidade, 0)) AS total_nao_conforme
-    FROM apontamento_v2.inspecao_inspecao i
-    JOIN apontamento_v2.apontamento_pintura_pecasordem pop ON i.pecas_ordem_pintura_id = pop.id
-    LEFT JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON de.inspecao_id = i.id
-    WHERE i.pecas_ordem_pintura_id IS NOT NULL
-    AND i.data_inspecao >= %(data_inicio)s
-    AND i.data_inspecao < %(data_fim)s
-    GROUP BY ano, mes_num
-    ORDER BY ano, mes_num;
+    WITH producao_total AS (
+    SELECT 
+        EXTRACT(YEAR FROM data) AS ano,
+        EXTRACT(MONTH FROM data) AS mes,
+        SUM(qtd_boa) AS total_produzido
+    FROM apontamento_v2.apontamento_pintura_pecasordem
+    WHERE qtd_boa IS NOT NULL
+        AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+    GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
+    ),
+    inspecoes_total AS (
+        SELECT
+            EXTRACT(YEAR FROM app.data) AS ano,
+            EXTRACT(MONTH FROM app.data) AS mes,
+            SUM(dei.conformidade) AS total_conforme,
+            SUM(dei.nao_conformidade) AS total_nao_conforme
+        FROM apontamento_v2.apontamento_pintura_pecasordem app
+        INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_pintura_id = app.id
+        INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
+        WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
+    )
+    SELECT 
+        p.ano,
+        p.mes,
+        p.total_produzido,
+        (COALESCE(i.total_conforme, 0) - COALESCE(i.total_nao_conforme, 0)) AS total_conforme,
+        COALESCE(i.total_nao_conforme, 0) AS total_nao_conforme
+    FROM producao_total p
+    LEFT JOIN inspecoes_total i ON p.ano = i.ano AND p.mes = i.mes
+    ORDER BY p.ano, p.mes;
     """
 
     with connection.cursor() as cursor:
@@ -3298,7 +3332,8 @@ def indicador_pintura_resumo_analise_temporal(request):
 
     resultado = []
     for row in rows:
-        ano, mes_num, total_prod, total_insp, total_nc = row
+        ano, mes_num, total_prod, total_conf, total_nc = row
+        total_insp = total_nc + total_conf
         perc_insp = (total_insp / total_prod) * 100 if total_prod else 0
 
         resultado.append({
