@@ -1,9 +1,6 @@
-from django.shortcuts import render
+from django.shortcuts import render,redirect
 from django.urls import reverse
-from django.shortcuts import redirect
 
-from django.shortcuts import render, redirect
-from django.urls import reverse
 
 from core.models import RotaAcesso
 
@@ -12,8 +9,6 @@ class RotaAccessMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Obtém o caminho da requisição, removendo "/" inicial e final
-        
         #  Se a URL contém "api/", libera automaticamente
         if "/api/" in request.path or request.path.startswith("api/"):
             return self.get_response(request)
@@ -25,6 +20,9 @@ class RotaAccessMiddleware:
 
         # Se o usuário não estiver autenticado, redireciona para o login
         if not request.user.is_authenticated and path != login_url.strip("/"):
+            print(login_url.strip("/"))
+            if path == "":
+                return redirect(f"{login_url}")
             return redirect(f"{login_url}?next={request.path}")
 
         # Ignorar rotas administrativas
@@ -36,14 +34,6 @@ class RotaAccessMiddleware:
         if "api/" in path or "media/" in path:
             return self.get_response(request)
         
-        path = request.path.strip("/")
-        
-        login_url = reverse('core:login')
-
-        # Se o usuário não estiver autenticado, redireciona para o login
-        if not request.user.is_authenticated and path != login_url.strip("/"):
-            return redirect(f"{login_url}?next={request.path}")
-
         # Obtém o perfil do usuário
         profile = getattr(request.user, 'profile', None)
 
@@ -51,24 +41,18 @@ class RotaAccessMiddleware:
         if profile and getattr(profile, "tipo_acesso", "").lower() == "pcp":
             return self.get_response(request)
 
-        # Ignorar rotas administrativas
-        EXCLUDED_PATHS = ['admin', 'login', 'logout', 'core']
-        if any(path.startswith(excluded) for excluded in EXCLUDED_PATHS):
-            return self.get_response(request)
-
         # Busca a rota no banco de dados
         rota = RotaAcesso.objects.filter(nome=path).first()
 
         # Se a rota **não existir no banco**, bloqueia o acesso
         if not rota:
+            if path == "":
+                return redirect("core:home")
             return render(request, 'home/erro-acesso.html', status=403)
 
         # Se a rota for do tipo API, sempre permite o acesso (apenas por segurança extra)
         # if rota.tipo_rota == 'api':
         #     return self.get_response(request)
-
-        # Obtém o perfil do usuário
-        profile = getattr(request.user, 'profile', None)
         if not profile:
             return render(request, 'home/erro-acesso.html', status=403)
 
