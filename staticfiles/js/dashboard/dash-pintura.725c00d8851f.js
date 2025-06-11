@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (startDate) queryParams.append('data_inicio', startDate);
         if (endDate) queryParams.append('data_fim', endDate);
 
-        const url = `/inspecao/estamparia/api/indicador-estamparia-analise-temporal/?${queryParams.toString()}`;
+        const url = `/inspecao/pintura/api/indicador-pintura-analise-temporal/?${queryParams.toString()}`;
 
         try {
             const response = await fetch(url);
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarGraficoCausas(startDate, endDate) {
 
-        let url = '/inspecao/estamparia/api/causas-nao-conformidade/';
+        let url = '/inspecao/pintura/api/causas-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -53,8 +53,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Agrupar por causa
             const causesCount = {};
             causesData.forEach(item => {
-                const causa = item.Causa;
-                const total = item["Soma do N° Total de não conformidades"];
+                const causa = item.nome_causa;
+                const total = item.quantidade;
                 causesCount[causa] = (causesCount[causa] || 0) + total;
             });
 
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarCarrosselImagens(startDate, endDate) {
 
-        let url = '/inspecao/estamparia/api/imagens-nao-conformidade/';
+        let url = '/inspecao/pintura/api/imagens-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const causas = item.causas.join(', ');
                 const itemHTML = `
                     <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                        <img src="${item.imagem_url}" class="d-block w-100" alt="Imagem de não conformidade" style="max-height: 500px; object-fit: contain;">
+                        <img src="${item.arquivo_url}" class="d-block w-100" alt="Imagem de não conformidade">
                         <div class="carousel-caption d-none d-md-block">
                             <h5>${causas}</h5>
                             <p>Data: ${item.data_execucao} | Quantidade: ${item.quantidade}</p>
@@ -115,8 +115,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function carregarCarrosselFichas(startDate, endDate) {
-        let url = '/inspecao/estamparia/api/fichas-inspecao/';
+    async function carregarTabelasPorTipo(startDate, endDate) {
+
+        let url = '/inspecao/pintura/api/causas-nao-conformidade-tipo/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -124,54 +125,79 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             const response = await fetch(url);
-            if (!response.ok) throw new Error('Erro ao buscar fichas de inspeção.');
-            const fichas = await response.json();
+            if (!response.ok) throw new Error('Erro ao buscar causas por tipo.');
 
-            const carouselInner = document.querySelector('#fichaCarousel .carousel-inner');
-            carouselInner.innerHTML = ''; // Limpa itens antigos
+            const data = await response.json();
 
-            if (fichas.length === 0) {
-                carouselInner.innerHTML = `
-                    <div class="carousel-item active">
-                        <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
-                            <p class="text-muted">Nenhuma ficha encontrada no período selecionado.</p>
-                        </div>
-                    </div>`;
+            const tabelaPU = document.querySelector('#table-pu tbody');
+            const tabelaPO = document.querySelector('#table-po tbody');
+
+            tabelaPU.innerHTML = '';
+            tabelaPO.innerHTML = '';
+
+            // Se não houver nenhum dado, exibe mensagem nas duas tabelas
+            if (data.length === 0) {
+                tabelaPU.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
+                    </tr>
+                `;
+                tabelaPO.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
+                    </tr>
+                `;
                 return;
             }
 
-            fichas.forEach((ficha, index) => {
-                const statusInspecao = ficha.inspecao_completa ? 'Completa' : 'Parcial';
-                const motivos = ficha.motivos_mortas.length > 0 ? 
-                    `Motivos: ${ficha.motivos_mortas.join(', ')}` : 'Sem motivos registrados';
-                
-                const itemHTML = `
-                    <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                        <img src="${ficha.ficha_url}" class="d-block w-100" alt="Ficha de inspeção" style="max-height: 500px; object-fit: contain;">
-                        <div class="carousel-caption d-none d-md-block bg-dark bg-opacity-75 rounded">
-                            <h5>Inspeção ${statusInspecao}</h5>
-                            <p>Data: ${ficha.data_execucao}</p>
-                            <p>${motivos}</p>
-                        </div>
-                    </div>
+            // Se houver dados, separa por tipo
+            let temPU = false;
+            let temPO = false;
+
+            data.forEach(item => {
+                const rowHTML = `
+                    <tr>
+                        <td>${item.Data}</td>
+                        <td>${item.Causa}</td>
+                        <td>${item.Peça}</td>
+                        <td>${item.Quantidade}</td>
+                    </tr>
                 `;
-                carouselInner.insertAdjacentHTML('beforeend', itemHTML);
+
+                if (item.Tipo === 'PU') {
+                    tabelaPU.insertAdjacentHTML('beforeend', rowHTML);
+                    temPU = true;
+                } else if (item.Tipo === 'PÓ') {
+                    tabelaPO.insertAdjacentHTML('beforeend', rowHTML);
+                    temPO = true;
+                }
             });
 
-            // Inicializa o carrossel se for Bootstrap 5
-            if (typeof bootstrap !== 'undefined') {
-                new bootstrap.Carousel(document.getElementById('fichaCarousel'));
+            // Se um dos tipos não veio na resposta, exibe aviso individual
+            if (!temPU) {
+                tabelaPU.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">Nenhum dado do tipo PU encontrado.</td>
+                    </tr>
+                `;
+            }
+            if (!temPO) {
+                tabelaPO.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">Nenhum dado do tipo PÓ encontrado.</td>
+                    </tr>
+                `;
             }
 
         } catch (error) {
-            console.error('Erro ao carregar carrossel de fichas:', error);
-            alert('Erro ao carregar fichas de inspeção.');
+            console.error('Erro ao carregar tabelas por tipo:', error);
+            alert('Erro ao carregar dados de não conformidades por tipo.');
         }
     }
 
     async function carregarTabelaCausas(startDate, endDate) {
 
-        let url = '/inspecao/estamparia/api/causas-nao-conformidade/';
+        let url = '/inspecao/pintura/api/causas-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -197,11 +223,10 @@ document.addEventListener('DOMContentLoaded', function() {
             data.forEach(item => {
                 const row = `
                     <tr>
-                        <td>${item.Data}</td>
-                        <td>${item["Peça"]}</td>
-                        <td>${item.Causa}</td>
-                        <td>${item["Soma do N° Total de não conformidades"]}</td>
-                        <td>${item.Destino}</td>
+                        <td>${item.data_execucao}</td>
+                        <td>${item.peca}</td>
+                        <td>${item.nome_causa}</td>
+                        <td>${item.quantidade}</td>
                     </tr>
                 `;
                 tabela.insertAdjacentHTML('beforeend', row);
@@ -215,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarTabelaProducao(startDate, endDate) {
 
-        let url = '/inspecao/estamparia/api/indicador-estamparia-resumo-analise-temporal/';
+        let url = '/inspecao/pintura/api/indicador-pintura-resumo-analise-temporal/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -283,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarGraficoProducao(startDate, endDate);
         carregarGraficoCausas(startDate, endDate);
         carregarCarrosselImagens(startDateInput.value, endDateInput.value);
-        carregarCarrosselFichas(startDateInput.value, endDateInput.value);
+        carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
         carregarTabelaCausas(startDateInput.value, endDateInput.value);
         carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
@@ -297,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarGraficoProducao(startDateInput.value, endDateInput.value);
         carregarGraficoCausas(startDateInput.value, endDateInput.value);
         carregarCarrosselImagens(startDateInput.value, endDateInput.value);
-        carregarCarrosselFichas(startDateInput.value, endDateInput.value);
+        carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
         carregarTabelaCausas(startDateInput.value, endDateInput.value);
         carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
@@ -307,7 +332,7 @@ document.addEventListener('DOMContentLoaded', function() {
     carregarGraficoProducao(startDateInput.value, endDateInput.value);
     carregarGraficoCausas(startDateInput.value, endDateInput.value);
     carregarCarrosselImagens(startDateInput.value, endDateInput.value);
-    carregarCarrosselFichas(startDateInput.value, endDateInput.value);
+    carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
     carregarTabelaCausas(startDateInput.value, endDateInput.value);
     carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
