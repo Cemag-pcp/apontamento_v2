@@ -64,7 +64,7 @@ export const loadOrdens = (container, filtros = {}) => {
 
                         linha.innerHTML = `
                             <td data-label="Código Conjunto">
-                                <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca}" 
+                                <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(ordem.peca[0])}" 
                                 target="_blank" rel="noopener noreferrer">
                                 ${truncateText(ordem.peca, 100)}
                                 </a>
@@ -285,7 +285,6 @@ export function carregarOrdensIniciadas(filtros = {}) {
         .then(data => {
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
-
                 const card = document.createElement('div');
                 card.dataset.ordemId = ordem.ordem_id;
                 
@@ -325,7 +324,7 @@ export function carregarOrdensIniciadas(filtros = {}) {
                             <strong>Qt. restante:</strong> ${ordem.qtd_restante}
                         </p>
                         <p class="card-text mb-0 small">
-                            <a href="https://drive.google.com/drive/u/0/search?q=${ordem.pecas}" target="_blank" rel="noopener noreferrer">
+                            <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(ordem.pecas[0])}" target="_blank" rel="noopener noreferrer">
                                 ${ordem.pecas}
                             </a>
                         </p>
@@ -431,7 +430,7 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                         <strong>Qt. restante:</strong> ${ordem.qtd_restante}
                     </p>
                     <p class="card-text mb-2 small">
-                        <a href="https://drive.google.com/drive/u/0/search?q=${ordem.pecas}" target="_blank" rel="noopener noreferrer">
+                        <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(ordem.pecas[0])}" target="_blank" rel="noopener noreferrer">
                             ${ordem.pecas}
                         </a>
                     </p>
@@ -1491,6 +1490,15 @@ function restaurarFiltros() {
     if (localStorage.getItem("filtroSetor")) {
         filtroSetor.value = localStorage.getItem("filtroSetor");
     }
+}
+
+function pegarCodigoPeca(peca){
+    if (peca.includes("-")) {
+        // Se a peça contém um hífen, divide a string e retorna a parte antes do hífen
+        const partes = peca.split("-");
+        return partes[0].trim(); // Retorna a parte antes do hífen
+    }
+    return peca; // Se não houver hífen, retorna a peça completa
 }
 
 document.addEventListener('DOMContentLoaded', () => {
