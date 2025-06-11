@@ -480,7 +480,7 @@ export function mostrarPecas(ordemId) {
                             ${data.pecas.map(peca => `
                                 <tr>
                                     <td>
-                                        <a href="https://drive.google.com/drive/u/0/search?q=${peca.peca}" target="_blank" rel="noopener noreferrer">
+                                        <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(peca.peca)}" target="_blank" rel="noopener noreferrer">
                                             ${peca.peca}
                                         </a>
                                     </td>
@@ -1397,3 +1397,12 @@ document.addEventListener('DOMContentLoaded', () => {
     filtro();
 
 });
+
+function pegarCodigoPeca(peca){
+    if (peca.includes("-")) {
+        // Se a peça contém um hífen, divide a string e retorna a parte antes do hífen
+        const partes = peca.split("-");
+        return partes[0].trim(); // Retorna a parte antes do hífen
+    }
+    return peca; // Se não houver hífen, retorna a peça completa
+}
