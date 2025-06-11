@@ -3426,51 +3426,43 @@ def causas_nao_conformidade_por_tipo(request):
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
-    queryset = CausasNaoConformidade.objects.filter(
-        dados_execucao__inspecao__data_inspecao__isnull=False,
-        dados_execucao__inspecao__pecas_ordem_pintura__isnull=False
-    ).select_related(
-        'dados_execucao__inspecao__pecas_ordem_pintura'
-    ).prefetch_related('causa')
+    sql = """
+    SELECT
+        TO_CHAR(i.data_inspecao, 'YYYY-MM') AS data_inspecao,
+        c.nome AS Causa,
+        UPPER(pop.tipo) AS Tipo,
+        pop.peca AS Peça,
+        SUM(cnc.quantidade) AS Quantidade
+    FROM apontamento_v2.inspecao_causasnaoconformidade cnc
+    JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
+    JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
+    JOIN apontamento_v2.apontamento_pintura_pecasordem pop ON i.pecas_ordem_pintura_id = pop.id
+    JOIN apontamento_v2.inspecao_causasnaoconformidade_causa link ON cnc.id = link.causasnaoconformidade_id
+    JOIN apontamento_v2.inspecao_causas c ON link.causas_id = c.id
+    WHERE i.data_inspecao IS NOT NULL
+      AND i.pecas_ordem_pintura_id IS NOT NULL
+      AND i.data_inspecao >= %(data_inicio)s
+      AND i.data_inspecao < %(data_fim)s
+    GROUP BY data_inspecao, Causa, Tipo, Peça
+    ORDER BY data_inspecao, Causa, Tipo, Peça;
+    """
 
-    if data_inicio:
-        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__gte=data_inicio)
-    if data_fim:
-        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__lte=data_fim)
+    with connection.cursor() as cursor:
+        cursor.execute(sql, {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+        })
+        rows = cursor.fetchall()
 
-    # Agora a chave inclui também o nome da peça
-    agrupado = defaultdict(int)
-
-    for item in queryset:
-        execucao = item.dados_execucao
-        inspecao = execucao.inspecao
-        peca = inspecao.pecas_ordem_pintura
-
-        if not peca or not peca.tipo:
-            continue
-
-        mes = inspecao.data_inspecao.month
-        ano = inspecao.data_inspecao.year
-        mes_formatado = f"{ano}-{mes:02d}"
-        tipo_tinta = peca.tipo.upper()
-        nome_peca = peca.peca
-
-        for causa in item.causa.all():
-            # Chave agora inclui nome_peca para separar por peça
-            chave = (mes_formatado, causa.nome, tipo_tinta, nome_peca)
-            agrupado[chave] += item.quantidade
-
-    # Monta JSON de saída
-    resultado = [
-        {
+    resultado = []
+    for data, causa, tipo, peca, quantidade in rows:
+        resultado.append({
             "Data": data,
             "Causa": causa,
             "Tipo": tipo,
             "Peça": peca,
-            "Quantidade": total
-        }
-        for (data, causa, tipo, peca), total in sorted(agrupado.items())
-    ]
+            "Quantidade": quantidade
+        })
 
     return JsonResponse(resultado, safe=False)
 
