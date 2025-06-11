@@ -401,6 +401,12 @@ def get_itens_inspecionados_pintura(request):
         if request.GET.get("inspetores")
         else []
     )
+            
+    status_conformidade_filtrados = (
+        request.GET.get("status-conformidade", "").split(",")
+        if request.GET.get("status-conformidade")
+        else []
+    )
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
@@ -426,6 +432,24 @@ def get_itens_inspecionados_pintura(request):
         datas = datas.filter(
             dadosexecucaoinspecao__inspetor__user__username__in=inspetores_filtrados
         ).distinct()
+    
+    # Filtro de status de conformidade
+    if status_conformidade_filtrados:
+        # Verifica os casos possíveis de combinação de filtros
+        if set(status_conformidade_filtrados) == {'conforme', 'nao_conforme'}:
+            pass
+        elif 'conforme' in status_conformidade_filtrados:
+            # Apenas itens conformes (nao_conformidades = 0) E num_execucao=0
+            datas = datas.filter(
+                dadosexecucaoinspecao__nao_conformidade=0,
+                dadosexecucaoinspecao__num_execucao=0
+            )
+        elif 'nao_conforme' in status_conformidade_filtrados:
+            # Apenas itens não conformes (nao_conformidades > 0) E num_execucao=0
+            datas = datas.filter(
+                dadosexecucaoinspecao__nao_conformidade__gt=0,
+                dadosexecucaoinspecao__num_execucao=0
+            )
 
     datas = datas.select_related(
         "pecas_ordem_pintura",
@@ -868,8 +892,6 @@ def get_itens_inspecionados_montagem(request):
         DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
     )
 
-    print(inspecionados_ids)
-
     # Captura os filtros aplicados pela URL
     maquinas_filtradas = (
         request.GET.get("maquinas", "").split(",")
@@ -879,6 +901,12 @@ def get_itens_inspecionados_montagem(request):
     inspetores_filtrados = (
         request.GET.get("inspetores", "").split(",")
         if request.GET.get("inspetores")
+        else []
+    )
+        
+    status_conformidade_filtrados = (
+        request.GET.get("status-conformidade", "").split(",")
+        if request.GET.get("status-conformidade")
         else []
     )
     data_filtrada = request.GET.get("data", None)
@@ -908,6 +936,25 @@ def get_itens_inspecionados_montagem(request):
         datas = datas.filter(
             dadosexecucaoinspecao__inspetor__user__username__in=inspetores_filtrados
         ).distinct()
+    
+        
+    # Filtro de status de conformidade
+    if status_conformidade_filtrados:
+        # Verifica os casos possíveis de combinação de filtros
+        if set(status_conformidade_filtrados) == {'conforme', 'nao_conforme'}:
+            pass
+        elif 'conforme' in status_conformidade_filtrados:
+            # Apenas itens conformes (nao_conformidades = 0) E num_execucao=0
+            datas = datas.filter(
+                dadosexecucaoinspecao__nao_conformidade=0,
+                dadosexecucaoinspecao__num_execucao=0
+            )
+        elif 'nao_conforme' in status_conformidade_filtrados:
+            # Apenas itens não conformes (nao_conformidades > 0) E num_execucao=0
+            datas = datas.filter(
+                dadosexecucaoinspecao__nao_conformidade__gt=0,
+                dadosexecucaoinspecao__num_execucao=0
+            )
 
     datas = datas.select_related(
         "pecas_ordem_montagem",
@@ -1650,8 +1697,6 @@ def get_itens_inspecionados_estamparia(request):
         DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
     )
 
-    print(inspecionados_ids)
-
     # Captura os filtros aplicados pela URL
     maquinas_filtradas = (
         request.GET.get("maquinas", "").split(",")
@@ -1661,6 +1706,12 @@ def get_itens_inspecionados_estamparia(request):
     inspetores_filtrados = (
         request.GET.get("inspetores", "").split(",")
         if request.GET.get("inspetores")
+        else []
+    )
+    
+    status_conformidade_filtrados = (
+        request.GET.get("status-conformidade", "").split(",")
+        if request.GET.get("status-conformidade")
         else []
     )
     data_filtrada = request.GET.get("data", None)
@@ -1702,6 +1753,24 @@ def get_itens_inspecionados_estamparia(request):
         datas = datas.filter(
             dadosexecucaoinspecao__inspetor__user__username__in=inspetores_filtrados
         )
+    
+    # Filtro de status de conformidade
+    if status_conformidade_filtrados:
+        # Verifica os casos possíveis de combinação de filtros
+        if set(status_conformidade_filtrados) == {'conforme', 'nao_conforme'}:
+            pass
+        elif 'conforme' in status_conformidade_filtrados:
+            # Apenas itens conformes (nao_conformidades = 0) E num_execucao=0
+            datas = datas.filter(
+                dadosexecucaoinspecao__nao_conformidade=0,
+                dadosexecucaoinspecao__num_execucao=0
+            )
+        elif 'nao_conforme' in status_conformidade_filtrados:
+            # Apenas itens não conformes (nao_conformidades > 0) E num_execucao=0
+            datas = datas.filter(
+                dadosexecucaoinspecao__nao_conformidade__gt=0,
+                dadosexecucaoinspecao__num_execucao=0
+            )
 
     datas = datas.select_related(
         "pecas_ordem_estamparia",
@@ -1721,8 +1790,6 @@ def get_itens_inspecionados_estamparia(request):
 
     # Cria um dicionário para mapear inspecao_id para seus dados de execução
     dados_execucao_dict = {de.inspecao_id: de for de in dados_execucao}
-
-    print(dados_execucao_dict)
 
     dados = []
     for data in pagina_obj:
@@ -1763,30 +1830,56 @@ def get_historico_estamparia(request, id):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # Otimiza a consulta usando select_related para trazer dados relacionados
     dados = (
         DadosExecucaoInspecao.objects.filter(inspecao__id=id)
         .select_related("inspetor__user")
+        .prefetch_related(
+            'infoadicionaisinspecaoestamparia_set',
+            'infoadicionaisinspecaoestamparia_set__motivo_mortas',
+            'infoadicionaisinspecaoestamparia_set__medidasinspecaoestamparia_set'
+        )
         .order_by("-id")
     )
 
-    # Usa list comprehension para construir a lista de histórico
-    list_history = [
-        {
+    list_history = []
+    for dado in dados:
+        info_adicionais = dado.infoadicionaisinspecaoestamparia_set.first()
+        medidas = []
+        
+        if info_adicionais:
+            total_medidas = dado.conformidade + dado.nao_conformidade
+            medidas_qs = info_adicionais.medidasinspecaoestamparia_set.all()[:total_medidas]
+            
+            medidas = [{
+                "cabecalhoMedidaA": m.cabecalho_medida_a,
+                "medidaA": m.medida_a,
+                "cabecalhoMedidaB": m.cabecalho_medida_b,
+                "medidaB": m.medida_b,
+                "cabecalhoMedidaC": m.cabecalho_medida_c,
+                "medidaC": m.medida_c,
+                "cabecalhoMedidaD": m.cabecalho_medida_d,
+                "medidaD": m.medida_d,
+            } for m in medidas_qs]
+
+        history_item = {
             "id": dado.id,
             "id_inspecao": id,
-            "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
-                "%d/%m/%Y %H:%M:%S"
-            ),
+            "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S"),
             "num_execucao": dado.num_execucao,
             "conformidade": dado.conformidade,
             "nao_conformidade": dado.nao_conformidade,
-            "inspetor": dado.inspetor.user.username,  # Já está otimizado com select_related
+            "inspetor": dado.inspetor.user.username if dado.inspetor else None,
+            "info_adicionais": {
+                "id": info_adicionais.id if info_adicionais else None,
+                "inspecao_completa": info_adicionais.inspecao_completa if info_adicionais else False,
+                "qtd_mortas": info_adicionais.qtd_mortas if info_adicionais else 0,
+                "motivo_mortas": [motivo.nome for motivo in info_adicionais.motivo_mortas.all()] if info_adicionais else [],
+                "ficha_url": info_adicionais.ficha.url if info_adicionais and info_adicionais.ficha else None,
+            },
+            "medidas_inspecao": medidas,
+            "total_medidas": dado.conformidade + dado.nao_conformidade  # Adicionando para facilitar no frontend
         }
-        for dado in dados
-    ]
-
-    print(list_history)
+        list_history.append(history_item)
 
     return JsonResponse({"history": list_history}, status=200)
 

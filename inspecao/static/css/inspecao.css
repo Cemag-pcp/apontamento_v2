@@ -147,3 +147,19 @@
     color: #6c757d; /* Cor cinza para os dados */
     margin-left: 5px;
 }
+
+.medidas-inspecao-container {
+    border-top: 1px solid #dee2e6;
+    padding-top: 15px;
+    margin-top: 15px;
+}
+
+.medidas-inspecao-container h6 {
+    font-size: 1rem;
+    color: #495057;
+    font-weight: 600;
+}
+
+.medidas-inspecao-container .table {
+    font-size: 0.85rem;
+}

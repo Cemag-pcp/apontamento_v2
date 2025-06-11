@@ -27,16 +27,96 @@ document.addEventListener("DOMContentLoaded", () => {
                 return response.json();
             })
             .then(data => {
-                
-                console.log(data)
+                console.log(data);
 
                 data.history.forEach((element, index) => {
-                    const isFirstItem = index === 0; 
+                    const isFirstItem = index === 0;
+                    
+                    // HTML para informações adicionais
+                    let infoAdicionaisHTML = '';
+                    if (element.info_adicionais) {
+                        infoAdicionaisHTML = `
+                            <div class="mt-3 info-adicionais-container">
+                                <h6 class="mb-2">Informações Adicionais: #${element.info_adicionais.id}</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>Inspeção Completa:</strong> ${element.info_adicionais.inspecao_completa ? 'Sim' : 'Não'}</li>
+                                    <li><strong>Qtd. Mortas:</strong> ${element.info_adicionais.qtd_mortas}</li>
+                                    ${element.info_adicionais.motivo_mortas.length > 0 ? 
+                                        `<li><strong>Motivo Mortas:</strong> ${element.info_adicionais.motivo_mortas.join(', ')}</li>` : ''}
+                                    ${element.info_adicionais.ficha_url ? 
+                                        `<li><strong>Ficha:</strong> <a href="${element.info_adicionais.ficha_url}" target="_blank">Ver imagem</a></li>` : ''}
+                                </ul>
+                            </div>`;
+                    }
+
+                    // HTML para medidas de inspeção
+                    let medidasHTML = '';
+                    if (element.medidas_inspecao && element.medidas_inspecao.length > 0) {
+                        medidasHTML = `<div class="mt-3 medidas-inspecao-container">
+                                        <h6 class="mb-2">Medidas de Inspeção:</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Medida Referência</th>
+                                                        <th>Valor</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>`;
+                        
+                        // Para cada peça inspecionada
+                        element.medidas_inspecao.forEach((medida, index) => {
+                            const pecaNum = index + 1;
+                            medidasHTML += `
+                                <tr class="table-info">
+                                    <td colspan="2"><strong>Amostra ${pecaNum}</strong></td>
+                                </tr>`;
+                            
+                            // Medida A
+                            if (medida.medidaA !== null && medida.medidaA !== undefined) {
+                                medidasHTML += `
+                                    <tr>
+                                        <td>${medida.cabecalhoMedidaA || 'Medida A'}</td>
+                                        <td>${medida.medidaA}</td>
+                                    </tr>`;
+                            }
+                            
+                            // Medida B
+                            if (medida.medidaB !== null && medida.medidaB !== undefined) {
+                                medidasHTML += `
+                                    <tr>
+                                        <td>${medida.cabecalhoMedidaB || 'Medida B'}</td>
+                                        <td>${medida.medidaB}</td>
+                                    </tr>`;
+                            }
+                            
+                            // Medida C
+                            if (medida.medidaC !== null && medida.medidaC !== undefined) {
+                                medidasHTML += `
+                                    <tr>
+                                        <td>${medida.cabecalhoMedidaC || 'Medida C'}</td>
+                                        <td>${medida.medidaC}</td>
+                                    </tr>`;
+                            }
+                            
+                            // Medida D
+                            if (medida.medidaD !== null && medida.medidaD !== undefined) {
+                                medidasHTML += `
+                                    <tr>
+                                        <td>${medida.cabecalhoMedidaD || 'Medida D'}</td>
+                                        <td>${medida.medidaD}</td>
+                                    </tr>`;
+                            }
+                        });
+                        
+                        medidasHTML += `</tbody></table></div></div>`;
+                    }
+
                     listaTimeline.innerHTML += `
-                            <li class="timeline-item" style="cursor:pointer;" 
-                                data-id="${element.id}" 
-                                data-nao-conformidade="${element.nao_conformidade}" 
-                                data-data="${element.data_execucao}">
+                        <li class="timeline-item" style="cursor:pointer;" 
+                            data-id="${element.id}" 
+                            data-nao-conformidade="${element.nao_conformidade}" 
+                            data-data="${element.data_execucao}">
                             <span class="timeline-icon ${element.nao_conformidade == 0 ? 'success' : 'danger'}">
                                 <i class="bi ${element.nao_conformidade == 0 ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
                             </span>
@@ -69,6 +149,8 @@ document.addEventListener("DOMContentLoaded", () => {
                                 <p class="${element.nao_conformidade == 0 ? 'text-success' : 'text-danger'}">
                                     <strong>Não Conformidade:</strong> ${element.nao_conformidade}
                                 </p>
+                                ${infoAdicionaisHTML}
+                                ${medidasHTML}
                             </div>
                         </li>`;
                 });
