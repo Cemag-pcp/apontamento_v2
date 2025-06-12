@@ -107,6 +107,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'apontamento_pintura/static'),
     os.path.join(BASE_DIR, 'cargas/static'),
 
+    os.path.join(BASE_DIR, 'sucata/static'),
     os.path.join(BASE_DIR, 'inspecao/static'),
     os.path.join(BASE_DIR, 'cadastro/static'),
 ]
