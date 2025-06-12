@@ -455,7 +455,7 @@ def get_itens_inspecionados_pintura(request):
         "pecas_ordem_pintura",
         "pecas_ordem_pintura__ordem",
         "pecas_ordem_pintura__operador_fim",
-    ).order_by("-id")
+    ).order_by("-dadosexecucaoinspecao__data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
@@ -960,7 +960,7 @@ def get_itens_inspecionados_montagem(request):
         "pecas_ordem_montagem",
         "pecas_ordem_montagem__ordem",
         "pecas_ordem_montagem__operador",
-    ).order_by("-id")
+    ).order_by("-dadosexecucaoinspecao__data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
@@ -1776,8 +1776,8 @@ def get_itens_inspecionados_estamparia(request):
         "pecas_ordem_estamparia",
         "pecas_ordem_estamparia__ordem",
         "pecas_ordem_estamparia__operador",
-    ).order_by("-id")
-
+    ).order_by("-dadosexecucaoinspecao__data_execucao")
+    
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
@@ -2193,136 +2193,112 @@ def get_itens_reinspecao_tubos_cilindros(request):
 
 
 def get_itens_inspecionados_tubos_cilindros(request):
+
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # Filtra apenas peças do tipo "tubo" ou "cilindro"
-    pecas_filtradas = PecasEstanqueidade.objects.filter(tipo__in=["tubo", "cilindro"])
-    inspecionados_ids = set(
-        DadosExecucaoInspecaoEstanqueidade.objects.filter(
-            inspecao_estanqueidade__peca__in=pecas_filtradas
-        ).values_list("inspecao_estanqueidade", flat=True)
-    )
+    pecas_filtradas = PecasEstanqueidade.objects.filter(tipo__in=["tubo", "cilindro"]).only('id')
+
+    inspecionados_ids = DadosExecucaoInspecaoEstanqueidade.objects.filter(
+        inspecao_estanqueidade__peca__in=pecas_filtradas
+    ).values_list("inspecao_estanqueidade_id", flat=True).distinct()
 
     # Filtros
-    inspetores_filtrados = (
-        request.GET.get("inspetores", "").split(",")
-        if request.GET.get("inspetores")
-        else []
-    )
+    inspetores_filtrados = request.GET.get("inspetores", "").split(",") if request.GET.get("inspetores") else []
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
-    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
-    itens_por_pagina = 12  # Itens por página
+    pagina = int(request.GET.get("pagina", 1))
+    itens_por_pagina = 6
 
-    # Filtra os dados
-    datas = InspecaoEstanqueidade.objects.filter(id__in=inspecionados_ids).order_by(
-        "-id"
-    )
-
-    quantidade_total = datas.count()
+    base_query = InspecaoEstanqueidade.objects.filter(id__in=inspecionados_ids).order_by("-data_inspecao")
 
     if data_filtrada:
-        datas = datas.filter(dadosexecucaoinspecaoestanqueidade__data_exec__date=data_filtrada).distinct()
+        base_query = base_query.filter(
+            dadosexecucaoinspecaoestanqueidade__data_exec__date=data_filtrada
+        ).distinct()
 
     if pesquisa_filtrada:
         if " - " in pesquisa_filtrada:
             codigo, descricao = pesquisa_filtrada.split(" - ", 1)
-            codigo = codigo.strip()
-            descricao = descricao.strip()
-            datas = datas.filter(
-                Q(peca__codigo__icontains=codigo)
-                & Q(peca__descricao__icontains=descricao)
+            base_query = base_query.filter(
+                Q(peca__codigo__icontains=codigo.strip()) &
+                Q(peca__descricao__icontains=descricao.strip())
             ).distinct()
         else:
-            datas = datas.filter(
-                Q(peca__codigo__icontains=pesquisa_filtrada)
-                | Q(peca__descricao__icontains=pesquisa_filtrada)
+            base_query = base_query.filter(
+                Q(peca__codigo__icontains=pesquisa_filtrada) |
+                Q(peca__descricao__icontains=pesquisa_filtrada)
             ).distinct()
 
     if inspetores_filtrados:
-        datas = datas.filter(
+        base_query = base_query.filter(
             dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
         ).distinct()
 
-    # Subconsulta para obter o maior num_execucao para cada inspecao_estanqueidade
-    maior_num_execucao_subquery = (
-        DadosExecucaoInspecaoEstanqueidade.objects.filter(
-            inspecao_estanqueidade=OuterRef("inspecao_estanqueidade")
-        )
-        .values("inspecao_estanqueidade")
-        .annotate(max_num_execucao=Max("num_execucao"))
-        .values("max_num_execucao")
+    quantidade_total = base_query.count()
+
+    maior_num_execucao_subquery = DadosExecucaoInspecaoEstanqueidade.objects.filter(
+        inspecao_estanqueidade_id=OuterRef('inspecao_estanqueidade_id')
+    ).order_by('-num_execucao').values('num_execucao')[:1]
+
+    dados_execucao = DadosExecucaoInspecaoEstanqueidade.objects.filter(
+        inspecao_estanqueidade__in=base_query,
+    ).annotate(
+        max_num_execucao=Subquery(maior_num_execucao_subquery)
+    ).filter(
+        num_execucao=F('max_num_execucao')
+    ).select_related(
+        'inspetor__user', 'inspecao_estanqueidade__peca'
+    ).prefetch_related(
+        'infoadicionaisexectuboscilindros_set'
     )
 
-    # Filtra os dados de execução para incluir apenas os registros com o maior num_execucao
-    dados_execucao = (
-        DadosExecucaoInspecaoEstanqueidade.objects.filter(
-            inspecao_estanqueidade__in=datas,
-            num_execucao=Subquery(maior_num_execucao_subquery),
-        )
-        .select_related("inspetor__user", "inspecao_estanqueidade__peca")
-        .prefetch_related("infoadicionaisexectuboscilindros_set")
-    )
-
-    # Cria um dicionário para mapear inspecao_id para seus dados de execução e informações adicionais
-    dados_execucao_dict = {
-        de.inspecao_estanqueidade_id: {
-            "dados_execucao": de,
-            "info_adicionais": de.infoadicionaisexectuboscilindros_set.first(),
+    dados_execucao_dict = {}
+    for de in dados_execucao:
+        dados_execucao_dict[de.inspecao_estanqueidade_id] = {
+            'dados_execucao': de,
+            'info_adicionais': de.infoadicionaisexectuboscilindros_set.first(),
         }
-        for de in dados_execucao
-    }
 
     # Paginação
-    paginador = Paginator(datas, itens_por_pagina)
+    paginador = Paginator(base_query, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
     dados = []
     for data in pagina_obj:
         de_info = dados_execucao_dict.get(data.id)
-        if de_info:
-            de = de_info["dados_execucao"]
-            info_adicionais = de_info["info_adicionais"]
+        if not de_info:
+            continue
+            
+        de = de_info['dados_execucao']
+        info_adicionais = de_info['info_adicionais']
+        
+        data_ajustada = de.data_exec - timedelta(hours=3)
+        possui_nao_conformidade = (
+            (info_adicionais.nao_conformidade + info_adicionais.nao_conformidade_refugo > 0) 
+            or de.num_execucao > 0
+        )
 
-            data_ajustada = de.data_exec - timedelta(hours=3)
-            possui_nao_conformidade = (
-                info_adicionais.nao_conformidade
-                + info_adicionais.nao_conformidade_refugo
-                > 0
-            ) or de.num_execucao > 0
+        dados.append({
+            'id': data.id,
+            'id_dados_execucao': de.id,
+            'data': data_ajustada.strftime('%d/%m/%Y %H:%M:%S'),
+            'peca': f'{data.peca.codigo} - {data.peca.descricao}',
+            'inspetor': de.inspetor.user.username if de.inspetor else None,
+            'possui_nao_conformidade': possui_nao_conformidade,
+            'nao_conformidade': info_adicionais.nao_conformidade if info_adicionais else 0,
+            'nao_conformidade_refugo': info_adicionais.nao_conformidade_refugo if info_adicionais else 0,
+            'qtd_inspecionada': info_adicionais.qtd_inspecionada if info_adicionais else 0,
+            'observacao': info_adicionais.observacao if info_adicionais else None,
+        })
 
-            item = {
-                "id": data.id,
-                "id_dados_execucao": de.id,
-                "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                "peca": f"{data.peca.codigo} - {data.peca.descricao}",
-                "inspetor": de.inspetor.user.username if de.inspetor else None,
-                "possui_nao_conformidade": possui_nao_conformidade,
-                "nao_conformidade": (
-                    info_adicionais.nao_conformidade if info_adicionais else 0
-                ),
-                "nao_conformidade_refugo": (
-                    info_adicionais.nao_conformidade_refugo if info_adicionais else 0
-                ),
-                "qtd_inspecionada": (
-                    info_adicionais.qtd_inspecionada if info_adicionais else 0
-                ),
-                "observacao": info_adicionais.observacao if info_adicionais else None,
-            }
-
-            dados.append(item)
-
-    return JsonResponse(
-        {
-            "dados": dados,
-            "total": quantidade_total,
-            "total_filtrado": paginador.count,
-            "pagina_atual": pagina_obj.number,
-            "total_paginas": paginador.num_pages,
-        },
-        status=200,
-    )
+    return JsonResponse({
+        'dados': dados,
+        'total': quantidade_total,
+        'total_filtrado': paginador.count,
+        'pagina_atual': pagina_obj.number,
+        'total_paginas': paginador.num_pages,
+    }, status=200)
 
 
 def envio_inspecao_tubos_cilindros(request):
@@ -3316,20 +3292,36 @@ def indicador_pintura_analise_temporal(request):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
     sql = """
-    SELECT
-        TO_CHAR(i.data_inspecao, 'YYYY-MM') AS mes,
-        SUM(pop.qtd_boa) AS qtd_peca_produzida,
-        SUM(COALESCE(de.conformidade, 0) + COALESCE(de.nao_conformidade, 0)) AS qtd_peca_inspecionada,
-        SUM(COALESCE(de.conformidade, 0)) AS soma_conformidade,
-        SUM(COALESCE(de.nao_conformidade, 0)) AS soma_nao_conformidade
-    FROM apontamento_v2.inspecao_inspecao i
-    JOIN apontamento_v2.apontamento_pintura_pecasordem pop ON i.pecas_ordem_pintura_id = pop.id
-    LEFT JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON de.inspecao_id = i.id
-    WHERE i.pecas_ordem_pintura_id IS NOT NULL
-    AND i.data_inspecao >= %(data_inicio)s
-    AND i.data_inspecao < %(data_fim)s
-    GROUP BY mes
-    ORDER BY mes;
+    WITH producao_total AS (
+        SELECT 
+            EXTRACT(YEAR FROM data) AS ano,
+            EXTRACT(MONTH FROM data) AS mes,
+            SUM(qtd_boa) AS total_produzido
+        FROM apontamento_v2.apontamento_pintura_pecasordem
+        WHERE qtd_boa IS NOT NULL
+            AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+        GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
+    ),
+    inspecoes_total AS (
+        SELECT
+            EXTRACT(YEAR FROM app.data) AS ano,
+            EXTRACT(MONTH FROM app.data) AS mes,
+            SUM(dei.conformidade) AS total_conforme,
+            SUM(dei.nao_conformidade) AS total_nao_conforme
+        FROM apontamento_v2.apontamento_pintura_pecasordem app
+        INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_pintura_id = app.id
+        INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
+        WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
+    )
+    SELECT 
+        concat(p.ano, '-', p.mes) as mes,
+        p.total_produzido,
+        (COALESCE(i.total_conforme, 0) - COALESCE(i.total_nao_conforme, 0)) AS total_conforme,
+        COALESCE(i.total_nao_conforme, 0) AS total_nao_conforme
+    FROM producao_total p
+    LEFT JOIN inspecoes_total i ON p.ano = i.ano AND p.mes = i.mes
+    ORDER BY p.ano, p.mes;
     """
 
     with connection.cursor() as cursor:
@@ -3341,7 +3333,8 @@ def indicador_pintura_analise_temporal(request):
 
     resultado = []
     for row in rows:
-        mes, qtd_produzida, qtd_inspecionada, soma_conformidade, soma_nao_conformidade = row
+        mes, qtd_produzida, soma_conformidade, soma_nao_conformidade = row
+        qtd_inspecionada = soma_conformidade + soma_nao_conformidade
         taxa_nc = (soma_nao_conformidade / soma_conformidade) if soma_conformidade else 0
 
         resultado.append({
@@ -3366,20 +3359,37 @@ def indicador_pintura_resumo_analise_temporal(request):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
     sql = """
-    SELECT
-        EXTRACT(YEAR FROM i.data_inspecao) AS ano,
-        EXTRACT(MONTH FROM i.data_inspecao) AS mes_num,
-        SUM(pop.qtd_boa) AS total_produzida,
-        SUM(COALESCE(de.conformidade, 0) + COALESCE(de.nao_conformidade, 0)) AS total_inspecionada,
-        SUM(COALESCE(de.nao_conformidade, 0)) AS total_nao_conforme
-    FROM apontamento_v2.inspecao_inspecao i
-    JOIN apontamento_v2.apontamento_pintura_pecasordem pop ON i.pecas_ordem_pintura_id = pop.id
-    LEFT JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON de.inspecao_id = i.id
-    WHERE i.pecas_ordem_pintura_id IS NOT NULL
-    AND i.data_inspecao >= %(data_inicio)s
-    AND i.data_inspecao < %(data_fim)s
-    GROUP BY ano, mes_num
-    ORDER BY ano, mes_num;
+    WITH producao_total AS (
+    SELECT 
+        EXTRACT(YEAR FROM data) AS ano,
+        EXTRACT(MONTH FROM data) AS mes,
+        SUM(qtd_boa) AS total_produzido
+    FROM apontamento_v2.apontamento_pintura_pecasordem
+    WHERE qtd_boa IS NOT NULL
+        AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+    GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
+    ),
+    inspecoes_total AS (
+        SELECT
+            EXTRACT(YEAR FROM app.data) AS ano,
+            EXTRACT(MONTH FROM app.data) AS mes,
+            SUM(dei.conformidade) AS total_conforme,
+            SUM(dei.nao_conformidade) AS total_nao_conforme
+        FROM apontamento_v2.apontamento_pintura_pecasordem app
+        INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_pintura_id = app.id
+        INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
+        WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
+    )
+    SELECT 
+        p.ano,
+        p.mes,
+        p.total_produzido,
+        (COALESCE(i.total_conforme, 0) - COALESCE(i.total_nao_conforme, 0)) AS total_conforme,
+        COALESCE(i.total_nao_conforme, 0) AS total_nao_conforme
+    FROM producao_total p
+    LEFT JOIN inspecoes_total i ON p.ano = i.ano AND p.mes = i.mes
+    ORDER BY p.ano, p.mes;
     """
 
     with connection.cursor() as cursor:
@@ -3391,7 +3401,8 @@ def indicador_pintura_resumo_analise_temporal(request):
 
     resultado = []
     for row in rows:
-        ano, mes_num, total_prod, total_insp, total_nc = row
+        ano, mes_num, total_prod, total_conf, total_nc = row
+        total_insp = total_nc + total_conf
         perc_insp = (total_insp / total_prod) * 100 if total_prod else 0
 
         resultado.append({
@@ -4333,9 +4344,6 @@ def indicador_tubos_cilindros_resumo_analise_temporal(request):
         Q(peca__tipo='tubo') | Q(peca__tipo='cilindro'),
         peca__isnull=False
     )
-
-    print(queryset)
-    print(len(queryset))
 
     if data_inicio:
         queryset = queryset.filter(data_inspecao__gte=data_inicio)
