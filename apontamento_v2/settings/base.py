@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'usuario',
     'core',
     'inspecao',
+    'sucata',
 
     'apontamento_serra',
     'apontamento_usinagem',
