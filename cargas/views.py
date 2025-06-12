@@ -132,7 +132,7 @@ def gerar_dados_sequenciamento(request):
             "obs": "Ordem gerada automaticamente",
             "peca_nome": str(row["Código"]) + " - " + row["Peca"],
             "qtd_planejada": int(row["Qtde_total"]),
-            "data_carga" : str(row["Datas"].date()) if setor == 'montagem' or 'solda' else row["Datas"],#.strftime("%Y-%m-%d") if isinstance(row["Datas"], pd.Timestamp) else datetime.strptime(str(row["Datas"]), "%d/%m/%Y").strftime("%Y-%m-%d")
+            "data_carga": str(row["Datas"].date()) if setor in ['montagem', 'solda'] else row["Datas"],
             "setor_conjunto" : row["Célula"]
         })
 
