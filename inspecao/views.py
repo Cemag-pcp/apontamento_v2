@@ -455,7 +455,7 @@ def get_itens_inspecionados_pintura(request):
         "pecas_ordem_pintura",
         "pecas_ordem_pintura__ordem",
         "pecas_ordem_pintura__operador_fim",
-    ).order_by("-id")
+    ).order_by("-dadosexecucaoinspecao__data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
@@ -960,7 +960,7 @@ def get_itens_inspecionados_montagem(request):
         "pecas_ordem_montagem",
         "pecas_ordem_montagem__ordem",
         "pecas_ordem_montagem__operador",
-    ).order_by("-id")
+    ).order_by("-dadosexecucaoinspecao__data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
@@ -1776,8 +1776,8 @@ def get_itens_inspecionados_estamparia(request):
         "pecas_ordem_estamparia",
         "pecas_ordem_estamparia__ordem",
         "pecas_ordem_estamparia__operador",
-    ).order_by("-id")
-
+    ).order_by("-dadosexecucaoinspecao__data_execucao")
+    
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
@@ -2193,136 +2193,112 @@ def get_itens_reinspecao_tubos_cilindros(request):
 
 
 def get_itens_inspecionados_tubos_cilindros(request):
+
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # Filtra apenas peças do tipo "tubo" ou "cilindro"
-    pecas_filtradas = PecasEstanqueidade.objects.filter(tipo__in=["tubo", "cilindro"])
-    inspecionados_ids = set(
-        DadosExecucaoInspecaoEstanqueidade.objects.filter(
-            inspecao_estanqueidade__peca__in=pecas_filtradas
-        ).values_list("inspecao_estanqueidade", flat=True)
-    )
+    pecas_filtradas = PecasEstanqueidade.objects.filter(tipo__in=["tubo", "cilindro"]).only('id')
+
+    inspecionados_ids = DadosExecucaoInspecaoEstanqueidade.objects.filter(
+        inspecao_estanqueidade__peca__in=pecas_filtradas
+    ).values_list("inspecao_estanqueidade_id", flat=True).distinct()
 
     # Filtros
-    inspetores_filtrados = (
-        request.GET.get("inspetores", "").split(",")
-        if request.GET.get("inspetores")
-        else []
-    )
+    inspetores_filtrados = request.GET.get("inspetores", "").split(",") if request.GET.get("inspetores") else []
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
-    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
-    itens_por_pagina = 12  # Itens por página
+    pagina = int(request.GET.get("pagina", 1))
+    itens_por_pagina = 6
 
-    # Filtra os dados
-    datas = InspecaoEstanqueidade.objects.filter(id__in=inspecionados_ids).order_by(
-        "-id"
-    )
-
-    quantidade_total = datas.count()
+    base_query = InspecaoEstanqueidade.objects.filter(id__in=inspecionados_ids).order_by("-data_inspecao")
 
     if data_filtrada:
-        datas = datas.filter(dadosexecucaoinspecaoestanqueidade__data_exec__date=data_filtrada).distinct()
+        base_query = base_query.filter(
+            dadosexecucaoinspecaoestanqueidade__data_exec__date=data_filtrada
+        ).distinct()
 
     if pesquisa_filtrada:
         if " - " in pesquisa_filtrada:
             codigo, descricao = pesquisa_filtrada.split(" - ", 1)
-            codigo = codigo.strip()
-            descricao = descricao.strip()
-            datas = datas.filter(
-                Q(peca__codigo__icontains=codigo)
-                & Q(peca__descricao__icontains=descricao)
+            base_query = base_query.filter(
+                Q(peca__codigo__icontains=codigo.strip()) &
+                Q(peca__descricao__icontains=descricao.strip())
             ).distinct()
         else:
-            datas = datas.filter(
-                Q(peca__codigo__icontains=pesquisa_filtrada)
-                | Q(peca__descricao__icontains=pesquisa_filtrada)
+            base_query = base_query.filter(
+                Q(peca__codigo__icontains=pesquisa_filtrada) |
+                Q(peca__descricao__icontains=pesquisa_filtrada)
             ).distinct()
 
     if inspetores_filtrados:
-        datas = datas.filter(
+        base_query = base_query.filter(
             dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
         ).distinct()
 
-    # Subconsulta para obter o maior num_execucao para cada inspecao_estanqueidade
-    maior_num_execucao_subquery = (
-        DadosExecucaoInspecaoEstanqueidade.objects.filter(
-            inspecao_estanqueidade=OuterRef("inspecao_estanqueidade")
-        )
-        .values("inspecao_estanqueidade")
-        .annotate(max_num_execucao=Max("num_execucao"))
-        .values("max_num_execucao")
+    quantidade_total = base_query.count()
+
+    maior_num_execucao_subquery = DadosExecucaoInspecaoEstanqueidade.objects.filter(
+        inspecao_estanqueidade_id=OuterRef('inspecao_estanqueidade_id')
+    ).order_by('-num_execucao').values('num_execucao')[:1]
+
+    dados_execucao = DadosExecucaoInspecaoEstanqueidade.objects.filter(
+        inspecao_estanqueidade__in=base_query,
+    ).annotate(
+        max_num_execucao=Subquery(maior_num_execucao_subquery)
+    ).filter(
+        num_execucao=F('max_num_execucao')
+    ).select_related(
+        'inspetor__user', 'inspecao_estanqueidade__peca'
+    ).prefetch_related(
+        'infoadicionaisexectuboscilindros_set'
     )
 
-    # Filtra os dados de execução para incluir apenas os registros com o maior num_execucao
-    dados_execucao = (
-        DadosExecucaoInspecaoEstanqueidade.objects.filter(
-            inspecao_estanqueidade__in=datas,
-            num_execucao=Subquery(maior_num_execucao_subquery),
-        )
-        .select_related("inspetor__user", "inspecao_estanqueidade__peca")
-        .prefetch_related("infoadicionaisexectuboscilindros_set")
-    )
-
-    # Cria um dicionário para mapear inspecao_id para seus dados de execução e informações adicionais
-    dados_execucao_dict = {
-        de.inspecao_estanqueidade_id: {
-            "dados_execucao": de,
-            "info_adicionais": de.infoadicionaisexectuboscilindros_set.first(),
+    dados_execucao_dict = {}
+    for de in dados_execucao:
+        dados_execucao_dict[de.inspecao_estanqueidade_id] = {
+            'dados_execucao': de,
+            'info_adicionais': de.infoadicionaisexectuboscilindros_set.first(),
         }
-        for de in dados_execucao
-    }
 
     # Paginação
-    paginador = Paginator(datas, itens_por_pagina)
+    paginador = Paginator(base_query, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
     dados = []
     for data in pagina_obj:
         de_info = dados_execucao_dict.get(data.id)
-        if de_info:
-            de = de_info["dados_execucao"]
-            info_adicionais = de_info["info_adicionais"]
+        if not de_info:
+            continue
+            
+        de = de_info['dados_execucao']
+        info_adicionais = de_info['info_adicionais']
+        
+        data_ajustada = de.data_exec - timedelta(hours=3)
+        possui_nao_conformidade = (
+            (info_adicionais.nao_conformidade + info_adicionais.nao_conformidade_refugo > 0) 
+            or de.num_execucao > 0
+        )
 
-            data_ajustada = de.data_exec - timedelta(hours=3)
-            possui_nao_conformidade = (
-                info_adicionais.nao_conformidade
-                + info_adicionais.nao_conformidade_refugo
-                > 0
-            ) or de.num_execucao > 0
+        dados.append({
+            'id': data.id,
+            'id_dados_execucao': de.id,
+            'data': data_ajustada.strftime('%d/%m/%Y %H:%M:%S'),
+            'peca': f'{data.peca.codigo} - {data.peca.descricao}',
+            'inspetor': de.inspetor.user.username if de.inspetor else None,
+            'possui_nao_conformidade': possui_nao_conformidade,
+            'nao_conformidade': info_adicionais.nao_conformidade if info_adicionais else 0,
+            'nao_conformidade_refugo': info_adicionais.nao_conformidade_refugo if info_adicionais else 0,
+            'qtd_inspecionada': info_adicionais.qtd_inspecionada if info_adicionais else 0,
+            'observacao': info_adicionais.observacao if info_adicionais else None,
+        })
 
-            item = {
-                "id": data.id,
-                "id_dados_execucao": de.id,
-                "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                "peca": f"{data.peca.codigo} - {data.peca.descricao}",
-                "inspetor": de.inspetor.user.username if de.inspetor else None,
-                "possui_nao_conformidade": possui_nao_conformidade,
-                "nao_conformidade": (
-                    info_adicionais.nao_conformidade if info_adicionais else 0
-                ),
-                "nao_conformidade_refugo": (
-                    info_adicionais.nao_conformidade_refugo if info_adicionais else 0
-                ),
-                "qtd_inspecionada": (
-                    info_adicionais.qtd_inspecionada if info_adicionais else 0
-                ),
-                "observacao": info_adicionais.observacao if info_adicionais else None,
-            }
-
-            dados.append(item)
-
-    return JsonResponse(
-        {
-            "dados": dados,
-            "total": quantidade_total,
-            "total_filtrado": paginador.count,
-            "pagina_atual": pagina_obj.number,
-            "total_paginas": paginador.num_pages,
-        },
-        status=200,
-    )
+    return JsonResponse({
+        'dados': dados,
+        'total': quantidade_total,
+        'total_filtrado': paginador.count,
+        'pagina_atual': pagina_obj.number,
+        'total_paginas': paginador.num_pages,
+    }, status=200)
 
 
 def envio_inspecao_tubos_cilindros(request):
@@ -4368,9 +4344,6 @@ def indicador_tubos_cilindros_resumo_analise_temporal(request):
         Q(peca__tipo='tubo') | Q(peca__tipo='cilindro'),
         peca__isnull=False
     )
-
-    print(queryset)
-    print(len(queryset))
 
     if data_inicio:
         queryset = queryset.filter(data_inspecao__gte=data_inicio)

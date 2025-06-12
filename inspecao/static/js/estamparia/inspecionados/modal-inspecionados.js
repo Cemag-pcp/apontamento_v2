@@ -267,7 +267,8 @@ document.addEventListener("DOMContentLoaded", () => {
                                                 <img src="${imagem.url}" class="card-img-top" alt="...">
                                                 <div class="card-body">
                                                     <h5 class="card-title">${causa.nomes.join(", ")}</h5>
-                                                    <p class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></p>
+                                                    <span class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></span>
+                                                    <p class="card-text label-modal"><small class="text-muted">Destino: ${causa.destino}</small></p>
                                                 </div>
                                             </div>`;
                             });                            
@@ -275,7 +276,8 @@ document.addEventListener("DOMContentLoaded", () => {
                             causaHTML += `<div class="card mb-3 p-0">
                                             <div class="card-body">
                                                 <h5 class="card-title">${causa.nomes.join(", ")}</h5>
-                                                <p class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></p>
+                                                <span class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></span>
+                                                <p class="card-text label-modal"><small class="text-muted">Destino: ${causa.destino}</small></p>
                                             </div>
                                         </div>`;
                         }
