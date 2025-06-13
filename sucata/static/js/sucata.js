@@ -24,7 +24,7 @@ function filtrarSucata() {
     document.getElementById('tabelaCodigoCorpo').innerHTML = '';
     document.getElementById('semResultados').classList.add('d-none');
     
-    let url = '/sucata/corte?';
+    let url = '/sucata/api?';
     if (dataInicio) url += `data_inicial=${dataInicio}&`;
     if (dataFim) url += `data_final=${dataFim}&`;
     if (codigoChapa) url += `codigo_chapa=${encodeURIComponent(codigoChapa)}`;
