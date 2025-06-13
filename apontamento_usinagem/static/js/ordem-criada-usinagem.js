@@ -976,11 +976,10 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
     });
 }
 
-// Modal para para "Iniciar próximo processo"
+// Modal para "Iniciar próximo processo"
 function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
     const modal = new bootstrap.Modal(document.getElementById('modalProxProcesso'));
     const modalTitle = document.getElementById('modalProxProcessoLabel');
-    const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
 
     const qtdProxProcesso = document.getElementById('qtdProxProcesso');
     const colQtdProxProcesso = document.getElementById('colQtdProxProcesso');
@@ -1016,6 +1015,9 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
                 escolhaMaquina.appendChild(option);
             })
             modalTitle.innerHTML = `Iniciar próximo processo`;
+
+            const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
+
             labelModalMaquinaProxProcesso.innerHTML = 'Em qual máquina será iniciado?'
             modal.show();
         }

@@ -24,3 +24,16 @@ def criar_ordem_usinagem(data):
         nova_ordem.save()
 
     return nova_ordem  # ou outra estrutura se quiser retornar algo mais
+
+def verificar_se_existe_ordem(peca):
+
+    print(peca.id)
+
+    # Verifica se existe uma ordem no setor de usinagem com a mesma peça e status 'aguardando_prox_proc'
+    pecas_ordem = PecasOrdem.objects.filter(
+        peca=peca,  # Relaciona a PecasOrdem com a Peca
+        ordem__grupo_maquina='usinagem',  # Verifica se a ordem está no setor de usinagem
+        ordem__status_atual='agua_prox_proc'  # Status aguardando próxima etapa
+    ).first()  # Retorna a primeira PecasOrdem que corresponder
+
+    return pecas_ordem  # Retorna a ordem se encontrada ou None se não existir

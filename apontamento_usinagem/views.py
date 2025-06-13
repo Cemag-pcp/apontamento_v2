@@ -287,8 +287,10 @@ def get_ordens_iniciadas(request):
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem, grupo_maquina='usinagem')
     if filtro_peca:
         ordens_queryset = ordens_queryset.filter(
-            ordem_pecas_usinagem__peca__codigo=filtro_peca
+            Q(ordem_pecas_usinagem__peca__codigo=filtro_peca) |
+            Q(ordem_pecas_usinagem__peca__descricao__icontains=filtro_peca)
         )
+
 
 
     # Paginação
@@ -359,7 +361,8 @@ def get_ordens_interrompidas(request):
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem, grupo_maquina='usinagem')
     if filtro_peca:
         ordens_queryset = ordens_queryset.filter(
-            ordem_pecas_usinagem__peca__codigo=filtro_peca
+            Q(ordem_pecas_usinagem__peca__codigo=filtro_peca) |
+            Q(ordem_pecas_usinagem__peca__descricao__icontains=filtro_peca)
         )
 
     paginator = Paginator(ordens_queryset, limit)  # Aplica a paginação
@@ -430,7 +433,8 @@ def get_ordens_ag_prox_proc(request):
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem, grupo_maquina='usinagem')
     if filtro_peca:
         ordens_queryset = ordens_queryset.filter(
-            ordem_pecas_usinagem__peca__codigo=filtro_peca
+            Q(ordem_pecas_usinagem__peca__codigo=filtro_peca) |
+            Q(ordem_pecas_usinagem__peca__descricao__icontains=filtro_peca)
         )
     if filtro_processo:
         ordens_queryset = ordens_queryset.filter(

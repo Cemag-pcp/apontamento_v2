@@ -21,7 +21,7 @@ class Maquina(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['nome','setor'], name='unique_nome_setor_maquina')
+            models.UniqueConstraint(fields=['nome','setor','tipo'], name='unique_nome_setor_maquina_tipo')
         ]
 
     def __str__(self):
