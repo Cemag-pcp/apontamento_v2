@@ -51,7 +51,7 @@ export const loadOrdens = (container, filtros = {}) => {
                         linha.innerHTML = `
                             <td>#${ordem.ordem}</td>
                             <td>
-                                <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca_codigo}" 
+                                <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(ordem.peca_codigo)}" 
                                 target="_blank" rel="noopener noreferrer">
                                 ${ordem.peca_codigo}
                                 </a>
@@ -2292,3 +2292,12 @@ document.addEventListener('DOMContentLoaded', () => {
         botaoCriarCambao.addEventListener("click", () => abrirModalCambao());
     }
 });
+
+function pegarCodigoPeca(peca){
+    if (peca.includes("-")) {
+        // Se a peça contém um hífen, divide a string e retorna a parte antes do hífen
+        const partes = peca.split("-");
+        return partes[0].trim(); // Retorna a parte antes do hífen
+    }
+    return peca; // Se não houver hífen, retorna a peça completa
+}
