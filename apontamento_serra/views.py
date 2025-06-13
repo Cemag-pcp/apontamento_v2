@@ -14,7 +14,7 @@ from django.contrib.auth.decorators import login_required
 from .models import PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada, Profile
 from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operador, Setor, MotivoMaquinaParada, Maquina
-from apontamento_usinagem.utils import criar_ordem_usinagem
+from apontamento_usinagem.utils import criar_ordem_usinagem, verificar_se_existe_ordem
 
 import os
 import re
@@ -96,7 +96,7 @@ def atualizar_status_ordem(request):
             with transaction.atomic():
                 # Parse do corpo da requisição
                 body = json.loads(request.body)
-                print(body)
+
                 status = body['status']
                 ordem_id = body['ordem_id']
                 # grupo_maquina = body['grupo_maquina'].lower()
@@ -180,21 +180,30 @@ def atualizar_status_ordem(request):
                         peca_obj.qtd_morta = mortas
                         peca_obj.save()
 
-                        # verifica se a peã tem passagem para usinagem
+                        # verifica se a peça tem passagem para usinagem
                         peca_object = Pecas.objects.get(pk=peca_id)
                         if peca_object.processo_1:
+
+                            # verifica se ja existe alguma ordem no setor de usinagem aguardando_prox_proc com a mesma peça, 
+                            # se existir apenas acrescenta a quantidade nova na que ja existe
                             
-                            dados_usinagem = {
+                            pecas_ordem_existente = verificar_se_existe_ordem(peca_object)
 
-                                'observacoes': 'Gerado a partir da serra',
-                                'dataProgramacao': now().date(),
-                                'qtdPlanejada': planejada,
-                                'pecaSelect': peca_object.codigo,
-                                'maquina': peca_object.processo_1,
-                                'status_atual': 'agua_prox_proc'
-                            }
+                            if pecas_ordem_existente:
+                                pecas_ordem_existente.qtd_planejada += planejada
 
-                            nova_ordem = criar_ordem_usinagem(dados_usinagem)
+                                pecas_ordem_existente.save()
+                            else:
+                                dados_usinagem = {
+                                    'observacoes': 'Gerado a partir da serra',
+                                    'dataProgramacao': now().date(),
+                                    'qtdPlanejada': planejada,
+                                    'pecaSelect': peca_object.codigo,
+                                    'maquina': peca_object.processo_1,
+                                    'status_atual': 'agua_prox_proc'
+                                }
+
+                                nova_ordem = criar_ordem_usinagem(dados_usinagem)
 
                     ordem.status_prioridade = 3
 
@@ -489,9 +498,11 @@ def get_mp(request):
     return JsonResponse(data)
 
 def get_peca(request):
+    
     """
     Retorna uma lista paginada de peca, com suporte a busca por código ou descrição.
     """
+
     # Obtém os parâmetros da requisição
     search = request.GET.get('search', '').strip()  # Termo de busca
     page = int(request.GET.get('page', 1))  # Página atual (padrão é 1)

@@ -21,9 +21,14 @@ class PecasAdmin(admin.ModelAdmin):
 class MpAdmin(admin.ModelAdmin):
     search_fields = ['codigo', 'descricao', 'setor__nome']
 
+class OperadorAdmin(admin.ModelAdmin):
+    list_display = ('matricula', 'nome', 'setor')
+    search_fields = ('matricula', 'nome', 'setor__nome')
+  
+
 admin.site.register(Maquina)
 admin.site.register(MotivoInterrupcao)
-admin.site.register(Operador)
+admin.site.register(Operador, OperadorAdmin)
 admin.site.register(Pecas, PecasAdmin)
 admin.site.register(Setor)
 admin.site.register(Mp, MpAdmin)

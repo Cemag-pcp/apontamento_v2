@@ -1,47 +1,59 @@
 import csv
 import re
 from django.core.management.base import BaseCommand
-from cadastro.models import Conjuntos, Carretas, ConjuntoCarreta  # Ajuste para seu app
+from cadastro.models import Maquina, Pecas, Setor
+from django.core.management.base import BaseCommand, CommandError
 
 class Command(BaseCommand):
-    help = 'Importa conjuntos e amarra às carretas'
+    help = 'Atualiza o campo processo_1 de Peças a partir de um CSV, mas somente para peças no setor=1.'
 
-    def handle(self, *args, **kwargs):
-        csv_file_path = r'C:\Users\pcp2\apontamento_usinagem\conj_carreta.csv'  # Substitua pelo caminho real
+    def add_arguments(self, parser):
+        parser.add_argument('csv_path', type=str, help='Caminho para o arquivo CSV (com colunas "peça" e "processo_1")')
 
-        conjuntos_list = []  # Lista para inserção em massa
-        relacoes_list = []  # Lista para vincular Conjuntos às Carretas
+    def handle(self, *args, **options):
+        path = options['csv_path']
+        try:
+            with open(path, newline='', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    codigo = row['peça'].strip()
+                    proc1_id = row['processo_1'].strip()
 
-        with open(csv_file_path, newline='', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile, delimiter=',')  # Ajuste o delimitador se necessário
-            
-            for row in reader:
-                codigo_descricao = row['codigo'].strip()
-                quantidade = int(row['quantidade'])
-                nome_carreta = row['carreta'].strip()
+                    # 1) Verifica se a máquina existe
+                    try:
+                        maquina = Maquina.objects.get(pk=proc1_id)
+                    except Maquina.DoesNotExist:
+                        self.stdout.write(self.style.WARNING(
+                            f'Máquina id={proc1_id} não encontrada — pulando peça {codigo}'
+                        ))
+                        continue
 
-                # Separando código e descrição, independente se for numérico ou não
-                partes = codigo_descricao.split(" - ", 1)  # Divide pelo primeiro " - "
-                codigo = partes[0].strip()  # Sempre pega a primeira parte como código
-                descricao = partes[1].strip() if len(partes) > 1 else ""  # Se houver uma descrição, pega a segunda parte
+                    # 2) Filtra Peca com esse código e que tenha setor=1
+                    qs = Pecas.objects.filter(codigo=codigo)
 
-                # Verificar se a carreta já existe
-                try:
-                    carreta = Carretas.objects.get(codigo=nome_carreta)
-                except Carretas.DoesNotExist:
-                    self.stdout.write(self.style.ERROR(f"Carreta '{nome_carreta}' não encontrada!"))
-                    continue  # Pula esse registro
+                    if not qs.exists():
+                        self.stdout.write(self.style.WARNING(
+                            f'Peca "{codigo}" não encontrada no banco — nada a fazer'
+                        ))
+                        continue
 
-                # Criar conjunto se não existir
-                conjunto, created = Conjuntos.objects.get_or_create(
-                    codigo=codigo,
-                    defaults={'descricao': descricao, 'quantidade': quantidade}
-                )
+                    for peca in qs:
+                        # Se a peça não tem o setor 1, adiciona o setor 1
+                        if not peca.setor.filter(id=1).exists():
+                            setor1 = Setor.objects.get(id=1)
+                            peca.setor.add(setor1)  # Adiciona o setor 1 à peça
+                            self.stdout.write(self.style.SUCCESS(
+                                f'Adicionado setor 1 à peça "{codigo}"'
+                            ))
 
-                # Criar relação ManyToMany via tabela intermediária
-                relacoes_list.append(ConjuntoCarreta(conjunto=conjunto, carreta=carreta))
+                        # 3) Atualiza campo processo_1 da peça
+                        peca.processo_1 = maquina
+                        peca.save()
+                        self.stdout.write(self.style.SUCCESS(
+                            f'Atualizado processo_1={proc1_id} para a peça "{codigo}"'
+                        ))
 
-        # Inserir em massa
-        ConjuntoCarreta.objects.bulk_create(relacoes_list, ignore_conflicts=True)
-
-        self.stdout.write(self.style.SUCCESS(f"Importação concluída! {len(relacoes_list)} registros adicionados."))
+        except FileNotFoundError:
+            raise CommandError(f'Arquivo não encontrado: {path}')
+        except Exception as e:
+            raise CommandError(f'Erro ao processar CSV: {e}')
