@@ -5,5 +5,5 @@ app_name = 'sucata'
 
 urlpatterns = [
     path('', views.sucata, name='sucata'),
-    path('api/', views.filtrar_sucata, name='filtrar-sucata')
+    path('api/corte', views.filtrar_sucata, name='filtrar-sucata')
 ]
