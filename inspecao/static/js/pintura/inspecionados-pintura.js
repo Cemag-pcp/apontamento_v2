@@ -31,6 +31,7 @@ function buscarItensInspecionados(pagina) {
     let itensFiltradosData = document.getElementById("itens-filtrados-inspecionados-data");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
+    let itensFiltradosStatusConformidade = document.getElementById("itens-filtrados-inspecionados-status");
     let paginacao = document.getElementById("paginacao-inspecionados-pintura");
 
     // Limpa os cards antes de buscar novos
@@ -51,6 +52,16 @@ function buscarItensInspecionados(pagina) {
     document.querySelectorAll('.form-check-input-inspecionados-inspetores:checked').forEach(checkbox => {
         inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
     });
+
+    let statusConformidade = [];    
+    if (document.getElementById('filter-itens-conformes-pintura').checked) {
+        statusConformidade.push('conforme');
+    }
+    
+    // Verifica se o checkbox de itens não conformes está marcado
+    if (document.getElementById('filter-itens-nao-conformes-pintura').checked) {
+        statusConformidade.push('nao_conforme');
+    }
 
     let dataSelecionada = document.getElementById('data-filtro-inspecionados').value;
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecionados').value;
@@ -79,6 +90,15 @@ function buscarItensInspecionados(pagina) {
         itensFiltradosPesquisa.textContent = "Pesquisa: " + pesquisarInspecao;
     } else {
         itensFiltradosPesquisa.style.display = "none";
+    }
+
+    if (statusConformidade.length > 0) {
+        params.append("status-conformidade", statusConformidade.join(","));
+        itensFiltradosStatusConformidade.style.display = "block";
+        itensFiltradosStatusConformidade.textContent = "Status: " + 
+            statusConformidade.map(s => s === 'conforme' ? 'Itens Conformes' : 'Itens Não Conformes').join(", ");
+    } else {
+        itensFiltradosStatusConformidade.style.display = "none";
     }
 
     if (inspetorSelecionado.length > 0) {
