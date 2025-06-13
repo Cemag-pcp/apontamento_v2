@@ -147,3 +147,9 @@
     color: #6c757d; /* Cor cinza para os dados */
     margin-left: 5px;
 }
+
+.chart-container {
+    position: relative;
+    height: 600px;
+    width: 100%;
+}

@@ -16,7 +16,24 @@ def filtrar_sucata(request):
     data_inicial = request.GET.get('data_inicial', None)
     data_final = request.GET.get('data_final', None)
     codigo_chapa = request.GET.get('codigo_chapa', None)
-    
+
+    if data_inicial and data_final:
+        try:
+            data_inicial_obj = datetime.strptime(data_inicial, '%Y-%m-%d')
+            data_final_obj = datetime.strptime(data_final, '%Y-%m-%d')
+            
+            if data_final_obj <= data_inicial_obj:
+                return JsonResponse(
+                    {'error': 'A data final deve ser maior que a data inicial.'},
+                    status=400
+                )
+                
+        except ValueError:
+            return JsonResponse(
+                {'error': 'Formato de data inválido. Use YYYY-MM-DD.'},
+                status=400
+            )
+        
     google_credentials_json["private_key"] = google_credentials_json["private_key"].replace("\\n", "\n")
     credentials = service_account.Credentials.from_service_account_info(
         google_credentials_json, 
@@ -35,13 +52,6 @@ def filtrar_sucata(request):
     
     # Filtrar as linhas de dados
     data_rows = all_data[5:]
-    
-    # Dicionários para agrupamento
-    agrupados_por_data_codigo = defaultdict(lambda: {
-        'aproveitamentos': [],
-        'peso_total': 0,
-        'count': 0
-    })
     
     agrupados_por_data = defaultdict(lambda: {
         'peso_total': 0,
@@ -76,11 +86,6 @@ def filtrar_sucata(request):
         except (ValueError, AttributeError):
             continue
         
-        # Agrupar para dados detalhados
-        chave = (data, codigo)
-        agrupados_por_data_codigo[chave]['aproveitamentos'].append(aproveitamento)
-        agrupados_por_data_codigo[chave]['peso_total'] += peso
-        
         # Agrupar para o gráfico
         agrupados_por_data[data]['peso_total'] += peso
         agrupados_por_data[data]['aproveitamentos'].append(aproveitamento)
@@ -109,18 +114,6 @@ def filtrar_sucata(request):
         {'codigo': codigo, 'peso': f"{peso:.2f}".replace('.', ',')}
         for codigo, peso in sorted(agrupados_por_codigo.items())
     ]
-    
-    # Preparar dados detalhados (opcional, se ainda necessário)
-    table_data = []
-    for (data, codigo), valores in agrupados_por_data_codigo.items():
-        media_aproveitamento = sum(valores['aproveitamentos']) / len(valores['aproveitamentos']) if valores['aproveitamentos'] else 0
-        
-        table_data.append({
-            'Data': data,
-            'Aproveitamento': f"{media_aproveitamento:.4f}".replace('.', ','),
-            'Sucata': f"{valores['peso_total']:.2f}".replace('.', ','),
-            'Codigo_Chapa': codigo
-        })
 
     response_data = {
         'success': True,
@@ -132,5 +125,7 @@ def filtrar_sucata(request):
             'codigo_chapa': codigo_chapa
         }
     }
+
+    print(response_data)
     
     return JsonResponse(response_data)
