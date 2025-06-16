@@ -214,6 +214,7 @@ class RotaAcesso(models.Model):
     APP_CHOICES = [
         ('core', 'Core'),
         ('users', 'Users'),
+        ('sucata', 'Sucata'),
         ('serra', 'Serra'),
         ('estamparia', 'Estamparia'),
         ('montagem', 'Montagem'),
