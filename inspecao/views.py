@@ -990,6 +990,8 @@ def get_itens_inspecionados_montagem(request):
                 "id_dados_execucao": de.id,
                 "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                 "peca": data.pecas_ordem_montagem.peca,
+                "qtd_produzida": data.pecas_ordem_montagem.qtd_boa,
+                "qtd_inspecionada": de.nao_conformidade + de.conformidade,
                 "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
@@ -3354,7 +3356,7 @@ def indicador_pintura_resumo_analise_temporal(request):
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
         if data_fim:
-            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d')
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
@@ -3577,30 +3579,6 @@ def dashboard_montagem(request):
     return render(request, "dashboard/montagem.html")
 
 def indicador_montagem_analise_temporal(request):
-
-    """
-    select
-        id.data_execucao as data_inspecao,
-        id.conformidade,
-        id.nao_conformidade,
-        ii.data_inspecao as data_producao,
-        ii.pecas_ordem_pintura_id,
-        app.peca,
-        app.tipo,
-        app.qtd_boa,
-        ic2.nome as nome_conformidade
-    from apontamento_v2.inspecao_inspecao ii
-    left join apontamento_v2.inspecao_dadosexecucaoinspecao id on ii.id = id.inspecao_id 
-    left join apontamento_v2.apontamento_pintura_pecasordem app on app.id = ii.pecas_ordem_pintura_id
-    left join apontamento_v2.inspecao_causasnaoconformidade ic on ic.dados_execucao_id = id.id
-    left join apontamento_v2.inspecao_causasnaoconformidade_causa icc on icc.causasnaoconformidade_id = ic.id
-    left join apontamento_v2.inspecao_causas ic2 on ic2.id = icc.causas_id 
-    where ii.pecas_ordem_pintura_id notnull
-    order by id.data_execucao desc;
-    """
-
-    # Recebe os parâmetros de data
-    setor = request.GET.get('setor')
     data_inicio = request.GET.get('data_inicio')
     data_fim = request.GET.get('data_fim')
 
@@ -3608,47 +3586,61 @@ def indicador_montagem_analise_temporal(request):
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
         if data_fim:
-            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d')
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+    
 
-    # Filtra somente as produções com peça ligada (mesmo sem inspeção)
-    queryset = Inspecao.objects.filter(
-        pecas_ordem_montagem__isnull=False
+    sql = """
+    WITH producao_total AS (
+        SELECT 
+            EXTRACT(YEAR FROM data) AS ano,
+            EXTRACT(MONTH FROM data) AS mes,
+            SUM(qtd_boa) AS total_produzido
+        FROM apontamento_v2.apontamento_montagem_pecasordem
+        WHERE qtd_boa IS NOT NULL
+            AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+        GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
+    ),
+    inspecoes_total AS (
+        SELECT
+            EXTRACT(YEAR FROM amp.data) AS ano,
+            EXTRACT(MONTH FROM amp.data) AS mes,
+            SUM(dei.conformidade) AS total_conforme,
+            SUM(dei.nao_conformidade) AS total_nao_conforme
+        FROM apontamento_v2.apontamento_montagem_pecasordem amp
+        INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_montagem_id = amp.id
+        INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
+        WHERE amp.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        GROUP BY EXTRACT(YEAR FROM amp.data), EXTRACT(MONTH FROM amp.data)
     )
+    SELECT 
+        concat(p.ano, '-', p.mes) as mes,
+        p.total_produzido,
+        (COALESCE(i.total_conforme, 0) - COALESCE(i.total_nao_conforme, 0)) AS total_conforme,
+        COALESCE(i.total_nao_conforme, 0) AS total_nao_conforme
+    FROM producao_total p
+    LEFT JOIN inspecoes_total i ON p.ano = i.ano AND p.mes = i.mes
+    ORDER BY p.ano, p.mes;
+    """
 
-    if data_inicio:
-        queryset = queryset.filter(data_inspecao__gte=data_inicio)
-    if data_fim:
-        queryset = queryset.filter(data_inspecao__lte=data_fim)
-
-    queryset = queryset.annotate(
-        mes=Cast(TruncMonth('data_inspecao'), output_field=CharField()),
-        qtd_boa=F('pecas_ordem_montagem__qtd_boa'),
-        conformidade=F('dadosexecucaoinspecao__conformidade'),
-        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
-    ).values('mes').annotate(
-        qtd_peca_produzida=Sum('qtd_boa'),
-        qtd_peca_inspecionada=Sum(
-            ExpressionWrapper(
-                F('conformidade') + F('nao_conformidade'),
-                output_field=FloatField()
-            )
-        ) / 2.5,
-        soma_conformidade=Sum('conformidade'),
-        soma_nao_conformidade=Sum('nao_conformidade'),
-    ).order_by('mes')
+    with connection.cursor() as cursor:
+        cursor.execute(sql, {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+        })
+        rows = cursor.fetchall()
 
     resultado = []
-    for item in queryset:
-        conformidade = item['soma_conformidade'] or 0
-        nao_conformidade = item['soma_nao_conformidade'] or 0
-        taxa_nc = (nao_conformidade / conformidade) if conformidade else 0
+    for row in rows:
+        mes, qtd_produzida, soma_conformidade, soma_nao_conformidade = row
+        qtd_inspecionada = soma_conformidade + soma_nao_conformidade
+        taxa_nc = (soma_nao_conformidade / soma_conformidade) if soma_conformidade else 0
 
         resultado.append({
-            'mes': item['mes'][:7],  # YYYY-MM
-            'qtd_peca_produzida': int(item['qtd_peca_produzida']) or 0,
-            'qtd_peca_inspecionada': int(item['qtd_peca_inspecionada']) or 0,
+            'mes': mes,
+            'qtd_peca_produzida': qtd_produzida or 0,
+            'qtd_peca_inspecionada': qtd_inspecionada or 0,
             'taxa_nao_conformidade': round(taxa_nc, 4),
         })
 
@@ -3662,53 +3654,63 @@ def indicador_montagem_resumo_analise_temporal(request):
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
         if data_fim:
-            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d')
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
-    # Query principal
-    queryset = Inspecao.objects.filter(
-        pecas_ordem_montagem__isnull=False
+
+    sql = """
+    WITH producao_total AS (
+    SELECT 
+        EXTRACT(YEAR FROM data) AS ano,
+        EXTRACT(MONTH FROM data) AS mes,
+        SUM(qtd_boa) AS total_produzido
+    FROM apontamento_v2.apontamento_montagem_pecasordem
+    WHERE qtd_boa IS NOT NULL
+        AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+    GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
+    ),
+    inspecoes_total AS (
+        SELECT
+            EXTRACT(YEAR FROM app.data) AS ano,
+            EXTRACT(MONTH FROM app.data) AS mes,
+            SUM(dei.conformidade) AS total_conforme,
+            SUM(dei.nao_conformidade) AS total_nao_conforme
+        FROM apontamento_v2.apontamento_montagem_pecasordem app
+        INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_montagem_id = app.id
+        INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
+        WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
     )
+    SELECT 
+        p.ano,
+        p.mes,
+        p.total_produzido,
+        (COALESCE(i.total_conforme, 0) - COALESCE(i.total_nao_conforme, 0)) AS total_conforme,
+        COALESCE(i.total_nao_conforme, 0) AS total_nao_conforme
+    FROM producao_total p
+    LEFT JOIN inspecoes_total i ON p.ano = i.ano AND p.mes = i.mes
+    ORDER BY p.ano, p.mes;
+    """
 
-    if data_inicio:
-        queryset = queryset.filter(data_inspecao__gte=data_inicio)
-    if data_fim:
-        queryset = queryset.filter(data_inspecao__lte=data_fim)
+    with connection.cursor() as cursor:
+        cursor.execute(sql, {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+        })
+        rows = cursor.fetchall()
 
-    # Anotações e agregações
-    queryset = queryset.annotate(
-        ano=ExtractYear('data_inspecao'),
-        mes_num=ExtractMonth('data_inspecao'),
-        qtd_boa=F('pecas_ordem_montagem__qtd_boa'),
-        conformidade=F('dadosexecucaoinspecao__conformidade'),
-        nao_conformidade=F('dadosexecucaoinspecao__nao_conformidade'),
-        qtd_inspecionada=ExpressionWrapper(
-            F('dadosexecucaoinspecao__conformidade') + F('dadosexecucaoinspecao__nao_conformidade'),
-            output_field=FloatField()
-        )
-    ).values('ano', 'mes_num').annotate(
-        total_produzida=Sum('qtd_boa'),
-        total_inspecionada=Sum('qtd_inspecionada') / 2.5,
-        total_nao_conforme=Sum('nao_conformidade'),
-    ).order_by('ano', 'mes_num')
-
-    # Monta JSON
     resultado = []
-    for item in queryset:
-        mes_formatado = f"{item['ano']}-{item['mes_num']}"
-
-        total_prod = item['total_produzida'] or 0
-        total_insp = item['total_inspecionada'] or 0
-        total_nc = item['total_nao_conforme'] or 0
-
+    for row in rows:
+        ano, mes_num, total_prod, total_conf, total_nc = row
+        total_insp = total_nc + total_conf
         perc_insp = (total_insp / total_prod) * 100 if total_prod else 0
 
         resultado.append({
-            "Data": mes_formatado,
-            "N° de peças produzidas": int(total_prod),
-            "N° de inspeções": int(total_insp),
-            "N° de não conformidades": int(total_nc),
+            "Data": f"{int(ano)}-{int(mes_num):02}",
+            "N° de peças produzidas": int(total_prod or 0),
+            "N° de inspeções": int(total_insp or 0),
+            "N° de não conformidades": int(total_nc or 0),
             "% de inspeção": f"{perc_insp:.2f} %"
         })
 
@@ -3723,7 +3725,7 @@ def causas_nao_conformidade_mensal_montagem(request):
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
         if data_fim:
-            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d')
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
@@ -3739,13 +3741,13 @@ def causas_nao_conformidade_mensal_montagem(request):
 
     # Aplica filtros de data se fornecidos
     if data_inicio:
-        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
+        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__gte=data_inicio)
     if data_fim:
-        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+        queryset = queryset.filter(dados_execucao__inspecao__data_inspecao__lte=data_fim)
 
     # Agrupa por mês/ano, peça e causa, somando as quantidades
     resultados = queryset.annotate(
-        data_mes=TruncMonth('dados_execucao__data_execucao')  # Agrupa por mês/ano
+        data_mes=TruncMonth('dados_execucao__inspecao__data_inspecao')  # Agrupa por mês/ano
     ).values(
         'data_mes',
         'dados_execucao__inspecao__pecas_ordem_montagem__peca',  # Campo da peça de montagem
