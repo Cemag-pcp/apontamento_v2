@@ -6,10 +6,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const endDateInput = document.getElementById('endDate');
 
     const today = new Date();
-    const lastMonth = new Date();
-    lastMonth.setMonth(today.getMonth() - 1);
 
-    startDateInput.valueAsDate = lastMonth;
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    startDateInput.valueAsDate = firstDayOfMonth;
     endDateInput.valueAsDate = today;
 
     async function carregarGraficoProducao(startDate, endDate) {
