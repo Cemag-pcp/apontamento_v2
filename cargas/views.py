@@ -27,6 +27,10 @@ from datetime import datetime
 import requests
 import json
 from datetime import timedelta
+import django
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
+django.setup()
 
 def home(request):
 
@@ -161,6 +165,8 @@ def atualizar_ordem_existente(request):
 
     data_inicio = request.GET.get('data_inicio')
     setor = request.GET.get('setor')
+    data_inicio = '2025-06-16'
+    setor = 'pintura'
 
     if not data_inicio or not setor:
         return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)
@@ -193,6 +199,7 @@ def atualizar_ordem_existente(request):
 
     # Gerar a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_inicio, setor)
+    # print(tabela_completa[tabela_completa['cor'] == 'Amarelo'])
 
     if setor == 'pintura':
         tabela_completa = tabela_completa.groupby(['Código', 'Peca', 'Célula', 'Datas','Recurso_cor','cor']).agg({'Qtde_total': 'sum'}).reset_index()
@@ -227,6 +234,9 @@ def atualizar_ordem_existente(request):
     # Preparar lista para criar novas ordens
     ordens_a_criar = []
 
+    # tabela_completa = tabela_completa.iloc[31:32]
+    # tabela_completa.reset_index(drop=True)
+
     for _, row in tabela_completa.iterrows():
         peca_nome = f"{str(row['Código'])} - {row['Peca']}"
         data_carga = row["Datas"]
@@ -241,7 +251,8 @@ def atualizar_ordem_existente(request):
             ordem_existente = Ordem.objects.filter(
                 grupo_maquina=setor,
                 data_carga=data_carga,
-                ordem_pecas_pintura__peca=peca_nome
+                ordem_pecas_pintura__peca=peca_nome,
+                cor=row['cor']
             ).first()
         else:
             ordem_existente = Ordem.objects.filter(
@@ -254,8 +265,10 @@ def atualizar_ordem_existente(request):
             # Atualizar qtd_planejada na peça vinculada
             if setor == 'montagem':
                 ordem_existente.ordem_pecas_montagem.filter(peca=peca_nome).update(qtd_planejada=int(row["Qtde_total"]))
-            else:
+            elif setor == 'pintura':
                 ordem_existente.ordem_pecas_pintura.filter(peca=peca_nome).update(qtd_planejada=int(row["Qtde_total"]))
+            else:
+                ordem_existente.ordem_pecas_solda.filter(peca=peca_nome).update(qtd_planejada=int(row["Qtde_total"]))
         else:
             # Criar nova ordem
             ordens_a_criar.append({

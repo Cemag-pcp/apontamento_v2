@@ -1792,6 +1792,7 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
         Ordem.objects.filter(data_carga__in=datas_requisicao, grupo_maquina=grupo_maquina)
         .values_list("data_carga", flat=True)
     )
+    
     datas_bloqueadas = datas_existentes & datas_requisicao
     if not atualizacao_ordem and datas_bloqueadas:
         return {
@@ -1818,7 +1819,8 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
             ordem_existente = Ordem.objects.filter(
                 grupo_maquina=grupo_maquina,
                 data_carga=data_carga,
-                ordem_pecas_pintura__peca=peca_nome
+                ordem_pecas_pintura__peca=peca_nome,
+                cor=cor
             ).first()
 
             if ordem_existente:
