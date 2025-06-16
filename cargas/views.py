@@ -466,6 +466,7 @@ def historico_ordens_montagem(request):
     maquina_param = request.GET.get('setor', None) # Chassi, Içamento...
     status_param = request.GET.get('status', None)
     ordem_param = request.GET.get('ordem', None)
+    conjunto_param = request.GET.get('conjunto', '')
 
     # Paginação
     page = request.GET.get('page', 1)
@@ -495,6 +496,8 @@ def historico_ordens_montagem(request):
         filtros_ordem['status_atual'] = status_param
     if ordem_param:
         filtros_ordem['id'] = ordem_param
+    if conjunto_param:
+        filtros_ordem['ordem_pecas_montagem__peca__contains'] = conjunto_param
 
     # Recupera os IDs das ordens que atendem aos filtros
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
@@ -557,6 +560,7 @@ def historico_ordens_pintura(request):
     cor = request.GET.get('cor', '') # Chassi, Içamento...
     status_param = request.GET.get('status', '')
     ordem_param = request.GET.get('ordem', '')
+    conjunto_param = request.GET.get('conjunto', '')
 
     # Paginação
     page = request.GET.get('page', 1)
@@ -585,6 +589,8 @@ def historico_ordens_pintura(request):
         filtros_ordem['status_atual'] = status_param
     if ordem_param:
         filtros_ordem['id'] = ordem_param
+    if conjunto_param:
+        filtros_ordem['ordem_pecas_pintura__peca__contains'] = conjunto_param
 
     # Recupera os IDs das ordens que atendem aos filtros
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
