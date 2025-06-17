@@ -497,7 +497,7 @@ def historico_ordens_montagem(request):
     if ordem_param:
         filtros_ordem['id'] = ordem_param
     if conjunto_param:
-        filtros_ordem['ordem_pecas_montagem__peca__contains'] = conjunto_param
+        filtros_ordem['ordem_pecas_montagem__peca__icontains'] = conjunto_param
 
     # Recupera os IDs das ordens que atendem aos filtros
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
@@ -590,7 +590,7 @@ def historico_ordens_pintura(request):
     if ordem_param:
         filtros_ordem['id'] = ordem_param
     if conjunto_param:
-        filtros_ordem['ordem_pecas_pintura__peca__contains'] = conjunto_param
+        filtros_ordem['ordem_pecas_pintura__peca__icontains'] = conjunto_param
 
     # Recupera os IDs das ordens que atendem aos filtros
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
