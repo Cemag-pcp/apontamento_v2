@@ -165,6 +165,8 @@ function buscarItensInspecionados(pagina) {
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
                         <strong>⚙️ Máquina:</strong> ${item.maquina}<br>
+                        <strong>🔢 Qtd Produzida:</strong> ${item.qtd_produzida}<br>
+                        <strong>🔍 Qtd Inspecionada:</strong> ${item.qtd_inspecionada}<br>
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>

@@ -167,7 +167,7 @@ function buscarItensInspecionadosRetrabalho(pagina) {
             const adicionarLinkPagina = (i) => {
                 paginacaoHTML += `
                     <li class="page-item ${i === paginaAtual ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="buscarItensInspecionados(${i})">${i}</a>
+                        <a class="page-link" href="#" onclick="buscarItensInspecionadosRetrabalho(${i})">${i}</a>
                     </li>`;
             };
 
