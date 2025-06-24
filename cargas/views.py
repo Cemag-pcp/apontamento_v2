@@ -334,6 +334,8 @@ def remanejar_carga(request):
             # **Recalcula `data_programacao` apenas uma vez, pois todas as ordens seguem a mesma lógica**
             if setor == 'montagem':
                 data_programacao = data_remaneja - timedelta(days=3)
+            elif setor == 'solda':
+                data_programacao = data_remaneja - timedelta(days=2)
             elif setor == 'pintura':
                 data_programacao = data_remaneja - timedelta(days=1)
 
