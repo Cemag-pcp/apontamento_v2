@@ -28,3 +28,10 @@ urlpatterns = [
     path('api/apontamentos-mp/serra', views.api_apontamentos_mp, name='api_apontamentos_mp'),
 
 ]
+
+# dashboard
+urlpatterns += [
+    path('dashboard', views.dashboard, name='dashboard'),
+
+    path('api/dashboard/indicador-hora-operacao-maquina', views.indicador_hora_operacao_maquina, name='indicador_hora_operacao_maquina'),
+]

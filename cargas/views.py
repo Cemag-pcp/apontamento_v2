@@ -1,3 +1,6 @@
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
+django.setup()
+
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
@@ -28,9 +31,6 @@ import requests
 import json
 from datetime import timedelta
 import django
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
-django.setup()
 
 def home(request):
 
@@ -165,8 +165,8 @@ def atualizar_ordem_existente(request):
 
     data_inicio = request.GET.get('data_inicio')
     setor = request.GET.get('setor')
-    data_inicio = '2025-06-16'
-    setor = 'pintura'
+    # data_inicio = '2025-06-26'
+    # setor = 'montagem'
 
     if not data_inicio or not setor:
         return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)

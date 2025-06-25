@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Gráfico de Produção por Turno</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    canvas { max-width: 100%; height: auto; }
+    select { margin: 0 10px 20px 0; padding: 5px; }
+  </style>
+</head>
+<body>
+    <h2>Produção por Máquina</h2>
+
+    <label>Selecione a(s) máquina(s):</label>
+    <select id="maquinaSelect">
+        <option value="Serra 1" >Serra 1</option>
+        <option value="Serra 2" >Serra 2</option>
+        <option value="Serra 3" >Serra 3</option>
+        <option value="Serra 4" selected>Serra 4</option>
+    </select>
+
+    <!-- Gráfico de linha: Tempo de produção por máquina -->
+    <canvas id="grafico1"></canvas>
+
+    <!-- Gráfico de barras: Quantidade de ops finalizada por máquina -->
+    <canvas id="grafico2"></canvas>
+
+    <script>
+        async function buscarDados() {
+            const resposta = await fetch('/serra/api/dashboard/indicador-hora-operacao-maquina?data_inicio=2025-06-01&data_fim=2025-06-30&maquina=Serra 4');
+            const dados = await resposta.json();
+
+            return dados.map(item => ({
+                maquina: item.maquina,
+                dia: item.dia,
+                producao_total: item.producao_total || "00:00:00",
+                parada_total: item.parada_total || "00:00:00",
+                tempo_ocioso: item.tempo_ocioso || "00:00:00"
+            }));
+        }
+
+        function tempoParaHoras(str) {
+            const [h, m, s] = str.split(':').map(parseFloat);
+            return h + m / 60 + s / 3600;
+        }
+
+        function gerarDatasetComparativo(dados, maquinasSelecionadas, todasAsDatas) {
+            const datasets = [];
+
+            maquinasSelecionadas.forEach(maquina => {
+                const valoresProducao = todasAsDatas.map(dia => {
+                    const entrada = dados.find(d => d.maquina === maquina && d.dia === dia);
+                    return entrada ? tempoParaHoras(entrada.producao_total) : 0;
+                });
+
+                const valoresParada = todasAsDatas.map(dia => {
+                    const entrada = dados.find(d => d.maquina === maquina && d.dia === dia);
+                    return entrada ? tempoParaHoras(entrada.parada_total) : 0;
+                });
+
+                const valoresOcioso = todasAsDatas.map(dia => {
+                    const entrada = dados.find(d => d.maquina === maquina && d.dia === dia);
+                    return entrada ? tempoParaHoras(entrada.tempo_ocioso) : 0;
+                });
+
+                datasets.push({
+                    label: 'Produção',
+                    data: valoresProducao,
+                    borderColor: 'green',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.3
+                });
+
+                datasets.push({
+                    label: 'Parada',
+                    data: valoresParada,
+                    borderColor: 'red',
+                    borderDash: [5, 5],
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.3
+                });
+
+                datasets.push({
+                    label: 'Ocioso',
+                    data: valoresOcioso,
+                    borderColor: 'gray',
+                    borderDash: [2, 4],
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.3
+                });
+            });
+
+            return datasets;
+        }
+
+        async function inicializarGrafico() {
+            const dados = await buscarDados();
+
+            const todasAsDatas = [...new Set(dados.map(d => d.dia))].sort();
+            const todasAsMaquinas = [...new Set(dados.map(d => d.maquina))];
+
+            const ctx = document.getElementById('grafico1').getContext('2d');
+
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: todasAsDatas,
+                    datasets: gerarDatasetComparativo(dados, todasAsMaquinas, todasAsDatas)
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: 'Produção, Parada e Ociosidade por Máquina' },
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(2)}h`
+                            }
+                        },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top',
+                            font: { weight: 'bold' },
+                            formatter: value => `${value.toFixed(1)}h`
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Horas' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Data' }
+                        }
+                    }
+                },
+                plugins: [ChartDataLabels]
+            });
+
+            // Atualizar ao mudar máquina
+            document.getElementById('maquinaSelect').addEventListener('change', () =>
+                atualizarGrafico(chart, dados, todasAsDatas)
+            );
+        }
+
+        function atualizarGrafico(chart, dados, todasAsDatas) {
+            const maquinas = [...document.getElementById('maquinaSelect').selectedOptions].map(opt => opt.value);
+            chart.data.datasets = gerarDatasetComparativo(dados, maquinas, todasAsDatas);
+            chart.update();
+        }
+
+        window.onload = inicializarGrafico;
+    </script>
+
+
+
+</body>
+</html>
