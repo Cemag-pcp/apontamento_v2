@@ -762,7 +762,7 @@ def api_ordens_finalizadas(request):
                 o.status_atual = 'finalizada'
                 AND o.ultima_atualizacao >= '2025-04-08'
                 AND poc.qtd_boa > 0
-            ORDER BY o.ultima_atualizacao;
+            ORDER BY o.ultima_atualizacao, peca;
         """)
         columns = [col[0] for col in cursor.description]
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]

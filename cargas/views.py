@@ -1,5 +1,3 @@
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
-django.setup()
 
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
@@ -31,6 +29,9 @@ import requests
 import json
 from datetime import timedelta
 import django
+
+django.setup()
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
 
 def home(request):
 
