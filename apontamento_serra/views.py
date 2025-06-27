@@ -15,7 +15,7 @@ from .models import PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada, Profile
 from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operador, Setor, MotivoMaquinaParada, Maquina
 from apontamento_usinagem.utils import criar_ordem_usinagem, verificar_se_existe_ordem
-from .utils import hora_operacao_maquina, hora_parada_maquina, formatar_timedelta
+from .utils import hora_operacao_maquina, hora_parada_maquina, formatar_timedelta, ordem_por_maquina
 
 import os
 import re
@@ -1027,6 +1027,7 @@ def merge_metricas(horas_producao, horas_parada):
         prod = parse_tempo(val.get('producao_total', '00:00:00'))
         parada = parse_tempo(val.get('parada_total', '00:00:00'))
         usado = prod + parada
+
         ocioso = timedelta(hours=20) - usado
         ocioso = max(ocioso, timedelta(seconds=0))  # nunca negativo
         val['tempo_ocioso'] = formatar_timedelta(ocioso)
@@ -1044,4 +1045,13 @@ def indicador_hora_operacao_maquina(request):
 
     resultado_unificado = merge_metricas(horas_producao, horas_parada)
 
-    return JsonResponse(horas_parada, safe=False)
+    return JsonResponse(resultado_unificado, safe=False)
+
+@login_required
+def indicador_ordem_finalizada_maquina(request):
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    resultado = ordem_por_maquina(data_inicio, data_fim)
+
+    return JsonResponse(resultado)

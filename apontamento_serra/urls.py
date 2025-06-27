@@ -34,4 +34,5 @@ urlpatterns += [
     path('dashboard', views.dashboard, name='dashboard'),
 
     path('api/dashboard/indicador-hora-operacao-maquina', views.indicador_hora_operacao_maquina, name='indicador_hora_operacao_maquina'),
+    path('api/dashboard/indicador-finalizacao-maquina', views.indicador_ordem_finalizada_maquina, name='indicador_ordem_finalizada_maquina'),
 ]
