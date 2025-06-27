@@ -1644,7 +1644,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
 def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
 
     if not ordens_data:
-        return {"error": "Ordens ja atualizada!", "status": 400}
+        return {"error": "Nenhuma ordem nova adicionada, caso tivesse ordem para ser excluída, foi excluída.", "status": 400}
 
     # Coletar datas únicas e validar
     try:
@@ -1775,7 +1775,7 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
 def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina="pintura"):
 
     if not ordens_data:
-        return {"error": "Nenhuma ordem fornecida!", "status": 400}
+        return {"error": "Nenhuma ordem nova adicionada, caso tivesse ordem para ser excluída, foi excluída.", "status": 400}
 
     # Coletar datas únicas e validar
     try:
@@ -1883,7 +1883,7 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
 def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='solda'):
 
     if not ordens_data:
-        return {"error": "Nenhuma ordem fornecida!", "status": 400}
+        return {"error": "Nenhuma ordem nova adicionada, caso tivesse ordem para ser excluída, foi excluída.", "status": 400}
 
     # Coletar datas únicas e validar
     try:

@@ -167,7 +167,7 @@ def atualizar_ordem_existente(request):
     data_inicio = request.GET.get('data_inicio')
     setor = request.GET.get('setor')
     # data_inicio = '2025-06-26'
-    # setor = 'montagem'
+    # setor = 'pintura'
 
     if not data_inicio or not setor:
         return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)
@@ -211,9 +211,14 @@ def atualizar_ordem_existente(request):
         # tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%Y-%d-%m", errors="coerce").dt.strftime("%Y-%m-%d")
 
     # Conjunto de peças atuais
-    pecas_atualizadas = set(
-        f"{str(row['Código'])} - {row['Peca']}" for _, row in tabela_completa.iterrows()
-    )
+    if setor == 'pintura':
+        pecas_atualizadas = set(
+            (f"{str(row['Código'])} - {row['Peca']}", row['cor']) for _, row in tabela_completa.iterrows()
+        )
+    else:
+        pecas_atualizadas = set(
+            f"{str(row['Código'])} - {row['Peca']}" for _, row in tabela_completa.iterrows()
+        )
 
     # Identificar ordens sem apontamento que não existem mais no sequenciamento
     if setor == 'montagem':
@@ -221,9 +226,14 @@ def atualizar_ordem_existente(request):
             ~Q(ordem_pecas_montagem__peca__in=pecas_atualizadas)
         )
     elif setor == 'pintura':
-        ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
-            ~Q(ordem_pecas_pintura__peca__in=pecas_atualizadas)
-        )
+        # ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
+        #     ~Q(ordem_pecas_pintura__peca__in=pecas_atualizadas)
+        # )
+        condicao = Q()
+        for peca, cor in pecas_atualizadas:
+            condicao |= Q(ordem_pecas_pintura__peca=peca, cor=cor)
+
+        ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).exclude(condicao)
     else:
         ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
             ~Q(ordem_pecas_solda__peca__in=pecas_atualizadas)

@@ -102,7 +102,6 @@
                         </div>
                     </div>
                 </div>
-                
                 <!-- Novo Gráfico Empilhado -->
                 <div class="row mt-4">
                     <div class="col-12">
@@ -118,13 +117,28 @@
                         </div>
                     </div>
                 </div>
+                <!-- Novo Gráfico Empilhado -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Unidade de peça produzida (Empilhado)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="grafico4"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let chart1, chart2, chart3;
+        let chart1, chart3, chart4;
 
         // Função para mostrar/esconder mensagens
         function mostrarMensagem(tipo, texto) {
@@ -203,6 +217,26 @@
         async function buscarDadosOrdens(dataInicio, dataFim) {
             try {
                 const url = `/serra/api/dashboard/indicador-finalizacao-maquina?data_inicio=${dataInicio}&data_fim=${dataFim}`;
+                
+                const resposta = await fetch(url);
+                
+                if (!resposta.ok) {
+                    throw new Error(`Erro na API: ${resposta.status} - ${resposta.statusText}`);
+                }
+                
+                const dados = await resposta.json();
+                
+                return dados;
+                
+            } catch (error) {
+                throw new Error(`Erro ao carregar dados de ordens: ${error.message}`);
+            }
+        }
+
+        // Função para buscar dados da segunda API (ordens finalizadas)
+        async function buscarDadosProducao(dataInicio, dataFim) {
+            try {
+                const url = `/serra/api/dashboard/indicador-pecas-produzidas-maquina?data_inicio=${dataInicio}&data_fim=${dataFim}`;
                 
                 const resposta = await fetch(url);
                 
@@ -351,9 +385,10 @@
                 mostrarMensagem('loading');
 
                 // Buscar dados das duas APIs em paralelo
-                const [dados, dadosOrdens] = await Promise.all([
+                const [dados, dadosOrdens, dadosProducao] = await Promise.all([
                     buscarDados(dataInicial, dataFinal, maquinaSelecionada),
-                    buscarDadosOrdens(dataInicial, dataFinal)
+                    buscarDadosOrdens(dataInicial, dataFinal),
+                    buscarDadosProducao(dataInicial, dataFinal)
                 ]);
 
                 document.getElementById('loadingSpinner').style.display = 'none';
@@ -367,8 +402,8 @@
 
                 // Destruir gráficos existentes
                 if (chart1) chart1.destroy();
-                if (chart2) chart2.destroy();
                 if (chart3) chart3.destroy();
+                if (chart4) chart4.destroy();
 
                 // Gráfico 1 - Linha (apenas se houver dados da primeira API)
                 if (dados.length > 0) {
@@ -423,12 +458,69 @@
                     });
                 }
 
-                // Gráfico 3 - Empilhado (sempre mostrar se houver dados)
+                // Gráfico 2 - Empilhado (sempre mostrar se houver dados)
                 if (Object.keys(dadosOrdens).length > 0) {
                     const dadosEmpilhados = processarDadosEmpilhados(dadosOrdens);
 
                     const ctx3 = document.getElementById('grafico3').getContext('2d');
                     chart3 = new Chart(ctx3, {
+                        type: 'bar',
+                        data: dadosEmpilhados,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                // title: { 
+                                //     display: true, 
+                                //     text: 'Ordens Finalizadas por Máquina (Empilhado)',
+                                //     font: { size: 16 }
+                                // },
+                                legend: { 
+                                    position: 'top',
+                                    labels: { boxWidth: 12 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `${context.dataset.label}: ${context.raw} ordens`;
+                                        }
+                                    }
+                                },
+                                datalabels: {
+                                    display: function(context) {
+                                        const valor = context.dataset.data[context.dataIndex];
+                                        return valor > 0;
+                                    },
+                                    color: 'white',
+                                    font: {
+                                        weight: 'bold',
+                                        size: 10
+                                    },
+                                    formatter: value => value
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: true,
+                                    title: { display: true, text: 'Data' }
+                                },
+                                y: {
+                                    stacked: true,
+                                    beginAtZero: true,
+                                    title: { display: true, text: 'Quantidade de Ordens' }
+                                }
+                            }
+                        },
+                        plugins: [ChartDataLabels]
+                    });
+                }
+
+                // Gráfico 3 - Empilhado (sempre mostrar se houver dados)
+                if (Object.keys(dadosProducao).length > 0) {
+                    const dadosEmpilhados = processarDadosEmpilhados(dadosProducao);
+
+                    const ctx4 = document.getElementById('grafico4').getContext('2d');
+                    chart4 = new Chart(ctx4, {
                         type: 'bar',
                         data: dadosEmpilhados,
                         options: {

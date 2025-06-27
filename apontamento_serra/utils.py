@@ -331,3 +331,53 @@ def ordem_por_maquina(data_inicio, data_fim):
         })
 
     return registros
+
+def producao_por_maquina(data_inicio, data_fim):
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d')
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    sql = """
+        SELECT 
+            asp.data::date,
+            cm.nome AS maquina,
+            sum(asp.qtd_boa) AS total_pecas_produzida
+        FROM apontamento_v2.apontamento_serra_pecasordem asp 
+        LEFT JOIN apontamento_v2.core_ordem co on co.id = asp.ordem_id 
+        LEFT JOIN apontamento_v2.cadastro_maquina cm ON cm.id = co.maquina_id
+        WHERE 
+            co.grupo_maquina = 'serra'
+            AND co.status_atual = 'finalizada'
+            -- filtros opcionais de data
+            AND asp.data >= %(data_inicio)s
+            AND asp.data < ((%(data_fim)s)::date + INTERVAL '1 day')
+        GROUP BY cm.nome, asp.data::date
+        ORDER BY data, maquina;
+        """
+
+    # Executar consulta
+    with connection.cursor() as cursor:
+        cursor.execute(sql, {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+        })
+        rows = cursor.fetchall()
+
+    # Agrupar por data
+    registros = {}
+
+    for data_finalizacao, maquina, total in rows:
+        dia_str = data_finalizacao.strftime('%Y-%m-%d')
+        if dia_str not in registros:
+            registros[dia_str] = []
+        registros[dia_str].append({
+            'maquina': maquina,
+            'total_ordens_finalizadas': total
+        })
+
+    return registros

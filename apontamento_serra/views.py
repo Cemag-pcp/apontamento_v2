@@ -15,7 +15,7 @@ from .models import PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada, Profile
 from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operador, Setor, MotivoMaquinaParada, Maquina
 from apontamento_usinagem.utils import criar_ordem_usinagem, verificar_se_existe_ordem
-from .utils import hora_operacao_maquina, hora_parada_maquina, formatar_timedelta, ordem_por_maquina
+from .utils import hora_operacao_maquina, hora_parada_maquina, formatar_timedelta, ordem_por_maquina, producao_por_maquina
 
 import os
 import re
@@ -1053,5 +1053,14 @@ def indicador_ordem_finalizada_maquina(request):
     data_fim = request.GET.get('data_fim')
 
     resultado = ordem_por_maquina(data_inicio, data_fim)
+
+    return JsonResponse(resultado)
+
+@login_required
+def indicador_peca_produzida_maquina(request):
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    resultado = producao_por_maquina(data_inicio, data_fim)
 
     return JsonResponse(resultado)
