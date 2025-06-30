@@ -47,7 +47,7 @@
             <form id="filtro-form" class="mb-4">
                 <div class="row g-3 align-items-center">
                     <!-- Campo de Data -->
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label for="filtro-data-carga" class="form-label small text-muted">Selecione a data</label>
                         <div class="input-group">
                             <span class="input-group-text bg-white"><i class="bi bi-calendar3" aria-hidden="true"></i></span>
@@ -56,13 +56,19 @@
                     </div>
             
                     <!-- Ordem -->
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label for="filtro-ordem" class="form-label small text-muted">Ordem</label>
                         <input type="text" class="form-control shadow-none" name="filtro-ordem" id="filtro-ordem" placeholder="Digite a ordem">
                     </div>
 
+                    <!-- Conjunto -->
+                    <div class="col-md-3">
+                        <label for="filtro-conjunto" class="form-label small text-muted">Conjunto</label>
+                        <input type="text" class="form-control shadow-none" name="filtro-conjunto" id="filtro-conjunto" placeholder="Digite o conjunto ou parte dele">
+                    </div>
+
                     <!-- Seleção de Setor -->
-                    <div class="col-md-3" id="filtro-montagem">
+                    <div class="col-md-2" id="filtro-montagem">
                         <label for="filtro-setor-montagem" class="form-label small text-muted">Selecione o setor</label>
                         <div class="input-group">
                             <span class="input-group-text bg-white"><i class="bi bi-list" aria-hidden="true"></i></span>
@@ -70,7 +76,7 @@
                             </select>
                         </div>
                     </div>
-            
+
                     <!-- Seleção de Cor -->
                     <div class="col-md-3" id="filtro-pintura" style="display: none;">
                         <label for="filtro-cor-pintura" class="form-label small text-muted">Selecione a cor</label>

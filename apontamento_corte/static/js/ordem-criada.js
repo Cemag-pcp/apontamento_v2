@@ -601,10 +601,12 @@ export function mostrarModalIniciar(ordemId, grupoMaquina) {
         laser_1: [
             { value: '16', label: 'Laser 1' },
             { value: '17', label: 'Laser 2 (JFY)' },
+            { value: '58', label: 'Laser 3 Trumpf' },
         ],
         laser_2: [
             { value: '17', label: 'Laser 2 (JFY)' },
             { value: '16', label: 'Laser 1' },
+            { value: '58', label: 'Laser 3 Trumpf' },
         ],
         plasma: [
             { value: '19', label: 'Plasma 1' },

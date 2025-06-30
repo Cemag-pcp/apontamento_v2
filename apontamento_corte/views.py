@@ -20,6 +20,7 @@ import os
 import tempfile
 import re
 import json
+import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 from datetime import datetime, time
 from functools import reduce
@@ -32,7 +33,6 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 def extrair_numeracao(nome_arquivo):
     match = re.search(r"(?i)OP\s*(\d+)", nome_arquivo)  # Permite espaços opcionais entre OP e o número
-    print(match)
     if match:
         return match.group(1)
     return None
@@ -88,7 +88,7 @@ def get_ordens_criadas(request):
     limit = int(request.GET.get('limit', 10))
 
     # Filtra as ordens com base nos parâmetros
-    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).order_by('-ultima_atualizacao', '-status_prioridade')
+    ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade').filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3']).order_by('-ultima_atualizacao', '-status_prioridade')
 
     if filtro_ordem:
         if '.' in filtro_ordem or 'dup' in filtro_ordem:
@@ -257,7 +257,7 @@ def get_ordens_iniciadas(request):
 
     # Filtra as ordens com base no status 'iniciada'
     ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_corte').select_related('propriedade') \
-        .filter(status_atual='iniciada', grupo_maquina__in=['plasma','laser_1','laser_2'])
+        .filter(status_atual='iniciada', grupo_maquina__in=['plasma','laser_1','laser_2', 'laser_3'])
 
     # Paginação (opcional)
     page = request.GET.get('page', 1)  # Obtém o número da página
@@ -301,7 +301,7 @@ def get_ordens_interrompidas(request):
 
     # Filtra as ordens com base no status 'interrompida'
     ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_corte').select_related('propriedade') \
-        .filter(status_atual='interrompida', grupo_maquina__in=['plasma','laser_1','laser_2'])
+        .filter(status_atual='interrompida', grupo_maquina__in=['plasma','laser_1','laser_2',' laser_3'])
 
     # Paginação (opcional)
     page = request.GET.get('page', 1)  # Obtém o número da página
@@ -421,7 +421,7 @@ def get_ordens_criadas_duplicar_ordem(request):
 
     #  Define a Query Base
     ordens_queryset = (
-        Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2'], duplicada=False)
+        Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2','laser_3'], duplicada=False)
         .prefetch_related('ordem_pecas_corte')  # Evita queries repetidas para peças
         .select_related('propriedade')  # Carrega a propriedade diretamente
         .order_by('-propriedade__aproveitamento')
@@ -458,7 +458,7 @@ def get_ordens_criadas_duplicar_ordem(request):
         ordens_queryset = ordens_queryset.filter(data_criacao__date=date.fromisoformat(dataCriacao))
 
     # Contagem de Registros para Paginação
-    # records_total = Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2']).count()
+    # records_total = Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2','laser_3]).count()
     records_filtered = ordens_queryset.count()
 
     # Paginação eficiente
@@ -586,7 +586,7 @@ def gerar_op_duplicada(request, pk_ordem):
         if maquina:
             maquina_ordem = get_object_or_404(Maquina, pk=maquina)
         else:
-            maquina_ordem = ordem_original.maquina.nome if ordem_original.maquina.nome in ['laser_1', 'laser_2'] else None
+            maquina_ordem = ordem_original.maquina.nome if ordem_original.maquina.nome in ['laser_1', 'laser_2','laser_3'] else None
 
         with transaction.atomic():
             # Cria a nova ordem como duplicada
@@ -651,7 +651,7 @@ def get_ordens_sequenciadas(request):
 
     if tipo_maquina == 'laser':
         filtro_grupo_maquina = {
-            'grupo_maquina__in': ['laser_1', 'laser_2', 'Laser 2 (JFY)']
+            'grupo_maquina__in': ['laser_1', 'laser_2', 'Laser 2 (JFY)','laser_3']
         }
     else:
         filtro_grupo_maquina = {
@@ -762,7 +762,7 @@ def api_ordens_finalizadas(request):
                 o.status_atual = 'finalizada'
                 AND o.ultima_atualizacao >= '2025-04-08'
                 AND poc.qtd_boa > 0
-            ORDER BY o.ultima_atualizacao;
+            ORDER BY o.ultima_atualizacao, peca;
         """)
         columns = [col[0] for col in cursor.description]
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -805,7 +805,7 @@ def api_ordens_finalizadas_mp(request):
             LEFT JOIN apontamento_v2.cadastro_maquina m ON o.maquina_id = m.id
         WHERE 
             o.status_atual = 'finalizada'
-        AND o.grupo_maquina IN ('laser_1', 'laser_2', 'plasma')
+        AND o.grupo_maquina IN ('laser_1', 'laser_2', 'plasma','laser_3)
         AND o.ultima_atualizacao >= '2025-04-08'
         ORDER BY o.ultima_atualizacao;
         """)
@@ -937,7 +937,10 @@ class ProcessarArquivoView(View):
 
         try:
             # Ler o arquivo Excel enviado
-            ordem_producao_excel = pd.read_excel(uploaded_file)
+            if tipo_maquina == 'laser_3':
+                ordem_producao_excel = ET.parse(uploaded_file)
+            else:
+                ordem_producao_excel = pd.read_excel(uploaded_file)
 
             # Realizar o tratamento da planilha
             if tipo_maquina=='plasma':
@@ -957,16 +960,8 @@ class ProcessarArquivoView(View):
                         raise ValueError("Nenhuma das abas 'AllPartsList' ou 'Lista de Todas as Peças' foi encontrada na planilha.")
                 
                 excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2,ordem_producao_excel_3)
-            # elif tipo_maquina=='laser_1':
-
-            #     comprimento = request.POST.get('comprimento')
-            #     largura=request.POST.get('largura')
-
-            #     espessura=get_object_or_404(Espessura, pk=request.POST.get('espessura'))
-                
-            #     # apenas para o laser1
-            #     ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='Nestings_Cost')
-            #     excel_tratado,propriedades = tratamento_planilha_laser1(ordem_producao_excel,ordem_producao_excel_2,comprimento,largura,espessura.nome)
+            elif tipo_maquina == 'laser_3':
+                excel_tratado,propriedades = tratamento_planilha_laser3(ordem_producao_excel)
 
             # Converter para uma lista de dicionários
             relevant_data = excel_tratado.to_dict(orient='records')
@@ -986,6 +981,7 @@ class SalvarArquivoView(View):
         Exemplo:
         - 9855 -> 0.9855
         - 006 -> 0.6
+        - 49.85 -> 0.4985
         """
         valor = str(valor)
         valor = valor.replace("%","").replace(",",".")
@@ -1032,11 +1028,14 @@ class SalvarArquivoView(View):
         numeracao_op = extrair_numeracao(uploaded_file.name)
 
         # Ler o arquivo Excel enviado
-        ordem_producao_excel = pd.read_excel(uploaded_file)
+        if tipo_maquina == 'laser_3':
+            ordem_producao_excel = ET.parse(uploaded_file)
+        else:
+            ordem_producao_excel = pd.read_excel(uploaded_file)
 
         tipo_maquina_tratada = tipo_maquina.replace("_"," ").title()
 
-        tipo_maquina_object = get_object_or_404(Maquina, nome__contains=tipo_maquina_tratada) if tipo_maquina in ['laser_1','laser_2'] else None
+        tipo_maquina_object = get_object_or_404(Maquina, nome__contains=tipo_maquina_tratada) if tipo_maquina in ['laser_1','laser_2','laser_3'] else None
 
         if tipo_maquina =='plasma':
             excel_tratado,propriedades = tratamento_planilha_plasma(ordem_producao_excel)
@@ -1067,6 +1066,8 @@ class SalvarArquivoView(View):
             # apenas para o laser1
             ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='Nestings_Cost')
             excel_tratado,propriedades = tratamento_planilha_laser1(ordem_producao_excel,ordem_producao_excel_2,comprimento,largura,espessura.nome)
+        elif tipo_maquina_object.nome == 'Laser 3 Trumpf':
+            excel_tratado,propriedades = tratamento_planilha_laser3(ordem_producao_excel)
 
         pecas = excel_tratado.to_dict(orient='records')  # Converter para uma lista de dicionários
 
@@ -1087,7 +1088,7 @@ class SalvarArquivoView(View):
                 PropriedadesOrdem.objects.create(
                     ordem=nova_ordem,
                     descricao_mp=prop['descricao_mp'],
-                    espessura=prop['espessura'].rstrip(),
+                    espessura=str(prop['espessura']).rstrip(),
                     quantidade=prop['quantidade'],
                     aproveitamento=SalvarArquivoView.corrigir_aproveitamento(prop['aproveitamento']),
                     tipo_chapa=tipo_chapa,

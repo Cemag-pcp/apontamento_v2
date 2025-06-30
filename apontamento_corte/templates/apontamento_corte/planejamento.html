@@ -201,6 +201,7 @@
                                 <option value="plasma">Plasma</option>
                                 <option value="laser_1">Laser 1</option>
                                 <option value="laser_2">Laser 2 (JFY)</option>
+                                <option value="laser_3">Laser 3 (Trumpf)</option>
                             </select>
                         </div>
                         <div class="col-md-3 mb-2">
@@ -365,7 +366,10 @@
                         <button class="nav-link active" id="laser1-tab" data-bs-toggle="tab" data-bs-target="#laser1" type="button" role="tab" aria-controls="laser1" aria-selected="true">Laser 1</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="laser2-tab" data-bs-toggle="tab" data-bs-target="#laser2" type="button" role="tab" aria-controls="laser2" aria-selected="false">Laser 2</button>
+                        <button class="nav-link" id="laser2-tab" data-bs-toggle="tab" data-bs-target="#laser2" type="button" role="tab" aria-controls="laser2" aria-selected="false">Laser 2 (JFY)</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="laser3-tab" data-bs-toggle="tab" data-bs-target="#laser3" type="button" role="tab" aria-controls="laser3" aria-selected="false">Laser 3 (Trumpf)</button>
                     </li>
                 </ul>
 
@@ -517,6 +521,74 @@
                             </div>
                             <div class="text-end">
                                 <button class="btn btn-success" id="confirmButtonLaser2" style="display:none;">Confirmar</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Laser 3 Form -->
+                    <div class="tab-pane fade" id="laser3" role="tabpanel" aria-labelledby="laser3-tab">
+                        <form id="laser3Form" method="post" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <input type="hidden" id="tipoMaquina" value="laser_3">
+                            <div class="row mb-3 align-items-center">
+                                <!-- data de programação -->
+                                <div class="col-md-5">
+                                    <label for="dataProgramacaoLaser3" class="form-label">Programação:</label>
+                                    <input type="date" id="dataProgramacaoLaser3" name="dataProgramacaoLaser3" class="form-control" required>
+                                </div>
+                                <!-- Tipo da chapa -->
+                                <div class="col-md-5">
+                                    <label for="tipoChapaLaser3" class="form-label">Tipo da chapa:</label>
+                                    <select class="form-select" name="tipoChapaLaser3" id="tipoChapaLaser3" required>
+                                        <option value="" disabled selected>Selecione o tipo</option>
+                                        <option value="aco_carbono">Aço carbono</option>
+                                        <option value="anti_derrapante">Anti derrapante</option>
+                                        <option value="alta_resistencia">Alta resistência</option>
+                                        <option value="inox">Inox</option>
+                                    </select>
+                                </div>
+                                <!-- Retalho -->
+                                <div class="col-md-2 d-flex align-items-center">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="retalhoLaser3" name="retalhoLaser3">
+                                        <label class="form-check-label ms-2" for="retalhoLaser3">Retalho</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="descricaoLaser3" class="form-label">Descrição:</label>
+                                <textarea class="form-control" id="descricaoLaser3" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3 d-flex align-items-center">
+                                <div class="flex-grow-1">
+                                    <label for="fileUploadLaser3" class="form-label">Arquivo XML:</label>
+                                    <input type="file" class="form-control" id="fileUploadLaser3" accept=".xml" required>
+                                </div>
+                                <div class="ms-3 align-self-end">
+                                    <button type="button" class="btn btn-danger btn-sm" id="resetFileLaser3" title="Limpar Arquivo">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <table class="table table-striped" id="previewTableLaser3" style="display: none;">
+                                    <thead>
+                                        <tr>
+                                            <th>Peça</th>
+                                            <th>Qt. Plan.</th>
+                                            <th>Espess.</th>
+                                            <th>Aprov.</th>
+                                            <th>Chapa</th>
+                                            <th>Qt. Chapa</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dados serão preenchidos via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-end">
+                                <button class="btn btn-success" id="confirmButtonLaser3" style="display:none;">Confirmar</button>
                             </div>
                         </form>
                     </div>

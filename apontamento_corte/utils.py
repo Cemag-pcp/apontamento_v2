@@ -2,6 +2,7 @@ import pandas as pd
 from datetime import date
 import re
 import numpy as np
+import xml.etree.ElementTree as ET
 
 def padronizar_medida_plasma(s):
     padroes = [1200, 1500, 2550]
@@ -268,3 +269,67 @@ def tratamento_planilha_laser1(df,df2,comprimento,largura,espessura):
     }]
 
     return df, propriedades
+
+def tratamento_planilha_laser3(tree):
+
+    # Carrega o XML
+    # tree = ET.parse('OP12.xml')
+    root = tree.getroot()
+
+    # 1. Espessura via UsedLaserTechnoTable > TableNo
+    espessura = None
+    for used_table in root.findall('.//UsedLaserTechnoTable'):
+        table_no = used_table.find('TableNo')
+        if table_no is not None and table_no.text and len(table_no.text) >= 5:
+            try:
+                espessura = float(table_no.text[2:5]) / 10
+                break
+            except ValueError:
+                pass
+
+    # 2. Dimensões (corrigido para RequiredSheets > Sheet > Dimensions)
+    dim = root.find('.//RequiredSheets/Sheet/Dimensions')
+    if dim is not None:
+        comprimento = float(dim.find('Length').text)
+        largura = float(dim.find('Width').text)
+        espessura_real = float(dim.find('Thickness').text)
+    else:
+        comprimento = largura = espessura_real = None
+
+    # 3. Quantidade de chapas
+    sheet = root.find('.//RequiredSheets/Sheet')
+    quantidade_chapas = int(sheet.find('TotalQuantityInJob').text) if sheet is not None else 0
+
+    # 4. Aproveitamento
+    waste_el = root.find('.//Waste')
+    aproveitamento = float(waste_el.text) if waste_el is not None else None
+
+    # 5. Peças (loop)
+    pecas_detalhadas = []
+    for part in root.findall('.//Parts/Part'):
+        peca = part.find('Description')
+        quantidade = part.find('TotalQuantityInJob')
+        
+        item = {
+            'peca': peca.text.strip() if peca is not None else '',
+            'qtd_planejada': quantidade.text.strip() if quantidade is not None else '',
+            'espessura': espessura,
+            'aproveitamento': aproveitamento,
+            'tamanho_da_chapa': f"{comprimento} x {largura} mm ",
+            'qt_chapas': quantidade_chapas
+        }
+
+        pecas_detalhadas.append(item)
+
+    df_pecas = pd.DataFrame(pecas_detalhadas)
+    # df_pecas.columns = ['qtd_planejada','peca','espessura','aproveitamento','tamanho_da_chapa','qt_chapas']
+
+    propriedades = [{
+        'descricao_mp': str(espessura) + " - " + f"{comprimento} x {largura} mm ",
+        'tamanho':f"{comprimento} x {largura} mm ",
+        'espessura':espessura,
+        'quantidade':quantidade_chapas,
+        'aproveitamento':aproveitamento,
+    }]
+
+    return df_pecas, propriedades

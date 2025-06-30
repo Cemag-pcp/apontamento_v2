@@ -19,6 +19,7 @@ MAQUINA_CHOICES = (
     #Corte
     ('laser_1', 'Laser 1'),
     ('laser_2', 'Laser 2 (JFY)'),
+    ('laser_3', 'Laser 3 (Trumpf)'),
     ('plasma_1', 'Plasma 1'),
     ('plasma_2', 'Plasma 2'),
     ('prensa', 'Prensa'),
@@ -58,6 +59,7 @@ class Ordem(models.Model):
     GRUPO_MAQUINA_CHOICES = (
         ('laser_1', 'Laser 1'),
         ('laser_2', 'Laser 2 (JFY)'),
+        ('laser_3', 'Laser 3 (Trumpf)'),
         ('plasma', 'Plasma'),
         ('prensa', 'Prensa'),
         ('usinagem', 'Usinagem'),
@@ -110,7 +112,7 @@ class Ordem(models.Model):
 
     def save(self, *args, **kwargs):
 
-        if not self.pk and self.grupo_maquina in ['plasma','laser_1','laser_2']:
+        if not self.pk and self.grupo_maquina in ['plasma','laser_1','laser_2','laser_3']:
             self.sequenciada = True
         
         elif self.grupo_maquina == 'montagem' and self.data_carga:
@@ -136,7 +138,7 @@ class Ordem(models.Model):
                 self.ordem_duplicada = "dup#1"  # Caso não tenha um pai definido (fallback)
 
         # Incrementa automaticamente apenas para os grupos diferentes de "Laser" e "Plasma"
-        elif not self.pk and self.grupo_maquina not in ['laser_1','laser_2','plasma']:
+        elif not self.pk and self.grupo_maquina not in ['laser_1','laser_2','laser_3','plasma']:
             # Busca o maior número de ordem dentro do mesmo grupo de máquina
             ultimo_numero = Ordem.objects.filter(grupo_maquina=self.grupo_maquina).aggregate(
                 Max('ordem')

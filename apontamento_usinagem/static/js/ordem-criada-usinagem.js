@@ -879,6 +879,8 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
         data => {
             const escolhaProcesso = document.getElementById('escolhaMaquinaProxProcesso');
             escolhaProcesso.innerHTML = `<option value="">------</option>`;
+            const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
+            labelModalMaquinaProxProcesso.innerHTML = 'Escolha o próximo processo:'
 
             Swal.close();
             data.processos.forEach((processo) => {

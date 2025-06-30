@@ -1,3 +1,4 @@
+
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
@@ -27,6 +28,10 @@ from datetime import datetime
 import requests
 import json
 from datetime import timedelta
+import django
+
+django.setup()
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
 
 def home(request):
 
@@ -161,6 +166,8 @@ def atualizar_ordem_existente(request):
 
     data_inicio = request.GET.get('data_inicio')
     setor = request.GET.get('setor')
+    # data_inicio = '2025-06-26'
+    # setor = 'pintura'
 
     if not data_inicio or not setor:
         return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)
@@ -193,6 +200,8 @@ def atualizar_ordem_existente(request):
 
     # Gerar a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_inicio, setor)
+    
+    # print(tabela_completa[tabela_completa['cor'] == 'Amarelo'])
 
     if setor == 'pintura':
         tabela_completa = tabela_completa.groupby(['Código', 'Peca', 'Célula', 'Datas','Recurso_cor','cor']).agg({'Qtde_total': 'sum'}).reset_index()
@@ -203,9 +212,14 @@ def atualizar_ordem_existente(request):
         # tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%Y-%d-%m", errors="coerce").dt.strftime("%Y-%m-%d")
 
     # Conjunto de peças atuais
-    pecas_atualizadas = set(
-        f"{str(row['Código'])} - {row['Peca']}" for _, row in tabela_completa.iterrows()
-    )
+    if setor == 'pintura':
+        pecas_atualizadas = set(
+            (f"{str(row['Código'])} - {row['Peca']}", row['cor']) for _, row in tabela_completa.iterrows()
+        )
+    else:
+        pecas_atualizadas = set(
+            f"{str(row['Código'])} - {row['Peca']}" for _, row in tabela_completa.iterrows()
+        )
 
     # Identificar ordens sem apontamento que não existem mais no sequenciamento
     if setor == 'montagem':
@@ -213,9 +227,14 @@ def atualizar_ordem_existente(request):
             ~Q(ordem_pecas_montagem__peca__in=pecas_atualizadas)
         )
     elif setor == 'pintura':
-        ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
-            ~Q(ordem_pecas_pintura__peca__in=pecas_atualizadas)
-        )
+        # ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
+        #     ~Q(ordem_pecas_pintura__peca__in=pecas_atualizadas)
+        # )
+        condicao = Q()
+        for peca, cor in pecas_atualizadas:
+            condicao |= Q(ordem_pecas_pintura__peca=peca, cor=cor)
+
+        ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).exclude(condicao)
     else:
         ordens_sem_apontamento = ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids).filter(
             ~Q(ordem_pecas_solda__peca__in=pecas_atualizadas)
@@ -226,6 +245,9 @@ def atualizar_ordem_existente(request):
 
     # Preparar lista para criar novas ordens
     ordens_a_criar = []
+
+    # tabela_completa = tabela_completa.iloc[31:32]
+    # tabela_completa.reset_index(drop=True)
 
     for _, row in tabela_completa.iterrows():
         peca_nome = f"{str(row['Código'])} - {row['Peca']}"
@@ -241,7 +263,8 @@ def atualizar_ordem_existente(request):
             ordem_existente = Ordem.objects.filter(
                 grupo_maquina=setor,
                 data_carga=data_carga,
-                ordem_pecas_pintura__peca=peca_nome
+                ordem_pecas_pintura__peca=peca_nome,
+                cor=row['cor']
             ).first()
         else:
             ordem_existente = Ordem.objects.filter(
@@ -254,8 +277,10 @@ def atualizar_ordem_existente(request):
             # Atualizar qtd_planejada na peça vinculada
             if setor == 'montagem':
                 ordem_existente.ordem_pecas_montagem.filter(peca=peca_nome).update(qtd_planejada=int(row["Qtde_total"]))
-            else:
+            elif setor == 'pintura':
                 ordem_existente.ordem_pecas_pintura.filter(peca=peca_nome).update(qtd_planejada=int(row["Qtde_total"]))
+            else:
+                ordem_existente.ordem_pecas_solda.filter(peca=peca_nome).update(qtd_planejada=int(row["Qtde_total"]))
         else:
             # Criar nova ordem
             ordens_a_criar.append({
@@ -321,6 +346,8 @@ def remanejar_carga(request):
             # **Recalcula `data_programacao` apenas uma vez, pois todas as ordens seguem a mesma lógica**
             if setor == 'montagem':
                 data_programacao = data_remaneja - timedelta(days=3)
+            elif setor == 'solda':
+                data_programacao = data_remaneja - timedelta(days=2)
             elif setor == 'pintura':
                 data_programacao = data_remaneja - timedelta(days=1)
 
@@ -453,6 +480,7 @@ def historico_ordens_montagem(request):
     maquina_param = request.GET.get('setor', None) # Chassi, Içamento...
     status_param = request.GET.get('status', None)
     ordem_param = request.GET.get('ordem', None)
+    conjunto_param = request.GET.get('conjunto', '')
 
     # Paginação
     page = request.GET.get('page', 1)
@@ -482,6 +510,8 @@ def historico_ordens_montagem(request):
         filtros_ordem['status_atual'] = status_param
     if ordem_param:
         filtros_ordem['id'] = ordem_param
+    if conjunto_param:
+        filtros_ordem['ordem_pecas_montagem__peca__icontains'] = conjunto_param
 
     # Recupera os IDs das ordens que atendem aos filtros
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
@@ -544,6 +574,7 @@ def historico_ordens_pintura(request):
     cor = request.GET.get('cor', '') # Chassi, Içamento...
     status_param = request.GET.get('status', '')
     ordem_param = request.GET.get('ordem', '')
+    conjunto_param = request.GET.get('conjunto', '')
 
     # Paginação
     page = request.GET.get('page', 1)
@@ -572,6 +603,8 @@ def historico_ordens_pintura(request):
         filtros_ordem['status_atual'] = status_param
     if ordem_param:
         filtros_ordem['id'] = ordem_param
+    if conjunto_param:
+        filtros_ordem['ordem_pecas_pintura__peca__icontains'] = conjunto_param
 
     # Recupera os IDs das ordens que atendem aos filtros
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
@@ -637,6 +670,8 @@ def editar_planejamento(request):
         # Determinar o modelo correto com base no setor
         if setor == 'montagem':
             atualizar_ordens = POMontagem.objects.filter(ordem=ordem)
+        elif setor == 'solda':
+            atualizar_ordens = POSolda.objects.filter(ordem=ordem)
         else:
             atualizar_ordens = POPintura.objects.filter(ordem=ordem)
 
@@ -651,7 +686,14 @@ def editar_planejamento(request):
             if setor == 'montagem':
                 conflito = Ordem.objects.filter(
                     data_carga=nova_data_carga,
-                    ordem_pecas_montagem__peca__in=pecas_ordem
+                    ordem_pecas_montagem__peca__in=pecas_ordem,
+                    maquina=ordem.maquina
+                ).exclude(id=ordem_id).exists()
+            elif setor == 'solda':
+                conflito = Ordem.objects.filter(
+                    data_carga=nova_data_carga,
+                    ordem_pecas_solda__peca__in=pecas_ordem,
+                    maquina=ordem.maquina
                 ).exclude(id=ordem_id).exists()
             else:  # pintura
                 conflito = Ordem.objects.filter(

@@ -29,16 +29,16 @@ class MedidasInspecaoEstamparia(models.Model):
 
     informacoes_adicionais_estamparia = models.ForeignKey(InfoAdicionaisInspecaoEstamparia, on_delete=models.CASCADE, null=False, blank=False)
 
-    cabecalho_medida_a = models.CharField(max_length=10, null=True, blank=True)
+    cabecalho_medida_a = models.CharField(max_length=30, null=True, blank=True)
     medida_a = models.FloatField(null=True, blank=True)
     
-    cabecalho_medida_b = models.CharField(max_length=10, null=True, blank=True)
+    cabecalho_medida_b = models.CharField(max_length=30, null=True, blank=True)
     medida_b = models.FloatField(null=True, blank=True)
 
-    cabecalho_medida_c = models.CharField(max_length=10, null=True, blank=True)
+    cabecalho_medida_c = models.CharField(max_length=30, null=True, blank=True)
     medida_c = models.FloatField(null=True, blank=True)
 
-    cabecalho_medida_d = models.CharField(max_length=10, null=True, blank=True)
+    cabecalho_medida_d = models.CharField(max_length=30, null=True, blank=True)
     medida_d = models.FloatField(null=True, blank=True)
 
 class DadosNaoConformidade(models.Model):
