@@ -43,7 +43,7 @@ def excluir_ordem(request):
             # Verifica o status atual da ordem antes de permitir a exclusão
             if ordem.status_atual in ['aguardando_iniciar', 'finalizada']:
                 # Exceção para o setor de corte (opção de retirar do sequenciamento)
-                if setor in ['laser_1','laser_2','plasma']:
+                if setor in ['laser_1','laser_2','laser_1','plasma']:
                     print('adicionando o motivo...')
                     ordem.motivo_retirar_sequenciada = motivo_exclusao
                     print('retirando do sequenciamento...')
@@ -266,7 +266,7 @@ def get_contagem_status_ordem(request):
     setor = request.GET.get('setor', '')  # Captura o setor da URL
 
     if setor == 'corte':
-        contagem_status = Ordem.objects.filter(grupo_maquina__in=('laser_1','laser_2','plasma'), excluida=False).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
+        contagem_status = Ordem.objects.filter(grupo_maquina__in=('laser_1','laser_2','laser_3','plasma'), excluida=False).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
     else:
         contagem_status = Ordem.objects.filter(grupo_maquina=setor, excluida=False).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
 

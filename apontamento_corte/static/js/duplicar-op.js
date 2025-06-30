@@ -213,7 +213,7 @@ function preencherModalDuplicacao(data,ordemId) {
 
     document.getElementById('modalDuplicarOrdem').setAttribute('data-ordem-id', ordemId);
     
-    const maquinas = ['laser_1', 'laser_2']; // laser_1: 16, laser_2: 17
+    const maquinas = ['laser_1', 'laser_2','laser_3']; // laser_1: 16, laser_2: 17
     const maquina = data.propriedades.maquina;
     const selectMaquina = document.getElementById('maquina');
     const colMaquina = document.getElementById('col-maquina');
@@ -221,7 +221,8 @@ function preencherModalDuplicacao(data,ordemId) {
     // Mapeamento: nome da máquina => ID
     const maquinaMap = {
         'laser_1': '16',
-        'laser_2': '17'
+        'laser_2': '17',
+        'laser_3': 58
     };
     
     if (maquinas.includes(maquina)) {

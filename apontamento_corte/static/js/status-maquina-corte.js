@@ -166,6 +166,7 @@ export function fetchOrdensSequenciadasLaser() {
                     const statusColorsMaquina = {
                         'laser_1': 'primary',
                         'laser_2': 'success',
+                        'laser_3': 'info',
                     };
                     const badgeColorMaquina = statusColorsMaquina[ordem.grupo_maquina] || 'secondary';
 
