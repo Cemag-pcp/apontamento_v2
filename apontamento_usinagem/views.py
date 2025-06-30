@@ -138,7 +138,6 @@ def atualizar_status_ordem(request):
             with transaction.atomic():
                 # Parse do corpo da requisição
                 body = json.loads(request.body)
-                print(body)
 
                 status = body['status']
                 ordem_id = body['ordem_id']

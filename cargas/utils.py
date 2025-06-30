@@ -109,13 +109,29 @@ def tratando_dados():
 
 def consultar_carretas(data_inicial, data_final):
     dados_carreta, dados_carga = get_data_from_sheets()
+    dados_carreta['Recurso'] = dados_carreta['Recurso'].astype(str)
+
+    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('AM', '')
+    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('AN', '')
+    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('VJ', '')
+    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('LC', '')
+    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('VM', '')
+    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('AV', '')
+    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('CO', '')
 
     dados_carreta['Recurso'] = dados_carreta['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
 
-    sufixos_para_remover = ['AV', 'VM', 'VJ', 'AN','CO','LC']
+    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('AM', '')
+    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('AN', '')
+    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('VJ', '')
+    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('LC', '')
+    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('VM', '')
+    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('AV', '')
+    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('CO', '')
+
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(
-        lambda x: x[:-2].rstrip() if str(x)[-2:] in sufixos_para_remover else x
+        lambda x: x.rstrip()
     )
 
     dados_carga['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
@@ -994,14 +1010,32 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
     resultado = criar_array_datas(data_inicial, data_final)
     base_carretas_original, base_carga_original = get_data_from_sheets()
 
-    resultado = pd.to_datetime(resultado, dayfirst=True, errors='coerce')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].astype(str)
+
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AM', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AN', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VJ', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('LC', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VM', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AV', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('CO', '')
+
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
+
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AM', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AN', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('VJ', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('LC', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('VM', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AV', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('CO', '')
 
     base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(
-        lambda x: "0" + str(x) if len(str(x)) == 5 else str(x)
+        lambda x: x.rstrip()
     )
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(
-        lambda x: "0" + str(x) if len(str(x)) == 5 else str(x)
-    )
+
+    resultado = pd.to_datetime(resultado, dayfirst=True, errors='coerce')
 
     # Ajusta colunas
     base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
@@ -1037,9 +1071,10 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
         if setor == 'pintura':
 
             base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
-
+            # base_carretas[base_carretas['Recurso'] == '034550G']
             base_carga['Recurso'] = base_carga['Recurso'].astype(str)
-
+            # base_carga[base_carga['Recurso'] == '034550G']
+            
             # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
             # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
             # base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
@@ -1119,9 +1154,9 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
 
             filtro_data = filtro_data.reset_index(drop=True)
 
-            for i in range(len(filtro_data)):
-                if filtro_data['Recurso'][i][0] == '0':
-                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+            # for i in range(len(filtro_data)):
+            #     if filtro_data['Recurso'][i][0] == '0':
+            #         filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
 
             # tab_completa['Recurso'] = tab_completa['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else x)
             filtro_data['Recurso'] = filtro_data['Recurso'].apply(lambda x: "0" + str(x)  if len(str(x)) == 5 else x)
@@ -1216,7 +1251,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
             
             tab_completa = tab_completa.reset_index(drop=True)
-            
+
         if setor == 'montagem':
 
             base_carretas['Código'] = base_carretas['Código'].astype(str)
@@ -1263,16 +1298,16 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
 
             escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
             filtro_data = base_carga.loc[escolha_data]
-            # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
+            # filtro_data[filtro_data['Recurso'] == '034550G']
 
             filtro_data = filtro_data.reset_index(drop=True)
-            filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
+            # filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
 
-            for i in range(len(filtro_data)):
-                if filtro_data['Recurso'][i][0] == '0':
-                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
-                if len(filtro_data['Recurso'][i]) == 5:
-                    filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
+            # for i in range(len(filtro_data)):
+            #     if filtro_data['Recurso'][i][0] == '0':
+            #         filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+            #     if len(filtro_data['Recurso'][i]) == 5:
+            #         filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
             
             ##### juntando planilhas de acordo com o recurso#######
 
@@ -1280,7 +1315,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
                                     'Recurso', 'Código', 'Peca', 'Qtde', 'Célula']], on=['Recurso'], how='left')
             tab_completa = tab_completa.dropna(axis=0)
 
-            # base_carretas[base_carretas['Recurso'] == '034538M21']
+            # tab_completa[tab_completa['Recurso'] == '034550G']
 
             # carretas_agrupadas = filtro_data[['Recurso','Qtde']]
             # carretas_agrupadas = pd.DataFrame(filtro_data.groupby('Recurso').sum())
@@ -1359,7 +1394,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             #     ['Código', 'Peca', 'Célula', 'Datas', 'Carga', 'PED_CHCRIACAO', 'Ano', 'codigo']).sum()
         
             tab_completa = tab_completa.reset_index(drop=True)
-
+            tab_completa[tab_completa['Código'] == '034550'] 
             # carga_unique = tab_completa['Carga'].unique()
 
             # for carga in carga_unique:
@@ -1707,6 +1742,7 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
         ordens_metadata = []
 
         for i, o in enumerate(ordens_data):
+            
             # try:
             #     data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
             # except:
@@ -1731,7 +1767,7 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
             )
 
             try:
-                maquina = Maquina.objects.get(nome=o["setor_conjunto"])
+                maquina = Maquina.objects.get(nome=o["setor_conjunto"],setor__nome='montagem')
                 nova_ordem.maquina = maquina
                 # calcula data_programacao manualmente
                 nova_ordem.data_programacao = data_carga - timedelta(days=3)

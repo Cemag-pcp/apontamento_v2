@@ -200,6 +200,7 @@ def atualizar_ordem_existente(request):
 
     # Gerar a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_inicio, setor)
+    
     # print(tabela_completa[tabela_completa['cor'] == 'Amarelo'])
 
     if setor == 'pintura':
@@ -669,6 +670,8 @@ def editar_planejamento(request):
         # Determinar o modelo correto com base no setor
         if setor == 'montagem':
             atualizar_ordens = POMontagem.objects.filter(ordem=ordem)
+        elif setor == 'solda':
+            atualizar_ordens = POSolda.objects.filter(ordem=ordem)
         else:
             atualizar_ordens = POPintura.objects.filter(ordem=ordem)
 
@@ -683,7 +686,14 @@ def editar_planejamento(request):
             if setor == 'montagem':
                 conflito = Ordem.objects.filter(
                     data_carga=nova_data_carga,
-                    ordem_pecas_montagem__peca__in=pecas_ordem
+                    ordem_pecas_montagem__peca__in=pecas_ordem,
+                    maquina=ordem.maquina
+                ).exclude(id=ordem_id).exists()
+            elif setor == 'solda':
+                conflito = Ordem.objects.filter(
+                    data_carga=nova_data_carga,
+                    ordem_pecas_solda__peca__in=pecas_ordem,
+                    maquina=ordem.maquina
                 ).exclude(id=ordem_id).exists()
             else:  # pintura
                 conflito = Ordem.objects.filter(
