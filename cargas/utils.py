@@ -197,20 +197,30 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
     resultado = pd.to_datetime(resultado, dayfirst=True, errors='coerce')
 
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].astype(str)
+
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AM', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AN', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VJ', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('LC', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VM', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AV', '')
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('CO', '')
+
+    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
+
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AM', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AN', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('VJ', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('LC', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('VM', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AV', '')
+    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('CO', '')
+
     base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(
-        lambda x: "0" + str(x) if len(str(x)) == 5 else str(x)
+        lambda x: x.rstrip()
     )
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(
-        lambda x: "0" + str(x) if len(str(x)) == 5 else str(x)
-    )
-    
-    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AM', '')
-    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AN', '')
-    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VJ', '')
-    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('LC', '')
-    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VM', '')
-    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AV', '')
-    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('CO', '')
 
     # Ajusta colunas
     base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
@@ -333,9 +343,9 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             filtro_data = filtro_data.reset_index(drop=True)
 
-            for i in range(len(filtro_data)):
-                if filtro_data['Recurso'][i][0] == '0':
-                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+            # for i in range(len(filtro_data)):
+            #     if filtro_data['Recurso'][i][0] == '0':
+            #         filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
 
             # tab_completa['Recurso'] = tab_completa['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else x)
             filtro_data['Recurso'] = filtro_data['Recurso'].apply(lambda x: "0" + str(x)  if len(str(x)) == 5 else x)
@@ -585,13 +595,13 @@ def gerar_arquivos(data_inicial, data_final, setor):
             filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
 
             filtro_data = filtro_data.reset_index(drop=True)
-            filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
+            # filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
 
-            for i in range(len(filtro_data)):
-                if filtro_data['Recurso'][i][0] == '0':
-                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
-                if len(filtro_data['Recurso'][i]) == 5:
-                    filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
+            # for i in range(len(filtro_data)):
+            #     if filtro_data['Recurso'][i][0] == '0':
+            #         filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+            #     if len(filtro_data['Recurso'][i]) == 5:
+            #         filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
             
             ##### juntando planilhas de acordo com o recurso#######
 
