@@ -805,7 +805,7 @@ def api_ordens_finalizadas_mp(request):
             LEFT JOIN apontamento_v2.cadastro_maquina m ON o.maquina_id = m.id
         WHERE 
             o.status_atual = 'finalizada'
-        AND o.grupo_maquina IN ('laser_1', 'laser_2', 'plasma','laser_3)
+        AND o.grupo_maquina IN ('laser_1', 'laser_2', 'plasma','laser_3')
         AND o.ultima_atualizacao >= '2025-04-08'
         ORDER BY o.ultima_atualizacao;
         """)
