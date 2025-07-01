@@ -582,6 +582,7 @@ def api_ordens_finalizadas(request):
                 m.nome AS maquina,
                 p.codigo AS peca,
                 p.descricao AS descricao,
+                ope.qtd_planejada AS total_planejada,
                 ope.qtd_boa AS total_produzido,
                 TO_CHAR(o.data_programacao, 'DD/MM/YYYY HH24:MI') AS data_programacao,
                 TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
