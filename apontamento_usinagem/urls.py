@@ -23,3 +23,8 @@ urlpatterns = [
     path('api/apontamentos-peca/usinagem', views.api_apontamentos_peca, name='api_apontamentos_peca'),
 
 ]
+
+# Google sheets
+urlpatterns += [
+    path('api/ordem-finalizadas', views.api_ordens_finalizadas, name='api_ordens_finalizadas'),
+]
