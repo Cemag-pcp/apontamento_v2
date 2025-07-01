@@ -58,9 +58,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-sm btn-proximo-processo" title="Passar para o próximo processo">
                                     <i class="fa fa-arrow-right"></i>
                                 </button>  
-                                <button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
-                                    <i class="bi bi-arrow-left-right"></i>
-                                </button>
                             `;
                         } else if (ordem.status_atual === 'aguardando_iniciar') {
                             botaoAcao = `
@@ -76,9 +73,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
                                     <i class="fa fa-redo"></i>
                                 </button>
-                                <button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
-                                    <i class="bi bi-arrow-left-right"></i>
-                                </button>
                             `;
                         } else if (ordem.status_atual === 'agua_prox_proc') {
                             botaoAcao = `
@@ -88,9 +82,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
                                     <i class="fa fa-trash"></i>
                                 </button>
-                                <button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
-                                    <i class="bi bi-arrow-left-right"></i>
-                                </button>
+
                             `;
                         }
                     
@@ -121,7 +113,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonMandarProxProcesso = card.querySelector('.btn-proximo-processo')
                         const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
                         const buttonExcluir= card.querySelector('.btn-excluir');
-                        const buttonDesfazer= card.querySelector('.btn-deletar');
 
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
@@ -176,13 +167,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         if (buttonExcluir) {
                             buttonExcluir.addEventListener('click', () => {
                                 mostrarModalExcluir(ordem.id, 'usinagem');
-                            });
-                        }
-
-                        // Adiciona evento ao botão "Desfazer", se existir
-                        if (buttonDesfazer) {
-                            buttonDesfazer.addEventListener('click', function() {
-                                mostrarModalRetornarOrdemIniciada(ordem.id);
                             });
                         }
 
