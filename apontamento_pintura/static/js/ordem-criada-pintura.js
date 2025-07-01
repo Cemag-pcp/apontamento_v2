@@ -364,7 +364,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
     </div>`;
 
     // Fetch para buscar ordens interrompidas
-    fetch(`api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`api/ordens-interrompidas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar as ordens interrompidas.');
@@ -449,7 +449,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
         <span class="sr-only">Loading...</span>
     </div>`;
 
-    fetch(`api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`api/ordens-ag-prox-proc/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
             container.innerHTML = ''; // Limpa o container

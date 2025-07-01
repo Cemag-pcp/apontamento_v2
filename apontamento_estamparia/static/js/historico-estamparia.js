@@ -12,7 +12,7 @@ function carregarTabela(pagina) {
         ordem: encodeURIComponent(ordemEscolhida),
     };
 
-    fetch(`/estamparia/api/ordens-criadas/?page=${pagina}&limit=10&status=finalizada&ordem=${filtros.ordem}`)
+    fetch(`/estamparia/api/ordens-criadas/?page=${pagina}&limit=100&status=finalizada&ordem=${filtros.ordem}`)
         .then(response => response.json())
         .then(data => {
             console.log(data.ordens); // Debug para verificar os dados recebidos

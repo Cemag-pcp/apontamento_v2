@@ -1022,24 +1022,24 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
 
     base_carretas_original['Recurso'] = base_carretas_original['Recurso'].astype(str)
 
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AM', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AN', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VJ', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('LC', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VM', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AV', '')
-    base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('CO', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AM', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AN', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VJ', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('LC', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('VM', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('AV', '')
+    # base_carretas_original['Recurso'] = base_carretas_original['Recurso'].str.replace('CO', '')
 
     base_carretas_original['Recurso'] = base_carretas_original['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
     base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
 
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AM', '')
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AN', '')
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('VJ', '')
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('LC', '')
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('VM', '')
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AV', '')
-    base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('CO', '')
+    # base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AM', '')
+    # base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AN', '')
+    # base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('VJ', '')
+    # base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('LC', '')
+    # base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('VM', '')
+    # base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('AV', '')
+    # base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].str.replace('CO', '')
 
     base_carga_original['PED_RECURSO.CODIGO'] = base_carga_original['PED_RECURSO.CODIGO'].apply(
         lambda x: x.rstrip()

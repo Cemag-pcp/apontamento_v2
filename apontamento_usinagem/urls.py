@@ -18,6 +18,7 @@ urlpatterns = [
     
     path('api/get-pecas/', views.get_pecas, name='get_pecas'),
     path('api/criar-ordem-usinagem/', views.planejar_ordem_usinagem, name='planejar_ordem_usinagem'),
+    path('api/retornar-processo/', views.retornar_processo, name='retornar_processo'),
 
     path('api/apontamentos-peca/usinagem', views.api_apontamentos_peca, name='api_apontamentos_peca'),
 

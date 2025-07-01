@@ -103,6 +103,10 @@ def gerar_dados_sequenciamento(request):
     data_final = request.GET.get('data_fim')
     setor = request.GET.get('setor')
 
+    # data_inicio='2025-07-01'
+    # data_final='2025-07-01'
+    # setor='pintura'
+
     if not data_inicio or not data_final or not setor:
         return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)
 
@@ -117,16 +121,13 @@ def gerar_dados_sequenciamento(request):
 
     # Gerar os arquivos e a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_final, setor)
+    # tabela_completa['cor'].unique()
 
     if setor == 'pintura':
         tabela_completa = tabela_completa.groupby(['Código', 'Peca', 'Célula', 'Datas','Recurso_cor','cor']).agg({'Qtde_total': 'sum'}).reset_index()
         tabela_completa.drop_duplicates(subset=['Código','Datas','cor'], inplace=True)
-        # tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
-        # tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
     else:
         tabela_completa.drop_duplicates(subset=['Código','Datas','Célula'], inplace=True)
-        # tabela_completa["Datas"] = pd.to_datetime(tabela_completa["Datas"], format="%d/%m/%Y", errors="coerce")
-        # tabela_completa["Datas"] = tabela_completa["Datas"].dt.strftime("%Y-%m-%d")
 
     # Criar a carga para a API de criar ordem
     ordens = []

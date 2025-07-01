@@ -580,6 +580,37 @@
     </div>
 </div>
 
+<!-- Modal excluir ordem -->
+<div class="modal fade" id="modalExcluir" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalExcluirLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalExcluirLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formExcluir">
+                    <div class="mb-3">
+                        <label for="escolhaMotivo" class="form-label">Qual motivo?</label>
+                        <select class="form-control" id="motivoExclusao" name="motivoExclusao" required>
+                            <option value="">------</option>
+                            {% for motivo in motivos_exclusao %}
+                            <option value="{{motivo.id}}">{{motivo.nome}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Footer do Formulário -->
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Excluir</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}

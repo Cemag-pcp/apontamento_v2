@@ -461,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = ''; // Limpa os cards
         const page = 1; // Reinicia a página
         const hasMoreData = true; // Permite novos carregamentos
-        const limit=10;
+        const limit=100;
 
         // Passa os parâmetros de filtro para a chamada fetch
         loadOrdens(container, page, limit, {

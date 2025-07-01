@@ -11,7 +11,7 @@ function carregarTabela(pagina) {
         ordem: encodeURIComponent(ordemEscolhida),
     };
 
-    fetch(`api/ordens-criadas/?page=${pagina}&limit=10&pecas=${filtros.pecas}&maquina=${filtros.maquina}&ordem=${filtros.ordem}`)
+    fetch(`api/ordens-criadas/?page=${pagina}&limit=100&pecas=${filtros.pecas}&maquina=${filtros.maquina}&ordem=${filtros.ordem}`)
         .then(response => response.json())
         .then(data => {
             atualizarTabela(data.data);

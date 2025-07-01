@@ -151,7 +151,7 @@ function carregarOrdensIniciadas(container) {
         <span class="sr-only">Loading...</span>
     </div>`;
 
-    fetch('api/ordens-iniciadas/?page=1&limit=10')
+    fetch('api/ordens-iniciadas/?page=1&limit=100')
         .then(response => response.json())
         .then(data => {
             container.innerHTML = ''; // Limpa o container
@@ -272,7 +272,7 @@ function carregarOrdensInterrompidas(container) {
     </div>`;
 
     // Fetch para buscar ordens interrompidas
-    fetch('api/ordens-interrompidas/?page=1&limit=10')
+    fetch('api/ordens-interrompidas/?page=1&limit=100')
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar as ordens interrompidas.');

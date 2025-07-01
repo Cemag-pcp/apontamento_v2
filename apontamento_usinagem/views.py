@@ -11,7 +11,7 @@ from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso, MaquinaParada
-from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada
+from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada, MotivoExclusao
 from .utils import criar_ordem_usinagem
 
 import pandas as pd
@@ -36,9 +36,13 @@ def planejamento(request):
 
     motivos = MotivoInterrupcao.objects.filter(setor__nome='usinagem', visivel=True)
     operadores = Operador.objects.filter(setor__nome='usinagem')
-    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='estamparia').exclude(nome='Finalizada parcial')
+    motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='usinagem').exclude(nome='Finalizada parcial')
+    motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='usinagem')
 
-    return render(request, 'apontamento_usinagem/planejamento.html', {'motivos':motivos,'operadores':operadores,'motivos_maquina_parada':motivos_maquina_parada,})
+    return render(request, 'apontamento_usinagem/planejamento.html', {'motivos':motivos,
+                                                                      'operadores':operadores,
+                                                                      'motivos_maquina_parada':motivos_maquina_parada,
+                                                                      'motivos_exclusao': motivos_exclusao})
 
 def processos(request):
 
@@ -568,3 +572,54 @@ def buscar_processos(request):
     processos = Maquina.objects.filter(setor__nome='usinagem', tipo='processo').values('id','nome')
 
     return JsonResponse({"processos":list(processos)})
+
+def retornar_processo(request):
+    if request.method != 'POST':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Método não permitido'}, 
+            status=405
+        )
+
+    try:
+        data = json.loads(request.body)
+        ordem_id = data.get('ordemId')
+        
+        if not ordem_id:
+            return JsonResponse(
+                {'status': 'error', 'message': 'ordemId não fornecido'}, 
+                status=400
+            )
+
+        with transaction.atomic():
+            ordem_process = OrdemProcesso.objects.filter(ordem_id=ordem_id)
+
+            ordem_process.delete()
+            
+            updated_count = Ordem.objects.filter(id=ordem_id).update(
+                maquina=None,
+                status_atual='aguardando_iniciar'
+            )
+            
+            if updated_count == 0:
+                raise Ordem.DoesNotExist(f"Ordem com id {ordem_id} não encontrada")
+
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Processo retornado com sucesso'
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {'status': 'error', 'message': 'JSON inválido'}, 
+            status=400
+        )
+    except Ordem.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ordem não encontrada'}, 
+            status=404
+        )
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': str(e)}, 
+            status=500
+        )

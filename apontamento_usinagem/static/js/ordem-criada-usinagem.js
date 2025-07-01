@@ -58,12 +58,17 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-sm btn-proximo-processo" title="Passar para o próximo processo">
                                     <i class="fa fa-arrow-right"></i>
                                 </button>  
-
+                                <button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
+                                    <i class="bi bi-arrow-left-right"></i>
+                                </button>
                             `;
                         } else if (ordem.status_atual === 'aguardando_iniciar') {
                             botaoAcao = `
                                 <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
                                     <i class="fa fa-play"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
+                                    <i class="fa fa-trash"></i>
                                 </button>
                             `;
                         } else if (ordem.status_atual === 'interrompida') {
@@ -71,11 +76,20 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
                                     <i class="fa fa-redo"></i>
                                 </button>
+                                <button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
+                                    <i class="bi bi-arrow-left-right"></i>
+                                </button>
                             `;
                         } else if (ordem.status_atual === 'agua_prox_proc') {
                             botaoAcao = `
                                 <button class="btn btn-warning btn-sm btn-iniciar-proximo-processo" title="Iniciar próximo processo">
                                     <i class="fa fa-play"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
+                                    <i class="bi bi-arrow-left-right"></i>
                                 </button>
                             `;
                         }
@@ -106,6 +120,8 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonProxProcesso = card.querySelector('.btn-iniciar-proximo-processo');
                         const buttonMandarProxProcesso = card.querySelector('.btn-proximo-processo')
                         const buttonFinalizarParcial = card.querySelector('.btn-finalizar-parcial')
+                        const buttonExcluir= card.querySelector('.btn-excluir');
+                        const buttonDesfazer= card.querySelector('.btn-deletar');
 
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
@@ -156,6 +172,20 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                             });
                         }
 
+                        // Adiciona evento ao botão "Excluir", se existir
+                        if (buttonExcluir) {
+                            buttonExcluir.addEventListener('click', () => {
+                                mostrarModalExcluir(ordem.id, 'usinagem');
+                            });
+                        }
+
+                        // Adiciona evento ao botão "Desfazer", se existir
+                        if (buttonDesfazer) {
+                            buttonDesfazer.addEventListener('click', function() {
+                                mostrarModalRetornarOrdemIniciada(ordem.id);
+                            });
+                        }
+
                         // Adiciona o card ao container
                         container.appendChild(card);
                     });
@@ -183,6 +213,139 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
             });
     });
 };
+
+function mostrarModalRetornarOrdemIniciada(ordemId) {
+    const modalRetornarProcessoIniciado = new bootstrap.Modal(document.getElementById('modalRetornarProcessoIniciado'));
+    const textRetorno = document.getElementById('text-confirm');
+    const modalTitle = document.getElementById("modalExcluirRetorno");
+    const form = document.getElementById('formRetornarProcessoIniciado');
+    
+    modalTitle.textContent = `#${ordemId}`;
+    textRetorno.textContent = `Você tem certeza que deseja retornar a Ordem #${ordemId} para o status "Aguardando Iniciar"?`;
+    
+    // Remove todos os listeners de submit existentes
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    
+    // Adiciona o novo listener
+    newForm.addEventListener('submit', async function handleSubmit(event) {
+        event.preventDefault();
+        
+        try {
+            const submitButton = document.getElementById('retornar-aguardando-iniciar');
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+            
+            const response = await fetch('api/retornar-processo/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ ordemId: ordemId })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                modalRetornarProcessoIniciado.hide();
+                carregarOrdensIniciadas(document.querySelector('.containerProcesso'));
+                carregarOrdensInterrompidas(document.querySelector('.containerInterrompido'));
+                carregarOrdensAgProProcesso(document.querySelector('.containerProxProcesso'))
+                resetarCardsInicial();
+            } else {
+                throw new Error(data.message || 'Erro ao retornar a ordem');
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            alert(error.message || 'Ocorreu um erro ao processar sua solicitação');
+        } finally {
+            const submitButton = document.getElementById('retornar-aguardando-iniciar');
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Retornar';
+            }
+        }
+    });
+    
+    modalRetornarProcessoIniciado.show();
+}
+
+// Modal para "Excluir"
+function mostrarModalExcluir(ordemId, setor) {
+    const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+    const modalTitle = document.getElementById('modalExcluirLabel');
+    const formExcluir = document.getElementById('formExcluir');
+
+    modalTitle.innerHTML = `Excluir Ordem ${ordemId}`;
+    modal.show();
+
+    // Remove listeners antigos e adiciona novo
+    const clonedForm = formExcluir.cloneNode(true);
+    formExcluir.parentNode.replaceChild(clonedForm, formExcluir);
+
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(clonedForm);
+        const motivoExclusao = formData.get('motivoExclusao');
+
+        Swal.fire({
+            title: 'Excluindo...',
+            text: 'Por favor, aguarde enquanto a ordem está sendo excluída.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch(`/core/api/excluir-ordem/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                ordem_id: ordemId,
+                setor: setor,
+                motivo: motivoExclusao
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() // Inclui o CSRF Token no cabeçalho
+            }
+        })
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(({ status, body }) => {
+            if (status === 201) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: body.success,
+                });
+
+                modal.hide();
+
+                // Recarrega os dados chamando a função de carregamento
+                document.getElementById('ordens-container').innerHTML = '';
+                resetarCardsInicial();
+                fetchContagemStatusOrdens();
+
+            } else {
+                // Exibe o erro vindo do backend
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: body.error || 'Erro ao excluir a ordem.',
+                });
+            }
+        })
+        .catch((error) => {
+            console.error('Erro:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
+            });
+        });
+    });
+}
 
 function iniciarContador(ordemId, dataCriacao) {
     const contador = document.getElementById(`contador-${ordemId}`);
@@ -321,7 +484,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
     </div>`;
 
     // Fetch para buscar ordens interrompidas
-    fetch(`/usinagem/api/ordens-interrompidas/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`/usinagem/api/ordens-interrompidas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar as ordens interrompidas.');
@@ -407,7 +570,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
         <span class="sr-only">Loading...</span>
     </div>`;
     
-    fetch(`/usinagem/api/ordens-ag-prox-proc/?page=1&limit=10&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&processo=${filtros.processo || ''}`)
+    fetch(`/usinagem/api/ordens-ag-prox-proc/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&processo=${filtros.processo || ''}`)
         .then(response => response.json())
         .then(data => {
             container.innerHTML = ''; // Limpa o container

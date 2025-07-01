@@ -16,7 +16,7 @@ function carregarTabela(pagina) {
         ordem: encodeURIComponent(ordemEscolhida),
     };
 
-    fetch(`/serra/api/ordens-criadas/?page=${pagina}&limit=10&status=finalizada&ordem=${filtros.ordem}`)
+    fetch(`/serra/api/ordens-criadas/?page=${pagina}&limit=100&status=finalizada&ordem=${filtros.ordem}`)
         .then(response => response.json())
         .then(data => {
             ordensCarregadas = data.ordens; // Armazena as ordens carregadas globalmente

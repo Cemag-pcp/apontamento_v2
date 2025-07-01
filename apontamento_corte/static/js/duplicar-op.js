@@ -20,7 +20,7 @@ async function carregarTabela(pagina) {
     console.log(filtros);
 
     try {
-        const response = await fetch(`api/ordens-criadas/?page=${pagina}&limit=10&pecas=${filtros.pecas}&maquina=${filtros.maquina}&ordem=${filtros.ordem}&dataCriacao=${filtros.dataCriacao}`);
+        const response = await fetch(`api/ordens-criadas/?page=${pagina}&limit=100&pecas=${filtros.pecas}&maquina=${filtros.maquina}&ordem=${filtros.ordem}&dataCriacao=${filtros.dataCriacao}`);
         const data = await response.json();
 
         atualizarTabela(data.data);
