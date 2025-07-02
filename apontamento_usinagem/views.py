@@ -403,8 +403,8 @@ def get_ordens_interrompidas(request):
             'data_criacao': ordem.data_criacao.strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
-            'maquina': ordem.maquina.nome,
-            'maquina_id': ordem.maquina.id,
+            'maquina': ordem.maquina.nome if ordem.maquina else None,
+            'maquina_id': ordem.maquina.id if ordem.maquina else None,
             'motivo_interrupcao': ultimo_processo_interrompido.motivo_interrupcao.nome if ultimo_processo_interrompido and ultimo_processo_interrompido.motivo_interrupcao else None,
             'ultima_atualizacao': ordem.ultima_atualizacao,
             'pecas': pecas_data,  # Adiciona informações das peças
@@ -484,7 +484,7 @@ def get_ordens_ag_prox_proc(request):
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'maquina': ordem.maquina.nome,
-            'maquina_id': ordem.maquina.id,
+            'maquina_id': ordem.maquina.id if ordem.maquina else None,
             'ultima_atualizacao': ordem.ultima_atualizacao,
             'processo_atual': qtd_processo_atual, 
             'totais': {
