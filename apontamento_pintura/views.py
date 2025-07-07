@@ -17,7 +17,7 @@ from apontamento_pintura.models import Retrabalho
 from inspecao.models import Reinspecao, DadosExecucaoInspecao, Inspecao
 from .models import PecasOrdem, CambaoPecas, Cambao
 from core.models import Ordem
-from cadastro.models import Operador
+from cadastro.models import Operador, Conjuntos
 from inspecao.models import Inspecao
 
 def planejamento(request):
@@ -317,6 +317,77 @@ def adicionar_pecas_cambao(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+@csrf_exempt
+def criar_ordem_fora_sequenciamento(request):
+
+    """
+    API para criar uma ordem fora do sequenciamento.
+    Verifica se o conjunto escolhido ja tem na data de carga escolhida.
+    Caso tenha, apenas acrescenta na quantidade planejada.
+    Caso não tenha, cria uma nova ordem com a quantidade planejada.
+    """
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    data = json.loads(request.body)
+
+    conjunto = data.get('peca')
+    codigo_conjunto = data.get('peca').split(" - ", maxsplit=1)[0]  # Pega apenas o código do conjunto
+    quantidade_planejada = data.get('quantidade')
+    cor = data.get('cor')
+    data_carga = data.get('dataCarga')
+    obs = data.get('observacao')
+
+    ordens_existentes = Ordem.objects.filter(
+        data_carga=data_carga,
+        grupo_maquina='pintura',
+        ordem_pecas_pintura__peca__contains=codigo_conjunto,
+        cor=cor,
+    ).values_list('id', flat=True)
+
+    if ordens_existentes:
+        ordem = Ordem.objects.get(id=ordens_existentes[0])
+        ordem.status_atual = 'aguardando_iniciar' if ordem.status_atual == 'finalizada' else ordem.status_atual
+        ordem.save()
+        pecas = PecasOrdem.objects.filter(ordem=ordem, peca__contains=codigo_conjunto)
+        for peca in pecas:
+            peca.qtd_planejada += int(quantidade_planejada)
+            peca.save()
+        return JsonResponse({'message': 'Quantidade planejada atualizada com sucesso!'})
+
+    else:
+        ordem = Ordem.objects.create(
+            grupo_maquina='pintura',
+            status_atual='aguardando_iniciar',
+            data_carga=datetime.strptime(data_carga, '%Y-%m-%d').date(),
+            cor=cor
+        )  
+        PecasOrdem.objects.create(
+            ordem=ordem,
+            peca=conjunto,
+            qtd_planejada=quantidade_planejada,
+            qtd_boa=0,
+            qtd_morta=0
+        )
+        return JsonResponse({'message': 'Ordem criada com sucesso!'})
+
+def listar_conjuntos(request):
+    """
+    API para listar os conjuntos disponíveis para o setor de montagem.
+    Aceita um parâmetro de busca opcional: ?termo=texto
+    """
+    termo = request.GET.get('termo', '').strip()
+
+    if termo:
+        conjuntos = Conjuntos.objects.filter(
+            Q(codigo__icontains=termo) | Q(descricao__icontains=termo)
+        ).values('id', 'codigo', 'descricao')
+    else:
+        conjuntos = Conjuntos.objects.values('id', 'codigo', 'descricao')
+
+    return JsonResponse({"conjuntos": list(conjuntos)})
 
 @csrf_exempt
 def finalizar_cambao(request):

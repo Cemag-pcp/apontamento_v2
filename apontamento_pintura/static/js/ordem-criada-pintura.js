@@ -632,27 +632,6 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
         }
     });
 
-    fetch('/cadastro/api/buscar-maquinas/?setor=estamparia', {
-        method: 'GET',
-        headers: {'Content-Type':'application/json'}
-    })
-    .then(response => response.json())
-    .then(data => {
-        const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
-        escolhaMaquina.innerHTML = `<option value="">------</option>`;
-
-        Swal.close();
-        data.maquinas.forEach((maquina) => {
-            const option = document.createElement('option');
-            option.value = maquina.id;
-            option.textContent = maquina.nome;
-            escolhaMaquina.appendChild(option);
-        });
-
-        modalTitle.innerHTML = 'Escolha a máquina';
-        modal.show();
-    });
-
     // Remove event listeners antigos do formulário e adiciona um novo
     const formIniciar = document.getElementById('formIniciarOrdemCorte');
     const clonedForm = formIniciar.cloneNode(true);
@@ -1005,32 +984,6 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
         }
     });
     
-    // Limpa opções antigas no select
-
-    fetch('/cadastro/api/buscar-maquinas/?setor=estamparia', {
-        method: 'GET',
-        headers: {'Content-Type':'application/json'}
-    })
-    .then(response => response.json())
-    .then(
-        data => {
-            const labelModalMaquinaProxProcesso = document.getElementById('labelModalMaquinaProxProcesso');
-            const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
-            escolhaMaquina.innerHTML = `<option value="">------</option>`;
-
-            Swal.close();
-            data.maquinas.forEach((maquina) => {
-                const option = document.createElement('option');
-                option.value = maquina.id;
-                option.textContent = maquina.nome;
-                escolhaMaquina.appendChild(option);
-            })
-            modalTitle.innerHTML = 'Iniciar próximo processo'
-            labelModalMaquinaProxProcesso.innerHTML = 'Em qual máquina será iniciado?'
-            modal.show();
-        }
-    )
-
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formProxProcesso');
     const clonedForm = formIniciar.cloneNode(true);
@@ -1530,7 +1483,7 @@ function modalPlanejar() {
     form.addEventListener('submit', handleSubmit);
 }
 
-function resetarCardsInicial(filtros = {}) {
+export function resetarCardsInicial(filtros = {}) {
     const container = document.getElementById('ordens-container');
     let isLoading = false; // Flag para evitar chamadas simultâneas
 
