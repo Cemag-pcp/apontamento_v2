@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produção por Máquina</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <style>
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+        .filter-section {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .error-message {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <h2 class="text-center mb-4">Dashboard de Produção</h2>
+                
+                <!-- Seção de Filtros -->
+                <div class="filter-section">
+                    <h5 class="mb-3">Filtros</h5>
+                    <form id="filtroForm">
+                        <div class="row g-3">
+                            <!-- Seleção de Máquina -->
+                            <div class="col-md-4">
+                                <label for="maquinaSelect" class="form-label">Selecione a máquina:</label>
+                                <select id="maquinaSelect" class="form-select" required>
+                                    <option value="">Selecione uma máquina</option>
+                                    <option value="Laser 1" selected>Laser 1</option>
+                                    <option value="Laser 2 (JFY)">Laser 2 (JFY)</option>
+                                    <option value="Laser 3 Trumpf">Laser 3 (Trumpf)</option>
+                                    <option value="Plasma 1">Plasma 1</option>
+                                    <option value="Plasma 2">Plasma 2</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Data Inicial -->
+                            <div class="col-md-3">
+                                <label for="dataInicial" class="form-label">Data Inicial:</label>
+                                <input type="date" id="dataInicial" class="form-control" value="2025-06-01" required>
+                            </div>
+                            
+                            <!-- Data Final -->
+                            <div class="col-md-3">
+                                <label for="dataFinal" class="form-label">Data Final:</label>
+                                <input type="date" id="dataFinal" class="form-control" value="2025-06-30" required>
+                            </div>
+                            
+                            <!-- Botão Filtrar -->
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" id="btnFiltrar" class="btn btn-primary w-100">
+                                    <i class="bi bi-funnel"></i> Filtrar
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Mensagem de Erro -->
+                        <div id="errorMessage" class="alert alert-danger mt-3 error-message" role="alert">
+                            <strong>Erro:</strong> <span id="errorText"></span>
+                        </div>
+                        
+                        <!-- Mensagem de Sucesso -->
+                        <div id="successMessage" class="alert alert-success mt-3 error-message" role="alert">
+                            <strong>Sucesso:</strong> Dados carregados com sucesso!
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Loading Spinner -->
+                <div id="loadingSpinner" class="text-center error-message">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-2">Carregando dados...</p>
+                </div>
+                
+                <!-- Gráficos -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Tempo de Produção por Máquina</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="grafico1"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Novo Gráfico Empilhado -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Ordens Finalizadas por Máquina (Empilhado)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="grafico3"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Novo Gráfico Empilhado -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Unidade de peça produzida (Empilhado)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="grafico4"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let chart1, chart3, chart4;
+
+        // Função para mostrar/esconder mensagens
+        function mostrarMensagem(tipo, texto) {
+            // Esconder todas as mensagens
+            document.querySelectorAll('.error-message').forEach(el => el.style.display = 'none');
+            
+            if (tipo === 'error') {
+                document.getElementById('errorText').textContent = texto;
+                document.getElementById('errorMessage').style.display = 'block';
+            } else if (tipo === 'success') {
+                document.getElementById('successMessage').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('successMessage').style.display = 'none';
+                }, 3000);
+            } else if (tipo === 'loading') {
+                document.getElementById('loadingSpinner').style.display = 'block';
+            }
+        }
+
+        // Função para validar datas
+        function validarDatas(dataInicial, dataFinal) {
+            const dataIni = new Date(dataInicial);
+            const dataFim = new Date(dataFinal);
+            
+            if (dataIni > dataFim) {
+                return 'A data inicial não pode ser maior que a data final.';
+            }
+            
+            const hoje = new Date();
+            if (dataFim > hoje) {
+                return 'A data final não pode ser maior que a data atual.';
+            }
+            
+            const diffTime = Math.abs(dataFim - dataIni);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays > 365) {
+                return 'O período selecionado não pode ser maior que 365 dias.';
+            }
+            
+            return null;
+        }
+
+        // Função para buscar dados da primeira API
+        async function buscarDados(dataInicio, dataFim, maquina) {
+            try {
+                const url = `/corte/api/dashboard/indicador-hora-operacao-maquina?data_inicio=${dataInicio}&data_fim=${dataFim}&maquina=${encodeURIComponent(maquina)}`;
+                
+                const resposta = await fetch(url);
+                
+                if (!resposta.ok) {
+                    throw new Error(`Erro na API: ${resposta.status} - ${resposta.statusText}`);
+                }
+                
+                const dados = await resposta.json();
+                
+                if (!dados || dados.length === 0) {
+                    return [];
+                }
+                
+                return dados.map(item => ({
+                    maquina: item.maquina,
+                    dia: item.dia,
+                    producao_total: item.producao_total || "00:00:00",
+                    parada_total: item.parada_total || "00:00:00",
+                    tempo_ocioso: item.tempo_ocioso || "00:00:00",
+                    ops_finalizadas: item.ops_finalizadas || 0
+                }));
+                
+            } catch (error) {
+                throw new Error(`Erro ao carregar dados de produção: ${error.message}`);
+            }
+        }
+
+        // Função para buscar dados da segunda API (ordens finalizadas)
+        async function buscarDadosOrdens(dataInicio, dataFim) {
+            try {
+                const url = `/corte/api/dashboard/indicador-finalizacao-maquina?data_inicio=${dataInicio}&data_fim=${dataFim}`;
+                
+                const resposta = await fetch(url);
+                
+                if (!resposta.ok) {
+                    throw new Error(`Erro na API: ${resposta.status} - ${resposta.statusText}`);
+                }
+                
+                const dados = await resposta.json();
+                
+                return dados;
+                
+            } catch (error) {
+                throw new Error(`Erro ao carregar dados de ordens: ${error.message}`);
+            }
+        }
+
+        // Função para buscar dados da segunda API (ordens finalizadas)
+        async function buscarDadosProducao(dataInicio, dataFim) {
+            try {
+                const url = `/corte/api/dashboard/indicador-pecas-produzidas-maquina?data_inicio=${dataInicio}&data_fim=${dataFim}`;
+                
+                const resposta = await fetch(url);
+                
+                if (!resposta.ok) {
+                    throw new Error(`Erro na API: ${resposta.status} - ${resposta.statusText}`);
+                }
+                
+                const dados = await resposta.json();
+                
+                return dados;
+                
+            } catch (error) {
+                throw new Error(`Erro ao carregar dados de ordens: ${error.message}`);
+            }
+        }
+
+        // Função para converter tempo em horas
+        function tempoParaHoras(str) {
+            const [h, m, s] = str.split(':').map(parseFloat);
+            return h + m / 60 + s / 3600;
+        }
+
+        // Função para gerar datasets do gráfico de linha
+        function gerarDatasetComparativo(dados, todasAsDatas) {
+            const valoresProducao = todasAsDatas.map(dia => {
+                const entrada = dados.find(d => d.dia === dia);
+                return entrada ? tempoParaHoras(entrada.producao_total) : 0;
+            });
+
+            const valoresParada = todasAsDatas.map(dia => {
+                const entrada = dados.find(d => d.dia === dia);
+                return entrada ? tempoParaHoras(entrada.parada_total) : 0;
+            });
+
+            const valoresOcioso = todasAsDatas.map(dia => {
+                const entrada = dados.find(d => d.dia === dia);
+                return entrada ? tempoParaHoras(entrada.tempo_ocioso) : 0;
+            });
+
+            return [
+                {
+                    label: 'Produção',
+                    data: valoresProducao,
+                    borderColor: '#28a745',
+                    backgroundColor: '#28a74520',
+                    borderWidth: 3,
+                    fill: false,
+                    tension: 0.3
+                },
+                {
+                    label: 'Parada',
+                    data: valoresParada,
+                    borderColor: '#dc3545',
+                    backgroundColor: '#dc354520',
+                    borderDash: [5, 5],
+                    borderWidth: 3,
+                    fill: false,
+                    tension: 0.3
+                },
+                {
+                    label: 'Ocioso',
+                    data: valoresOcioso,
+                    borderColor: '#6c757d',
+                    backgroundColor: '#6c757d20',
+                    borderDash: [2, 4],
+                    borderWidth: 3,
+                    fill: false,
+                    tension: 0.3
+                }
+            ];
+        }
+
+        // Função para gerar dados do gráfico de barras
+        function gerarDatasetBarras(dados, todasAsDatas) {
+            const valores = todasAsDatas.map(dia => {
+                const entrada = dados.find(d => d.dia === dia);
+                return entrada ? entrada.ops_finalizadas : 0;
+            });
+
+            return [{
+                label: 'Operações Finalizadas',
+                data: valores,
+                backgroundColor: '#007bff',
+                borderColor: '#007bff',
+                borderWidth: 1
+            }];
+        }
+
+        // Função para processar dados do gráfico empilhado
+        function processarDadosEmpilhados(dadosOrdens) {
+            // Extrair todas as datas
+            const todasAsDatas = Object.keys(dadosOrdens).sort();
+            
+            // Extrair todas as máquinas
+            const todasAsMaquinas = new Set();
+            Object.values(dadosOrdens).forEach(dadosDia => {
+                dadosDia.forEach(item => todasAsMaquinas.add(item.maquina));
+            });
+            
+            const maquinasArray = Array.from(todasAsMaquinas).sort();
+            
+            // Cores para cada máquina
+            const cores = [
+                '#007bff', // Azul
+                '#28a745', // Verde
+                '#ffc107', // Amarelo
+                '#dc3545', // Vermelho
+                '#6f42c1', // Roxo
+                '#fd7e14', // Laranja
+                '#20c997', // Teal
+                '#e83e8c'  // Rosa
+            ];
+            
+            // Criar datasets para cada máquina
+            const datasets = maquinasArray.map((maquina, index) => {
+                const valores = todasAsDatas.map(data => {
+                    const dadosDia = dadosOrdens[data] || [];
+                    const dadosMaquina = dadosDia.find(item => item.maquina === maquina);
+                    return dadosMaquina ? dadosMaquina.total_ordens_finalizadas : 0;
+                });
+                
+                return {
+                    label: maquina,
+                    data: valores,
+                    backgroundColor: cores[index % cores.length],
+                    borderColor: cores[index % cores.length],
+                    borderWidth: 1
+                };
+            });
+            
+            return { labels: todasAsDatas, datasets };
+        }
+
+        // Função para criar/atualizar gráficos
+        async function atualizarGraficos() {
+            const dataInicial = document.getElementById('dataInicial').value;
+            const dataFinal = document.getElementById('dataFinal').value;
+            const maquinaSelecionada = document.getElementById('maquinaSelect').value;
+
+            if (!maquinaSelecionada) {
+                mostrarMensagem('error', 'Selecione uma máquina.');
+                return;
+            }
+
+            try {
+                mostrarMensagem('loading');
+
+                // Buscar dados das duas APIs em paralelo
+                const [dados, dadosOrdens, dadosProducao] = await Promise.all([
+                    buscarDados(dataInicial, dataFinal, maquinaSelecionada),
+                    buscarDadosOrdens(dataInicial, dataFinal),
+                    buscarDadosProducao(dataInicial, dataFinal)
+                ]);
+
+                document.getElementById('loadingSpinner').style.display = 'none';
+
+                if (dados.length === 0 && Object.keys(dadosOrdens).length === 0) {
+                    mostrarMensagem('error', 'Nenhum dado encontrado para os filtros selecionados.');
+                    return;
+                }
+
+                mostrarMensagem('success');
+
+                // Destruir gráficos existentes
+                if (chart1) chart1.destroy();
+                if (chart3) chart3.destroy();
+                if (chart4) chart4.destroy();
+
+                // Gráfico 1 - Linha (apenas se houver dados da primeira API)
+                if (dados.length > 0) {
+                    const todasAsDatas = [...new Set(dados.map(d => d.dia))].sort();
+                    
+                    const ctx1 = document.getElementById('grafico1').getContext('2d');
+                    chart1 = new Chart(ctx1, {
+                        type: 'line',
+                        data: {
+                            labels: todasAsDatas,
+                            datasets: gerarDatasetComparativo(dados, todasAsDatas)
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                // title: { 
+                                //     display: true, 
+                                //     text: `Produção, Parada e Ociosidade - ${maquinaSelecionada}`,
+                                //     font: { size: 16 }
+                                // },
+                                legend: { position: 'top' },
+                                tooltip: {
+                                    callbacks: {
+                                        label: ctx => `${ctx.dataset.label}: ${ctx.raw.toFixed(2)}h`
+                                    }
+                                },
+                                datalabels: {
+                                    display: true,
+                                    align: 'top',
+                                    anchor: 'end',
+                                    color: '#000',
+                                    font: {
+                                        weight: 'bold',
+                                        size: 10
+                                    },
+                                    formatter: value => `${value.toFixed(1)}h`
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 25,
+                                    title: { display: true, text: 'Horas' }
+                                },
+                                x: {
+                                    title: { display: true, text: 'Data' }
+                                }
+                            }
+                        },
+                        plugins: [ChartDataLabels]
+                    });
+                }
+
+                // Gráfico 2 - Empilhado (sempre mostrar se houver dados)
+                if (Object.keys(dadosOrdens).length > 0) {
+                    const dadosEmpilhados = processarDadosEmpilhados(dadosOrdens);
+
+                    const ctx3 = document.getElementById('grafico3').getContext('2d');
+                    chart3 = new Chart(ctx3, {
+                        type: 'bar',
+                        data: dadosEmpilhados,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                // title: { 
+                                //     display: true, 
+                                //     text: 'Ordens Finalizadas por Máquina (Empilhado)',
+                                //     font: { size: 16 }
+                                // },
+                                legend: { 
+                                    position: 'top',
+                                    labels: { boxWidth: 12 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `${context.dataset.label}: ${context.raw} ordens`;
+                                        }
+                                    }
+                                },
+                                datalabels: {
+                                    display: function(context) {
+                                        const valor = context.dataset.data[context.dataIndex];
+                                        return valor > 0;
+                                    },
+                                    color: 'white',
+                                    font: {
+                                        weight: 'bold',
+                                        size: 10
+                                    },
+                                    formatter: value => value
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: true,
+                                    title: { display: true, text: 'Data' }
+                                },
+                                y: {
+                                    stacked: true,
+                                    beginAtZero: true,
+                                    title: { display: true, text: 'Quantidade de Ordens' }
+                                }
+                            }
+                        },
+                        plugins: [ChartDataLabels]
+                    });
+                }
+
+                // Gráfico 3 - Empilhado (sempre mostrar se houver dados)
+                if (Object.keys(dadosProducao).length > 0) {
+                    const dadosEmpilhados = processarDadosEmpilhados(dadosProducao);
+
+                    const ctx4 = document.getElementById('grafico4').getContext('2d');
+                    chart4 = new Chart(ctx4, {
+                        type: 'bar',
+                        data: dadosEmpilhados,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                // title: { 
+                                //     display: true, 
+                                //     text: 'Ordens Finalizadas por Máquina (Empilhado)',
+                                //     font: { size: 16 }
+                                // },
+                                legend: { 
+                                    position: 'top',
+                                    labels: { boxWidth: 12 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `${context.dataset.label}: ${context.raw} ordens`;
+                                        }
+                                    }
+                                },
+                                datalabels: {
+                                    display: function(context) {
+                                        const valor = context.dataset.data[context.dataIndex];
+                                        return valor > 0;
+                                    },
+                                    color: 'white',
+                                    font: {
+                                        weight: 'bold',
+                                        size: 10
+                                    },
+                                    formatter: value => value
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: true,
+                                    title: { display: true, text: 'Data' }
+                                },
+                                y: {
+                                    stacked: true,
+                                    beginAtZero: true,
+                                    title: { display: true, text: 'Quantidade de Ordens' }
+                                }
+                            }
+                        },
+                        plugins: [ChartDataLabels]
+                    });
+                }
+
+            } catch (error) {
+                document.getElementById('loadingSpinner').style.display = 'none';
+                mostrarMensagem('error', error.message);
+            }
+        }
+
+        // Event listener para o formulário
+        document.getElementById('filtroForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const dataInicial = document.getElementById('dataInicial').value;
+            const dataFinal = document.getElementById('dataFinal').value;
+            
+            // Validar datas
+            const erroValidacao = validarDatas(dataInicial, dataFinal);
+            if (erroValidacao) {
+                mostrarMensagem('error', erroValidacao);
+                return;
+            }
+            
+            // Esconder mensagens de erro
+            document.querySelectorAll('.error-message').forEach(el => el.style.display = 'none');
+            
+            // Atualizar gráficos
+            atualizarGraficos();
+        });
+
+        // Carregar dados iniciais ao carregar a página
+        window.onload = function() {
+            atualizarGraficos();
+        };
+    </script>
+</body>
+</html>

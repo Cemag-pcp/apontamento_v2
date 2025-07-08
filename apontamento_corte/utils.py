@@ -333,3 +333,4 @@ def tratamento_planilha_laser3(tree):
     }]
 
     return df_pecas, propriedades
+

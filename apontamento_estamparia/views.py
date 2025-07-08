@@ -13,11 +13,14 @@ from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso,MaquinaParada, Profile
 from cadastro.models import MotivoInterrupcao, Pecas, Operador, MotivoMaquinaParada, MotivoExclusao, Maquina
 from inspecao.models import Inspecao, DadosExecucaoInspecao
+from .utils_dashboard import *
+from apontamento_serra.utils import formatar_timedelta
 
 from datetime import datetime, timedelta
 import os
 import re
 import json
+from collections import defaultdict
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
@@ -688,3 +691,73 @@ def retornar_processo(request):
             {'status': 'error', 'message': str(e)}, 
             status=500
         )
+    
+#### dashboard
+
+def dashboard(request):
+
+    return render(request, 'dashboard/dashboard-estamparia.html')
+
+def parse_tempo(hora_str):
+    h, m, s = map(float, hora_str.split(':'))
+    return timedelta(hours=h, minutes=m, seconds=s)
+
+def merge_metricas(horas_producao, horas_parada):
+    resultado = defaultdict(dict)
+
+    # Produção
+    for item in horas_producao:
+        key = (item['maquina'], item['dia'])
+        resultado[key]['maquina'] = item['maquina']
+        resultado[key]['dia'] = item['dia']
+        resultado[key]['producao_total'] = item.get('total_dia', '00:00:00')
+
+    # Parada
+    for item in horas_parada:
+        key = (item['maquina'], item['dia'])
+        resultado[key].setdefault('maquina', item['maquina'])
+        resultado[key].setdefault('dia', item['dia'])
+        resultado[key]['parada_total'] = item.get('total_dia', '00:00:00')
+
+    # Calcular tempo ocioso
+    for key, val in resultado.items():
+        prod = parse_tempo(val.get('producao_total', '00:00:00'))
+        parada = parse_tempo(val.get('parada_total', '00:00:00'))
+        usado = prod + parada
+
+        ocioso = timedelta(hours=20) - usado
+        ocioso = max(ocioso, timedelta(seconds=0))  # nunca negativo
+        val['tempo_ocioso'] = formatar_timedelta(ocioso)
+
+    return sorted(resultado.values(), key=lambda x: (x['dia'], x['maquina']))
+
+@login_required
+def indicador_hora_operacao_maquina(request):
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+    maquina_param = request.GET.get('maquina')
+
+    horas_producao = hora_operacao_maquina(maquina_param, data_inicio, data_fim)
+    horas_parada = hora_parada_maquina(maquina_param, data_inicio, data_fim)
+
+    resultado_unificado = merge_metricas(horas_producao, horas_parada)
+
+    return JsonResponse(resultado_unificado, safe=False)
+
+@login_required
+def indicador_ordem_finalizada_maquina(request):
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    resultado = ordem_por_maquina(data_inicio, data_fim)
+
+    return JsonResponse(resultado)
+
+@login_required
+def indicador_peca_produzida_maquina(request):
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+
+    resultado = producao_por_maquina(data_inicio, data_fim)
+
+    return JsonResponse(resultado)        
