@@ -379,6 +379,7 @@ def ordens_criadas(request):
     data_carga = request.GET.get('data_carga')
     maquina_param = request.GET.get('setor', '')
     status_param = request.GET.get('status', '')
+    data_programacao = request.GET.get("data-programada", '')
 
     if data_carga == '':
         data_carga = now().date()
@@ -393,6 +394,8 @@ def ordens_criadas(request):
         filtros_ordem['maquina'] = maquina
     if status_param:
         filtros_ordem['status_atual'] = status_param
+    if data_programacao:
+        filtros_ordem['data_programacao'] = data_programacao
 
     # Recupera os IDs das ordens que atendem aos filtros
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
@@ -420,6 +423,17 @@ def ordens_criadas(request):
         )
     )
 
+    # datas_programacao = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).values_list(
+    #     'ordem__data_programacao', flat=True
+    # ).distinct()
+    datas_programacao = set(item['ordem__data_programacao'] for item in pecas_ordem_agg)
+    data_programacao = next(iter(datas_programacao), None)
+    data_formatada = data_programacao.strftime('%d/%m/%Y') if data_programacao else None
+
+    datas_carga = set(item['ordem__data_carga'] for item in pecas_ordem_agg)
+    data_carga = next(iter(datas_carga), None)
+    data_formatada_carga = data_carga if data_carga else None
+
     # Máquinas a excluir da contagem
     maquinas_excluidas = [
         'PLAT. TANQUE. CAÇAM. 2',
@@ -430,13 +444,16 @@ def ordens_criadas(request):
         'FEIXE DE MOLAS',
         'SERRALHERIA',
         'ROÇADEIRA'
-
     ]
 
     maquinas = Ordem.objects.filter(id__in=ordem_ids).exclude(maquina__nome__in=maquinas_excluidas).values('maquina__nome','maquina__id').distinct()
 
-    return JsonResponse({"ordens": list(pecas_ordem_agg),
-                         "maquinas":list(maquinas)})
+    return JsonResponse({
+                            "ordens": list(pecas_ordem_agg),
+                            "maquinas":list(maquinas),
+                            "data_programacao":data_formatada,
+                            "data_formatada_carga": data_formatada_carga
+                        })
 
 def verificar_qt_restante(request):
 

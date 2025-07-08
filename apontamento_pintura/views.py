@@ -44,10 +44,12 @@ def ordens_criadas(request):
 
     cor = request.GET.get("cor", '')
     conjunto = request.GET.get("conjunto", '')
+    data_programacao = request.GET.get("data-programada", '')
 
     if cor:
         filtros['cor'] = cor
-
+    if data_programacao:
+        filtros['data_programacao'] = data_programacao
     if conjunto:
         filtros_peca['peca__contains'] = conjunto
 
@@ -98,7 +100,21 @@ def ordens_criadas(request):
         .order_by("-status_prioridade", "data_programacao")
     )
 
-    return JsonResponse({"ordens": list(ordens_queryset.values())})
+    primeira_data = ordens_queryset.first().data_programacao if ordens_queryset.exists() else None
+    data_programacao_formatada = (
+        primeira_data.strftime('%d/%m/%Y') if primeira_data else None
+    )
+
+    primeira_data_carga = ordens_queryset.first().data_carga if ordens_queryset.exists() else None
+    data_programacao_formatada_carga = (
+        primeira_data_carga if primeira_data_carga else None
+    )
+
+    return JsonResponse({
+                            "ordens": list(ordens_queryset.values()),
+                            "data_programacao": data_programacao_formatada,
+                            "data_carga": data_programacao_formatada_carga
+                        })
 
 @csrf_exempt
 def criar_ordem(request):

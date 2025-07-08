@@ -179,7 +179,7 @@
             <div class="filter-body">
                 <form id="filtro-form" class="mb-4">
                     <div class="row g-3 align-items-center">
-                        <div class="col-md-3 mb-2">
+                        <div class="col-md-2 mb-2">
                             <label for="filtro-ordem" class="form-label">Ordem</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light">
@@ -194,7 +194,7 @@
                                 <option class="text-muted" value="">Filtrar por processo</option>
                             </select>
                         </div> -->
-                        <div class="col-md-3 mb-2">
+                        <div class="col-md-2 mb-2">
                             <label for="filtro-peca" class="form-label">Peça</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light">
@@ -214,7 +214,16 @@
                                 <option value="agua_prox_proc">Próximo processo</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-3 mb-2">
+                            <label for="filtro-data-programada" class="form-label">Data programada</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-calendar"></i>
+                                </span>
+                                <input type="date" class="form-control" id="filtro-data-programada" placeholder="Data de entrega">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
                             <label for=""></label>
                             <button type="submit" class="btn btn-primary w-100">Filtrar</button>
                         </div>

@@ -7,7 +7,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`/usinagem/api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}`)
+        fetch(`/usinagem/api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -97,6 +97,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                     ${statusBadge}
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">#${ordem.ordem} Criado em: ${ordem.data_criacao}</p>
+                                <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao}</p>
                                 <p class="mb-2">${ordem.obs || '<span class="text-muted">Sem observações</span>'}</p>
                             </div>
                             <div class="card-footer text-end" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
@@ -1579,11 +1580,13 @@ function resetarCardsInicial(filtros = {}) {
     const filtroOrdem = document.getElementById('filtro-ordem');
     const filtroPeca = document.getElementById('filtro-peca');
     const filtroStatus = document.getElementById('filtro-status');
+    const filtroDataProgramada = document.getElementById('filtro-data-programada');
 
     const currentFiltros = {
         ordem: filtros.ordem || filtroOrdem.value.trim(),
         peca: filtros.peca || filtroPeca.value.trim(),
         status: filtros.status || filtroStatus.value.trim(),
+        data_programada: filtros.data_programada || filtroDataProgramada.value.trim(),
     };
 
     // Função principal para buscar e renderizar ordens

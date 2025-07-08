@@ -76,6 +76,7 @@ def get_ordens_criadas(request):
     filtro_ordem = request.GET.get('ordem', '').strip()
     filtro_peca = request.GET.get('peca', '').strip()
     status_atual = request.GET.get('status', '').strip()
+    data_programada = request.GET.get('data-programada', '').strip()
 
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
@@ -101,6 +102,8 @@ def get_ordens_criadas(request):
         ordens_queryset = ordens_queryset.filter(peca_codigo=filtro_peca)
     if status_atual:
         ordens_queryset = ordens_queryset.filter(status_atual=status_atual)
+    if data_programada:
+        ordens_queryset = ordens_queryset.filter(data_programacao=data_programada)
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -117,6 +120,7 @@ def get_ordens_criadas(request):
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
+            'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'peca': {

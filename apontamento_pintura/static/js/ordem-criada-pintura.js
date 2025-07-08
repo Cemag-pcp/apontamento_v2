@@ -4,13 +4,17 @@ export const loadOrdens = (container, filtros = {}) => {
     return new Promise((resolve, reject) => {
         if (isLoading) return resolve({ ordens: [] });
         isLoading = true;
+        document.getElementById('data-entrega-info').textContent = '[carregando...]';
 
-        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&cor=${filtros.cor || ''}&conjunto=${filtros.conjunto || ''}`)
+        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&cor=${filtros.cor || ''}&conjunto=${filtros.conjunto || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
                 container.innerHTML = ""; // Limpa antes de inserir novas ordens
-                
+
+                document.getElementById('data-entrega-info').textContent = data.data_programacao;
+                document.getElementById('filtro-data-carga').value = data.data_carga;
+
                 if (ordens.length > 0) {
                     // Criar cabeçalho da tabela
                     const tableWrapper = document.createElement("div");
@@ -1491,11 +1495,13 @@ export function resetarCardsInicial(filtros = {}) {
     const filtroDataCarga = document.getElementById('filtro-data-carga');
     const filtroCor = document.getElementById('filtro-cor');
     const filtroConjunto = document.getElementById('filtro-conjunto');
+    const filtroDataProgramada = document.getElementById('filtro-data-programada');
     
     const currentFiltros = {
         data_carga: filtroDataCarga.value,
         cor: filtroCor.value,
         conjunto: filtroConjunto.value,
+        data_programada: filtroDataProgramada.value,
     };
 
     // Função para buscar e renderizar ordens sem paginação
@@ -1532,12 +1538,14 @@ function filtro() {
         const filtroDataCarga = document.getElementById('filtro-data-carga');
         const filtroCor = document.getElementById('filtro-cor');
         const filtroConjunto = document.getElementById('filtro-conjunto');
+        const filtroDataProgramada = document.getElementById('filtro-data-programada');
 
         // Captura os valores atualizados dos filtros
         const filtros = {
             data_carga: filtroDataCarga.value,
             cor: filtroCor.value,
             conjunto: filtroConjunto.value,
+            data_programada: filtroDataProgramada.value,
         };
 
         // Recarrega os resultados com os novos filtros

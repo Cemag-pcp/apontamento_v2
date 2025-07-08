@@ -71,7 +71,7 @@
                 </div>
     
                 <!-- Filtro por Cor -->
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="filtro-cor" class="form-label fw-bold">Cor</label>
                     <select class="form-select" name="filtro-cor" id="filtro-cor" disabled>
                         <option value="" selected>Escolha uma cor...</option>
@@ -79,21 +79,41 @@
                 </div>
 
                 <!-- Filtro por conjunto -->
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="filtro-conjunto" class="form-label fw-bold">Conjunto</label>
                     <input type="text" id="filtro-conjunto" class="form-control">
                 </div>
-    
+
+                <!-- Filtro por data programada -->
+                <div class="col-md-3">
+                    <label for="filtro-data-programada" class="form-label fw-bold">Data programada</label>
+                    <input type="date" id="filtro-data-programada" class="form-control">
+                </div>
+
                 <!-- Botão de Filtrar -->
-                <div class="col-md-3 d-flex align-items-end">
+                <div class="col-md-2 d-flex align-items-end">
                     <button type="submit" class="btn btn-primary w-100">Filtrar</button>
                 </div>
             </div>
         </form>
     
-        <!-- Botão Criar Cambão alinhado à direita -->
-        <div class="d-flex justify-content-end mb-4">
-            <button id="btn-criar-cambao" class="btn btn-success" disabled>Criar Cambão</button>
+        <!-- Linha com alerta e botão alinhados -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+
+            <!-- Alerta informativo -->
+            <div class="alert alert-info d-flex align-items-center m-0" role="alert">
+                <i class="fas fa-info-circle me-2"></i>
+                <div>
+                    <strong>Você está visualizando:</strong>
+                    Conjuntos programados para entrega em
+                    <span id="data-entrega-info" class="fw-semibold text-primary">[carregando...]</span>
+                </div>
+            </div>
+
+            <!-- Botão de ação -->
+            <button id="btn-criar-cambao" class="btn btn-success" disabled>
+                <i class="fas fa-plus me-1"></i> Criar Cambão
+            </button>
         </div>
     
         <!-- Tabela de Ordens Criadas -->

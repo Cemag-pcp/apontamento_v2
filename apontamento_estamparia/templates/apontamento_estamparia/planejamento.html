@@ -192,32 +192,46 @@
             <div class="filter-body">
                 <form id="filtro-form" class="mb-4 p-3 bg-light rounded shadow-sm">
                     <div class="row g-3 align-items-center">
-                        <div class="col-md-3 col-sm-6">
+                        <div class="col-md-2 mb-2">
+                            <label for="filtro-ordem" class="form-label">Ordem</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                                <input type="text" id="filtro-ordem" class="form-control border-start-0" placeholder="Filtrar por Ordem">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="filtro-ordem" placeholder="Número da ordem">
                             </div>
                         </div>
-                        <div class="col-md-3 col-sm-6">
+                        <div class="col-md-2 mb-2">
+                            <label for="filtro-peca" class="form-label">Peça</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-white"><i class="bi bi-tag"></i></span>
-                                <input type="text" id="filtro-peca" class="form-control border-start-0" placeholder="Filtrar por Peça">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-box"></i>
+                                </span>
+                                <input type="text" class="form-control" id="filtro-peca" placeholder="Código ou nome da peça">
                             </div>
                         </div>
-                        <div class="col-md-3 col-sm-6">
+                        <div class="col-md-3 mb-2">
+                            <label for="filtro-status" class="form-label">Status</label>
+                            <select class="form-select" id="filtro-status">
+                                <option class="text-muted" value="">Filtrar por status</option>
+                                <option value="aguardando_iniciar">Aguardando iniciar</option>
+                                <option value="iniciada">Iniciada</option>
+                                <option value="interrompida">Interrompida</option>
+                                <!-- <option value="finalizada">Finalizada</option> -->
+                                <option value="agua_prox_proc">Próximo processo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label for="filtro-data-programada" class="form-label">Data programada</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-white"><i class="bi bi-funnel"></i></span>
-                                <select class="form-select border-start-0" name="filtro-status" id="filtro-status">
-                                    <option value="">Escolha o status</option>
-                                    <option value="aguardando_iniciar">Aguardando iniciar</option>
-                                    <option value="iniciada">Iniciada</option>
-                                    <option value="interrompida">Interrompida</option>
-                                    <!-- <option value="finalizada">Finalizada</option> -->
-                                    <option value="agua_prox_proc">Próximo processo</option>
-                                </select>
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-calendar"></i>
+                                </span>
+                                <input type="date" class="form-control" id="filtro-data-programada" placeholder="Data de entrega">
                             </div>
                         </div>
-                        <div class="col-md-3 col-sm-6">
+                        <div class="col-md-2 col-sm-6">
+                            <label for=""></label>
                             <button type="submit" class="btn btn-primary w-100 shadow-sm">
                                 <i class="bi bi-filter me-2"></i>Filtrar
                             </button>

@@ -8,6 +8,85 @@
 {% block links %}
     <link rel="stylesheet" href="{% static 'css/badges.css' %}">
     <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+    
+    <style>
+        .btn-criar-op {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            color: white;
+        }
+        .btn-parada {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+        .btn-parada:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+            color: white;
+        }
+        .btn-criar-op:hover {
+            background-color: #0b5ed7;
+            border-color: #0a58ca;
+            color: white;
+        }
+        .filter-card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border: 1px solid rgba(0, 0, 0, 0.125);
+            border-radius: 0.25rem;
+        }
+        .filter-header {
+            background-color: #f8f9fa;
+            padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+            font-weight: 500;
+        }
+        .filter-body {
+            padding: 1.25rem;
+        }
+        .filter-footer {
+            background-color: #f8f9fa;
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid rgba(0, 0, 0, 0.125);
+        }
+        .form-select, .form-control {
+            border-radius: 4px;
+            border: 1px solid #ced4da;
+        }
+        .btn-filter {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            color: white;
+            width: 100%;
+        }
+        .btn-filter:hover {
+            background-color: #0b5ed7;
+            border-color: #0a58ca;
+            color: white;
+        }
+        .btn-clear {
+            background-color: #6c757d;
+            border-color: #6c757d;
+            color: white;
+        }
+        .btn-clear:hover {
+            background-color: #5a6268;
+            border-color: #545b62;
+            color: white;
+        }
+        .bg-prox-processo {
+            background-color: #b54ef0;
+            color: #000;
+        }
+        .btn-proximo-processo {
+            background-color: #b54ef0;
+            color: #000;
+        }
+        .btn-proximo-processo:hover {
+            background-color: #a03ddd; /* um tom um pouco mais escuro */
+            color: #fff; /* opcional para mais contraste */
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -102,52 +181,78 @@
 
     <!-- Container para Planejamento -->
     <div id="containerPlanejar" class="mb-5">
-        <!-- Botões para abrir modais -->
-        <div class="d-flex justify-content-end gap-3 mb-4">
-            <button type="button" class="btn btn-primary" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
-                Parada de máquina
-            </button>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSerra">
-                Planejar
-            </button>
-            <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#modalImportarOpSerra">
-                Importar Ordens
-            </button>
+        <!-- Título Planejamento -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="text-secondary"></h3>
         </div>
-
-        <!-- Painel de Ordens Criadas -->
-        <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
         <!-- Formulário de Filtro -->
-        <form id="filtro-form" class="mb-4">
-            <div class="row g-3 align-items-center">
-                <div class="col-md-3">
-                    <input type="text" id="filtro-ordem" class="form-control" placeholder="Filtrar por Ordem">
-                </div>
-                <div class="col-md-3">
-                    <select class="form-select" name="filtro-status" id="filtro-status">
-                        <option value="">Escolha o status</option>
-                        <option value="aguardando_iniciar">Aguardando iniciar</option>
-                        <option value="iniciada">Iniciada</option>
-                        <option value="interrompida">Interrompida</option>
-                        <option value="finalizada">Finalizada</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <select id="filtro-mp" class="form-select" name="filtro-mp">
-                        <option value="" selected>Selecione a MP</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <select id="filtro-peca" class="form-select" name="filtro-peca">
-                        <option value="" selected>Selecione a Peça</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+        <div class="filter-card mb-4">
+            <div class="filter-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Painel de Ordens Criadas</h5>
+                <div class="d-flex gap-3">
+                    <button type="button" class="btn btn-parada me-2" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
+                        <i class="bi bi-stop-circle"></i> Parada de máquina
+                    </button>
+                    <button type="button" class="btn btn-criar-op" data-bs-toggle="modal" data-bs-target="#modalSerra">
+                        <i class="bi bi-plus-circle"></i> Planejar 
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#modalImportarOpSerra">
+                        Importar Ordens
+                    </button>
                 </div>
             </div>
-        </form>
-
+            <div class="filter-body">
+                <form id="filtro-form" class="mb-4">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-2 mb-2">
+                            <label for="filtro-ordem" class="form-label">Ordem</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="filtro-ordem" placeholder="Número da ordem">
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label for="filtro-status" class="form-label">Status</label>
+                            <select class="form-select" id="filtro-status">
+                                <option class="text-muted" value="">Filtrar por status</option>
+                                <option value="aguardando_iniciar">Aguardando iniciar</option>
+                                <option value="iniciada">Iniciada</option>
+                                <option value="interrompida">Interrompida</option>
+                                <!-- <option value="finalizada">Finalizada</option> -->
+                                <option value="agua_prox_proc">Próximo processo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filtro-mp" class="form-label">MP</label>
+                            <select id="filtro-mp" class="form-select" name="filtro-mp">
+                                <option value="" selected>Selecione a MP</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filtro-peca" class="form-label">Peça</label>
+                            <select id="filtro-peca" class="form-select" name="filtro-peca">
+                                <option value="" selected>Selecione a Peça</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <label for="filtro-data-programada" class="form-label">Data programada</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-calendar"></i>
+                                </span>
+                                <input type="date" class="form-control" id="filtro-data-programada" placeholder="Data de entrega">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for=""></label>
+                            <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
         <div class="border rounded p-4 bg-light">
             <!-- Container de Ordens -->
             <div style="max-height: 650px; min-height: 250px; overflow-y: auto; overflow-x: hidden;">

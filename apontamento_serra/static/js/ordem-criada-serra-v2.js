@@ -7,7 +7,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&status=${filtros.status || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}`)
+        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&status=${filtros.status || ''}&mp=${filtros.mp || ''}&peca=${filtros.peca || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -88,6 +88,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                     ${statusBadge}
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">Criado em: ${ordem.data_criacao}</p>
+                                <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao}</p>
                                 <p class="mb-2">${ordem.obs || '<span class="text-muted">Sem observações</span>'}</p>
                                 <ul class="list-unstyled mb-0" style="font-size: 0.85rem;">
                                     <li><strong>MP:</strong> ${ordem.propriedade?.descricao_mp || 'N/A'}</li>
@@ -601,12 +602,14 @@ function resetarCardsInicial(filtros = {}) {
     const filtroMp = document.getElementById('filtro-mp');
     const filtroStatus = document.getElementById('filtro-status');
     const filtroPeca = document.getElementById('filtro-peca');
+    const filtroDataProgramada = document.getElementById('filtro-data-programada');
 
     const currentFiltros = {
         ordem: filtros.ordem || filtroOrdem.value.trim(),
         mp: filtros.mp || filtroMp.value.trim(),
         status: filtros.status || filtroStatus.value.trim(),
         peca: filtros.peca || filtroPeca.value.trim(),
+        data_programada: filtros.data_programada || filtroDataProgramada.value.trim(),
     };
 
     // Função principal para buscar e renderizar ordens

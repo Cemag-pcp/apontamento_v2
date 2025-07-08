@@ -83,6 +83,7 @@ def get_ordens_criadas(request):
     filtro_status = request.GET.get('status', '')
     filtro_peca = request.GET.get('peca', '').strip()
     filtro_turno = request.GET.get('turno', '')
+    filtro_data_programada = request.GET.get('data-programada', '').strip()
 
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
@@ -115,6 +116,8 @@ def get_ordens_criadas(request):
                 Q(ultima_atualizacao__time__gte=time(21, 0)) |
                 Q(ultima_atualizacao__time__lte=time(7, 0))
             )
+    if filtro_data_programada:
+        ordens_queryset = ordens_queryset.filter(data_programacao=filtro_data_programada)
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -129,6 +132,7 @@ def get_ordens_criadas(request):
         'ordem': ordem.ordem if ordem.ordem else ordem.ordem_duplicada,
         'grupo_maquina': ordem.get_grupo_maquina_display(),
         'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
+        'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
         'obs': ordem.obs,
         'status_atual': ordem.status_atual,
         'maquina': ordem.maquina.nome if ordem.maquina else None,

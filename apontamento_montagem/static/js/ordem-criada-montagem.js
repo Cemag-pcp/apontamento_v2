@@ -5,7 +5,9 @@ export const loadOrdens = (container, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] });
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&setor=${filtros.setor || ''}`)
+        document.getElementById('data-entrega-info').textContent = '[carregando...]';
+
+        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&setor=${filtros.setor || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -114,6 +116,9 @@ export const loadOrdens = (container, filtros = {}) => {
     
                     setorContainer.appendChild(button);
                 });
+
+                document.getElementById('data-entrega-info').textContent = data.data_programacao;
+                document.getElementById('filtro-data-carga').textContent = data.data_carga;
 
             })
             .catch(error => {
@@ -1006,10 +1011,12 @@ export function resetarCardsInicial(filtros = {}) {
     // Obtém os filtros atualizados
     const filtroDataCarga = document.getElementById('filtro-data-carga');
     const filtroSetor = document.getElementById('filtro-setor');
+    const filtroDataProgramada = document.getElementById('filtro-data-programada');
 
     const currentFiltros = {
         data_carga: filtroDataCarga.value,
-        setor: filtroSetor.value
+        setor: filtroSetor.value,
+        data_programada: filtroDataProgramada.value,
     };
 
     // Função para buscar e renderizar ordens sem paginação
@@ -1045,11 +1052,13 @@ export function filtro() {
 
         const filtroDataCarga = document.getElementById('filtro-data-carga');
         const filtroSetor = document.getElementById('filtro-setor');
+        const filtroDataProgramada = document.getElementById('filtro-data-programada');
 
         // Captura os valores atualizados dos filtros
         const filtros = {
             data_carga: filtroDataCarga.value,
-            setor: filtroSetor.value
+            setor: filtroSetor.value,
+            data_programada: filtroDataProgramada.value,
         };
 
         // Recarrega os resultados com os novos filtros

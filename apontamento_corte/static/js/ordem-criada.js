@@ -8,7 +8,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
         isLoading = true;
 
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${encodeURIComponent(filtros.ordem || '')}&maquina=${filtros.maquina || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}&turno=${filtros.turno || ''}`)
+        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${encodeURIComponent(filtros.ordem || '')}&maquina=${filtros.maquina || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}&turno=${filtros.turno || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -99,6 +99,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">Criado em: ${ordem.data_criacao}</p>
                                 ${dataFinalizacao}
+                                <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao}</p>
                                 <p class="mb-2">${ordem.obs || '<span class="text-muted">Sem observações</span>'}</p>
                                 <ul class="list-unstyled mb-0" style="font-size: 0.85rem;">
                                     <li><strong>MP:</strong> ${ordem.propriedade.descricao_mp || 'N/A'}</li>
@@ -1258,16 +1259,16 @@ export function resetarCardsInicial(filtros = {}) {
     const filtroStatus = document.getElementById('filtro-status');
     const filtroPeca = document.getElementById('filtro-peca');
     const filtroTurno = document.getElementById('filtro-turno');
+    const filtroDataProgramada = document.getElementById('filtro-data-programada');
 
     const currentFiltros = {
         ordem: filtros.ordem || filtroOrdem.value.trim(),
         maquina: filtros.maquina || filtroMaquina.value,
         status: filtros.status || filtroStatus.value,
         peca: filtros.peca || filtroPeca.value,
-        turno: filtros.turno || filtroTurno.value
+        turno: filtros.turno || filtroTurno.value,
+        data_programada: filtros.data_programada || filtroDataProgramada.value.trim(),
     };
-
-    console.log(currentFiltros)
 
     // Função principal para buscar e renderizar ordens
     const fetchOrdens = () => {
