@@ -1936,7 +1936,7 @@ async function cambaoProcesso() {
                     </div>
                     <div class="card-body p-2">
                         ${camboes.map(cambao => `
-                            <div class="border rounded p-2 mb-2">
+                            <div class="border rounded p-2 mb-2 cambao-card">
                                 <div class="d-flex justify-content-between">
                                     <strong>Cambão #${cambao.nome}</strong> 
                                     <span class="badge ${cambao.tipo === 'PÓ' ? 'bg-primary' : 'bg-secondary'}">${cambao.tipo}</span>
@@ -1948,7 +1948,7 @@ async function cambaoProcesso() {
                                 </span>
                                 <ul class="list-unstyled mt-2">
                                     ${cambao.pecas.map(peca => `
-                                        <li class="d-flex justify-content-between">
+                                        <li class="d-flex justify-content-between cambaoInformacoes">
                                             <span>Peça: 
                                                 <strong title="${peca.peca}">
                                                     ${peca.peca.length > maxLength ? peca.peca.substring(0, maxLength) + "..." : peca.peca}
@@ -1957,10 +1957,18 @@ async function cambaoProcesso() {
                                             <span>Data Carga: <strong>${new Intl.DateTimeFormat('pt-BR').format(new Date(peca.data_carga+"T00:00:00"))}</strong></span>
                                             <span>Qtd: <strong>${peca.quantidade_pendurada}</strong></span>
                                         </li>
+                                        <li class="d-none justify-content-between visualizar-conjuntos" >
+                                            <span>Peça: 
+                                                <strong title="${peca.peca}">
+                                                    ${peca.peca}
+                                                </strong>
+                                            </span> 
+                                        </li>
                                     `).join('')}
                                 </ul>
                                 <div class="d-flex justify-content-between mt-2">
                                     <small class="text-muted">Início: ${new Date(cambao.data_pendura).toLocaleString()}</small>
+                                    <button id="visualizarConjuntosButton-${cambao.id}" class="btn btn-sm btn-success" >Visualizar conjuntos completos</button>
                                     <button class="btn btn-sm btn-danger btn-finalizar" data-cambao-id="${cambao.id}">
                                         Encerrar
                                     </button>
@@ -1975,6 +1983,29 @@ async function cambaoProcesso() {
             // Iniciar contador para cada cambão
             camboes.forEach(cambao => {
                 iniciarContador(`cambao-${cambao.id}`, cambao.data_pendura);
+            });
+        });
+
+        // Modificar visualização para ver nomes de conjuntos completos
+        document.querySelectorAll('[id^="visualizarConjuntosButton-"]').forEach(function(botao) {
+            botao.addEventListener('click', function() {
+                // converte `this` para jQuery para usar jQuery em volta dele
+                const $botao = $(this);
+
+                // encontra o elemento .btn-visualizar-conjuntos mais próximo dentro do container comum
+                $botao.closest('.cambao-card').find('.visualizar-conjuntos').toggleClass('d-none');
+
+                // faz o mesmo para .cambaoInformacoes
+                $botao.closest('.cambao-card').find('.cambaoInformacoes').toggleClass('d-none');
+
+                if ($botao.closest('.cambao-card').find('.cambaoInformacoes').hasClass('d-none')){
+                    $botao.text('Visualizar Tudo');
+                }else{
+                    $botao.text('Visualizar conjuntos completos')
+                }
+                
+
+                
             });
         });
 
