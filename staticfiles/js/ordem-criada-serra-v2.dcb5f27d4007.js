@@ -271,7 +271,7 @@ export function carregarOrdensIniciadas(container, filtros={}) {
             // 3. Se não mudou nada, sai
             if (!houveMudanca) return;
 
-            // 4. Mostra o spinner *só agora*
+            // 4. Mostra o spinner  
             container.innerHTML = `
                 <div class="spinner-border text-dark" role="status">
                     <span class="sr-only">Loading...</span>
@@ -458,7 +458,7 @@ export function carregarOrdensInterrompidas(container, filtros={}) {
             // 3. Se não mudou nada, sai
             if (!houveMudanca) return;
 
-            // 4. Mostra o spinner *só agora*
+            // 4. Mostra o spinner  
             container.innerHTML = `
             <div class="spinner-border text-dark" role="status">
                 <span class="sr-only">Loading...</span>

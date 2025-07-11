@@ -354,14 +354,39 @@ function iniciarContador(ordemId, dataCriacao) {
 }
 
 export function carregarOrdensIniciadas(container, filtros = {}) {
-    container.innerHTML = `
-    <div class="spinner-border text-dark" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>`;
+    
+    // 1. Armazena snapshot atual
+    const cardsAtuais = {};
+    container.querySelectorAll('[data-ordem-id]').forEach(card => {
+        cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
+    });
 
     fetch(`/usinagem/api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&processo=${filtros.processo || ''}`)
         .then(response => response.json())
         .then(data => {
+
+            let houveMudanca = false;
+            
+            // 2. Verifica se houve alguma alteração
+            for (const ordem of data.ordens) {
+                const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
+                const ultimaAnterior = cardsAtuais[ordem.ordem];
+                
+                if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
+                    houveMudanca = true;
+                    break;
+                }
+            }
+
+            // 3. Se não mudou nada, sai
+            if (!houveMudanca) return;
+
+            // 4. Mostra o spinner  
+            container.innerHTML = `
+                <div class="spinner-border text-dark" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>`;
+
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
 
@@ -463,10 +488,14 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
 }
 
 export function carregarOrdensInterrompidas(container, filtros = {}) {
-    container.innerHTML = `
-    <div class="spinner-border text-dark" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>`;
+    // container.innerHTML = `
+    // <div class="spinner-border text-dark" role="status">
+    //     <span class="sr-only">Loading...</span>
+    // </div>`;
+    const cardsAtuais = {};
+    container.querySelectorAll('[data-ordem-id]').forEach(card => {
+        cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
+    });
 
     // Fetch para buscar ordens interrompidas
     fetch(`/usinagem/api/ordens-interrompidas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
@@ -477,6 +506,28 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
             return response.json();
         })
         .then(data => {
+            let houveMudanca = false;
+
+            // 2. Verifica se houve alguma alteração
+            for (const ordem of data.ordens) {
+                const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
+                const ultimaAnterior = cardsAtuais[ordem.ordem];
+
+                if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
+                    houveMudanca = true;
+                    break;
+                }
+            }
+
+            // 3. Se não mudou nada, sai
+            if (!houveMudanca) return;
+
+            // 4. Mostra o spinner  
+            container.innerHTML = `
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>`;
+
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
                 // Cria o card
@@ -550,14 +601,39 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
 }
 
 function carregarOrdensAgProProcesso(container, filtros = {}) {
-    container.innerHTML = `
-    <div class="spinner-border text-dark" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>`;
     
+    // 1. Armazena snapshot atual
+    const cardsAtuais = {};
+    container.querySelectorAll('[data-ordem-id]').forEach(card => {
+        cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
+    });
+
     fetch(`/usinagem/api/ordens-ag-prox-proc/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&processo=${filtros.processo || ''}`)
         .then(response => response.json())
         .then(data => {
+
+            let houveMudanca = false;
+
+            // 2. Verifica se houve alguma alteração
+            for (const ordem of data.ordens) {
+                const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
+                const ultimaAnterior = cardsAtuais[ordem.ordem];
+
+                if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
+                    houveMudanca = true;
+                    break;
+                }
+            }
+
+            // 3. Se não mudou nada, sai
+            if (!houveMudanca) return;
+
+            // 4. Mostra o spinner  
+            container.innerHTML = `
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>`;
+
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
 
@@ -678,6 +754,11 @@ function mostrarModalInterromper(ordemId, grupoMaquina, ordem_numero) {
             }
         });
 
+        // dentro do container containerProcesso
+        const container = document.querySelector('.containerProcesso');
+        const card = container?.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
+
         fetch(`/usinagem/api/ordens/atualizar-status/`, {
             method: 'PATCH',
             body: JSON.stringify({
@@ -787,6 +868,9 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 Swal.showLoading();
             },
         });
+
+        const card = document.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
 
         fetch(`/usinagem/api/ordens/atualizar-status/`, {
             method: 'PATCH',
@@ -1064,6 +1148,10 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
             },
         });
 
+        const container = document.querySelector('.containerProcesso');
+        const card = container?.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
+
         fetch(`/usinagem/api/ordens/atualizar-status/`, {
             method: 'PATCH',
             body: JSON.stringify({
@@ -1183,6 +1271,10 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
 
         const formData = new FormData(clonedForm);
         const maquinaName = formData.get('escolhaMaquinaProxProcesso');
+
+        const container = document.querySelector('.containerProxProcesso');
+        const card = container?.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
 
         // Exibe SweetAlert de carregamento
         Swal.fire({
@@ -1419,6 +1511,10 @@ function mostrarModalRetornar(ordemId, maquina) {
 
     clonedForm.addEventListener('submit', (event) => {
         event.preventDefault();
+        
+        const container = document.querySelector('.containerInterrompido');
+        const card = container?.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
 
         Swal.fire({
             title: 'Retornando Ordem...',
@@ -1698,6 +1794,17 @@ function filtro() {
 //         console.error('Erro ao carregar processos:', error);
 //     }
 // }
+export function inicializarAutoAtualizacaoOrdens() {
+    const containerIniciado = document.querySelector('.containerProcesso');
+    const containerInterrompido = document.querySelector('.containerInterrompido');
+    const containerProxProcesso = document.querySelector('.containerProxProcesso');
+
+    setInterval(() => {
+        carregarOrdensIniciadas(containerIniciado);
+        carregarOrdensInterrompidas(containerInterrompido);
+        carregarOrdensAgProProcesso(containerProxProcesso);
+    }, 30000);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -1736,16 +1843,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const containerIniciado = document.querySelector('.containerProcesso');
-    carregarOrdensIniciadas(containerIniciado);
-
     const containerInterrompido = document.querySelector('.containerInterrompido');
-    carregarOrdensInterrompidas(containerInterrompido);
-
     const containerProxProcesso = document.querySelector('.containerProxProcesso')
+    
+    carregarOrdensIniciadas(containerIniciado);
+    carregarOrdensInterrompidas(containerInterrompido);
     carregarOrdensAgProProcesso(containerProxProcesso);
 
     filtro();
 
     filtro_prox_processo();
+    inicializarAutoAtualizacaoOrdens();
 
 });
