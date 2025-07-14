@@ -37,6 +37,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # 'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -130,3 +131,12 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 LOGIN_URL = '/core/login/'
 LOGIN_REDIRECT_URL = '/core/'  
 LOGOUT_REDIRECT_URL = '/core/login/'  
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": ["rediss://default:AU7-AAIjcDEwZjkzNWM1NzJhYjc0OGM1OWRhOGRmNGY3NmRiMjE4OHAxMA@many-oriole-20222.upstash.io:6379"],
+        },
+    },
+}

@@ -356,36 +356,36 @@ function iniciarContador(ordemId, dataCriacao) {
 export function carregarOrdensIniciadas(container, filtros = {}) {
     
     // 1. Armazena snapshot atual
-    // const cardsAtuais = {};
-    // container.querySelectorAll('[data-ordem-id]').forEach(card => {
-    //     cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
-    // });
+    const cardsAtuais = {};
+    container.querySelectorAll('[data-ordem-id]').forEach(card => {
+        cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
+    });
 
     fetch(`/usinagem/api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&processo=${filtros.processo || ''}`)
         .then(response => response.json())
         .then(data => {
 
-            // let houveMudanca = false;
+            let houveMudanca = false;
             
             // 2. Verifica se houve alguma alteração
-            // for (const ordem of data.ordens) {
-            //     const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
-            //     const ultimaAnterior = cardsAtuais[ordem.ordem];
+            for (const ordem of data.ordens) {
+                const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
+                const ultimaAnterior = cardsAtuais[ordem.ordem];
                 
-            //     if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
-            //         houveMudanca = true;
-            //         break;
-            //     }
-            // }
+                if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
+                    houveMudanca = true;
+                    break;
+                }
+            }
 
             // 3. Se não mudou nada, sai
-            // if (!houveMudanca) return;
+            if (!houveMudanca) return;
 
             // 4. Mostra o spinner  
-            // container.innerHTML = `
-            //     <div class="spinner-border text-dark" role="status">
-            //         <span class="sr-only">Loading...</span>
-            //     </div>`;
+            container.innerHTML = `
+                <div class="spinner-border text-dark" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>`;
 
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
@@ -492,10 +492,10 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
     // <div class="spinner-border text-dark" role="status">
     //     <span class="sr-only">Loading...</span>
     // </div>`;
-    // const cardsAtuais = {};
-    // container.querySelectorAll('[data-ordem-id]').forEach(card => {
-    //     cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
-    // });
+    const cardsAtuais = {};
+    container.querySelectorAll('[data-ordem-id]').forEach(card => {
+        cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
+    });
 
     // Fetch para buscar ordens interrompidas
     fetch(`/usinagem/api/ordens-interrompidas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
@@ -506,27 +506,27 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
             return response.json();
         })
         .then(data => {
-            // let houveMudanca = false;
+            let houveMudanca = false;
 
             // 2. Verifica se houve alguma alteração
-            // for (const ordem of data.ordens) {
-            //     const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
-            //     const ultimaAnterior = cardsAtuais[ordem.ordem];
+            for (const ordem of data.ordens) {
+                const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
+                const ultimaAnterior = cardsAtuais[ordem.ordem];
 
-            //     if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
-            //         houveMudanca = true;
-            //         break;
-            //     }
-            // }
+                if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
+                    houveMudanca = true;
+                    break;
+                }
+            }
 
             // 3. Se não mudou nada, sai
-            // if (!houveMudanca) return;
+            if (!houveMudanca) return;
 
             // 4. Mostra o spinner  
-            // container.innerHTML = `
-            // <div class="spinner-border text-dark" role="status">
-            //     <span class="sr-only">Loading...</span>
-            // </div>`;
+            container.innerHTML = `
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>`;
 
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
@@ -600,39 +600,39 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
         });
 }
 
-export function carregarOrdensAgProProcesso(container, filtros = {}) {
+function carregarOrdensAgProProcesso(container, filtros = {}) {
     
     // 1. Armazena snapshot atual
-    // const cardsAtuais = {};
-    // container.querySelectorAll('[data-ordem-id]').forEach(card => {
-    //     cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
-    // });
+    const cardsAtuais = {};
+    container.querySelectorAll('[data-ordem-id]').forEach(card => {
+        cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
+    });
 
     fetch(`/usinagem/api/ordens-ag-prox-proc/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&processo=${filtros.processo || ''}`)
         .then(response => response.json())
         .then(data => {
 
-            // let houveMudanca = false;
+            let houveMudanca = false;
 
             // 2. Verifica se houve alguma alteração
-            // for (const ordem of data.ordens) {
-            //     const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
-            //     const ultimaAnterior = cardsAtuais[ordem.ordem];
+            for (const ordem of data.ordens) {
+                const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
+                const ultimaAnterior = cardsAtuais[ordem.ordem];
 
-            //     if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
-            //         houveMudanca = true;
-            //         break;
-            //     }
-            // }
+                if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
+                    houveMudanca = true;
+                    break;
+                }
+            }
 
             // 3. Se não mudou nada, sai
-            // if (!houveMudanca) return;
+            if (!houveMudanca) return;
 
             // 4. Mostra o spinner  
-            // container.innerHTML = `
-            // <div class="spinner-border text-dark" role="status">
-            //     <span class="sr-only">Loading...</span>
-            // </div>`;
+            container.innerHTML = `
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>`;
 
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
@@ -1853,6 +1853,6 @@ document.addEventListener('DOMContentLoaded', () => {
     filtro();
 
     filtro_prox_processo();
-    // inicializarAutoAtualizacaoOrdens();
+    inicializarAutoAtualizacaoOrdens();
 
 });

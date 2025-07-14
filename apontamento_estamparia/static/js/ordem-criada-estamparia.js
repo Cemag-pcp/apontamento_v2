@@ -214,17 +214,74 @@ function iniciarContador(ordemId, dataCriacao) {
     setInterval(atualizarContador, 1000);
 }
 
+function removerCardDeOutrosContainers(ordemId, containerAtual) {
+    const todosContainers = [
+        document.querySelector('.containerProcesso'),
+        document.querySelector('.containerInterrompido'),
+        document.querySelector('.containerProxProcesso')
+    ];
+
+    todosContainers.forEach(container => {
+        if (container && container !== containerAtual) {
+            const cardDuplicado = container.querySelector(`[data-ordem-id="${ordemId}"]`);
+            if (cardDuplicado) {
+                cardDuplicado.remove();
+            }
+        }
+    });
+}
+
 export function carregarOrdensIniciadas(container, filtros = {}) {
-    container.innerHTML = `
-        <div class="spinner-border text-dark" role="status">
-            <span class="sr-only">Loading...</span>
-        </div>`;
-        
+    
+    // 1. Armazena snapshot atual
+    const cardsAtuais = {};
+    container.querySelectorAll('[data-ordem-id]').forEach(card => {
+        cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
+    });
+
     fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
+
+            let houveMudanca = false;
+            
+            // 2. Verifica se houve alguma alteração
+            for (const ordem of data.ordens) {
+                const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
+                const ultimaAnterior = cardsAtuais[ordem.ordem];
+                
+                if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
+                    houveMudanca = true;
+                    break;
+                }
+            }
+
+            // 3. Se não mudou nada, sai
+            if (!houveMudanca) return;
+
+            // 4. Mostra o spinner  
+            // container.innerHTML = `
+            //     <div class="spinner-border text-dark" role="status">
+            //         <span class="sr-only">Loading...</span>
+            //     </div>`;
+
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
+                
+                const cardExistente = container.querySelector(`[data-ordem-id="${ordem.ordem}"]`);
+                const ultimaAtualizacao = new Date(ordem.ultima_atualizacao).getTime();
+
+                if (cardExistente) {
+                    const contador = cardExistente.querySelector(`#contador-${ordem.ordem}`);
+                    const atualAnterior = cardExistente.dataset.ultimaAtualizacao;
+
+                    // Só atualiza se tiver realmente mudado
+                    if (!atualAnterior || parseInt(atualAnterior) !== ultimaAtualizacao) {
+                        cardExistente.remove(); // Remove card antigo para recriar
+                    } else {
+                        return; // Não atualizou, segue p/ próxima
+                    }
+                }
 
                 const card = document.createElement('div');
                 card.dataset.ordemId = ordem.id;
@@ -291,7 +348,7 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                 
                 if (buttonDeletar) {
                     buttonDeletar.addEventListener('click', function() {
-                        mostrarModalRetornarOrdemIniciada(ordem.id);
+                        mostrarModalRetornarOrdemIniciada(ordem.id, container);
                     });
                 }
 
@@ -321,6 +378,7 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                 //     });
                 // }
 
+                removerCardDeOutrosContainers(ordem.ordem, container);
                 container.appendChild(card);
 
                 iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
@@ -331,10 +389,16 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
 };
 
 export function carregarOrdensInterrompidas(container, filtros = {}) {
-    container.innerHTML = `
-        <div class="spinner-border text-dark" role="status">
-            <span class="sr-only">Loading...</span>
-        </div>`;
+    // container.innerHTML = `
+    //     <div class="spinner-border text-dark" role="status">
+    //         <span class="sr-only">Loading...</span>
+    //     </div>`;
+    
+    // 1. Armazena snapshot atual
+    const cardsAtuais = {};
+    container.querySelectorAll('[data-ordem-id]').forEach(card => {
+        cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
+    });
 
     // Fetch para buscar ordens interrompidas
     fetch(`api/ordens-interrompidas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
@@ -345,9 +409,47 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
             return response.json();
         })
         .then(data => {
+            let houveMudanca = false;
+
+            // 2. Verifica se houve alguma alteração
+            for (const ordem of data.ordens) {
+                const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
+                const ultimaAnterior = cardsAtuais[ordem.ordem];
+
+                if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
+                    houveMudanca = true;
+                    break;
+                }
+            }
+
+            // 3. Se não mudou nada, sai
+            if (!houveMudanca) return;
+
+            // 4. Mostra o spinner  
+            container.innerHTML = `
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>`;
+
             container.innerHTML = ''; // Limpa o container
-            console.log(data);
+
             data.ordens.forEach(ordem => {
+
+                const cardExistente = container.querySelector(`[data-ordem-id="${ordem.ordem}"]`);
+                const ultimaAtualizacao = new Date(ordem.ultima_atualizacao).getTime();
+
+                if (cardExistente) {
+                    const contador = cardExistente.querySelector(`#contador-${ordem.ordem}`);
+                    const atualAnterior = cardExistente.dataset.ultimaAtualizacao;
+
+                    // Só atualiza se tiver realmente mudado
+                    if (!atualAnterior || parseInt(atualAnterior) !== ultimaAtualizacao) {
+                        cardExistente.remove(); // Remove card antigo para recriar
+                    } else {
+                        return; // Não atualizou, segue p/ próxima
+                    }
+                }
+
                 // Cria o card
                 const card = document.createElement('div');
                 card.dataset.ordemId = ordem.id;
@@ -411,11 +513,12 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
 
                 if (buttonDeletar) {
                     buttonDeletar.addEventListener('click', function() {
-                        mostrarModalRetornarOrdemIniciada(ordem.id);
+                        mostrarModalRetornarOrdemIniciada(ordem.id, container);
                     });
                 }
             
                 // Adiciona o card ao container
+                removerCardDeOutrosContainers(ordem.ordem, container);
                 container.appendChild(card);
 
                 iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
@@ -429,16 +532,55 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
 };
 
 function carregarOrdensAgProProcesso(container, filtros = {}) {
-    container.innerHTML = `
-        <div class="spinner-border text-dark" role="status">
-            <span class="sr-only">Loading...</span>
-        </div>`;
-        
+    
+    // 1. Armazena snapshot atual
+    const cardsAtuais = {};
+    container.querySelectorAll('[data-ordem-id]').forEach(card => {
+        cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
+    });
+
     fetch(`api/ordens-ag-prox-proc/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
         .then(response => response.json())
         .then(data => {
+            let houveMudanca = false;
+
+            // 2. Verifica se houve alguma alteração
+            for (const ordem of data.ordens) {
+                const ultimaNova = new Date(ordem.ultima_atualizacao).getTime();
+                const ultimaAnterior = cardsAtuais[ordem.ordem];
+
+                if (!ultimaAnterior || ultimaNova !== ultimaAnterior) {
+                    houveMudanca = true;
+                    break;
+                }
+            }
+
+            // 3. Se não mudou nada, sai
+            if (!houveMudanca) return;
+
+            // 4. Mostra o spinner  
+            container.innerHTML = `
+            <div class="spinner-border text-dark" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>`;
+
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
+
+                const cardExistente = container.querySelector(`[data-ordem-id="${ordem.ordem}"]`);
+                const ultimaAtualizacao = new Date(ordem.ultima_atualizacao).getTime();
+
+                if (cardExistente) {
+                    const contador = cardExistente.querySelector(`#contador-${ordem.ordem}`);
+                    const atualAnterior = cardExistente.dataset.ultimaAtualizacao;
+
+                    // Só atualiza se tiver realmente mudado
+                    if (!atualAnterior || parseInt(atualAnterior) !== ultimaAtualizacao) {
+                        cardExistente.remove(); // Remove card antigo para recriar
+                    } else {
+                        return; // Não atualizou, segue p/ próxima
+                    }
+                }
 
                 const card = document.createElement('div');
                 card.dataset.ordemId = ordem.id;
@@ -499,10 +641,12 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
 
                 if (buttonDeletar) {
                     buttonDeletar.addEventListener('click', function() {
-                        mostrarModalRetornarOrdemIniciada(ordem.id);
+                        mostrarModalRetornarOrdemIniciada(ordem.id, container);
                     });
                 }
 
+                removerCardDeOutrosContainers(ordem.ordem, container);
+                
                 container.appendChild(card);
 
                 iniciarContador(ordem.ordem, ordem.ultima_atualizacao)
@@ -563,7 +707,12 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
                 Swal.showLoading();
             }
         });
-
+        
+        // dentro do container containerProcesso
+        const container = document.querySelector('.containerProcesso');
+        const card = container?.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
+        
         fetch(`api/ordens/atualizar-status/`, {
             method: 'PATCH',
             body: JSON.stringify({
@@ -610,7 +759,7 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
     });
 }
 
-function mostrarModalRetornarOrdemIniciada(ordemId) {
+function mostrarModalRetornarOrdemIniciada(ordemId, container) {
     const modalRetornarProcessoIniciado = new bootstrap.Modal(document.getElementById('modalRetornarProcessoIniciado'));
     const textRetorno = document.getElementById('text-confirm');
     const modalTitle = document.getElementById("modalExcluirRetorno");
@@ -631,7 +780,12 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
             const submitButton = document.getElementById('retornar-aguardando-iniciar');
             submitButton.disabled = true;
             submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
-            
+    
+            // dentro do container
+            // const container = document.querySelector(`.${container}`);
+            const card = container?.querySelector(`[data-ordem-id="${ordemId}"]`);
+            if (card) card.remove();
+
             const response = await fetch('api/retornar-processo/', {
                 method: 'POST',
                 headers: {
@@ -721,6 +875,9 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 Swal.showLoading();
             },
         });
+
+        const card = document.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
 
         fetch(`api/ordens/atualizar-status/`, {
             method: 'PATCH',
@@ -965,6 +1122,10 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
         const maquinaName = formData.get('escolhaMaquinaProxProcesso');
         const qtdProxProcesso = formData.get('qtdProxProcesso');
 
+        const container = document.querySelector('.containerProcesso');
+        const card = container?.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
+
         // Exibe SweetAlert de carregamento
         Swal.fire({
             title: 'Mudando processo...',
@@ -1090,6 +1251,10 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
 
         const formData = new FormData(clonedForm);
         const maquinaName = formData.get('escolhaMaquinaProxProcesso');
+
+        const container = document.querySelector('.containerProxProcesso');
+        const card = container?.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
 
         // Exibe SweetAlert de carregamento
         Swal.fire({
@@ -1334,6 +1499,11 @@ function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
         });
 
         const formData = new FormData(clonedForm);
+
+        // dentro do container containerProcesso
+        const container = document.querySelector('.containerInterrompido');
+        const card = container?.querySelector(`[data-ordem-id="${ordemId}"]`);
+        if (card) card.remove();
 
         fetch(`api/ordens/atualizar-status/`, {
             method: 'PATCH',
@@ -1682,6 +1852,18 @@ function filtro() {
     });
 }
 
+export function inicializarAutoAtualizacaoOrdens() {
+    const containerIniciado = document.querySelector('.containerProcesso');
+    const containerInterrompido = document.querySelector('.containerInterrompido');
+    const containerProxProcesso = document.querySelector('.containerProxProcesso');
+
+    setInterval(() => {
+        carregarOrdensIniciadas(containerIniciado);
+        carregarOrdensInterrompidas(containerInterrompido);
+        carregarOrdensAgProProcesso(containerProxProcesso);
+    }, 30000);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     resetarCardsInicial();
@@ -1719,14 +1901,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const containerIniciado = document.querySelector('.containerProcesso');
-    carregarOrdensIniciadas(containerIniciado);
-
     const containerInterrompido = document.querySelector('.containerInterrompido');
-    carregarOrdensInterrompidas(containerInterrompido);
+    const containerProxProcesso = document.querySelector('.containerProxProcesso');
 
-    const containerProxProcesso = document.querySelector('.containerProxProcesso')
+    carregarOrdensIniciadas(containerIniciado);
+    carregarOrdensInterrompidas(containerInterrompido);
     carregarOrdensAgProProcesso(containerProxProcesso);
 
     filtro();
+    // inicializarAutoAtualizacaoOrdens();
 
 });
