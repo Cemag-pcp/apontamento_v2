@@ -12,7 +12,7 @@ from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso, MaquinaParada
 from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada, MotivoExclusao
-from .utils import criar_ordem_usinagem
+from .utils import criar_ordem_usinagem, notificar_ordem
 
 import pandas as pd
 import os
@@ -200,7 +200,6 @@ def atualizar_status_ordem(request):
 
                     ordem.maquina = maquina_nome
                     ordem.status_prioridade = 1
-
                 elif status == 'finalizada':
                     operador_final = int(body.get('operador_final'))
                     obs_final = body.get('obs_finalizar')
@@ -262,6 +261,7 @@ def atualizar_status_ordem(request):
                     )
 
                 ordem.save()
+                notificar_ordem(ordem)  # dispara o websocket
 
                 return JsonResponse({
                     'message': 'Status atualizado com sucesso.',
@@ -297,8 +297,6 @@ def get_ordens_iniciadas(request):
             Q(ordem_pecas_usinagem__peca__codigo=filtro_peca) |
             Q(ordem_pecas_usinagem__peca__descricao__icontains=filtro_peca)
         )
-
-
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -658,3 +656,4 @@ def retornar_processo(request):
             {'status': 'error', 'message': str(e)}, 
             status=500
         )
+    
