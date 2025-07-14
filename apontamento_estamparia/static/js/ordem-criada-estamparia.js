@@ -121,7 +121,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                             });
                         }
 
-                        // Adiciona evento ao botão "Interromper", se existir
                         if (buttonInterromper) {
                             buttonInterromper.addEventListener('click', () => {
                                 mostrarModalInterromper(ordem.id, ordem.grupo_maquina);
