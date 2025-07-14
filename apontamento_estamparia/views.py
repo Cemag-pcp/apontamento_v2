@@ -113,7 +113,7 @@ def get_ordens_criadas(request):
     try:
         ordens_page = paginator.page(page)
     except EmptyPage:
-        return JsonResponse({'ordens': []})  # Retorna vazio se a página não existir
+        return JsonResponse({'ordens': []})
 
     # Monta os dados para a resposta
     data = []
@@ -124,6 +124,8 @@ def get_ordens_criadas(request):
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
+            'maquina': ordem.maquina.nome if ordem.maquina else "Sem máquina planejada",
+            'maquina_id': ordem.maquina.id if ordem.maquina else "Sem máquina planejada",
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'peca': {
@@ -547,10 +549,13 @@ def planejar_ordem_estamparia(request):
 
         with transaction.atomic():
 
+            maquina = Maquina.objects.filter(id=request.POST.get("maquinaPlanejada")).first()
+
             nova_ordem = Ordem.objects.create(
                 obs=request.POST.get('observacoes'),
                 grupo_maquina='estamparia',
-                data_programacao=request.POST.get("dataProgramacao")
+                data_programacao=request.POST.get("dataProgramacao"),
+                maquina=maquina
             )
 
             PecasOrdem.objects.create(
@@ -561,7 +566,8 @@ def planejar_ordem_estamparia(request):
 
         return JsonResponse({
             'message': 'Status atualizado com sucesso.',
-            'ordem_id': nova_ordem.pk
+            'ordem_id': nova_ordem.pk,
+            'maquina_id': maquina.id
         })
 
 def api_apontamentos_peca(request):
