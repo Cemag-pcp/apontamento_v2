@@ -113,7 +113,7 @@ def get_ordens_criadas(request):
     try:
         ordens_page = paginator.page(page)
     except EmptyPage:
-        return JsonResponse({'ordens': []})  # Retorna vazio se a página não existir
+        return JsonResponse({'ordens': []})
 
     # Monta os dados para a resposta
     data = []
