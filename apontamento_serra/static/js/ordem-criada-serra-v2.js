@@ -272,10 +272,10 @@ export function carregarOrdensIniciadas(container, filtros={}) {
             if (!houveMudanca) return;
 
             // 4. Mostra o spinner  
-            container.innerHTML = `
-                <div class="spinner-border text-dark" role="status">
-                    <span class="sr-only">Loading...</span>
-                </div>`;
+            // container.innerHTML = `
+            //     <div class="spinner-border text-dark" role="status">
+            //         <span class="sr-only">Loading...</span>
+            //     </div>`;
 
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
@@ -2024,14 +2024,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Atualização periódica para ambos (se existirem)
-        setInterval(() => {
-            if (containerIniciado) {
-                carregarOrdensIniciadas(containerIniciado);
-            }
-            if (containerInterrompido) {
-                carregarOrdensInterrompidas(containerInterrompido);
-            }
-        }, 30000);
+        // setInterval(() => {
+        //     if (containerIniciado) {
+        //         carregarOrdensIniciadas(containerIniciado);
+        //     }
+        //     if (containerInterrompido) {
+        //         carregarOrdensInterrompidas(containerInterrompido);
+        //     }
+        // }, 30000);
         
     } catch (error) {
         console.error("Erro ao carregar a página:", error);

@@ -382,10 +382,10 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
             if (!houveMudanca) return;
 
             // 4. Mostra o spinner  
-            container.innerHTML = `
-                <div class="spinner-border text-dark" role="status">
-                    <span class="sr-only">Loading...</span>
-                </div>`;
+            // container.innerHTML = `
+            //     <div class="spinner-border text-dark" role="status">
+            //         <span class="sr-only">Loading...</span>
+            //     </div>`;
 
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
@@ -1853,6 +1853,6 @@ document.addEventListener('DOMContentLoaded', () => {
     filtro();
 
     filtro_prox_processo();
-    inicializarAutoAtualizacaoOrdens();
+    // inicializarAutoAtualizacaoOrdens();
 
 });
