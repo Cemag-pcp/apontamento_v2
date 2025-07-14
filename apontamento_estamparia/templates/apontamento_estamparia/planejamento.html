@@ -260,9 +260,6 @@
                 <h4 class="text-center text-secondary">Processos em Andamento</h4>
                 <div class="border rounded p-3 bg-light">
                     <div class="row row-cols-2 g-3 containerProcesso" style="max-height: 400px; overflow-y: auto;">
-                        <div class="spinner-border text-dark" role="status">
-                            <span class="sr-only">Loading...</span>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -270,9 +267,7 @@
                 <h4 class="text-center text-secondary">Processos Interrompidos</h4>
                 <div class="border rounded p-3 bg-light">
                     <div class="row row-cols-2 g-3 containerInterrompido" style="max-height: 400px; overflow-y: auto;">
-                        <div class="spinner-border text-dark" role="status">
-                            <span class="sr-only">Loading...</span>
-                        </div>
+
                     </div>
                 </div>
             </div>
@@ -280,9 +275,6 @@
                 <h4 class="text-center text-secondary">Próximo processo</h4>
                 <div class="border rounded p-3 bg-light">
                     <div class="row row-cols-2 g-3 containerProxProcesso" style="max-height: 400px; overflow-y: auto;">
-                        <div class="spinner-border text-dark" role="status">
-                            <span class="sr-only">Loading...</span>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -319,12 +311,22 @@
                     </div>
 
                     <div class="row mb-3 align-items-center">
+                        <!-- Peça -->
+                        <div class="col-md-6">
+                            <label class="form-label">Máquina:</label>
+                            <select class="form-select" id="maquinas-select" name="maquinaPlanejada" style="width: 100%;" required>
+                                <option value="" disabled selected>Selecione a Máquina</option>
+                            </select>
+                        </div>
                         <!-- Quantidade Planejada -->
                         <div class="col-md-6">
                             <label for="qtdPlanejada" class="form-label">Quantidade Planejada:</label>
                             <input type="number" class="form-control" id="qtdPlanejada" name="qtdPlanejada" min="1" placeholder="Digite a quantidade" required>
                         </div>
                         
+                    </div>
+
+                    <div class="row mb-3 align-items-center">
                         <!-- Observações -->
                         <div class="col-md-6">
                             <label for="observacoes" class="form-label">Observações:</label>

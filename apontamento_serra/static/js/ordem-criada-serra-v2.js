@@ -271,11 +271,11 @@ export function carregarOrdensIniciadas(container, filtros={}) {
             // 3. Se não mudou nada, sai
             if (!houveMudanca) return;
 
-            // 4. Mostra o spinner *só agora*
-            container.innerHTML = `
-                <div class="spinner-border text-dark" role="status">
-                    <span class="sr-only">Loading...</span>
-                </div>`;
+            // 4. Mostra o spinner  
+            // container.innerHTML = `
+            //     <div class="spinner-border text-dark" role="status">
+            //         <span class="sr-only">Loading...</span>
+            //     </div>`;
 
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
@@ -458,7 +458,7 @@ export function carregarOrdensInterrompidas(container, filtros={}) {
             // 3. Se não mudou nada, sai
             if (!houveMudanca) return;
 
-            // 4. Mostra o spinner *só agora*
+            // 4. Mostra o spinner  
             container.innerHTML = `
             <div class="spinner-border text-dark" role="status">
                 <span class="sr-only">Loading...</span>
@@ -1448,7 +1448,6 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 
             modal.show();
 
-
             if (!formFinalizar.checkValidity()) {
                 formFinalizar.reportValidity(); // Exibe as mensagens de erro nativas do navegador
                 return; // Interrompe a submissão se o formulário for inválido
@@ -2025,14 +2024,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Atualização periódica para ambos (se existirem)
-        setInterval(() => {
-            if (containerIniciado) {
-                carregarOrdensIniciadas(containerIniciado);
-            }
-            if (containerInterrompido) {
-                carregarOrdensInterrompidas(containerInterrompido);
-            }
-        }, 30000);
+        // setInterval(() => {
+        //     if (containerIniciado) {
+        //         carregarOrdensIniciadas(containerIniciado);
+        //     }
+        //     if (containerInterrompido) {
+        //         carregarOrdensInterrompidas(containerInterrompido);
+        //     }
+        // }, 30000);
         
     } catch (error) {
         console.error("Erro ao carregar a página:", error);

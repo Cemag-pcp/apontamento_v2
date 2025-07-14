@@ -1448,7 +1448,6 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 
             modal.show();
 
-
             if (!formFinalizar.checkValidity()) {
                 formFinalizar.reportValidity(); // Exibe as mensagens de erro nativas do navegador
                 return; // Interrompe a submissão se o formulário for inválido
