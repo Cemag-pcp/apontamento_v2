@@ -7,7 +7,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}&data-programada=${filtros.data_programada || ''}`)
+        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}&maquina=${filtros.maquina || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -243,7 +243,7 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
         cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
     });
 
-    fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&maquina=${filtros.maquina || ''}`)
         .then(response => response.json())
         .then(data => {
 
@@ -405,7 +405,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
     });
 
     // Fetch para buscar ordens interrompidas
-    fetch(`api/ordens-interrompidas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`api/ordens-interrompidas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&maquina=${filtros.maquina || ''}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar as ordens interrompidas.');
@@ -543,7 +543,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
         cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
     });
 
-    fetch(`api/ordens-ag-prox-proc/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`api/ordens-ag-prox-proc/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&maquina=${filtros.maquina || ''}`)
         .then(response => response.json())
         .then(data => {
             let houveMudanca = false;
@@ -1805,12 +1805,14 @@ function resetarCardsInicial(filtros = {}) {
     const filtroOrdem = document.getElementById('filtro-ordem');
     const filtroPeca = document.getElementById('filtro-peca');
     const filtroStatus = document.getElementById('filtro-status');
+    const filtroMaquina = document.getElementById('filtro-maquina');
     const filtroDataProgramada = document.getElementById('filtro-data-programada');
 
     const currentFiltros = {
         ordem: filtros.ordem || filtroOrdem.value.trim(),
         peca: filtros.peca || filtroPeca.value.trim(),
         status: filtros.status || filtroStatus.value.trim(),
+        maquina: filtros.maquina || filtroMaquina.value.trim(),
         data_programada: filtros.data_programada || filtroDataProgramada.value.trim(),
     };
 
@@ -1876,6 +1878,7 @@ function filtro() {
             ordem: document.getElementById('filtro-ordem').value.trim(),
             peca: document.getElementById('filtro-peca').value.trim(),
             status: document.getElementById('filtro-status').value.trim(),
+            maquina: document.getElementById('filtro-maquina').value.trim(),
         };
 
         // Recarrega os resultados com os novos filtros
