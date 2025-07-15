@@ -19,7 +19,7 @@ DATABASES = {
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
         'OPTIONS': {
-            'options': '-c search_path='+env('BASE_TESTE'),
+            'options': '-c search_path='+env('BASE_PROD'),
         },
     }
 }
@@ -27,8 +27,6 @@ DATABASES = {
 # STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Configurações adicionais para desenvolvimento (opcional)
 # STATIC_URL = '/static/'
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
-# STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
+# STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
