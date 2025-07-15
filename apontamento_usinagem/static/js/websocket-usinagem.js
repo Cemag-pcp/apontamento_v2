@@ -1,5 +1,7 @@
 import { carregarOrdensIniciadas, carregarOrdensAgProProcesso, carregarOrdensInterrompidas } from './ordem-criada-usinagem.js';
 
+//testes
+
 // const socket = new WebSocket(`ws://${window.location.host}/ws/ordens/iniciadas/`);
 const protocol = window.location.protocol === "https:" ? "wss" : "ws";
 const socket = new WebSocket(`${protocol}://${window.location.host}/ws/ordens/iniciadas/`);
