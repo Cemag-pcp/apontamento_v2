@@ -429,7 +429,7 @@ def get_ordens_criadas_duplicar_ordem(request):
 
     #  Define a Query Base
     ordens_queryset = (
-        Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2','laser_3'], duplicada=False)
+        Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2','laser_3'], duplicada=False, excluida=False)
         .prefetch_related('ordem_pecas_corte')  # Evita queries repetidas para peças
         .select_related('propriedade')  # Carrega a propriedade diretamente
         .order_by('-propriedade__aproveitamento')
@@ -554,6 +554,35 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)    
+
+def excluir_op_padrao(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+    
+    try:
+        # Parse do JSON do corpo da requisição
+        data = json.loads(request.body)
+        ordem_id = data.get('ordem_id')
+        
+        if not ordem_id:
+            return JsonResponse({'error': 'ordem_id não fornecido'}, status=400)
+        
+        # Busca a ordem no banco de dados
+        try:
+            ordem = Ordem.objects.get(pk=ordem_id)
+        except Ordem.DoesNotExist:
+            return JsonResponse({'error': 'Ordem não encontrada'}, status=404)
+        
+        # Marca como excluída e salva
+        ordem.excluida = True
+        ordem.save()
+        
+        return JsonResponse({'success': True, 'message': f'Ordem {ordem_id} marcada como excluída'})
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 def gerar_op_duplicada(request, pk_ordem):
 

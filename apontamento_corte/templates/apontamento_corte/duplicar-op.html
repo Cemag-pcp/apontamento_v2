@@ -157,6 +157,32 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalExcluirOrdem" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalExcluirOrdemLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title text-primary" id="modalExcluirOrdemLabel">
+                    <i class="bi bi-files me-2"></i>Excluir Ordem
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formExcluirOrdem">
+                <input type="hidden" name="ordemId" value="">
+                <div class="modal-body p-4">
+                    <p class="text-body"></p>
+                </div>
+                <div class="modal-footer">
+                    <button id="submitExcluirOrdem" type="submit" class="btn btn-danger d-flex align-items-center gap-2">
+                        <span class="spinner-border spinner-border-sm" style="display: none;"></span>
+                        <span role="status">Excluir OP</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
