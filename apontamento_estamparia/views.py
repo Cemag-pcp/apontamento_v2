@@ -78,6 +78,7 @@ def get_ordens_criadas(request):
     # Captura os parâmetros de filtro
     filtro_ordem = request.GET.get('ordem', '').strip()
     filtro_peca = request.GET.get('peca', '').strip()
+    filtro_maquina = request.GET.get('maquina', '').strip()
     status_atual = request.GET.get('status', '').strip()
     data_programada = request.GET.get('data-programada', '').strip()
 
@@ -103,6 +104,8 @@ def get_ordens_criadas(request):
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
     if filtro_peca:
         ordens_queryset = ordens_queryset.filter(peca_codigo=filtro_peca)
+    if filtro_maquina:
+        ordens_queryset = ordens_queryset.filter(maquina__nome=filtro_maquina.title())
     if status_atual:
         ordens_queryset = ordens_queryset.filter(status_atual=status_atual)
     if data_programada:
@@ -318,6 +321,7 @@ def get_ordens_iniciadas(request):
     limit = int(request.GET.get('limit', 10))
     filtro_ordem = request.GET.get('ordem', '').strip()
     filtro_peca = request.GET.get('peca', '').strip()
+    filtro_maquina = request.GET.get('maquina', '').strip()
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
@@ -325,6 +329,8 @@ def get_ordens_iniciadas(request):
         ordens_queryset = ordens_queryset.filter(
             ordem_pecas_estamparia__peca__codigo=filtro_peca
         )
+    if filtro_maquina:
+        ordens_queryset = ordens_queryset.filter(maquina__nome=filtro_maquina.title())
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
