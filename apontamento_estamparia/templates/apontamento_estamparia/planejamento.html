@@ -210,6 +210,15 @@
                                 <input type="text" class="form-control" id="filtro-peca" placeholder="Código ou nome da peça">
                             </div>
                         </div>
+                        <div class="col-md-2 mb-2">
+                            <label for="filtro-maquina" class="form-label">Máquina</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-gear"></i>
+                                </span>
+                                <input type="text" class="form-control" id="filtro-maquina" placeholder="Máquina">
+                            </div>
+                        </div>
                         <div class="col-md-3 mb-2">
                             <label for="filtro-status" class="form-label">Status</label>
                             <select class="form-select" id="filtro-status">
@@ -311,12 +320,22 @@
                     </div>
 
                     <div class="row mb-3 align-items-center">
+                        <!-- Peça -->
+                        <div class="col-md-6">
+                            <label class="form-label">Máquina:</label>
+                            <select class="form-select" id="maquinas-select" name="maquinaPlanejada" style="width: 100%;" required>
+                                <option value="" disabled selected>Selecione a Máquina</option>
+                            </select>
+                        </div>
                         <!-- Quantidade Planejada -->
                         <div class="col-md-6">
                             <label for="qtdPlanejada" class="form-label">Quantidade Planejada:</label>
                             <input type="number" class="form-control" id="qtdPlanejada" name="qtdPlanejada" min="1" placeholder="Digite a quantidade" required>
                         </div>
                         
+                    </div>
+
+                    <div class="row mb-3 align-items-center">
                         <!-- Observações -->
                         <div class="col-md-6">
                             <label for="observacoes" class="form-label">Observações:</label>

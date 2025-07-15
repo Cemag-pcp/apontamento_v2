@@ -7,7 +7,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] }); // Evita chamadas duplicadas
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}&data-programada=${filtros.data_programada || ''}`)
+        fetch(`api/ordens-criadas/?page=${page}&limit=${limit}&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&status=${filtros.status || ''}&maquina=${filtros.maquina || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -16,6 +16,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const card = document.createElement('div');
                         card.classList.add('col-md-4'); // Adiciona a classe de coluna
 
+                        console.log(ordem)
                         card.dataset.ordemId = ordem.id; // Adiciona o ID da ordem para referência
                         card.dataset.grupoPeca = ordem.grupo_peca || ''; // Adiciona o grupo máquina
                         card.dataset.obs = ordem.obs || ''; // Adiciona observações
@@ -93,6 +94,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">#${ordem.ordem} Criado em: ${ordem.data_criacao}</p>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao}</p>
+                                <p class="text-muted mb-2" style="font-size: 0.85rem;">Maquina: ${ordem.maquina}</p>
                                 <p class="mb-2">${ordem.obs || '<span class="text-muted">Sem observações</span>'}</p>
                             </div>
                             <div class="card-footer text-end" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
@@ -113,7 +115,9 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Iniciar", se existir
                         if (buttonIniciar) {
                             buttonIniciar.addEventListener('click', () => {
-                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina);
+                                console.log(ordem.maquina_id)
+                                console.log(ordem.maquina)
+                                mostrarModalIniciar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
                             });
                         }
 
@@ -239,7 +243,7 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
         cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
     });
 
-    fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`api/ordens-iniciadas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&maquina=${filtros.maquina || ''}`)
         .then(response => response.json())
         .then(data => {
 
@@ -362,7 +366,7 @@ export function carregarOrdensIniciadas(container, filtros = {}) {
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        atualizarStatusOrdem(ordem.id, ordem.grupo_maquina, 'finalizada');
+                        atualizarStatusOrdem(ordem.id, ordem.grupo_maquina, 'finalizada', ordem.maquina_id);
                     });
                 }
 
@@ -401,7 +405,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
     });
 
     // Fetch para buscar ordens interrompidas
-    fetch(`api/ordens-interrompidas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`api/ordens-interrompidas/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&maquina=${filtros.maquina || ''}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error('Erro ao buscar as ordens interrompidas.');
@@ -539,7 +543,7 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
         cardsAtuais[card.dataset.ordemId] = parseInt(card.dataset.ultimaAtualizacao || 0);
     });
 
-    fetch(`api/ordens-ag-prox-proc/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}`)
+    fetch(`api/ordens-ag-prox-proc/?page=1&limit=100&ordem=${filtros.ordem || ''}&peca=${filtros.peca || ''}&maquina=${filtros.maquina || ''}`)
         .then(response => response.json())
         .then(data => {
             let houveMudanca = false;
@@ -656,14 +660,49 @@ function carregarOrdensAgProProcesso(container, filtros = {}) {
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
 }
 
+function carregarMaquinasEstamparia() {
+    // Seleciona o elemento select (substitua '#maquinas-select' pelo seletor do seu elemento)
+    const selectMaquinas = document.querySelector('#maquinas-select');
+    
+    // Limpa opções existentes
+    selectMaquinas.innerHTML = '<option value="">Selecione uma máquina</option>';
+
+    // Faz a requisição para a API
+    fetch('/cadastro/api/buscar-maquinas/?setor=estamparia')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao carregar máquinas');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Para cada máquina retornada, cria uma option e adiciona ao select
+            data.maquinas.forEach(maquina => {
+                const option = document.createElement('option');
+                option.value = maquina.id;  // Usa o ID como value
+                option.textContent = maquina.nome;  // Usa o nome como texto exibido
+                selectMaquinas.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            // Adiciona uma opção de erro caso ocorra algum problema
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Erro ao cargar máquinas';
+            selectMaquinas.appendChild(option);
+        });
+}
+
+
 function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
 
-function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
+function atualizarStatusOrdem(ordemId, grupoMaquina, status, idMaquinaPlanejada) {
     switch (status) {
         case 'iniciada':
-            mostrarModalIniciar(ordemId, grupoMaquina);
+            mostrarModalIniciar(ordemId, grupoMaquina, idMaquinaPlanejada);
             break;
         case 'interrompida':
             mostrarModalInterromper(ordemId, grupoMaquina);
@@ -822,7 +861,7 @@ function mostrarModalRetornarOrdemIniciada(ordemId, container) {
 }
 
 // Modal para "Iniciar"
-function mostrarModalIniciar(ordemId, grupoMaquina) {
+function mostrarModalIniciar(ordemId, grupoMaquina, idMaquinaPlanejada) {
     const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
 
@@ -849,8 +888,13 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
             const option = document.createElement('option');
             option.value = maquina.id;
             option.textContent = maquina.nome;
+            if (maquina.id == idMaquinaPlanejada) {
+                option.selected = true;
+            }
             escolhaMaquina.appendChild(option);
         });
+
+        console.log(idMaquinaPlanejada)
 
         modalTitle.innerHTML = 'Escolha a máquina';
         modal.show();
@@ -1703,7 +1747,7 @@ async function handleSubmit(event) {
                 btnIniciar.replaceWith(btnIniciar.cloneNode(true));
                 document.querySelector('.btn-iniciar-planejar').addEventListener('click', function () {
                     modal.hide();
-                    mostrarModalIniciar(data.ordem_id, 'estamparia');
+                    mostrarModalIniciar(data.ordem_id, 'estamparia', data.maquina_id);
                 });
             }
 
@@ -1761,12 +1805,14 @@ function resetarCardsInicial(filtros = {}) {
     const filtroOrdem = document.getElementById('filtro-ordem');
     const filtroPeca = document.getElementById('filtro-peca');
     const filtroStatus = document.getElementById('filtro-status');
+    const filtroMaquina = document.getElementById('filtro-maquina');
     const filtroDataProgramada = document.getElementById('filtro-data-programada');
 
     const currentFiltros = {
         ordem: filtros.ordem || filtroOrdem.value.trim(),
         peca: filtros.peca || filtroPeca.value.trim(),
         status: filtros.status || filtroStatus.value.trim(),
+        maquina: filtros.maquina || filtroMaquina.value.trim(),
         data_programada: filtros.data_programada || filtroDataProgramada.value.trim(),
     };
 
@@ -1832,6 +1878,7 @@ function filtro() {
             ordem: document.getElementById('filtro-ordem').value.trim(),
             peca: document.getElementById('filtro-peca').value.trim(),
             status: document.getElementById('filtro-status').value.trim(),
+            maquina: document.getElementById('filtro-maquina').value.trim(),
         };
 
         // Recarrega os resultados com os novos filtros
@@ -1907,6 +1954,7 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarOrdensIniciadas(containerIniciado);
     carregarOrdensInterrompidas(containerInterrompido);
     carregarOrdensAgProProcesso(containerProxProcesso);
+    carregarMaquinasEstamparia();
 
     filtro();
     // inicializarAutoAtualizacaoOrdens();

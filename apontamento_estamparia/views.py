@@ -78,6 +78,7 @@ def get_ordens_criadas(request):
     # Captura os parâmetros de filtro
     filtro_ordem = request.GET.get('ordem', '').strip()
     filtro_peca = request.GET.get('peca', '').strip()
+    filtro_maquina = request.GET.get('maquina', '').strip()
     status_atual = request.GET.get('status', '').strip()
     data_programada = request.GET.get('data-programada', '').strip()
 
@@ -103,6 +104,8 @@ def get_ordens_criadas(request):
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
     if filtro_peca:
         ordens_queryset = ordens_queryset.filter(peca_codigo=filtro_peca)
+    if filtro_maquina:
+        ordens_queryset = ordens_queryset.filter(maquina__nome=filtro_maquina.title())
     if status_atual:
         ordens_queryset = ordens_queryset.filter(status_atual=status_atual)
     if data_programada:
@@ -113,7 +116,7 @@ def get_ordens_criadas(request):
     try:
         ordens_page = paginator.page(page)
     except EmptyPage:
-        return JsonResponse({'ordens': []})  # Retorna vazio se a página não existir
+        return JsonResponse({'ordens': []})
 
     # Monta os dados para a resposta
     data = []
@@ -124,6 +127,8 @@ def get_ordens_criadas(request):
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
+            'maquina': ordem.maquina.nome if ordem.maquina else "Sem máquina planejada",
+            'maquina_id': ordem.maquina.id if ordem.maquina else "Sem máquina planejada",
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'peca': {
@@ -316,6 +321,7 @@ def get_ordens_iniciadas(request):
     limit = int(request.GET.get('limit', 10))
     filtro_ordem = request.GET.get('ordem', '').strip()
     filtro_peca = request.GET.get('peca', '').strip()
+    filtro_maquina = request.GET.get('maquina', '').strip()
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
@@ -323,6 +329,8 @@ def get_ordens_iniciadas(request):
         ordens_queryset = ordens_queryset.filter(
             ordem_pecas_estamparia__peca__codigo=filtro_peca
         )
+    if filtro_maquina:
+        ordens_queryset = ordens_queryset.filter(maquina__nome=filtro_maquina.title())
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -547,10 +555,13 @@ def planejar_ordem_estamparia(request):
 
         with transaction.atomic():
 
+            maquina = Maquina.objects.filter(id=request.POST.get("maquinaPlanejada")).first()
+
             nova_ordem = Ordem.objects.create(
                 obs=request.POST.get('observacoes'),
                 grupo_maquina='estamparia',
-                data_programacao=request.POST.get("dataProgramacao")
+                data_programacao=request.POST.get("dataProgramacao"),
+                maquina=maquina
             )
 
             PecasOrdem.objects.create(
@@ -561,7 +572,8 @@ def planejar_ordem_estamparia(request):
 
         return JsonResponse({
             'message': 'Status atualizado com sucesso.',
-            'ordem_id': nova_ordem.pk
+            'ordem_id': nova_ordem.pk,
+            'maquina_id': maquina.id
         })
 
 def api_apontamentos_peca(request):
