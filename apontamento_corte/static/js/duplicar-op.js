@@ -52,7 +52,8 @@ function atualizarTabela(ordens) {
             <td>${ordem.propriedade?.descricao_mp || '-'}</td>
             <td>${ordem.propriedade?.aproveitamento || '-'}</td>
             <td>
-                <button class="btn-ver-pecas btn btn-sm btn-primary" data-id="${ordem.id}">Ver Peças</button>
+                <button class="btn-ver-pecas btn btn-sm btn-primary m-1" data-id="${ordem.id}">Ver Peças</button>
+                <button class="btn-excluir-op btn btn-sm btn-danger m-1" data-id="${ordem.id}" data-ordem="${ordem.ordem}">Excluir OP</button>
             </td>
         `;
 
@@ -207,6 +208,31 @@ function configurarBotaoVerPecas() {
     });
 }
 
+function configurarBotaoExcluirOp() {
+    document.addEventListener('click', function (event) {
+        if (event.target.classList.contains('btn-excluir-op')) {
+            const ordem = event.target.getAttribute('data-ordem'); 
+            const ordemId = event.target.getAttribute('data-id');
+            const textModal = document.querySelector('.text-body');
+            const formExcluir = document.getElementById('formExcluirOrdem');
+            const modal = new bootstrap.Modal(document.getElementById('modalExcluirOrdem'));
+
+            // Adiciona um campo hidden ao formulário com o ID da ordem
+            let idInput = formExcluir.querySelector('input[name="ordemId"]');
+            if (!idInput) {
+                idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'ordemId';
+                formExcluir.appendChild(idInput);
+            }
+            idInput.value = ordemId;
+
+            textModal.textContent = `Tem certeza que deseja excluir a ordem de número ${ordem}?`;
+            modal.show();
+        }
+    });
+}
+
 //  Preenche o modal com informações da duplicação
 function preencherModalDuplicacao(data,ordemId) {
     const bodyDuplicarOrdem = document.getElementById('bodyDuplicarOrdem');
@@ -349,6 +375,54 @@ function atualizarQuantidadePecas(quantidadeOriginalChapas, novaQuantidadeChapas
     }
 }
 
+function excluirOrdem() {
+    document.getElementById('formExcluirOrdem').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Obtém o botão de submit e o spinner
+        const submitBtn = document.getElementById('submitExcluirOrdem');
+        const spinner = submitBtn.querySelector('.spinner-border-sm');
+        const btnText = submitBtn.querySelector('[role="status"]');
+        
+        // Desabilita o botão e mostra o spinner
+        submitBtn.disabled = true;
+        spinner.style.display = 'inline-block';
+        btnText.textContent = 'Excluindo...';
+        
+        const formData = new FormData(this);
+        const ordemId = formData.get('ordemId');
+        
+        fetch('/corte/api/excluir-op-padrao/', {
+            method: 'POST',
+            body: JSON.stringify({ ordem_id: ordemId }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken() 
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            const bootstrapModal = bootstrap.Modal.getInstance(document.getElementById('modalExcluirOrdem'));
+            bootstrapModal.hide();
+            carregarTabela(1);
+        })
+        .catch(error => {
+            console.error('Erro ao excluir ordem:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: error,
+            });
+        })
+        .finally(() => {
+            // Reabilita o botão e esconde o spinner, independente de sucesso ou falha
+            submitBtn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.textContent = 'Excluir OP';
+        });
+    });
+}
+
 function duplicarOrdem() {
     const formDuplicarOrdem = document.getElementById('formDuplicarOrdem');
 
@@ -457,6 +531,9 @@ function getCSRFToken() {
 //  Configuração inicial ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
     configurarSelect2Pecas();
+    configurarBotaoExcluirOp();
+    excluirOrdem();
+
     configurarBotaoVerPecas();
     duplicarOrdem();
 
