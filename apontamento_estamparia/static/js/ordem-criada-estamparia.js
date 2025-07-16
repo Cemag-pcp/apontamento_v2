@@ -1970,7 +1970,7 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarOrdensIniciadas(containerIniciado);
     carregarOrdensInterrompidas(containerInterrompido);
     carregarOrdensAgProProcesso(containerProxProcesso);
-    carregarMaquinasEstamparia(['#maquinas-select', '#filtro-maquina']);
+    carregarMaquinasEstamparia(['#maquinas-select', '#filtro-maquina']); // Lista de selects que receberao maquinas
 
     filtro();
     // inicializarAutoAtualizacaoOrdens();
