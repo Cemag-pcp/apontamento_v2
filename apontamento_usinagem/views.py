@@ -20,6 +20,8 @@ import tempfile
 import re
 import json
 
+from apontamento_usinagem.utils import notificar_ordem
+
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
 
@@ -262,6 +264,7 @@ def atualizar_status_ordem(request):
                     )
 
                 ordem.save()
+                notificar_ordem(ordem)  # dispara o websocket
 
                 return JsonResponse({
                     'message': 'Status atualizado com sucesso.',
