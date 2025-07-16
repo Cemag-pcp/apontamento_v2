@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     'apontamento_solda',
     'cargas',
     'storages',
+
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -69,6 +71,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'apontamento_v2.wsgi.application'
+ASGI_APPLICATION = 'apontamento_v2.asgi.application'
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -141,6 +144,6 @@ CHANNEL_LAYERS = {
 }
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
+SECURE_SSL_REDIRECT = True # False para dev
+SESSION_COOKIE_SECURE = True # False para dev
+CSRF_COOKIE_SECURE = True # False para dev
