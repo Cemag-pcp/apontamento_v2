@@ -38,8 +38,6 @@ INSTALLED_APPS = [
     'storages',
 
     'channels',
-
-    'django_extensions',
 ]
 
 MIDDLEWARE = [
