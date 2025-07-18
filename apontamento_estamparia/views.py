@@ -15,6 +15,7 @@ from cadastro.models import MotivoInterrupcao, Pecas, Operador, MotivoMaquinaPar
 from inspecao.models import Inspecao, DadosExecucaoInspecao
 from .utils_dashboard import *
 from apontamento_serra.utils import formatar_timedelta
+from core.utils import notificar_ordem
 
 from datetime import datetime, timedelta
 import os
@@ -293,6 +294,7 @@ def atualizar_status_ordem(request):
                 )
 
             ordem.save()
+            notificar_ordem(ordem)
 
             return JsonResponse({
                 'message': 'Status atualizado com sucesso.',

@@ -41,10 +41,14 @@ google_credentials_json={
             "token_uri":os.environ.get('token_uri'),
         }
 
+if "\\n" in google_credentials_json["private_key"]:
+    google_credentials_json["private_key"] = google_credentials_json["private_key"].replace("\\n", "\n")
+
 scope = ['https://www.googleapis.com/auth/spreadsheets',
          "https://www.googleapis.com/auth/drive"]
 
-google_credentials_json["private_key"] = google_credentials_json["private_key"].replace("\\n", "\n")
+# google_credentials_json["private_key"] = google_credentials_json["private_key"].replace("\\n", "\n")
+# google_credentials_json["private_key"] = google_credentials_json["private_key"]#.replace(" ", "\n")
 
 credentials = service_account.Credentials.from_service_account_info(google_credentials_json, scopes=scope)
 

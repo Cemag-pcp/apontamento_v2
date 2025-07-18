@@ -20,7 +20,7 @@ import tempfile
 import re
 import json
 
-from apontamento_usinagem.utils import notificar_ordem
+from core.utils import notificar_ordem
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')

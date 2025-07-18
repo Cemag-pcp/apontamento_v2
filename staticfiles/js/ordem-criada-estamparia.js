@@ -534,7 +534,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
         });
 };
 
-function carregarOrdensAgProProcesso(container, filtros = {}) {
+export function carregarOrdensAgProProcesso(container, filtros = {}) {
     
     // 1. Armazena snapshot atual
     const cardsAtuais = {};
@@ -1970,7 +1970,11 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarOrdensIniciadas(containerIniciado);
     carregarOrdensInterrompidas(containerInterrompido);
     carregarOrdensAgProProcesso(containerProxProcesso);
+<<<<<<< HEAD
     carregarMaquinasEstamparia(['#maquinas-select', '#filtro-maquina']); // Lista de selects que receberao maquinas
+=======
+    carregarMaquinasEstamparia(['#maquinas-select', '#filtro-maquina']);
+>>>>>>> dev
 
     filtro();
     // inicializarAutoAtualizacaoOrdens();
