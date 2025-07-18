@@ -659,14 +659,19 @@ export function carregarOrdensAgProProcesso(container, filtros = {}) {
         .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
 }
 
-function carregarMaquinasEstamparia() {
-    // Seleciona o elemento select (substitua '#maquinas-select' pelo seletor do seu elemento)
-    const selectMaquinas = document.querySelector('#maquinas-select');
+function carregarMaquinasEstamparia(selectIds) {
+    // Se nenhum ID for passado, usa um array vazio
+    const ids = Array.isArray(selectIds) ? selectIds : [];
     
-    // Limpa opções existentes
-    selectMaquinas.innerHTML = '<option value="">Selecione uma máquina</option>';
+    // Se nenhum ID foi passado, procura por um select com id padrão
+    if (ids.length === 0) {
+        const defaultSelect = document.querySelector('#maquinas-select');
+        if (defaultSelect) {
+            ids.push('#maquinas-select');
+        }
+    }
 
-    // Faz a requisição para a API
+    // Faz a requisição para a API apenas uma vez
     fetch('/cadastro/api/buscar-maquinas/?setor=estamparia')
         .then(response => {
             if (!response.ok) {
@@ -675,23 +680,35 @@ function carregarMaquinasEstamparia() {
             return response.json();
         })
         .then(data => {
-            // Para cada máquina retornada, cria uma option e adiciona ao select
-            data.maquinas.forEach(maquina => {
-                const option = document.createElement('option');
-                option.value = maquina.id;  // Usa o ID como value
-                option.textContent = maquina.nome;  // Usa o nome como texto exibido
-                selectMaquinas.appendChild(option);
+            // Para cada ID na lista, atualiza o select correspondente
+            ids.forEach(id => {
+                const select = document.querySelector(id);
+                if (select) {
+                    // Limpa opções existentes
+                    select.innerHTML = '<option value="">Selecione uma máquina</option>';
+
+                    // Adiciona as novas opções
+                    data.maquinas.forEach(maquina => {
+                        const option = document.createElement('option');
+                        option.value = maquina.id;
+                        option.textContent = maquina.nome;
+                        select.appendChild(option);
+                    });
+                }
             });
         })
         .catch(error => {
             console.error('Erro:', error);
-            // Adiciona uma opção de erro caso ocorra algum problema
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'Erro ao cargar máquinas';
-            selectMaquinas.appendChild(option);
+            // Adiciona uma opção de erro em todos os selects
+            ids.forEach(id => {
+                const select = document.querySelector(id);
+                if (select) {
+                    select.innerHTML = '<option value="">Erro ao carregar máquinas</option>';
+                }
+            });
         });
 }
+
 
 
 function getCSRFToken() {
@@ -1953,7 +1970,7 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarOrdensIniciadas(containerIniciado);
     carregarOrdensInterrompidas(containerInterrompido);
     carregarOrdensAgProProcesso(containerProxProcesso);
-    carregarMaquinasEstamparia();
+    carregarMaquinasEstamparia(['#maquinas-select', '#filtro-maquina']);
 
     filtro();
     // inicializarAutoAtualizacaoOrdens();
