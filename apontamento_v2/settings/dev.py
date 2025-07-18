@@ -5,7 +5,8 @@ DEBUG = env.bool('DEBUG', default=True)
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost','apontamento-v2-testes.onrender.com', '192.168.3.3']
 CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
-    'http://127.0.0.1',
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
     'https://apontamento-v2-testes.onrender.com',
     'https://91a4-177-19-132-134.ngrok-free.app'
 ]
@@ -19,7 +20,7 @@ DATABASES = {
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
         'OPTIONS': {
-            'options': '-c search_path='+env('BASE_PROD'),
+            'options': '-c search_path='+env('BASE_TESTE'),
         },
     }
 }
@@ -32,3 +33,7 @@ STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False

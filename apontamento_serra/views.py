@@ -16,6 +16,7 @@ from core.models import OrdemProcesso,PropriedadesOrdem,Ordem,MaquinaParada, Pro
 from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operador, Setor, MotivoMaquinaParada, Maquina
 from apontamento_usinagem.utils import criar_ordem_usinagem, verificar_se_existe_ordem
 from .utils import hora_operacao_maquina, hora_parada_maquina, formatar_timedelta, ordem_por_maquina, producao_por_maquina
+from core.utils import notificar_ordem
 
 import os
 import re
@@ -216,6 +217,7 @@ def atualizar_status_ordem(request):
                     ordem.status_prioridade = 2
             
                 ordem.save()
+                notificar_ordem(ordem)
 
                 return JsonResponse({
                     'message': 'Status atualizado com sucesso.',

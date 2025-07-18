@@ -1,6 +1,9 @@
 from pathlib import Path
 import os
 import environ
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -35,10 +38,14 @@ INSTALLED_APPS = [
     'storages',
 
     'channels',
+
+    'django_extensions',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # 'whitenoise.middleware.WhiteNoiseMiddleware', # temporario em dev
+
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -142,8 +149,3 @@ CHANNEL_LAYERS = {
         },
     },
 }
-
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = True # False para dev
-SESSION_COOKIE_SECURE = True # False para dev
-CSRF_COOKIE_SECURE = True # False para dev

@@ -217,10 +217,10 @@ function iniciarContador(ordemId, dataCriacao) {
 }
 
 export function carregarOrdensIniciadas(container) {
-    container.innerHTML = `
-    <div class="spinner-border text-dark" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>`;
+    // container.innerHTML = `
+    // <div class="spinner-border text-dark" role="status">
+    //     <span class="sr-only">Loading...</span>
+    // </div>`;
 
     fetch('api/ordens-iniciadas/?page=1&limit=100')
         .then(response => response.json())
@@ -335,10 +335,10 @@ export function carregarOrdensIniciadas(container) {
 }
 
 export function carregarOrdensInterrompidas(container) {
-    container.innerHTML = `
-    <div class="spinner-border text-dark" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>`;
+    // container.innerHTML = `
+    // <div class="spinner-border text-dark" role="status">
+    //     <span class="sr-only">Loading...</span>
+    // </div>`;
     
     // Fetch para buscar ordens interrompidas
     fetch('api/ordens-interrompidas/?page=1&limit=100')

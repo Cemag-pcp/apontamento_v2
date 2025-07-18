@@ -17,6 +17,7 @@ from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, Mot
 from .utils import *
 from .utils_dashboard import *
 from apontamento_serra.utils import formatar_timedelta
+from core.utils import notificar_ordem
 
 import pandas as pd
 import os
@@ -244,6 +245,7 @@ def atualizar_status_ordem(request):
                     ordem.status_prioridade = 2
 
                 ordem.save()
+                notificar_ordem(ordem)
 
                 return JsonResponse({
                     'message': 'Status atualizado com sucesso.',

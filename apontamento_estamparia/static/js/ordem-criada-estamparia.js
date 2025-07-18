@@ -534,7 +534,7 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
         });
 };
 
-function carregarOrdensAgProProcesso(container, filtros = {}) {
+export function carregarOrdensAgProProcesso(container, filtros = {}) {
     
     // 1. Armazena snapshot atual
     const cardsAtuais = {};
