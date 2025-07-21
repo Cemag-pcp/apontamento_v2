@@ -20,7 +20,7 @@ DATABASES = {
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
         'OPTIONS': {
-            'options': '-c search_path='+env('BASE_TESTE'),
+            'options': '-c search_path='+env('BASE_PROD'),
         },
     }
 }
@@ -37,3 +37,5 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
+
+# daphne -b 127.0.0.1 -p 8000 apontamento_v2.asgi:application
