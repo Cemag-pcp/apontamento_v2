@@ -17,6 +17,7 @@ function enviarDadosInspecao() {
     formData.append('pecasProduzidas', document.getElementById('pecasProduzidas').value);
     formData.append('inspetor', document.getElementById('inspetor').value);
     formData.append('numPecaDefeituosa', document.getElementById('numPecaDefeituosa').value);
+    formData.append('autoInspecaoNoturna', document.getElementById('autoInspecaoNoturna').checked);
     formData.append('inspecao_total', document.getElementById('inspecao_total').value);
 
     // Coletando causas de peças mortas
