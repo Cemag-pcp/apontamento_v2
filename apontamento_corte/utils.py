@@ -54,8 +54,11 @@ def padronizar_medida_laser_2(s):
 
 def tratamento_planilha_plasma(df):
 
+    # df = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xls')
+
     df = df.dropna(how='all')
 
+    tempo_estimado_total = df['Unnamed: 16'][38]
     tamanho_chapa = df[df.columns[24:25]][9:10].values.tolist()[0][0].replace('×', 'x')
     qt_chapa = df[df.columns[2:3]][9:10]
 
@@ -149,11 +152,16 @@ def tratamento_planilha_plasma(df):
         'espessura':espessura,
         'quantidade':qt_chapa_list[0][0],
         'aproveitamento':aproveitamento_list[0],
+        'tempo_estimado_total': tempo_estimado_total
     }]
 
     return df, propriedades
 
 def tratamento_planilha_laser2(df,df2,df3):
+
+    df = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx')
+    df2 = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx', sheet_name='AllPartsList')
+    df3 = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx', sheet_name='Cost List')
 
     tamanho_chapa = df['Unnamed: 2'][6].replace(".",",").replace("*","×") + " mm"
     qt_chapa = df['Unnamed: 3'][6:len(df)-1].sum()
@@ -165,6 +173,9 @@ def tratamento_planilha_laser2(df,df2,df3):
     tamanho_chapa_real = df3['Unnamed: 4'][index_tamanho_chapa_real + 1]
     tamanho_chapa_real = tamanho_chapa_real.replace(".",",").replace("*","×") + " mm"
     tamanho_chapa_real = padronizar_medida_laser_2(tamanho_chapa_real)
+
+    # buscar tempo estimado total
+    tempo_estimado_total = df3['Unnamed: 9'][2]
 
     df2.columns = df2.iloc[0]
     df2 = df2[1:].reset_index(drop=True)
@@ -208,6 +219,7 @@ def tratamento_planilha_laser2(df,df2,df3):
         'espessura':espessura_df,
         'quantidade':qt_chapa,
         'aproveitamento':aproveitamento_df,
+        'tempo_estimado_total': tempo_estimado_total
     }]
 
     return df2, propriedades
@@ -216,6 +228,8 @@ def tratamento_planilha_laser1(df,df2,comprimento,largura,espessura):
 
     df = df.dropna(how='all')            
     df2 = df2.dropna(how='all')            
+
+    tempo_estimado_total = df2['Unnamed: 3'][18]
 
     qt_chapas = df2[df2.columns[2:3]][3:4]
     qt_chapas_list = qt_chapas.values.tolist()[0][0]
@@ -266,6 +280,7 @@ def tratamento_planilha_laser1(df,df2,comprimento,largura,espessura):
         'espessura':espessura,
         'quantidade':qt_chapas_list,
         'aproveitamento':aprov_list,
+        'tempo_estimado_total': tempo_estimado_total
     }]
 
     return df, propriedades

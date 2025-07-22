@@ -228,7 +228,7 @@ export function fetchOrdensSequenciadasLaser() {
                             <strong>Chapa:</strong> ${ordem.descricao_mp} ${ordem.tipo_chapa}
                         </p></small>
                         <small><p class="card-text mb-1">
-                            <strong>Qt. chapa:</strong> ${ordem.quantidade}
+                            <strong>Qt. chapa:</strong> ${ordem.quantidade} | <strong>Tempo estimado:</strong> ${ordem.tempo_estimado}
                         </p></small>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center">
@@ -396,7 +396,7 @@ export function fetchOrdensSequenciadasPlasma() {
                             <strong>Chapa:</strong> ${ordem.descricao_mp} ${ordem.tipo_chapa}
                         </p></small>
                         <small><p class="card-text mb-1">
-                            <strong>Qt. chapa:</strong> ${ordem.quantidade}
+                            <strong>Qt. chapa:</strong> ${ordem.quantidade} | <strong>Tempo estimado:</strong> ${ordem.tempo_estimado}
                         </p></small>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center">
