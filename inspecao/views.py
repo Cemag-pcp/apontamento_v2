@@ -4492,3 +4492,7 @@ def imagens_nao_conformidade_tubos_cilindros(request):
             })
             
     return JsonResponse(resultado, safe=False)
+
+def inspecao_serra_usinagem(request):
+
+    return render(request, 'inspecao_serra_usinagem.html')

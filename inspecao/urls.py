@@ -67,6 +67,7 @@ urlpatterns += [
     path('conjuntos-inspecionados/', views.conjuntos_inspecionados_montagem, name='conjuntos-inspecionados-montagem'),
     path('estamparia/', views.inspecao_estamparia, name='inspecao-estamparia'),
     path('pintura/', views.inspecao_pintura, name='inspecao-pintura'),
+    path('serra-usinagem/', views.inspecao_serra_usinagem, name='inspecao-serra-usinagem'),
     path('tubos-cilindros/', views.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),
     path('dashboard/pintura/', views.dashboard_pintura, name='dasdashboard_pinturahboard'),
     path('dashboard/montagem/', views.dashboard_montagem, name='dasdashboard_montagemhboard'),
