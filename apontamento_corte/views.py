@@ -1144,7 +1144,6 @@ class SalvarArquivoView(View):
 
         return JsonResponse({'message': 'Dados salvos com sucesso!'})
     
-
 #### dashboard
 
 def dashboard(request):

@@ -38,7 +38,7 @@
                             <!-- Seleção de Máquina -->
                             <div class="col-md-4">
                                 <label for="maquinaSelect" class="form-label">Selecione a máquina:</label>
-                                <select id="maquinaSelect" class="form-select" required>
+                                <select id="maquinaSelect" class="form-select">
                                     <option value="">Selecione uma máquina</option>
                                     <option value="Viradeira 1" selected>Viradeira 1</option>
                                     <option value="Viradeira 2">Viradeira 2</option>
@@ -88,6 +88,58 @@
                     <p class="mt-2">Carregando dados...</p>
                 </div>
                 
+                <!-- Cards big numbers -->
+                
+                <!-- 
+                Total de peças produzidas
+                Tempo total de produção
+                Tempo total de parada
+                Tempo total ocioso
+                Total de ordens finalizadas
+                -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Total de Peças Produzidas</h5>
+                                <p id="totalPecas" class="card-text">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Tempo Total de Produção</h5>
+                                <p id="tempoProducao" class="card-text">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Tempo Total de Parada</h5>
+                                <p id="tempoParada" class="card-text">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Tempo Total Ocioso</h5>
+                                <p id="tempoOcioso" class="card-text">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mt-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Total de Ordens Finalizadas</h5>
+                                <p id="totalOrdens" class="card-text">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Gráficos -->
                 <div class="row">
                     <div class="col-12">

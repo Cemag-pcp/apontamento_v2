@@ -30,3 +30,11 @@ urlpatterns = [
     path('api/buscar-maquinas-disponiveis/', views.get_maquinas_disponiveis, name='buscar_maquinas_disponiveis'),
 
 ]
+
+#consulta de peças
+urlpatterns += [
+    path('home-pecas/', views.consulta_pecas, name='consulta_pecas'),
+    path('api/consulta-carreta/', views.consulta_carretas, name='consulta_carretas'),
+    path('api/consulta-conjunto/', views.consulta_conjunto, name='consulta_conjunto'),
+    path('api/consulta-peca/', views.mostrar_pecas_completa, name='mostrar_pecas_completa'),
+]

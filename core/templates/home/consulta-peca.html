@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Consultar peças</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/consulta-pecas.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-search me-2"></i>
+                Consulta de Peças
+            </h1>
+            
+            <!-- Seção de Filtros -->
+            <div class="form-section">
+                <h5 class="mb-3">
+                    <i class="fas fa-filter me-2"></i>
+                    Filtros de Consulta
+                </h5>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="carretaInput" class="form-label">
+                            <i class="fas fa-truck me-1"></i>
+                            Carreta
+                        </label>
+                        <div class="autocomplete-container">
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="carretaInput" placeholder="Digite para buscar carretas..." autocomplete="off">
+                                <div class="loading position-absolute top-50 end-0 translate-middle-y me-3" id="carretaLoading">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                        <span class="visually-hidden">Carregando...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="autocomplete-dropdown" id="carretaDropdown"></div>
+                            <!-- <div class="selected-item" id="carretaSelected">
+                                <div class="item-info">
+                                    <span class="item-code" id="carretaSelectedCode"></span>
+                                    <span class="item-description" id="carretaSelectedDesc"></span>
+                                </div>
+                                <span class="remove-btn" id="carretaRemove">
+                                    <i class="fas fa-times"></i>
+                                </span>
+                            </div> -->
+                            <input type="hidden" id="carretaId" value="">
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="conjuntoInput" class="form-label">
+                            <i class="fas fa-cogs me-1"></i>
+                            Conjunto
+                        </label>
+                        <div class="autocomplete-container">
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="conjuntoInput" placeholder="Primeiro selecione uma carreta..." disabled autocomplete="off">
+                                <div class="loading position-absolute top-50 end-0 translate-middle-y me-3" id="conjuntoLoading">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                        <span class="visually-hidden">Carregando...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="autocomplete-dropdown" id="conjuntoDropdown"></div>
+                            <!-- <div class="selected-item" id="conjuntoSelected">
+                                <div class="item-info">
+                                    <span class="item-code" id="conjuntoSelectedCode"></span>
+                                    <span class="item-description" id="conjuntoSelectedDesc"></span>
+                                </div>
+                                <span class="remove-btn" id="conjuntoRemove">
+                                    <i class="fas fa-times"></i>
+                                </span>
+                            </div> -->
+                            <input type="hidden" id="conjuntoId" value="">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12 text-end">
+                        <button class="btn btn-primary me-2" id="consultarBtn" disabled>
+                            <i class="fas fa-search me-1"></i>
+                            Consultar
+                        </button>
+                        <button class="btn btn-secondary" id="limparBtn">
+                            <i class="fas fa-eraser me-1"></i>
+                            Limpar
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Seção de Resultados -->
+            <div class="results-section">
+                <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table me-2"></i>
+                    </h5>
+                    <!-- <button class="btn btn-success no-print" id="imprimirBtn" disabled>
+                        <i class="fas fa-print me-1"></i>
+                        Imprimir
+                    </button> -->
+                </div>
+                
+                <div class="table-container">
+                    <div class="loading text-center p-4" id="tabelaLoading">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando dados...</span>
+                        </div>
+                        <p class="mt-2 mb-0">Carregando dados da consulta...</p>
+                    </div>
+                    
+                    <div class="empty-state" id="emptyState">
+                        <i class="fas fa-inbox"></i>
+                        <h6>Nenhum resultado encontrado</h6>
+                        <p class="mb-0">Selecione os filtros acima e clique em "Consultar" para visualizar os dados.</p>
+                    </div>
+                    
+                    <table class="table table-striped table-hover mb-0" id="resultadosTable" style="display: none;">
+                        <thead>
+                            <tr>
+                                <th scope="col">Desenho</th>
+                                <th scope="col">Peça</th>
+                                <th scope="col">Mp</th>
+                                <th scope="col">Qt. peças</th>
+                                <th scope="col">Conjunto</th>
+                                <th scope="col">1º Processo</th>
+                                <th scope="col">2º Processo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultadosBody">
+                            <!-- Dados serão inseridos aqui via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+        
+{% block scripts %}
+<script type="module" src="{% static 'js/script_consulta_pecas.js' %}"></script>
+{% endblock %}

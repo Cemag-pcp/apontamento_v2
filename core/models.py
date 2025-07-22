@@ -105,6 +105,9 @@ class Ordem(models.Model):
     data_carga = models.DateField(null=True, blank=True)
     cor = models.CharField(max_length=50, blank=True, null=True) # Cinza, Vermelho, Amarelo...
 
+    #Tempo estimado da ordem (apenas para corte)
+    tempo_estimado = models.CharField(max_length=20, blank=True, null=True)  # Exemplo: "00:30:00" (HH:MM:SS)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['ordem', 'maquina'], name='unique_ordem_processo')
