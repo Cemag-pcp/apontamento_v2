@@ -14,7 +14,12 @@ def hora_operacao_maquina(maquina_param, data_inicio, data_fim):
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
-    sql = """
+    if not maquina_param == '':
+        maquina_where = 'AND cm.nome = %(maquina_param)s'
+    else:
+        maquina_where = ''
+
+    sql = f"""
         WITH parametros AS (
         SELECT
             (%(data_inicio)s::date) AT TIME ZONE 'America/Fortaleza' AS start_ts,
@@ -33,7 +38,7 @@ def hora_operacao_maquina(maquina_param, data_inicio, data_fim):
                 AND co.status = 'iniciada'
                 AND COALESCE(co.data_fim, NOW()) >= p.start_ts
                 AND co.data_inicio < p.end_ts_exclusive
-                AND cm.nome = %(maquina_param)s
+                {maquina_where}
         ),
         dias AS (
             SELECT
@@ -152,7 +157,12 @@ def hora_parada_maquina(maquina_param, data_inicio, data_fim):
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
-    sql = """
+    if not maquina_param == '':
+        maquina_where = 'AND cm2.nome = %(maquina_param)s'
+    else:
+        maquina_where = ''
+
+    sql = f"""
         WITH parametros AS (
             SELECT
                 (%(data_inicio)s::date) AT TIME ZONE 'America/Fortaleza' AS start_ts,
@@ -165,8 +175,12 @@ def hora_parada_maquina(maquina_param, data_inicio, data_fim):
                     COALESCE(cm.data_fim, NOW()) AS data_fim
                 FROM apontamento_v2.core_maquinaparada cm
                 LEFT JOIN apontamento_v2.cadastro_maquina cm2 ON cm2.id = cm.maquina_id
+                left join apontamento_v2.cadastro_setor cs on cs.id = cm2.setor_id
                 CROSS JOIN parametros p
-                WHERE cm2.nome = %(maquina_param)s and cm.data_inicio >= p.start_ts AND COALESCE(cm.data_fim, NOW()) < p.end_ts_exclusive
+                WHERE cm.data_inicio >= p.start_ts
+                AND COALESCE(cm.data_fim, NOW()) < p.end_ts_exclusive
+                AND cs.nome = 'estamparia'
+                {maquina_where}                
             ),
             dias AS (
                 SELECT
@@ -370,3 +384,4 @@ def producao_por_maquina(data_inicio, data_fim):
         })
 
     return registros
+

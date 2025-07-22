@@ -145,3 +145,17 @@ class PecasEstanqueidade(models.Model):
 
     def __str__(self):
         return f'{self.codigo} - {self.descricao}'
+
+class CarretasExplodidas(models.Model):
+
+    codigo_peca = models.CharField(max_length=250, blank=True, null=True)
+    descricao_peca = models.CharField(max_length=255, blank=True, null=True)
+    mp_peca = models.CharField(max_length=255, blank=True, null=True)
+    total_peca = models.CharField(max_length=10, blank=True, null=True)
+    conjunto_peca = models.CharField(max_length=255, blank=True, null=True)
+    primeiro_processo = models.CharField(max_length=255, blank=True, null=True)
+    segundo_processo = models.CharField(max_length=255, blank=True, null=True)
+    carreta = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f'{self.descricao_peca}'

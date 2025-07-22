@@ -12,9 +12,10 @@ from django.db import transaction
 from django.db.models import Prefetch, Count
 from django.contrib.auth.models import User
 from django.contrib import messages
+from django.views.decorators.http import require_GET
 
 from .models import Ordem, Versao
-from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina
+from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina,CarretasExplodidas
 from core.models import Ordem,MaquinaParada,OrdemProcesso,Profile,RotaAcesso
 
 import json
@@ -500,3 +501,80 @@ def retornar_processo(request):
             {'status': 'error', 'message': str(e)}, 
             status=500
         )
+
+#Consultas de peças
+
+def consulta_pecas(request):
+    
+    "Redirecionar para a tela de consultas de peça"
+
+    return render(request, 'home/consulta-peca.html')
+
+@require_GET
+def consulta_carretas(request):
+    """
+    Retorna sugestões de carretas com base em um caractere digitado.
+    Exemplo de uso: /api/consulta-carretas/?q=car
+    """
+
+    termo = request.GET.get('q', '').strip()
+
+    if not termo:
+        return JsonResponse({'carretas': []})
+
+    carretas = (
+        CarretasExplodidas.objects
+        .filter(carreta__icontains=termo)
+        .values_list('carreta', flat=True)
+        .distinct()
+    )
+
+    return JsonResponse({'carretas': list(carretas)})
+
+@require_GET
+def consulta_conjunto(request):
+    """
+    Retorna sugestões de conjuntos com base na carreta selecionada e nos caracteres digitados.
+    Exemplo de uso: /api/consulta-conjuntos/?carreta=F4&q=PLAT
+    """
+
+    caractere = request.GET.get('q', '').strip()
+    carreta = request.GET.get('carreta', '').strip()
+
+    if not carreta:
+        return JsonResponse({'conjuntos': []})
+
+    queryset = CarretasExplodidas.objects.filter(carreta=carreta)
+
+    if caractere:
+        queryset = queryset.filter(conjunto_peca__icontains=caractere)
+
+    conjuntos = (
+        queryset
+        .values_list('conjunto_peca', flat=True)
+        .distinct()
+    )
+
+    return JsonResponse({'conjuntos': list(conjuntos)})
+
+@require_GET
+def mostrar_pecas_completa(request):
+    
+    """
+    Retorna as peças completas de uma carreta e conjunto específicos.
+    Exemplo de uso: /api/pecas-completa/?carreta=carreta1&conjunto=conjunto1
+    """
+
+    conjunto = request.GET.get('conjunto', '').strip()
+    carreta = request.GET.get('carreta', '').strip()
+
+    if not carreta or not conjunto:
+        return JsonResponse({'error': 'Carreta ou conjunto não fornecido'}, status=400)
+
+    pecas = (
+        CarretasExplodidas.objects
+        .filter(carreta=carreta, conjunto_peca=conjunto, primeiro_processo__in=['CORTAR', 'SERRAR', 'C USINAR'])
+        .values('descricao_peca','mp_peca','total_peca','conjunto_peca','primeiro_processo','segundo_processo')
+    )
+
+    return JsonResponse({'pecas': list(pecas)})
