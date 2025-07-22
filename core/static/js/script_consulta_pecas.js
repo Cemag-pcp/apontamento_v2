@@ -28,7 +28,7 @@ const conjuntoId = document.getElementById('conjuntoId');
 // Outros elementos DOM
 const consultarBtn = document.getElementById('consultarBtn');
 const limparBtn = document.getElementById('limparBtn');
-const imprimirBtn = document.getElementById('imprimirBtn');
+// const imprimirBtn = document.getElementById('imprimirBtn');
 const tabelaLoading = document.getElementById('tabelaLoading');
 const emptyState = document.getElementById('emptyState');
 const resultadosTable = document.getElementById('resultadosTable');
@@ -245,42 +245,42 @@ async function carregarDados() {
         // Mostrar tabela e atualizar contador
         resultadosTable.style.display = 'table';
         // totalRegistros.textContent = `${dados.length} registro${dados.length !== 1 ? 's' : ''}`;
-        imprimirBtn.disabled = false;
+        // imprimirBtn.disabled = false;
     } else {
         // Mostrar estado vazio
         emptyState.style.display = 'block';
         // totalRegistros.textContent = '0 registros';
-        imprimirBtn.disabled = true;
+        // imprimirBtn.disabled = true;
     }
 }
 
 // Função de impressão
-function imprimir() {
-    const carretaTexto = `${carretaInput.textContent}`;
-    const conjuntoTexto = `${conjuntoInput.textContent}`;
+// function imprimir() {
+//     const carretaTexto = `${carretaInput.textContent}`;
+//     const conjuntoTexto = `${conjuntoInput.textContent}`;
     
-    // Criar cabeçalho para impressão
-    const printHeader = document.createElement('div');
-    printHeader.innerHTML = `
-        <div style="text-align: center; margin-bottom: 20px;">
-            <h2>Relatório de Peças</h2>
-            <p><strong>Carreta:</strong> ${carretaTexto}</p>
-            <p><strong>Conjunto:</strong> ${conjuntoTexto}</p>
-            <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
-        </div>
-    `;
+//     // Criar cabeçalho para impressão
+//     const printHeader = document.createElement('div');
+//     printHeader.innerHTML = `
+//         <div style="text-align: center; margin-bottom: 20px;">
+//             <h2>Relatório de Peças</h2>
+//             <p><strong>Carreta:</strong> ${carretaTexto}</p>
+//             <p><strong>Conjunto:</strong> ${conjuntoTexto}</p>
+//             <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+//         </div>
+//     `;
     
-    // Inserir cabeçalho temporariamente
-    document.body.insertBefore(printHeader, document.body.firstChild);
+//     // Inserir cabeçalho temporariamente
+//     document.body.insertBefore(printHeader, document.body.firstChild);
     
-    // Imprimir
-    window.print();
+//     // Imprimir
+//     window.print();
     
-    // Remover cabeçalho após impressão
-    setTimeout(() => {
-        document.body.removeChild(printHeader);
-    }, 1000);
-}
+//     // Remover cabeçalho após impressão
+//     setTimeout(() => {
+//         document.body.removeChild(printHeader);
+//     }, 1000);
+// }
 
 // Função para limpar formulário
 function limparFormulario() {
@@ -290,7 +290,7 @@ function limparFormulario() {
     resultadosTable.style.display = 'none';
     emptyState.style.display = 'block';
     // totalRegistros.textContent = '0 registros';
-    imprimirBtn.disabled = true;
+    // imprimirBtn.disabled = true;
 }
 
 // Fechar dropdowns quando clicar fora
@@ -363,7 +363,7 @@ conjuntoInput.addEventListener('focus', function () {
 // Event listeners para botões
 consultarBtn.addEventListener('click', carregarDados);
 limparBtn.addEventListener('click', limparFormulario);
-imprimirBtn.addEventListener('click', imprimir);
+// imprimirBtn.addEventListener('click', imprimir);
 
 // Navegação pelo teclado nos dropdowns
 function handleKeyNavigation(event, dropdown, items) {
