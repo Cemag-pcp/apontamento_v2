@@ -159,9 +159,9 @@ def tratamento_planilha_plasma(df):
 
 def tratamento_planilha_laser2(df,df2,df3):
 
-    df = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx')
-    df2 = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx', sheet_name='AllPartsList')
-    df3 = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx', sheet_name='Cost List')
+    # df = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx')
+    # df2 = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx', sheet_name='AllPartsList')
+    # df3 = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx', sheet_name='Cost List')
 
     tamanho_chapa = df['Unnamed: 2'][6].replace(".",",").replace("*","×") + " mm"
     qt_chapa = df['Unnamed: 3'][6:len(df)-1].sum()
