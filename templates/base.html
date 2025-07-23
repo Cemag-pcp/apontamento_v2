@@ -77,6 +77,9 @@
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:consulta_pecas' %}">Consultar peças</a>
                                 </nav>
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'core:acessos' %}">Acessos</a>
+                                </nav>
                             </div>
 
                             <div class="sb-sidenav-menu-heading">Cargas</div>
@@ -103,7 +106,7 @@
                                 Sucata
                             </a>
 
-                            <div class="sb-sidenav-menu-heading">Setor</div>
+                            <div class="sb-sidenav-menu-heading">Apontamentos</div>
                             
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseUsinagem" aria-expanded="false" aria-controls="collapseUsinagem">
                                 <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
@@ -207,78 +210,104 @@
                                 </nav>
                             </div>
 
+                            
+                            <div class="sb-sidenav-menu-heading">Inspeção</div>
+
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseInspecao" aria-expanded="false" aria-controls="collapseInspecao">
                                 <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Inspeção
+                                Inspeção por setor
                                 <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
                             </a>
-                                <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:inspecao-pintura' %}">Pintura</a>
-                                    </nav>
-                                </div>
-                                <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:inspecao-estamparia' %}">Estamparia</a>
-                                    </nav>
-                                </div>
-                                <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:inspecao-montagem' %}">Montagem</a>
-                                    </nav>
-                                </div>
-                                <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:conjuntos-inspecionados-montagem' %}">Conjuntos inpecionados - Montagem</a>
-                                    </nav>
-                                </div>
+                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:inspecao-pintura' %}">Pintura</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:inspecao-estamparia' %}">Estamparia</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:inspecao-montagem' %}">Montagem</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:conjuntos-inspecionados-montagem' %}">Conjuntos inpecionados - Montagem</a>
+                                </nav>
+                            </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseInspecaoEstanqueidade" aria-expanded="false" aria-controls="collapseInspecao">
                                 <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
                                 Inspeção Estanqueidade
                                 <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
                             </a>
-                                <div class="collapse" id="collapseInspecaoEstanqueidade" aria-labelledby="headingInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:inspecao-tanque' %}">Tanque</a>
-                                    </nav>
-                                </div>
-                                <div class="collapse" id="collapseInspecaoEstanqueidade" aria-labelledby="headingInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:inspecao-tubos-cilindros' %}">Tubos e Cilindros</a>
-                                    </nav>
-                                </div>
+                            <div class="collapse" id="collapseInspecaoEstanqueidade" aria-labelledby="headingInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:inspecao-tanque' %}">Tanque</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseInspecaoEstanqueidade" aria-labelledby="headingInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:inspecao-tubos-cilindros' %}">Tubos e Cilindros</a>
+                                </nav>
+                            </div>
+
+                            <div class="sb-sidenav-menu-heading">Dashboard</div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseDashboadInspecao" aria-expanded="false" aria-controls="collapseInspecao">
                                 <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
                                 Dashboard Inspeção
                                 <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
                             </a>
-                                <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:dasdashboard_pinturahboard' %}">Pintura</a>
-                                    </nav>
-                                </div>
-                                <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:dasdashboard_montagemhboard' %}">Montagem</a>
-                                    </nav>
-                                </div>
-                                <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:dasdashboard_estampariahboard' %}">Estamparia</a>
-                                    </nav>
-                                </div>
-                                <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:dashboard-tanque' %}">Tanque</a>
-                                    </nav>
-                                </div>
-                                <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="{% url 'inspecao:dashboard-tubos-cilindros' %}">Tubos e Cilindros</a>
-                                    </nav>
-                                </div>
+                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:dasdashboard_pinturahboard' %}">Pintura</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:dasdashboard_montagemhboard' %}">Montagem</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:dasdashboard_estampariahboard' %}">Estamparia</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:dashboard-tanque' %}">Tanque</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:dashboard-tubos-cilindros' %}">Tubos e Cilindros</a>
+                                </nav>
+                            </div>
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseDashboadProducao" aria-expanded="false" aria-controls="collapseProducao">
+                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
+                                Dashboard Produção
+                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            </a>
+                            <div class="collapse" id="collapseDashboadProducao" aria-labelledby="headingDashboadProducao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'corte:dashboard' %}">Corte</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseDashboadProducao" aria-labelledby="headingDashboadProducao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'estamparia:dashboard' %}">Estamparia</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseDashboadProducao" aria-labelledby="headingDashboadProducao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'serra:dashboard' %}">Serra</a>
+                                </nav>
+                            </div>
+
                         </div>
                     </div>
                     <div class="sb-sidenav-footer">
