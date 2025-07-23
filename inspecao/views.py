@@ -1311,10 +1311,14 @@ def inspecionar_estamparia(request):
                 DadosExecucaoInspecao, inspecao=inspecao
             )
             inspecao_completa = request.POST.get("inspecao_total")  # campo boleano
+            auto_inspecao_noturna = request.POST.get("autoInspecaoNoturna")
+
+            print(auto_inspecao_noturna)
 
             new_info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.create(
                 dados_exec_inspecao=dados_exec_inspecao,
                 inspecao_completa=True if inspecao_completa == "sim" else False,
+                autoinspecao_noturna=True if auto_inspecao_noturna == "true" else False,
                 qtd_mortas=numPecaDefeituosa if numPecaDefeituosa > 0 else 0,
             )
 
