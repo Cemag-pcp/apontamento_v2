@@ -21,6 +21,7 @@ class InfoAdicionaisInspecaoEstamparia(models.Model):
 
     dados_exec_inspecao = models.ForeignKey(DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False)
     inspecao_completa = models.BooleanField(default=False)
+    autoinspecao_noturna = models.BooleanField(default=False)
     qtd_mortas = models.IntegerField(default=0, null=False, blank=False)
     motivo_mortas = models.ManyToManyField(Causas, related_name='motivo_morta_estamparia', blank=True)
     ficha = models.ImageField(upload_to='ficha_estamparia/', null=True, blank=True)
