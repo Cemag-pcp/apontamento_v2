@@ -639,7 +639,8 @@ def gerar_op_duplicada(request, pk_ordem):
                 maquina=maquina_ordem,
                 obs=obs_duplicar,
                 status_atual='aguardando_iniciar',
-                data_programacao=data_programacao
+                data_programacao=data_programacao,
+                tempo_estimado=ordem_original.tempo_estimado,
             )
 
             # Duplica as propriedades associadas
