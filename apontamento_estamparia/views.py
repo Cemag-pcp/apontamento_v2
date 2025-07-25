@@ -99,7 +99,7 @@ def get_ordens_criadas(request):
         peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
         peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
         peca_quantidade=Subquery(primeira_peca.values('qtd_planejada'))
-    ).order_by('status_prioridade')#.exclude(status_atual='finalizada')
+    ).order_by('status_prioridade', '-ultima_atualizacao')#.exclude(status_atual='finalizada')
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
