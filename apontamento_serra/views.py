@@ -83,7 +83,7 @@ def get_pecas_ordem(request, pk_ordem, name_maquina):
         ]
 
         # Retorna as propriedades e as peças como JSON
-        return JsonResponse({'pecas': pecas, 'propriedades': propriedades})
+        return JsonResponse({'pecas': pecas, 'propriedades': propriedades, 'ordem_status': ordem.status_atual})
 
     except Ordem.DoesNotExist:
         # Retorna erro caso a ordem não seja encontrada
@@ -581,7 +581,17 @@ def criar_ordem(request):
         except Exception as e:
             # Captura erros genéricos
             return JsonResponse({'status': 'error', 'message': 'Erro ao criar a ordem', 'details': str(e)}, status=500)
-        
+
+def adicionar_pecas_ordem(request):
+
+    if request.method == 'POST':
+
+        data = json.loads(request.body)
+
+        print(data)
+
+        return JsonResponse({'data': data})
+
 @csrf_exempt
 def importar_ordens_serra(request):
     if request.method == "POST":
