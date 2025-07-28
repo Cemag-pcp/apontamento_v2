@@ -19,7 +19,7 @@ document.getElementById("confirmar-exclusao").addEventListener("click", function
         }
     });
     
-    const url = new URL(`/inspecao/api/delete-execucao`, window.location.origin);
+    const url = new URL(`/inspecao/api/delete-execucao/`, window.location.origin);
     url.searchParams.append('idDadosExecucao', idDadosExecucao);
     url.searchParams.append('idInspecao', idInspecao);
     url.searchParams.append('primeiraExecucao', primeiraExecucao);

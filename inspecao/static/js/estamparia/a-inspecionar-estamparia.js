@@ -159,7 +159,10 @@ function buscarItensInspecao(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                    <div class='d-flex justify-content-between'>
+                        <h5> ${item.peca}</h5>
+                        <span style="color:gray;font-weight:bold;">${item.status}</span>
+                    </div>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data:</strong> ${item.data}<br>
@@ -184,7 +187,6 @@ function buscarItensInspecao(pagina) {
             // Chamar modal ao clicar em "Iniciar Inspecao"
             document.querySelectorAll('.iniciar-inspecao').forEach(button => {
                 button.addEventListener('click', function () {
-
                     // Capturar dados do botão
                     const itemId = this.getAttribute('data-id');
                     const itemData = this.getAttribute('data-data');
@@ -218,8 +220,78 @@ function buscarItensInspecao(pagina) {
 
                     controlarLinhasTabela();
 
-                    // Mostrar o modal
                     new bootstrap.Modal(modalInspecao).show();
+        
+                    // Fazer requisição para verificar medidas de estamparia
+                    fetch(`/inspecao/api/medidas-estamparia/${itemId}/`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Erro na requisição');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            // Verificar se existem medidas retornadas
+                            if (data.has_measures && data.medidas && data.medidas.length > 0) {
+                                // Limpar todas as linhas primeiro
+                                for (let i = 1; i <= 3; i++) {
+                                    for (let j = 1; j <= 4; j++) {
+                                        document.getElementById(`valor${i}_${j}`).value = '';
+                                    }
+                                    // Resetar radios de conformidade
+                                    document.getElementById(`conforming${i}`).checked = true;
+                                }
+                                
+                                // Preencher cada linha com as medidas correspondentes
+                                data.medidas.forEach((medida, index) => {
+                                    const row = index + 1; // Linhas começam em 1
+                                    
+                                    // Verifica se a linha existe antes de preencher
+                                    if (row <= 3) {
+                                        document.getElementById(`valor${row}_1`).value = medida.medida_a || '';
+                                        document.getElementById(`valor${row}_2`).value = medida.medida_b || '';
+                                        document.getElementById(`valor${row}_3`).value = medida.medida_c || '';
+                                        document.getElementById(`valor${row}_4`).value = medida.medida_d || '';
+                                        
+                                        // Se quiser preencher os cabeçalhos (opcional)
+                                        if (row === 1) {
+                                            const headers = document.querySelectorAll('thead th');
+                                            if (medida.cabecalho_medida_a) headers[0].textContent = medida.cabecalho_medida_a;
+                                            if (medida.cabecalho_medida_b) headers[1].textContent = medida.cabecalho_medida_b;
+                                            if (medida.cabecalho_medida_c) headers[2].textContent = medida.cabecalho_medida_c;
+                                            if (medida.cabecalho_medida_d) headers[3].textContent = medida.cabecalho_medida_d;
+                                        }
+                                    }
+                                });
+                                
+                                // Opcional: desabilitar campos se a inspeção estiver completa
+                                if (data.inspecao_completa) {
+                                    const inputs = document.querySelectorAll('input[type="number"], input[type="radio"]');
+                                    inputs.forEach(input => {
+                                        input.disabled = true;
+                                    });
+                                }
+                                
+                                console.log(`${data.total_medidas} medidas carregadas com sucesso`);
+                            } else {
+                                console.log('Nenhuma medida encontrada para esta inspeção');
+                                // Limpar todos os campos
+                                for (let i = 1; i <= 3; i++) {
+                                    for (let j = 1; j <= 4; j++) {
+                                        document.getElementById(`valor${i}_${j}`).value = '';
+                                    }
+                                }
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Erro ao buscar medidas:', error);
+                            // Limpar todos os campos em caso de erro
+                            for (let i = 1; i <= 3; i++) {
+                                for (let j = 1; j <= 4; j++) {
+                                    document.getElementById(`valor${i}_${j}`).value = '';
+                                }
+                            }
+                        });
                 });
             });
         });
@@ -736,24 +808,24 @@ function validarFormulario() {
         }
 
         // Verificar se a linha obrigatória não está preenchida corretamente
-        if (i <= linhasObrigatorias && !linhaPreenchida) {
-            Toast.fire({
-                icon: "error",
-                title: `Por favor, preencha pelo menos um campo e marque conformidade na linha ${i} da tabela de medições técnicas.`
-            });
+        // if (i <= linhasObrigatorias && !linhaPreenchida) {
+        //     Toast.fire({
+        //         icon: "error",
+        //         title: `Por favor, preencha pelo menos um campo e marque conformidade na linha ${i} da tabela de medições técnicas.`
+        //     });
 
-            return false;
-        }
+        //     return false;
+        // }
     }
 
     // Verifica se o número de linhas preenchidas é suficiente
-    if (linhasPreenchidas < linhasObrigatorias) {
-        Toast.fire({
-            icon: "error",
-            title: `Por favor, preencha pelo menos ${linhasObrigatorias} linha(s) da tabela de medições técnicas.`
-        });
-        return false;
-    }
+    // if (linhasPreenchidas < linhasObrigatorias) {
+    //     Toast.fire({
+    //         icon: "error",
+    //         title: `Por favor, preencha pelo menos ${linhasObrigatorias} linha(s) da tabela de medições técnicas.`
+    //     });
+    //     return false;
+    // }
 
     // 3. Validação inspeção 100%
     const inspecao_total = document.getElementById("inspecao_total").value;

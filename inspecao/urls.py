@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/itens-inspecao-estamparia/', views.get_itens_inspecao_estamparia, name='itens-inspecao-estamparia'),
     path('api/itens-inspecionados-estamparia/', views.get_itens_inspecionados_estamparia, name='itens-inspecionados-estamparia'),
     path('api/itens-reinspecao-estamparia/', views.get_itens_reinspecao_estamparia, name='itens-reinspecao-estamparia'),
+    path('api/medidas-estamparia/<int:inspecao_id>/', views.medidas_estamparia, name="itens-medidas-estamparia"),
 
     path('api/envio-inspecao-estamparia/', views.inspecionar_estamparia, name='inspecionar_estamparia'),
     path('api/envio-reinspecao-estamparia/', views.envio_reinspecao_estamparia, name='envio_reinspecao_estamparia'),

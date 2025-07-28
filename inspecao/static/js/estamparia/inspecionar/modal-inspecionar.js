@@ -184,7 +184,6 @@ function buscarItensInspecao(pagina) {
             // Chamar modal ao clicar em "Iniciar Inspecao"
             document.querySelectorAll('.iniciar-inspecao').forEach(button => {
                 button.addEventListener('click', function () {
-
                     // Capturar dados do botão
                     const itemId = this.getAttribute('data-id');
                     const itemData = this.getAttribute('data-data');
@@ -217,6 +216,46 @@ function buscarItensInspecao(pagina) {
                     modalInspecao.querySelector('#numPecaDefeituosa').setAttribute("max", itemQtd);
 
                     controlarLinhasTabela();
+
+                    // Fazer requisição para verificar medidas de estamparia
+                    fetch(`/inspecao/api/medidas-estamparia/${itemId}/`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Erro na requisição');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            // Verificar se existem medidas retornadas
+                            if (data && (data.medida_a !== null || data.medida_b !== null || 
+                                        data.medida_c !== null || data.medida_d !== null)) {
+                                // Preencher os campos de medidas no modal, se existirem
+                                if (data.cabecalho_medida_a && data.medida_a !== null) {
+                                    const medidaAInput = document.createElement('input');
+                                    medidaAInput.type = 'number';
+                                    medidaAInput.className = 'form-control';
+                                    medidaAInput.value = data.medida_a;
+                                    medidaAInput.readOnly = true;
+                                    
+                                    const labelA = document.createElement('label');
+                                    labelA.textContent = data.cabecalho_medida_a;
+                                    
+                                    // Adicionar ao modal (ajuste conforme sua estrutura HTML)
+                                    document.getElementById('medidas-container').appendChild(labelA);
+                                    document.getElementById('medidas-container').appendChild(medidaAInput);
+                                }
+                                
+                                // Repetir para outras medidas (B, C, D) conforme necessário
+                                // ...
+                                
+                                console.log('Medidas carregadas:', data);
+                            } else {
+                                console.log('Nenhuma medida encontrada para esta inspeção');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Erro ao buscar medidas:', error);
+                        });
 
                     // Mostrar o modal
                     new bootstrap.Modal(modalInspecao).show();

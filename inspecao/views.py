@@ -8,7 +8,9 @@ from django.db.models import (
 from django.db import transaction
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models.functions import Concat, Cast, TruncMonth, ExtractYear, ExtractMonth
+from django.db.models.functions import (
+    Concat, Cast, TruncMonth, ExtractYear, ExtractMonth, Least, Coalesce
+)
 from django.db import connection
 
 from cadastro.models import PecasEstanqueidade
@@ -40,6 +42,7 @@ from apontamento_estamparia.models import (
 from datetime import datetime, timedelta
 from collections import defaultdict
 import json
+from django.core.exceptions import ObjectDoesNotExist
 
 def motivos_causas(request, setor):
 
@@ -1260,6 +1263,10 @@ def inspecionar_estamparia(request):
         dataInspecao = request.POST.get("dataInspecao")
         pecasProduzidas = int(request.POST.get("pecasProduzidas"))
         inspetor = request.POST.get("inspetor")
+        medidas_raw = request.POST.get("medidas")
+        medidas = json.loads(medidas_raw) if medidas_raw else []
+        print(len(medidas))
+        print(f"MEDIDAS: {medidas}")
         numPecaDefeituosa = (
             int(request.POST.get("numPecaDefeituosa", None))
             if request.POST.get("numPecaDefeituosa", None)
@@ -1291,7 +1298,7 @@ def inspecionar_estamparia(request):
             total_pecas_afetadas += quantidade  # Acumula a quantidade afetada
 
         # model: DadosExecucaoInspecao
-        tamanho_amostra = min(3, pecasProduzidas - numPecaDefeituosa)
+        tamanho_amostra = min(len(medidas), pecasProduzidas - numPecaDefeituosa)
 
         nao_conformidade = total_pecas_afetadas  # soma de todas não conformidade, não considera peças mortas
 
@@ -1334,8 +1341,7 @@ def inspecionar_estamparia(request):
             )
 
             # Dicionários para armazenar os valores dinamicamente
-            medidas_raw = request.POST.get("medidas")
-            medidas = json.loads(medidas_raw) if medidas_raw else []
+
 
             for linha in medidas:
                 campos = {
@@ -1442,102 +1448,217 @@ def inspecionar_estamparia(request):
     return JsonResponse({"success": True, "message": "Inspeção realizada com sucesso!"})
 
 
+def medidas_estamparia(request, inspecao_id):
+    try:
+        # Busca a inspeção e verifica se pertence à estamparia
+        inspecao = Inspecao.objects.get(id=inspecao_id, pecas_ordem_estamparia__isnull=False)
+        
+        # Busca a última execução de inspeção
+        execucao_inspecao = DadosExecucaoInspecao.objects.filter(
+            inspecao=inspecao
+        ).order_by('-num_execucao').first()
+        
+        if not execucao_inspecao:
+            return JsonResponse({
+                'message': 'Nenhuma execução de inspeção encontrada para este item',
+                'has_execution': False
+            }, status=200)
+        
+        # Busca informações adicionais da estamparia
+        info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.filter(
+            dados_exec_inspecao=execucao_inspecao
+        ).first()
+        
+        if not info_adicionais:
+            return JsonResponse({
+                'message': 'Nenhuma informação adicional encontrada',
+                'has_execution': True,
+                'has_additional_info': False
+            }, status=200)
+        
+        # Busca TODAS as medidas relacionadas (não apenas a primeira)
+        medidas = MedidasInspecaoEstamparia.objects.filter(
+            informacoes_adicionais_estamparia=info_adicionais
+        ).order_by('id')  # Ordena por ID ou por outro campo relevante
+        
+        if not medidas.exists():
+            return JsonResponse({
+                'message': 'Nenhuma medida encontrada para esta inspeção',
+                'has_execution': True,
+                'has_additional_info': True,
+                'has_measures': False
+            }, status=200)
+        
+        # Monta o response com todas as medidas encontradas
+        medidas_data = []
+        for medida in medidas:
+            medidas_data.append({
+                'cabecalho_medida_a': medida.cabecalho_medida_a,
+                'medida_a': medida.medida_a,
+                'cabecalho_medida_b': medida.cabecalho_medida_b,
+                'medida_b': medida.medida_b,
+                'cabecalho_medida_c': medida.cabecalho_medida_c,
+                'medida_c': medida.medida_c,
+                'cabecalho_medida_d': medida.cabecalho_medida_d,
+                'medida_d': medida.medida_d,
+                'medida_id': medida.id  # Adiciona ID para referência
+            })
+        
+        response_data = {
+            'has_execution': True,
+            'has_additional_info': True,
+            'has_measures': True,
+            'medidas': medidas_data,  # Lista de todas as medidas
+            'inspecao_completa': info_adicionais.inspecao_completa,
+            'autoinspecao_noturna': info_adicionais.autoinspecao_noturna,
+            'qtd_mortas': info_adicionais.qtd_mortas,
+            'total_medidas': len(medidas_data)  # Quantidade total de medidas
+        }
+
+        print(response_data)
+        
+        return JsonResponse(response_data, status=200)
+        
+    except ObjectDoesNotExist:
+        return JsonResponse({
+            'error': 'Inspeção não encontrada ou não pertence à estamparia',
+            'found': False
+        }, status=404)
+    
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'message': 'Ocorreu um erro ao processar a requisição'
+        }, status=500)
+
 def get_itens_inspecao_estamparia(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    inspecoes_ids = set(
-        DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
+    # Primeiro obtemos todas as inspeções que já foram executadas com os totais
+    inspecoes_executadas = (
+        DadosExecucaoInspecao.objects
+        .filter(inspecao__pecas_ordem_estamparia__isnull=False)
+        .values("inspecao")
+        .annotate(
+            total_inspecionado=Sum(
+                F('conformidade') + F('nao_conformidade'),
+                output_field=IntegerField()
+            )
+        )
     )
 
-    # Captura os parâmetros enviados na URL
-    maquinas_filtradas = (
-        request.GET.get("maquinas", "").split(",")
-        if request.GET.get("maquinas")
-        else []
-    )
-    data_filtrada = request.GET.get("data", None)
-    pesquisa_filtrada = request.GET.get("pesquisar", None)
-    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
-    itens_por_pagina = 12  # Itens por página
-
-    # Filtra os dados
-    datas = Inspecao.objects.filter(pecas_ordem_estamparia__isnull=False).exclude(
-        id__in=inspecoes_ids
+    # Subquery para obter a qtd_boa
+    qtd_boa_subquery = (
+        Inspecao.objects
+        .filter(id=OuterRef('inspecao'))
+        .values('pecas_ordem_estamparia__qtd_boa')[:1]
     )
 
-    quantidade_total = datas.count()  # Total de itens sem filtro
+    # Anotamos com a qtd_boa e calculamos a amostra requerida
+    inspecoes_com_info = (
+        inspecoes_executadas
+        .annotate(
+            qtd_boa=Coalesce(Subquery(qtd_boa_subquery), 0, output_field=FloatField()),
+            amostra_requerida=Least(3, F('qtd_boa'), output_field=IntegerField())
+        )
+    )
+
+    # Criamos um dicionário com as informações necessárias
+    inspecoes_dict = {
+        item['inspecao']: {
+            'total_inspecionado': item['total_inspecionado'],
+            'amostra_requerida': item['amostra_requerida']
+        }
+        for item in inspecoes_com_info
+    }
+
+    # IDs das inspeções completas (que já atingiram a amostra requerida)
+    inspecoes_completas_ids = [
+        k for k, v in inspecoes_dict.items()
+        if v['total_inspecionado'] >= v['amostra_requerida']
+    ]
+
+    # Query principal com todas as condições
+    datas = (
+        Inspecao.objects
+        .filter(pecas_ordem_estamparia__isnull=False)
+        .exclude(id__in=inspecoes_completas_ids)
+        .select_related(
+            "pecas_ordem_estamparia",
+            "pecas_ordem_estamparia__ordem",
+            "pecas_ordem_estamparia__operador",
+            "pecas_ordem_estamparia__peca",
+            "pecas_ordem_estamparia__ordem__maquina"
+        )
+    )
+
+    # Aplicação dos filtros
+    maquinas_filtradas = request.GET.get("maquinas", "").split(",") if request.GET.get("maquinas") else []
+    data_filtrada = request.GET.get("data")
+    pesquisa_filtrada = request.GET.get("pesquisar")
+    pagina = int(request.GET.get("pagina", 1))
+    itens_por_pagina = 12
+
+    quantidade_total = datas.count()
 
     if maquinas_filtradas:
-        datas = datas.filter(
-            pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas
-        )
-
+        datas = datas.filter(pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas)
+    
     if data_filtrada:
         datas = datas.filter(data_inspecao__date=data_filtrada)
-
+    
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
-        datas = datas.filter(
-            pecas_ordem_estamparia__peca__codigo__icontains=pesquisa_filtrada
-        )
+        datas = datas.filter(pecas_ordem_estamparia__peca__codigo__icontains=pesquisa_filtrada)
 
-    datas = datas.select_related(
-        "pecas_ordem_estamparia",
-        "pecas_ordem_estamparia__ordem",
-        "pecas_ordem_estamparia__operador",
-    ).order_by("-id")
+    total_filtrado = datas.count()
 
     # Paginação
-    paginador = Paginator(datas, itens_por_pagina)
+    paginador = Paginator(datas.order_by("-id"), itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
+    # Construção dos dados de resposta
     dados = []
     for data in pagina_obj:
-        data_ajustada = data.data_inspecao - timedelta(hours=3)
+        peca_ordem = data.pecas_ordem_estamparia
+        operador = peca_ordem.operador
+        peca = peca_ordem.peca
+        ordem = peca_ordem.ordem
+        
         matricula_nome_operador = None
+        if operador:
+            matricula_nome_operador = f"{operador.matricula} - {operador.nome}"
 
-        if data.pecas_ordem_estamparia.operador:
-            matricula_nome_operador = f"{data.pecas_ordem_estamparia.operador.matricula} - {data.pecas_ordem_estamparia.operador.nome}"
-
-        # Operador
-        if data.pecas_ordem_estamparia.operador:
-            matricula_nome_operador = f"{data.pecas_ordem_estamparia.operador.matricula} - {data.pecas_ordem_estamparia.operador.nome}"
-
-        # Peça
         peca_info = ""
-        if data.pecas_ordem_estamparia.peca:
-            peca_info = f"{data.pecas_ordem_estamparia.peca.codigo} - {data.pecas_ordem_estamparia.peca.descricao}"
+        if peca:
+            peca_info = f"{peca.codigo} - {peca.descricao}"
 
-        # Máquina
-        maquina_nome = None
-        if (
-            data.pecas_ordem_estamparia.ordem
-            and data.pecas_ordem_estamparia.ordem.maquina
-        ):
-            maquina_nome = data.pecas_ordem_estamparia.ordem.maquina.nome
+        maquina_nome = ordem.maquina.nome if ordem and ordem.maquina else None
 
-        item = {
+        # Determina o status
+        status = "Não iniciada"
+        if data.id in inspecoes_dict:
+            info = inspecoes_dict[data.id]
+            status = f"Incompleta ({info['total_inspecionado']}/{info['amostra_requerida']})"
+
+        dados.append({
             "id": data.id,
-            "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+            "data": (data.data_inspecao - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S"),
             "peca": peca_info,
             "maquina": maquina_nome,
-            "qtd_apontada": data.pecas_ordem_estamparia.qtd_boa,
+            "qtd_apontada": peca_ordem.qtd_boa,
             "operador": matricula_nome_operador,
-        }
+            "status": status
+        })
 
-        dados.append(item)
-
-    return JsonResponse(
-        {
-            "dados": dados,
-            "total": quantidade_total,
-            "total_filtrado": paginador.count,  # Total de itens após filtro
-            "pagina_atual": pagina_obj.number,
-            "total_paginas": paginador.num_pages,
-        },
-        status=200,
-    )
+    return JsonResponse({
+        "dados": dados,
+        "total": quantidade_total,
+        "total_filtrado": total_filtrado,
+        "pagina_atual": pagina_obj.number,
+        "total_paginas": paginador.num_pages,
+    }, status=200)
 
 
 def get_itens_reinspecao_estamparia(request):
