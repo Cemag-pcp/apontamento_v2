@@ -132,7 +132,7 @@
             <div class="col-md-12">
                 <h4 class="text-center text-secondary">Processos em Andamento</h4>
                 <div class="border rounded p-3 bg-light">
-                    <div id="cambao-container" class="row g-3" style="max-height: 800px; overflow-y: auto;">
+                    <div id="cambao-container" class="row g-3 cambao-container" style="max-height: 800px; overflow-y: auto;">
                         <!-- Os cambões serão adicionados dinamicamente aqui -->
                     </div>
                 </div>
@@ -312,5 +312,6 @@
 {% block scripts %}
 <script type="module" src="{% static 'js/ordem-criada-pintura.js' %}"></script>
 <script type="module" src="{% static 'js/ordem-fora-sequenciamento-pintura.js' %}"></script>
+<script type="module" src="{% static 'js/websocket-pintura.js' %}"></script>
 {% endblock %}
 

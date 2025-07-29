@@ -1881,12 +1881,12 @@ document.getElementById("confirmarCriacaoCambao").addEventListener("click", () =
     });
 });
 
-async function cambaoProcesso() {
+export async function cambaoProcesso() {
     const cambaoContainer = document.getElementById("cambao-container");
-    cambaoContainer.innerHTML = `
-    <div class="spinner-border text-dark" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>`;
+    // cambaoContainer.innerHTML = `
+    // <div class="spinner-border text-dark" role="status">
+    //     <span class="sr-only">Loading...</span>
+    // </div>`;
     
     try {
         const response = await fetch("api/cambao-processo/");

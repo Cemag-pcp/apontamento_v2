@@ -19,6 +19,7 @@ from .models import PecasOrdem, CambaoPecas, Cambao
 from core.models import Ordem
 from cadastro.models import Operador, Conjuntos
 from inspecao.models import Inspecao
+from core.utils import notificar_ordem
 
 def planejamento(request):
     return render(request, "apontamento_pintura/planejamento.html")
@@ -324,7 +325,8 @@ def adicionar_pecas_cambao(request):
                 # Atualizar status do cambão para "em uso"
                 cambao.status = "em uso"
                 cambao.save()
-
+                notificar_ordem(peca_ordem.ordem)
+                
             return JsonResponse(
                 {"success": True, "message": "Peças adicionadas ao cambão com sucesso!"}
             )
@@ -407,16 +409,23 @@ def listar_conjuntos(request):
 
 @csrf_exempt
 def finalizar_cambao(request):
+    
     """
+    
     Finaliza um cambão, registrando as peças e liberando para novo uso.
+    
     """
 
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-
+            
+            cambao_nome = data.get('cambao_nome')
             cambao_id = data.get("cambao_id")
             operador_id = data.get("operador")
+
+            if cambao_nome:
+                cambao_id = Cambao.objects.filter(nome=cambao_nome).values_list('id', flat=True).first()
 
             if not cambao_id:
                 return JsonResponse(
@@ -497,6 +506,8 @@ def finalizar_cambao(request):
                 cambao.cor = ''  # Limpa a cor do cambão
                 cambao.data_fim = now()
                 cambao.save()
+                # ordem = Ordem.objects.get(pk=ordem_id)
+                notificar_ordem(peca_ordem_original.ordem)
 
             return JsonResponse(
                 {
@@ -1237,4 +1248,3 @@ def api_tempos(request):
         })
 
     return JsonResponse(final_results, safe=False)
-
