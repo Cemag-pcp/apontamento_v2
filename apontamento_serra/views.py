@@ -588,9 +588,26 @@ def adicionar_pecas_ordem(request):
 
         data = json.loads(request.body)
 
+        ordem = Ordem.objects.filter(id=data.get('ordem_id')).first()
+
         print(data)
 
-        return JsonResponse({'data': data})
+        nova_peca = PecasOrdem.objects.create(
+            ordem=ordem,
+            peca=get_object_or_404(Pecas, codigo=data.get('peca')),
+            qtd_planejada=data.get('quantidade', 1),
+        )
+
+        peca = {
+            'id_peca': nova_peca.id,
+            'peca_id': nova_peca.peca.id,
+            'peca_codigo': nova_peca.peca.codigo,
+            'peca_nome': f"{nova_peca.peca.codigo} - {nova_peca.peca.descricao}",
+            'quantidade': nova_peca.qtd_planejada,
+            'qtd_morta': nova_peca.qtd_morta
+        }
+
+        return JsonResponse({'success': True, 'peca': peca})
 
 @csrf_exempt
 def importar_ordens_serra(request):

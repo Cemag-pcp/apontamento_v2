@@ -369,7 +369,7 @@ export function carregarOrdensIniciadas(container, filtros={}) {
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
                         <button class="btn btn-outline-primary btn-sm btn-ver-peca" title="Ver Peças">
-                            <i class="fa fa-eye"></i> Ver Peças
+                            <i class="fa fa-eye"></i> Ver / Editar Peças 
                         </button>
                         <div class="d-flex gap-2">
                             ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
@@ -895,6 +895,15 @@ function mostrarPecas(ordemId, maquinaName, mostrarDescricao = false) {
             if (btnSalvar) {
                 const tempId = target.getAttribute('data-temp-id');
                 const row = document.getElementById(tempId);
+                // Exibe SweetAlert de carregamento
+                Swal.fire({
+                    title: 'Carregando...',
+                    text: 'Salvando peça nova...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
                 
                 // Obtém os valores dos campos
                 const selectPeca = $(`#selectPeca-${tempId}`);
@@ -907,11 +916,17 @@ function mostrarPecas(ordemId, maquinaName, mostrarDescricao = false) {
                     return;
                 }
 
-                // Mostra loading
-                Swal.fire({
-                    title: 'Salvando...',
-                    allowOutsideClick: false,
-                    didOpen: () => Swal.showLoading()
+
+                const Toast = Swal.mixin({
+                    toast: true,
+                    position: "bottom-end",
+                    showConfirmButton: false,
+                    timer: 3000,
+                    timerProgressBar: true,
+                    didOpen: (toast) => {
+                    toast.onmouseenter = Swal.stopTimer;
+                    toast.onmouseleave = Swal.resumeTimer;
+                    }
                 });
 
                 // Requisição POST para o backend
@@ -923,7 +938,7 @@ function mostrarPecas(ordemId, maquinaName, mostrarDescricao = false) {
                     },
                     body: JSON.stringify({
                         ordem_id: ordemId, // Usando a variável ordemId que já está no escopo
-                        peca_id: pecaId,
+                        peca: pecaId,
                         quantidade: quantidade
                     })
                 })
@@ -934,18 +949,49 @@ function mostrarPecas(ordemId, maquinaName, mostrarDescricao = false) {
                     return response.json();
                 })
                 .then(data => {
-                    Swal.close();
                     if (data.success) {
-                        console.log(data)
-                        // // Atualiza a tabela com os novos dados
-                        // mostrarPecas(ordemId, maquinaName, mostrarDescricao);
-                        // Swal.fire('Sucesso', 'Peça adicionada com sucesso!', 'success');
+                        Swal.close();
+                        
+                        Toast.fire({
+                            icon: "success",
+                            title: "Peça adicionada com sucesso."
+                        });
+                        
+                        // Remove a linha temporária
+                        const linhaParaRemover = document.getElementById(tempId);
+                        if (linhaParaRemover) {
+                            linhaParaRemover.remove();
+                        }
+                        
+                        // Adiciona a nova peça diretamente na tabela
+                        const tabelaPecas = document.getElementById('tabelaPecas');
+                        const novaPecaHTML = `
+                            <tr id="linha-${data.peca.id_peca}">
+                                <td>
+                                    <a href="https://drive.google.com/drive/u/0/search?q=${data.peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
+                                        ${data.peca.peca_nome}
+                                    </a>
+                                </td>
+                                <td>${data.peca.quantidade}</td>
+                                <td>
+                                    <button class="btn btn-danger btn-sm btn-excluir-peca" data-index="${data.peca.id_peca}">
+                                        🗑 Excluir
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                        
+                        tabelaPecas.insertAdjacentHTML('beforeend', novaPecaHTML);
+
                     } else {
                         throw new Error(data.message || 'Erro ao processar resposta');
                     }
                 })
                 .catch(error => {
-                    Swal.fire('Erro', error.message, 'error');
+                    Toast.fire({
+                        icon: "error",
+                        title: error.message
+                    });
                     console.error('Erro:', error);
                 });
             }
