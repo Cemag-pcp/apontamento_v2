@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btnPararMaquina').addEventListener('click', () => {
         mostrarModalPararMaquina(); // Chama a função já existente
     });
-
 });
 
 export function fetchStatusMaquinas() {
@@ -280,8 +279,6 @@ export function fetchOrdensSequenciadasLaser() {
                 btnSalvarPrioridade.addEventListener('click', salvarPrioridade);
                 btnSalvarPrioridade.dataset.listenerAdded = 'true';
             }
-    
-            somarTemposEstimados('ordens-sequenciadas-laser-container','tempo-estimado-total-laser');
 
         })
         .catch(error => {
@@ -302,7 +299,6 @@ export function fetchOrdensSequenciadasLaser() {
         });
         btnFiltrarOrdemSequenciadaLaser.dataset.listenerAdded = 'true';
     }
-    
 }
 
 export function fetchOrdensSequenciadasPlasma() {
@@ -447,8 +443,6 @@ export function fetchOrdensSequenciadasPlasma() {
                 btnSalvarPrioridade.addEventListener('click', salvarPrioridade);
                 btnSalvarPrioridade.dataset.listenerAdded = 'true';
             }
-
-            somarTemposEstimados('ordens-sequenciadas-plasma-container','tempo-estimado-total-plasma');
 
         })
         .catch(error => {
@@ -761,59 +755,4 @@ function mostrarModalExcluir(ordemId, setor) {
             });
         });
     });
-}
-
-function somarTemposEstimados(containerId, spanId) {
-
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const tempoElements = container.querySelectorAll('.card .card-body p');
-    let totalMilissegundos = 0;
-
-    tempoElements.forEach(p => {
-        if (p.innerText.includes('Tempo estimado:')) {
-            const tempoStr = p.innerText.split('Tempo estimado:')[1].trim();
-
-            // Formato 1: 00:23:56.831000
-            if (tempoStr.includes(':')) {
-                const partes = tempoStr.split(':');
-                if (partes.length === 3) {
-                    const horas = parseInt(partes[0], 10);
-                    const minutos = parseInt(partes[1], 10);
-                    const [segundos, micros] = partes[2].split('.');
-                    const milissegundos = parseInt(segundos, 10) * 1000 + parseInt(micros?.slice(0, 3) || 0, 10);
-                    totalMilissegundos += (horas * 3600000) + (minutos * 60000) + milissegundos;
-                    return;
-                }
-            }
-
-            // Formato 2 e 3: ex: 1hours4min17,5s ou 22min26,6s
-            const horasMatch = tempoStr.match(/(\d+)\s*hours?/i);
-            const minMatch = tempoStr.match(/(\d+)\s*min/i);
-            const secMatch = tempoStr.match(/(\d+[.,]?\d*)\s*s/i);
-
-            const horas = horasMatch ? parseInt(horasMatch[1], 10) : 0;
-            const minutos = minMatch ? parseInt(minMatch[1], 10) : 0;
-
-            let segundos = 0;
-            if (secMatch) {
-                segundos = parseFloat(secMatch[1].replace(',', '.'));
-            }
-
-            totalMilissegundos += (horas * 3600000) + (minutos * 60000) + (segundos * 1000);
-        }
-    });
-
-    const horas = Math.floor(totalMilissegundos / 3600000);
-    const minutos = Math.floor((totalMilissegundos % 3600000) / 60000);
-    const segundos = Math.floor((totalMilissegundos % 60000) / 1000);
-
-    const tempoFinal = 
-        String(horas).padStart(2, '0') + ':' +
-        String(minutos).padStart(2, '0') + ':' +
-        String(segundos).padStart(2, '0');
-
-    document.getElementById(spanId).innerHTML = `Tempo estimado: ${tempoFinal}`;
-
 }

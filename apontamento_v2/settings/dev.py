@@ -25,6 +25,13 @@ DATABASES = {
     }
 }
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': os.path.join(BASE_DIR, 'db_test.sqlite3'),
+#     }
+# }
+
 # STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Configurações adicionais para desenvolvimento (opcional)
 # STATIC_URL = '/static/'

@@ -151,7 +151,10 @@ def get_ordens_criadas(request):
             'retalho': 'Sim' if ordem.propriedade.retalho else None,
         },
         'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M') if ordem.status_atual == 'finalizada' else None,
+        'tempo_estimado': ordem.tempo_estimado if ordem.tempo_estimado else 'Não foi possivel calcular',
     } for ordem in ordens_page]
+
+    print(data)
 
     return JsonResponse({'ordens': data})
 
@@ -636,7 +639,8 @@ def gerar_op_duplicada(request, pk_ordem):
                 maquina=maquina_ordem,
                 obs=obs_duplicar,
                 status_atual='aguardando_iniciar',
-                data_programacao=data_programacao
+                data_programacao=data_programacao,
+                tempo_estimado=ordem_original.tempo_estimado,
             )
 
             # Duplica as propriedades associadas
@@ -1103,7 +1107,7 @@ class SalvarArquivoView(View):
             espessura=get_object_or_404(Espessura, pk=request.POST.get('espessura'))
             
             # apenas para o laser1
-            ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='Nestings_Cost')
+            ordem_producao_excel_2 = pd.read_excel(uploaded_file, sheet_name='Nestings_Cost', dtype={'Unnamed: 3': str})
             excel_tratado,propriedades = tratamento_planilha_laser1(ordem_producao_excel,ordem_producao_excel_2,comprimento,largura,espessura.nome)
         elif tipo_maquina_object.nome == 'Laser 3 Trumpf':
             excel_tratado,propriedades = tratamento_planilha_laser3(ordem_producao_excel)
@@ -1112,13 +1116,18 @@ class SalvarArquivoView(View):
 
         with transaction.atomic():
 
+            # buscar tempo estimado
+            for prop in propriedades:
+                tempo_estimado = prop['tempo_estimado_total']
+
             # criar ordem
             nova_ordem = Ordem.objects.create(
                 ordem=int(numeracao_op),
                 obs=descricao,
                 grupo_maquina=tipo_maquina,
                 data_programacao=data_programacao,
-                maquina=tipo_maquina_object
+                maquina=tipo_maquina_object,
+                tempo_estimado=tempo_estimado
             )
             
             # salvar propriedades
@@ -1131,11 +1140,15 @@ class SalvarArquivoView(View):
                     quantidade=prop['quantidade'],
                     aproveitamento=SalvarArquivoView.corrigir_aproveitamento(prop['aproveitamento']),
                     tipo_chapa=tipo_chapa,
-                    retalho=retalho
+                    retalho=retalho,
                 )
             
             # salvar peças
             for peca in pecas:
+                print(peca['qtd_planejada'])
+                if peca['qtd_planejada'] == 0:
+                    continue
+
                 PecasOrdem.objects.create(
                     ordem=nova_ordem,
                     peca=peca['peca'],

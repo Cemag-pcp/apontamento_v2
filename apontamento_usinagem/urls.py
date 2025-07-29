@@ -28,3 +28,12 @@ urlpatterns = [
 urlpatterns += [
     path('api/ordem-finalizadas', views.api_ordens_finalizadas, name='api_ordens_finalizadas'),
 ]
+
+# dashboard
+# urlpatterns += [
+#     path('dashboard', views.dashboard, name='dashboard'),
+
+#     path('api/dashboard/indicador-hora-operacao-maquina', views.indicador_hora_operacao_maquina, name='indicador_hora_operacao_maquina'),
+#     path('api/dashboard/indicador-finalizacao-maquina', views.indicador_ordem_finalizada_maquina, name='indicador_ordem_finalizada_maquina'),
+#     path('api/dashboard/indicador-pecas-produzidas-maquina', views.indicador_peca_produzida_maquina, name='indicador_peca_produzida_maquina'),
+# ]

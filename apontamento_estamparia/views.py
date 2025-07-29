@@ -99,7 +99,7 @@ def get_ordens_criadas(request):
         peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
         peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
         peca_quantidade=Subquery(primeira_peca.values('qtd_planejada'))
-    ).order_by('status_prioridade').exclude(status_atual='finalizada')
+    ).order_by('status_prioridade')#.exclude(status_atual='finalizada')
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
@@ -132,6 +132,7 @@ def get_ordens_criadas(request):
             'maquina_id': ordem.maquina.id if ordem.maquina else "Sem máquina planejada",
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
+            'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M'),
             'peca': {
                 'codigo': ordem.peca_codigo,
                 'descricao': ordem.peca_descricao,
