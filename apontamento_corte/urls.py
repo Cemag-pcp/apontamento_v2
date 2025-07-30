@@ -17,7 +17,6 @@ urlpatterns = [
     path('duplicar-op/api/pecas/', views.get_pecas, name='get_pecas'),
     path('duplicar-op/api/duplicar-ordem/<int:pk_ordem>/pecas/', views.get_pecas_ordem_duplicar_ordem, name='get_pecas_ordem_duplicar_ordem'),
     path('duplicar-op/api/duplicar-ordem/<int:pk_ordem>/', views.gerar_op_duplicada, name='gerar_op_duplicada'),
-
     
     path('api/excluir-op-padrao/', views.excluir_op_padrao, name='excluir_op_padrao'),
     path('api/ordens-criadas/', views.get_ordens_criadas, name='get_ordens_criadas'),

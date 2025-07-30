@@ -236,6 +236,8 @@ function configurarBotaoExcluirOp() {
 //  Preenche o modal com informações da duplicação
 function preencherModalDuplicacao(data,ordemId) {
     const bodyDuplicarOrdem = document.getElementById('bodyDuplicarOrdem');
+    
+    console.log(data);
 
     document.getElementById('modalDuplicarOrdem').setAttribute('data-ordem-id', ordemId);
     
@@ -274,6 +276,7 @@ function preencherModalDuplicacao(data,ordemId) {
 
     // Criando o conteúdo inicial do modal com a tabela da chapa
     bodyDuplicarOrdem.innerHTML = `
+        <h5 class="text-center mt-3">ORDEM: ${data.propriedades.ordem}</h6>
         <h6 class="text-center mt-3">Informações da Chapa</h6>
         <table class="table table-bordered table-sm text-center">
             <thead>
