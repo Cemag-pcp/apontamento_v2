@@ -100,8 +100,9 @@ def get_ordens_criadas(request):
     ).annotate(
         peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
         peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
-        peca_quantidade=Subquery(primeira_peca.values('qtd_planejada'))
-    ).order_by('-data_criacao').exclude(status_atual='finalizada')
+        peca_quantidade=Subquery(primeira_peca.values('qtd_planejada')),
+        peca_quantidade_boa=Subquery(primeira_peca.values('qtd_boa'))
+    ).order_by('-data_criacao')#.exclude(status_atual='finalizada')
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
@@ -130,10 +131,12 @@ def get_ordens_criadas(request):
             'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
+            'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M'),
             'peca': {
                 'codigo': ordem.peca_codigo,
                 'descricao': ordem.peca_descricao,
                 'quantidade': ordem.peca_quantidade,
+                'quantidade_boa': ordem.peca_quantidade_boa,
             } if ordem.peca_codigo else None
         })
 

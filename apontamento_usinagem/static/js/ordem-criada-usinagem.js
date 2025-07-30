@@ -97,7 +97,17 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                     ${statusBadge}
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">#${ordem.ordem} Criado em: ${ordem.data_criacao}</p>
-                                <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao}</p>
+                                <p class="text-muted mb-2" style="font-size: 0.85rem;">
+                                Programada para: ${ordem.data_programacao} | Qt.: ${
+                                    Number(ordem.peca.quantidade_boa) === 0
+                                    ? ordem.peca.quantidade
+                                    : ordem.peca.quantidade_boa
+                                }
+                                </p>
+                                ${ordem.status_atual === 'finalizada' 
+                                    ? `<p class="text-success fw-semibold mb-2" style="font-size: 0.85rem;">Finalizada em: ${ordem.ultima_atualizacao}</p>` 
+                                    : ''
+                                }                                
                                 <p class="mb-2">${ordem.obs || '<span class="text-muted">Sem observações</span>'}</p>
                             </div>
                             <div class="card-footer text-end" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6;">
