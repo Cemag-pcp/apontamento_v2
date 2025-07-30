@@ -530,8 +530,6 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
             if str(esp) not in valores_remover and esp is not None
         ]
 
-        print(espessuras)
-
         tipos_chapas = [tipo[1] for tipo in PropriedadesOrdem.TIPO_CHAPA_CHOICES]
 
         # Propriedades da ordem
@@ -542,6 +540,7 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
             'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
             'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
             'maquina': ordem.grupo_maquina,
+            'ordem': ordem.ordem,
         }
 
         # Peças relacionadas à ordem

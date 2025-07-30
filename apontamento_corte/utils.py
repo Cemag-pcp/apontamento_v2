@@ -285,10 +285,21 @@ def tratamento_planilha_laser1(df,df2,comprimento,largura,espessura):
 
     return df, propriedades
 
+def converter_minutos_para_horas(minutos_float):
+    """
+    Converte um valor em minutos (ex: 26.73) para o formato hh:mm:ss
+    """
+    total_segundos = int(round(minutos_float * 60))
+    horas = total_segundos // 3600
+    minutos = (total_segundos % 3600) // 60
+    segundos = total_segundos % 60
+    return f"{horas:02d}:{minutos:02d}:{segundos:02d}"
+
+
 def tratamento_planilha_laser3(tree):
 
     # Carrega o XML
-    # tree = ET.parse('OP12.xml')
+    tree = ET.parse('OP12.xml')
     root = tree.getroot()
 
     # 1. Espessura via UsedLaserTechnoTable > TableNo
@@ -319,6 +330,15 @@ def tratamento_planilha_laser3(tree):
     waste_el = root.find('.//Waste')
     aproveitamento = float(waste_el.text) if waste_el is not None else None
 
+    # 4.1 Tempo estimado total
+    tempo_estimato_total_elem = root.find('.//TotalRuntime')
+    if tempo_estimato_total_elem is not None and tempo_estimato_total_elem.text:
+        tempo_estimado_total_horas = float(tempo_estimato_total_elem.text)
+        tempo_estimado_total_horas = converter_minutos_para_horas(tempo_estimado_total_horas)
+        print("Tempo estimado total:", tempo_estimado_total_horas)
+    else:
+        print("Elemento <TotalRuntime> não encontrado ou vazio.")
+
     # 5. Peças (loop)
     pecas_detalhadas = []
     for part in root.findall('.//Parts/Part'):
@@ -345,6 +365,7 @@ def tratamento_planilha_laser3(tree):
         'espessura':espessura,
         'quantidade':quantidade_chapas,
         'aproveitamento':aproveitamento,
+        'tempo_estimado_total':tempo_estimado_total_horas
     }]
 
     return df_pecas, propriedades
