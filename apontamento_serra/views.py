@@ -17,6 +17,7 @@ from cadastro.models import MotivoExclusao, MotivoInterrupcao, Mp, Pecas, Operad
 from apontamento_usinagem.utils import criar_ordem_usinagem, verificar_se_existe_ordem
 from .utils import hora_operacao_maquina, hora_parada_maquina, formatar_timedelta, ordem_por_maquina, producao_por_maquina
 from core.utils import notificar_ordem
+from inspecao.models import Inspecao
 
 import os
 import re
@@ -207,7 +208,12 @@ def atualizar_status_ordem(request):
                                     'status_atual': 'agua_prox_proc'
                                 }
 
-                                nova_ordem = criar_ordem_usinagem(dados_usinagem)
+                                nova_ordem = criar_ordem_usinagem(dados_usinagem) 
+
+                        else:
+                            Inspecao.objects.create(    
+                                pecas_ordem_serra=peca_obj
+                            )                   
 
                     ordem.status_prioridade = 3
 
@@ -229,6 +235,7 @@ def atualizar_status_ordem(request):
         except Ordem.DoesNotExist:
             return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
         except Exception as e:
+            print(e)
             return JsonResponse({'error': str(e)}, status=500)
 
     return JsonResponse({'error': 'Método não permitido.'}, status=405)

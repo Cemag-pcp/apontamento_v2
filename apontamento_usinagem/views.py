@@ -12,6 +12,7 @@ from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso, MaquinaParada
 from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada, MotivoExclusao
+from inspecao.models import Inspecao
 from .utils import criar_ordem_usinagem
 
 import pandas as pd
@@ -215,7 +216,7 @@ def atualizar_status_ordem(request):
                     # peca.qtd_boa = qt_produzida  
                     # peca.qtd_morta = qt_mortas 
 
-                    PecasOrdem.objects.create(
+                    peca_obj = PecasOrdem.objects.create(
                         ordem=ordem,
                         peca=peca.peca,
                         qtd_planejada=peca.qtd_planejada,
@@ -225,6 +226,10 @@ def atualizar_status_ordem(request):
                     )      
 
                     peca.save()
+
+                    Inspecao.objects.create(    
+                        pecas_ordem_usinagem=peca_obj
+                    )
 
                     ordem.status_prioridade = 3
                 elif status == 'interrompida':

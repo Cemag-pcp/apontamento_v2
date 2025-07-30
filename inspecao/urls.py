@@ -33,6 +33,10 @@ urlpatterns = [
     path('api/historico-estamparia/<int:id>', estamparia.get_historico_estamparia, name='historico-estamparia'),
     path('api/historico-causas-estamparia/<int:id>', estamparia.get_historico_causas_estamparia, name='historico-causas-estamparia'),
 
+    path('api/itens-inspecao-serra-usinagem/', serra_usinagem.get_itens_inspecao_serra_usinagem, name='itens-inspecao-serra-usinagem'),
+    path('api/itens-inspecionados-serra-usinagem/', serra_usinagem.get_itens_inspecionados_serra_usinagem, name='itens-inspecionados-serra-usinagem'),
+    path('api/itens-reinspecao-serra-usinagem/', serra_usinagem.get_itens_reinspecao_serra_usinagem, name='itens-reinspecao-estamserra-usinagemparia'),
+
     path('api/motivos-causas/<str:setor>/', views_general.motivos_causas, name='motivos_causas'),
 
     path('api/historico-montagem/<int:id>', montagem.get_historico_montagem, name='historico-montagem'),
