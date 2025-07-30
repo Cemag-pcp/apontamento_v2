@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/get-mp/', views.get_mp, name='get_mp'),
     path('api/get-peca/', views.get_peca, name='get_peca'),
     path('api/criar-ordem/', views.criar_ordem, name='criar_ordem'),
+    path('api/adicionar-peca-ordem/', views.adicionar_pecas_ordem, name='adicionar_pecas_ordem'),
     path('api/importar-ordens-serra/', views.importar_ordens_serra, name='importar_ordens_serra'),
     path('api/verificar-dados-ordem/', views.verificar_mp_pecas_na_ordem, name='verificar_ordem'),
     path('api/duplicar-ordem/', views.duplicar_ordem, name='duplicar_ordem'),

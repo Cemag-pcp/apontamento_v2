@@ -369,7 +369,7 @@ export function carregarOrdensIniciadas(container, filtros={}) {
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
                         <button class="btn btn-outline-primary btn-sm btn-ver-peca" title="Ver Peças">
-                            <i class="fa fa-eye"></i> Ver Peças
+                            <i class="fa fa-eye"></i> Ver / Editar Peças 
                         </button>
                         <div class="d-flex gap-2">
                             ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
@@ -749,6 +749,13 @@ function mostrarPecas(ordemId, maquinaName, mostrarDescricao = false) {
                             `).join('')}
                         </tbody>
                     </table>
+                    ${data.ordem_status !== 'finalizada' ? `
+                    <div class="text-end mt-2">
+                        <button class="btn btn-primary btn-sm" id="btnAdicionarPeca">
+                            <i class="fas fa-plus"></i> Adicionar Peça
+                        </button>
+                    </div>
+                    ` : ''}
                     ${(mostrarDescricao && data.propriedades && data.propriedades.descricao_mp) ? `
                     <div class="modal-footer text-end mt-3">
                         <button id="btnIniciarOrdem" class="btn btn-success">
@@ -757,9 +764,88 @@ function mostrarPecas(ordemId, maquinaName, mostrarDescricao = false) {
                     </div>
                     ` : ''}
                 `;
+
+                // Adiciona o evento de clique para o botão de adicionar peça
+                const btnAdicionar = document.getElementById('btnAdicionarPeca');
+                if (btnAdicionar) {
+                    btnAdicionar.addEventListener('click', function() {
+                        const tabelaPecas = document.getElementById('tabelaPecas');
+                        
+                        // Cria um ID temporário único para a nova linha
+                        const tempId = 'temp-' + Date.now();
+                        
+                        // Prepara as opções do select baseadas nas peças existentes
+                        const optionsPecas = data.pecas.map(peca => 
+                            `<option value="${peca.id_peca}">${peca.peca_nome} (${peca.peca_codigo})</option>`
+                        ).join('');
+                        
+                        // Adiciona a nova linha no final da tabela com um select
+                        const novaRow = `
+                            <tr id="${tempId}">
+                                <td>
+                                    <select class="form-select form-select-sm select2-peca" id="selectPeca-${tempId}" style="width: 100%">
+                                        <option value="" selected disabled>Selecione uma peça</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control form-control-sm" placeholder="Quantidade" min="1" value="1">
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-1 justify-content-center">
+                                        <button class="btn btn-danger btn-sm btn-cancelar-peca" data-temp-id="${tempId}">
+                                            Cancelar
+                                        </button>
+                                        <button class="btn btn-success btn-sm btn-salvar-peca" data-temp-id="${tempId}">
+                                            Salvar
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                        
+                        tabelaPecas.insertAdjacentHTML('beforeend', novaRow);
+                        
+                        // Inicializa o Select2 para o novo select
+                        $(`#selectPeca-${tempId}`).select2({
+                            placeholder: 'Selecione a Peça',
+                            width: '100%',
+                            theme: 'bootstrap-5',
+                            dropdownParent: $('#modalPecas .modal-content'),
+                            ajax: {
+                                url: 'api/get-peca/',
+                                dataType: 'json',
+                                delay: 250,
+                                data: function(params) {
+                                    return {
+                                        search: params.term || '',
+                                        page: params.page || 1,
+                                        per_page: 10
+                                    };
+                                },
+                                processResults: function(data, params) {
+                                    params.page = params.page || 1;
+                                    return {
+                                        results: data.results.map(item => ({
+                                            id: item.id,
+                                            text: item.text
+                                        })),
+                                        pagination: {
+                                            more: data.pagination.more
+                                        }
+                                    };
+                                },
+                                cache: true
+                            },
+                            minimumInputLength: 0
+                        });
+
+
+                        // Rola a tabela para mostrar a nova linha
+                        document.querySelector(`#${tempId}`).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    });
+                };
             }
             
-
             const modal = new bootstrap.Modal(document.getElementById('modalPecas'));
             modal.show();
 
@@ -789,6 +875,127 @@ function mostrarPecas(ordemId, maquinaName, mostrarDescricao = false) {
                 text: 'Erro ao carregar as peças. Por favor, tente novamente.',
             });
         });
+
+        modalContent.onclick = function(event) {
+            const target = event.target;
+
+            // --- Ação: Cancelar Peça ---
+            const btnCancelar = target.closest('.btn-cancelar-peca');
+            if (btnCancelar) {
+                const tempId = btnCancelar.getAttribute('data-temp-id');
+                const linhaParaRemover = document.getElementById(tempId);
+                if (linhaParaRemover) {
+                    linhaParaRemover.remove();
+                }
+                return; // Encerra a execução
+            }
+
+            // --- Ação: Salvar Peça ---
+            const btnSalvar = target.closest('.btn-salvar-peca');
+            if (btnSalvar) {
+                const tempId = target.getAttribute('data-temp-id');
+                const row = document.getElementById(tempId);
+                // Exibe SweetAlert de carregamento
+                Swal.fire({
+                    title: 'Carregando...',
+                    text: 'Salvando peça nova...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+                
+                // Obtém os valores dos campos
+                const selectPeca = $(`#selectPeca-${tempId}`);
+                const pecaId = selectPeca.val();
+                const pecaText = selectPeca.find('option:selected').text();
+                const quantidade = row.querySelector('input[type="number"]').value;
+                
+                if (!pecaId) {
+                    Swal.fire('Erro', 'Por favor, selecione uma peça', 'error');
+                    return;
+                }
+
+
+                const Toast = Swal.mixin({
+                    toast: true,
+                    position: "bottom-end",
+                    showConfirmButton: false,
+                    timer: 3000,
+                    timerProgressBar: true,
+                    didOpen: (toast) => {
+                    toast.onmouseenter = Swal.stopTimer;
+                    toast.onmouseleave = Swal.resumeTimer;
+                    }
+                });
+
+                // Requisição POST para o backend
+                fetch('api/adicionar-peca-ordem/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken() // Se estiver usando Django
+                    },
+                    body: JSON.stringify({
+                        ordem_id: ordemId, // Usando a variável ordemId que já está no escopo
+                        peca: pecaId,
+                        quantidade: quantidade
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro ao salvar peça');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        Swal.close();
+                        
+                        Toast.fire({
+                            icon: "success",
+                            title: "Peça adicionada com sucesso."
+                        });
+                        
+                        // Remove a linha temporária
+                        const linhaParaRemover = document.getElementById(tempId);
+                        if (linhaParaRemover) {
+                            linhaParaRemover.remove();
+                        }
+                        
+                        // Adiciona a nova peça diretamente na tabela
+                        const tabelaPecas = document.getElementById('tabelaPecas');
+                        const novaPecaHTML = `
+                            <tr id="linha-${data.peca.id_peca}">
+                                <td>
+                                    <a href="https://drive.google.com/drive/u/0/search?q=${data.peca.peca_codigo}" target="_blank" rel="noopener noreferrer">
+                                        ${data.peca.peca_nome}
+                                    </a>
+                                </td>
+                                <td>${data.peca.quantidade}</td>
+                                <td>
+                                    <button class="btn btn-danger btn-sm btn-excluir-peca" data-index="${data.peca.id_peca}">
+                                        🗑 Excluir
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                        
+                        tabelaPecas.insertAdjacentHTML('beforeend', novaPecaHTML);
+
+                    } else {
+                        throw new Error(data.message || 'Erro ao processar resposta');
+                    }
+                })
+                .catch(error => {
+                    Toast.fire({
+                        icon: "error",
+                        title: error.message
+                    });
+                    console.error('Erro:', error);
+                });
+            }
+        }
 }
 
 // Função para excluir uma peça (mantendo ao menos uma)

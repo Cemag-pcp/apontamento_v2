@@ -83,7 +83,7 @@ def get_pecas_ordem(request, pk_ordem, name_maquina):
         ]
 
         # Retorna as propriedades e as peças como JSON
-        return JsonResponse({'pecas': pecas, 'propriedades': propriedades})
+        return JsonResponse({'pecas': pecas, 'propriedades': propriedades, 'ordem_status': ordem.status_atual})
 
     except Ordem.DoesNotExist:
         # Retorna erro caso a ordem não seja encontrada
@@ -581,7 +581,34 @@ def criar_ordem(request):
         except Exception as e:
             # Captura erros genéricos
             return JsonResponse({'status': 'error', 'message': 'Erro ao criar a ordem', 'details': str(e)}, status=500)
-        
+
+def adicionar_pecas_ordem(request):
+
+    if request.method == 'POST':
+
+        data = json.loads(request.body)
+
+        ordem = Ordem.objects.filter(id=data.get('ordem_id')).first()
+
+        print(data)
+
+        nova_peca = PecasOrdem.objects.create(
+            ordem=ordem,
+            peca=get_object_or_404(Pecas, codigo=data.get('peca')),
+            qtd_planejada=data.get('quantidade', 1),
+        )
+
+        peca = {
+            'id_peca': nova_peca.id,
+            'peca_id': nova_peca.peca.id,
+            'peca_codigo': nova_peca.peca.codigo,
+            'peca_nome': f"{nova_peca.peca.codigo} - {nova_peca.peca.descricao}",
+            'quantidade': nova_peca.qtd_planejada,
+            'qtd_morta': nova_peca.qtd_morta
+        }
+
+        return JsonResponse({'success': True, 'peca': peca})
+
 @csrf_exempt
 def importar_ordens_serra(request):
     if request.method == "POST":
