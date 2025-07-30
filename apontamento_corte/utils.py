@@ -299,7 +299,7 @@ def converter_minutos_para_horas(minutos_float):
 def tratamento_planilha_laser3(tree):
 
     # Carrega o XML
-    # tree = ET.parse('OP12.xml')
+    tree = ET.parse('OP12.xml')
     root = tree.getroot()
 
     # 1. Espessura via UsedLaserTechnoTable > TableNo
@@ -334,8 +334,8 @@ def tratamento_planilha_laser3(tree):
     tempo_estimato_total_elem = root.find('.//TotalRuntime')
     if tempo_estimato_total_elem is not None and tempo_estimato_total_elem.text:
         tempo_estimado_total_horas = float(tempo_estimato_total_elem.text)
-        tempo_estimato_total_horas = converter_minutos_para_horas(tempo_estimado_total_horas)
-        print("Tempo estimado total:", tempo_estimato_total_horas)
+        tempo_estimado_total_horas = converter_minutos_para_horas(tempo_estimado_total_horas)
+        print("Tempo estimado total:", tempo_estimado_total_horas)
     else:
         print("Elemento <TotalRuntime> não encontrado ou vazio.")
 
