@@ -25,7 +25,6 @@ class InfoAdicionaisSerraUsinagem(models.Model):
         DadosExecucaoInspecao, on_delete=models.CASCADE, related_name="info_adicionais"
     )
     inspecao_completa = models.BooleanField(default=False)
-    autoinspecao_noturna = models.BooleanField(default=False)
     ficha = models.ImageField(upload_to="fichas_inspecao/", null=True, blank=True)
 
     observacoes_gerais = models.TextField(null=True, blank=True)
@@ -38,7 +37,7 @@ class InfoAdicionaisSerraUsinagem(models.Model):
         return f"Info Adicional - Execução {self.dados_exec_inspecao.num_execucao}"
 
 
-class MedidasProcesso(models.Model):
+class MedidasProcessoSerraUsinagem(models.Model):
     TIPO_PROCESSO_CHOICES = [
         ("serra", "Serra"),
         ("usinagem", "Usinagem"),
@@ -72,3 +71,20 @@ class MedidasProcesso(models.Model):
 
     def __str__(self):
         return f"Medição {self.id} - {self.get_tipo_processo_display()}"
+
+class DetalheMedidaSerraUsinagem(models.Model):
+    medida_processo = models.ForeignKey(
+        MedidasProcessoSerraUsinagem,
+        on_delete=models.CASCADE,
+        related_name='detalhes'
+    )
+    cabecalho = models.CharField(max_length=30)
+    valor = models.FloatField()
+    conforme = models.BooleanField(default=True)
+    amostra = models.IntegerField(default=1)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.cabecalho}: {self.valor}"

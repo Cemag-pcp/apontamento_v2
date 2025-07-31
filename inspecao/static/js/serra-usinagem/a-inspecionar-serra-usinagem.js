@@ -60,8 +60,6 @@ document.getElementById("numPecaDefeituosa").addEventListener("change", (event) 
         return;
     }
 
-    controlarLinhasTabela();
-
     if ((value - max) === 0){
         document.getElementById("medicoesTecnicas").style.display = 'none';
         document.getElementById("inspecao_total").value = 'Sim';
@@ -195,10 +193,6 @@ function buscarItensInspecao(pagina) {
                     const itemPeca = this.getAttribute('data-peca');
                     const itemMaquina = this.getAttribute('data-maquina');
                     
-                    // Remover itens anteriores e resetar o modal
-                    removeAllNonConformityItems();
-                    resetModal();
-                    
                     const modalInspecao = document.getElementById('inspectionModal');
                     
                     // Pegar a data atual formatada
@@ -219,10 +213,33 @@ function buscarItensInspecao(pagina) {
 
                     modalInspecao.querySelector('#numPecaDefeituosa').setAttribute("max", itemQtd);
 
-                    controlarLinhasTabela();
-
-                    // Mostrar o modal
-                    new bootstrap.Modal(modalInspecao).show();
+                    // Remover itens anteriores e resetar o modal
+                    removeAllNonConformityItems();
+                    resetModal();
+                    
+                    fetch(`/inspecao/api/get-execucao-inspecao-serra-usinagem/?id_inspecao=${itemId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        },
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.existe && data.dados.length > 0) {
+                            console.log(data.dados)
+                            // Preencher as linhas de medição com os dados retornados
+                            preencherLinhasMedicao(data.dados);
+                            // Só agora mostrar o modal
+                            new bootstrap.Modal(document.getElementById('inspectionModal')).show();
+                        } else {
+                            // Se não houver dados, pode abrir o modal vazio ou mostrar aviso
+                            new bootstrap.Modal(document.getElementById('inspectionModal')).show();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao buscar execuções:', error);
+                    });
                 });
             });
         });
@@ -275,52 +292,56 @@ function buscarItensInspecao(pagina) {
     });
 }
 
-function controlarLinhasTabela() { 
-    const qtdProduzida = parseInt(document.getElementById("pecasProduzidas").value) || 0;
-    const qtdMorta = parseInt(document.getElementById("numPecaDefeituosa").value) || 0;
-    
-    if (qtdProduzida <= 0) {
-        Toast.fire({
-            icon: "warning",
-            title: "Por favor, informe uma quantidade válida de peças produzidas."
+function preencherLinhasMedicao(dados) {
+    if (!dados.length) return;
+
+    // Ativa o checkbox do tipo de inspeção retornado
+    const tipo = dados[0].tipo_processo;
+    const checkbox = document.getElementById(`checkbox-inspecao-${tipo}`);
+    if (checkbox && !checkbox.checked) {
+        checkbox.checked = true;
+        checkbox.dispatchEvent(new Event('change'));
+    }
+
+    // Preencher os medida-input (cabeçalhos)
+    if (dados[0].detalhes) {
+        dados[0].detalhes.forEach((detalhe, idx) => {
+            const medidaInput = document.querySelector(
+                `.measurement-section[data-type="${tipo}"] input[name="medida-input-${idx + 1}"]`
+            );
+            if (medidaInput) medidaInput.value = detalhe.cabecalho;
         });
-        return;
     }
 
-    // A quantidade de peças válidas para análise é a quantidade produzida menos a quantidade de peças mortas.
-    const qtdParaAnalise = qtdProduzida - qtdMorta;
+    // Preencher os valores das medições por amostra
+    dados.forEach(item => {
+        if (item.detalhes && Array.isArray(item.detalhes)) {
+            item.detalhes.forEach((detalhe, idx) => {
+                const input = document.querySelector(
+                    `input[name="${tipo}_valor${item.amostra}_${idx + 1}"]`
+                );
+                if (input) input.value = detalhe.valor;
 
-    // if (qtdParaAnalise <= 0) {
-    //     alert("A quantidade de peças mortas é igual ou maior que a quantidade produzida. Não há peças para análise.");
-    //     return;
-    // }
-
-    // Número máximo de linhas exibidas na tabela (limitado a 3)
-    const maxLinhas = 3;
-    const linhasExibidas = Math.min(qtdParaAnalise, maxLinhas);
-    // Mostrar ou ocultar as linhas da tabela
-    for (let i = 1; i <= maxLinhas; i++) {
-        const linha = document.getElementById(`linhaMedicao${i}`);
-        const linhaInput = document.querySelectorAll(`#linhaMedicao${i} td input`)
-        const linhaCheckbox = document.querySelectorAll(`#linhaMedicao${i} .form-check input`)
-        if (i <= linhasExibidas) {
-            linha.style.display = ""; // Mostra a linha
-        } else {
-            linha.style.display = "none"; // Esconde a linha
-            linhaInput.forEach((input) => {
-                input.value = "";
-            })
-            linhaCheckbox.forEach((checkbox) => {
-                checkbox.checked = false;
-            })
+                // Marcar o checkbox de conformidade
+                const conformingCheckbox = document.querySelector(
+                    `input[name="${tipo}_conformity${item.amostra}"][value="conforming"]`
+                );
+                const nonConformingCheckbox = document.querySelector(
+                    `input[name="${tipo}_conformity${item.amostra}"][value="nonConforming"]`
+                );
+                if (conformingCheckbox && nonConformingCheckbox) {
+                    if (detalhe.conforme === true) {
+                        conformingCheckbox.checked = true;
+                        nonConformingCheckbox.checked = false;
+                    } else if (detalhe.conforme === false) {
+                        conformingCheckbox.checked = false;
+                        nonConformingCheckbox.checked = true;
+                    }
+                }
+            });
         }
-    }
+    });
 
-    if(qtdParaAnalise === 0){
-        document.getElementById("sectionMedicaoTec").style.display = "none";
-    } else {
-        document.getElementById("sectionMedicaoTec").style.display = "block";
-    } 
 }
 
 function togglePecaMortaSection(mostrar) {
@@ -339,7 +360,6 @@ function togglePecaMortaSection(mostrar) {
         
         // Limpa o valor do input e dispara a função de controle da tabela
         qtMorta.value = "";
-        controlarLinhasTabela();
     }
 
     document.getElementById('medicoesTecnicas').style.display = 'block';
@@ -422,6 +442,8 @@ function resetModal() {
         statusBadge.textContent = 'Não verificado';
         statusBadge.className = 'badge bg-secondary text-dark';
     }
+
+    updateConformityCounts();
 }
 
 // Verificar se algum checkbox "Outro" está marcado
@@ -448,22 +470,31 @@ function resetModal() {
 
 // Atualizar contagem de conformidades e não conformidades
 function updateConformityCounts() {
-    const totalRadios = document.querySelectorAll('[name^="conformity"]').length / 2;
-    let nonConformCount = 0;
-    
-    for (let i = 1; i <= totalRadios; i++) {
-        const nonConformRadio = document.getElementById(`nonConforming${i}`);
-        if (nonConformRadio && nonConformRadio.checked) {
-            nonConformCount++;
-        }
-    }
-    
-    // Mostrar ou ocultar a seção de não conformidades
+    // Verifica quais inspeções estão ativas
+    const activeInspections = [];
+    document.querySelectorAll('.inspection-checkbox:checked').forEach(checkbox => {
+        activeInspections.push(checkbox.id.replace('checkbox-inspecao-', ''));
+    });
+
+    // Conta apenas os não conformes das inspeções ativas
+    let nonConformingCount = 0;
+    activeInspections.forEach(type => {
+        nonConformingCount += document.querySelectorAll(`.conformity-check[value="nonConforming"][name*="${type}"]:checked`).length;
+    });
+
     const nonConformitySection = document.getElementById('nonConformitySection');
-    if (nonConformCount > 0) {
-        nonConformitySection.style.display = 'block';
-    } else {
-        nonConformitySection.style.display = 'none';
+    nonConformitySection.style.display = nonConformingCount > 0 ? 'block' : 'none';
+}
+
+function resetConformityForType(inspectionType) {
+    // Desmarca todos os checkboxes de não conformidade do tipo
+    document.querySelectorAll(`.conformity-check[value="nonConforming"][name*="${inspectionType}"]`).forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    // Se não houver mais nenhum não conforme marcado, limpa os itens
+    if (document.querySelectorAll('.conformity-check[value="nonConforming"]:checked').length === 0) {
+        removeAllNonConformityItems();
     }
 }
 
@@ -705,77 +736,12 @@ function validarFormulario() {
         qtdPecaMorta = quantidade; // Armazena a quantidade de peças mortas
     }
 
-    // 2. Validação das medições técnicas conforme a quantidade produzida 
-    let linhasObrigatorias = Math.min(qtdProduzida-qtdPecaMorta, 3); // No máximo 3 linhas obrigatórias
-    let linhasPreenchidas = 0;
-    let somaQuantidadeNaoConforme = 0;
-
-    for (let i = 1; i <= 3; i++) {
-        let linhaPreenchida = false;
-        let algumCampoPreenchido = false;
-        let conformeMarcado = false;
-        let naoConformeMarcado = false;
-
-        // Verificar se pelo menos um campo da linha foi preenchido
-        for (let j = 1; j <= 4; j++) {
-            const valor = document.getElementById(`valor${i}_${j}`).value.trim();
-            if (valor !== "") { // Verifica se o campo possui algum valor
-                algumCampoPreenchido = true;
-            }
-        }
-
-        // Verificar se um dos botões de conformidade foi marcado
-        conformeMarcado = document.getElementById(`conforming${i}`).checked;
-        naoConformeMarcado = document.getElementById(`nonConforming${i}`).checked;
-
-        if(naoConformeMarcado){
-            somaQuantidadeNaoConforme += 1;
-        }
-
-        // A linha é considerada preenchida se pelo menos um campo tiver valor E uma conformidade for marcada
-        if (algumCampoPreenchido && (conformeMarcado || naoConformeMarcado)) {
-            linhaPreenchida = true;
-            linhasPreenchidas++;
-        }
-
-        // Verificar se a linha obrigatória não está preenchida corretamente
-        if (i <= linhasObrigatorias && !linhaPreenchida) {
-            Toast.fire({
-                icon: "error",
-                title: `Por favor, preencha pelo menos um campo e marque conformidade na linha ${i} da tabela de medições técnicas.`
-            });
-
-            return false;
-        }
-    }
-
-    // Verifica se o número de linhas preenchidas é suficiente
-    if (linhasPreenchidas < linhasObrigatorias) {
-        Toast.fire({
-            icon: "error",
-            title: `Por favor, preencha pelo menos ${linhasObrigatorias} linha(s) da tabela de medições técnicas.`
-        });
-        return false;
-    }
-
     // 3. Validação inspeção 100%
     const inspecao_total = document.getElementById("inspecao_total").value;
     if (inspecao_total === '') {
         Toast.fire({
             icon: "error",
             title: `Por favor, informe se será necessário inspeção 100%.`
-        });
-        return false;
-    }
-
-    // 4. Validação de conformidade (pelo menos um marcado)
-    const conformidadeMarcada = document.querySelectorAll('[name^="conformity"]:checked').length;
-    const quantidade = parseInt(document.getElementById("numPecaDefeituosa").value);
-
-    if (!((qtdProduzida - quantidade) === 0) && (conformidadeMarcada === 0)) {
-        Toast.fire({
-            icon: "error",
-            title: `Por favor, marque pelo menos uma opção de conformidade (Conforme ou Não Conforme).`
         });
         return false;
     }
@@ -790,61 +756,8 @@ function validarFormulario() {
         const causasSelecionadas = document.querySelectorAll(`#causasContainer${id} .causa-checkbox:checked`).length;
         const destinoSelecionado = document.getElementById(`destino${id}`).value;
         
-
-        if (somaQuantidadeNaoConforme > 0){
-            if (!quantidade || quantidade <= 0) {
-                Toast.fire({
-                    icon: "error",
-                    title: `Por favor, informe a quantidade afetada para a não conformidade #${id}.`
-                });
-                return false;
-            }
-
-            if (causasSelecionadas === 0) {
-                Toast.fire({
-                    icon: "error",
-                    title: `Por favor, selecione pelo menos uma causa para a não conformidade #${id}.`
-                });
-
-                return false;
-            }
-
-            if (destinoSelecionado === '') {
-                Toast.fire({
-                    icon: "error",
-                    title: `Por favor, selecione o destino correto para a não conformidade #${id}.`
-                });
-
-                return false;
-            }
-        }
         // Acumular quantidade afetada das não conformidades
         somaQuantidadesAfetadas += quantidade;
-    }
-
-    // 6. Verificar se a quantidade de peças mortas + quantidade afetada é maior que a quantidade produzida
-    const totalPecasProblema = qtdPecaMorta + somaQuantidadesAfetadas;
-    const totalNaoConformidade = somaQuantidadeNaoConforme;
-    console.log(totalNaoConformidade)
-    console.log(somaQuantidadesAfetadas)
-
-    if (totalPecasProblema > qtdProduzida) {
-        Toast.fire({
-            icon: "error",
-            title: `A soma da quantidade de peças mortas e das quantidades afetadas por não conformidades não pode ultrapassar a quantidade produzida.`
-        });
-
-        return false;
-    }
-    
-
-    if (totalNaoConformidade > 0 && totalNaoConformidade !== somaQuantidadesAfetadas) {
-        Toast.fire({
-            icon: "error",
-            title: `A soma da quantidade de não conformidades tem que ser igual a soma das quantidades afetadas`
-        });
-
-        return false;
     }
 
     return true;

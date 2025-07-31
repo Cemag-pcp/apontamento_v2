@@ -36,6 +36,10 @@ urlpatterns = [
     path('api/itens-inspecao-serra-usinagem/', serra_usinagem.get_itens_inspecao_serra_usinagem, name='itens-inspecao-serra-usinagem'),
     path('api/itens-inspecionados-serra-usinagem/', serra_usinagem.get_itens_inspecionados_serra_usinagem, name='itens-inspecionados-serra-usinagem'),
     path('api/itens-reinspecao-serra-usinagem/', serra_usinagem.get_itens_reinspecao_serra_usinagem, name='itens-reinspecao-estamserra-usinagemparia'),
+    path('api/get-execucao-inspecao-serra-usinagem/', serra_usinagem.get_execucao_inspecao_serra_usinagem, name='execucao-inspecao-serra-usinagem'),
+
+    path('api/envio-inspecao-serra-usinagem/', serra_usinagem.envio_inspecao_serra_usinagem, name='inspecionar-serra-usinagem'),
+    path('api/envio-reinspecao-serra-usinagem/', serra_usinagem.envio_reinspecao_serra_usinagem, name='envio-reinspecao-serra-usinagem'),
 
     path('api/motivos-causas/<str:setor>/', views_general.motivos_causas, name='motivos_causas'),
 

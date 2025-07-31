@@ -282,15 +282,15 @@
                             <div class="d-flex flex-column align-items-start mb-3">
                                 <h6>Inspeção</h6>
                                 <div class="d-flex justify-content-end gap-2 mt-2">
-                                    <input type="checkbox" name="checkbox-inspecao-serra" id="checkbox-inspecao-serra">
+                                    <input type="checkbox" name="checkbox-inspecao-serra" id="checkbox-inspecao-serra" class="inspection-checkbox">
                                     <label for="checkbox-inspecao-serra">Inspeção Serra</label>
                                 </div>
                                 <div class="d-flex justify-content-end gap-2 mt-2">
-                                    <input type="checkbox" name="checkbox-inspecao-usinagem" id="checkbox-inspecao-usinagem">
+                                    <input type="checkbox" name="checkbox-inspecao-usinagem" id="checkbox-inspecao-usinagem" class="inspection-checkbox">
                                     <label for="checkbox-inspecao-usinagem">Inspeção Usinagem</label>
                                 </div>
                                 <div class="d-flex justify-content-end gap-2 mt-2">
-                                    <input type="checkbox" name="checkbox-inspecao-furacao" id="checkbox-inspecao-furacao">
+                                    <input type="checkbox" name="checkbox-inspecao-furacao" id="checkbox-inspecao-furacao" class="inspection-checkbox">
                                     <label for="checkbox-inspecao-furacao">Inspeção Furação</label>
                                 </div>
                             </div>
@@ -372,119 +372,10 @@
                         <div class="card-header bg-light">
                             <h6 class="mb-0">Medições Técnicas</h6>
                         </div>
-                        <div class="card-body">
-                            <div id="sectionMedicaoTec">
-                                <label class="form-label">Medidas especificadas em desenho técnico</label>
-                                <div class="table-responsive">
-                                    <table class="table table-bordered inspection-table" >
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>
-                                                    <input type="text" placeholder="Medida 1" class="form-control" id="medida1" style="padding: 5px;">
-                                                </th>
-                                                <th>
-                                                    <input type="text" placeholder="Medida 2" class="form-control" id="medida2" style="padding: 5px;">
-                                                </th>
-                                                <th>
-                                                    <input type="text" placeholder="Medida 3" class="form-control" id="medida3" style="padding: 5px;">
-                                                </th>
-                                                <th>
-                                                    <input type="text" placeholder="Medida 4" class="form-control" id="medida4" style="padding: 5px;">
-                                                </th>
-                                                <th style="font-size: 11px;">Conforme</th>
-                                                <th style="font-size: 11px;">Não conforme</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr id="linhaMedicao1">
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_1" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_2" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_3" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor1_4" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity1" id="conforming1" value="conforming" checked>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity1" id="nonConforming1" value="nonConforming">
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr id="linhaMedicao2">
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_1" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_2" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_3" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor2_4" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity2" id="conforming2" value="conforming" checked>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity2" id="nonConforming2" value="nonConforming">
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            <tr id="linhaMedicao3">
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_1" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_2" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_3" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor3_4" style="padding: 5px;">
-                                                </td>
-                                                <td>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity3" id="conforming3" value="conforming" checked>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input conformity-radio" type="radio" name="conformity3" id="nonConforming3" value="nonConforming">
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div class="row mb-3" id="inspecaoTotal">
-                                <div class="col-sm-12">
-                                    <label for="inspecao_total">Necessita realizar a inspeção 100%?</label>
-                                    <select class="form-select" name="inspecao_total" id="inspecao_total">
-                                        <option value="" selected hidden disabled></option>
-                                        <option value="Não">Não</option>
-                                        <option value="Sim">Sim</option>
-                                    </select>
-                                </div>
-                            </div>
+                        <div class="card-body" id="medicoes-container">
+                            <!-- As seções de medição serão inseridas aqui dinamicamente -->
                         </div>
                     </div>
-
                     <!-- Seção 4: Não Conformidades - Inicialmente oculta -->
                     <div id="nonConformitySection" class="card mb-4" style="display: none;">
                         <div class="card-header bg-warning text-dark">
@@ -678,13 +569,14 @@
 {% endblock %}
 
 {% block scripts %} 
+<script src="{% static 'js/serra-usinagem/medidas/medidas.js' %}"></script>
 <script src="{% static 'js/serra-usinagem/a-inspecionar-serra-usinagem.js' %}"></script>
 <script src="{% static 'js/serra-usinagem/inspecionados-serra-usinagem.js' %}"></script>
 <script src="{% static 'js/serra-usinagem/reinspecao-serra-usinagem.js' %}"></script>
+<script src="{% static 'js/serra-usinagem/inspecionar/enviar-inspecao.js' %}"></script>
 <!-- <script src="{% static 'js/serra-usinagem/reinspecionar/modal-reinspecionar.js' %}"></script>
 <script src="{% static 'js/serra-usinagem/inspecionados/modal-inspecionados.js' %}"></script>
 <script src="{% static 'js/serra-usinagem/reinspecionar/envio-reinspecao.js' %}"></script>
-<script src="{% static 'js/serra-usinagem/inspecionar/enviar-inspecao.js' %}"></script>
 <script src="{% static 'js/serra-usinagem/inspecionados/excluir-execucao.js' %}"></script>
 <script src="{% static 'js/geral/utils.js' %}"> -->
 
