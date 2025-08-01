@@ -25,6 +25,7 @@ class InfoAdicionaisSerraUsinagem(models.Model):
         DadosExecucaoInspecao, on_delete=models.CASCADE, related_name="info_adicionais"
     )
     inspecao_completa = models.BooleanField(default=False)
+    inspecao_finalizada = models.BooleanField(default=False)
     ficha = models.ImageField(upload_to="fichas_inspecao/", null=True, blank=True)
 
     observacoes_gerais = models.TextField(null=True, blank=True)

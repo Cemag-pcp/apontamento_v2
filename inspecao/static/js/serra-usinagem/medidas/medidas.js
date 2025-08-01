@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', function() {
         usinagem: { medidas: [], valores: {} },
         furacao: { medidas: [], valores: {} }
     };
+
+    updateMeasurementSections();
     
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
@@ -44,22 +46,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Adiciona a seção de inspeção 100% se houver pelo menos uma seção
-        if (container.children.length > 0) {
-            const inspecaoTotalDiv = document.createElement('div');
-            inspecaoTotalDiv.className = 'row mb-3';
-            inspecaoTotalDiv.id = 'inspecaoTotal';
-            inspecaoTotalDiv.innerHTML = `
-                <div class="col-sm-12">
-                    <label for="inspecao_total">Necessita realizar a inspeção 100%?</label>
-                    <select class="form-select" name="inspecao_total" id="inspecao_total">
-                        <option value="" selected hidden disabled></option>
-                        <option value="Não">Não</option>
-                        <option value="Sim">Sim</option>
-                    </select>
-                </div>
-            `;
-            container.appendChild(inspecaoTotalDiv);
-        }
+
+        const inspecaoTotalDiv = document.createElement('div');
+        inspecaoTotalDiv.className = 'row mb-3';
+        inspecaoTotalDiv.id = 'inspecaoTotal';
+        inspecaoTotalDiv.innerHTML = `
+            <div class="col-sm-12">
+                <label for="inspecao_total">Necessita realizar a inspeção 100%?</label>
+                <select class="form-select" name="inspecao_total" id="inspecao_total">
+                    <option value="" selected hidden disabled></option>
+                    <option value="Não">Não</option>
+                    <option value="Sim">Sim</option>
+                </select>
+            </div>
+        `;
+        container.appendChild(inspecaoTotalDiv);
     }
     
     function saveCurrentValues() {
@@ -114,13 +115,42 @@ document.addEventListener('DOMContentLoaded', function() {
                     <table class="table table-bordered inspection-table">
                         <thead class="table-light">
                             <tr>
-                                ${createHeaderCells(type)}
+                                ${Array.from({length: 4}, (_, i) => `
+                                    <th>
+                                        <input type="text" placeholder="Medida ${i+1}" 
+                                            class="form-control medida-input" 
+                                            name="medida-input-${i+1}"
+                                            style="padding: 5px;">
+                                    </th>
+                                `).join('')}
+                                <th style="font-size: 11px;">Conforme</th>
+                                <th style="font-size: 11px;">Não conforme</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${createMeasurementRow(1, type)}
-                            ${createMeasurementRow(2, type)}
-                            ${createMeasurementRow(3, type)}
+                            ${[1, 2, 3].map(rowNumber => `
+                                <tr>
+                                    ${Array.from({length: 4}, (_, i) => `
+                                        <td>
+                                            <input type="number" step="0.01" class="form-control" 
+                                                placeholder="Valor" style="padding: 5px;" 
+                                                name="${type}_valor${rowNumber}_${i+1}">
+                                        </td>
+                                    `).join('')}
+                                    <td>
+                                        <div class="form-check">
+                                            <input class="form-check-input conformity-check" type="checkbox" 
+                                                name="${type}_conformity${rowNumber}" value="conforming">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="form-check">
+                                            <input class="form-check-input conformity-check" type="checkbox" 
+                                                name="${type}_conformity${rowNumber}" value="nonConforming">
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -129,67 +159,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return section;
     }
-    
-    function createHeaderCells(type) {
-        let headerCells = '';
-        for (let i = 1; i <= 4; i++) {
-            const medidaValue = storedValues[type].medidas[i-1] || '';
-            headerCells += `
-                <th>
-                    <input type="text" placeholder="Medida ${i}" 
-                           class="form-control medida-input" 
-                           name="medida-input-${i}"
-                           style="padding: 5px;"
-                           value="${medidaValue}">
-                </th>
-            `;
-        }
-        headerCells += `
-            <th style="font-size: 11px;">Conforme</th>
-            <th style="font-size: 11px;">Não conforme</th>
-        `;
-        return headerCells;
-    }
-    
-    function createMeasurementRow(rowNumber, type) {
-        const rowData = storedValues[type].valores[rowNumber] || {};
-        
-        let cells = '';
-        for (let i = 1; i <= 4; i++) {
-            const value = rowData[i] || '';
-            cells += `
-                <td>
-                    <input type="number" step="0.01" class="form-control" 
-                           placeholder="Valor" style="padding: 5px;" 
-                           name="${type}_valor${rowNumber}_${i}"
-                           value="${value}">
-                </td>
-            `;
-        }
-        
-        const conformingChecked = rowData.conformity === 'conforming' ? 'checked' : '';
-        const nonConformingChecked = rowData.conformity === 'nonConforming' ? 'checked' : '';
-        
-        cells += `
-            <td>
-                <div class="form-check">
-                    <input class="form-check-input conformity-check" type="checkbox" 
-                           name="${type}_conformity${rowNumber}" value="conforming" 
-                           ${conformingChecked}>
-                </div>
-            </td>
-            <td>
-                <div class="form-check">
-                    <input class="form-check-input conformity-check" type="checkbox" 
-                           name="${type}_conformity${rowNumber}" value="nonConforming" 
-                           ${nonConformingChecked}>
-                </div>
-            </td>
-        `;
-        
-        return `<tr>${cells}</tr>`;
-    }
-    
 
     updateConformityCounts();
     

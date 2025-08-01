@@ -10,11 +10,10 @@ function enviarDadosInspecao() {
     const formData = new FormData();
 
     // 1. Coletar informações básicas
-    formData.append('id-inspecao', document.getElementById('id-inspecao').value);
+    formData.append('inspecao_id', document.getElementById('id-inspecao').value);
     formData.append('dataInspecao', document.getElementById('dataInspecao').value);
     formData.append('pecasProduzidas', document.getElementById('pecasProduzidas').value);
     formData.append('inspetor', document.getElementById('inspetor').value);
-    formData.append('numPecaDefeituosa', document.getElementById('numPecaDefeituosa').value);
     formData.append('inspecao_total', document.getElementById('inspecao_total').value);
 
     // 2. Coletar quais inspeções estão ativas

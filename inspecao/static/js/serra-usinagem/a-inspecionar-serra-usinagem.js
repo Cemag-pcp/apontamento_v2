@@ -21,9 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Inicializar contagem de conformidades
     updateConformityCounts();
-
-    preencherCausas_1();
-
 });
 
 document.getElementById("btn-filtrar-inspecao-serra-usinagem").addEventListener("click", (event) => {
@@ -46,29 +43,6 @@ document.getElementById("btn-limpar-inspecao-serra-usinagem").addEventListener("
     buscarItensInspecao(1);
 });
 
-document.getElementById("numPecaDefeituosa").addEventListener("change", (event) => {
-
-    // Verifica se o valor máximo é menor que o valor atual
-    const max = parseInt(event.target.max);
-    const value = parseInt(event.target.value);
-    if (value > max) {
-        Toast.fire({
-            icon: "warning",
-            title: "A quantidade de peça morta não pode exceder o total de peças produzidas."
-        });
-        event.target.value = '';  
-        return;
-    }
-
-    if ((value - max) === 0){
-        document.getElementById("medicoesTecnicas").style.display = 'none';
-        document.getElementById("inspecao_total").value = 'Sim';
-    } else {
-        document.getElementById("medicoesTecnicas").style.display = 'block';
-        document.getElementById("inspecao_total").value = '';
-    }
-
-});
 
 function buscarItensInspecao(pagina) {
     let cardsInspecao = document.getElementById("cards-inspecao");
@@ -186,6 +160,10 @@ function buscarItensInspecao(pagina) {
             document.querySelectorAll('.iniciar-inspecao').forEach(button => {
                 button.addEventListener('click', function () {
 
+                // Remover itens anteriores e resetar o modal
+                    removeAllNonConformityItems();
+                    resetModal();
+
                     // Capturar dados do botão
                     const itemId = this.getAttribute('data-id');
                     const itemData = this.getAttribute('data-data');
@@ -198,7 +176,8 @@ function buscarItensInspecao(pagina) {
                     // Pegar a data atual formatada
                     const currentDate = new Date();
                     const formattedDate = currentDate.toISOString().split('T')[0];
-                    
+                    console.log(formattedDate)
+
                     modalInspecao.querySelector('#dataInspecao').value = formattedDate;
                     modalInspecao.querySelector('#conjuntoName').value = itemPeca;
                     modalInspecao.querySelector('#maquina').value = itemMaquina;
@@ -210,12 +189,6 @@ function buscarItensInspecao(pagina) {
                     modalInspecao.querySelector('#pecasProduzidas').disabled = true;
                     modalInspecao.querySelector('#dataInspecao').disabled = true;
                     modalInspecao.querySelector('#conjuntoName').disabled = true;
-
-                    modalInspecao.querySelector('#numPecaDefeituosa').setAttribute("max", itemQtd);
-
-                    // Remover itens anteriores e resetar o modal
-                    removeAllNonConformityItems();
-                    resetModal();
                     
                     fetch(`/inspecao/api/get-execucao-inspecao-serra-usinagem/?id_inspecao=${itemId}`, {
                         method: 'GET',
@@ -226,8 +199,9 @@ function buscarItensInspecao(pagina) {
                     })
                     .then(response => response.json())
                     .then(data => {
-                        if (data.existe && data.dados.length > 0) {
-                            console.log(data.dados)
+                        console.log(data.existe);
+                        console.log(data.dados.length);
+                        if (data.existe && data.dados && Object.keys(data.dados.tipos_processo).length > 0) {
                             // Preencher as linhas de medição com os dados retornados
                             preencherLinhasMedicao(data.dados);
                             // Só agora mostrar o modal
@@ -293,76 +267,65 @@ function buscarItensInspecao(pagina) {
 }
 
 function preencherLinhasMedicao(dados) {
-    if (!dados.length) return;
+    console.log(dados)
+    if (!dados || !dados.tipos_processo) return;
 
-    // Ativa o checkbox do tipo de inspeção retornado
-    const tipo = dados[0].tipo_processo;
-    const checkbox = document.getElementById(`checkbox-inspecao-${tipo}`);
-    if (checkbox && !checkbox.checked) {
-        checkbox.checked = true;
-        checkbox.dispatchEvent(new Event('change'));
-    }
+    // Atualiza status da inspeção completa
+    document.getElementById('inspecao_total').value = dados.inspecao_completa ? "Sim" : "Não";
 
-    // Preencher os medida-input (cabeçalhos)
-    if (dados[0].detalhes) {
-        dados[0].detalhes.forEach((detalhe, idx) => {
-            const medidaInput = document.querySelector(
-                `.measurement-section[data-type="${tipo}"] input[name="medida-input-${idx + 1}"]`
+    // Para cada tipo de processo (serra, usinagem, furacao)
+    for (const [tipo, dadosTipo] of Object.entries(dados.tipos_processo)) {
+        // Ativa o checkbox correspondente
+        const checkbox = document.getElementById(`checkbox-inspecao-${tipo}`);
+        if (checkbox) {
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change'));
+        }
+
+        // Preenche os cabeçalhos (nomes das medidas)
+        dadosTipo.cabecalhos.forEach((cabecalho, index) => {
+            const inputCabecalho = document.querySelector(
+                `.measurement-section[data-type="${tipo}"] input[name="medida-input-${index + 1}"]`
             );
-            if (medidaInput) medidaInput.value = detalhe.cabecalho;
+            if (inputCabecalho) {
+                inputCabecalho.value = cabecalho;
+                inputCabecalho.disabled = true;
+            }
         });
-    }
 
-    // Preencher os valores das medições por amostra
-    dados.forEach(item => {
-        if (item.detalhes && Array.isArray(item.detalhes)) {
-            item.detalhes.forEach((detalhe, idx) => {
-                const input = document.querySelector(
-                    `input[name="${tipo}_valor${item.amostra}_${idx + 1}"]`
+        // Preenche os valores das amostras
+        for (const [amostraNum, amostraData] of Object.entries(dadosTipo.amostras)) {
+            amostraData.medidas.forEach((medida, medidaIndex) => {
+                const inputValor = document.querySelector(
+                    `input[name="${tipo}_valor${amostraNum}_${medidaIndex + 1}"]`
                 );
-                if (input) input.value = detalhe.valor;
-
-                // Marcar o checkbox de conformidade
-                const conformingCheckbox = document.querySelector(
-                    `input[name="${tipo}_conformity${item.amostra}"][value="conforming"]`
-                );
-                const nonConformingCheckbox = document.querySelector(
-                    `input[name="${tipo}_conformity${item.amostra}"][value="nonConforming"]`
-                );
-                if (conformingCheckbox && nonConformingCheckbox) {
-                    if (detalhe.conforme === true) {
-                        conformingCheckbox.checked = true;
-                        nonConformingCheckbox.checked = false;
-                    } else if (detalhe.conforme === false) {
-                        conformingCheckbox.checked = false;
-                        nonConformingCheckbox.checked = true;
-                    }
+                console.log(inputValor)
+                if (inputValor) {
+                    inputValor.value = medida.valor;
                 }
             });
+
+            // Marca conformidade da amostra
+            const conformeCheckbox = document.querySelector(
+                `input[name="${tipo}_conformity${amostraNum}"][value="conforming"]`
+            );
+            const naoConformeCheckbox = document.querySelector(
+                `input[name="${tipo}_conformity${amostraNum}"][value="nonConforming"]`
+            );
+            
+            if (conformeCheckbox && naoConformeCheckbox) {
+                if (amostraData.conforme) {
+                    conformeCheckbox.checked = true;
+                    naoConformeCheckbox.checked = false;
+                } else {
+                    conformeCheckbox.checked = false;
+                    naoConformeCheckbox.checked = true;
+                }
+                conformeCheckbox.disabled = true;
+                naoConformeCheckbox.disabled = true;
+            }
         }
-    });
-
-}
-
-function togglePecaMortaSection(mostrar) {
-    const secao = document.getElementById('pecaMortaSection');
-    const statusBadge = document.getElementById('statusPecasDefeituosas');
-    const qtMorta = document.getElementById('numPecaDefeituosa');
-    
-    if (mostrar) {
-        secao.style.display = 'block';
-        statusBadge.textContent = 'Peças com defeito';
-        statusBadge.className = 'badge bg-danger text-white';
-    } else {
-        secao.style.display = 'none';
-        statusBadge.textContent = 'Sem defeitos';
-        statusBadge.className = 'badge bg-success text-white';
-        
-        // Limpa o valor do input e dispara a função de controle da tabela
-        qtMorta.value = "";
     }
-
-    document.getElementById('medicoesTecnicas').style.display = 'block';
 }
 
 async function buscarMotivosCausas() {
@@ -378,31 +341,6 @@ async function buscarMotivosCausas() {
     } catch (error) {
         console.error(error);
     }
-}
-
-async function preencherCausas_1() {
-    const dados_causas = await buscarMotivosCausas();  // Aguarda os dados serem carregados
-
-    if (!dados_causas || !dados_causas.motivos) {
-        console.error("Dados inválidos ou vazios retornados da API.");
-        return;
-    }
-
-    const causasContainer = document.getElementById('causasPecaMorta');
-    causasContainer.innerHTML = '';  // Limpa o conteúdo anterior
-
-    dados_causas.motivos.forEach((motivoCausa, index) => {
-        const motivoId = `causa1_${index + 1}`;
-        const motivoDiv = document.createElement('div');
-        motivoDiv.className = 'form-check mb-2';
-
-        motivoDiv.innerHTML = `
-            <input class="form-check-input causa-checkbox" type="checkbox" id="${motivoId}" name="causas1" value="${motivoCausa.id}">
-            <label class="form-check-label" for="${motivoId}">${motivoCausa.nome}</label>
-        `;
-        
-        causasContainer.appendChild(motivoDiv);
-    });
 }
 
 // Função para resetar o modal
@@ -424,24 +362,6 @@ function resetModal() {
     document.querySelectorAll('input[disabled], select[disabled]').forEach(function(input) {
         input.disabled = false;
     });
-
-    // Limpar as causas de peças mortas
-    preencherCausas_1();
-
-    // Resetar o valor do campo de quantidade de peças mortas
-    const qtMorta = document.getElementById('numPecaDefeituosa');
-    if (qtMorta) qtMorta.value = '';
-
-    // Ocultar a seção de peças mortas (resetar para estado inicial)
-    const secaoPecaMorta = document.getElementById('pecaMortaSection');
-    if (secaoPecaMorta) secaoPecaMorta.style.display = 'none';
-
-    // Atualizar o status badge para o estado inicial
-    const statusBadge = document.getElementById('statusPecasDefeituosas');
-    if (statusBadge) {
-        statusBadge.textContent = 'Não verificado';
-        statusBadge.className = 'badge bg-secondary text-dark';
-    }
 
     updateConformityCounts();
 }
@@ -707,33 +627,6 @@ function validarFormulario() {
             title: "Por favor, informe o nome do inspetor."
         });
         return false;
-    }
-
-    // 1. Validação de peças mortas
-    const pecaMortaSim = document.getElementById("pecaMortaSim").checked;
-    let qtdPecaMorta = 0;
-    
-    if (pecaMortaSim) {
-        const quantidade = parseInt(document.getElementById("numPecaDefeituosa").value);
-        const causasSelecionadas = document.querySelectorAll("#causasPecaMorta .causa-checkbox:checked").length;
-
-        if (!quantidade || quantidade <= 0) {
-            Toast.fire({
-                icon: "error",
-                title: "Por favor, informe a quantidade de peças mortas."
-            });
-            return false;
-        }
-
-        if (causasSelecionadas === 0) {
-            Toast.fire({
-                icon: "error",
-                title: "Por favor, selecione pelo menos uma causa para as peças mortas."
-            });
-            return false;
-        }
-
-        qtdPecaMorta = quantidade; // Armazena a quantidade de peças mortas
     }
 
     // 3. Validação inspeção 100%
