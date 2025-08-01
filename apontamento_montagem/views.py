@@ -195,6 +195,7 @@ def atualizar_status_ordem(request):
         ordem_id = body.get('ordem_id')
         grupo_maquina = 'montagem'
         qt_produzida = body.get('qt_realizada', 0)
+        continua = body.get('continua', 'false').lower() == 'true'
 
         if not ordem_id or not grupo_maquina or not status:
             return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
@@ -306,8 +307,8 @@ def atualizar_status_ordem(request):
                 else:
                     codigo = peca.peca
                 
+                # verifica se ta na lista de itens a ser inspecionado pelo setor da montagem
                 conjuntos_inspecionados = ConjuntosInspecionados.objects.filter(codigo=codigo)
-
                 if conjuntos_inspecionados:
                     Inspecao.objects.create(
                         pecas_ordem_montagem=ultimo_peca_ordem,
@@ -319,11 +320,28 @@ def atualizar_status_ordem(request):
                 # Se a quantidade finalizada atingir a planejada, muda status para concluída
                 if sum_pecas_finalizadas == peca.qtd_planejada:
                     ordem.status_atual = status
+                    ordem.status_prioridade = 3
+                    ordem.save()
                 else:
-                    ordem.status_atual = 'aguardando_iniciar'
 
-                ordem.status_prioridade = 3
-                ordem.save()
+                    # se o operador desejar continuar a ordem em aberto?
+                    # continua = True
+                    # mas e se o operador clicar sem querer? Como ele finaliza apenas sem computar a ordem?
+                    if continua == True:
+                        ordem.status_atual = 'iniciada'
+                        ordem.status_prioridade = 1
+                        ordem.save()
+
+                        nova_peca_ordem = PecasOrdem.objects.create(
+                            ordem=ordem,
+                            peca=peca.peca,
+                            qtd_planejada=peca.qtd_planejada,
+                            qtd_boa=0,
+                            operador=None,
+                            processo_ordem=novo_processo
+                        )
+
+                        nova_peca_ordem.save()
 
             elif status == 'interrompida':
                 novo_processo.motivo_interrupcao = get_object_or_404(MotivoInterrupcao, pk=body['motivo'])
