@@ -1032,6 +1032,12 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         const modalElement = document.getElementById('finalizarModal');
         const finalizarModal = bootstrap.Modal.getInstance(modalElement);
         finalizarModal.hide();
+
+        // fechar modal de confirmação
+        const modalElementConfirmacao = document.getElementById('modalFinalizarParcial');
+        const finalizarModalConfirmacao = bootstrap.Modal.getInstance(modalElementConfirmacao);
+        finalizarModalConfirmacao.hide();
+
         Swal.close();
     })
     .catch(error => {

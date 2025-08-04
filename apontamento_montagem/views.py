@@ -299,7 +299,6 @@ def atualizar_status_ordem(request):
                 ultimo_peca_ordem.qtd_boa=int(qt_produzida)
                 ultimo_peca_ordem.processo_ordem=novo_processo
                 ultimo_peca_ordem.operador=operador_final
-                
                 ultimo_peca_ordem.save()
 
                 if "-" in peca.peca:
@@ -326,7 +325,8 @@ def atualizar_status_ordem(request):
 
                     # se o operador desejar continuar a ordem em aberto?
                     # continua = True
-                    # mas e se o operador clicar sem querer? Como ele finaliza apenas sem computar a ordem?
+                    # mas e se o operador clicar sem querer?
+                    # Como ele finaliza apenas sem computar a ordem?
                     if continua == True:
                         ordem.status_atual = 'iniciada'
                         ordem.status_prioridade = 1
@@ -342,6 +342,11 @@ def atualizar_status_ordem(request):
                         )
 
                         nova_peca_ordem.save()
+
+                    else:
+                        ordem.status_atual = 'aguardando_iniciar'
+                        ordem.status_prioridade = 1
+                        ordem.save()
 
             elif status == 'interrompida':
                 novo_processo.motivo_interrupcao = get_object_or_404(MotivoInterrupcao, pk=body['motivo'])
