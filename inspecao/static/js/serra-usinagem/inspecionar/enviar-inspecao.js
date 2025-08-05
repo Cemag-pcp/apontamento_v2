@@ -6,7 +6,7 @@ function enviarDadosInspecao() {
     const buttonSalvarInspecao = document.getElementById('saveInspection');
     buttonSalvarInspecao.disabled = true;
     buttonSalvarInspecao.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>';
-
+    
     const formData = new FormData();
 
     // 1. Coletar informações básicas
@@ -31,6 +31,10 @@ function enviarDadosInspecao() {
     });
     formData.append('causasPecaMorta', JSON.stringify(causasPecaMorta));
 
+    const qtdProduzida = document.getElementById('pecasProduzidas').value;
+    // Converter para número e garantir que seja pelo menos 1
+    const qtdLinhas = Math.max(1, Math.min(3, parseInt(qtdProduzida) || 1));
+
     // 4. Coletar medidas técnicas apenas dos tipos ativos
     inspecoesAtivas.forEach(tipo => {
         const medidasTipo = [];
@@ -41,14 +45,14 @@ function enviarDadosInspecao() {
         document.querySelectorAll(`#sectionMedicao${tipoCapitalizado} .medida-input`).forEach((input, index) => {
             cabecalhos[index] = input.value.trim();
         });
-
-        // Coletar linhas de medição (3 linhas padrão)
-        for (let linha = 1; linha <= 3; linha++) {
+        
+        // Coletar linhas de medição (quantidade dinâmica conforme regra)
+        for (let linha = 1; linha <= qtdLinhas; linha++) {
             const medida = {};
             let algumCampoPreenchido = false;
 
-            // Coletar os 4 valores de medida
-            for (let coluna = 1; coluna <= 4; coluna++) {
+            // Coletar os 8 valores de medida
+            for (let coluna = 1; coluna <= 8; coluna++) {
                 const nomeMedida = cabecalhos[coluna-1] || `Medida ${coluna}`;
                 const valorInput = document.querySelector(`input[name="${tipo}_valor${linha}_${coluna}"]`);
                 const valor = valorInput ? valorInput.value.trim() : '';

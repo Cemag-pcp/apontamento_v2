@@ -139,8 +139,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         console.log("ENTROU")
                         conformingCheckbox.checked = value.conforming;
                         nonConformingCheckbox.checked = value.nonConforming;
-                        conformingCheckbox.disabled = value.disabled;
-                        nonConformingCheckbox.disabled = value.disabled;
                     }
                 } else {
                     const input = document.querySelector(`.measurement-section[data-type="${type}"] input[name="${type}_valor${row}_${key}"]`);
@@ -172,19 +170,23 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const typeName = type === 'serra' ? 'Serra' : type === 'usinagem' ? 'Usinagem' : 'Furação';
         
+        // Obter quantidade produzida ou usar 3 como padrão
+        const qtdProduzida = parseInt(document.getElementById('pecasProduzidas').value) || 0;
+        const numberOfRows = qtdProduzida >= 3 ? 3 : Math.max(1, qtdProduzida); // Mínimo 1 linha
+        
         section.innerHTML = `
             <div id="sectionMedicao${typeName}">
                 <label class="form-label">Medidas especificadas em desenho técnico - (<span class="fw-bold">${typeName}</span>)</label>
                 <div class="table-responsive">
-                    <table class="table table-bordered inspection-table">
+                    <table class="table table-bordered inspection-table" style="width: 730px;">
                         <thead class="table-light">
                             <tr>
-                                ${Array.from({length: 4}, (_, i) => `
+                                ${Array.from({length: 8}, (_, i) => `
                                     <th>
-                                        <input type="text" placeholder="Medida ${i+1}" 
+                                        <input type="text" placeholder="Medida" 
                                             class="form-control medida-input" 
                                             name="medida-input-${i+1}"
-                                            style="padding: 5px;">
+                                            style="padding: 5px; font-size: 11px;">
                                     </th>
                                 `).join('')}
                                 <th style="font-size: 11px;">Conforme</th>
@@ -192,25 +194,27 @@ document.addEventListener('DOMContentLoaded', function() {
                             </tr>
                         </thead>
                         <tbody>
-                            ${[1, 2, 3].map(rowNumber => `
+                            ${Array.from({length: numberOfRows}, (_, rowNumber) => `
                                 <tr>
-                                    ${Array.from({length: 4}, (_, i) => `
+                                    ${Array.from({length: 8}, (_, i) => `
                                         <td>
                                             <input type="number" step="0.01" class="form-control" 
-                                                placeholder="Valor" style="padding: 5px;" 
-                                                name="${type}_valor${rowNumber}_${i+1}">
+                                                placeholder="Valor" style="padding: 5px;
+                                                font-size: 11px; box-shadow: 0 0 0 0;
+                                                border: 0 none; outline: 0;" 
+                                                name="${type}_valor${rowNumber+1}_${i+1}">
                                         </td>
                                     `).join('')}
                                     <td>
                                         <div class="form-check">
                                             <input class="form-check-input conformity-check" type="checkbox" 
-                                                name="${type}_conformity${rowNumber}" value="conforming">
+                                                name="${type}_conformity${rowNumber+1}" value="conforming">
                                         </div>
                                     </td>
                                     <td>
                                         <div class="form-check">
                                             <input class="form-check-input conformity-check" type="checkbox" 
-                                                name="${type}_conformity${rowNumber}" value="nonConforming">
+                                                name="${type}_conformity${rowNumber+1}" value="nonConforming">
                                         </div>
                                     </td>
                                 </tr>

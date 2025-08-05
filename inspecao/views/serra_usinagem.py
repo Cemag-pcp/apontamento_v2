@@ -22,7 +22,7 @@ from core.models import Profile, Maquina
 
 from collections import defaultdict
 import json
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 
 
 def inspecao_serra_usinagem(request):
@@ -77,6 +77,11 @@ def get_itens_inspecao_serra_usinagem(request):
         # Construção da query base
         query = Q(
             Q(pecas_ordem_serra__isnull=False) | Q(pecas_ordem_usinagem__isnull=False)
+        )
+
+        query &= (
+            Q(dadosexecucaoinspecao__isnull=True) |  # Não iniciadas
+            Q(dadosexecucaoinspecao__num_execucao=0)  # Primeira execução (num_execucao = 0)
         )
 
         # Filtro por status0
@@ -192,7 +197,7 @@ def get_itens_inspecao_serra_usinagem(request):
 
                     if ultima_execucao.info_adicionais.inspecao_finalizada:
                         status_info["status"] = "Finalizada"
-                    elif ultima_execucao.info_adicionais.inspecao_completa:
+                    elif ultima_execucao.info_adicionais.inspecao_finalizada:
                         status_info["status"] = "Completa"
                     else:
                         status_info["status"] = "Em andamento"
@@ -225,6 +230,7 @@ def get_itens_inspecao_serra_usinagem(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+
 @require_GET
 def get_execucao_inspecao_serra_usinagem(request):
     id_inspecao = request.GET.get("id_inspecao")
@@ -232,18 +238,22 @@ def get_execucao_inspecao_serra_usinagem(request):
         return JsonResponse({"error": "id_inspecao não informado"}, status=400)
 
     try:
-        execucoes = DadosExecucaoInspecao.objects.filter(inspecao_id=id_inspecao).order_by('-num_execucao')
+        execucoes = DadosExecucaoInspecao.objects.filter(
+            inspecao_id=id_inspecao
+        ).order_by("-num_execucao")
         if not execucoes.exists():
             return JsonResponse({"existe": False, "dados": []})
 
         ultima_execucao = execucoes.first()
         info_adicionais = getattr(ultima_execucao, "info_adicionais", None)
-        
+
         medidas = MedidasProcessoSerraUsinagem.objects.filter(execucao=ultima_execucao)
-        
+
         dados_organizados = {
-            'inspecao_completa': info_adicionais.inspecao_completa if info_adicionais else False,
-            'tipos_processo': {}
+            "inspecao_completa": (
+                info_adicionais.inspecao_completa if info_adicionais else False
+            ),
+            "tipos_processo": {},
         }
 
         for medida in medidas:
@@ -255,62 +265,66 @@ def get_execucao_inspecao_serra_usinagem(request):
             # Organiza por amostra e coleta cabeçalhos mantendo a ordem e repetições
             amostras = {}
             cabecalhos_por_amostra = {}  # Para armazenar cabeçalhos por amostra
-            cabecalhos_unicos = set()     # Para armazenar todos os cabeçalhos únicos
-            
+            cabecalhos_unicos = set()  # Para armazenar todos os cabeçalhos únicos
+
             for detalhe in detalhes:
                 amostra = detalhe.amostra
 
                 if amostra not in amostras:
-                    amostras[amostra] = {
-                        'conforme': True,
-                        'medidas': []
-                    }
-                    cabecalhos_por_amostra[amostra] = []  # Inicializa lista de cabeçalhos para esta amostra
-                
+                    amostras[amostra] = {"conforme": True, "medidas": []}
+                    cabecalhos_por_amostra[amostra] = (
+                        []
+                    )  # Inicializa lista de cabeçalhos para esta amostra
+
                 # Adiciona o cabeçalho na ordem em que aparece
                 cabecalhos_por_amostra[amostra].append(detalhe.cabecalho)
                 cabecalhos_unicos.add(detalhe.cabecalho)
-                
-                amostras[amostra]['medidas'].append({
-                    'nome': detalhe.cabecalho,
-                    'valor': detalhe.valor,
-                    'conforme': detalhe.conforme
-                })
-                
+
+                amostras[amostra]["medidas"].append(
+                    {
+                        "nome": detalhe.cabecalho,
+                        "valor": detalhe.valor,
+                        "conforme": detalhe.conforme,
+                    }
+                )
+
                 if not detalhe.conforme:
-                    amostras[amostra]['conforme'] = False
-            
+                    amostras[amostra]["conforme"] = False
+
             # Verifica se todas as amostras têm a mesma sequência de cabeçalhos
             sequencia_cabecalhos = None
             cabecalhos_consistentes = True
-            
+
             for amostra, cabecalhos in cabecalhos_por_amostra.items():
                 if sequencia_cabecalhos is None:
                     sequencia_cabecalhos = cabecalhos
                 elif cabecalhos != sequencia_cabecalhos:
                     cabecalhos_consistentes = False
                     break
-            
+
             # Se todas as amostras têm a mesma sequência, usa essa sequência
             if cabecalhos_consistentes and sequencia_cabecalhos:
                 cabecalhos_finais = sequencia_cabecalhos
             else:
                 # Caso contrário, usa os cabeçalhos únicos em ordem alfabética (ou outra lógica)
                 cabecalhos_finais = sorted(cabecalhos_unicos)
-                
-            dados_organizados['tipos_processo'][tipo] = {
-                'cabecalhos': cabecalhos_finais,  # Agora é uma lista ordenada, não um set
-                'amostras': amostras
+
+            dados_organizados["tipos_processo"][tipo] = {
+                "cabecalhos": cabecalhos_finais,  # Agora é uma lista ordenada, não um set
+                "amostras": amostras,
             }
 
-        return JsonResponse({
-            "existe": True,
-            "dados": dados_organizados,
-            "num_execucao": ultima_execucao.num_execucao
-        })
-        
+        return JsonResponse(
+            {
+                "existe": True,
+                "dados": dados_organizados,
+                "num_execucao": ultima_execucao.num_execucao,
+            }
+        )
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
 
 def get_itens_reinspecao_serra_usinagem(request):
     maquinas = request.GET.get("maquinas")  # Ex: "Serra1,Usinagem2"
@@ -320,9 +334,13 @@ def get_itens_reinspecao_serra_usinagem(request):
 
     # Buscar reinspeções pendentes (não reinspecionadas) para serra ou usinagem
     reinspecoes = Reinspecao.objects.filter(
-        reinspecionado=False, inspecao__pecas_ordem_serra__isnull=False
+        reinspecionado=False,
+        inspecao__pecas_ordem_serra__isnull=False,
+        inspecao__dadosexecucaoinspecao__info_adicionais__inspecao_finalizada=True,
     ) | Reinspecao.objects.filter(
-        reinspecionado=False, inspecao__pecas_ordem_usinagem__isnull=False
+        reinspecionado=False,
+        inspecao__pecas_ordem_usinagem__isnull=False,
+        inspecao__dadosexecucaoinspecao__info_adicionais__inspecao_finalizada=True,
     )
 
     # Filtro por máquinas
@@ -398,7 +416,7 @@ def get_itens_reinspecao_serra_usinagem(request):
         ultima_execucao = inspecao.execucoes[-1] if inspecao.execucoes else None
 
         item = {
-            "id": reinspecao.id,
+            "id": inspecao.id,
             "id_inspecao": inspecao.id,
             "data_solicitacao": reinspecao.data_reinspecao.strftime(
                 "%d/%m/%Y %H:%M:%S"
@@ -450,10 +468,11 @@ def get_itens_inspecionados_serra_usinagem(request):
     pesquisar = request.GET.get("pesquisar")  # Ex: "peça 123"
     pagina = request.GET.get("pagina", 1)
 
-    # Buscar apenas inspeções que possuem execução (já inspecionadas)
+    # Buscar apenas inspeções que possuem execução com num_execucao=0
     inspecoes = Inspecao.objects.filter(
         Q(pecas_ordem_serra__isnull=False) | Q(pecas_ordem_usinagem__isnull=False),
         dadosexecucaoinspecao__isnull=False,  # Filtra apenas inspeções com execução
+        dadosexecucaoinspecao__num_execucao=0  # Filtra apenas a primeira execução
     ).distinct()
 
     if maquinas:
@@ -465,7 +484,7 @@ def get_itens_inspecionados_serra_usinagem(request):
 
     # Filtro por data
     if data:
-        inspecoes = inspecoes.filter(data__data_inspecao=data)
+        inspecoes = inspecoes.filter(data_inspecao__date=data)
 
     # Filtro por pesquisa (nome ou código da peça)
     if pesquisar:
@@ -476,13 +495,13 @@ def get_itens_inspecionados_serra_usinagem(request):
             | Q(pecas_ordem_usinagem__peca__codigo__icontains=pesquisar)
         )
 
-    # Prefetch para buscar execuções relacionadas (agora garantido que existem)
+    # Prefetch para buscar apenas execuções com num_execucao=0
     inspecoes = inspecoes.prefetch_related(
         Prefetch(
             "dadosexecucaoinspecao_set",
-            queryset=DadosExecucaoInspecao.objects.select_related(
+            queryset=DadosExecucaoInspecao.objects.filter(num_execucao=0).select_related(
                 "inspetor__user",
-                "info_adicionais",  # Adicionando o relacionamento com info_adicionais
+                "info_adicionais",
             ),
             to_attr="execucoes",
         ),
@@ -521,9 +540,8 @@ def get_itens_inspecionados_serra_usinagem(request):
             else "Sem operador"
         )
 
-        # Agora só temos inspeções com execução
+        # Agora só temos inspeções com execução num_execucao=0
         for execucao in inspecao.execucoes:
-            # Verifica se tem informações adicionais
             info_adicionais = getattr(execucao, "info_adicionais", None)
 
             item = {
@@ -544,6 +562,7 @@ def get_itens_inspecionados_serra_usinagem(request):
                     info_adicionais.inspecao_completa if info_adicionais else False
                 ),
                 "tem_ficha": bool(info_adicionais.ficha) if info_adicionais else False,
+                "num_execucao": execucao.num_execucao  # Adicionando num_execucao na resposta
             }
             dados.append(item)
 
@@ -565,188 +584,316 @@ def envio_inspecao_serra_usinagem(request):
     try:
         # Dados básicos
         data = request.POST
-        inspecao_id = data.get('inspecao_id')
-        inspetor_id = data.get('inspetor_id')
-        observacao = data.get('observacao', '')
-        ficha = request.FILES.get('ficha')
-        
+        inspecao_id = data.get("inspecao_id")
+        inspetor_id = data.get("inspetor")
+        observacao = data.get("observacao", "")
+        inspecao_completa = data.get("inspecao_total")
+        inspecao_completa = True if inspecao_completa == "Sim" else False
+
+        ficha = request.FILES.get("ficha")
+
         # Dados estruturados
-        inspecoes_ativas = json.loads(data.get('inspecoes_ativas', '[]'))
-        medidas_serra = json.loads(data.get('medidas_serra', '[]'))
-        medidas_usinagem = json.loads(data.get('medidas_usinagem', '[]'))
-        medidas_furacao = json.loads(data.get('medidas_furacao', '[]'))
-        nao_conformidades = json.loads(data.get('naoConformidades', '[]'))
-        inspecao_completa = json.loads(data.get('inspecao_completa', 'false'))
+        inspecoes_ativas = json.loads(data.get("inspecoes_ativas", "[]"))
+        medidas_serra = json.loads(data.get("medidas_serra", "[]"))
+        medidas_usinagem = json.loads(data.get("medidas_usinagem", "[]"))
+        medidas_furacao = json.loads(data.get("medidas_furacao", "[]"))
+        nao_conformidades = json.loads(data.get("naoConformidades", "[]"))
 
         print(medidas_serra)
         print(medidas_usinagem)
         print(medidas_furacao)
-        
-        # Obter instância da inspeção
-        inspecao = Inspecao.objects.get(id=inspecao_id)
-        inspetor = Profile.objects.get(id=inspetor_id) if inspetor_id else None
-        
-        # Verificar se já existe execução para esta inspeção
-        dados_execucao_existente = DadosExecucaoInspecao.objects.filter(
-            inspecao=inspecao
-        ).order_by('-num_execucao').first()
-        
-        if dados_execucao_existente:
-            # Usar a execução existente
-            dados_execucao = dados_execucao_existente
-            # Atualizar campos se necessário
-            dados_execucao.inspetor = inspetor
-            dados_execucao.observacao = observacao
-            dados_execucao.save()
-            
-            # Obter ou criar info_adicionais existente
-            info_adicionais, created = InfoAdicionaisSerraUsinagem.objects.get_or_create(
-                dados_exec_inspecao=dados_execucao,
-                defaults={
-                    'inspecao_completa': inspecao_completa,
-                    'ficha': ficha,
-                    'observacoes_gerais': observacao
-                }
+
+        print(inspecao_completa)
+
+        with transaction.atomic():
+            # Obter instância da inspeção
+            inspecao = Inspecao.objects.get(id=inspecao_id)
+            inspetor = Profile.objects.get(id=inspetor_id) if inspetor_id else None
+
+            # Verificar se já existe execução para esta inspeção
+            dados_execucao_existente = (
+                DadosExecucaoInspecao.objects.filter(inspecao=inspecao)
+                .order_by("-num_execucao")
+                .first()
             )
-            
-            if not created:
-                # Atualizar info_adicionais existente
-                info_adicionais.inspecao_completa = inspecao_completa
-                if ficha:
-                    info_adicionais.ficha = ficha
-                info_adicionais.observacoes_gerais = observacao
-                info_adicionais.save()
-        else:
-            # Criar nova execução
-            dados_execucao = DadosExecucaoInspecao(
-                inspecao=inspecao,
-                inspetor=inspetor,
-                conformidade=0,
-                nao_conformidade=0,
-                observacao=observacao
-            )
-            dados_execucao.save()
-            
-            # Criar novas info_adicionais
-            info_adicionais = InfoAdicionaisSerraUsinagem(
-                dados_exec_inspecao=dados_execucao,
-                inspecao_completa=inspecao_completa,
-                ficha=ficha,
-                observacoes_gerais=observacao,
-                inspecao_finalizada=False
-            )
-            info_adicionais.save()
-        
-        # Processar medidas (mesma lógica para execução nova ou existente)
-        def processar_medidas(tipo_processo, medidas_data):
-            if tipo_processo not in inspecoes_ativas:
-                return
-                
-            # Verificar se já existe medida para este tipo
-            medida_existente = MedidasProcessoSerraUsinagem.objects.filter(
-                execucao=dados_execucao,
-                tipo_processo=tipo_processo
-            ).first()
-            
-            if medida_existente:
-                # Limpar detalhes existentes para reprocessar
-                medida_existente.detalhes.all().delete()
-                medida_processo = medida_existente
-            else:
-                # Criar nova medida
-                medida_processo = MedidasProcessoSerraUsinagem(
-                    execucao=dados_execucao,
-                    info_adicionais=info_adicionais,
-                    tipo_processo=tipo_processo
+
+            if dados_execucao_existente:
+                # Usar a execução existente
+                dados_execucao = dados_execucao_existente
+                # Atualizar campos se necessário
+                dados_execucao.inspetor = inspetor
+                dados_execucao.observacao = observacao
+                dados_execucao.save()
+
+                # Obter ou criar info_adicionais existente
+                info_adicionais, created = (
+                    InfoAdicionaisSerraUsinagem.objects.get_or_create(
+                        dados_exec_inspecao=dados_execucao,
+                        defaults={
+                            "inspecao_completa": inspecao_completa,
+                            "ficha": ficha,
+                            "observacoes_gerais": observacao,
+                        },
+                    )
                 )
-                medida_processo.save()
-            
-            # Processar as medidas (mesma lógica)
-            for idx, amostra_data in enumerate(medidas_data, 1):
-                conforme_amostra = amostra_data.pop('conforme', True)
-                
-                for medida_nome, medida_valor in amostra_data.items():
-                    if isinstance(medida_valor, dict):
-                        DetalheMedidaSerraUsinagem.objects.create(
-                            medida_processo=medida_processo,
-                            cabecalho=medida_valor['nome'],
-                            valor=medida_valor['valor'],
-                            conforme=conforme_amostra,
-                            amostra=idx
-                        )
-                
-                if conforme_amostra:
-                    dados_execucao.conformidade += 1
+
+                if not created:
+                    # Atualizar info_adicionais existente
+                    info_adicionais.inspecao_completa = inspecao_completa
+                    if ficha:
+                        info_adicionais.ficha = ficha
+                    info_adicionais.observacoes_gerais = observacao
+                    info_adicionais.save()
+            else:
+                # Criar nova execução
+                dados_execucao = DadosExecucaoInspecao(
+                    inspecao=inspecao,
+                    inspetor=inspetor,
+                    conformidade=0,
+                    nao_conformidade=0,
+                    observacao=observacao,
+                )
+                dados_execucao.save()
+
+                # Criar novas info_adicionais
+                info_adicionais = InfoAdicionaisSerraUsinagem(
+                    dados_exec_inspecao=dados_execucao,
+                    inspecao_completa=inspecao_completa,
+                    ficha=ficha,
+                    observacoes_gerais=observacao,
+                    inspecao_finalizada=False,
+                )
+                info_adicionais.save()
+
+            # Processar medidas (mesma lógica para execução nova ou existente)
+            def processar_medidas(tipo_processo, medidas_data):
+                if tipo_processo not in inspecoes_ativas:
+                    return
+
+                # Verificar se já existe medida para este tipo
+                medida_existente = MedidasProcessoSerraUsinagem.objects.filter(
+                    execucao=dados_execucao, tipo_processo=tipo_processo
+                ).first()
+
+                if medida_existente:
+                    # Limpar detalhes existentes para reprocessar
+                    medida_existente.detalhes.all().delete()
+                    medida_processo = medida_existente
                 else:
-                    dados_execucao.nao_conformidade += 1
-        
-        # Processar cada tipo de medida
-        processar_medidas('serra', medidas_serra)
-        processar_medidas('usinagem', medidas_usinagem)
-        processar_medidas('furacao', medidas_furacao)
-        
-        if 'naoConformidades' in request.POST:
-            # Processar não conformidades (limpar existentes primeiro)
-            CausasNaoConformidade.objects.filter(dados_execucao=dados_execucao).delete()
-            nao_conformidades = json.loads(request.POST.get('naoConformidades', '[]'))
-            for nc_data in nao_conformidades:
-                # Só processa se houver causas definidas
-                if nc_data.get('causas'):
-                    # Tratamento robusto da quantidade
-                    quantidade_str = str(nc_data.get('quantidadeAfetada', '1')).strip()
-                    quantidade = int(quantidade_str) if quantidade_str else 1
+                    # Criar nova medida
+                    medida_processo = MedidasProcessoSerraUsinagem(
+                        execucao=dados_execucao,
+                        info_adicionais=info_adicionais,
+                        tipo_processo=tipo_processo,
+                    )
+                    medida_processo.save()
+
+                # Variável para verificar se TODAS as amostras deste processo são conformes
+                todas_conformes = True
+
+                # Processar cada amostra
+                for amostra_idx, amostra_data in enumerate(medidas_data, 1):
+                    conforme_amostra = amostra_data.get('conforme', True)
                     
-                    causa_nc = CausasNaoConformidade.objects.create(
-                        dados_execucao=dados_execucao,
-                        quantidade=quantidade
+                    # Salvar os detalhes das medidas no banco de dados
+                    for medida_key, medida_valor in amostra_data.items():
+                        if medida_key != 'conforme' and isinstance(medida_valor, dict):
+                            DetalheMedidaSerraUsinagem.objects.create(
+                                medida_processo=medida_processo,
+                                cabecalho=medida_valor['nome'],
+                                valor=medida_valor['valor'],
+                                conforme=medida_valor.get('conforme', True),
+                                amostra=amostra_idx,
+                            )
+                    
+                    # Verificar conformidade da amostra
+                    if not conforme_amostra:
+                        dados_execucao.nao_conformidade += 1
+                        todas_conformes = False
+                    # Nota: Não incrementamos conformidade aqui ainda
+                
+                # Se TODAS as amostras deste processo forem conformes, conta 1 conformidade
+                if todas_conformes and medidas_data:  # Verifica também se há medidas
+                    dados_execucao.conformidade += 1
+
+            # Processar cada tipo de medida
+            processar_medidas("serra", medidas_serra)
+            processar_medidas("usinagem", medidas_usinagem)
+            processar_medidas("furacao", medidas_furacao)
+
+            if "naoConformidades" in request.POST:
+                # Processar não conformidades (limpar existentes primeiro)
+                CausasNaoConformidade.objects.filter(dados_execucao=dados_execucao).delete()
+
+                bool_destino = False
+                nao_conformidades = json.loads(request.POST.get("naoConformidades", "[]"))
+                
+                # Verificar se pelo menos um destino é "sucata"
+                for nc_data in nao_conformidades:
+                    if nc_data.get("destino", "").lower() == "sucata":
+                        bool_destino = True
+                        break  # Se encontrou um, pode parar de verificar
+
+                reinspecao, _ = Reinspecao.objects.get_or_create(
+                    inspecao=inspecao,
+                    reinspecionado=bool_destino,
+                )
+                nao_conformidades = json.loads(request.POST.get("naoConformidades", "[]"))
+                for nc_data in nao_conformidades:
+                    # Só processa se houver causas definidas
+                    if nc_data.get("causas"):
+                        # Tratamento robusto da quantidade
+                        destino = nc_data.get("destino", None)
+                        quantidade_str = str(nc_data.get("quantidadeAfetada", "1")).strip()
+                        quantidade = int(quantidade_str) if quantidade_str else 1
+
+                        causa_nc = CausasNaoConformidade.objects.create(
+                            dados_execucao=dados_execucao,
+                            quantidade=quantidade,
+                            destino=destino,
+                        )
+
+                        # Adiciona causas
+                        for causa_id in nc_data.get("causas", []):
+                            try:
+                                causa = Causas.objects.get(id=causa_id)
+                                causa_nc.causa.add(causa)
+                            except Causas.DoesNotExist:
+                                continue
+
+                        # Processar arquivos
+                        for arquivo in request.FILES.getlist(
+                            f'nc_files_{nc_data.get("id")}'
+                        ):
+                            ArquivoCausa.objects.create(
+                                causa_nao_conformidade=causa_nc, arquivo=arquivo
+                            )
+
+            # Verificar finalização
+            def verificar_finalizacao():
+                # Obter a peça da ordem relacionada à inspeção
+                pecas_ordem = None
+                if inspecao.pecas_ordem_serra:
+                    pecas_ordem = inspecao.pecas_ordem_serra
+                elif inspecao.pecas_ordem_usinagem:
+                    pecas_ordem = inspecao.pecas_ordem_usinagem
+                
+                if not pecas_ordem:
+                    return False  # Se não houver peça relacionada, não pode finalizar
+                
+                qtd_produzida = pecas_ordem.qtd_boa
+                
+                for tipo in inspecoes_ativas:
+                    amostras_count = (
+                        DetalheMedidaSerraUsinagem.objects.filter(
+                            medida_processo__execucao=dados_execucao,
+                            medida_processo__tipo_processo=tipo,
+                        )
+                        .values("amostra")
+                        .distinct()
+                        .count()
                     )
                     
-                    # Adiciona causas
-                    for causa_id in nc_data.get('causas', []):
-                        try:
-                            causa = Causas.objects.get(id=causa_id)
-                            causa_nc.causa.add(causa)
-                        except Causas.DoesNotExist:
-                            continue
-                    
-                    # Processar arquivos
-                    for arquivo in request.FILES.getlist(f'nc_files_{nc_data.get("id")}'):
-                        ArquivoCausa.objects.create(
-                            causa_nao_conformidade=causa_nc,
-                            arquivo=arquivo
-                        )
-        
-        # Verificar finalização
-        def verificar_finalizacao():
-            for tipo in inspecoes_ativas:
-                amostras_count = DetalheMedidaSerraUsinagem.objects.filter(
-                    medida_processo__execucao=dados_execucao,
-                    medida_processo__tipo_processo=tipo
-                ).values('amostra').distinct().count()
-                
-                if amostras_count < 3:
-                    return False
-            return True
-        
-        info_adicionais.inspecao_finalizada = verificar_finalizacao()
-        info_adicionais.save()
-        dados_execucao.save()
-        
-        return JsonResponse({
-            'status': 'success',
-            'message': 'Inspeção registrada com sucesso',
-            'inspecao_finalizada': info_adicionais.inspecao_finalizada,
-            'execucao_id': dados_execucao.id,
-            'nova_execucao': not bool(dados_execucao_existente)
-        })
-    
+                    # Verifica se o número de amostras é suficiente baseado na quantidade produzida
+                    if qtd_produzida >= 3:
+                        # Se produção >= 3, exige 3 amostras
+                        if amostras_count < 3:
+                            return False
+                    else:
+                        # Se produção < 3, exige amostras igual à quantidade produzida
+                        if amostras_count < qtd_produzida:
+                            return False
+                return True
+
+            info_adicionais.inspecao_finalizada = verificar_finalizacao()
+            info_adicionais.save()
+            dados_execucao.save()
+
+            return JsonResponse(
+                {
+                    "status": "success",
+                    "message": "Inspeção registrada com sucesso",
+                    "inspecao_finalizada": info_adicionais.inspecao_finalizada,
+                    "execucao_id": dados_execucao.id,
+                    "nova_execucao": not bool(dados_execucao_existente),
+                }
+            )
+
     except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=500)
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
 def envio_reinspecao_serra_usinagem(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
 
-    return JsonResponse({})
+    try:
+        with transaction.atomic():
+            print(request.POST)
+            print(request.FILES)
+            id_inspecao = request.POST.get("idInspecao")
+            id_execucao = request.POST.get("execucaoId")
+            data_inspecao = request.POST.get("dataReinspecao")
+            maquina = request.POST.get("maquinaReinspecao")
+            pecas = request.POST.get("pecasProduzidasReinspecao")
+            inspetor_id = request.POST.get("inspetorReinspecao")
+            conformidade = request.POST.get("qtdConformidadeReinspecao")
+            nao_conformidade = request.POST.get("qtdNaoConformidadeReinspecao")
+            ficha_reinspecao = request.FILES.get("ficha_reinspecao")
+
+            inspecao = Inspecao.objects.get(id=id_inspecao)
+            inspetor = Profile.objects.get(id=inspetor_id)
+
+            # Criação do registro de execução
+            dados_execucao = DadosExecucaoInspecao.objects.create(
+                inspecao=inspecao,
+                inspetor=inspetor,
+                conformidade=int(conformidade),
+                nao_conformidade=int(nao_conformidade),
+            )
+
+            # Criação das informações adicionais
+            info_adicionais = InfoAdicionaisSerraUsinagem.objects.create(
+                dados_exec_inspecao=dados_execucao,
+                inspecao_completa=True,
+                ficha=ficha_reinspecao,
+            )
+
+            if int(nao_conformidade) > 0:
+                quantidade_total_causas = int(
+                    request.POST.get("quantidade_total_causas", 0)
+                )
+
+                for i in range(1, quantidade_total_causas + 1):
+                    causas_ids = request.POST.getlist(f"causas_reinspecao_{i}")
+                    quantidade_afetada = request.POST.get(f"quantidade_reinspecao_{i}")
+                    destino = request.POST.get(f"destino_reinspecao_{i}")
+                    imagens = request.FILES.getlist(f"imagens_reinspecao_{i}")
+
+                    # Criar o objeto principal da não conformidade
+                    dados_nao_conformidade = CausasNaoConformidade.objects.create(
+                        informacoes_adicionais_serra_usinagem=info_adicionais,
+                        qt_nao_conformidade=int(quantidade_afetada),
+                        destino=destino,  # Aqui você pode ajustar o destino conforme o seu fluxo
+                    )
+
+                    # Relacionar as causas
+                    if causas_ids:
+                        dados_nao_conformidade.causas.set(causas_ids)
+
+                    # Salvar as imagens relacionadas
+                    for imagem in imagens:
+                        ArquivoCausa.objects.create(
+                            causa_nao_conformidade=dados_nao_conformidade,
+                            arquivo=imagem,
+                        )
+            else:
+                reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
+                if reinspecao:
+                    reinspecao.reinspecionado = True
+                    reinspecao.save()
+
+        return JsonResponse({"success": True})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)

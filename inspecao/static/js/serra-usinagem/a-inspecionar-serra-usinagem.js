@@ -170,6 +170,18 @@ function buscarItensInspecao(pagina) {
                     removeAllNonConformityItems();
                     resetModal();
 
+                    const sections = [
+                        'sectionMedicaoSerra',
+                        'sectionMedicaoUsinagem',
+                        'sectionMedicaoFuração'
+                    ];
+                    
+                    sections.forEach(sectionId => {
+                        const section = document.getElementById(sectionId);
+                        if (section) {
+                            section.style.display = 'none';
+                        }
+                    });
                     // Capturar dados do botão
                     const itemId = this.getAttribute('data-id');
                     const itemData = this.getAttribute('data-data');
@@ -212,7 +224,6 @@ function buscarItensInspecao(pagina) {
                             preencherLinhasMedicao(data.dados);
                             const inspecaoTotal = document.getElementById('inspecao_total');
                             inspecaoTotal.value = data.dados.inspecao_completa ? "Sim" : "Não";
-                            inspecaoTotal.disabled = true;
                             new bootstrap.Modal(document.getElementById('inspectionModal')).show();
                             // Só agora mostrar o modal
                         } else {
@@ -276,7 +287,6 @@ function buscarItensInspecao(pagina) {
 }
 
 function preencherLinhasMedicao(dados) {
-
     if (!dados || !dados.tipos_processo) return;
 
     // Para cada tipo de processo (serra, usinagem, furacao)
@@ -290,13 +300,11 @@ function preencherLinhasMedicao(dados) {
         }
 
         // Preenche os cabeçalhos (nomes das medidas)
-        console.log(dadosTipo.cabecalhos);
         dadosTipo.cabecalhos.forEach((cabecalho, index) => {
             const inputCabecalho = document.querySelector(
                 `.measurement-section[data-type="${tipo}"] input[name="medida-input-${index + 1}"]`
             );
             if (inputCabecalho) {
-                console.log(cabecalho);
                 inputCabecalho.value = cabecalho;
                 inputCabecalho.disabled = true;
             }
@@ -304,14 +312,23 @@ function preencherLinhasMedicao(dados) {
 
         // Preenche os valores das amostras
         for (const [amostraNum, amostraData] of Object.entries(dadosTipo.amostras)) {
+            // Desabilitar TODOS os inputs desta linha/amostra
+            const linhaInputs = document.querySelectorAll(
+                `input[name^="${tipo}_valor${amostraNum}_"], 
+                 input[name="${tipo}_conformity${amostraNum}"]`
+            );
+            
+            linhaInputs.forEach(input => {
+                input.disabled = true;
+            });
+
+            // Preencher valores específicos
             amostraData.medidas.forEach((medida, medidaIndex) => {
                 const inputValor = document.querySelector(
                     `input[name="${tipo}_valor${amostraNum}_${medidaIndex + 1}"]`
                 );
-                console.log(inputValor)
                 if (inputValor) {
                     inputValor.value = medida.valor;
-                    inputValor.disabled = true;
                 }
             });
 
@@ -331,8 +348,6 @@ function preencherLinhasMedicao(dados) {
                     conformeCheckbox.checked = false;
                     naoConformeCheckbox.checked = true;
                 }
-                conformeCheckbox.disabled = true;
-                naoConformeCheckbox.disabled = true;
             }
         }
     }

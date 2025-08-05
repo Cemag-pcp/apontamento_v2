@@ -145,7 +145,7 @@ function buscarItensReinspecao(pagina) {
                         data-data="${item.data}"
                         data-nao-conformidade="${item.nao_conformidade}"
                         data-conformidade="${item.conformidade}"
-                        data-qtd-total="${item.qtd_total}"
+                        data-qtd-total="${item.qtd_apontada}"
                         data-peca="${item.peca}"
                         data-maquina="${item.maquina}"
                         class="btn btn-dark w-100 iniciar-reinspecao">

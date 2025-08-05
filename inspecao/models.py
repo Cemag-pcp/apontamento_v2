@@ -2,6 +2,7 @@ from django.db import models
 from core.models import Profile
 from cadastro.models import PecasEstanqueidade
 
+
 class Inspecao(models.Model):
 
     data_inspecao = models.DateTimeField(auto_now_add=True)
@@ -54,6 +55,7 @@ class Inspecao(models.Model):
 
         return f"Inspeção {self.id} - {setor_inspecao}"
 
+
 class DadosExecucaoInspecao(models.Model):
 
     inspecao = models.ForeignKey(
@@ -88,6 +90,7 @@ class DadosExecucaoInspecao(models.Model):
         # Chama o método save da superclasse para salvar o objeto
         super(DadosExecucaoInspecao, self).save(*args, **kwargs)
 
+
 class Reinspecao(models.Model):
 
     inspecao = models.ForeignKey(
@@ -95,6 +98,7 @@ class Reinspecao(models.Model):
     )
     data_reinspecao = models.DateTimeField(auto_now_add=True)
     reinspecionado = models.BooleanField(default=False)
+
 
 class Causas(models.Model):
 
@@ -121,6 +125,11 @@ class Causas(models.Model):
 
 class CausasNaoConformidade(models.Model):
 
+    DESTINO_CHOICES = (
+        ("retrabalho", "Retrabalho"),
+        ("sucata", "Sucata"),
+    )
+
     dados_execucao = models.ForeignKey(
         DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False
     )
@@ -128,6 +137,9 @@ class CausasNaoConformidade(models.Model):
         Causas, related_name="causas_nao_conformidade", blank=True
     )
     quantidade = models.IntegerField(null=False, blank=False)
+    destino = models.CharField(
+        max_length=10, choices=DESTINO_CHOICES, null=True, blank=True, default=None
+    )
 
 
 class ArquivoCausa(models.Model):
@@ -251,6 +263,7 @@ class CausasNaoConformidadeEstanqueidade(models.Model):
         Causas, related_name="causas_nao_conformidade_estanqueidade", blank=True
     )
     quantidade = models.IntegerField(null=False, blank=False)
+
 
 class ArquivoCausaEstanqueidade(models.Model):
     causa_nao_conformidade = models.ForeignKey(
