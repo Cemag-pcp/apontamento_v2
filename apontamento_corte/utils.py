@@ -345,8 +345,8 @@ def tratamento_planilha_laser3(tree):
         quantidade = part.find('TotalQuantityInJob')
         
         item = {
-            'peca': peca.text.strip() if peca is not None else '',
-            'qtd_planejada': quantidade.text.strip() if quantidade is not None else '',
+            'peca': peca.text.strip() if peca is not None and peca.text is not None else '',
+            'qtd_planejada': quantidade.text.strip() if quantidade is not None and quantidade.text is not None else '',
             'espessura': espessura,
             'aproveitamento': aproveitamento,
             'tamanho_da_chapa': f"{comprimento} x {largura} mm ",

@@ -960,7 +960,9 @@ class ProcessarArquivoView(View):
         # Verifica se o arquivo foi enviado
         uploaded_file = request.FILES.get('file')
         tipo_maquina = request.POST.get('tipoMaquina')
-
+        print(tipo_maquina)
+        print(uploaded_file)
+        
         if not uploaded_file:
             return JsonResponse({'error': 'Nenhum arquivo enviado.'}, status=400)
 
