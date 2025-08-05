@@ -348,7 +348,7 @@ def tratamento_planilha_laser3(tree):
         item = {
             'peca': peca.text.strip() if peca is not None and peca.text is not None else '',
             'qtd_planejada': quantidade.text.strip() if quantidade is not None and quantidade.text is not None else '',
-            'espessura': espessura,
+            'espessura': espessura_real,
             'aproveitamento': aproveitamento,
             'tamanho_da_chapa': f"{comprimento} x {largura} mm ",
             'qt_chapas': quantidade_chapas
@@ -360,9 +360,9 @@ def tratamento_planilha_laser3(tree):
     # df_pecas.columns = ['qtd_planejada','peca','espessura','aproveitamento','tamanho_da_chapa','qt_chapas']
 
     propriedades = [{
-        'descricao_mp': str(espessura) + " - " + f"{comprimento} x {largura} mm ",
+        'descricao_mp': str(espessura_real) + " - " + f"{comprimento} x {largura} mm ",
         'tamanho':f"{comprimento} x {largura} mm ",
-        'espessura':espessura,
+        'espessura':espessura_real,
         'quantidade':quantidade_chapas,
         'aproveitamento':aproveitamento,
         'tempo_estimado_total':tempo_estimado_total_horas
