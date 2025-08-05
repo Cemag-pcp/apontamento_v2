@@ -328,7 +328,8 @@ def tratamento_planilha_laser3(tree):
     # 4. Aproveitamento
     waste_el = root.find('.//Waste')
     aproveitamento = float(waste_el.text) if waste_el is not None else None
-
+    aproveitamento = 100 - aproveitamento 
+    
     # 4.1 Tempo estimado total
     tempo_estimato_total_elem = root.find('.//TotalRuntime')
     if tempo_estimato_total_elem is not None and tempo_estimato_total_elem.text:
