@@ -154,8 +154,6 @@ def get_ordens_criadas(request):
         'tempo_estimado': ordem.tempo_estimado if ordem.tempo_estimado else 'Não foi possivel calcular',
     } for ordem in ordens_page]
 
-    print(data)
-
     return JsonResponse({'ordens': data})
 
 def atualizar_status_ordem(request):
@@ -891,6 +889,9 @@ def excluir_ordem(request):
         ordem_id = data.get('ordem_id')
         motivo_id = data.get('motivo')
 
+        print(ordem_id)
+        print(motivo_id)
+        
         ordem = get_object_or_404(Ordem, pk=ordem_id)
         motivo = get_object_or_404(MotivoExclusao, pk=int(motivo_id))
 

@@ -295,11 +295,10 @@ def converter_minutos_para_horas(minutos_float):
     segundos = total_segundos % 60
     return f"{horas:02d}:{minutos:02d}:{segundos:02d}"
 
-
 def tratamento_planilha_laser3(tree):
 
     # Carrega o XML
-    tree = ET.parse('OP12.xml')
+    # tree = ET.parse('OP12.xml')
     root = tree.getroot()
 
     # 1. Espessura via UsedLaserTechnoTable > TableNo
