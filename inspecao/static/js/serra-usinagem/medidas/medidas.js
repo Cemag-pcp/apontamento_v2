@@ -9,6 +9,22 @@ document.addEventListener('DOMContentLoaded', function() {
         furacao: { medidas: [], valores: {} }
     };
 
+    // Cria o elemento inspecaoTotalDiv uma vez, fora da função updateMeasurementSections
+    const inspecaoTotalDiv = document.createElement('div');
+    inspecaoTotalDiv.className = 'row mb-3';
+    inspecaoTotalDiv.id = 'inspecaoTotal';
+    inspecaoTotalDiv.innerHTML = `
+        <div class="col-sm-12">
+            <label for="inspecao_total">Necessita realizar a inspeção 100%?</label>
+            <select class="form-select" name="inspecao_total" id="inspecao_total">
+                <option value="" selected hidden disabled></option>
+                <option value="Não">Não</option>
+                <option value="Sim">Sim</option>
+            </select>
+        </div>
+    `;
+    container.appendChild(inspecaoTotalDiv);
+
     updateMeasurementSections();
     
     checkboxes.forEach(checkbox => {
@@ -16,62 +32,51 @@ document.addEventListener('DOMContentLoaded', function() {
             const inspectionType = this.id.replace('checkbox-inspecao-', '');
             
             if (!this.checked) {
-                // Quando desmarca um checkbox de inspeção
                 resetConformityForType(inspectionType);
             }
             
-            updateMeasurementSections(); // Sua função existente
-            updateConformityCounts(); // Atualiza a visibilidade da seção
+            updateMeasurementSections();
+            updateConformityCounts();
         });
     });
     
     function updateMeasurementSections() {
-        // Salva os valores atuais antes de recriar as seções
         saveCurrentValues();
         
-        // Limpa o container
-        container.innerHTML = '';
+        // Remove apenas as seções de medição, não o inspecaoTotalDiv
+        document.querySelectorAll('.measurement-section').forEach(section => {
+            section.remove();
+        });
         
-        // Adiciona as seções conforme os checkboxes marcados
+        // Adiciona as seções de medição antes do inspecaoTotalDiv
         if (document.getElementById('checkbox-inspecao-serra').checked) {
-            container.appendChild(createMeasurementSection('serra'));
+            container.insertBefore(createMeasurementSection('serra'), inspecaoTotalDiv);
+            restoreValues('serra');
         }
         
         if (document.getElementById('checkbox-inspecao-usinagem').checked) {
-            container.appendChild(createMeasurementSection('usinagem'));
+            container.insertBefore(createMeasurementSection('usinagem'), inspecaoTotalDiv);
+            restoreValues('usinagem');
         }
         
         if (document.getElementById('checkbox-inspecao-furacao').checked) {
-            container.appendChild(createMeasurementSection('furacao'));
+            container.insertBefore(createMeasurementSection('furacao'), inspecaoTotalDiv);
+            restoreValues('furacao');
         }
         
-        // Adiciona a seção de inspeção 100% se houver pelo menos uma seção
-
-        const inspecaoTotalDiv = document.createElement('div');
-        inspecaoTotalDiv.className = 'row mb-3';
-        inspecaoTotalDiv.id = 'inspecaoTotal';
-        inspecaoTotalDiv.innerHTML = `
-            <div class="col-sm-12">
-                <label for="inspecao_total">Necessita realizar a inspeção 100%?</label>
-                <select class="form-select" name="inspecao_total" id="inspecao_total">
-                    <option value="" selected hidden disabled></option>
-                    <option value="Não">Não</option>
-                    <option value="Sim">Sim</option>
-                </select>
-            </div>
-        `;
-        container.appendChild(inspecaoTotalDiv);
+        setupConformityCheckboxes();
     }
     
     function saveCurrentValues() {
-        // Salva os valores dos inputs de medida (cabeçalho da tabela)
         document.querySelectorAll('.medida-input').forEach(input => {
             const sectionType = input.closest('.measurement-section').dataset.type;
             const index = Array.from(input.parentElement.parentElement.children).indexOf(input.parentElement);
-            storedValues[sectionType].medidas[index] = input.value;
+            storedValues[sectionType].medidas[index] = {
+                value: input.value,
+                disabled: input.disabled
+            };
         });
         
-        // Salva os valores das medições
         document.querySelectorAll('input[type="number"]').forEach(input => {
             const nameParts = input.name.split('_');
             if (nameParts.length === 3) {
@@ -82,11 +87,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!storedValues[sectionType].valores[row]) {
                     storedValues[sectionType].valores[row] = {};
                 }
-                storedValues[sectionType].valores[row][col] = input.value;
+                storedValues[sectionType].valores[row][col] = {
+                    value: input.value,
+                    disabled: input.disabled
+                };
             }
         });
         
-        // Salva os estados dos checkboxes de conformidade
         document.querySelectorAll('.conformity-check').forEach(checkbox => {
             const nameParts = checkbox.name.split('_');
             if (nameParts.length === 2) {
@@ -96,8 +103,65 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!storedValues[sectionType].valores[row]) {
                     storedValues[sectionType].valores[row] = {};
                 }
-                storedValues[sectionType].valores[row].conformity = checkbox.checked ? checkbox.value : '';
+                
+                const checkboxes = document.querySelectorAll(`input[name="${checkbox.name}"]`);
+                storedValues[sectionType].valores[row].conformity = {
+                    conforming: checkboxes[0].checked,
+                    nonConforming: checkboxes[1].checked,
+                    disabled: checkboxes[0].disabled
+                };
             }
+        });
+    }
+    
+    function restoreValues(type) {
+        // Restaura cabeçalhos (medidas)
+        storedValues[type].medidas.forEach((medida, index) => {
+            const input = document.querySelector(`.measurement-section[data-type="${type}"] input[name="medida-input-${index + 1}"]`);
+            if (input && medida) {
+                input.value = medida.value || '';
+                input.disabled = medida.disabled || false;
+            }
+        });
+        
+        // Restaura valores numéricos e conformidade
+        Object.entries(storedValues[type].valores).forEach(([row, values]) => {
+            Object.entries(values).forEach(([key, value]) => {
+                if (key === 'conformity') {
+                    const conformingCheckbox = document.querySelector(
+                        `.measurement-section[data-type="${type}"] input[name="${type}_conformity${row}"][value="conforming"]`
+                    );
+                    const nonConformingCheckbox = document.querySelector(
+                        `.measurement-section[data-type="${type}"] input[name="${type}_conformity${row}"][value="nonConforming"]`
+                    );
+                    
+                    if (conformingCheckbox && nonConformingCheckbox) {
+                        console.log("ENTROU")
+                        conformingCheckbox.checked = value.conforming;
+                        nonConformingCheckbox.checked = value.nonConforming;
+                        conformingCheckbox.disabled = value.disabled;
+                        nonConformingCheckbox.disabled = value.disabled;
+                    }
+                } else {
+                    const input = document.querySelector(`.measurement-section[data-type="${type}"] input[name="${type}_valor${row}_${key}"]`);
+                    if (input && value) {
+                        input.value = value.value || '';
+                        input.disabled = value.disabled || false;
+                    }
+                }
+            });
+        });
+    }
+
+    function setupConformityCheckboxes() {
+        document.querySelectorAll('.conformity-check').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const checkboxes = document.querySelectorAll(`input[name="${this.name}"]`);
+                checkboxes.forEach(cb => {
+                    if (cb !== this) cb.checked = false;
+                });
+                updateConformityCounts();
+            });
         });
     }
     
@@ -161,18 +225,5 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     updateConformityCounts();
-    
-    // Adiciona evento para os checkboxes de conformidade (impedir marcar ambos)
-    document.addEventListener('change', function(e) {
-        if (e.target && e.target.classList.contains('conformity-check')) {
-            // Garante que apenas um checkbox por linha está marcado
-            const checkboxes = document.querySelectorAll(`input[name="${e.target.name}"]`);
-            if (e.target.checked) {
-                checkboxes.forEach(cb => {
-                    if (cb !== e.target) cb.checked = false;
-                });
-            }
-            updateConformityCounts();
-        }
-    });
+
 });

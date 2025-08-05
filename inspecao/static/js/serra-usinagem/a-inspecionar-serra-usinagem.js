@@ -115,6 +115,10 @@ function buscarItensInspecao(pagina) {
 
         const quantidadeInspecoes = items.total;
         const quantidadeFiltradaInspecoes = items.total_filtrado;
+        const status = {
+            "Não iniciado":"devolvido",
+            "Em andamento": "pendente"
+        }
 
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
@@ -132,8 +136,10 @@ function buscarItensInspecao(pagina) {
             <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <div class="d-flex justify-content-between">
-                        <h5 class="w-75"> ${item.peca}</h5>
-                        <span class="w-25">${item.status}</span>
+                        <h5 style="width:70%;"> ${item.peca}</h5>
+                        <div class="text-center">
+                            <p class="status-badge status-${status[item.status]}" style="font-size:13px">${item.status}</p>
+                        </div>
                     </div>
                     <p>Inspecao #${item.id}</p>
                     <p>
@@ -204,8 +210,11 @@ function buscarItensInspecao(pagina) {
                         if (data.existe && data.dados && Object.keys(data.dados.tipos_processo).length > 0) {
                             // Preencher as linhas de medição com os dados retornados
                             preencherLinhasMedicao(data.dados);
-                            // Só agora mostrar o modal
+                            const inspecaoTotal = document.getElementById('inspecao_total');
+                            inspecaoTotal.value = data.dados.inspecao_completa ? "Sim" : "Não";
+                            inspecaoTotal.disabled = true;
                             new bootstrap.Modal(document.getElementById('inspectionModal')).show();
+                            // Só agora mostrar o modal
                         } else {
                             // Se não houver dados, pode abrir o modal vazio ou mostrar aviso
                             new bootstrap.Modal(document.getElementById('inspectionModal')).show();
@@ -267,11 +276,8 @@ function buscarItensInspecao(pagina) {
 }
 
 function preencherLinhasMedicao(dados) {
-    console.log(dados)
-    if (!dados || !dados.tipos_processo) return;
 
-    // Atualiza status da inspeção completa
-    document.getElementById('inspecao_total').value = dados.inspecao_completa ? "Sim" : "Não";
+    if (!dados || !dados.tipos_processo) return;
 
     // Para cada tipo de processo (serra, usinagem, furacao)
     for (const [tipo, dadosTipo] of Object.entries(dados.tipos_processo)) {
@@ -279,15 +285,18 @@ function preencherLinhasMedicao(dados) {
         const checkbox = document.getElementById(`checkbox-inspecao-${tipo}`);
         if (checkbox) {
             checkbox.checked = true;
+            checkbox.disabled = true;
             checkbox.dispatchEvent(new Event('change'));
         }
 
         // Preenche os cabeçalhos (nomes das medidas)
+        console.log(dadosTipo.cabecalhos);
         dadosTipo.cabecalhos.forEach((cabecalho, index) => {
             const inputCabecalho = document.querySelector(
                 `.measurement-section[data-type="${tipo}"] input[name="medida-input-${index + 1}"]`
             );
             if (inputCabecalho) {
+                console.log(cabecalho);
                 inputCabecalho.value = cabecalho;
                 inputCabecalho.disabled = true;
             }
@@ -302,6 +311,7 @@ function preencherLinhasMedicao(dados) {
                 console.log(inputValor)
                 if (inputValor) {
                     inputValor.value = medida.valor;
+                    inputValor.disabled = true;
                 }
             });
 
@@ -396,10 +406,15 @@ function updateConformityCounts() {
         activeInspections.push(checkbox.id.replace('checkbox-inspecao-', ''));
     });
 
-    // Conta apenas os não conformes das inspeções ativas
+    // Conta apenas os não conformes das inspeções ativas que não estão desabilitados
     let nonConformingCount = 0;
     activeInspections.forEach(type => {
-        nonConformingCount += document.querySelectorAll(`.conformity-check[value="nonConforming"][name*="${type}"]:checked`).length;
+        document.querySelectorAll(`.conformity-check[value="nonConforming"][name*="${type}"]`).forEach(checkbox => {
+            // Só conta se o checkbox estiver marcado E não estiver desabilitado
+            if (checkbox.checked && !checkbox.disabled) {
+                nonConformingCount++;
+            }
+        });
     });
 
     const nonConformitySection = document.getElementById('nonConformitySection');

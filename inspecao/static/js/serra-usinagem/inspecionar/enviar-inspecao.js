@@ -85,24 +85,35 @@ function enviarDadosInspecao() {
             causas.push(checkbox.value);
         });
 
-        const naoConformidade = {
-            tipo: document.querySelector(`select[name="tipo_nao_conformidade${id}"]`)?.value || '',
-            quantidadeAfetada: document.getElementById(`quantidadeAfetada${id}`).value,
-            destino: document.getElementById(`destino${id}`).value,
-            causas: causas
-        };
+        const tipo = document.querySelector(`select[name="tipo_nao_conformidade${id}"]`)?.value || '';
+        const quantidadeAfetada = document.getElementById(`quantidadeAfetada${id}`).value;
+        const destino = document.getElementById(`destino${id}`).value;
 
-        // Coletar fotos
-        const fotoInput = document.getElementById(`fotoNaoConformidade${id}`);
-        if (fotoInput && fotoInput.files.length > 0) {
-            for (let i = 0; i < fotoInput.files.length; i++) {
-                formData.append(`fotos_nao_conformidade[${id}][${i}]`, fotoInput.files[i]);
+        // Só inclui se tiver pelo menos um campo preenchido (exceto fotos)
+        if (tipo || quantidadeAfetada || destino || causas.length > 0) {
+            const naoConformidade = {
+                tipo: tipo,
+                quantidadeAfetada: quantidadeAfetada,
+                destino: destino,
+                causas: causas
+            };
+
+            // Coletar fotos (só se houver não conformidade válida)
+            const fotoInput = document.getElementById(`fotoNaoConformidade${id}`);
+            if (fotoInput && fotoInput.files.length > 0) {
+                for (let i = 0; i < fotoInput.files.length; i++) {
+                    formData.append(`fotos_nao_conformidade[${id}][${i}]`, fotoInput.files[i]);
+                }
             }
-        }
 
-        naoConformidades.push(naoConformidade);
+            naoConformidades.push(naoConformidade);
+        }
     });
-    formData.append('naoConformidades', JSON.stringify(naoConformidades));
+
+    // Só envia não conformidades se houver itens válidos
+    if (naoConformidades.length > 0) {
+        formData.append('naoConformidades', JSON.stringify(naoConformidades));
+    }
 
     // 6. Enviar para o backend
     fetch('/inspecao/api/envio-inspecao-serra-usinagem/', {
