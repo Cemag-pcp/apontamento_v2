@@ -36,8 +36,8 @@ document.addEventListener("DOMContentLoaded", async function () {
                 const checkbox = document.createElement('div');
                 checkbox.classList.add("form-check", "mb-1");
                 checkbox.innerHTML = `
-                    <input class="form-check-input" type="checkbox" value="${causa.id}" name="causasReinspecao[]">
-                    <label class="form-check-label">
+                    <input class="form-check-input" type="checkbox" value="${causa.id}" id="${causa.nome}_${causa.id}" name="causasReinspecao[]">
+                    <label class="form-check-label" for="${causa.nome}_${causa.id}">
                         ${causa.nome}
                     </label>
                 `;

@@ -50,6 +50,7 @@ function buscarItensInspecao(pagina) {
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecao");
     let itensInspecionar = document.getElementById("itens-inspecionar");
     let itensFiltradosMaquina = document.getElementById("itens-filtrados-inspecao-maquina");
+    let itensFiltradosStatus = document.getElementById("itens-filtrados-inspecao-status");
     let itensFiltradosData = document.getElementById("itens-filtrados-inspecao-data");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecao-pesquisa");
     let paginacao = document.getElementById("paginacao-inspecao-serra-usinagem");
@@ -68,6 +69,11 @@ function buscarItensInspecao(pagina) {
         maquinasSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
+    let statusSelecionados = [];
+    document.querySelectorAll('.form-check-status-input-inspecao-serra-usinagem:checked').forEach(checkbox => {
+        statusSelecionados.push(checkbox.nextElementSibling.textContent.trim());
+    });
+
     let dataSelecionada = document.getElementById('data-filtro-inspecao').value;
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
@@ -79,6 +85,15 @@ function buscarItensInspecao(pagina) {
         itensFiltradosMaquina.textContent = "Máquinas: " + maquinasSelecionadas.join(", ");
     } else {
         itensFiltradosMaquina.style.display = "none";
+    }
+
+    if (statusSelecionados.length > 0) {
+        console.log(statusSelecionados);
+        params.append("status", statusSelecionados.join(","));
+        itensFiltradosStatus.style.display = "block";
+        itensFiltradosStatus.textContent = "Status: " + statusSelecionados.join(", ");
+    } else {
+        itensFiltradosStatus.style.display = "none";
     }
 
     if (dataSelecionada) {
@@ -113,8 +128,8 @@ function buscarItensInspecao(pagina) {
     }).then(items => {
         cardsInspecao.innerHTML = "";
 
-        const quantidadeInspecoes = items.total;
-        const quantidadeFiltradaInspecoes = items.total_filtrado;
+        const quantidadeInspecoes = items.total_inspecoes_sem_filtros;
+        const quantidadeFiltradaInspecoes = items.paginacao.total_filtrado;
         const status = {
             "Não iniciado":"devolvido",
             "Em andamento": "pendente"
@@ -173,7 +188,7 @@ function buscarItensInspecao(pagina) {
                     const sections = [
                         'sectionMedicaoSerra',
                         'sectionMedicaoUsinagem',
-                        'sectionMedicaoFuração'
+                        'sectionMedicaoFuracao'
                     ];
                     
                     sections.forEach(sectionId => {
@@ -194,7 +209,6 @@ function buscarItensInspecao(pagina) {
                     // Pegar a data atual formatada
                     const currentDate = new Date();
                     const formattedDate = currentDate.toISOString().split('T')[0];
-                    console.log(formattedDate)
 
                     modalInspecao.querySelector('#dataInspecao').value = formattedDate;
                     modalInspecao.querySelector('#conjuntoName').value = itemPeca;
@@ -217,8 +231,6 @@ function buscarItensInspecao(pagina) {
                     })
                     .then(response => response.json())
                     .then(data => {
-                        console.log(data.existe);
-                        console.log(data.dados.length);
                         if (data.existe && data.dados && Object.keys(data.dados.tipos_processo).length > 0) {
                             // Preencher as linhas de medição com os dados retornados
                             preencherLinhasMedicao(data.dados);
@@ -306,16 +318,14 @@ function preencherLinhasMedicao(dados) {
             );
             if (inputCabecalho) {
                 inputCabecalho.value = cabecalho;
-                inputCabecalho.disabled = true;
             }
         });
 
         // Preenche os valores das amostras
         for (const [amostraNum, amostraData] of Object.entries(dadosTipo.amostras)) {
-            // Desabilitar TODOS os inputs desta linha/amostra
+            // Desabilitar TODOS os inputs desta linha/amostra input[name^="${tipo}_valor${amostraNum}_"], 
             const linhaInputs = document.querySelectorAll(
-                `input[name^="${tipo}_valor${amostraNum}_"], 
-                 input[name="${tipo}_conformity${amostraNum}"]`
+                `input[name="${tipo}_conformity${amostraNum}"]`
             );
             
             linhaInputs.forEach(input => {
@@ -613,6 +623,7 @@ function previewImage(input, previewId) {
                 const img = document.createElement('img');
                 img.src = e.target.result;
                 img.className = 'file-preview'; // Você pode estilizar isso com CSS
+                img.style.maxWidth = '150px'; // Ajuste o tamanho conforme necessário
                 div.appendChild(img);
 
                 const fileName = document.createElement('p');
@@ -644,12 +655,8 @@ function getSelectedCauses(itemId) {
     return selectedCauses;
 }
 
-// Função para validar o formulário antes do envio
 function validarFormulario() {
-
-    const qtdProduzida = parseInt(document.getElementById("pecasProduzidas").value);
-
-    // Validação de inspetor
+    // 1. Validação de inspetor
     const inspetor = document.getElementById('inspetor').value;
     if (inspetor === '') {
         Toast.fire({
@@ -659,31 +666,217 @@ function validarFormulario() {
         return false;
     }
 
-    // 3. Validação inspeção 100%
-    const inspecao_total = document.getElementById("inspecao_total").value;
-    if (inspecao_total === '') {
+    const checkboxSerra = document.getElementById('checkbox-inspecao-serra');
+    const checkboxUsinagem = document.getElementById('checkbox-inspecao-usinagem');
+    const checkboxFuracao = document.getElementById('checkbox-inspecao-furacao');
+    
+    if (!checkboxSerra.checked && !checkboxUsinagem.checked && !checkboxFuracao.checked) {
         Toast.fire({
             icon: "error",
-            title: `Por favor, informe se será necessário inspeção 100%.`
+            title: "Selecione pelo menos um tipo de inspeção (Serra, Usinagem ou Furação)."
         });
         return false;
     }
 
-    // 5. Validação de não conformidades (cada não conformidade deve ter quantidade e pelo menos uma causa)
-    let somaQuantidadesAfetadas = 0;
+    // 2. Validação inspeção 100%
+    const inspecao_total = document.getElementById("inspecao_total").value;
+    if (inspecao_total === '') {
+        Toast.fire({
+            icon: "error",
+            title: "Por favor, informe se será necessário inspeção 100%."
+        });
+        return false;
+    }
 
-    const naoConformidades = document.querySelectorAll('.non-conformity-item');
-    for (const item of naoConformidades) {
-        const id = item.id.replace('nonConformityItem', '');
-        const quantidade = parseInt(document.getElementById(`quantidadeAfetada${id}`).value);
-        const causasSelecionadas = document.querySelectorAll(`#causasContainer${id} .causa-checkbox:checked`).length;
-        const destinoSelecionado = document.getElementById(`destino${id}`).value;
-        
-        // Acumular quantidade afetada das não conformidades
-        somaQuantidadesAfetadas += quantidade;
+    // 3. Validação das seções de medição (apenas para as seções marcadas)
+    const sections = [
+        { prefix: 'serra', sectionId: 'sectionMedicaoSerra', checkboxId: 'checkbox-inspecao-serra' },
+        { prefix: 'usinagem', sectionId: 'sectionMedicaoUsinagem', checkboxId: 'checkbox-inspecao-usinagem' },
+        { prefix: 'furacao', sectionId: 'sectionMedicaoFuracao', checkboxId: 'checkbox-inspecao-furacao' }
+    ];
+
+    for (const section of sections) {
+        const checkbox = document.getElementById(section.checkboxId);
+        if (checkbox?.checked) {
+            const result = validarSectionMedicao(section.prefix, section.sectionId);
+            if (!result.valid) {
+                Toast.fire({
+                    icon: "error",
+                    title: result.message
+                });
+                return false;
+            }
+        }
+    }
+
+    // 4. Validação das não conformidades
+    const totalNaoConformes = contarNaoConformidades();
+    if (totalNaoConformes > 0) {
+        const result = validarNaoConformidades(totalNaoConformes);
+        if (!result.valid) {
+            Toast.fire({
+                icon: "error",
+                title: result.message
+            });
+            return false;
+        }
     }
 
     return true;
+}
+
+function validarSectionMedicao(prefix, sectionId) {
+    const section = document.getElementById(sectionId);
+    const medidaInputs = section.querySelectorAll(`input[name^="medida-input-"]`);
+    const sectionName = section.querySelector('.fw-bold').textContent;
+    const rows = section.querySelectorAll('tbody tr');
+    
+    // 1. Validação completa entre cabeçalhos, valores e checkboxes
+    for (let col = 0; col < medidaInputs.length; col++) {
+        const medidaInput = medidaInputs[col];
+        const medidaValue = medidaInput.value.trim();
+        const colNumber = col + 1;
+        
+        // Verifica se há valores preenchidos nesta coluna
+        let hasValuesInColumn = false;
+        for (let row = 0; row < rows.length; row++) {
+            const valueInput = rows[row].querySelector(`input[name^="${prefix}_valor"][name$="_${colNumber}"]`);
+            if (valueInput && valueInput.value.trim() !== '') {
+                hasValuesInColumn = true;
+                break;
+            }
+        }
+        
+        // Validação: Se tem cabeçalho mas não tem valores
+        if (medidaValue !== '' && !hasValuesInColumn) {
+            return {
+                valid: false,
+                message: `Para a medida "${medidaValue}" em ${sectionName}, preencha pelo menos um valor na tabela.`
+            };
+        }
+        
+        // Validação: Se tem valores mas não tem cabeçalho
+        if (hasValuesInColumn && medidaValue === '') {
+            return {
+                valid: false,
+                message: `Preencha o cabeçalho da coluna ${colNumber} em ${sectionName} para os valores inseridos.`
+            };
+        }
+    }
+    
+    // 2. Validação das linhas (valores vs checkboxes)
+    for (let row = 0; row < rows.length; row++) {
+        const rowInputs = rows[row].querySelectorAll(`input[name^="${prefix}_valor"]`);
+        let rowHasValue = false;
+        
+        // Verifica se a linha tem algum valor preenchido
+        for (const input of rowInputs) {
+            if (input.value.trim() !== '') {
+                rowHasValue = true;
+                break;
+            }
+        }
+        
+        // Validação: Se tem valores mas não tem checkbox marcado
+        if (rowHasValue) {
+            const conformityCheckboxes = rows[row].querySelectorAll(`input[name="${prefix}_conformity${row+1}"]:not(:disabled)`);
+            
+            if (conformityCheckboxes.length > 0) {
+                let hasConformity = false;
+                for (const checkbox of conformityCheckboxes) {
+                    if (checkbox.checked) {
+                        hasConformity = true;
+                        break;
+                    }
+                }
+                
+                if (!hasConformity) {
+                    return {
+                        valid: false,
+                        message: `Na linha ${row+1} da seção ${sectionName}, marque "Conforme" ou "Não Conforme".`
+                    };
+                }
+            }
+        }
+        
+        // Validação: Se tem checkbox marcado mas não tem valores
+        const anyCheckboxChecked = rows[row].querySelector(`input[name="${prefix}_conformity${row+1}"]:checked`);
+        if (anyCheckboxChecked && !rowHasValue) {
+            return {
+                valid: false,
+                message: `Na linha ${row+1} da seção ${sectionName}, preencha pelo menos um valor para marcar a conformidade.`
+            };
+        }
+    }
+    
+    return { valid: true };
+}
+
+function contarNaoConformidades() {
+    let count = 0;
+    document.querySelectorAll('input[value="nonConforming"]:checked:not(:disabled)').forEach(checkbox => {
+        count++;
+    });
+    return count;
+}
+
+function validarNaoConformidades(totalNaoConformes) {
+    const nonConformityItems = document.querySelectorAll('.non-conformity-item');
+    let hasValidItem = false;
+    let totalQuantidadeAfetada = 0;
+
+    for (let i = 0; i < nonConformityItems.length; i++) {
+        const item = nonConformityItems[i];
+        const id = i + 1;
+        
+        // Verifica se o item está preenchido
+        const causas = item.querySelectorAll(`input[name="causas${id}"]:checked`).length;
+        const quantidade = parseInt(item.querySelector(`#quantidadeAfetada${id}`).value) || 0;
+        const destino = item.querySelector(`#destino${id}`).value;
+        
+        if (causas > 0 || quantidade > 0 || destino !== '') {
+            // Validação dos campos obrigatórios
+            if (causas === 0) {
+                return {
+                    valid: false,
+                    message: `Selecione pelo menos uma causa para o item de não conformidade ${id}`
+                };
+            }
+            
+            if (quantidade <= 0) {
+                return {
+                    valid: false,
+                    message: `Informe a quantidade afetada (maior que zero) para o item de não conformidade ${id}`
+                };
+            }
+            
+            if (destino === '') {
+                return {
+                    valid: false,
+                    message: `Selecione o destino para o item de não conformidade ${id}`
+                };
+            }
+            
+            totalQuantidadeAfetada += quantidade;
+            hasValidItem = true;
+        }
+    }
+
+    if (!hasValidItem && totalNaoConformes > 0) {
+        return {
+            valid: false,
+            message: 'Para as não conformidades identificadas, preencha pelo menos um item completo (causa, quantidade e destino)'
+        };
+    }
+
+    if (hasValidItem && totalQuantidadeAfetada !== totalNaoConformes) {
+        return {
+            valid: false,
+            message: `A soma das quantidades afetadas (${totalQuantidadeAfetada}) deve ser igual ao total de não conformidades identificadas (${totalNaoConformes})`
+        };
+    }
+
+    return { valid: true };
 }
 
 document.getElementById('inspectionModal').addEventListener('hide.bs.modal', function (event) {

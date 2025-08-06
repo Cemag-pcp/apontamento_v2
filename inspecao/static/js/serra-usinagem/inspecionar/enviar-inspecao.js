@@ -53,7 +53,8 @@ function enviarDadosInspecao() {
 
             // Coletar os 8 valores de medida
             for (let coluna = 1; coluna <= 8; coluna++) {
-                const nomeMedida = cabecalhos[coluna-1] || `Medida ${coluna}`;
+                const nomeMedida = cabecalhos[coluna-1];
+                console.log(nomeMedida);
                 const valorInput = document.querySelector(`input[name="${tipo}_valor${linha}_${coluna}"]`);
                 const valor = valorInput ? valorInput.value.trim() : '';
 

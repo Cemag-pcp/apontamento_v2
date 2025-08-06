@@ -86,9 +86,12 @@ def get_itens_inspecao_serra_usinagem(request):
 
         # Filtro por status0
         if status_param:
-            if status_param == "nao_iniciado":
+            print(status_param == "Não iniciado")
+            print(status_param)
+            print("Não iniciado")
+            if status_param == "Não iniciado":
                 query &= Q(dadosexecucaoinspecao__isnull=True)
-            elif status_param == "em_andamento":
+            elif status_param == "Em andamento":
                 query &= Q(dadosexecucaoinspecao__isnull=False) & Q(
                     dadosexecucaoinspecao__info_adicionais__inspecao_finalizada=False
                 )
@@ -98,6 +101,8 @@ def get_itens_inspecao_serra_usinagem(request):
             query &= Q(dadosexecucaoinspecao__isnull=True) | Q(
                 dadosexecucaoinspecao__info_adicionais__inspecao_finalizada=False
             )
+        
+        total_sem_filtros = Inspecao.objects.filter(query).count()
 
         # Outros filtros (mantidos da versão anterior)
         if maquinas_param:
@@ -152,8 +157,6 @@ def get_itens_inspecao_serra_usinagem(request):
 
         # Aplica a query e ordenação
         inspecoes = Inspecao.objects.filter(query).distinct().order_by("-data_inspecao")
-
-        print(inspecoes)
 
         # Paginação
         paginator = Paginator(inspecoes, itens_por_pagina)
@@ -220,9 +223,10 @@ def get_itens_inspecao_serra_usinagem(request):
                 "paginacao": {
                     "pagina_atual": page_obj.number,
                     "total_paginas": paginator.num_pages,
-                    "total_itens": paginator.count,
+                    "total_filtrado": paginator.count,
                     "itens_por_pagina": itens_por_pagina,
                 },
+                "total_inspecoes_sem_filtros": total_sem_filtros,
             },
             safe=False,
         )
@@ -394,6 +398,8 @@ def get_itens_reinspecao_serra_usinagem(request):
 
     for reinspecao in pagina_obj:
         inspecao = reinspecao.inspecao
+
+        data_ajustada = reinspecao.data_reinspecao - timedelta(hours=3)
         # Prioriza serra ou usinagem
         ordem_peca = inspecao.pecas_ordem_serra or inspecao.pecas_ordem_usinagem
         if not ordem_peca:
@@ -418,7 +424,7 @@ def get_itens_reinspecao_serra_usinagem(request):
         item = {
             "id": inspecao.id,
             "id_inspecao": inspecao.id,
-            "data_solicitacao": reinspecao.data_reinspecao.strftime(
+            "data": data_ajustada.strftime(
                 "%d/%m/%Y %H:%M:%S"
             ),
             "peca": peca_info,
@@ -431,20 +437,20 @@ def get_itens_reinspecao_serra_usinagem(request):
                 if hasattr(reinspecao, "motivo")
                 else "Não especificado"
             ),
-            "inspetor_original": (
+            "inspetor": (
                 ultima_execucao.inspetor.user.username
                 if ultima_execucao and ultima_execucao.inspetor
                 else "N/A"
             ),
-            "data_inspecao_original": (
+            "data_inspecao": (
                 ultima_execucao.data_execucao.strftime("%d/%m/%Y %H:%M:%S")
                 if ultima_execucao
                 else "N/A"
             ),
-            "conformidade_original": (
+            "conformidade": (
                 ultima_execucao.conformidade if ultima_execucao else 0
             ),
-            "nao_conformidade_original": (
+            "nao_conformidade": (
                 ultima_execucao.nao_conformidade if ultima_execucao else 0
             ),
         }
@@ -602,7 +608,6 @@ def envio_inspecao_serra_usinagem(request):
         print(medidas_serra)
         print(medidas_usinagem)
         print(medidas_furacao)
-
         print(inspecao_completa)
 
         with transaction.atomic():
@@ -621,6 +626,8 @@ def envio_inspecao_serra_usinagem(request):
                 # Usar a execução existente
                 dados_execucao = dados_execucao_existente
                 # Atualizar campos se necessário
+                dados_execucao.conformidade = 0
+                dados_execucao.nao_conformidade = 0
                 dados_execucao.inspetor = inspetor
                 dados_execucao.observacao = observacao
                 dados_execucao.save()
@@ -665,8 +672,43 @@ def envio_inspecao_serra_usinagem(request):
                 )
                 info_adicionais.save()
 
-            # Processar medidas (mesma lógica para execução nova ou existente)
-            def processar_medidas(tipo_processo, medidas_data):
+            # Agrupar todas as medidas
+            todas_medidas = {
+                "serra": medidas_serra,
+                "usinagem": medidas_usinagem,
+                "furacao": medidas_furacao
+            }
+
+            # Determinar o número máximo de amostras entre todos os processos
+            max_amostras = max(
+                len(medidas_serra),
+                len(medidas_usinagem),
+                len(medidas_furacao)
+            )
+
+            # Processar cada amostra (posição 0 = 1ª amostra, posição 1 = 2ª amostra, etc.)
+            for amostra_idx in range(max_amostras):
+                amostra_conforme = True
+                
+                # Verificar cada tipo de processo para esta amostra
+                for tipo_processo, medidas in todas_medidas.items():
+                    if tipo_processo not in inspecoes_ativas:
+                        continue
+                        
+                    # Verificar se existe medida para esta amostra no processo atual
+                    if amostra_idx < len(medidas):
+                        medida_amostra = medidas[amostra_idx]
+                        if not medida_amostra.get('conforme', True):
+                            amostra_conforme = False
+                
+                # Atualizar contagem conforme/nao conforme
+                if amostra_conforme:
+                    dados_execucao.conformidade += 1
+                else:
+                    dados_execucao.nao_conformidade += 1
+
+            # Salvar as medidas no banco de dados
+            def salvar_medidas(tipo_processo, medidas_data):
                 if tipo_processo not in inspecoes_ativas:
                     return
 
@@ -688,38 +730,23 @@ def envio_inspecao_serra_usinagem(request):
                     )
                     medida_processo.save()
 
-                # Variável para verificar se TODAS as amostras deste processo são conformes
-                todas_conformes = True
-
                 # Processar cada amostra
                 for amostra_idx, amostra_data in enumerate(medidas_data, 1):
-                    conforme_amostra = amostra_data.get('conforme', True)
-                    
                     # Salvar os detalhes das medidas no banco de dados
                     for medida_key, medida_valor in amostra_data.items():
+                        print(amostra_data)
                         if medida_key != 'conforme' and isinstance(medida_valor, dict):
                             DetalheMedidaSerraUsinagem.objects.create(
                                 medida_processo=medida_processo,
                                 cabecalho=medida_valor['nome'],
                                 valor=medida_valor['valor'],
-                                conforme=medida_valor.get('conforme', True),
+                                conforme=amostra_data.get('conforme', True),
                                 amostra=amostra_idx,
                             )
-                    
-                    # Verificar conformidade da amostra
-                    if not conforme_amostra:
-                        dados_execucao.nao_conformidade += 1
-                        todas_conformes = False
-                    # Nota: Não incrementamos conformidade aqui ainda
-                
-                # Se TODAS as amostras deste processo forem conformes, conta 1 conformidade
-                if todas_conformes and medidas_data:  # Verifica também se há medidas
-                    dados_execucao.conformidade += 1
 
-            # Processar cada tipo de medida
-            processar_medidas("serra", medidas_serra)
-            processar_medidas("usinagem", medidas_usinagem)
-            processar_medidas("furacao", medidas_furacao)
+            # Salvar as medidas para cada tipo de processo
+            for tipo_processo, medidas in todas_medidas.items():
+                salvar_medidas(tipo_processo, medidas)
 
             if "naoConformidades" in request.POST:
                 # Processar não conformidades (limpar existentes primeiro)
@@ -852,7 +879,6 @@ def envio_reinspecao_serra_usinagem(request):
                 nao_conformidade=int(nao_conformidade),
             )
 
-            # Criação das informações adicionais
             info_adicionais = InfoAdicionaisSerraUsinagem.objects.create(
                 dados_exec_inspecao=dados_execucao,
                 inspecao_completa=True,
@@ -867,14 +893,13 @@ def envio_reinspecao_serra_usinagem(request):
                 for i in range(1, quantidade_total_causas + 1):
                     causas_ids = request.POST.getlist(f"causas_reinspecao_{i}")
                     quantidade_afetada = request.POST.get(f"quantidade_reinspecao_{i}")
-                    destino = request.POST.get(f"destino_reinspecao_{i}")
                     imagens = request.FILES.getlist(f"imagens_reinspecao_{i}")
 
                     # Criar o objeto principal da não conformidade
                     dados_nao_conformidade = CausasNaoConformidade.objects.create(
-                        informacoes_adicionais_serra_usinagem=info_adicionais,
+                        dados_execucao=dados_execucao,
                         qt_nao_conformidade=int(quantidade_afetada),
-                        destino=destino,  # Aqui você pode ajustar o destino conforme o seu fluxo
+                        destino='retrabalho',  # Aqui você pode ajustar o destino conforme o seu fluxo
                     )
 
                     # Relacionar as causas

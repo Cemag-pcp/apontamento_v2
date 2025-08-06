@@ -136,9 +136,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     );
                     
                     if (conformingCheckbox && nonConformingCheckbox) {
-                        console.log("ENTROU")
                         conformingCheckbox.checked = value.conforming;
                         nonConformingCheckbox.checked = value.nonConforming;
+                        // Adicione estas linhas para desabilitar os checkboxes
+                        conformingCheckbox.disabled = value.disabled || false;
+                        nonConformingCheckbox.disabled = value.disabled || false;
                     }
                 } else {
                     const input = document.querySelector(`.measurement-section[data-type="${type}"] input[name="${type}_valor${row}_${key}"]`);
@@ -168,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
         section.className = 'mb-4 measurement-section';
         section.dataset.type = type;
         
-        const typeName = type === 'serra' ? 'Serra' : type === 'usinagem' ? 'Usinagem' : 'Furação';
+        const typeName = type === 'serra' ? 'Serra' : type === 'usinagem' ? 'Usinagem' : 'Furacao';
         
         // Obter quantidade produzida ou usar 3 como padrão
         const qtdProduzida = parseInt(document.getElementById('pecasProduzidas').value) || 0;
