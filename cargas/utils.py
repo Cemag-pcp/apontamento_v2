@@ -332,6 +332,9 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 'VM', '')  # Vermelho
             base_carga['Recurso'] = base_carga['Recurso'].str.replace(
                 'AV', '')  # Amarelo
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace(
+                'CO', '')  # Cinza
+
             # base_carga['Recurso'] = base_carga['Recurso'].str.replace(
             #     'AS', '')  # Amarelo
 
@@ -341,6 +344,8 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
             filtro_data = base_carga.loc[escolha_data]
+            print(filtro_data)
+
             # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
 
             # procv e trazendo as colunas que quero ver
