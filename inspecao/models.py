@@ -2,6 +2,7 @@ from django.db import models
 from core.models import Profile
 from cadastro.models import PecasEstanqueidade
 
+
 class Inspecao(models.Model):
 
     data_inspecao = models.DateTimeField(auto_now_add=True)
@@ -26,16 +27,34 @@ class Inspecao(models.Model):
         blank=True,
     )
 
+    pecas_ordem_serra = models.ForeignKey(
+        "apontamento_serra.PecasOrdem",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    pecas_ordem_usinagem = models.ForeignKey(
+        "apontamento_usinagem.PecasOrdem",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+
     def __str__(self):
 
         if self.pecas_ordem_pintura:
             setor_inspecao = f"Pintura - {self.pecas_ordem_pintura.id}"
         elif self.pecas_ordem_montagem:
             setor_inspecao = f"Montagem - {self.pecas_ordem_montagem.id}"
+        elif self.pecas_ordem_serra:
+            setor_inspecao = f"Serra - {self.pecas_ordem_serra.id}"
+        elif self.pecas_ordem_usinagem:
+            setor_inspecao = f"Usinagem - {self.pecas_ordem_usinagem.id}"
         else:
             setor_inspecao = f"Estamparia - {self.pecas_ordem_estamparia.id}"
 
         return f"Inspeção {self.id} - {setor_inspecao}"
+
 
 class DadosExecucaoInspecao(models.Model):
 
@@ -71,6 +90,7 @@ class DadosExecucaoInspecao(models.Model):
         # Chama o método save da superclasse para salvar o objeto
         super(DadosExecucaoInspecao, self).save(*args, **kwargs)
 
+
 class Reinspecao(models.Model):
 
     inspecao = models.ForeignKey(
@@ -79,12 +99,14 @@ class Reinspecao(models.Model):
     data_reinspecao = models.DateTimeField(auto_now_add=True)
     reinspecionado = models.BooleanField(default=False)
 
+
 class Causas(models.Model):
 
     SETOR_CHOICES = (
         ("pintura", "Pintura"),
         ("montagem", "Montagem"),
         ("estamparia", "Estamparia"),
+        ("serra-usinagem", "Serra e Usinagem"),
         ("tubos cilindros", "Tubos e Cilindros"),
         ("tanque", "Tanque"),
     )
@@ -103,6 +125,11 @@ class Causas(models.Model):
 
 class CausasNaoConformidade(models.Model):
 
+    DESTINO_CHOICES = (
+        ("retrabalho", "Retrabalho"),
+        ("sucata", "Sucata"),
+    )
+
     dados_execucao = models.ForeignKey(
         DadosExecucaoInspecao, on_delete=models.CASCADE, null=False, blank=False
     )
@@ -110,6 +137,9 @@ class CausasNaoConformidade(models.Model):
         Causas, related_name="causas_nao_conformidade", blank=True
     )
     quantidade = models.IntegerField(null=False, blank=False)
+    destino = models.CharField(
+        max_length=10, choices=DESTINO_CHOICES, null=True, blank=True, default=None
+    )
 
 
 class ArquivoCausa(models.Model):
@@ -233,6 +263,7 @@ class CausasNaoConformidadeEstanqueidade(models.Model):
         Causas, related_name="causas_nao_conformidade_estanqueidade", blank=True
     )
     quantidade = models.IntegerField(null=False, blank=False)
+
 
 class ArquivoCausaEstanqueidade(models.Model):
     causa_nao_conformidade = models.ForeignKey(
