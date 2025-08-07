@@ -317,7 +317,10 @@ def tratamento_planilha_laser3(tree):
     if dim is not None:
         comprimento = float(dim.find('Length').text)
         largura = float(dim.find('Width').text)
-        espessura_real = float(dim.find('Thickness').text)
+
+        valor = float(dim.find('Thickness').text)
+        espessura_real = f"{int(valor)} mm" if valor.is_integer() else f"{valor:.1f} mm"
+
     else:
         comprimento = largura = espessura_real = None
 
