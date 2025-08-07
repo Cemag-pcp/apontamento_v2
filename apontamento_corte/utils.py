@@ -3,6 +3,7 @@ from datetime import date
 import re
 import numpy as np
 import xml.etree.ElementTree as ET
+import re
 
 def padronizar_medida_plasma(s):
     padroes = [1200, 1500, 2550]
@@ -59,6 +60,19 @@ def tratamento_planilha_plasma(df):
     df = df.dropna(how='all')
 
     tempo_estimado_total = df['Unnamed: 16'][38]
+
+    tempo_estimado_total_tratado = ""
+
+    primeiro_digito_tempo = tempo_estimado_total[0:2]
+    try:
+        primeiro_digito_tempo = int(primeiro_digito_tempo)
+        if primeiro_digito_tempo < 10:
+            tempo_estimado_total_tratado = "0"+tempo_estimado_total
+            tempo_estimado_total_tratado = tempo_estimado_total_tratado.split('.')[0]
+    except:
+        tempo_estimado_total_tratado = "0"+tempo_estimado_total
+        tempo_estimado_total_tratado = tempo_estimado_total_tratado.split('.')[0]
+
     tamanho_chapa = df[df.columns[24:25]][9:10].values.tolist()[0][0].replace('×', 'x')
     qt_chapa = df[df.columns[2:3]][9:10]
 
@@ -152,7 +166,7 @@ def tratamento_planilha_plasma(df):
         'espessura':espessura,
         'quantidade':qt_chapa_list[0][0],
         'aproveitamento':aproveitamento_list[0],
-        'tempo_estimado_total': tempo_estimado_total
+        'tempo_estimado_total': tempo_estimado_total_tratado
     }]
 
     return df, propriedades
@@ -176,6 +190,8 @@ def tratamento_planilha_laser2(df,df2,df3):
 
     # buscar tempo estimado total
     tempo_estimado_total = df3['Unnamed: 9'][2]
+
+    tempo_estimado_total_tratado = normalizar_tempo(tempo_estimado_total)
 
     df2.columns = df2.iloc[0]
     df2 = df2[1:].reset_index(drop=True)
@@ -219,7 +235,7 @@ def tratamento_planilha_laser2(df,df2,df3):
         'espessura':espessura_df,
         'quantidade':qt_chapa,
         'aproveitamento':aproveitamento_df,
-        'tempo_estimado_total': tempo_estimado_total
+        'tempo_estimado_total': tempo_estimado_total_tratado
     }]
 
     return df2, propriedades
@@ -299,7 +315,7 @@ def converter_minutos_para_horas(minutos_float):
 def tratamento_planilha_laser3(tree):
 
     # Carrega o XML
-    tree = ET.parse('OP12.xml')
+    # tree = ET.parse('OP12.xml')
     root = tree.getroot()
 
     # 1. Espessura via UsedLaserTechnoTable > TableNo
@@ -370,3 +386,21 @@ def tratamento_planilha_laser3(tree):
 
     return df_pecas, propriedades
 
+def normalizar_tempo(s):
+    """Normaliza o tempo para o formato HH:MM:SS. Ex: '29min43,2s' -> '00:29:43'"""
+    s = s.lower().replace(",", ".")  # padroniza decimal com ponto
+    horas = minutos = segundos = 0
+
+    # Expressões regulares
+    match_horas = re.search(r'(\d+)\s*hours?', s)
+    match_min = re.search(r'(\d+)\s*min', s)
+    match_seg = re.search(r'(\d+(?:\.\d+)?)\s*s', s)  # aceita número com ponto decimal
+
+    if match_horas:
+        horas = int(match_horas.group(1))
+    if match_min:
+        minutos = int(match_min.group(1))
+    if match_seg:
+        segundos = int(float(match_seg.group(1)))  # converte corretamente
+
+    return f"{horas:02d}:{minutos:02d}:{segundos:02d}"
