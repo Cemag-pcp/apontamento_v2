@@ -221,6 +221,16 @@ function buscarItensInspecao(pagina) {
                     modalInspecao.querySelector('#pecasProduzidas').disabled = true;
                     modalInspecao.querySelector('#dataInspecao').disabled = true;
                     modalInspecao.querySelector('#conjuntoName').disabled = true;
+
+                    // Mostrar SweetAlert de carregamento
+                    Swal.fire({
+                        title: 'Carregando inspeção',
+                        html: 'Por favor, aguarde enquanto os dados são carregados...',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
                     
                     fetch(`/inspecao/api/get-execucao-inspecao-serra-usinagem/?id_inspecao=${itemId}`, {
                         method: 'GET',
@@ -231,6 +241,8 @@ function buscarItensInspecao(pagina) {
                     })
                     .then(response => response.json())
                     .then(data => {
+                        Swal.close();
+
                         if (data.existe && data.dados && Object.keys(data.dados.tipos_processo).length > 0) {
                             // Preencher as linhas de medição com os dados retornados
                             preencherLinhasMedicao(data.dados);
@@ -245,6 +257,12 @@ function buscarItensInspecao(pagina) {
                     })
                     .catch(error => {
                         console.error('Erro ao buscar execuções:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Ocorreu um erro ao carregar os dados da inspeção. Por favor, tente novamente.',
+                            confirmButtonText: 'OK'
+                        });
                     });
                 });
             });

@@ -97,6 +97,7 @@ function enviarDadosInspecao() {
         // Só inclui se tiver pelo menos um campo preenchido (exceto fotos)
         if (tipo || quantidadeAfetada || destino || causas.length > 0) {
             const naoConformidade = {
+                id: id, // Adicionar o ID único
                 tipo: tipo,
                 quantidadeAfetada: quantidadeAfetada,
                 destino: destino,
@@ -107,7 +108,7 @@ function enviarDadosInspecao() {
             const fotoInput = document.getElementById(`fotoNaoConformidade${id}`);
             if (fotoInput && fotoInput.files.length > 0) {
                 for (let i = 0; i < fotoInput.files.length; i++) {
-                    formData.append(`fotos_nao_conformidade[${id}][${i}]`, fotoInput.files[i]);
+                    formData.append(`nc_files_${id}`, fotoInput.files[i]);
                 }
             }
 

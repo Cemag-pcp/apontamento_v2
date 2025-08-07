@@ -153,11 +153,9 @@ function buscarItensInspecionados(pagina) {
                 iconeNaoConformidade = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
             }
 
-            let color = borderColors[item.cor];
-
             const cards = `
             <div class="col-md-4 mb-4">
-                <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
+                <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <h5> ${item.peca}</h5>
                     <p>Inspeção #${item.id}</p>
                     <p>

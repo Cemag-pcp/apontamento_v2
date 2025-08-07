@@ -481,12 +481,36 @@ def get_itens_inspecionados_serra_usinagem(request):
         dadosexecucaoinspecao__num_execucao=0  # Filtra apenas a primeira execução
     ).distinct()
 
+    status_conformidade_filtrados = (
+        request.GET.get("status-conformidade", "").split(",")
+        if request.GET.get("status-conformidade")
+        else []
+    )
+
     if maquinas:
         maquinas_lista = maquinas.split(",")
         inspecoes = inspecoes.filter(
             Q(pecas_ordem_serra__ordem__maquina__nome__in=maquinas_lista)
             | Q(pecas_ordem_usinagem__ordem__maquina__nome__in=maquinas_lista)
         )
+    
+        # Filtro de status de conformidade
+    if status_conformidade_filtrados:
+        # Verifica os casos possíveis de combinação de filtros
+        if set(status_conformidade_filtrados) == {"conforme", "nao_conforme"}:
+            pass
+        elif "conforme" in status_conformidade_filtrados:
+            # Apenas itens conformes (nao_conformidades = 0) E num_execucao=0
+            inspecoes = inspecoes.filter(
+                dadosexecucaoinspecao__nao_conformidade=0,
+                dadosexecucaoinspecao__num_execucao=0,
+            )
+        elif "nao_conforme" in status_conformidade_filtrados:
+            # Apenas itens não conformes (nao_conformidades > 0) E num_execucao=0
+            inspecoes = inspecoes.filter(
+                dadosexecucaoinspecao__nao_conformidade__gt=0,
+                dadosexecucaoinspecao__num_execucao=0,
+            )
 
     # Filtro por data
     if data:
@@ -546,13 +570,16 @@ def get_itens_inspecionados_serra_usinagem(request):
             else "Sem operador"
         )
 
+
         # Agora só temos inspeções com execução num_execucao=0
         for execucao in inspecao.execucoes:
+            data_ajustada = execucao.data_execucao - timedelta(hours=3)
             info_adicionais = getattr(execucao, "info_adicionais", None)
+            possui_nao_conformidade = execucao.nao_conformidade > 0 or execucao.num_execucao > 0
 
             item = {
                 "id": inspecao.id,
-                "data": execucao.data_execucao.strftime("%d/%m/%Y %H:%M:%S"),
+                "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                 "peca": peca_info,
                 "maquina": maquina_nome,
                 "qtd_apontada": ordem_peca.qtd_boa,
@@ -568,7 +595,8 @@ def get_itens_inspecionados_serra_usinagem(request):
                     info_adicionais.inspecao_completa if info_adicionais else False
                 ),
                 "tem_ficha": bool(info_adicionais.ficha) if info_adicionais else False,
-                "num_execucao": execucao.num_execucao  # Adicionando num_execucao na resposta
+                "num_execucao": execucao.num_execucao,  # Adicionando num_execucao na resposta
+                "possui_nao_conformidade": possui_nao_conformidade,
             }
             dados.append(item)
 
@@ -767,19 +795,13 @@ def envio_inspecao_serra_usinagem(request):
                 )
                 nao_conformidades = json.loads(request.POST.get("naoConformidades", "[]"))
                 for nc_data in nao_conformidades:
-                    # Só processa se houver causas definidas
                     if nc_data.get("causas"):
-                        # Tratamento robusto da quantidade
-                        destino = nc_data.get("destino", None)
-                        quantidade_str = str(nc_data.get("quantidadeAfetada", "1")).strip()
-                        quantidade = int(quantidade_str) if quantidade_str else 1
-
                         causa_nc = CausasNaoConformidade.objects.create(
                             dados_execucao=dados_execucao,
-                            quantidade=quantidade,
-                            destino=destino,
+                            quantidade=int(nc_data.get("quantidadeAfetada", 1)),
+                            destino=nc_data.get("destino"),
                         )
-
+                        
                         # Adiciona causas
                         for causa_id in nc_data.get("causas", []):
                             try:
@@ -787,13 +809,14 @@ def envio_inspecao_serra_usinagem(request):
                                 causa_nc.causa.add(causa)
                             except Causas.DoesNotExist:
                                 continue
-
-                        # Processar arquivos
-                        for arquivo in request.FILES.getlist(
-                            f'nc_files_{nc_data.get("id")}'
-                        ):
+                        
+                        # Processar arquivos - verifique se o nome do campo está correto
+                        nc_id = nc_data.get("id")
+                        for arquivo in request.FILES.getlist(f'nc_files_{nc_id}'):
+                            print(f"Adicionando arquivo: {arquivo.name} para causa {causa_nc.id}")
                             ArquivoCausa.objects.create(
-                                causa_nao_conformidade=causa_nc, arquivo=arquivo
+                                causa_nao_conformidade=causa_nc, 
+                                arquivo=arquivo
                             )
 
             # Verificar finalização
@@ -898,13 +921,13 @@ def envio_reinspecao_serra_usinagem(request):
                     # Criar o objeto principal da não conformidade
                     dados_nao_conformidade = CausasNaoConformidade.objects.create(
                         dados_execucao=dados_execucao,
-                        qt_nao_conformidade=int(quantidade_afetada),
+                        quantidade=int(quantidade_afetada),
                         destino='retrabalho',  # Aqui você pode ajustar o destino conforme o seu fluxo
                     )
 
                     # Relacionar as causas
                     if causas_ids:
-                        dados_nao_conformidade.causas.set(causas_ids)
+                        dados_nao_conformidade.causa.set(causas_ids)
 
                     # Salvar as imagens relacionadas
                     for imagem in imagens:
@@ -919,6 +942,107 @@ def envio_reinspecao_serra_usinagem(request):
                     reinspecao.save()
 
         return JsonResponse({"success": True})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+def get_historico_serra_usinagem(request, id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    dados = (
+        DadosExecucaoInspecao.objects.filter(inspecao__id=id)
+        .select_related("inspetor__user")
+        .prefetch_related(
+            "info_adicionais",
+            "medidas_processo",
+            "medidas_processo__detalhes",
+        )
+        .order_by("-id")
+    )
+
+    list_history = []
+    for dado in dados:
+        info_adicionais = dado.info_adicionais if hasattr(dado, 'info_adicionais') else None
+        medidas_processo = dado.medidas_processo.all()
+        
+        # Organizar medidas por tipo de processo
+        medidas_por_processo = {}
+        for processo in medidas_processo:
+            detalhes = [
+                {
+                    "cabecalho": d.cabecalho,
+                    "valor": d.valor,
+                    "conforme": d.conforme,
+                    "amostra": d.amostra,
+                }
+                for d in processo.detalhes.all()
+            ]
+            
+            if processo.tipo_processo not in medidas_por_processo:
+                medidas_por_processo[processo.tipo_processo] = []
+                
+            medidas_por_processo[processo.tipo_processo].extend(detalhes)
+
+        history_item = {
+            "id": dado.id,
+            "id_inspecao": id,
+            "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
+                "%d/%m/%Y %H:%M:%S"
+            ),
+            "num_execucao": dado.num_execucao,
+            "conformidade": dado.conformidade,
+            "nao_conformidade": dado.nao_conformidade,
+            "inspetor": dado.inspetor.user.username if dado.inspetor else None,
+            "info_adicionais": {
+                "id": info_adicionais.id if info_adicionais else None,
+                "inspecao_completa": info_adicionais.inspecao_completa if info_adicionais else False,
+                "inspecao_finalizada": info_adicionais.inspecao_finalizada if info_adicionais else False,
+                "ficha_url": info_adicionais.ficha.url if info_adicionais and info_adicionais.ficha else None,
+                "observacoes_gerais": info_adicionais.observacoes_gerais if info_adicionais else None,
+            },
+            "medidas_por_processo": medidas_por_processo,
+            "total_medidas": dado.conformidade + dado.nao_conformidade,
+        }
+        list_history.append(history_item)
+
+    return JsonResponse({"history": list_history}, status=200)
+
+def get_historico_causas_serra_usinagem(request, id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    try:
+        dados_nao_conformidades = CausasNaoConformidade.objects.filter(
+            dados_execucao__id=id
+        ).prefetch_related("causa", "arquivos")
+
+        causas_dict = defaultdict(
+            lambda: {
+                "id_nc": None,
+                "nomes": [],
+                "destino": None,
+                "quantidade": None,
+                "imagens": [],
+            }
+        )
+
+        for dados in dados_nao_conformidades:
+            if causas_dict[dados.id]["id_nc"] is None:
+                causas_dict[dados.id]["id_nc"] = dados.id
+                causas_dict[dados.id]["destino"] = dados.destino
+                causas_dict[dados.id]["quantidade"] = dados.quantidade
+                causas_dict[dados.id]["imagens"] = [
+                    {"id": arquivo.id, "url": arquivo.arquivo.url}
+                    for arquivo in dados.arquivos.all()
+                ]
+            causas_dict[dados.id]["nomes"].extend(
+                [causa.nome for causa in dados.causa.all()]
+            )
+
+        causas_list = list(causas_dict.values())
+
+        return JsonResponse({"causas": causas_list}, status=200)
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)

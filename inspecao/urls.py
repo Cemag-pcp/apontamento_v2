@@ -41,6 +41,9 @@ urlpatterns = [
     path('api/envio-inspecao-serra-usinagem/', serra_usinagem.envio_inspecao_serra_usinagem, name='inspecionar-serra-usinagem'),
     path('api/envio-reinspecao-serra-usinagem/', serra_usinagem.envio_reinspecao_serra_usinagem, name='envio-reinspecao-serra-usinagem'),
 
+    path('api/historico-serra-usinagem/<int:id>', serra_usinagem.get_historico_serra_usinagem, name='historico-serra-usinagem'),
+    path('api/historico-causas-serra-usinagem/<int:id>', serra_usinagem.get_historico_causas_serra_usinagem, name='historico-causas-serra-usinagem'),
+
     path('api/motivos-causas/<str:setor>/', views_general.motivos_causas, name='motivos_causas'),
 
     path('api/historico-montagem/<int:id>', montagem.get_historico_montagem, name='historico-montagem'),
