@@ -143,7 +143,7 @@ def get_ordens_criadas(request):
                     'ordem_id':ordem.pk,
                     'ordem': ordem.ordem,
                     'data_criacao': ordem.data_criacao,
-                    'maquina': ordem.maquina.nome,
+                    'maquina': ordem.maquina.nome if ordem.maquina else "Sem máquina planejada",
                     'id': peca_ordem.id,
                     'peca_id': peca_ordem.peca.id,
                     'peca_codigo': peca_ordem.peca.codigo,
