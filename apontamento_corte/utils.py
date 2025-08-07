@@ -311,7 +311,6 @@ def converter_minutos_para_horas(minutos_float):
     segundos = total_segundos % 60
     return f"{horas:02d}:{minutos:02d}:{segundos:02d}"
 
-
 def tratamento_planilha_laser3(tree):
 
     # Carrega o XML
@@ -334,7 +333,10 @@ def tratamento_planilha_laser3(tree):
     if dim is not None:
         comprimento = float(dim.find('Length').text)
         largura = float(dim.find('Width').text)
-        espessura_real = float(dim.find('Thickness').text)
+
+        valor = float(dim.find('Thickness').text)
+        espessura_real = f"{int(valor)} mm" if valor.is_integer() else f"{valor:.1f} mm"
+
     else:
         comprimento = largura = espessura_real = None
 
@@ -345,7 +347,8 @@ def tratamento_planilha_laser3(tree):
     # 4. Aproveitamento
     waste_el = root.find('.//Waste')
     aproveitamento = float(waste_el.text) if waste_el is not None else None
-
+    aproveitamento = 100 - aproveitamento 
+    
     # 4.1 Tempo estimado total
     tempo_estimato_total_elem = root.find('.//TotalRuntime')
     if tempo_estimato_total_elem is not None and tempo_estimato_total_elem.text:
@@ -362,9 +365,9 @@ def tratamento_planilha_laser3(tree):
         quantidade = part.find('TotalQuantityInJob')
         
         item = {
-            'peca': peca.text.strip() if peca is not None else '',
-            'qtd_planejada': quantidade.text.strip() if quantidade is not None else '',
-            'espessura': espessura,
+            'peca': peca.text.strip() if peca is not None and peca.text is not None else '',
+            'qtd_planejada': quantidade.text.strip() if quantidade is not None and quantidade.text is not None else '',
+            'espessura': espessura_real,
             'aproveitamento': aproveitamento,
             'tamanho_da_chapa': f"{comprimento} x {largura} mm ",
             'qt_chapas': quantidade_chapas
@@ -376,9 +379,9 @@ def tratamento_planilha_laser3(tree):
     # df_pecas.columns = ['qtd_planejada','peca','espessura','aproveitamento','tamanho_da_chapa','qt_chapas']
 
     propriedades = [{
-        'descricao_mp': str(espessura) + " - " + f"{comprimento} x {largura} mm ",
+        'descricao_mp': str(espessura_real) + " - " + f"{comprimento} x {largura} mm ",
         'tamanho':f"{comprimento} x {largura} mm ",
-        'espessura':espessura,
+        'espessura':espessura_real,
         'quantidade':quantidade_chapas,
         'aproveitamento':aproveitamento,
         'tempo_estimado_total':tempo_estimado_total_horas

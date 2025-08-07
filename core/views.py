@@ -44,7 +44,7 @@ def excluir_ordem(request):
             # Verifica o status atual da ordem antes de permitir a exclusão
             if ordem.status_atual in ['aguardando_iniciar', 'finalizada']:
                 # Exceção para o setor de corte (opção de retirar do sequenciamento)
-                if setor in ['laser_1','laser_2','laser_1','plasma']:
+                if setor in ['laser_1','laser_2','laser_1','laser_3','plasma']:
                     print('adicionando o motivo...')
                     ordem.motivo_retirar_sequenciada = motivo_exclusao
                     print('retirando do sequenciamento...')
