@@ -210,10 +210,9 @@ def atualizar_status_ordem(request):
 
                                 nova_ordem = criar_ordem_usinagem(dados_usinagem) 
 
-                        else:
-                            Inspecao.objects.create(    
-                                pecas_ordem_serra=peca_obj
-                            )                   
+                        Inspecao.objects.create(    
+                            pecas_ordem_serra=peca_obj
+                        )                   
 
                     ordem.status_prioridade = 3
 
