@@ -10,6 +10,28 @@ from apontamento_serra.models import (
     DetalheMedidaSerraUsinagem,
     InfoAdicionaisSerraUsinagem,
 )
+from django.db.models import (
+    Q,
+    Prefetch,
+    Max,
+    Sum,
+    F,
+    FloatField,
+    ExpressionWrapper,
+    Value,
+    CharField,
+    Count,
+    When,
+    Case,
+)
+from django.db.models.functions import (
+    Concat,
+    Cast,
+    TruncMonth,
+    ExtractYear,
+    ExtractMonth,
+    Coalesce,
+)
 from ..models import (
     Inspecao,
     DadosExecucaoInspecao,
@@ -813,11 +835,15 @@ def envio_inspecao_serra_usinagem(request):
                         # Processar arquivos - verifique se o nome do campo está correto
                         nc_id = nc_data.get("id")
                         for arquivo in request.FILES.getlist(f'nc_files_{nc_id}'):
-                            print(f"Adicionando arquivo: {arquivo.name} para causa {causa_nc.id}")
-                            ArquivoCausa.objects.create(
+                            print(request.FILES)
+                            print(request.FILES.keys())
+                            print(f"Adicionando arquivo: {arquivo} para causa {causa_nc.id}")
+                            obj = ArquivoCausa.objects.create(
                                 causa_nao_conformidade=causa_nc, 
                                 arquivo=arquivo
                             )
+                            print("URL do arquivo:", obj.arquivo.url)
+
 
             # Verificar finalização
             def verificar_finalizacao():
@@ -1046,3 +1072,384 @@ def get_historico_causas_serra_usinagem(request, id):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+### dashboard serra_usinagem ###
+
+def dashboard_serra_usinagem(request):
+    return render(request, "dashboard/serra-usinagem.html")
+
+def indicador_serra_usinagem_analise_temporal(request):
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+    except ValueError:
+        return JsonResponse(
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
+        )
+
+    # Filtra inspeções de serra OU usinagem
+    queryset = Inspecao.objects.filter(
+        Q(pecas_ordem_serra__isnull=False) | 
+        Q(pecas_ordem_usinagem__isnull=False)
+    )
+
+    if data_inicio:
+        queryset = queryset.filter(data_inspecao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(data_inspecao__lte=data_fim)
+
+    queryset = (
+        queryset.annotate(
+            mes=Cast(TruncMonth("data_inspecao"), output_field=CharField()),
+            # Usa Coalesce para pegar valores de serra ou usinagem
+            qtd_boa=Coalesce(
+                F("pecas_ordem_serra__qtd_boa"),
+                F("pecas_ordem_usinagem__qtd_boa")
+            ),
+            conformidade=F("dadosexecucaoinspecao__conformidade"),
+            nao_conformidade=F("dadosexecucaoinspecao__nao_conformidade"),
+            setor=Case(
+                When(pecas_ordem_serra__isnull=False, then=Value('serra')),
+                When(pecas_ordem_usinagem__isnull=False, then=Value('usinagem')),
+                default=Value(''),
+                output_field=CharField()
+            )
+        )
+        .values("mes", "setor")
+        .annotate(
+            qtd_peca_produzida=Count("id"),
+            qtd_peca_inspecionada=Count("dadosexecucaoinspecao__id"),
+            soma_conformidade=Sum("conformidade"),
+            soma_nao_conformidade=Sum("nao_conformidade"),
+        )
+        .order_by("mes", "setor")
+    )
+
+    resultado = []
+    for item in queryset:
+        conformidade = item["soma_conformidade"] or 0
+        nao_conformidade = item["soma_nao_conformidade"] or 0
+        taxa_nc = (nao_conformidade / conformidade) if conformidade else 0
+
+        print(conformidade)
+        print(nao_conformidade)
+        print(taxa_nc)
+        print(round(taxa_nc, 4))
+
+        resultado.append({
+            "mes": item["mes"][:7],
+            "setor": item["setor"],
+            "qtd_peca_produzida": item["qtd_peca_produzida"] or 0,
+            "qtd_peca_inspecionada": item["qtd_peca_inspecionada"] or 0,
+            "taxa_nao_conformidade": round(taxa_nc, 4),
+        })
+
+    return JsonResponse(resultado, safe=False)
+
+def indicador_serra_usinagem_resumo_analise_temporal(request):
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+    except ValueError:
+        return JsonResponse(
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
+        )
+
+    queryset = Inspecao.objects.filter(
+        Q(pecas_ordem_serra__isnull=False) | 
+        Q(pecas_ordem_usinagem__isnull=False)
+    )
+
+    if data_inicio:
+        queryset = queryset.filter(data_inspecao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(data_inspecao__lte=data_fim)
+
+    queryset = (
+        queryset.annotate(
+            ano=ExtractYear("data_inspecao"),
+            mes_num=ExtractMonth("data_inspecao"),
+            qtd_boa=Coalesce(
+                F("pecas_ordem_serra__qtd_boa"),
+                F("pecas_ordem_usinagem__qtd_boa")
+            ),
+            conformidade=F("dadosexecucaoinspecao__conformidade"),
+            nao_conformidade=F("dadosexecucaoinspecao__nao_conformidade"),
+            setor=Case(
+                When(pecas_ordem_serra__isnull=False, then=Value('serra')),
+                When(pecas_ordem_usinagem__isnull=False, then=Value('usinagem')),
+                default=Value(''),
+                output_field=CharField()
+            )
+        )
+        .values("ano", "mes_num", "setor")
+        .annotate(
+            total_produzida=Count("id"),
+            total_inspecionada=Count("dadosexecucaoinspecao__id"),
+            total_nao_conforme=Count(
+                "dadosexecucaoinspecao__id", filter=Q(nao_conformidade__gt=0)
+            ),
+        )
+        .order_by("ano", "mes_num", "setor")
+    )
+
+    resultado = []
+    for item in queryset:
+        mes_formatado = f"{item['ano']}-{item['mes_num']}"
+
+        total_prod = item["total_produzida"] or 0
+        total_insp = item["total_inspecionada"] or 0
+        total_nc = item["total_nao_conforme"] or 0
+
+        perc_insp = (total_insp / total_prod) * 100 if total_prod else 0
+
+        resultado.append({
+            "Data": mes_formatado,
+            "Setor": item["setor"],
+            "N° de peças produzidas": int(total_prod),
+            "N° de inspeções": int(total_insp),
+            "N° de não conformidades": int(total_nc),
+            "% de inspeção": f"{perc_insp:.2f} %",
+        })
+
+    return JsonResponse(resultado, safe=False)
+
+def causas_nao_conformidade_mensal_serra_usinagem(request):
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+    except ValueError:
+        return JsonResponse(
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
+        )
+
+    # Filtra causas de não conformidade para serra ou usinagem
+    queryset = CausasNaoConformidade.objects.filter(
+        Q(dados_execucao__inspecao__pecas_ordem_serra__isnull=False) |
+        Q(dados_execucao__inspecao__pecas_ordem_usinagem__isnull=False),
+        causa__isnull=False
+    )
+
+    if data_inicio:
+        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+
+    resultados = (
+        queryset.annotate(
+            mes_formatado=Concat(
+                ExtractYear("dados_execucao__data_execucao"),
+                Value("-"),
+                ExtractMonth("dados_execucao__data_execucao"),
+                output_field=CharField(),
+            ),
+            peca_info=Case(
+                When(
+                    dados_execucao__inspecao__pecas_ordem_serra__isnull=False,
+                    then=Concat(
+                        F("dados_execucao__inspecao__pecas_ordem_serra__peca__codigo"),
+                        Value(" - "),
+                        F("dados_execucao__inspecao__pecas_ordem_serra__peca__descricao"),
+                        output_field=CharField()
+                    )
+                ),
+                When(
+                    dados_execucao__inspecao__pecas_ordem_usinagem__isnull=False,
+                    then=Concat(
+                        F("dados_execucao__inspecao__pecas_ordem_usinagem__peca__codigo"),
+                        Value(" - "),
+                        F("dados_execucao__inspecao__pecas_ordem_usinagem__peca__descricao"),
+                        output_field=CharField()
+                    )
+                ),
+                default=Value(''),
+                output_field=CharField()
+            ),
+            setor=Case(
+                When(dados_execucao__inspecao__pecas_ordem_serra__isnull=False, then=Value('serra')),
+                When(dados_execucao__inspecao__pecas_ordem_usinagem__isnull=False, then=Value('usinagem')),
+                default=Value(''),
+                output_field=CharField()
+            )
+        )
+        .values(
+            "mes_formatado",
+            "causa__nome",
+            "destino",
+            "peca_info",
+            "setor"
+        )
+        .annotate(total_nao_conformidades=Sum("quantidade"))
+        .order_by("mes_formatado", "causa__nome")
+    )
+
+    resultado = [
+        {
+            "Data": item["mes_formatado"],
+            "Setor": item["setor"],
+            "Causa": item["causa__nome"],
+            "Destino": item["destino"],
+            "Peça": item["peca_info"],
+            "Soma do N° Total de não conformidades": item["total_nao_conformidades"],
+        }
+        for item in resultados
+    ]
+
+    return JsonResponse(resultado, safe=False)
+
+def imagens_nao_conformidade_serra_usinagem(request):
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+    except ValueError:
+        return JsonResponse(
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
+        )
+
+    # Query otimizada para buscar causas de não conformidade com arquivos
+    queryset = CausasNaoConformidade.objects.filter(
+        Q(dados_execucao__isnull=False),
+        Q(arquivos__isnull=False)
+    ).select_related(
+        'dados_execucao',
+        'dados_execucao__inspecao',
+    ).prefetch_related(
+        'causa',
+        Prefetch('arquivos', queryset=ArquivoCausa.objects.all())
+    ).distinct()
+
+    # Filtros de data
+    if data_inicio:
+        queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+
+    # Determina o setor (serra ou usinagem) baseado na inspeção relacionada
+    queryset = queryset.annotate(
+        setor=Case(
+            When(dados_execucao__inspecao__pecas_ordem_serra__isnull=False, then=Value('serra')),
+            When(dados_execucao__inspecao__pecas_ordem_usinagem__isnull=False, then=Value('usinagem')),
+            default=Value(''),
+            output_field=CharField()
+        ),
+        peca_info=Case(
+            When(dados_execucao__inspecao__pecas_ordem_serra__isnull=False,
+                 then=Concat(
+                     F('dados_execucao__inspecao__pecas_ordem_serra__peca__codigo'),
+                     Value(' - '),
+                     F('dados_execucao__inspecao__pecas_ordem_serra__peca__descricao'),
+                     output_field=CharField()
+                 )),
+            When(dados_execucao__inspecao__pecas_ordem_usinagem__isnull=False,
+                 then=Concat(
+                     F('dados_execucao__inspecao__pecas_ordem_usinagem__peca__codigo'),
+                     Value(' - '),
+                     F('dados_execucao__inspecao__pecas_ordem_usinagem__peca__descricao'),
+                     output_field=CharField()
+                 )),
+            default=Value(''),
+            output_field=CharField()
+        )
+    )
+
+    # Pré-carrega os dados relacionados
+    causas_completas = list(queryset)
+
+    resultado = []
+    for causa in causas_completas:
+        # Determina a data de execução
+        data_execucao = causa.dados_execucao.data_execucao.strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Pega os nomes das causas relacionadas
+        causas = [c.nome for c in causa.causa.all()]
+        
+        # Processa os arquivos (imagens) relacionados
+        for arquivo in causa.arquivos.all():
+            if hasattr(arquivo, 'arquivo') and arquivo.arquivo:
+                resultado.append({
+                    "data_execucao": data_execucao,
+                    "setor": causa.setor,
+                    "causas": causas,
+                    "quantidade": causa.quantidade,
+                    "destino": causa.get_destino_display() if causa.destino else "Não especificado",
+                    "imagem_url": request.build_absolute_uri(arquivo.arquivo.url),
+                    "peça": causa.peca_info,
+                    "observacoes": causa.dados_execucao.observacao or ""
+                })
+
+    return JsonResponse(resultado, safe=False)
+
+def ficha_inspecao_serra_usinagem(request):
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+    except ValueError:
+        return JsonResponse(
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
+        )
+
+    queryset = InfoAdicionaisSerraUsinagem.objects.filter(
+        Q(dados_exec_inspecao__isnull=False),
+        Q(ficha__isnull=False)
+    ).select_related("dados_exec_inspecao")
+
+    if data_inicio:
+        queryset = queryset.filter(dados_exec_inspecao__data_execucao__gte=data_inicio)
+    if data_fim:
+        queryset = queryset.filter(dados_exec_inspecao__data_execucao__lt=data_fim)
+
+    queryset = queryset.annotate(
+        data_execucao=F("dados_exec_inspecao__data_execucao"),
+        setor=Case(
+            When(
+                dados_exec_inspecao__inspecao__pecas_ordem_serra__isnull=False, 
+                then=Value('serra')
+            ),
+            When(
+                dados_exec_inspecao__inspecao__pecas_ordem_usinagem__isnull=False, 
+                then=Value('usinagem')
+            ),
+            default=Value(''),
+            output_field=CharField()
+        )
+    )
+
+    resultados = []
+    for item in queryset:
+        if item.ficha:
+            resultados.append({
+                "data_execucao": item.data_execucao.strftime("%Y-%m-%d %H:%M:%S"),
+                "setor": item.setor,
+                "inspecao_completa": item.inspecao_completa,
+                "qtd_mortas": item.qtd_mortas,
+                "motivos_mortas": [
+                    causa.nome for causa in item.motivo_mortas.all()
+                ],
+                "ficha_url": request.build_absolute_uri(item.ficha.url),
+            })
+
+    return JsonResponse(resultados, safe=False)
