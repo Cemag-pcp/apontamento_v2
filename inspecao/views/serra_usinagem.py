@@ -1445,10 +1445,6 @@ def ficha_inspecao_serra_usinagem(request):
                 "data_execucao": item.data_execucao.strftime("%Y-%m-%d %H:%M:%S"),
                 "setor": item.setor,
                 "inspecao_completa": item.inspecao_completa,
-                "qtd_mortas": item.qtd_mortas,
-                "motivos_mortas": [
-                    causa.nome for causa in item.motivo_mortas.all()
-                ],
                 "ficha_url": request.build_absolute_uri(item.ficha.url),
             })
 
