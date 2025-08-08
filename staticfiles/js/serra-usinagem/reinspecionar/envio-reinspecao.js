@@ -9,7 +9,8 @@ document.getElementById('saveReinspection').addEventListener('click', function (
     const quantidadeConformidade = document.getElementById('qtdConformidadeReinspecao').value;
     const qtdNaoConformidadeReinspecao = document.getElementById('qtdNaoConformidadeReinspecao').value;
     const pecasProduzidas = document.getElementById('pecasProduzidasReinspecao').value;
-    const inspetor = document.getElementById('inspetorReinspecao').value
+    const inspetor = document.getElementById('inspetorReinspecao').value;
+    const fichaReinspection = document.getElementById('fichaReinspection').files[0]; // Adicionado para verificar o arquivo
 
     if (!inspetor) {
         Toast.fire({
@@ -19,6 +20,17 @@ document.getElementById('saveReinspection').addEventListener('click', function (
         this.disabled = false; // Reabilitar o botão
         this.innerHTML = 'Salvar';
         return
+    }
+
+    // Validação da ficha de inspeção (campo obrigatório)
+    if (!fichaReinspection) {
+        Toast.fire({
+            icon: "error",
+            title: "Por favor, anexe a ficha de inspeção 100%."
+        });
+        this.disabled = false;
+        this.innerHTML = 'Salvar';
+        return;
     }
 
     if(parseInt(quantidadeConformidade) > parseInt(pecasProduzidas)) {
