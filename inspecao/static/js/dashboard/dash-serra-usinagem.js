@@ -141,8 +141,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             fichas.forEach((ficha, index) => {
                 const statusInspecao = ficha.inspecao_completa ? 'Completa' : 'Parcial';
-                const motivos = ficha.motivos_mortas.length > 0 ? 
-                    `Motivos: ${ficha.motivos_mortas.join(', ')}` : 'Sem motivos registrados';
                 
                 const itemHTML = `
                     <div class="carousel-item ${index === 0 ? 'active' : ''}">
@@ -150,7 +148,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="carousel-caption d-none d-md-block bg-dark bg-opacity-75 rounded">
                             <h5>Inspeção ${statusInspecao}</h5>
                             <p>Data: ${ficha.data_execucao}</p>
-                            <p>${motivos}</p>
                         </div>
                     </div>
                 `;
