@@ -43,7 +43,7 @@ import json
 
 def motivos_causas(request, setor):
 
-    motivos = Causas.objects.filter(setor=setor)
+    motivos = Causas.objects.filter(setor=setor, excluida=False)
 
     return JsonResponse({"motivos": list(motivos.values())})
 
@@ -53,7 +53,7 @@ def inspecao_montagem(request):
         tipo_acesso="inspetor", permissoes__nome="inspecao/montagem"
     )
 
-    causas = Causas.objects.filter(setor="montagem")
+    causas = Causas.objects.filter(setor="montagem", excluida=False)
 
     maquinas = list(
         Maquina.objects.filter(tipo="maquina", setor_id__nome="montagem").values_list(
@@ -159,7 +159,7 @@ def inspecao_pintura(request):
     users = Profile.objects.filter(
         tipo_acesso="inspetor", permissoes__nome="inspecao/pintura"
     )
-    causas = Causas.objects.filter(setor="pintura")
+    causas = Causas.objects.filter(setor="pintura", excluida=False)
 
     cores = ["Amarelo", "Azul", "Cinza", "Laranja", "Verde", "Vermelho"]
 
@@ -1215,7 +1215,7 @@ def envio_reinspecao_montagem(request):
 def inspecao_estamparia(request):
 
     maquinas = Maquina.objects.filter(setor__nome="estamparia", tipo="maquina")
-    motivos = Causas.objects.filter(setor="estamparia")
+    motivos = Causas.objects.filter(setor="estamparia", excluida=False)
     inspetores = Profile.objects.filter(
         tipo_acesso="inspetor", permissoes__nome="inspecao/estamparia"
     )
@@ -2051,7 +2051,7 @@ def inspecao_tubos_cilindros(request):
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
     ]
 
-    causas = Causas.objects.filter(setor="tubos cilindros")
+    causas = Causas.objects.filter(setor="tubos cilindros", excluida=False)
 
     list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
 
