@@ -594,6 +594,7 @@ export function mostrarModalIniciar(ordemId, grupoMaquina) {
     modal.show();
 
     grupoMaquina = grupoMaquina.toLowerCase().replace(" ","_").replace(" (jfy)","");
+    console.log(grupoMaquina);
 
     // Limpa opções antigas no select
     escolhaMaquina.innerHTML = ``;
@@ -609,6 +610,11 @@ export function mostrarModalIniciar(ordemId, grupoMaquina) {
             { value: '17', label: 'Laser 2 (JFY)' },
             { value: '16', label: 'Laser 1' },
             { value: '58', label: 'Laser 3 Trumpf' },
+        ],
+        laser_3: [
+            { value: '58', label: 'Laser 3 Trumpf' },
+            { value: '16', label: 'Laser 1' },
+            { value: '17', label: 'Laser 2 (JFY)' },
         ],
         plasma: [
             { value: '19', label: 'Plasma 1' },

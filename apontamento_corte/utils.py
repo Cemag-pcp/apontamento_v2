@@ -3,6 +3,7 @@ from datetime import date
 import re
 import numpy as np
 import xml.etree.ElementTree as ET
+import re
 
 def padronizar_medida_plasma(s):
     padroes = [1200, 1500, 2550]
@@ -59,6 +60,19 @@ def tratamento_planilha_plasma(df):
     df = df.dropna(how='all')
 
     tempo_estimado_total = df['Unnamed: 16'][38]
+
+    tempo_estimado_total_tratado = ""
+
+    primeiro_digito_tempo = tempo_estimado_total[0:2]
+    try:
+        primeiro_digito_tempo = int(primeiro_digito_tempo)
+        if primeiro_digito_tempo < 10:
+            tempo_estimado_total_tratado = "0"+tempo_estimado_total
+            tempo_estimado_total_tratado = tempo_estimado_total_tratado.split('.')[0]
+    except:
+        tempo_estimado_total_tratado = "0"+tempo_estimado_total
+        tempo_estimado_total_tratado = tempo_estimado_total_tratado.split('.')[0]
+
     tamanho_chapa = df[df.columns[24:25]][9:10].values.tolist()[0][0].replace('×', 'x')
     qt_chapa = df[df.columns[2:3]][9:10]
 
@@ -152,7 +166,7 @@ def tratamento_planilha_plasma(df):
         'espessura':espessura,
         'quantidade':qt_chapa_list[0][0],
         'aproveitamento':aproveitamento_list[0],
-        'tempo_estimado_total': tempo_estimado_total
+        'tempo_estimado_total': tempo_estimado_total_tratado
     }]
 
     return df, propriedades
@@ -176,6 +190,8 @@ def tratamento_planilha_laser2(df,df2,df3):
 
     # buscar tempo estimado total
     tempo_estimado_total = df3['Unnamed: 9'][2]
+
+    tempo_estimado_total_tratado = normalizar_tempo(tempo_estimado_total)
 
     df2.columns = df2.iloc[0]
     df2 = df2[1:].reset_index(drop=True)
@@ -219,7 +235,7 @@ def tratamento_planilha_laser2(df,df2,df3):
         'espessura':espessura_df,
         'quantidade':qt_chapa,
         'aproveitamento':aproveitamento_df,
-        'tempo_estimado_total': tempo_estimado_total
+        'tempo_estimado_total': tempo_estimado_total_tratado
     }]
 
     return df2, propriedades
@@ -285,6 +301,16 @@ def tratamento_planilha_laser1(df,df2,comprimento,largura,espessura):
 
     return df, propriedades
 
+def converter_minutos_para_horas(minutos_float):
+    """
+    Converte um valor em minutos (ex: 26.73) para o formato hh:mm:ss
+    """
+    total_segundos = int(round(minutos_float * 60))
+    horas = total_segundos // 3600
+    minutos = (total_segundos % 3600) // 60
+    segundos = total_segundos % 60
+    return f"{horas:02d}:{minutos:02d}:{segundos:02d}"
+
 def tratamento_planilha_laser3(tree):
 
     # Carrega o XML
@@ -307,7 +333,10 @@ def tratamento_planilha_laser3(tree):
     if dim is not None:
         comprimento = float(dim.find('Length').text)
         largura = float(dim.find('Width').text)
-        espessura_real = float(dim.find('Thickness').text)
+
+        valor = float(dim.find('Thickness').text)
+        espessura_real = f"{int(valor)} mm" if valor.is_integer() else f"{valor:.1f} mm"
+
     else:
         comprimento = largura = espessura_real = None
 
@@ -318,6 +347,16 @@ def tratamento_planilha_laser3(tree):
     # 4. Aproveitamento
     waste_el = root.find('.//Waste')
     aproveitamento = float(waste_el.text) if waste_el is not None else None
+    aproveitamento = 100 - aproveitamento 
+    
+    # 4.1 Tempo estimado total
+    tempo_estimato_total_elem = root.find('.//TotalRuntime')
+    if tempo_estimato_total_elem is not None and tempo_estimato_total_elem.text:
+        tempo_estimado_total_horas = float(tempo_estimato_total_elem.text)
+        tempo_estimado_total_horas = converter_minutos_para_horas(tempo_estimado_total_horas)
+        print("Tempo estimado total:", tempo_estimado_total_horas)
+    else:
+        print("Elemento <TotalRuntime> não encontrado ou vazio.")
 
     # 5. Peças (loop)
     pecas_detalhadas = []
@@ -326,9 +365,9 @@ def tratamento_planilha_laser3(tree):
         quantidade = part.find('TotalQuantityInJob')
         
         item = {
-            'peca': peca.text.strip() if peca is not None else '',
-            'qtd_planejada': quantidade.text.strip() if quantidade is not None else '',
-            'espessura': espessura,
+            'peca': peca.text.strip() if peca is not None and peca.text is not None else '',
+            'qtd_planejada': quantidade.text.strip() if quantidade is not None and quantidade.text is not None else '',
+            'espessura': espessura_real,
             'aproveitamento': aproveitamento,
             'tamanho_da_chapa': f"{comprimento} x {largura} mm ",
             'qt_chapas': quantidade_chapas
@@ -340,12 +379,31 @@ def tratamento_planilha_laser3(tree):
     # df_pecas.columns = ['qtd_planejada','peca','espessura','aproveitamento','tamanho_da_chapa','qt_chapas']
 
     propriedades = [{
-        'descricao_mp': str(espessura) + " - " + f"{comprimento} x {largura} mm ",
+        'descricao_mp': str(espessura_real) + " - " + f"{comprimento} x {largura} mm ",
         'tamanho':f"{comprimento} x {largura} mm ",
-        'espessura':espessura,
+        'espessura':espessura_real,
         'quantidade':quantidade_chapas,
         'aproveitamento':aproveitamento,
+        'tempo_estimado_total':tempo_estimado_total_horas
     }]
 
     return df_pecas, propriedades
 
+def normalizar_tempo(s):
+    """Normaliza o tempo para o formato HH:MM:SS. Ex: '29min43,2s' -> '00:29:43'"""
+    s = s.lower().replace(",", ".")  # padroniza decimal com ponto
+    horas = minutos = segundos = 0
+
+    # Expressões regulares
+    match_horas = re.search(r'(\d+)\s*hours?', s)
+    match_min = re.search(r'(\d+)\s*min', s)
+    match_seg = re.search(r'(\d+(?:\.\d+)?)\s*s', s)  # aceita número com ponto decimal
+
+    if match_horas:
+        horas = int(match_horas.group(1))
+    if match_min:
+        minutos = int(match_min.group(1))
+    if match_seg:
+        segundos = int(float(match_seg.group(1)))  # converte corretamente
+
+    return f"{horas:02d}:{minutos:02d}:{segundos:02d}"

@@ -30,6 +30,7 @@ class Cambao(models.Model):
     cor = models.CharField(max_length=20)
     status = models.CharField(max_length=20, default='livre')  # 'livre', 'em uso', 'finalizado'
     tipo = models.CharField(max_length=20)  # PÓ ou PU
+    ativo = models.BooleanField(default=True)
 
     def __str__(self):
         return f"Cambão {self.id} - {self.cor} ({self.status})"

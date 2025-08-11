@@ -89,6 +89,10 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">Criado em: ${ordem.data_criacao}</p>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao}</p>
+                                ${ordem.status_atual === 'finalizada' 
+                                    ? `<p class="text-success fw-semibold mb-2" style="font-size: 0.85rem;">Finalizada em: ${ordem.ultima_atualizacao}</p>` 
+                                    : ''
+                                }                                
                                 <p class="mb-2">${ordem.obs || '<span class="text-muted">Sem observações</span>'}</p>
                                 <ul class="list-unstyled mb-0" style="font-size: 0.85rem;">
                                     <li><strong>MP:</strong> ${ordem.propriedade?.descricao_mp || 'N/A'}</li>

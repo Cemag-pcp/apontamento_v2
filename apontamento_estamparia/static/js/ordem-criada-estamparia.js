@@ -93,7 +93,11 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                     ${statusBadge}
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">#${ordem.ordem} Criado em: ${ordem.data_criacao}</p>
-                                <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao}</p>
+                                ${ordem.info_pecas && ordem.info_pecas.length > 0
+                                ? (Number(ordem.info_pecas[0].qtd_boa) === 0
+                                    ? `<p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao} | Qt.: ${ordem.peca.quantidade}</p>`
+                                    : `<p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao} | Qt.: ${ordem.info_pecas[0].qtd_boa}</p>`)
+                                : `<p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao} | Qt.: ${ordem.peca.quantidade}</p>`}
                                 ${ordem.status_atual === 'finalizada' 
                                     ? `<p class="text-success fw-semibold mb-2" style="font-size: 0.85rem;">Finalizada em: ${ordem.ultima_atualizacao}</p>` 
                                     : ''
@@ -712,8 +716,6 @@ function carregarMaquinasEstamparia(selectIds) {
             });
         });
 }
-
-
 
 function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;

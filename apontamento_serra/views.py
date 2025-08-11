@@ -290,6 +290,7 @@ def get_ordens_criadas(request):
             'status_atual': ordem.status_atual,
             'maquina':ordem.maquina.nome if ordem.maquina else None,
             'maquina_id': ordem.maquina.id if ordem.maquina else None,
+            'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M'),
             'propriedade': {
                 'descricao_mp': propriedade.mp_codigo.codigo +" - "+ propriedade.mp_codigo.descricao if propriedade else None,
                 'mp_codigo': propriedade.mp_codigo.codigo if propriedade.mp_codigo else None,

@@ -154,8 +154,6 @@ def get_ordens_criadas(request):
         'tempo_estimado': ordem.tempo_estimado if ordem.tempo_estimado else 'Não foi possivel calcular',
     } for ordem in ordens_page]
 
-    print(data)
-
     return JsonResponse({'ordens': data})
 
 def atualizar_status_ordem(request):
@@ -530,8 +528,6 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
             if str(esp) not in valores_remover and esp is not None
         ]
 
-        print(espessuras)
-
         tipos_chapas = [tipo[1] for tipo in PropriedadesOrdem.TIPO_CHAPA_CHOICES]
 
         # Propriedades da ordem
@@ -542,6 +538,7 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
             'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
             'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
             'maquina': ordem.grupo_maquina,
+            'ordem': ordem.ordem,
         }
 
         # Peças relacionadas à ordem
@@ -892,6 +889,9 @@ def excluir_ordem(request):
         ordem_id = data.get('ordem_id')
         motivo_id = data.get('motivo')
 
+        print(ordem_id)
+        print(motivo_id)
+        
         ordem = get_object_or_404(Ordem, pk=ordem_id)
         motivo = get_object_or_404(MotivoExclusao, pk=int(motivo_id))
 
@@ -960,7 +960,9 @@ class ProcessarArquivoView(View):
         # Verifica se o arquivo foi enviado
         uploaded_file = request.FILES.get('file')
         tipo_maquina = request.POST.get('tipoMaquina')
-
+        print(tipo_maquina)
+        print(uploaded_file)
+        
         if not uploaded_file:
             return JsonResponse({'error': 'Nenhum arquivo enviado.'}, status=400)
 

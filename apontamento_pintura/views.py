@@ -523,7 +523,7 @@ def finalizar_cambao(request):
 
 def cambao_livre(request):
     tipo = request.GET.get('tipo')
-    cambao_livres = Cambao.objects.filter(tipo=tipo)
+    cambao_livres = Cambao.objects.filter(tipo=tipo, ativo=True)
 
     resultado = []
     for c in cambao_livres:
