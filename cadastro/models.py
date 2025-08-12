@@ -55,10 +55,14 @@ class MotivoExclusao(models.Model):
 
 class Operador(models.Model):
 
+    STATUS_CHOICES = (('ativo','Ativo'),
+                      ('inativo','Inativo'))
+
     matricula = models.CharField(max_length=10)
     nome = models.CharField(max_length=20)
     setor = models.ForeignKey(Setor, on_delete=models.CASCADE, related_name='operador_setor')
     maquinas = models.ManyToManyField(Maquina, related_name='operadores', blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ativo')
 
     class Meta:
         constraints = [
