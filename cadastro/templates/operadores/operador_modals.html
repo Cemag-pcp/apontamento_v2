@@ -1,0 +1,114 @@
+<!-- Modal adicionar -->
+<div class="modal fade" id="adicionarOperadorModal" tabindex="-1" aria-labelledby="adiconarOperadorModal" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="formAdicionarOperador" method="post">
+          {% csrf_token %}
+          <div class="modal-header">
+            <h1 class="modal-title fs-5" id="adicionarOperadorLabel">Adicionar Operador</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Matrícula -->
+            <div class="form-group mb-4">
+              <label class="form-label" style="font-weight: 500; color: #555;">Matrícula</label>
+              <input class="form-control" type="text" name="matricula" required>
+            </div>
+  
+            <!-- Nome -->
+            <div class="form-group mb-4">
+              <label class="form-label" style="font-weight: 500; color: #555;">Nome</label>
+              <input class="form-control" type="text" name="nome" required>
+            </div>
+  
+            <!-- Setor -->
+            <div class="form-group mb-4">
+              <label class="form-label" style="font-weight: 500; color: #555;">Setor</label>
+              <select name="setor" class="form-control" id="setorNovoOperador" required>
+                <option value="">-----</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              Fechar
+            </button>
+            <button type="submit" class="btn btn-primary">
+              <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display: none;"></span>Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal editar -->
+  <div class="modal fade" id="editOperador" tabindex="-1" aria-labelledby="editOperadorLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="formEditOperador" method="post">
+          {% csrf_token %}
+          <div class="modal-header">
+            <h1 class="modal-title fs-5" id="editOperadorLabel">Editar Operador</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Matrícula -->
+            <div class="form-group mb-4">
+              <label for="matriculaOperador" class="form-label" style="font-weight: 500; color: #555;">Matrícula</label>
+              <input class="form-control" type="text" id="matriculaOperador" name="matricula">
+            </div>
+  
+            <!-- Nome -->
+            <div class="form-group mb-4">
+              <label for="nomeOperador" class="form-label" style="font-weight: 500; color: #555;">Nome</label>
+              <input class="form-control" type="text" id="nomeOperador" name="nome">
+            </div>
+  
+            <div class="form-group mb-4">
+              <label class="form-label" style="font-weight: 500; color: #555;">Setor</label>
+              <select name="setor" class="form-control" id="setorOperador" required>
+                <option value="">-----</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              Fechar
+            </button>
+            <button type="submit" class="btn btn-primary">
+              <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display: none;"></span>Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal desativar -->
+  <div class="modal fade" id="desativarOperador" tabindex="-1" aria-labelledby="desativarOperadorLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <form id="formDesativarOperador" method="POST" class="modal-content">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="desativarOperadorLabel">Desativar Operador</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+  
+        <div class="modal-body">
+          <span id="textoConfirmacao">Você confirma a desativação do operador <strong><span id="operadorDesativar">xxxxx</span></strong>?</span>
+          <input type="hidden" name="operador_id" id="operadorIdDesativar">
+        </div>
+  
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+          <button type="submit" class="btn btn-primary">
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display: none;"></span>Confirmar Desativação
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
