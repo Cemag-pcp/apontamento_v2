@@ -1,0 +1,12 @@
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+    .table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+    #filtroForm .form-label {
+        font-weight: 500;
+    }
