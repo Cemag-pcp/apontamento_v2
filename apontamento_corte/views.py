@@ -312,7 +312,7 @@ def get_ordens_interrompidas(request):
 
     # Filtra as ordens com base no status 'interrompida'
     ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_corte').select_related('propriedade') \
-        .filter(status_atual='interrompida', grupo_maquina__in=['plasma','laser_1','laser_2',' laser_3'])
+        .filter(status_atual='interrompida', grupo_maquina__in=['plasma','laser_1','laser_2','laser_3'])
 
     # Paginação (opcional)
     page = request.GET.get('page', 1)  # Obtém o número da página

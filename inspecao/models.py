@@ -115,6 +115,7 @@ class Causas(models.Model):
     setor = models.CharField(
         max_length=40, choices=SETOR_CHOICES, null=False, blank=False
     )
+    excluida = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.nome} - setor {self.setor}"

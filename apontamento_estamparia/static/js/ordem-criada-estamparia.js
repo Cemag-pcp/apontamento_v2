@@ -1921,17 +1921,6 @@ function filtro() {
     });
 }
 
-export function inicializarAutoAtualizacaoOrdens() {
-    const containerIniciado = document.querySelector('.containerProcesso');
-    const containerInterrompido = document.querySelector('.containerInterrompido');
-    const containerProxProcesso = document.querySelector('.containerProxProcesso');
-
-    setInterval(() => {
-        carregarOrdensIniciadas(containerIniciado);
-        carregarOrdensInterrompidas(containerInterrompido);
-        carregarOrdensAgProProcesso(containerProxProcesso);
-    }, 30000);
-}
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -1979,6 +1968,5 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarMaquinasEstamparia(['#maquinas-select', '#filtro-maquina']); // Lista de selects que receberao maquinas
 
     filtro();
-    // inicializarAutoAtualizacaoOrdens();
 
 });
