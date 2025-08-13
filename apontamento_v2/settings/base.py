@@ -143,7 +143,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": ["rediss://default:AU7-AAIjcDEwZjkzNWM1NzJhYjc0OGM1OWRhOGRmNGY3NmRiMjE4OHAxMA@many-oriole-20222.upstash.io:6379"],
+            "hosts": ["redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"],
         },
     },
 }
