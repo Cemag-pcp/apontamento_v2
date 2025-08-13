@@ -2,13 +2,14 @@ from .base import *
 
 # Configurações específicas de desenvolvimento
 DEBUG = env.bool('DEBUG', default=True)
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost','apontamento-v2-testes.onrender.com', '192.168.3.3', '192.168.3.18']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost','apontamento-v2-testes.onrender.com', '192.168.3.3', '192.168.3.18', 'cold-su-lions-adjacent.trycloudflare.com']
 CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
     'http://127.0.0.1:8000',
     'http://localhost:8000',
     'https://apontamento-v2-testes.onrender.com',
-    'http://192.168.3.18:8084'
+    'http://192.168.3.18:8084',
+    'https://cold-su-lions-adjacent.trycloudflare.com'
 ]
 
 DATABASES = {

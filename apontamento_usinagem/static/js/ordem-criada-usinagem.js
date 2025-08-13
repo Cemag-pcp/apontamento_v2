@@ -1804,17 +1804,6 @@ function filtro() {
 //         console.error('Erro ao carregar processos:', error);
 //     }
 // }
-export function inicializarAutoAtualizacaoOrdens() {
-    const containerIniciado = document.querySelector('.containerProcesso');
-    const containerInterrompido = document.querySelector('.containerInterrompido');
-    const containerProxProcesso = document.querySelector('.containerProxProcesso');
-
-    setInterval(() => {
-        carregarOrdensIniciadas(containerIniciado);
-        carregarOrdensInterrompidas(containerInterrompido);
-        carregarOrdensAgProProcesso(containerProxProcesso);
-    }, 30000);
-}
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -1863,6 +1852,5 @@ document.addEventListener('DOMContentLoaded', () => {
     filtro();
 
     filtro_prox_processo();
-    // inicializarAutoAtualizacaoOrdens();
 
 });
