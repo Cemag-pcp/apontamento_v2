@@ -155,19 +155,13 @@ def get_itens_inspecao_serra_usinagem(request):
                 pecas_ordem_serra__peca__codigo__icontains=pesquisar_param
             )
             query_pesquisa |= Q(
-                pecas_ordem_serra__peca__nome__icontains=pesquisar_param
+                pecas_ordem_serra__peca__descricao__icontains=pesquisar_param
             )
             query_pesquisa |= Q(
                 pecas_ordem_usinagem__peca__codigo__icontains=pesquisar_param
             )
             query_pesquisa |= Q(
-                pecas_ordem_usinagem__peca__nome__icontains=pesquisar_param
-            )
-            query_pesquisa |= Q(
-                pecas_ordem_serra__operador__nome__icontains=pesquisar_param
-            )
-            query_pesquisa |= Q(
-                pecas_ordem_serra__operador__matricula__icontains=pesquisar_param
+                pecas_ordem_usinagem__peca__descricao__icontains=pesquisar_param
             )
             query_pesquisa |= Q(
                 pecas_ordem_usinagem__operador__nome__icontains=pesquisar_param
@@ -384,9 +378,9 @@ def get_itens_reinspecao_serra_usinagem(request):
     # Filtro por pesquisa (nome ou código da peça)
     if pesquisar:
         reinspecoes = reinspecoes.filter(
-            Q(inspecao__pecas_ordem_serra__peca__nome__icontains=pesquisar)
+            Q(inspecao__pecas_ordem_serra__peca__descricao__icontains=pesquisar)
             | Q(inspecao__pecas_ordem_serra__peca__codigo__icontains=pesquisar)
-            | Q(inspecao__pecas_ordem_usinagem__peca__nome__icontains=pesquisar)
+            | Q(inspecao__pecas_ordem_usinagem__peca__descricao__icontains=pesquisar)
             | Q(inspecao__pecas_ordem_usinagem__peca__codigo__icontains=pesquisar)
         )
 
@@ -541,9 +535,9 @@ def get_itens_inspecionados_serra_usinagem(request):
     # Filtro por pesquisa (nome ou código da peça)
     if pesquisar:
         inspecoes = inspecoes.filter(
-            Q(pecas_ordem_serra__peca__nome__icontains=pesquisar)
+            Q(pecas_ordem_serra__peca__descricao__icontains=pesquisar)
             | Q(pecas_ordem_serra__peca__codigo__icontains=pesquisar)
-            | Q(pecas_ordem_usinagem__peca__nome__icontains=pesquisar)
+            | Q(pecas_ordem_usinagem__peca__descricao__icontains=pesquisar)
             | Q(pecas_ordem_usinagem__peca__codigo__icontains=pesquisar)
         )
 
