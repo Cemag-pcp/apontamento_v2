@@ -42,6 +42,32 @@
                     <label for="filtro-peca" class="form-label small text-muted">Peça</label>
                     <select id="filtro-peca" class="form-select bg-light" multiple="multiple"></select>
                 </div>
+                <!-- Modo de busca -->
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Modo de busca</label>
+                    <select id="filtro-modo" class="form-select bg-light">
+                        <option value="all">Contém todas as peças</option>
+                        <option value="prioritize">Priorizar peça</option>
+                        <option value="qty">Quantidades por ordem</option>
+                    </select>
+                </div>
+
+                <!-- Priorizar peça -->
+                <div class="col-md-3" id="wrap-priorizar-peca" style="display:none;">
+                    <label for="priorizar-peca" class="form-label small text-muted">Peça prioritária</label>
+                    <select id="priorizar-peca" class="form-select bg-light"></select>
+                    <!-- <div class="form-text">A API deve retornar ordens onde esta peça tenha maior quantidade.</div> -->
+                </div>
+
+                <!-- Quantidades por ordem (repetidor simples) -->
+                <div class="col-12" id="wrap-qty-peca" style="display:none;">
+                    <label class="form-label small text-muted">Quantidades por peça</label>
+                    <div id="qty-rows" class="d-grid gap-2"></div>
+                    <button type="button" id="btn-add-qty" class="btn btn-outline-secondary btn-sm mt-2">
+                        + adicionar peça e quantidade
+                    </button>
+                    <div class="form-text">Trazer ordens que contenham cada peça com a quantidade >= informada.</div>
+                </div>
                 <div class="col-md-2">
                     <label for="filtro-maquina" class="form-label small text-muted">Máquina</label>
                     <select class="form-select bg-light" name="filtro-maquina" id="filtro-maquina">

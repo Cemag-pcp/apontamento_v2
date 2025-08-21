@@ -415,9 +415,17 @@ def filtrar_ordens(request):
 
     return JsonResponse({"ordens": resultados})
 
+from django.db.models import Q, Count, Sum, F
+from django.core.paginator import Paginator, EmptyPage
+from django.utils.timezone import localtime
+from datetime import date
+from functools import reduce
+from urllib.parse import unquote
+import re, json
+
 def get_ordens_criadas_duplicar_ordem(request):
     #  Captura os parâmetros da requisição
-    pecas = request.GET.get('pecas', '')  
+    pecas = request.GET.get('pecas', '')
     pecas = [unquote(p) for p in pecas.split('|')] if pecas else []
     pecas = [re.match(r'\d+', p).group() for p in pecas if re.match(r'\d+', p)]
 
@@ -433,24 +441,39 @@ def get_ordens_criadas_duplicar_ordem(request):
     limit = int(request.GET.get('limit', 10))
     draw = int(request.GET.get('draw', 1))
 
+    # NOVOS PARÂMETROS (acréscimo)
+    modo = request.GET.get('modo', 'all')  # 'all' | 'prioritize' | 'qty'
+    priorizar_raw = unquote(request.GET.get('priorizar', '')).strip()
+    priorizar = re.match(r'\d+', priorizar_raw).group() if re.match(r'\d+', priorizar_raw) else ''
+
+    qtymap_str = request.GET.get('qtymap', '')
+    try:
+        qtymap = json.loads(unquote(qtymap_str)) if qtymap_str else {}
+    except Exception:
+        qtymap = {}
+    # normaliza chaves de qtymap para manter só dígitos
+    qtymap = {
+        (re.match(r'\d+', k).group() if re.match(r'\d+', k) else k): v
+        for k, v in qtymap.items()
+        if (isinstance(v, (int, float)) and v >= 0)
+    }
+
     #  Define a Query Base
     ordens_queryset = (
         Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2','laser_3'], duplicada=False, excluida=False)
         .prefetch_related('ordem_pecas_corte')  # Evita queries repetidas para peças
-        .select_related('propriedade')  # Carrega a propriedade diretamente
+        .select_related('propriedade')          # Carrega a propriedade diretamente
         .order_by('-propriedade__aproveitamento')
     )
 
-    # otimização do Filtro de Peças
+    # otimização do Filtro de Peças (comportamento existente)
     if codigos_unicos:
-        # Filtro composto para cada código usando startswith
         filtros = reduce(
             lambda acc, c: acc | Q(ordem_pecas_corte__peca__startswith=c),
             codigos_unicos[1:],
             Q(ordem_pecas_corte__peca__startswith=codigos_unicos[0])
         )
 
-        # Aplica o filtro para buscar apenas ordens com todas as peças desejadas
         ordens_queryset = ordens_queryset.filter(filtros).annotate(
             pecas_encontradas=Count(
                 'ordem_pecas_corte__peca',
@@ -461,28 +484,76 @@ def get_ordens_criadas_duplicar_ordem(request):
             pecas_encontradas=len(codigos_unicos)
         )
 
-    # Filtra Máquina e Ordem se necessário
+    # Filtra Máquina e Ordem se necessário (existente)
     if maquina:
         ordens_queryset = ordens_queryset.filter(grupo_maquina=maquina)
     if ordem:
         ordens_queryset = ordens_queryset.filter(ordem=ordem)
-    
-    # Filtra Data Criação
+
+    # Filtra Data Criação (existente)
     if dataCriacao:
         ordens_queryset = ordens_queryset.filter(data_criacao__date=date.fromisoformat(dataCriacao))
 
-    # Contagem de Registros para Paginação
-    # records_total = Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2','laser_3]).count()
+    # ========= ACRÉSCIMOS DE LÓGICA (sem desfazer o que existe) =========
+
+    # Para priorização e qty precisamos de anotações de quantidade por peça
+    # Monta o conjunto de "códigos de interesse" conforme o modo
+    codigos_interesse = set(codigos_unicos)
+    if modo == 'qty' and qtymap:
+        codigos_interesse |= set(qtymap.keys())
+    if modo == 'prioritize' and priorizar:
+        codigos_interesse |= {priorizar}
+
+    # Cria anotações dinâmicas por peça (Sum filtrado por prefixo do código da peça)
+    # Ex.: q_12345 = SUM(qtd_planejada WHERE peca startswith '12345')
+    if codigos_interesse:
+        annotations = {}
+        for c in codigos_interesse:
+            key = f"q_{c}"
+            annotations[key] = Sum(
+                'ordem_pecas_corte__qtd_planejada',
+                filter=Q(ordem_pecas_corte__peca__startswith=c)
+            )
+        ordens_queryset = ordens_queryset.annotate(**annotations)
+
+    # (1) modo PRIORITIZE: priorizar peça -> a peça priorizada deve ter a MAIOR quantidade
+    #    Estratégia: exigir q_priorizar >= q_outros para cada outro código relevante.
+    if modo == 'prioritize' and priorizar:
+        prio_key = f"q_{priorizar}"
+        # Garante que existe a anotação da priorizada
+        if codigos_interesse and prio_key in ordens_queryset.query.annotations:
+            for c in codigos_interesse:
+                if c == priorizar:
+                    continue
+                other_key = f"q_{c}"
+                # só compara se a outra anotação também existe
+                if other_key in ordens_queryset.query.annotations:
+                    ordens_queryset = ordens_queryset.filter(
+                        Q(**{f"{prio_key}__gte": F(other_key)}) | Q(**{other_key: None})
+                    )
+            # também assegura que a priorizada exista (>0) para fazer sentido
+            ordens_queryset = ordens_queryset.filter(**{f"{prio_key}__gt": 0})
+
+    # (2) modo QTY: qtymap = { 'CODPECA': quantidade_minima } -> exigir q_cod >= quantidade
+    if modo == 'qty' and qtymap:
+        for c, req in qtymap.items():
+            key = f"q_{c}"
+            # se a anotação não existir, ainda assim o filtro abaixo retornará vazio
+            ordens_queryset = ordens_queryset.filter(**{f"{key}__gte": req})
+
+    # =====================================================================
+
+    # Contagem de Registros para Paginação (existente)
     records_filtered = ordens_queryset.count()
 
-    # Paginação eficiente
+    # Paginação eficiente (existente)
     paginator = Paginator(ordens_queryset, limit)
     try:
         ordens_page = paginator.page(page)
     except EmptyPage:
         return JsonResponse({'draw': draw, 'recordsTotal': records_filtered, 'recordsFiltered': records_filtered, 'data': []})
 
-    # Otimização da Serialização dos Dados
+    # Otimização da Serialização dos Dados (existente)
     data = [
         {
             'id': ordem.pk,
@@ -502,7 +573,7 @@ def get_ordens_criadas_duplicar_ordem(request):
         } for ordem in ordens_page
     ]
 
-    #  Ordena os dados com base no aproveitamento corrigido
+    #  Ordena os dados com base no aproveitamento corrigido (existente)
     data.sort(key=lambda x: x['aproveitamento'], reverse=True)
 
     return JsonResponse({
