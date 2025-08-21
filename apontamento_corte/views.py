@@ -166,6 +166,7 @@ def atualizar_status_ordem(request):
 
                 status = body['status']
                 ordem_id = body['ordem_id']
+                comentario_extra = body['comentario_extra'] if 'comentario_extra' in body else ''
                 # grupo_maquina = body['grupo_maquina'].lower()
                 pecas_geral = body.get('pecas_mortas', [])
                 qtd_chapas = body.get('qtdChapas', None)
@@ -242,6 +243,7 @@ def atualizar_status_ordem(request):
                     ordem.obs_operador = body.get('obsFinal')
                 elif status == 'interrompida':
                     novo_processo.motivo_interrupcao = MotivoInterrupcao.objects.get(nome=body['motivo'])
+                    novo_processo.comentario_extra = comentario_extra
                     novo_processo.save()
                     ordem.status_prioridade = 2
 
@@ -336,6 +338,7 @@ def get_ordens_interrompidas(request):
             'maquina': ordem.maquina.nome if ordem.maquina else None,
             'maquina_id': ordem.maquina.id if ordem.maquina else None,
             'motivo_interrupcao': ultimo_processo_interrompido.motivo_interrupcao.nome if ultimo_processo_interrompido and ultimo_processo_interrompido.motivo_interrupcao else None,
+            'comentario_extra': ultimo_processo_interrompido.comentario_extra if ultimo_processo_interrompido else None,
             'ultima_atualizacao': ordem.ultima_atualizacao,
             'propriedade': {
                 'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,

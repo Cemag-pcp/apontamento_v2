@@ -179,6 +179,7 @@ class OrdemProcesso(models.Model):
     data_fim = models.DateTimeField(null=True, blank=True)  # Armazena quando o status foi finalizado
     motivo_interrupcao = models.ForeignKey(MotivoInterrupcao, on_delete=models.CASCADE, null=True, blank=True)
     maquina = models.ForeignKey(Maquina, related_name='processo_maquina', on_delete=models.CASCADE, null=True, blank=True)
+    comentario_extra = models.CharField(max_length=255, blank=True, null=True)  # Campo para comentários adicionais
 
     def finalizar_atual(self):
         """

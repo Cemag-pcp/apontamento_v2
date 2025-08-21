@@ -389,6 +389,11 @@ export function carregarOrdensInterrompidas(container) {
                         <p class="card-text mb-3">
                             <strong>Descrição MP:</strong> ${ordem.propriedade.descricao_mp || 'Sem descrição'}
                         </p>
+                        ${ordem.comentario_extra ? `
+                            <div class="alert alert-warning d-flex align-items-center mb-3 p-2" role="alert">
+                                <strong class="me-2">⚠️ Atenção:</strong> ${ordem.comentario_extra}
+                            </div>
+                        ` : ''}
                     </div>
                     
                     <div class="card-footer d-flex justify-content-between align-items-center bg-white p-3 border-top">
@@ -529,6 +534,7 @@ function mostrarModalInterromper(ordemId) {
 
         const formData = new FormData(clonedForm);
         const motivoInterrupcao = formData.get('motivoInterrupcao');
+        const comentarioExtra = formData.get('comentarioExtra');
 
         Swal.fire({
             title: 'Interrompendo...',
@@ -545,7 +551,8 @@ function mostrarModalInterromper(ordemId) {
                 ordem_id: ordemId,
                 // grupo_maquina: grupoMaquina,
                 status: 'interrompida',
-                motivo: motivoInterrupcao
+                motivo: motivoInterrupcao,
+                comentario_extra: comentarioExtra
             }),
             headers: {
                 'Content-Type': 'application/json',
