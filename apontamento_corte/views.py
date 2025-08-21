@@ -688,15 +688,18 @@ def get_ordens_sequenciadas(request):
     # Máquina do laser ou plasma
     tipo_maquina = request.GET.get('maquina')
     ordem = request.GET.get('ordem', '')
+    filtro_grupo_maquina = {
+        'grupo_maquina': tipo_maquina
+    }
 
-    if tipo_maquina == 'laser':
-        filtro_grupo_maquina = {
-            'grupo_maquina__in': ['laser_1', 'laser_2', 'Laser 2 (JFY)','laser_3']
-        }
-    else:
-        filtro_grupo_maquina = {
-            'grupo_maquina': 'plasma'
-        }
+    # if tipo_maquina == 'laser':
+    #     filtro_grupo_maquina = {
+    #         'grupo_maquina__in': ['laser_1', 'laser_2', 'Laser 2 (JFY)','laser_3']
+    #     }
+    # else:
+    #     filtro_grupo_maquina = {
+    #         'grupo_maquina': 'plasma'
+    #     }
 
     filtros = {
         'sequenciada': True,

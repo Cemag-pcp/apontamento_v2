@@ -12,7 +12,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('refresh-ordens-sequenciadas-laser').addEventListener('click', function () {
-        fetchOrdensSequenciadasLaser(); // Chama a função existente
+        const tabAtiva = document.querySelector('#laserTabs .nav-link.active');
+        const grupo = tabAtiva ? tabAtiva.dataset.group : '';
+
+        fetchOrdensSequenciadasLaser(grupo); // Chama a função existente
     });
 
     document.getElementById('refresh-ordens-sequenciadas-plasma').addEventListener('click', function () {
@@ -21,6 +24,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('btnPararMaquina').addEventListener('click', () => {
         mostrarModalPararMaquina(); // Chama a função já existente
+    });
+
+    inicializarTabsLaser(function(grupo) {
+        console.log("Tab clicada:", grupo);
+        fetchOrdensSequenciadasLaser(grupo);
     });
 
 });
@@ -116,7 +124,29 @@ export function fetchStatusMaquinas() {
         });
 }
 
-export function fetchOrdensSequenciadasLaser() {
+function inicializarTabsLaser(callback) {
+  const tabs = document.querySelectorAll("#laserTabs .nav-link");
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", function (event) {
+      event.preventDefault();
+
+      // Atualiza visual da tab ativa
+      tabs.forEach((t) => t.classList.remove("active"));
+      this.classList.add("active");
+
+      // Recupera o grupo selecionado
+      const grupo = this.dataset.group;
+
+      // Executa o callback passado, se existir
+      if (typeof callback === "function") {
+        callback(grupo);
+      }
+    });
+  });
+}
+
+export function fetchOrdensSequenciadasLaser(grupo = 'laser_1') {
     // Seleciona o container onde os cards serão adicionados
     const container = document.getElementById('ordens-sequenciadas-laser-container');
     const btnFiltrarOrdemSequenciadaLaser = document.getElementById('btnPesquisarOrdemSequenciadaLaser');
@@ -291,15 +321,21 @@ export function fetchOrdensSequenciadasLaser() {
     }
     
     // Busca inicial sem filtro de ordem
-    carregarOrdens(`api/ordens-sequenciadas/?maquina=laser`);
+    carregarOrdens(`api/ordens-sequenciadas/?maquina=${grupo}`);
     
     // Verifica se o listener já foi adicionado para evitar duplicação
     if (!btnFiltrarOrdemSequenciadaLaser.dataset.listenerAdded) {
         btnFiltrarOrdemSequenciadaLaser.addEventListener('click', () => {
             const ordemDigitada = ordemLaser.value.trim();
-            const url = `api/ordens-sequenciadas/?maquina=laser${ordemDigitada ? `&ordem=${encodeURIComponent(ordemDigitada)}` : ''}`;
+
+            // Descobre qual tab está ativa
+            const tabAtiva = document.querySelector('#laserTabs .nav-link.active');
+            const grupo = tabAtiva ? tabAtiva.dataset.group : '';
+
+            const url = `api/ordens-sequenciadas/?maquina=${grupo}${ordemDigitada ? `&ordem=${encodeURIComponent(ordemDigitada)}` : ''}`;
             carregarOrdens(url);
         });
+
         btnFiltrarOrdemSequenciadaLaser.dataset.listenerAdded = 'true';
     }
     
