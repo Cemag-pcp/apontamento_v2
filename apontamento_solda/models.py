@@ -11,7 +11,8 @@ class PecasOrdem(models.Model):
     qtd_planejada=models.FloatField()
     qtd_morta=models.FloatField(default=0)
     qtd_boa=models.FloatField(default=0)
-    operador=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_produzido_solda', blank=True, null=True)
+    operador_inicio=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_inicio_solda', blank=True, null=True)
+    operador_final=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_produzido_solda', blank=True, null=True)
     data = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     processo_ordem = models.ForeignKey(OrdemProcesso, on_delete=models.CASCADE, related_name='processo_ordem_solda', blank=True, null=True)
 

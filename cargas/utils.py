@@ -2016,8 +2016,10 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
                 ordem=ultimo_numero + i + 1  # atribui manualmente a ordem
             )
 
+            print(o['setor_conjunto'])
+
             try:
-                maquina = Maquina.objects.get(nome=o["setor_conjunto"])
+                maquina = Maquina.objects.get(nome=o["setor_conjunto"], setor__nome='solda')
                 nova_ordem.maquina = maquina
                 # calcula data_programacao manualmente
                 nova_ordem.data_programacao = data_carga - timedelta(days=3)

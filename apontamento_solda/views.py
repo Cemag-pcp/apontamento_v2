@@ -16,6 +16,7 @@ from .models import PecasOrdem, ConjuntosInspecionados
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos
 from inspecao.models import Inspecao
+from core.utils import notificar_ordem
 
 @csrf_exempt
 def criar_ordem(request):
@@ -159,34 +160,6 @@ def criar_ordem(request):
 @csrf_exempt
 def atualizar_status_ordem(request):
 
-    """
-    Para iniciar uma ordem:
-
-    {
-        "status": "iniciada",
-        "ordem_id": 21101,
-    }
-
-    Para interromper uma ordem:
-
-    {
-        "status": "interrompida",
-        "ordem_id": 21101,
-        "motivo": 2
-    }
-
-    Para finalizar uma ordem:
-
-    {
-        "status": "finalizada",
-        "ordem_id": 21103,
-        "operador_final": 2,
-        "obs_finalizar": "teste",
-        "qt_realizada": 2,
-        "qt_mortas": 0
-    }
-    """
-
     try:
         # Parse do corpo da requisição
         body = json.loads(request.body)
@@ -204,6 +177,57 @@ def atualizar_status_ordem(request):
 
         # Validações básicas
         if ordem.status_atual == status:
+            
+            if ordem.status_atual == 'iniciada':
+                operador_inicio = body.get('operador_inicio', None)
+
+                # verifica se a quantidade restante para a ordem é maior q eu 1
+                # mas tem que coletar todas as ordems cuja ordem_pai seja a ordem atual
+                ordens_filhas = Ordem.objects.filter(Q(ordem_pai=ordem) | Q(id=ordem.id))
+                pecas_ordem = PecasOrdem.objects.filter(ordem__in=ordens_filhas)
+                qtd_planejada_total = pecas_ordem.aggregate(total_planejada=Coalesce(Sum('qtd_planejada'), Value(0), output_field=FloatField()))['total_planejada']
+                qtd_planejada_total = qtd_planejada_total / pecas_ordem.count()
+
+                qtd_boa_total = pecas_ordem.aggregate(total_boa=Coalesce(Sum('qtd_boa'), Value(0), output_field=FloatField()))['total_boa']
+                qtd_restante = qtd_planejada_total - qtd_boa_total
+                if qtd_restante <= 1:
+                    return JsonResponse({'error': f'Essa ordem já está iniciada e não possui quantidade restante suficiente para criar uma nova ordem. Atualize a página.'}, status=400)
+            
+                # criar nova ordem clone da ordem atual apenas alterando a coluna ordem e a coluna ordem_pai que será a referencia da própria ordem
+                nova_ordem = Ordem.objects.create(
+                    grupo_maquina=ordem.grupo_maquina,
+                    status_atual='iniciada',
+                    data_carga=ordem.data_carga,
+                    data_programacao=ordem.data_programacao,
+                    maquina=ordem.maquina,
+                    ordem_pai=ordem,
+                    obs=ordem.obs,
+                )
+
+                # Cria o novo processo
+                novo_processo = OrdemProcesso.objects.create(
+                    ordem=nova_ordem,
+                    status='iniciada',
+                    data_inicio=now(),
+                )
+
+                # cria um novo registro em "pecasordem" com a nova ordem e com a mesma peça da ordem original
+                peca = PecasOrdem.objects.filter(ordem=ordem).first()
+                nova_peca_ordem = PecasOrdem.objects.create(
+                    ordem=nova_ordem,
+                    peca=peca.peca,
+                    qtd_planejada=qtd_planejada_total,
+                    qtd_boa=0,
+                    operador_inicio_id=operador_inicio,
+                    processo_ordem=novo_processo
+                )
+                
+                notificar_ordem(nova_ordem)
+
+                return JsonResponse({
+                    'message': 'Ordem iniciada com sucesso.',
+                })
+            
             return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
 
         if status == 'retorno' and ordem.status_atual == 'iniciada':
@@ -225,6 +249,7 @@ def atualizar_status_ordem(request):
             )
 
             if status == 'iniciada':
+                operador_inicio = body.get('operador_inicio', None)
 
                 # Validações básicas
                 if ordem.status_atual == 'interrompida':
@@ -247,7 +272,7 @@ def atualizar_status_ordem(request):
                     peca=peca.peca,
                     qtd_planejada=peca.qtd_planejada,
                     qtd_boa=0,
-                    operador=None,
+                    operador_inicio_id=operador_inicio,
                     processo_ordem=novo_processo
                 )
 
@@ -297,22 +322,11 @@ def atualizar_status_ordem(request):
                 ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
                 ultimo_peca_ordem.qtd_boa=int(qt_produzida)
                 ultimo_peca_ordem.processo_ordem=novo_processo
-                ultimo_peca_ordem.operador=operador_final
+                ultimo_peca_ordem.operador_final=operador_final
+                ultimo_peca_ordem.ordem=ordem.ordem_pai if ordem.ordem_pai else ordem
                 
                 ultimo_peca_ordem.save()
-
-                if "-" in peca.peca:
-                    codigo = peca.peca.split(" - ", maxsplit=1)[0]
-                else:
-                    codigo = peca.peca
                 
-                conjuntos_inspecionados = ConjuntosInspecionados.objects.filter(codigo=codigo)
-
-                if conjuntos_inspecionados:
-                    Inspecao.objects.create(
-                        pecas_ordem_solda=ultimo_peca_ordem,
-                    )
-
                 # Verificar novamente a quantidade finalizada após o novo registro
                 sum_pecas_finalizadas = PecasOrdem.objects.filter(ordem=ordem).aggregate(Sum('qtd_boa'))['qtd_boa__sum']
 
@@ -350,6 +364,7 @@ def atualizar_status_ordem(request):
                 ultimo_peca_ordem.save()
 
             ordem.save()
+            notificar_ordem(ordem)
 
             return JsonResponse({
                 'message': 'Status atualizado com sucesso.',
@@ -386,7 +401,8 @@ def ordens_criadas(request):
     # Monta os filtros para a model Ordem
     filtros_ordem = {
         'data_carga': data_carga,
-        'grupo_maquina': 'solda'
+        'grupo_maquina': 'solda',
+        'ordem_pai__isnull': True
     }
     if maquina_param:
         maquina = get_object_or_404(Maquina, pk=maquina_param)
@@ -498,27 +514,50 @@ def ordens_iniciadas(request):
         # Filtra apenas os processos que ainda não foram finalizados (data_fim nula)
         processos_ativos = ordem.processos.filter(data_fim__isnull=True)
 
+        # pega o registro mais recente ainda em andamento, com operador_inicio preenchido
+        registro_inicio = (
+            ordem.ordem_pecas_solda
+                .filter(operador_inicio__isnull=False, operador_final__isnull=True)
+                .select_related('operador_inicio')
+                .order_by('-id')  # ou '-data_inicio' se existir
+                .first()
+        )
+
+        operador_inicio = registro_inicio.operador_inicio.matricula + " - " + registro_inicio.operador_inicio.nome.split(' ')[0] if registro_inicio else None
+
         # Obtém apenas os nomes das peças, eliminando duplicatas
         pecas_unicas = sorted(set(peca.peca for peca in ordem.ordem_pecas_solda.all()))
 
         # Calcula a soma total de qtd_planejada e qtd_boa para esta ordem
-        agregacoes = ordem.ordem_pecas_solda.aggregate(
-            total_planejada=Avg('qtd_planejada', default=0.0),
-            total_boa=Sum('qtd_boa', default=0.0)
+        # se a peça tiver a coluna "ordem_pai" preenchida, tem que somar todas as peças cuja ordem_pai seja a ordem atual
+        ordem_atual = ordem
+        if ordem.ordem_pai != None:
+            ordem = ordem.ordem_pai
+        
+        ordens_para_somar = Ordem.objects.filter(
+            Q(ordem_pai=ordem) | Q(id=ordem.id)
+        )
+
+        pecas_para_somar = PecasOrdem.objects.filter(ordem__in=ordens_para_somar)
+
+        agregacoes = pecas_para_somar.aggregate(
+            total_planejada=Sum('qtd_planejada', default=0.0, output_field=FloatField()),
+            total_boa=Sum('qtd_boa', default=0.0, output_field=FloatField())
         )
 
         resultado.append({
-            "ordem_id": ordem.id,
-            "ordem_numero": ordem.ordem,
-            "data_carga": ordem.data_carga,
-            "data_programacao": ordem.data_programacao,
-            "grupo_maquina": ordem.grupo_maquina,
-            "maquina": ordem.maquina.nome if ordem.maquina else None,
-            "maquina_id": ordem.maquina.id if ordem.maquina else None,
-            "status_atual": ordem.status_atual,
-            "ultima_atualizacao": ordem.ultima_atualizacao,
+            "ordem_id": ordem_atual.id,
+            "ordem_numero": ordem_atual.ordem,
+            "data_carga": ordem_atual.data_carga,
+            "data_programacao": ordem_atual.data_programacao,
+            "grupo_maquina": ordem_atual.grupo_maquina,
+            "maquina": ordem_atual.maquina.nome if ordem_atual.maquina else None,
+            "maquina_id": ordem_atual.maquina.id if ordem_atual.maquina else None,
+            "status_atual": ordem_atual.status_atual,
+            "ultima_atualizacao": ordem_atual.ultima_atualizacao,
             "pecas": pecas_unicas,  # Lista apenas os nomes das peças (sem repetições)
-            "qtd_restante": agregacoes['total_planejada'] - agregacoes['total_boa'],  # Soma total de qtd_planejada
+            "qtd_restante": (agregacoes['total_planejada'] / pecas_para_somar.count()) - agregacoes['total_boa'],  # Soma total de qtd_planejada
+            "operador_inicio": operador_inicio,
             "processos": [
                 {
                     "processo_id": processo.id,
@@ -561,26 +600,47 @@ def ordens_interrompidas(request):
         # Filtra apenas os processos que ainda não foram finalizados (data_fim nula)
         processos_ativos = ordem.processos.filter(data_fim__isnull=True)
 
+        registro_inicio = (
+            ordem.ordem_pecas_solda
+                .filter(operador_inicio__isnull=False, operador_final__isnull=True)
+                .select_related('operador_inicio')
+                .order_by('-id')  # ou '-data_inicio' se existir
+                .first()
+        )
+
+        operador_inicio = registro_inicio.operador_inicio.matricula + " - " + registro_inicio.operador_inicio.nome.split(' ')[0] if registro_inicio else None
+
         # Obtém apenas os nomes das peças, eliminando duplicatas
         pecas_unicas = sorted(set(peca.peca for peca in ordem.ordem_pecas_solda.all()))
 
         # Calcula a soma total de qtd_planejada e qtd_boa para esta ordem
-        agregacoes = ordem.ordem_pecas_solda.aggregate(
-            total_planejada=Avg('qtd_planejada', default=0.0),
-            total_boa=Sum('qtd_boa', default=0.0)
+        ordem_atual = ordem
+        if ordem.ordem_pai != None:
+            ordem = ordem.ordem_pai
+        
+        ordens_para_somar = Ordem.objects.filter(
+            Q(ordem_pai=ordem) | Q(id=ordem.id)
+        )
+
+        pecas_para_somar = PecasOrdem.objects.filter(ordem__in=ordens_para_somar)
+
+        agregacoes = pecas_para_somar.aggregate(
+            total_planejada=Sum('qtd_planejada', default=0.0, output_field=FloatField()),
+            total_boa=Sum('qtd_boa', default=0.0, output_field=FloatField())
         )
 
         resultado.append({
-            "ordem_id": ordem.id,
-            "ordem_numero": ordem.ordem,
-            "data_carga": ordem.data_carga,
-            "data_programacao": ordem.data_programacao,
-            "grupo_maquina": ordem.grupo_maquina,
-            "maquina": ordem.maquina.nome if ordem.maquina else None,
-            "status_atual": ordem.status_atual,
-            "ultima_atualizacao": ordem.ultima_atualizacao,
+            "ordem_id": ordem_atual.id,
+            "ordem_numero": ordem_atual.ordem,
+            "data_carga": ordem_atual.data_carga,
+            "data_programacao": ordem_atual.data_programacao,
+            "grupo_maquina": ordem_atual.grupo_maquina,
+            "maquina": ordem_atual.maquina.nome if ordem_atual.maquina else None,
+            "status_atual": ordem_atual.status_atual,
+            "ultima_atualizacao": ordem_atual.ultima_atualizacao,
             "pecas": pecas_unicas,  # Lista apenas os nomes das peças (sem repetições)
-            "qtd_restante": agregacoes['total_planejada'] - agregacoes['total_boa'],  # Soma total de qtd_planejada
+            "qtd_restante": (agregacoes['total_planejada'] / pecas_para_somar.count()) - agregacoes['total_boa'],  # Soma total de qtd_planejada
+            "operador_inicio": operador_inicio,
             "processos": [
                 {
                     "processo_id": processo.id,
