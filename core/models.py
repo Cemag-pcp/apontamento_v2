@@ -227,6 +227,8 @@ class RotaAcesso(models.Model):
         ('pintura', 'Pintura'),
         ('prod_especiais', 'Prod Especiais'),
         ('corte', 'Corte'),
+        ('solda', 'Solda'),
+        ('expedicao', 'Expedição'),
         ('usinagem', 'Usinagem'),
         ('cargas', 'Cargas'),
         ('inspecao', 'Inspeção'),

@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Apontamentos - Setor de Expedição</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+    <link rel="stylesheet" href="{% static 'css/table-fixed-header.css' %}">
+    <style>
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .table-fixed-header thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+            z-index: 10;
+        }
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .carreta-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">Apontamentos - Setor de Expedição</h2>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal">
+                    <i class="fas fa-plus me-2"></i>Criar Pacote
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Indicadores -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Pacotes Hoje
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="pacotesHoje">24</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-box fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Despachados
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="despachados">18</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-truck fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Pendentes
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="pendentes">6</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Carretas Ativas
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="carretasAtivas">8</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-trailer fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Apontamentos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Histórico de Expedições</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="table table-bordered table-hover table-fixed-header" id="tabelaExpedicoes">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data de Carga</th>
+                                    <th>Carga</th>
+                                    <th>Nome da Carreta</th>
+                                    <th>Cor</th>
+                                    <th>Cliente</th>
+                                    <th>Status Final</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Dados serão carregados via JavaScript -->
+                                <tr>
+                                    <td>15/01/2024</td>
+                                    <td>Produtos Eletrônicos</td>
+                                    <td>Carreta-001</td>
+                                    <td><span class="carreta-color" style="background-color: #ff0000;"></span>Vermelha</td>
+                                    <td>Cliente ABC</td>
+                                    <td><span class="badge bg-success status-badge">Entregue</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" title="Visualizar">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>15/01/2024</td>
+                                    <td>Material de Construção</td>
+                                    <td>Carreta-002</td>
+                                    <td><span class="carreta-color" style="background-color: #0000ff;"></span>Azul</td>
+                                    <td>Cliente XYZ</td>
+                                    <td><span class="badge bg-warning status-badge">Em Trânsito</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" title="Visualizar">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>14/01/2024</td>
+                                    <td>Alimentos</td>
+                                    <td>Carreta-003</td>
+                                    <td><span class="carreta-color" style="background-color: #00ff00;"></span>Verde</td>
+                                    <td>Cliente DEF</td>
+                                    <td><span class="badge bg-danger status-badge">Atrasado</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" title="Visualizar">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Criar Pacote -->
+<div class="modal fade" id="criarPacoteModal" tabindex="-1" aria-labelledby="criarPacoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="criarPacoteModalLabel">Criar Novo Pacote para Despacho</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCriarPacote">
+                    <!-- Etapa 1: Seleção de Data -->
+                    <div id="etapa1" class="etapa-form">
+                        <div class="mb-3">
+                            <label for="dataCarga" class="form-label">Data de Carga <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="dataCarga" required>
+                            <div class="form-text">Selecione a data para carregar os clientes disponíveis</div>
+                        </div>
+                    </div>
+
+                    <!-- Etapa 2: Seleção de Cliente -->
+                    <div id="etapa2" class="etapa-form" style="display: none;">
+                        <div class="mb-3">
+                            <label for="selectCliente" class="form-label">Cliente <span class="text-danger">*</span></label>
+                            <select class="form-select" id="selectCliente" required disabled>
+                                <option value="">Primeiro selecione uma data</option>
+                            </select>
+                            <div class="form-text">Selecione o cliente para carregar as carretas disponíveis</div>
+                        </div>
+                    </div>
+
+                    <!-- Etapa 3: Seleção de Carretas -->
+                    <div id="etapa3" class="etapa-form" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">Carretas Disponíveis <span class="text-danger">*</span></label>
+                            <div id="carretasContainer" class="border rounded p-3">
+                                <p class="text-muted mb-0">Selecione um cliente para ver as carretas disponíveis</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="observacoes" class="form-label">Observações</label>
+                            <textarea class="form-control" id="observacoes" rows="3" placeholder="Observações adicionais sobre o pacote..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSalvarPacote" disabled>Criar Pacote</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dataCarga = document.getElementById('dataCarga');
+    const selectCliente = document.getElementById('selectCliente');
+    const carretasContainer = document.getElementById('carretasContainer');
+    const btnSalvarPacote = document.getElementById('btnSalvarPacote');
+    const etapa2 = document.getElementById('etapa2');
+    const etapa3 = document.getElementById('etapa3');
+
+    // Quando a data é selecionada
+    dataCarga.addEventListener('change', function() {
+        const data = this.value;
+        if (data) {
+            // Chama API para buscar clientes
+            buscarClientes(data);
+            etapa2.style.display = 'block';
+        } else {
+            etapa2.style.display = 'none';
+            etapa3.style.display = 'none';
+            selectCliente.disabled = true;
+            btnSalvarPacote.disabled = true;
+        }
+    });
+
+    // Quando o cliente é selecionado
+    selectCliente.addEventListener('change', function() {
+        const cliente = this.value;
+        const data = dataCarga.value;
+        
+        if (cliente && data) {
+            // Chama API para buscar carretas
+            buscarCarretas(data, cliente);
+            etapa3.style.display = 'block';
+        } else {
+            etapa3.style.display = 'none';
+            btnSalvarPacote.disabled = true;
+        }
+    });
+
+    // Função para buscar clientes via API
+    async function buscarClientes(data) {
+        console.log('Buscando clientes para data:', data);
+
+        try {
+            const response = await fetch(`api/clientes_disponiveis/?data_carga=${encodeURIComponent(data)}`);
+            if (!response.ok) {
+                throw new Error(`Erro na API: ${response.status}`);
+            }
+
+            // Como sua view retorna uma lista de códigos, ex.: ["CLI001","CLI002"]
+            const clientes = await response.json();
+
+            // Popula o select de clientes
+            selectCliente.innerHTML = '<option value="">Selecione um cliente</option>';
+            clientes.forEach((cliente, idx) => {
+                const option = document.createElement('option');
+                option.value = cliente;  // valor = código vindo do backend
+                option.textContent = cliente; // exibe o código (ou nome se preferir)
+                selectCliente.appendChild(option);
+            });
+
+            selectCliente.disabled = false;
+        } catch (err) {
+            console.error('Erro ao buscar clientes:', err);
+            alert('Erro ao carregar clientes. Tente novamente.');
+        }
+    }
+
+    // Função para buscar carretas via API
+    // Mapa de cores -> hex (mesmas cores que o backend gera: vermelho, azul, verde, laranja, amarelo, cinza)
+    const COLOR_HEX = {
+    vermelho: '#ff0000',
+    azul: '#0000ff',
+    verde: '#00ff00',
+    laranja: '#ffa500',
+    amarelo: '#ffff00',
+    cinza: '#808080'
+    };
+
+    // Função para buscar carretas via API
+    async function buscarCarretas(data, clienteId) {
+        console.log('Buscando carretas para data:', data, 'e cliente:', clienteId);
+
+        // estado de loading (opcional)
+        carretasContainer.innerHTML = `
+            <div class="text-muted">Carregando carretas...</div>
+        `;
+
+        try {
+            const url = `api/carretas_disponiveis/?data_carga=${encodeURIComponent(data)}&cliente=${encodeURIComponent(clienteId)}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+            throw new Error(`Erro na API: ${response.status}`);
+            }
+
+            // back-end retorna array de registros:
+            // [{ Recurso, Qtde, PED_NUMEROSERIE, cor }, ...]
+            const registros = await response.json();
+
+            // Agregar por Recurso (uma “carreta”)
+            // totaliza Qtde e junta séries (se quiser usar depois)
+            const porRecurso = new Map();
+            registros.forEach(r => {
+            const recurso = (r.Recurso || '').toString();
+            const cor = (r.cor || 'laranja').toLowerCase();
+            const qtde = Number(r.Qtde) || 0;
+            const serie = r.PED_NUMEROSERIE || '';
+
+            if (!porRecurso.has(recurso)) {
+                porRecurso.set(recurso, {
+                id: recurso,                         // usamos o próprio nome como id estável
+                nome: recurso,                       // exibe o nome da carreta (Recurso)
+                cor,
+                corHex: COLOR_HEX[cor] || '#999999',
+                totalQtde: 0,
+                series: []
+                });
+            }
+            const acc = porRecurso.get(recurso);
+            acc.totalQtde += qtde;
+            if (serie) acc.series.push(serie);
+            });
+
+            // Transforma em array para render
+            const carretas = Array.from(porRecurso.values());
+
+            // Monta HTML de checkboxes
+            let html = '<div class="row">';
+            carretas.forEach(carreta => {
+            html += `
+                <div class="col-md-6 mb-2">
+                <div class="form-check d-flex align-items-center gap-2">
+                    <input
+                    class="form-check-input carreta-checkbox"
+                    type="checkbox"
+                    value="${carreta.id}"
+                    id="carreta-${CSS.escape(carreta.id)}"
+                    data-cor="${carreta.cor}"
+                    data-hex="${carreta.corHex}"
+                    data-qtde="${carreta.totalQtde}"
+                    >
+                    <label class="form-check-label" for="carreta-${CSS.escape(carreta.id)}">
+                    <span class="carreta-color" style="
+                            display:inline-block;
+                            width:12px;height:12px;border-radius:3px;
+                            background-color:${carreta.corHex};
+                            margin-right:6px;"></span>
+                    ${carreta.nome} — ${carreta.cor} (Qtde: ${carreta.totalQtde})
+                    </label>
+                </div>
+                </div>
+            `;
+            });
+            html += '</div>';
+
+            carretasContainer.innerHTML = html;
+
+            // Adiciona event listeners aos checkboxes
+            const checkboxes = document.querySelectorAll('.carreta-checkbox');
+            checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', validarFormulario);
+            });
+
+        } catch (err) {
+            console.error('Erro ao buscar carretas:', err);
+            carretasContainer.innerHTML = `
+            <div class="text-danger">Erro ao carregar carretas. Tente novamente.</div>
+            `;
+        }
+    }
+
+    // Valida se pelo menos uma carreta foi selecionada
+    function validarFormulario() {
+        const checkboxes = document.querySelectorAll('.carreta-checkbox:checked');
+        btnSalvarPacote.disabled = checkboxes.length === 0;
+    }
+
+    // Salvar pacote
+    btnSalvarPacote.addEventListener('click', function() {
+        const data = dataCarga.value;
+        const clienteId = selectCliente.value;
+        const carretasSelecionadas = Array.from(document.querySelectorAll('.carreta-checkbox:checked')).map(cb => cb.value);
+        const observacoes = document.getElementById('observacoes').value;
+
+        const pacote = {
+            data: data,
+            clienteId: clienteId,
+            carretas: carretasSelecionadas,
+            observacoes: observacoes
+        };
+
+        console.log('Criando pacote:', pacote);
+        
+        // Aqui você faria a chamada para a API para salvar o pacote
+        // fetch('/api/criar-pacote/', {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //         'X-CSRFToken': getCookie('csrftoken')
+        //     },
+        //     body: JSON.stringify(pacote)
+        // })
+
+        alert('Pacote criado com sucesso!');
+        
+        // Reset do formulário
+        document.getElementById('formCriarPacote').reset();
+        etapa2.style.display = 'none';
+        etapa3.style.display = 'none';
+        selectCliente.disabled = true;
+        btnSalvarPacote.disabled = true;
+        
+        // Fecha o modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('criarPacoteModal'));
+        modal.hide();
+        
+        // Recarrega a tabela
+        // carregarTabelaExpedicoes();
+    });
+
+    // Função para obter CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %}

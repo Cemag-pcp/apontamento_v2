@@ -75,11 +75,11 @@ def get_data_from_sheets():
 
     return base_carretas, base_carga
 
-def tratando_dados():
+def tratando_dados(base_carretas, base_carga, data_carga, cliente=None):
 
     ##### Tratando datas######
 
-    base_carretas, base_carga = get_data_from_sheets()
+    # base_carretas, base_carga = get_data_from_sheets()
 
     dados_carga = base_carga
     dados_carreta = base_carretas
@@ -87,14 +87,20 @@ def tratando_dados():
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
     dados_carreta['Recurso'] = dados_carreta['Recurso'].apply(lambda x: "0" + str(x) if len(str(x))==5 else str(x))
 
-    base_carga = base_carga[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
+    base_carga = base_carga[['UF','Carga','Cidade','PED_PESSOA.CODIGO','PED_NUMEROSERIE','PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
     base_carga['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
         base_carga['PED_PREVISAOEMISSAODOC'], format='%d/%m/%Y', errors='coerce')
+    
+    # filtrando apenas pela data escolhida
+    base_carga = base_carga[base_carga['PED_PREVISAOEMISSAODOC'] == data_carga]
+
     base_carga['Ano'] = base_carga['PED_PREVISAOEMISSAODOC'].dt.strftime('%Y')
     base_carga['PED_PREVISAOEMISSAODOC'] = base_carga.PED_PREVISAOEMISSAODOC.dt.strftime(
         '%d/%m/%Y')
 
     #### renomeando colunas#####
+    if cliente:
+        base_carga = base_carga[base_carga['PED_PESSOA.CODIGO'] == cliente]
 
     base_carga = base_carga.rename(columns={'PED_PREVISAOEMISSAODOC': 'Datas',
                                             'PED_RECURSO.CODIGO': 'Recurso',
@@ -110,6 +116,8 @@ def tratando_dados():
     today = datetime.now()
     ts = pd.Timestamp(today)
     today = today.strftime('%d/%m/%Y')
+
+    return dados_carreta,base_carga
 
 def consultar_carretas(data_inicial, data_final):
     dados_carreta, dados_carga = get_data_from_sheets()
