@@ -107,6 +107,11 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
 
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
+        const status = {
+            "Inspecionado":"devolvido",
+            "Não Inspecionado": "pendente"
+        }
+
         items.dados.forEach(item => {
             let borderColors = {
                 "Laranja": "orange", "Verde": "green",
@@ -127,7 +132,12 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                    <div class="d-flex justify-content-between">
+                        <h5 style="width:70%;"> ${item.peca}</h5>
+                        <div class="text-center">
+                            <p class="status-badge status-cancelado inspecionar-solda" style="font-size:13px; cursor:pointer;">Solda inspecionada</p>
+                        </div>
+                    </div>
                     <h6 class="card-subtitle mb-2 text-muted">Inspeção #${item.id}</h6>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>

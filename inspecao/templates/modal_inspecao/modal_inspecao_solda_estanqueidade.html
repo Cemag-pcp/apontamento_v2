@@ -1,0 +1,107 @@
+<div class="modal fade" id="modal-inspecionar-solda-tanque" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="inspecionar-solda-tanqueLabel">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title title" id="inspecionar-solda-tanqueLabel">Inspecionar Solda do Tanque</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="form-inspecao">
+          <div class="modal-body p-4" style="max-height: 70vh;overflow-y: auto;">
+            <div class="row">
+                <input type="hidden" name="id-inspecao-solda-tanque" id="id-inspecao-solda-tanque" class="form-control">
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal" for="data-finalizada-inspecao-solda-tanque">Data Finalizada:</label>
+                    <input type="text" name="data-finalizada-inspecao-solda-tanque" id="data-finalizada-inspecao-solda-tanque" class="form-control" disabled>
+                </div>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal" for="data-inspecao-solda-tanque">Data Inspeção:</label>
+                    <input type="datetime-local" name="data-inspecao-solda-tanque" id="data-inspecao-solda-tanque" class="form-control" required>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-12 mb-4">
+                    <label class="label-modal" for="peca-inspecao-solda-tanque">Conjuntos:</label>
+                    <input type="text" name="peca-inspecao-solda-tanque" id="peca-inspecao-solda-tanque"
+                        class="form-control" disabled>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Quantidade Produzida:</label>
+                    <input id="qtd-produzida-solda-tanque" type="number" name="qtd-produzida-solda-tanque" value=""
+                        class="form-control" disabled>
+                </div>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Quantidade Inspecionada:</label>
+                    <input id="qtd-inspecao-solda-tanque" type="number" name="qtd-inspecao-solda-tanque" value="1"
+                        class="form-control" min="1">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">N° total de conformidades:</label>
+                    <input type="number" id="conformidade-inspecao-solda-tanque" min="0" name="conformidade-inspecao-solda-tanque" value=""
+                        class="form-control" required>
+                </div>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">N° total de não conformidades:</label>
+                    <input type="number" id="nao-conformidade-inspecao-solda-tanque" name="nao-conformidade-inspecao-solda-tanque" value=""
+                        class="form-control" disabled>
+                </div>
+            </div>
+            <div id="containerInspecao">
+              <div class="row mb-3 selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
+                <span class="label-modal text-end"> 1ª Causa</span>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Causas:</label>
+                    <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
+                      {% for causa in causas %}
+                        <option value="{{causa.id}}">{{causa.nome}}</option>
+                      {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Quantidade:</label>
+                    <input type="number" style="font-size: 14px;" min="1" class="form-control" required>
+                </div>
+                <div class="col-sm-12 mb-4">
+                    <label class="label-modal">Imagens:</label>
+                    <input class="form-control" type="file" name="imagens_1" accept="image/*" multiple>
+                </div>
+              </div> 
+            </div>
+            <div id="addRemoveContainer" class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
+              <button type="button" class="btn btn-white" id="removeButtonsolda-tanque" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
+              <button type="button" class="btn btn-white" id="addButtonsolda-tanque" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-sm-6 mb-4">
+                    <label class="label-modal">Inspetor:</label>
+                    <select name="inspetor-inspecao-solda-tanque" id="inspetor-inspecao-solda-tanque" class="form-control" aria-readonly="true" required>
+                        <option value="" selected hidden disabled></option>
+                        {% if not inspetor_logado %}
+                          {% for inspetor in inspetores %}
+                            <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                          {% endfor %}
+                        {% else %}
+                          <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="col-sm-6 mb-4">
+                  <label for="observacao-inspecao-solda-tanque" class="label-modal">Observação:</label>
+                  <input name="observacao-inspecao-solda-tanque" maxlength="150" id="observacao-inspecao-solda-tanque" class="form-control">
+                </div>
+            </div>    
+          </div>                
+          <div class="modal-footer">
+            <button id="submit-inspecionar-solda-tanque" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+              <span role="status">Enviar inspeção</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+</div>

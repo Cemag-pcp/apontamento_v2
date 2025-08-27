@@ -50,10 +50,13 @@ def inspecao_tanque(request):
     users = Profile.objects.filter(
         tipo_acesso="inspetor", permissoes__nome="inspecao/tanque"
     )
+    causas = Causas.objects.filter(setor="montagem")
 
     lista_inspetores = [
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
     ]
+
+    list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
 
     tanques = PecasEstanqueidade.objects.filter(tipo="tanque")
 
@@ -78,6 +81,7 @@ def inspecao_tanque(request):
             "tanques": dict_tanques,
             "inspetores": lista_inspetores,
             "inspetor_logado": inspetor_logado,
+            "causas": list_causas
         },
     )
 

@@ -109,6 +109,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
                 button.querySelector(".spinner-border").style.display = "none";
             })
+        } else if (event.target.classList.contains('inspecionar-solda')){
+            const modalSolda = new bootstrap.Modal(document.getElementById('modal-inspecionar-solda-tanque'));
+            modalSolda.show();
         }
     });
 });
