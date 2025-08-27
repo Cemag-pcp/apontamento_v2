@@ -7,7 +7,7 @@ from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
-from django.db.models import Count, Q
+from django.db.models import Q, Count, Sum, F
 from django.forms.models import model_to_dict
 from django.contrib.auth.decorators import login_required
 
@@ -29,6 +29,11 @@ from urllib.parse import unquote
 from datetime import datetime, time, timedelta
 from functools import reduce
 from collections import defaultdict
+
+from datetime import date
+from functools import reduce
+from urllib.parse import unquote
+import re, json
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
@@ -414,14 +419,6 @@ def filtrar_ordens(request):
     ]
 
     return JsonResponse({"ordens": resultados})
-
-from django.db.models import Q, Count, Sum, F
-from django.core.paginator import Paginator, EmptyPage
-from django.utils.timezone import localtime
-from datetime import date
-from functools import reduce
-from urllib.parse import unquote
-import re, json
 
 def get_ordens_criadas_duplicar_ordem(request):
     #  Captura os parâmetros da requisição
