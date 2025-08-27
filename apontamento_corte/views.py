@@ -233,7 +233,7 @@ def atualizar_status_ordem(request):
                         mortas = peca.get('mortas', 0)
 
                         peca = PecasOrdem.objects.get(ordem=ordem, peca=peca_id)
-                        peca.qtd_boa = planejada
+                        peca.qtd_boa = planejada - mortas
                         peca.qtd_morta = mortas
 
                         peca.save()
