@@ -15,3 +15,4 @@ class PecasOrdem(models.Model):
     # unique constraint de peça e ordem, para evitar duplicidade
     class Meta:
         unique_together = ('ordem', 'peca')
+

@@ -317,7 +317,7 @@ function preencherModalDuplicacao(data,ordemId) {
     const maquinaMap = {
         'laser_1': '16',
         'laser_2': '17',
-        'laser_3': '58'
+        'laser_3': 58
     };
     
     if (maquinas.includes(maquina)) {
@@ -329,8 +329,7 @@ function preencherModalDuplicacao(data,ordemId) {
             <option value="">Selecione uma máquina</option>
             <option value="16">Laser 1</option>
             <option value="17">Laser 2 (JFY)</option>
-            <option value="58">Laser 3 (Trumpf)</option>`
-        ;
+        `;
     
         // Seleciona automaticamente com base na máquina recebida
         selectMaquina.value = maquinaMap[maquina];

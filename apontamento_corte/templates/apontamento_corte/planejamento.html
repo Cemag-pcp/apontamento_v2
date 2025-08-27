@@ -124,33 +124,61 @@
             <div class="col-md-4">
                 <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
                     Sequenciamento Laser
-                    <button class="btn btn-sm" id="refresh-ordens-sequenciadas-laser">🔄</button>
+                    <button class="btn btn-sm" id="refresh-ordens-sequenciadas-laser" title="Recarregar">🔄</button>
                 </h4>
+
                 <div class="border rounded p-3 bg-light" style="max-height: 400px; overflow-y: auto;">
+
+                    <!-- TABS -->
+                    <ul class="nav nav-tabs mb-3" id="laserTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" href="#" data-group="laser_1" role="tab">Laser 1</a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" href="#" data-group="laser_2" role="tab">Laser 2</a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" href="#" data-group="laser_3" role="tab">Laser 3</a>
+                        </li>
+                    </ul>
+
+                    <!-- BUSCA -->
                     <div class="mb-3">
                         <div class="input-group">
                             <input id="pesquisarOrdemSequenciadaLaser" class="form-control" type="text" placeholder="Buscar Ordem">
-                            <button class="btn btn-outline-secondary" type="button" id="btnPesquisarOrdemSequenciadaLaser">
-                                <i class="bi bi-search"></i>
+                            <button class="btn btn-outline-secondary" type="button" id="btnPesquisarOrdemSequenciadaLaser" title="Filtrar">
+                            <i class="bi bi-search"></i>
                             </button>
                         </div>
                     </div>
-                    <div id="ordens-sequenciadas-laser-container">
-                        
-                    </div>
+
+                    <!-- CONTAINER DOS CARDS -->
+                    <div id="ordens-sequenciadas-laser-container"></div>
                 </div>
+
                 <div class="mt-3">
                     <span class="legend">
                         <span id="tempo-estimado-total-laser"></span>
                     </span>
                 </div>
-            </div>    
+            </div>  
             <div class="col-md-4">
                 <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
                     Sequenciamento Plasma
                     <button class="btn btn-sm" id="refresh-ordens-sequenciadas-plasma">🔄</button>
                 </h4>
                 <div class="border rounded p-3 bg-light" style="height: auto; max-height: 400px; overflow-y: auto;">
+                    
+                    <!-- TABS -->
+                    <!-- <ul class="nav nav-tabs mb-3" id="plasmaTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" href="#" data-group="plasma_1" role="tab">Plasma 1</a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" href="#" data-group="plasma_2" role="tab">Plasma 2</a>
+                        </li>
+                    </ul> -->
+
                     <div class="mb-3">
                         <div class="input-group">
                             <input id="pesquisarOrdemSequenciadaPlasma" class="form-control" type="text" placeholder="Buscar Ordem">
@@ -701,6 +729,12 @@
                             <option value="{{motivo.nome}}">{{motivo.nome}}</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    
+                    <!-- comentário extra sobre a interrupção da ordem -->
+                    <div class="mb-3">
+                        <label for="comentarioExtra" class="form-label">Comentário extra</label>
+                        <textarea class="form-control" id="comentarioExtra" name="comentarioExtra" rows="3" placeholder="Algum comentário adicional"></textarea>
                     </div>
 
                     <!-- Footer do Formulário -->

@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'apontamento_pintura',
     'apontamento_montagem',
     'apontamento_solda',
+    'apontamento_exped',
     'cargas',
     'storages',
 

@@ -230,10 +230,10 @@ def atualizar_status_ordem(request):
 
                     peca.save()
                     
-                    if not peca.peca.processo_1:
-                        Inspecao.objects.create(    
-                            pecas_ordem_usinagem=peca_obj
-                        )
+                    # if not peca.peca.processo_1:
+                    #     Inspecao.objects.create(    
+                    #         pecas_ordem_usinagem=peca_obj
+                    #     )
 
                     ordem.status_prioridade = 3
                 elif status == 'interrompida':

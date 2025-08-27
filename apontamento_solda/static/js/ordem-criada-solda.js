@@ -41,6 +41,7 @@ export const loadOrdens = (container, filtros = {}) => {
 
                     const tabelaCorpo = document.getElementById('tabela-ordens-corpo');
                     ordens.forEach(ordem => {
+                        console.log(ordem);
                         const linha = document.createElement('tr');
                         linha.dataset.ordemId = ordem.ordem;
                         
@@ -72,7 +73,14 @@ export const loadOrdens = (container, filtros = {}) => {
                             <td data-label="Status"><span class="${badgeClass}">${ordem.ordem__status_atual.replace("_", " ")}</span></td>
                             <td data-label="Qtd. a Fazer">${ordem.restante}</td>
                             <td data-label="Qtd. Feita">${ordem.total_boa}</td>
-                            <td data-label="Ação"><button class="btn btn-sm btn-primary btn-start">Iniciar</button></td>
+                            <td data-label="Ação">
+                                <button 
+                                class="btn btn-sm btn-primary btn-start"
+                                data-ordem-id="${ordem.ordem}"
+                                data-maquina-nome="${ordem.ordem__maquina__nome}">
+                                Iniciar
+                                </button>
+                            </td>
                         `;
 
                         tabelaCorpo.appendChild(linha);
@@ -128,87 +136,29 @@ export const loadOrdens = (container, filtros = {}) => {
 };
 
 let currentOrdemId = null;
+let currentMaquinaNome = null;
 
 function truncateText(text, maxLength) {
     return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
 }
 
 // Usando delegação de eventos para capturar o clique no botão "Iniciar"
-document.addEventListener('click', function(e) {
-    if (e.target && e.target.classList.contains('btn-start')) {
-        const linha = e.target.closest('tr');
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('.btn-start'); // garante que é o botão, mesmo clicando no texto/ícone
+  if (!btn) return;
 
-        if (!linha) {
-            console.error("Linha da tabela não encontrada.");
-            return;
-        }
+  const ordemId = btn.dataset.ordemId || btn.getAttribute('data-ordem-id');
+  const maquinaNome = btn.dataset.maquinaNome || btn.getAttribute('data-maquina-nome');
 
-        currentOrdemId = linha.getAttribute('data-ordem-id');
+  if (!ordemId) {
+    console.error("Ordem ID não encontrado no botão.");
+    return;
+  }
 
-        if (!currentOrdemId) {
-            console.error("Ordem ID não encontrada na linha.");
-            return;
-        }
-
-        console.log("Ordem selecionada:", currentOrdemId);
-
-        // Obtém o modal corretamente
-        const modalElement = document.getElementById('confirmModal');
-
-        // Remove manualmente o aria-hidden antes de exibir o modal
-        modalElement.removeAttribute("aria-hidden");
-
-        // Exibe o modal corretamente
-        const confirmModal = new bootstrap.Modal(modalElement);
-        confirmModal.show();
-    }
+  mostrarModalIniciar(ordemId, maquinaNome);
 });
 
-document.getElementById('confirmStartButton').addEventListener('click', function() {
-    Swal.fire({
-        title: 'Verificando quantidade pendente...',
-        text: 'Aguarde enquanto verificamos se a ordem pode ser iniciada.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        },
-    });
-
-    // Primeiro, verificar se a ordem tem quantidade pendente
-    fetch(`api/verificar-qt-restante/?ordem_id=${currentOrdemId}`)
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(err => { throw err; });
-        }
-        return response.json();
-    })
-    .then(data => {
-        Swal.close(); // Fecha o loading
-
-        if (data.ordens.length === 0) {
-            throw new Error("Ordem não encontrada.");
-        }
-
-        const ordem = data.ordens[0]; // Pegamos a primeira ordem retornada
-        if (ordem.restante === 0.0) {
-            throw new Error("Essa ordem já foi totalmente produzida. Não é possível iniciá-la novamente.");
-        }
-
-        // Se chegou até aqui, pode iniciar a ordem
-        iniciarOrdem(currentOrdemId);
-    })
-    .catch(error => {
-        console.error('Erro ao verificar quantidade pendente:', error);
-
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: error.message || 'Não foi possível verificar a quantidade pendente. Tente novamente.',
-        });
-    });
-});
-
-function iniciarOrdem(ordemId) {
+function iniciarOrdem(ordemId, operadorId) {
     const filtroDataCarga = document.getElementById('filtro-data-carga');
     const filtroSetor = document.getElementById('filtro-setor');
 
@@ -234,7 +184,8 @@ function iniciarOrdem(ordemId) {
         },
         body: JSON.stringify({
             status: "iniciada",
-            ordem_id: ordemId
+            ordem_id: ordemId,
+            operador_inicio: operadorId
         })
     })
     .then(response => {
@@ -268,21 +219,22 @@ function iniciarOrdem(ordemId) {
         Swal.fire({
             icon: 'error',
             title: 'Erro',
-            text: error.message || 'Ocorreu um erro ao tentar iniciar a ordem. Tente novamente.',
+            text: error.error || 'Ocorreu um erro ao tentar iniciar a ordem. Tente novamente.',
         });
     });
 }
 
 export function carregarOrdensIniciadas(filtros = {}) {
     const container = document.querySelector('.containerProcesso');
-    container.innerHTML = `
-    <div class="spinner-border text-dark" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>`;
+    // container.innerHTML = `
+    // <div class="spinner-border text-dark" role="status">
+    //     <span class="sr-only">Loading...</span>
+    // </div>`;
 
     fetch(`api/ordens-iniciadas/?setor=${filtros.setor || ''}`)
         .then(response => response.json())
         .then(data => {
+            
             container.innerHTML = ''; // Limpa o container
             data.ordens.forEach(ordem => {
 
@@ -324,10 +276,13 @@ export function carregarOrdensIniciadas(filtros = {}) {
                         <p class="card-text mb-2 small">
                             <strong>Qt. restante:</strong> ${ordem.qtd_restante}
                         </p>
-                        <p class="card-text mb-0 small">
+                        <p class="card-text mb-2 small">
                             <a href="https://drive.google.com/drive/u/0/search?q=${ordem.pecas}" target="_blank" rel="noopener noreferrer">
                                 ${ordem.pecas}
                             </a>
+                        </p>
+                        <p class="card-text mb-2 small">
+                            <strong>Operador: </strong> ${ordem.operador_inicio}
                         </p>
                     </div>
 
@@ -373,10 +328,10 @@ export function carregarOrdensIniciadas(filtros = {}) {
 
 export function carregarOrdensInterrompidas(filtros = {}) {
     const container = document.querySelector('.containerInterrompido');
-    container.innerHTML = `
-    <div class="spinner-border text-dark" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>`;
+    // container.innerHTML = `
+    // <div class="spinner-border text-dark" role="status">
+    //     <span class="sr-only">Loading...</span>
+    // </div>`;
 
     // Fetch para buscar ordens interrompidas
 
@@ -429,6 +384,9 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                     </p>
                     <p class="card-text mb-2 small">
                         <strong>Qt. restante:</strong> ${ordem.qtd_restante}
+                    </p>
+                    <p class="card-text mb-2 small">
+                        <strong>Operador: </strong> ${ordem.operador_inicio}
                     </p>
                     <p class="card-text mb-2 small">
                         <a href="https://drive.google.com/drive/u/0/search?q=${ordem.pecas}" target="_blank" rel="noopener noreferrer">
@@ -758,6 +716,67 @@ function mostrarModalFinalizar(ordemId, maquina, max_itens) {
     modal.show();
 }
 
+function mostrarModalIniciar(ordemId, maquina) {
+    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+    const operadorSelect = document.getElementById('operadorInicial');
+    const labelOperadores = document.getElementById('labelOperadores');
+
+    const todosOperadorInicial = document.getElementById('todosOperadorInicial');
+
+    operadorSelect.style.display = 'block';
+
+    todosOperadorInicial.style.display = 'none';
+    labelOperadores.textContent = `Operador - ${maquina}` 
+
+    document.getElementById('ordemIdIniciar').value = ordemId;
+
+    operadorSelect.setAttribute('data-active', 'true');
+    todosOperadorInicial.setAttribute('data-active', 'false');
+
+    labelOperadores.setAttribute('data-maquina', maquina)
+
+    operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
+    todosOperadorInicial.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
+
+    fetch(`api/listar-operadores/?maquina=${maquina}`)
+    .then(response => {
+        if (!response.ok) {
+            throw new Error("Erro ao buscar operadores");
+        }
+        return response.json();
+    })
+    .then(data => {
+    
+        if (data.operadores_maquina.length === 0) {
+            operadorSelect.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
+        } else {
+            data.operadores_maquina.forEach(operador => {
+                operadorSelect.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+            });
+            operadorSelect.disabled = false; // Habilita o select após carregar os dados
+        }
+
+        if (data.operadores.length === 0) {
+            todosOperadorInicial.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
+        } else {
+            data.operadores.forEach(operador => {
+                todosOperadorInicial.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+            });
+            todosOperadorInicial.disabled = false; // Habilita o select após carregar os dados
+        }
+    })
+    .catch(error => {
+        console.error("Erro ao carregar operadores:", error);
+        operadorSelect.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
+        todosOperadorInicial.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
+    });
+    
+    modal.show();
+}
+
+// PARA MODAL FINALIZAR
+
 document.getElementById('direcionarTodosOperadores').addEventListener('click', function () {
     const operadorFinal = document.getElementById('operadorFinal');
     const todosOperadorFinal = document.getElementById('todosOperadorFinal');
@@ -912,6 +931,127 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
             icon: 'error',
             title: 'Erro',
             text: error.message || 'Erro ao finalizar a ordem. Tente novamente.'
+        });
+    });
+});
+
+// PARA MODAL INICIAR
+
+document.getElementById('direcionarTodosOperadoresOperadorInicial').addEventListener('click', function () {
+    const operadorFinal = document.getElementById('operadorInicial');
+    const todosOperadorInicial = document.getElementById('todosOperadorInicial');
+    const labelOperadores = document.getElementById('labelOperadoresInicial');
+
+    const descricaoBotaoVoltar = document.getElementById('descricaoBotaoVoltarOperadorInicial');
+    const descricaoBotaoLista = document.getElementById('descricaoBotaoListaOperadorInicial');
+    
+    labelOperadores.textContent = `Todos os Operadores` 
+
+    operadorFinal.style.display = 'none';
+    operadorFinal.setAttribute('data-active', 'false');
+    todosOperadorInicial.style.display = 'block';
+    todosOperadorInicial.setAttribute('data-active', 'true');
+
+    descricaoBotaoVoltar.style.display = 'block';
+    descricaoBotaoLista.style.display = 'none';
+});
+
+document.getElementById('botaoVoltarOperadoresMaquinaOperadorInicial').addEventListener('click', function () {
+    const operadorInicial = document.getElementById('operadorInicial');
+    const todosOperadorInicial = document.getElementById('todosOperadorInicial');
+    const labelOperadores = document.getElementById('labelOperadores');
+
+    const descricaoBotaoLista = document.getElementById('descricaoBotaoListaOperadorInicial');
+    const descricaoBotaoVoltar = document.getElementById('descricaoBotaoVoltarOperadorInicial');
+
+    const maquina = labelOperadores.getAttribute('data-maquina')
+    labelOperadores.textContent = `Operadores - ${maquina}` 
+
+    todosOperadorInicial.style.display = 'none';
+    todosOperadorInicial.setAttribute('data-active', 'false');
+    operadorInicial.style.display = 'block';
+    operadorInicial.setAttribute('data-active', 'true');
+
+    descricaoBotaoLista.style.display = 'block';
+    descricaoBotaoVoltar.style.display = 'none';
+});
+
+document.getElementById('confirmStartButton').addEventListener('click', function() {
+    const operadorInicio = document.getElementById('operadorInicial');
+    const todosOperadorInicio = document.getElementById('todosOperadorInicial');
+
+    // Determinar qual select está ativo e obter o valor do operador
+    let operadorId;
+    if (operadorInicio.style.display !== 'none' && operadorInicio.getAttribute('data-active') === 'true') {
+        if (!operadorInicio.value || operadorInicio.value === "") {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Por favor, selecione um operador da máquina.'
+            });
+            return;
+        }
+        operadorId = operadorInicio.value;
+    } else if (todosOperadorInicio.style.display !== 'none' && todosOperadorInicio.getAttribute('data-active') === 'true') {
+        if (!todosOperadorInicio.value || todosOperadorInicio.value === "") {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Por favor, selecione um operador da lista geral.'
+            });
+            return;
+        }
+        operadorId = todosOperadorInicio.value;
+    } else {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Por favor, selecione um operador válido.'
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: 'Verificando quantidade pendente...',
+        text: 'Aguarde enquanto verificamos se a ordem pode ser iniciada.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        },
+    });
+
+    const currentOrdemId = document.getElementById('ordemIdIniciar').value;
+
+    // Primeiro, verificar se a ordem tem quantidade pendente
+    fetch(`api/verificar-qt-restante/?ordem_id=${currentOrdemId}`)
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => { throw err; });
+        }
+        return response.json();
+    })
+    .then(data => {
+        Swal.close(); // Fecha o loading
+
+        if (data.ordens.length === 0) {
+            throw new Error("Ordem não encontrada.");
+        }
+
+        const ordem = data.ordens[0]; // Pegamos a primeira ordem retornada
+        if (ordem.restante === 0.0) {
+            throw new Error("Essa ordem já foi totalmente produzida. Não é possível iniciá-la novamente.");
+        }
+
+        // Se chegou até aqui, pode iniciar a ordem
+        iniciarOrdem(currentOrdemId, operadorId);
+    })
+    .catch(error => {
+        console.error('Erro ao verificar quantidade pendente:', error);
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message || 'Não foi possível verificar a quantidade pendente. Tente novamente.',
         });
     });
 });

@@ -20,6 +20,7 @@ urlpatterns = [
     path('pintura/', include('apontamento_pintura.urls')),
     path('montagem/', include('apontamento_montagem.urls')),
     path('solda/', include('apontamento_solda.urls')),
+    path('expedicao/', include('apontamento_exped.urls')),
     path('inspecao/', include('inspecao.urls')),
     path('cargas/', include('cargas.urls')),
     path('sucata/', include('sucata.urls'))

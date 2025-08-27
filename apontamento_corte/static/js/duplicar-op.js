@@ -1,36 +1,103 @@
 async function carregarTabela(pagina) {
-    mostrarLoading(true); // Exibe o spinner
+  mostrarLoading(true);
 
-    const selectElement = document.getElementById('filtro-peca');
+  const selectElement = document.getElementById('filtro-peca');
+  const maquinaSelecionada = document.getElementById('filtro-maquina')?.value || '';
+  const ordemEscolhida     = document.getElementById('filtro-ordem')?.value || '';
+  const dataCriacao        = document.getElementById('filtro-data-criacao')?.value || '';
+  const modoBusca          = document.getElementById('filtro-modo')?.value || 'all';
 
-    const maquinaSelecionada = document.getElementById('filtro-maquina')?.value || '';
-    const ordemEscolhida = document.getElementById('filtro-ordem')?.value || '';
-    const pecasSelecionadas = Array.from(selectElement.selectedOptions).map(option => option.value);
-    const dataCriacao = document.getElementById('filtro-data-criacao')?.value || '';
+  const pecasSelecionadas  = Array.from(selectElement.selectedOptions).map(option => option.value);
 
+  // novos campos
+  const pecaPrioritaria    = (modoBusca === 'prioritize')
+    ? (document.getElementById('priorizar-peca')?.value || '')
+    : '';
 
-    // Junta todas as peças com um delimitador seguro
-    const filtros = {
-        pecas: encodeURIComponent(pecasSelecionadas.join('|')),
-        maquina: encodeURIComponent(maquinaSelecionada),
-        ordem: encodeURIComponent(ordemEscolhida),
-        dataCriacao: encodeURIComponent(dataCriacao)
-    };
+  const qtyMapaObj = (modoBusca === 'qty') ? coletarQuantidadesPorPeca() : {};
+  const qtyMapaStr = Object.keys(qtyMapaObj).length
+    ? encodeURIComponent(JSON.stringify(qtyMapaObj))
+    : '';
 
-    console.log(filtros);
+  // monta query
+  const params = new URLSearchParams({
+    page: String(pagina),
+    limit: '100',
+    pecas: pecasSelecionadas.join('|'),            // já OK sem encode extra
+    maquina: maquinaSelecionada,
+    ordem: ordemEscolhida,
+    dataCriacao: dataCriacao,
+    modo: modoBusca,                               // NEW: 'all' | 'prioritize' | 'qty'
+    priorizar: pecaPrioritaria,                    // NEW: peça prioritária (se houver)
+    qtymap: qtyMapaStr                             // NEW: JSON de {peca:qtd}
+  });
 
-    try {
-        const response = await fetch(`api/ordens-criadas/?page=${pagina}&limit=100&pecas=${filtros.pecas}&maquina=${filtros.maquina}&ordem=${filtros.ordem}&dataCriacao=${filtros.dataCriacao}`);
-        const data = await response.json();
-
-        atualizarTabela(data.data);
-        atualizarPaginacao(data.recordsTotal, pagina);
-    } catch (error) {
-        console.error('Erro ao carregar a tabela:', error);
-    } finally {
-        mostrarLoading(false); // Oculta o spinner
-    }
+  try {
+    const response = await fetch(`api/ordens-criadas/?${params.toString()}`);
+    const data = await response.json();
+    atualizarTabela(data.data);
+    atualizarPaginacao(data.recordsTotal, pagina);
+  } catch (error) {
+    console.error('Erro ao carregar a tabela:', error);
+  } finally {
+    mostrarLoading(false);
+  }
 }
+
+// util: cria uma linha peça+quantidade
+function criarLinhaQty(pecaOptions = []) {
+  const row = document.createElement('div');
+  row.className = 'row g-2 align-items-center';
+  row.innerHTML = `
+    <div class="col-md-5">
+      <select class="form-select bg-light qty-peca"></select>
+    </div>
+    <div class="col-md-4">
+      <input type="number" min="0" step="1" class="form-control bg-light qty-valor" placeholder="Quantidade">
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+      <button type="button" class="btn btn-outline-danger btn-sm btn-remove-qty">Remover</button>
+    </div>
+  `;
+
+  const select = row.querySelector('.qty-peca');
+  // popular opções
+  pecaOptions.forEach(opt => select.appendChild(opt.cloneNode(true)));
+
+  // botão remover
+  row.querySelector('.btn-remove-qty').addEventListener('click', () => row.remove());
+
+  return row;
+}
+
+// sincroniza opções do "priorizar-peca" com as peças atualmente selecionadas
+function syncPriorizarPeca() {
+  const multi = document.getElementById('filtro-peca');
+  const priorizar = document.getElementById('priorizar-peca');
+  priorizar.innerHTML = '';
+  const selecionadas = Array.from(multi.selectedOptions);
+  if (!selecionadas.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Selecione peças acima';
+    priorizar.appendChild(opt);
+    return;
+  }
+  selecionadas.forEach(optSel => {
+    const opt = document.createElement('option');
+    opt.value = optSel.value;
+    opt.textContent = optSel.textContent;
+    priorizar.appendChild(opt);
+  });
+}
+
+// mostra/esconde blocos conforme o modo
+function toggleModoBusca() {
+  const modo = document.getElementById('filtro-modo').value;
+  document.getElementById('wrap-priorizar-peca').style.display = (modo === 'prioritize') ? '' : 'none';
+  document.getElementById('wrap-qty-peca').style.display        = (modo === 'qty')        ? '' : 'none';
+}
+
 
 //  Atualiza a tabela
 function atualizarTabela(ordens) {
@@ -250,7 +317,7 @@ function preencherModalDuplicacao(data,ordemId) {
     const maquinaMap = {
         'laser_1': '16',
         'laser_2': '17',
-        'laser_3': 58
+        'laser_3': '58'
     };
     
     if (maquinas.includes(maquina)) {
@@ -262,7 +329,8 @@ function preencherModalDuplicacao(data,ordemId) {
             <option value="">Selecione uma máquina</option>
             <option value="16">Laser 1</option>
             <option value="17">Laser 2 (JFY)</option>
-        `;
+            <option value="58">Laser 3 (Trumpf)</option>`
+        ;
     
         // Seleciona automaticamente com base na máquina recebida
         selectMaquina.value = maquinaMap[maquina];
@@ -553,4 +621,63 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     carregarTabela(1);
+
+      const modo = document.getElementById('filtro-modo');
+  const multi = document.getElementById('filtro-peca');
+  const btnAddQty = document.getElementById('btn-add-qty');
+  const qtyRows = document.getElementById('qty-rows');
+
+  // muda modo
+  modo.addEventListener('change', toggleModoBusca);
+
+  // quando mudar peças, sincroniza priorizar e opções do repetidor
+  multi.addEventListener('change', () => {
+    syncPriorizarPeca();
+    // opcional: atualizar selects existentes no repetidor
+    const options = Array.from(multi.options).map(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.textContent;
+      return opt;
+    });
+    qtyRows.querySelectorAll('.qty-peca').forEach(select => {
+      const valAtual = select.value;
+      select.innerHTML = '';
+      options.forEach(opt => select.appendChild(opt.cloneNode(true)));
+      // tenta restaurar valor
+      if (Array.from(select.options).some(o => o.value === valAtual)) {
+        select.value = valAtual;
+      }
+    });
+  });
+
+  // adicionar linha no repetidor
+  btnAddQty.addEventListener('click', () => {
+    const options = Array.from(multi.options).map(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.textContent;
+      return opt;
+    });
+    const row = criarLinhaQty(options);
+    qtyRows.appendChild(row);
+  });
+
+  // estado inicial
+  toggleModoBusca();
+  syncPriorizarPeca();
 });
+
+function coletarQuantidadesPorPeca() {
+  const rows = document.querySelectorAll('#qty-rows .row');
+  const mapa = {};
+  rows.forEach(r => {
+    const peca = r.querySelector('.qty-peca')?.value;
+    const qtdStr = r.querySelector('.qty-valor')?.value;
+    const qtd = Number(qtdStr);
+    if (peca && Number.isFinite(qtd) && qtd >= 0) {
+      mapa[peca] = qtd;
+    }
+  });
+  return mapa;
+}

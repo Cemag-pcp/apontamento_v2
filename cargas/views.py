@@ -424,7 +424,8 @@ def andamento_cargas(request):
         # Filtra apenas as ordens dentro do intervalo solicitado
         cargas = Ordem.objects.filter(
             grupo_maquina=setor,
-            data_carga__range=[start_date, end_date]
+            data_carga__range=[start_date, end_date],
+            ordem_pai__isnull=True
         ).order_by('data_carga').values_list('data_carga', flat=True).distinct()
         
         for data in cargas:
