@@ -62,6 +62,7 @@ urlpatterns = [
 
     path('tanque/', estanqueidade.inspecao_tanque, name='inspecao-tanque'),
     path('api/envio-inspecao-tanque/', estanqueidade.envio_inspecao_tanque, name='envio-inspecao-tanque'),
+    path('api/envio-inspecao-solda-tanque/', estanqueidade.envio_inspecao_solda_tanque, name='envio-inspecao-solda-tanque'),
     path('api/envio-reinspecao-tanque/', estanqueidade.envio_reinspecao_tanque, name='envio-reinspecao-tanque'),
 
     path('api/itens-reinspecao-tanque/', estanqueidade.get_itens_reinspecao_tanque, name='itens-reinspecao-tanque'),

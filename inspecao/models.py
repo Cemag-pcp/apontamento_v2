@@ -40,6 +40,13 @@ class Inspecao(models.Model):
         blank=True,
     )
 
+    tanque = models.ForeignKey(
+        "InspecaoEstanqueidade",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+
     def __str__(self):
 
         if self.pecas_ordem_pintura:
@@ -50,6 +57,8 @@ class Inspecao(models.Model):
             setor_inspecao = f"Serra - {self.pecas_ordem_serra.id}"
         elif self.pecas_ordem_usinagem:
             setor_inspecao = f"Usinagem - {self.pecas_ordem_usinagem.id}"
+        elif self.tanque:
+            setor_inspecao = f"Tanque - {self.tanque.id}"
         else:
             setor_inspecao = f"Estamparia - {self.pecas_ordem_estamparia.id}"
 

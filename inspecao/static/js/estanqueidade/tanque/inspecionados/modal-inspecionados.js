@@ -1,4 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
+    
+    const dataInspecao = document.getElementById('data-inspecao-solda-tanque');
+    const hoje = new Date().toISOString().split('T')[0];
+    dataInspecao.value = hoje;
+    
     document.addEventListener("click", function(event) {
         if (event.target.classList.contains('historico-inspecao')) {
 
@@ -109,9 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
                 button.querySelector(".spinner-border").style.display = "none";
             })
-        } else if (event.target.classList.contains('inspecionar-solda')){
-            const modalSolda = new bootstrap.Modal(document.getElementById('modal-inspecionar-solda-tanque'));
-            modalSolda.show();
         }
     });
 });

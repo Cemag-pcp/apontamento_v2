@@ -29,14 +29,19 @@ from django.db.models.functions import (
 
 from cadastro.models import PecasEstanqueidade
 from ..models import (
+    Inspecao,
     Causas,
     InspecaoEstanqueidade,
     DadosExecucaoInspecaoEstanqueidade,
+    DadosExecucaoInspecao,
     ReinspecaoEstanqueidade,
+    Reinspecao,
     DetalhesPressaoTanque,
     InfoAdicionaisExecTubosCilindros,
+    CausasNaoConformidade,
     CausasNaoConformidadeEstanqueidade,
     ArquivoCausaEstanqueidade,
+    ArquivoCausa
 )
 from core.models import Profile
 
@@ -1202,6 +1207,20 @@ def get_itens_inspecionados_tanque(request):
             "dados_execucao": de,
             "info_adicionais": info_adicionais,
         }
+        
+    # --- INÍCIO DA MODIFICAÇÃO ---
+    # 1. Pega os IDs de InspecaoEstanqueidade da página atual.
+    ids_pagina_atual = [item.id for item in pagina_obj]
+
+    # 2. Busca na tabela Inspecao quais desses IDs já existem no campo 'tanque'.
+    #    Usar 'values_list' com 'flat=True' é muito eficiente para obter uma lista de IDs.
+    #    Colocamos em um set() para uma verificação de existência (in) super rápida (O(1)).
+    ids_em_inspecao_geral = set(
+        Inspecao.objects.filter(tanque_id__in=ids_pagina_atual).values_list(
+            "tanque_id", flat=True
+        )
+    )
+    # --- FIM DA MODIFICAÇÃO ---
 
     dados = []
     for data in pagina_obj:
@@ -1217,15 +1236,18 @@ def get_itens_inspecionados_tanque(request):
                 info.nao_conformidade for info in info_adicionais_list
             )
 
+            existe_em_inspecao = data.id in ids_em_inspecao_geral
+
             item = {
                 "id": data.id,
                 "tipo_inspecao": data.peca.tipo,
                 "id_dados_execucao": de.id,
                 "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                 "data_carga": data_carga_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
+                "peca": f"{data.peca.codigo} - {data.peca.descricao}",
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
+                "inspecao_geral_realizada": existe_em_inspecao,
             }
 
             dados.append(item)
@@ -1763,3 +1785,71 @@ def imagens_nao_conformidade_tubos_cilindros(request):
             )
 
     return JsonResponse(resultado, safe=False)
+
+def envio_inspecao_solda_tanque(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    id_inspecao = request.POST.get("id-inspecao-solda-tanque")
+
+    try:
+        with transaction.atomic():
+            data_inspecao = request.POST.get("data-inspecao-solda-tanque")
+            conformidade = request.POST.get("conformidade-inspecao-solda-tanque")
+            inspetor_id = request.POST.get("inspetor-inspecao-solda-tanque")
+            nao_conformidade = request.POST.get("nao-conformidade-inspecao-solda-tanque")
+            observacao = request.POST.get("observacao-inspecao-solda-tanque")
+            quantidade_total_causas = int(
+                request.POST.get("quantidade-total-causas", 0)
+            )
+
+            # Convertendo a string para um objeto datetime
+            data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
+
+            # Obtém a inspeção e o inspetor
+            inspecao = Inspecao.objects.create(
+                tanque=id_inspecao
+            )
+            inspetor = Profile.objects.get(user__pk=inspetor_id)
+
+            # Cria uma instância de DadosExecucaoInspecao
+            dados_execucao = DadosExecucaoInspecao(
+                inspecao=inspecao,
+                inspetor=inspetor,
+                data_execucao=data_ajustada,
+                conformidade=int(conformidade),
+                nao_conformidade=int(nao_conformidade),
+                observacao=observacao,
+            )
+            dados_execucao.save()
+
+            # Verifica se há não conformidade
+            if int(nao_conformidade) > 0:
+                # Cria uma instância de Reinspecao
+                reinspecao = Reinspecao(inspecao=inspecao, reinspecionado=False)
+                reinspecao.save()
+
+                # Itera sobre todas as causas (causas_1, causas_2, etc.)
+                for i in range(1, quantidade_total_causas + 1):
+                    causas = request.POST.getlist(f"causas_{i}")  # Lista de causas
+                    quantidade = request.POST.get(f"quantidade_{i}")
+                    imagens = request.FILES.getlist(f"imagens_{i}")  # Lista de arquivos
+
+                    # Obtém todas as causas de uma vez
+                    causas_objs = Causas.objects.filter(id__in=causas)
+                    causa_nao_conformidade = CausasNaoConformidade.objects.create(
+                        dados_execucao=dados_execucao, quantidade=int(quantidade)
+                    )
+                    causa_nao_conformidade.causa.add(*causas_objs)
+
+                    # Itera sobre cada imagem
+                    for imagem in imagens:
+                        ArquivoCausa.objects.create(
+                            causa_nao_conformidade=causa_nao_conformidade,
+                            arquivo=imagem,
+                        )
+
+        return JsonResponse({"success": True})
+
+    except Exception as e:
+        return JsonResponse({"error": "Erro"}, status=400)

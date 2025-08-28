@@ -10,31 +10,33 @@
             <div class="row">
                 <input type="hidden" name="id-inspecao-solda-tanque" id="id-inspecao-solda-tanque" class="form-control">
                 <div class="col-sm-6 mb-4">
-                    <label class="label-modal" for="data-finalizada-inspecao-solda-tanque">Data Finalizada:</label>
-                    <input type="text" name="data-finalizada-inspecao-solda-tanque" id="data-finalizada-inspecao-solda-tanque" class="form-control" disabled>
+                    <label class="label-modal" for="data-inspecao-solda-tanque">Data Inspeção:</label>
+                    <input type="date" name="data-inspecao-solda-tanque" id="data-inspecao-solda-tanque" class="form-control" required>
                 </div>
                 <div class="col-sm-6 mb-4">
-                    <label class="label-modal" for="data-inspecao-solda-tanque">Data Inspeção:</label>
-                    <input type="datetime-local" name="data-inspecao-solda-tanque" id="data-inspecao-solda-tanque" class="form-control" required>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-sm-12 mb-4">
-                    <label class="label-modal" for="peca-inspecao-solda-tanque">Conjuntos:</label>
-                    <input type="text" name="peca-inspecao-solda-tanque" id="peca-inspecao-solda-tanque"
-                        class="form-control" disabled>
+                  <label class="label-modal" for="peca-inspecao-solda-tanque">Conjuntos:</label>
+                  <input type="text" name="peca-inspecao-solda-tanque" id="peca-inspecao-solda-tanque"
+                      class="form-control" disabled>
                 </div>
             </div>
             <div class="row">
                 <div class="col-sm-6 mb-4">
                     <label class="label-modal">Quantidade Produzida:</label>
-                    <input id="qtd-produzida-solda-tanque" type="number" name="qtd-produzida-solda-tanque" value=""
-                        class="form-control" disabled>
+                    <input id="qtd-produzida-solda-tanque" min="1" value="1" type="number" name="qtd-produzida-solda-tanque"
+                        class="form-control">
                 </div>
                 <div class="col-sm-6 mb-4">
-                    <label class="label-modal">Quantidade Inspecionada:</label>
-                    <input id="qtd-inspecao-solda-tanque" type="number" name="qtd-inspecao-solda-tanque" value="1"
-                        class="form-control" min="1">
+                    <label class="label-modal">Inspetor:</label>
+                    <select name="inspetor-inspecao-solda-tanque" id="inspetor-inspecao-solda-tanque" class="form-control" aria-readonly="true" required>
+                        <option value="" selected hidden disabled></option>
+                        {% if not inspetor_logado %}
+                          {% for inspetor in inspetores %}
+                            <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                          {% endfor %}
+                        {% else %}
+                          <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                        {% endif %}
+                    </select>
                 </div>
             </div>
             <div class="row">
@@ -76,19 +78,6 @@
             </div>
             <hr>
             <div class="row">
-                <div class="col-sm-6 mb-4">
-                    <label class="label-modal">Inspetor:</label>
-                    <select name="inspetor-inspecao-solda-tanque" id="inspetor-inspecao-solda-tanque" class="form-control" aria-readonly="true" required>
-                        <option value="" selected hidden disabled></option>
-                        {% if not inspetor_logado %}
-                          {% for inspetor in inspetores %}
-                            <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
-                          {% endfor %}
-                        {% else %}
-                          <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
-                        {% endif %}
-                    </select>
-                </div>
                 <div class="col-sm-6 mb-4">
                   <label for="observacao-inspecao-solda-tanque" class="label-modal">Observação:</label>
                   <input name="observacao-inspecao-solda-tanque" maxlength="150" id="observacao-inspecao-solda-tanque" class="form-control">

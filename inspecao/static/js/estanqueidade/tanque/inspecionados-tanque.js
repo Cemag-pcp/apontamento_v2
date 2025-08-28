@@ -113,13 +113,8 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
         }
 
         items.dados.forEach(item => {
-            let borderColors = {
-                "Laranja": "orange", "Verde": "green",
-                "Vermelho": "red", "Azul": "blue",
-                "Amarelo": "yellow", "Cinza": "gray"
-            };
-
             let iconeNaoConformidade;
+            let status;
 
             if (item.possui_nao_conformidade) {
                 iconeNaoConformidade = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
@@ -127,15 +122,21 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                 iconeNaoConformidade = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
             }
 
-            let color = borderColors[item.cor];
+            if (item.inspecao_geral_realizada === false) {
+                status = 'cancelado'
+            } else {
+                status = 'entregue'
+            }
 
             const cards = `
             <div class="col-md-4 mb-4">
-                <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
+                <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <div class="d-flex justify-content-between">
                         <h5 style="width:70%;"> ${item.peca}</h5>
                         <div class="text-center">
-                            <p class="status-badge status-cancelado inspecionar-solda" style="font-size:13px; cursor:pointer;">Solda inspecionada</p>
+                            <p class="status-badge status-${status} inspecionar-solda" 
+                            style="font-size:13px; cursor:pointer;" data-id="${item.id}" 
+                            data-nome="${item.peca}">Solda inspecionada</p>
                         </div>
                     </div>
                     <h6 class="card-subtitle mb-2 text-muted">Inspeção #${item.id}</h6>
