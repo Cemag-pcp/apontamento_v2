@@ -107,14 +107,10 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
 
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
-        const status = {
-            "Inspecionado":"devolvido",
-            "Não Inspecionado": "pendente"
-        }
-
         items.dados.forEach(item => {
             let iconeNaoConformidade;
             let status;
+            let inspection_type;
 
             if (item.possui_nao_conformidade) {
                 iconeNaoConformidade = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
@@ -123,9 +119,11 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
             }
 
             if (item.inspecao_geral_realizada === false) {
-                status = 'cancelado'
+                status = 'cancelado';
+                inspection_type = 'inspecionar-solda'
             } else {
-                status = 'entregue'
+                status = 'entregue';
+                inspection_type = 'get-inspecionar-solda'
             }
 
             const cards = `
@@ -134,7 +132,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                     <div class="d-flex justify-content-between">
                         <h5 style="width:70%;"> ${item.peca}</h5>
                         <div class="text-center">
-                            <p class="status-badge status-${status} inspecionar-solda" 
+                            <p class="status-badge status-${status} ${inspection_type}" 
                             style="font-size:13px; cursor:pointer;" data-id="${item.id}" 
                             data-nome="${item.peca}">Solda inspecionada</p>
                         </div>

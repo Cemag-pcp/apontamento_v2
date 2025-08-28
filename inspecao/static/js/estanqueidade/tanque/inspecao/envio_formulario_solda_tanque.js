@@ -102,10 +102,7 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
             title: "Inspeção de solda/tanque realizada com sucesso"
           });
         
-        // Atualizar as listas específicas de solda/tanque (se aplicável)
-        // buscarItensInspecaoSoldaTanque(1);
-        // buscarItensReinspecaoSoldaTanque(1);
-        // buscarItensInspecionadosSoldaTanque(1);
+        buscarItensInspecionadosEstanqueidadeTanque(1);
     })
     .catch(error => {
         console.error(error);

@@ -1264,6 +1264,34 @@ def get_itens_inspecionados_tanque(request):
     )
 
 
+def itens_enviados_tanque(request, tanque_id):
+    try:
+        # Buscar o tanque
+        tanque = InspecaoEstanqueidade.objects.get(id=tanque_id)
+        
+        # Buscar a última inspeção deste tanque (se existir)
+        ultima_inspecao = DadosExecucaoInspecao.objects.filter(
+            inspecao__tanque=tanque
+        ).order_by('-num_execucao').first()
+        
+        # Preparar dados para retorno
+        dados = {
+            'id': tanque.id,
+            'nome': f"{tanque.peca.codigo} - {tanque.peca.descricao}",  # Ajuste conforme seu modelo
+            'data_inspecao': ultima_inspecao.data_execucao.isoformat() if ultima_inspecao else None,
+            'quantidade_produzida': getattr(ultima_inspecao, 'quantidade_produzida', 1) if ultima_inspecao else 1,
+            'inspetor': ultima_inspecao.inspetor.id if ultima_inspecao and ultima_inspecao.inspetor else None,
+            'conformidade': ultima_inspecao.conformidade if ultima_inspecao else 0,
+            'nao_conformidade': ultima_inspecao.nao_conformidade if ultima_inspecao else 0,
+            'observacao': ultima_inspecao.observacao if ultima_inspecao else '',
+            'causas': []  # Você precisará adaptar para incluir as causas
+        }
+        
+        return JsonResponse(dados)
+        
+    except InspecaoEstanqueidade.DoesNotExist:
+        return JsonResponse({'error': 'Tanque não encontrado'}, status=404)
+
 def get_historico_tanque(request, id):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
@@ -1806,9 +1834,11 @@ def envio_inspecao_solda_tanque(request):
             # Convertendo a string para um objeto datetime
             data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
 
+            tanque_obj = InspecaoEstanqueidade.objects.get(pk=id_inspecao)
+
             # Obtém a inspeção e o inspetor
             inspecao = Inspecao.objects.create(
-                tanque=id_inspecao
+                tanque=tanque_obj
             )
             inspetor = Profile.objects.get(user__pk=inspetor_id)
 
@@ -1850,6 +1880,9 @@ def envio_inspecao_solda_tanque(request):
                         )
 
         return JsonResponse({"success": True})
+    
+    except InspecaoEstanqueidade.DoesNotExist:
+        return JsonResponse({"error": "O tanque especificado não existe."}, status=404)
 
     except Exception as e:
         return JsonResponse({"error": "Erro"}, status=400)
