@@ -110,7 +110,8 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
         items.dados.forEach(item => {
             let iconeNaoConformidade;
             let status;
-            let inspection_type;
+            let inspectionType;
+            let isCompliance
 
             if (item.possui_nao_conformidade) {
                 iconeNaoConformidade = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
@@ -120,10 +121,12 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
 
             if (item.inspecao_geral_realizada === false) {
                 status = 'cancelado';
-                inspection_type = 'inspecionar-solda'
+                inspectionType = 'inspecionar-solda'
+                isCompliance = 'Solda não conforme'
             } else {
                 status = 'entregue';
-                inspection_type = 'get-inspecionar-solda'
+                inspectionType = 'get-inspecionar-solda'
+                isCompliance = 'Solda conforme'
             }
 
             const cards = `
@@ -132,9 +135,9 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                     <div class="d-flex justify-content-between">
                         <h5 style="width:70%;"> ${item.peca}</h5>
                         <div class="text-center">
-                            <p class="status-badge status-${status} ${inspection_type}" 
+                            <p class="status-badge status-${status} ${inspectionType}" 
                             style="font-size:13px; cursor:pointer;" data-id="${item.id}" 
-                            data-nome="${item.peca}">Solda inspecionada</p>
+                            data-nome="${item.peca}">${isCompliance}</p>
                         </div>
                     </div>
                     <h6 class="card-subtitle mb-2 text-muted">Inspeção #${item.id}</h6>

@@ -1272,19 +1272,48 @@ def itens_enviados_tanque(request, tanque_id):
         # Buscar a última inspeção deste tanque (se existir)
         ultima_inspecao = DadosExecucaoInspecao.objects.filter(
             inspecao__tanque=tanque
+        ).prefetch_related(
+            'causasnaoconformidade_set__causa',
+            'causasnaoconformidade_set__arquivos'
         ).order_by('-num_execucao').first()
+        
+        # Buscar as causas da não conformidade da última inspeção
+        causas_data = []
+        if ultima_inspecao:
+            # Recuperar todas as CausasNaoConformidade relacionadas a esta execução
+            causas_nao_conformidade = ultima_inspecao.causasnaoconformidade_set.all()
+            
+            for causa_nc in causas_nao_conformidade:
+                # Para cada causa de não conformidade, recuperar as causas específicas
+                causas_relacionadas = causa_nc.causa.all()
+                # Recuperar imagens associadas
+                imagens = []
+                for arquivo in causa_nc.arquivos.all():
+                    if arquivo.arquivo:
+                        imagens.append({
+                            'url': arquivo.arquivo.url,
+                            'nome': arquivo.arquivo.name
+                        })
+                
+                for causa in causas_relacionadas:
+                    causas_data.append({
+                        'id': causa.id,
+                        'nome': causa.nome,
+                        'quantidade': causa_nc.quantidade,
+                        'imagens': imagens
+                    })
         
         # Preparar dados para retorno
         dados = {
             'id': tanque.id,
-            'nome': f"{tanque.peca.codigo} - {tanque.peca.descricao}",  # Ajuste conforme seu modelo
+            'nome': f"{tanque.peca.codigo} - {tanque.peca.descricao}",
             'data_inspecao': ultima_inspecao.data_execucao.isoformat() if ultima_inspecao else None,
             'quantidade_produzida': getattr(ultima_inspecao, 'quantidade_produzida', 1) if ultima_inspecao else 1,
             'inspetor': ultima_inspecao.inspetor.id if ultima_inspecao and ultima_inspecao.inspetor else None,
             'conformidade': ultima_inspecao.conformidade if ultima_inspecao else 0,
             'nao_conformidade': ultima_inspecao.nao_conformidade if ultima_inspecao else 0,
             'observacao': ultima_inspecao.observacao if ultima_inspecao else '',
-            'causas': []  # Você precisará adaptar para incluir as causas
+            'causas': causas_data
         }
         
         return JsonResponse(dados)

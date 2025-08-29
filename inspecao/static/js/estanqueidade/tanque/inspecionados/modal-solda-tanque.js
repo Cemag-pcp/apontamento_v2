@@ -64,6 +64,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Função para preencher o modal GET com os dados da API
     function preencherModalGetComDados(dados) {
         // Preencher campos do modal GET com dados da API
+        const form = document.getElementById('form-solda-tanque-get');
+        form.reset();
+
         if (dados.id) {
             document.getElementById("id-inspecao-solda-tanque-get").value = dados.id;
         }
@@ -87,10 +90,9 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById('inspetor-inspecao-solda-tanque-get').value = dados.inspetor;
         }
         
-        if (dados.conformidade) {
+        if (dados.conformidade >= 0) {
             document.getElementById('conformidade-inspecao-solda-tanque-get').value = dados.conformidade;
         }
-        console.log(dados.nao_conformidade)
         
         if (dados.nao_conformidade >= 0) {
             document.getElementById('nao-conformidade-inspecao-solda-tanque-get').value = dados.nao_conformidade;
@@ -99,51 +101,62 @@ document.addEventListener("DOMContentLoaded", () => {
         if (dados.observacao) {
             document.getElementById('observacao-inspecao-solda-tanque-get').value = dados.observacao;
         }
-        
-        // Preencher causas se existirem (para o modal GET)
+
+        // Preencher lista de causas
+        const listaCausasContainer = document.getElementById('lista-causas-container');
+        listaCausasContainer.innerHTML = ''; // Limpar container
+
         if (dados.causas && dados.causas.length > 0) {
-            const containerGet = document.querySelector('#modal-inspecionar-solda-tanque-get #containerInspecao');
-            if (containerGet) {
-                containerGet.innerHTML = '';
-                
-                dados.causas.forEach((causa, index) => {
-                    const causaIndex = index + 1;
-                    const causaDiv = document.createElement('div');
-                    causaDiv.className = 'row mb-3 selectContainerInspecao';
-                    causaDiv.style = 'border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;';
-                    
-                    causaDiv.innerHTML = `
-                        <span class="label-modal text-end">${causaIndex}ª Causa</span>
-                        <div class="col-sm-6 mb-4">
-                            <label class="label-modal">Causas:</label>
-                            <select class="form-control select2" name="causas_${causaIndex}" style="font-size: 14px;" multiple disabled>
-                                ${
-                                    Array.isArray(window.causas) ?
-                                    window.causas.map(causa_option =>
-                                        `<option value="${causa_option.id}" ${causa.id == causa_option.id ? 'selected' : ''}>${causa_option.nome}</option>`
-                                    ).join('')
-                                    : ''
-                                }
-                            </select>
-                        </div>
-                        <div class="col-sm-6 mb-4">
-                            <label class="label-modal">Quantidade:</label>
-                            <input type="number" style="font-size: 14px;" class="form-control" value="${causa.quantidade || ''}" disabled>
-                        </div>
-                        <div class="col-sm-12 mb-4">
-                            <label class="label-modal">Imagens:</label>
-                            <div>
-                                ${causa.imagens && causa.imagens.length > 0 ? 
-                                    causa.imagens.map(img => `<img src="${img.url}" style="width: 100px; height: 100px; object-fit: cover; margin-right: 5px;" alt="Imagem da causa">`).join('') : 
-                                    'Nenhuma imagem disponível'
-                                }
+            dados.causas.forEach((causa, index) => {
+                const cardCausa = document.createElement('div');
+                cardCausa.className = 'card mb-3';
+                cardCausa.innerHTML = `
+                    <div class="card-header bg-light">
+                        <strong>Causa ${index + 1}</strong>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Nome:</strong> ${causa.nome}</p>
+                                <p><strong>Quantidade:</strong> ${causa.quantidade}</p>
                             </div>
                         </div>
-                    `;
-                    
-                    containerGet.appendChild(causaDiv);
-                });
-            }
+                        ${causa.imagens && causa.imagens.length > 0 ? `
+                            <div class="mt-3">
+                                <strong>Imagens:</strong>
+                                <div class="d-flex flex-wrap gap-2 mt-2">
+                                    ${causa.imagens.map(img => `
+                                        <img src="${img.url}" class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;" 
+                                            alt="Imagem da causa" data-bs-toggle="modal" data-bs-target="#modalImagem${index}">
+                                        
+                                        <!-- Modal para imagem ampliada -->
+                                        <div class="modal fade" id="modalImagem${index}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-lg">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Imagem da Causa</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body text-center">
+                                                        <img src="${img.url}" class="img-fluid" alt="Imagem ampliada">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : '<p><strong>Imagens:</strong> Nenhuma imagem disponível</p>'}
+                    </div>
+                `;
+                listaCausasContainer.appendChild(cardCausa);
+            });
+        } else {
+            listaCausasContainer.innerHTML = `
+                <div class="alert alert-info">
+                    Nenhuma causa de não conformidade registrada para esta inspeção.
+                </div>
+            `;
         }
         
         // Desabilitar todos os campos no modal GET (apenas visualização)
@@ -161,12 +174,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 elemento.disabled = true;
             }
         });
-        
-        // Desabilitar botões de adicionar/remover no modal GET
-        const addButtonGet = document.getElementById('addButtonsolda-tanque-get');
-        const removeButtonGet = document.getElementById('removeButtonsolda-tanque-get');
-        if (addButtonGet) addButtonGet.style.display = 'none';
-        if (removeButtonGet) removeButtonGet.style.display = 'none';
     }
 
     // Lógica para calcular não conformidades (para o modal de edição)

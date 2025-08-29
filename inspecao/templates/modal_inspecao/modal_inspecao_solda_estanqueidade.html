@@ -97,12 +97,13 @@
 
 
 <div class="modal fade" id="modal-inspecionar-solda-tanque-get" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="inspecionar-solda-tanque-getLabel">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title title" id="inspecionar-solda-tanque-getLabel">Inspecionar Solda do Tanque</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+        <form id="form-solda-tanque-get">
           <div class="modal-body p-4" style="max-height: 70vh;overflow-y: auto;">
             <div class="row">
                 <input type="hidden" name="id-inspecao-solda-tanque-get" id="id-inspecao-solda-tanque-get" class="form-control">
@@ -148,39 +149,26 @@
                         class="form-control" disabled>
                 </div>
             </div>
-            <div id="containerInspecao">
-              <div class="row mb-3 selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
-                <span class="label-modal text-end"> 1ª Causa</span>
-                <div class="col-sm-6 mb-4">
-                    <label class="label-modal">Causas:</label>
-                    <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
-                      {% for causa in causas %}
-                        <option value="{{causa.id}}">{{causa.nome}}</option>
-                      {% endfor %}
-                    </select>
+            
+            <!-- Lista de Causas (apenas visualização) -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <h6 class="label-modal">Causas das Não Conformidades:</h6>
+                    <div id="lista-causas-container" class="mt-3">
+                        <!-- As causas serão inseridas aqui via JavaScript -->
+                    </div>
                 </div>
-                <div class="col-sm-6 mb-4">
-                    <label class="label-modal">Quantidade:</label>
-                    <input type="number" style="font-size: 14px;" min="1" class="form-control" required>
-                </div>
-                <div class="col-sm-12 mb-4">
-                    <label class="label-modal">Imagens:</label>
-                    <input class="form-control" type="file" name="imagens_1" accept="image/*" multiple>
-                </div>
-              </div> 
             </div>
-            <div id="addRemoveContainer" class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
-              <button type="button" class="btn btn-white" id="removeButtonsolda-tanque-get" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
-              <button type="button" class="btn btn-white" id="addButtonsolda-tanque-get" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
-            </div>
+            
             <hr>
             <div class="row">
-                <div class="col-sm-6 mb-4">
+                <div class="col-sm-12 mb-4">
                   <label for="observacao-inspecao-solda-tanque-get" class="label-modal">Observação:</label>
-                  <input name="observacao-inspecao-solda-tanque-get" maxlength="150" id="observacao-inspecao-solda-tanque-get" class="form-control">
+                  <textarea name="observacao-inspecao-solda-tanque-get" maxlength="150" id="observacao-inspecao-solda-tanque-get" class="form-control" rows="3" disabled></textarea>
                 </div>
             </div>    
-          </div>                
+          </div> 
+        </form>               
       </div>
     </div>
 </div>
