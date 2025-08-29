@@ -18,3 +18,11 @@ LEFT JOIN apontamento_v2_testes.apontamento_montagem_pecasordem po ON po.process
 LEFT JOIN apontamento_v2_testes.cadastro_maquina m ON o.maquina_id = m.id
 WHERE o.grupo_maquina = 'montagem' and o.id = 29385 ;
 
+-- Altera o status em lote de uma peça específica
+UPDATE apontamento_v2.core_ordem AS co
+SET excluida = TRUE
+FROM apontamento_v2.apontamento_corte_pecasordem AS acp
+WHERE co.id = acp.ordem_id
+  AND acp.peca LIKE '%031204%'
+  AND co.excluida IS DISTINCT FROM TRUE
+RETURNING co.id;  -- lista os ids atualizados

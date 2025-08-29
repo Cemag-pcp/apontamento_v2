@@ -761,6 +761,10 @@ def excluir_ordens_dia_setor(request):
         ordens_com_apontamentos = ordens_qs.annotate(
             total_apontado=Sum('ordem_pecas_pintura__qtd_boa')
         ).filter(total_apontado__gt=0)
+    elif setor == 'solda':
+        ordens_com_apontamentos = ordens_qs.annotate(
+            total_apontado=Sum('ordem_pecas_solda__qtd_boa')
+        ).filter(total_apontado__gt=0)
     else:
         return JsonResponse({"error": "Setor inválido. Use 'montagem' ou 'pintura'."}, status=400)
 
