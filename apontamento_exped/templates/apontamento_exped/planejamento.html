@@ -35,14 +35,15 @@
 {% endblock %}
 
 {% block content %}
+
 <div class="container-fluid py-4">
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="mb-0">Apontamentos - Setor de Expedição</h2>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal">
-                    <i class="fas fa-plus me-2"></i>Criar Pacote
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarCaixaModal">
+                    <i class="fas fa-plus me-2"></i>Criar Caixa
                 </button>
             </div>
         </div>
@@ -135,56 +136,18 @@
                         <table class="table table-bordered table-hover table-fixed-header" id="tabelaExpedicoes">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Data de Carga</th>
+                                    <th>Chave</th>
+                                    <th>Dt. Carga</th>
                                     <th>Carga</th>
-                                    <th>Nome da Carreta</th>
-                                    <th>Cor</th>
+                                    <th>Nome Carga</th>
                                     <th>Cliente</th>
-                                    <th>Status Final</th>
+                                    <th>Status</th>
                                     <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <!-- Dados serão carregados via JavaScript -->
-                                <tr>
-                                    <td>15/01/2024</td>
-                                    <td>Produtos Eletrônicos</td>
-                                    <td>Carreta-001</td>
-                                    <td><span class="carreta-color" style="background-color: #ff0000;"></span>Vermelha</td>
-                                    <td>Cliente ABC</td>
-                                    <td><span class="badge bg-success status-badge">Entregue</span></td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-primary" title="Visualizar">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>15/01/2024</td>
-                                    <td>Material de Construção</td>
-                                    <td>Carreta-002</td>
-                                    <td><span class="carreta-color" style="background-color: #0000ff;"></span>Azul</td>
-                                    <td>Cliente XYZ</td>
-                                    <td><span class="badge bg-warning status-badge">Em Trânsito</span></td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-primary" title="Visualizar">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>14/01/2024</td>
-                                    <td>Alimentos</td>
-                                    <td>Carreta-003</td>
-                                    <td><span class="carreta-color" style="background-color: #00ff00;"></span>Verde</td>
-                                    <td>Cliente DEF</td>
-                                    <td><span class="badge bg-danger status-badge">Atrasado</span></td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-primary" title="Visualizar">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                    </td>
-                                </tr>
+
                             </tbody>
                         </table>
                     </div>
@@ -194,12 +157,12 @@
     </div>
 </div>
 
-<!-- Modal para Criar Pacote -->
-<div class="modal fade" id="criarPacoteModal" tabindex="-1" aria-labelledby="criarPacoteModalLabel" aria-hidden="true">
+<!-- Modal para criar Caixa -->
+<div class="modal fade" id="criarCaixaModal" tabindex="-1" aria-labelledby="criarCaixaModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="criarPacoteModalLabel">Criar Novo Pacote para Despacho</h5>
+                <h5 class="modal-title" id="criarCaixaModalLabel">Criar caixa de pacotes</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -213,8 +176,19 @@
                         </div>
                     </div>
 
-                    <!-- Etapa 2: Seleção de Cliente -->
+                    <!-- Etapa 2: Seleção de carga -->
                     <div id="etapa2" class="etapa-form" style="display: none;">
+                        <div class="mb-3">
+                            <label for="selectCarga" class="form-label">Carga <span class="text-danger">*</span></label>
+                            <select class="form-select" id="selectCarga" required disabled>
+                                <option value="">Primeiro selecione uma data</option>
+                            </select>
+                            <div class="form-text">Selecione a carga para carregar os clientes disponíveis</div>
+                        </div>
+                    </div>
+
+                    <!-- Etapa 3: Seleção de Cliente -->
+                    <div id="etapa3" class="etapa-form" style="display: none;">
                         <div class="mb-3">
                             <label for="selectCliente" class="form-label">Cliente <span class="text-danger">*</span></label>
                             <select class="form-select" id="selectCliente" required disabled>
@@ -224,8 +198,8 @@
                         </div>
                     </div>
 
-                    <!-- Etapa 3: Seleção de Carretas -->
-                    <div id="etapa3" class="etapa-form" style="display: none;">
+                    <!-- Etapa 4: Seleção de Carretas -->
+                    <div id="etapa4" class="etapa-form" style="display: none;">
                         <div class="mb-3">
                             <label class="form-label">Carretas Disponíveis <span class="text-danger">*</span></label>
                             <div id="carretasContainer" class="border rounded p-3">
@@ -242,249 +216,212 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnSalvarPacote" disabled>Criar Pacote</button>
+                <button type="button" class="btn btn-primary" id="btnSalvarPacote" disabled>Salvar</button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Modal para visualizar pacote dentro da caixa -->
+<div class="modal fade" id="visualizarPacote" tabindex="-1" aria-labelledby="visualizarPacoteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="visualizarPacoteLabel">Visualizar pacotes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-end">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal">
+                        <i class="fas fa-plus me-2"></i>Criar Pacote
+                    </button>
+                </div>
+                <!-- cards mostrando os pacotes -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para criar pacote -->
+<div class="modal fade" id="criarPacoteModal" tabindex="-1" aria-labelledby="criarPacoteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title" id="criarPacoteModalLabel">Criar Pacote</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+
+      <div class="modal-body">
+        <form id="formCriar">
+          <div class="mb-3">
+            <label for="nomePacote" class="form-label">Nome do Pacote</label>
+            <input type="text" class="form-control" id="nomePacote" name="nomePacote" placeholder="Ex: PACOTE_001" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="observacoesPacote" class="form-label">Observações</label>
+            <textarea class="form-control" id="observacoesPacote" name="observacoesPacote" rows="3" placeholder="Informações adicionais..."></textarea>
+          </div>
+
+          <hr>
+
+          <h6>Itens do Pacote</h6>
+          <div id="itensPacote">
+            <div class="row g-2 align-items-end item-pacote">
+              <div class="col-md-8">
+                <label class="form-label">Descrição do Item</label>
+                <input type="text" name="descricao[]" class="form-control" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Quantidade</label>
+                <input type="number" name="quantidade[]" class="form-control" min="1" required>
+              </div>
+              <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-danger btn-sm btnRemoverItem" title="Remover item">✕</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <button type="button" class="btn btn-outline-success btn-sm" id="btnAdicionarItem">+ Adicionar Item</button>
+          </div>
+
+          <input type="hidden" id="idCargaPacote" name="idCargaPacote">
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btnVoltarVisualizarPacote">Voltar</button>
+        <button type="submit" class="btn btn-primary" form="formCriar">Salvar</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
+<script type="module" src="{% static 'js/criar_caixa.js' %}"></script>
+<script type="module" src="{% static 'js/carregar_cargas.js' %}"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const dataCarga = document.getElementById('dataCarga');
-    const selectCliente = document.getElementById('selectCliente');
-    const carretasContainer = document.getElementById('carretasContainer');
-    const btnSalvarPacote = document.getElementById('btnSalvarPacote');
-    const etapa2 = document.getElementById('etapa2');
-    const etapa3 = document.getElementById('etapa3');
+document.addEventListener('DOMContentLoaded', function () {
 
-    // Quando a data é selecionada
-    dataCarga.addEventListener('change', function() {
-        const data = this.value;
-        if (data) {
-            // Chama API para buscar clientes
-            buscarClientes(data);
-            etapa2.style.display = 'block';
-        } else {
-            etapa2.style.display = 'none';
-            etapa3.style.display = 'none';
-            selectCliente.disabled = true;
-            btnSalvarPacote.disabled = true;
-        }
-    });
+    const itensContainer = document.getElementById('itensPacote');
+    const btnAdicionar = document.getElementById('btnAdicionarItem');
+    const formCriarPacote = document.getElementById('formCriar');
+    const btnVoltar = document.getElementById('btnVoltarVisualizarPacote');
 
-    // Quando o cliente é selecionado
-    selectCliente.addEventListener('change', function() {
-        const cliente = this.value;
-        const data = dataCarga.value;
-        
-        if (cliente && data) {
-            // Chama API para buscar carretas
-            buscarCarretas(data, cliente);
-            etapa3.style.display = 'block';
-        } else {
-            etapa3.style.display = 'none';
-            btnSalvarPacote.disabled = true;
-        }
-    });
-
-    // Função para buscar clientes via API
-    async function buscarClientes(data) {
-        console.log('Buscando clientes para data:', data);
-
-        try {
-            const response = await fetch(`api/clientes_disponiveis/?data_carga=${encodeURIComponent(data)}`);
-            if (!response.ok) {
-                throw new Error(`Erro na API: ${response.status}`);
-            }
-
-            // Como sua view retorna uma lista de códigos, ex.: ["CLI001","CLI002"]
-            const clientes = await response.json();
-
-            // Popula o select de clientes
-            selectCliente.innerHTML = '<option value="">Selecione um cliente</option>';
-            clientes.forEach((cliente, idx) => {
-                const option = document.createElement('option');
-                option.value = cliente;  // valor = código vindo do backend
-                option.textContent = cliente; // exibe o código (ou nome se preferir)
-                selectCliente.appendChild(option);
-            });
-
-            selectCliente.disabled = false;
-        } catch (err) {
-            console.error('Erro ao buscar clientes:', err);
-            alert('Erro ao carregar clientes. Tente novamente.');
-        }
-    }
-
-    // Função para buscar carretas via API
-    // Mapa de cores -> hex (mesmas cores que o backend gera: vermelho, azul, verde, laranja, amarelo, cinza)
-    const COLOR_HEX = {
-    vermelho: '#ff0000',
-    azul: '#0000ff',
-    verde: '#00ff00',
-    laranja: '#ffa500',
-    amarelo: '#ffff00',
-    cinza: '#808080'
-    };
-
-    // Função para buscar carretas via API
-    async function buscarCarretas(data, clienteId) {
-        console.log('Buscando carretas para data:', data, 'e cliente:', clienteId);
-
-        // estado de loading (opcional)
-        carretasContainer.innerHTML = `
-            <div class="text-muted">Carregando carretas...</div>
+    // Adicionar novo item
+    btnAdicionar.addEventListener('click', () => {
+        const item = document.createElement('div');
+        item.className = 'row g-2 align-items-end item-pacote mt-2';
+        item.innerHTML = `
+            <div class="col-md-8">
+                <input type="text" name="descricao[]" class="form-control" placeholder="Descrição do item" required>
+            </div>
+            <div class="col-md-3">
+                <input type="number" name="quantidade[]" class="form-control" placeholder="Qtd" min="1" required>
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-danger btn-sm btnRemoverItem" title="Remover item">✕</button>
+            </div>
         `;
+        itensContainer.appendChild(item);
+    });
 
-        try {
-            const url = `api/carretas_disponiveis/?data_carga=${encodeURIComponent(data)}&cliente=${encodeURIComponent(clienteId)}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-            throw new Error(`Erro na API: ${response.status}`);
-            }
-
-            // back-end retorna array de registros:
-            // [{ Recurso, Qtde, PED_NUMEROSERIE, cor }, ...]
-            const registros = await response.json();
-
-            // Agregar por Recurso (uma “carreta”)
-            // totaliza Qtde e junta séries (se quiser usar depois)
-            const porRecurso = new Map();
-            registros.forEach(r => {
-            const recurso = (r.Recurso || '').toString();
-            const cor = (r.cor || 'laranja').toLowerCase();
-            const qtde = Number(r.Qtde) || 0;
-            const serie = r.PED_NUMEROSERIE || '';
-
-            if (!porRecurso.has(recurso)) {
-                porRecurso.set(recurso, {
-                id: recurso,                         // usamos o próprio nome como id estável
-                nome: recurso,                       // exibe o nome da carreta (Recurso)
-                cor,
-                corHex: COLOR_HEX[cor] || '#999999',
-                totalQtde: 0,
-                series: []
-                });
-            }
-            const acc = porRecurso.get(recurso);
-            acc.totalQtde += qtde;
-            if (serie) acc.series.push(serie);
-            });
-
-            // Transforma em array para render
-            const carretas = Array.from(porRecurso.values());
-
-            // Monta HTML de checkboxes
-            let html = '<div class="row">';
-            carretas.forEach(carreta => {
-            html += `
-                <div class="col-md-6 mb-2">
-                <div class="form-check d-flex align-items-center gap-2">
-                    <input
-                    class="form-check-input carreta-checkbox"
-                    type="checkbox"
-                    value="${carreta.id}"
-                    id="carreta-${CSS.escape(carreta.id)}"
-                    data-cor="${carreta.cor}"
-                    data-hex="${carreta.corHex}"
-                    data-qtde="${carreta.totalQtde}"
-                    >
-                    <label class="form-check-label" for="carreta-${CSS.escape(carreta.id)}">
-                    <span class="carreta-color" style="
-                            display:inline-block;
-                            width:12px;height:12px;border-radius:3px;
-                            background-color:${carreta.corHex};
-                            margin-right:6px;"></span>
-                    ${carreta.nome} — ${carreta.cor} (Qtde: ${carreta.totalQtde})
-                    </label>
-                </div>
-                </div>
-            `;
-            });
-            html += '</div>';
-
-            carretasContainer.innerHTML = html;
-
-            // Adiciona event listeners aos checkboxes
-            const checkboxes = document.querySelectorAll('.carreta-checkbox');
-            checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', validarFormulario);
-            });
-
-        } catch (err) {
-            console.error('Erro ao buscar carretas:', err);
-            carretasContainer.innerHTML = `
-            <div class="text-danger">Erro ao carregar carretas. Tente novamente.</div>
-            `;
+    // Remover item
+    itensContainer.addEventListener('click', function (e) {
+        if (e.target.classList.contains('btnRemoverItem')) {
+            const itemRow = e.target.closest('.item-pacote');
+            if (itemRow) itemRow.remove();
         }
-    }
+    });
 
-    // Valida se pelo menos uma carreta foi selecionada
-    function validarFormulario() {
-        const checkboxes = document.querySelectorAll('.carreta-checkbox:checked');
-        btnSalvarPacote.disabled = checkboxes.length === 0;
-    }
+    // Submeter formulário
+    formCriarPacote.addEventListener('submit', async function (e) {
+        e.preventDefault();
 
-    // Salvar pacote
-    btnSalvarPacote.addEventListener('click', function() {
-        const data = dataCarga.value;
-        const clienteId = selectCliente.value;
-        const carretasSelecionadas = Array.from(document.querySelectorAll('.carreta-checkbox:checked')).map(cb => cb.value);
-        const observacoes = document.getElementById('observacoes').value;
+        const form = e.currentTarget;
+        const fd = new FormData(form);
 
-        const pacote = {
-            data: data,
-            clienteId: clienteId,
-            carretas: carretasSelecionadas,
-            observacoes: observacoes
+        // Coleta múltiplos valores
+        const descricoes  = fd.getAll('descricao[]');    // ["Item A", "Item B", ...]
+        const quantidades = fd.getAll('quantidade[]');   // ["2", "5", ...]
+
+        // Monta itens pareando descrição x quantidade
+        const itens = descricoes.map((desc, i) => ({
+            descricao: (desc || '').trim(),
+            quantidade: Number(quantidades[i] || 0)
+        }))
+        // filtra linhas vazias ou quantidade inválida
+        .filter(it => it.descricao && Number.isFinite(it.quantidade) && it.quantidade > 0);
+
+        // Payload final
+        const payload = {
+            nomePacote: fd.get('nomePacote'),
+            observacoesPacote: fd.get('observacoesPacote') || '',
+            idCargaPacote: fd.get('idCargaPacote'),
+            itens
         };
 
-        console.log('Criando pacote:', pacote);
-        
-        // Aqui você faria a chamada para a API para salvar o pacote
-        // fetch('/api/criar-pacote/', {
-        //     method: 'POST',
-        //     headers: {
-        //         'Content-Type': 'application/json',
-        //         'X-CSRFToken': getCookie('csrftoken')
-        //     },
-        //     body: JSON.stringify(pacote)
-        // })
+        console.log('Payload para enviar:', payload);
 
-        alert('Pacote criado com sucesso!');
-        
-        // Reset do formulário
-        document.getElementById('formCriarPacote').reset();
-        etapa2.style.display = 'none';
-        etapa3.style.display = 'none';
-        selectCliente.disabled = true;
-        btnSalvarPacote.disabled = true;
-        
-        // Fecha o modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('criarPacoteModal'));
-        modal.hide();
-        
-        // Recarrega a tabela
-        // carregarTabelaExpedicoes();
+        // Exemplo de POST em JSON (Django/DRF)
+        try {
+            const resp = await fetch('api/guardar-pacote/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Se usar CSRF no Django:
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+                body: JSON.stringify(payload)
+            });
+
+            if (!resp.ok) {
+                const erro = await resp.text();
+                console.error('Erro ao salvar pacote:', erro);
+                alert('Erro ao salvar o pacote.');
+                return;
+            }
+
+            // Fecha este modal e abre o visualizar
+            const modalCriar = bootstrap.Modal.getInstance(document.getElementById('criarPacoteModal'));
+            const modalVisualizar = new bootstrap.Modal(document.getElementById('visualizarPacote'));
+            modalCriar.hide();
+            setTimeout(() => modalVisualizar.show(), 300);
+
+        } catch (err) {
+            console.error(err);
+            alert('Falha na comunicação com o servidor.');
+        }
     });
 
-    // Função para obter CSRF token
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
+    // Botão voltar (sem salvar, só troca os modais)
+    btnVoltar.addEventListener('click', function () {
+        const modalCriar = bootstrap.Modal.getInstance(document.getElementById('criarPacoteModal'));
+        const modalVisualizar = new bootstrap.Modal(document.getElementById('visualizarPacote'));
+        modalCriar.hide();
+        setTimeout(() => modalVisualizar.show(), 300);
+    });
+});
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
             }
         }
-        return cookieValue;
     }
-});
+    return cookieValue;
+}
 </script>
+
 {% endblock %}
