@@ -109,6 +109,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
 
         items.dados.forEach(item => {
             let iconeNaoConformidade;
+            let iconeNaoConformidadeSolda;
             let status;
             let inspectionType;
             let isCompliance
@@ -119,14 +120,20 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                 iconeNaoConformidade = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
             }
 
+            if (item.possui_nao_conformidade_inspecao_solda) {
+                iconeNaoConformidadeSolda = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
+            } else {
+                iconeNaoConformidadeSolda = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
+            }
+
             if (item.inspecao_geral_realizada === false) {
                 status = 'cancelado';
                 inspectionType = 'inspecionar-solda'
-                isCompliance = 'Solda não conforme'
+                isCompliance = 'Solda não inspecionada'
             } else {
                 status = 'entregue';
                 inspectionType = 'get-inspecionar-solda'
-                isCompliance = 'Solda conforme'
+                isCompliance = 'Solda inspecionada'
             }
 
             const cards = `
@@ -146,7 +153,21 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
-                    <div>
+                    <div class="d-flex justify-content-between align-items-center">
+                            <div class="col-sm-8">
+                                <div class="d-flex gap-2 align-items-center">
+                                    ${iconeNaoConformidade}
+                                    <span style="font-size: 0.875rem; color:#71717a; font-weight:bold;">
+                                        Possui não conformidade no teste de estanqueidade?
+                                    </span>
+                                </div>
+                                <div class="d-flex gap-2 align-items-center">
+                                    ${iconeNaoConformidadeSolda}
+                                    <span style="font-size: 0.875rem; color:#71717a; font-weight:bold;">
+                                        Possui não conformidade na Solda ?
+                                    </span>
+                                </div>
+                            </div>
                         <button 
                             data-id="${item.id}"
                             data-data="${item.data}"
@@ -156,7 +177,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                             data-conformidade="${item.conformidade}"
                             data-cor="${item.cor}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
-                        class="btn btn-white historico-inspecao w-100 d-flex justify-content-center align-items-center gap-2">              
+                        class="btn btn-white historico-inspecao d-flex gap-2 justify-content-between align-items-center">              
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>
                             Ver detalhes
                         </button>

@@ -245,7 +245,7 @@ def get_itens_reinspecao_montagem(request):
     itens_por_pagina = 12
 
     # Mantém a lógica original: traz tanto montagem quanto tanque
-    query = Q(id__in=reinspecao_ids) & (Q(pecas_ordem_montagem__isnull=False) | Q(tanque__isnull=False))
+    query = Q(id__in=reinspecao_ids) & (Q(pecas_ordem_montagem__isnull=False) | Q(estanqueidade__isnull=False))
 
     if maquinas_filtradas:
         query &= Q(pecas_ordem_montagem__ordem__maquina__nome__in=maquinas_filtradas)
@@ -255,10 +255,10 @@ def get_itens_reinspecao_montagem(request):
 
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
-        # Pesquisa tanto em peças de montagem quanto em tanques
+        # Pesquisa tanto em peças de montagem quanto em estanqueidades
         query &= (Q(pecas_ordem_montagem__peca__icontains=pesquisa_filtrada) | 
-                 Q(tanque__peca__codigo__icontains=pesquisa_filtrada) |
-                 Q(tanque__peca__descricao__icontains=pesquisa_filtrada))
+                 Q(estanqueidade__peca__codigo__icontains=pesquisa_filtrada) |
+                 Q(estanqueidade__peca__descricao__icontains=pesquisa_filtrada))
 
     if inspetores_filtrados:
         query &= Q(
@@ -272,8 +272,8 @@ def get_itens_reinspecao_montagem(request):
             "pecas_ordem_montagem",
             "pecas_ordem_montagem__ordem",
             "pecas_ordem_montagem__ordem__maquina",
-            "tanque",
-            "tanque__peca",  # Adicionado para carregar relacionamento com peça do tanque
+            "estanqueidade",
+            "estanqueidade__peca",  # Adicionado para carregar relacionamento com peça do tanque
         )
         .prefetch_related(
             "dadosexecucaoinspecao_set",
@@ -286,7 +286,7 @@ def get_itens_reinspecao_montagem(request):
     quantidade_total = Inspecao.objects.filter(
         id__in=reinspecao_ids
     ).filter(
-        Q(pecas_ordem_montagem__isnull=False) | Q(tanque__isnull=False)
+        Q(pecas_ordem_montagem__isnull=False) | Q(estanqueidade__isnull=False)
     ).count()
 
     # Paginação
@@ -324,8 +324,8 @@ def get_itens_reinspecao_montagem(request):
                     "id": data.id,
                     "tipo": "tanque",
                     "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                    "peca": f"{data.tanque.peca.codigo} - {data.tanque.peca.descricao}",
-                    "maquina": "Estanqueidade",  # Ou outro identificador apropriado
+                    "peca": f"{data.estanqueidade.peca.codigo} - {data.estanqueidade.peca.descricao}",
+                    "maquina": "Tanque",  # Ou outro identificador apropriado
                     "conformidade": dados_execucao.conformidade,
                     "nao_conformidade": dados_execucao.nao_conformidade,
                     "inspetor": (
@@ -381,7 +381,7 @@ def get_itens_inspecionados_montagem(request):
 
     # CORREÇÃO: Filtra tanto inspeções de montagem quanto de tanque
     datas = Inspecao.objects.filter(
-        (Q(pecas_ordem_montagem__isnull=False) | Q(tanque__isnull=False)),
+        (Q(pecas_ordem_montagem__isnull=False) | Q(estanqueidade__isnull=False)),
         id__in=inspecionados_ids
     )
 
@@ -391,7 +391,7 @@ def get_itens_inspecionados_montagem(request):
     if maquinas_filtradas:
         datas = datas.filter(
             Q(pecas_ordem_montagem__ordem__maquina__nome__in=maquinas_filtradas) |
-            Q(tanque__isnull=False)  # Mantém os tanques mesmo com filtro de máquinas
+            Q(estanqueidade__isnull=False)  # Mantém os tanques mesmo com filtro de máquinas
         ).distinct()
 
     if data_filtrada:
@@ -403,8 +403,8 @@ def get_itens_inspecionados_montagem(request):
     if pesquisa_filtrada:
         datas = datas.filter(
             Q(pecas_ordem_montagem__peca__icontains=pesquisa_filtrada) |
-            Q(tanque__peca__codigo__icontains=pesquisa_filtrada) |
-            Q(tanque__peca__descricao__icontains=pesquisa_filtrada)
+            Q(estanqueidade__peca__codigo__icontains=pesquisa_filtrada) |
+            Q(estanqueidade__peca__descricao__icontains=pesquisa_filtrada)
         ).distinct()
 
     if inspetores_filtrados:
@@ -435,8 +435,8 @@ def get_itens_inspecionados_montagem(request):
         "pecas_ordem_montagem",
         "pecas_ordem_montagem__ordem",
         "pecas_ordem_montagem__ordem__maquina",
-        "tanque",
-        "tanque__peca",
+        "estanqueidade",
+        "estanqueidade__peca",
     ).order_by("-dadosexecucaoinspecao__data_execucao")
 
     # Paginação
@@ -484,7 +484,7 @@ def get_itens_inspecionados_montagem(request):
                     "tipo": "tanque",
                     "id_dados_execucao": de.id,
                     "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                    "peca": f"{data.tanque.peca.codigo} - {data.tanque.peca.descricao}",
+                    "peca": f"{data.estanqueidade.peca.codigo} - {data.estanqueidade.peca.descricao}",
                     "qtd_produzida": 1,  # Tanques geralmente são unitários
                     "qtd_inspecionada": de.nao_conformidade + de.conformidade,
                     "maquina": "Tanque",  # Identificador apropriado para tanques

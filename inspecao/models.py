@@ -40,7 +40,7 @@ class Inspecao(models.Model):
         blank=True,
     )
 
-    tanque = models.ForeignKey(
+    estanqueidade = models.ForeignKey(
         "InspecaoEstanqueidade",
         on_delete=models.CASCADE,
         null=True,

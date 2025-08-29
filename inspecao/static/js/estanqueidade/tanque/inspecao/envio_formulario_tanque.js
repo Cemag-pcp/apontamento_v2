@@ -75,8 +75,8 @@ form.addEventListener('submit', async (event) => {
                 timer: 3000,
                 showConfirmButton: false
             });
-
-            // document.getElementById('id-inspecao-solda-tanque').value = result.id_inspecao; // ID da inspeção recém-criada
+            
+            document.getElementById('id-inspecao-solda-tanque').value = result.id_inspecao; // ID da inspeção recém-criada
             document.getElementById('peca-inspecao-solda-tanque').value = document.getElementById('produto-estanqueidade-tanque').value; // Nome da peça ou conjunto
             document.getElementById('qtd-produzida-solda-tanque').value = 1; // Quantidade da OP
 

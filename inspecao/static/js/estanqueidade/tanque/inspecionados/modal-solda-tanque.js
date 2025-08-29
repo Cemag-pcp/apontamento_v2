@@ -27,6 +27,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function buscarDadosInspecaoTanque(idTanque) {
         try {
+
+            Swal.fire({
+                title: 'Carregando...',
+                text: 'Buscando informações da inspeção...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
             // Mostrar loading no botão (se existir no modal de visualização)
             const loadingElement = document.querySelector('#modal-inspecionar-solda-tanque-get .spinner-border');
             if (loadingElement) {
@@ -58,6 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (loadingElement) {
                 loadingElement.style.display = 'none';
             }
+            Swal.close();
         }
     }
 
