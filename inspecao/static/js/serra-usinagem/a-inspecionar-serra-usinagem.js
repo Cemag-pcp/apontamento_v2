@@ -269,13 +269,12 @@ function buscarItensInspecao(pagina) {
         });
 
         itensInspecionar.textContent = "Itens a Inspecionar";
-
-        if (items.total_paginas > 1) {
+        if (items.paginacao.total_paginas > 1) {
             let paginacaoHTML = `<nav aria-label="Page navigation">
                 <ul class="pagination justify-content-center">`;
 
-            const paginaAtual = items.pagina_atual;
-            const totalPaginas = items.total_paginas;
+            const paginaAtual = items.paginacao.pagina_atual;
+            const totalPaginas = items.paginacao.total_paginas;
 
             // Função para adicionar um link de página
             const adicionarLinkPagina = (i) => {
