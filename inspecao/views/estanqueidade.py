@@ -29,14 +29,19 @@ from django.db.models.functions import (
 
 from cadastro.models import PecasEstanqueidade
 from ..models import (
+    Inspecao,
     Causas,
     InspecaoEstanqueidade,
     DadosExecucaoInspecaoEstanqueidade,
+    DadosExecucaoInspecao,
     ReinspecaoEstanqueidade,
+    Reinspecao,
     DetalhesPressaoTanque,
     InfoAdicionaisExecTubosCilindros,
+    CausasNaoConformidade,
     CausasNaoConformidadeEstanqueidade,
     ArquivoCausaEstanqueidade,
+    ArquivoCausa,
 )
 from core.models import Profile
 
@@ -50,10 +55,13 @@ def inspecao_tanque(request):
     users = Profile.objects.filter(
         tipo_acesso="inspetor", permissoes__nome="inspecao/tanque"
     )
+    causas = Causas.objects.filter(setor="montagem")
 
     lista_inspetores = [
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
     ]
+
+    list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
 
     tanques = PecasEstanqueidade.objects.filter(tipo="tanque")
 
@@ -78,6 +86,7 @@ def inspecao_tanque(request):
             "tanques": dict_tanques,
             "inspetores": lista_inspetores,
             "inspetor_logado": inspetor_logado,
+            "causas": list_causas,
         },
     )
 
@@ -823,7 +832,7 @@ def envio_inspecao_tanque(request):
                 )
                 reinspecao_parte_inferior.save()
 
-        return JsonResponse({"success": True})
+        return JsonResponse({"success": True, "id_inspecao":inspecao.id})
 
     except Exception as e:
         print(e)
@@ -1111,7 +1120,7 @@ def get_itens_inspecionados_tanque(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # Filtra apenas peças do tipo "tubo" ou "cilindro"
+    # Filtra apenas peças do tipo "tanque"
     pecas_filtradas = PecasEstanqueidade.objects.filter(tipo="tanque")
     inspecionados_ids = set(
         DadosExecucaoInspecaoEstanqueidade.objects.filter(
@@ -1127,6 +1136,20 @@ def get_itens_inspecionados_tanque(request):
     )
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
+    
+    # Novos filtros
+    status_solda_filtrado = (
+        request.GET.get("status_solda", "").split(",")
+        if request.GET.get("status_solda")
+        else []
+    )
+    
+    status_teste_filtrado = (
+        request.GET.get("status_teste", "").split(",")
+        if request.GET.get("status_teste")
+        else []
+    )
+    
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
 
@@ -1152,6 +1175,45 @@ def get_itens_inspecionados_tanque(request):
         datas = datas.filter(
             dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
         ).distinct()
+        
+    # Aplicar filtros de status da solda
+    if status_solda_filtrado:
+        # Primeiro, obtenha os IDs das inspeções com não conformidade na solda
+        ids_com_nao_conformidade_solda = set(
+            DadosExecucaoInspecao.objects.filter(
+                inspecao__estanqueidade_id__in=datas.values_list('id', flat=True),
+                nao_conformidade__gt=0
+            ).values_list("inspecao__estanqueidade_id", flat=True)
+        )
+        
+        if "conforme" in status_solda_filtrado and "nao_conforme" in status_solda_filtrado:
+            # Mostrar todos (não filtrar)
+            pass
+        elif "conforme" in status_solda_filtrado:
+            # Filtrar apenas soldas conformes (sem não conformidade)
+            datas = datas.exclude(id__in=ids_com_nao_conformidade_solda)
+        elif "nao_conforme" in status_solda_filtrado:
+            # Filtrar apenas soldas não conformes
+            datas = datas.filter(id__in=ids_com_nao_conformidade_solda)
+    
+    # Aplicar filtros de status do teste de estanqueidade
+    if status_teste_filtrado:
+        # Primeiro, obtenha os IDs dos testes com não conformidade
+        ids_com_nao_conformidade_teste = set(
+            InspecaoEstanqueidade.objects.filter(
+                dadosexecucaoinspecaoestanqueidade__detalhespressaotanque__nao_conformidade__gt=0
+            ).values_list('id', flat=True)
+        )
+        
+        if "conforme" in status_teste_filtrado and "nao_conforme" in status_teste_filtrado:
+            # Mostrar todos (não filtrar)
+            pass
+        elif "conforme" in status_teste_filtrado:
+            # Filtrar apenas testes conformes (sem não conformidade)
+            datas = datas.exclude(id__in=ids_com_nao_conformidade_teste)
+        elif "nao_conforme" in status_teste_filtrado:
+            # Filtrar apenas testes não conformes
+            datas = datas.filter(id__in=ids_com_nao_conformidade_teste)
 
     datas = datas.select_related("peca").order_by("-id")
 
@@ -1199,6 +1261,26 @@ def get_itens_inspecionados_tanque(request):
             "info_adicionais": info_adicionais,
         }
 
+    # 1. Pega os IDs de InspecaoEstanqueidade da página atual.
+    ids_pagina_atual = [item.id for item in pagina_obj]
+
+    # 2. Busca na tabela Inspecao quais desses IDs já existem no campo 'estanqueidade'.
+    ids_em_inspecao_geral = set(
+        Inspecao.objects.filter(estanqueidade_id__in=ids_pagina_atual).values_list(
+            "estanqueidade_id", flat=True
+        )
+    )
+    
+    # 3. Busca na tabela DadosExecucaoInspecao quais inspeções têm nao_conformidade > 0
+    ids_com_nao_conformidade = set(
+        DadosExecucaoInspecao.objects.filter(
+            inspecao__estanqueidade_id__in=ids_pagina_atual,
+            nao_conformidade__gt=0
+        ).values_list("inspecao__estanqueidade_id", flat=True)
+    )
+
+    print(ids_com_nao_conformidade)
+
     dados = []
     for data in pagina_obj:
         de_info = dados_execucao_dict.get(data.id)
@@ -1213,15 +1295,21 @@ def get_itens_inspecionados_tanque(request):
                 info.nao_conformidade for info in info_adicionais_list
             )
 
+            existe_em_inspecao = data.id in ids_em_inspecao_geral
+            
+            possui_nao_conformidade_inspecao_geral = data.id in ids_com_nao_conformidade
+
             item = {
                 "id": data.id,
                 "tipo_inspecao": data.peca.tipo,
                 "id_dados_execucao": de.id,
                 "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                 "data_carga": data_carga_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                "peca": f"{data.peca.codigo} - {data.peca.descricao}",  # Ajustado para pegar o código da peça
+                "peca": f"{data.peca.codigo} - {data.peca.descricao}",
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
+                "inspecao_geral_realizada": existe_em_inspecao,
+                "possui_nao_conformidade_inspecao_solda": possui_nao_conformidade_inspecao_geral,
             }
 
             dados.append(item)
@@ -1230,12 +1318,85 @@ def get_itens_inspecionados_tanque(request):
         {
             "dados": dados,
             "total": quantidade_total,
-            "total_filtrado": paginador.count,  # Total de itens após filtro
+            "total_filtrado": paginador.count,
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
         },
         status=200,
     )
+
+
+def itens_enviados_tanque(request, tanque_id):
+    try:
+        # Buscar o tanque
+        tanque = InspecaoEstanqueidade.objects.get(id=tanque_id)
+
+        # Buscar a última inspeção deste tanque (se existir)
+        ultima_inspecao = (
+            DadosExecucaoInspecao.objects.filter(inspecao__estanqueidade=tanque)
+            .prefetch_related(
+                "causasnaoconformidade_set__causa",
+                "causasnaoconformidade_set__arquivos",
+            )
+            .order_by("num_execucao")
+            .first()
+        )
+
+        # Buscar as causas da não conformidade da última inspeção
+        causas_data = []
+        if ultima_inspecao:
+            # Recuperar todas as CausasNaoConformidade relacionadas a esta execução
+            causas_nao_conformidade = ultima_inspecao.causasnaoconformidade_set.all()
+
+            for causa_nc in causas_nao_conformidade:
+                # Para cada causa de não conformidade, recuperar as causas específicas
+                causas_relacionadas = causa_nc.causa.all()
+                # Recuperar imagens associadas
+                imagens = []
+                for arquivo in causa_nc.arquivos.all():
+                    if arquivo.arquivo:
+                        imagens.append(
+                            {"url": arquivo.arquivo.url, "nome": arquivo.arquivo.name}
+                        )
+
+                for causa in causas_relacionadas:
+                    causas_data.append(
+                        {
+                            "id": causa.id,
+                            "nome": causa.nome,
+                            "quantidade": causa_nc.quantidade,
+                            "imagens": imagens,
+                        }
+                    )
+
+        # Preparar dados para retorno
+        dados = {
+            "id": tanque.id,
+            "nome": f"{tanque.peca.codigo} - {tanque.peca.descricao}",
+            "data_inspecao": (
+                ultima_inspecao.data_execucao.isoformat() if ultima_inspecao else None
+            ),
+            "quantidade_produzida": (
+                ultima_inspecao.conformidade if ultima_inspecao else 0
+            )
+            + (ultima_inspecao.nao_conformidade if ultima_inspecao else 0),
+            "inspetor": (
+                ultima_inspecao.inspetor.id
+                if ultima_inspecao and ultima_inspecao.inspetor
+                else None
+            ),
+            "conformidade": ultima_inspecao.conformidade if ultima_inspecao else 0,
+            "nao_conformidade": (
+                ultima_inspecao.nao_conformidade if ultima_inspecao else 0
+            ),
+            "observacao": ultima_inspecao.observacao if ultima_inspecao else "",
+            "causas": causas_data,
+        }
+
+        return JsonResponse(dados)
+
+    except InspecaoEstanqueidade.DoesNotExist:
+        return JsonResponse({"error": "Tanque não encontrado"}, status=404)
 
 
 def get_historico_tanque(request, id):
@@ -1759,3 +1920,77 @@ def imagens_nao_conformidade_tubos_cilindros(request):
             )
 
     return JsonResponse(resultado, safe=False)
+
+
+def envio_inspecao_solda_tanque(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    id_inspecao = request.POST.get("id-inspecao-solda-tanque")
+
+    try:
+        with transaction.atomic():
+            data_inspecao = request.POST.get("data-inspecao-solda-tanque")
+            conformidade = request.POST.get("conformidade-inspecao-solda-tanque")
+            inspetor_id = request.POST.get("inspetor-inspecao-solda-tanque")
+            nao_conformidade = request.POST.get(
+                "nao-conformidade-inspecao-solda-tanque"
+            )
+            observacao = request.POST.get("observacao-inspecao-solda-tanque")
+            quantidade_total_causas = int(
+                request.POST.get("quantidade-total-causas", 0)
+            )
+
+            # Convertendo a string para um objeto datetime
+            data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
+
+            tanque_obj = InspecaoEstanqueidade.objects.get(pk=id_inspecao)
+
+            # Obtém a inspeção e o inspetor
+            inspecao = Inspecao.objects.create(estanqueidade=tanque_obj)
+            inspetor = Profile.objects.get(user__pk=inspetor_id)
+
+            # Cria uma instância de DadosExecucaoInspecao
+            dados_execucao = DadosExecucaoInspecao(
+                inspecao=inspecao,
+                inspetor=inspetor,
+                data_execucao=data_ajustada,
+                conformidade=int(conformidade),
+                nao_conformidade=int(nao_conformidade),
+                observacao=observacao,
+            )
+            dados_execucao.save()
+
+            # Verifica se há não conformidade
+            if int(nao_conformidade) > 0:
+                # Cria uma instância de Reinspecao
+                reinspecao = Reinspecao(inspecao=inspecao, reinspecionado=False)
+                reinspecao.save()
+
+                # Itera sobre todas as causas (causas_1, causas_2, etc.)
+                for i in range(1, quantidade_total_causas + 1):
+                    causas = request.POST.getlist(f"causas_{i}")  # Lista de causas
+                    quantidade = request.POST.get(f"quantidade_{i}")
+                    imagens = request.FILES.getlist(f"imagens_{i}")  # Lista de arquivos
+
+                    # Obtém todas as causas de uma vez
+                    causas_objs = Causas.objects.filter(id__in=causas)
+                    causa_nao_conformidade = CausasNaoConformidade.objects.create(
+                        dados_execucao=dados_execucao, quantidade=int(quantidade)
+                    )
+                    causa_nao_conformidade.causa.add(*causas_objs)
+
+                    # Itera sobre cada imagem
+                    for imagem in imagens:
+                        ArquivoCausa.objects.create(
+                            causa_nao_conformidade=causa_nao_conformidade,
+                            arquivo=imagem,
+                        )
+
+        return JsonResponse({"success": True})
+
+    except InspecaoEstanqueidade.DoesNotExist:
+        return JsonResponse({"error": "O tanque especificado não existe."}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"error": "Erro"}, status=400)

@@ -49,7 +49,7 @@
                         <p class="fw-bold mx-2 my-1">Filter Inspections</p>
                         <hr>
                         <input id="pesquisar-peca-reinspecao" type="text" class="form-control mb-3" placeholder="Pesquisar...">
-                        
+
                         <h6 class="mt-3">Inspetor</h6>
                         {% for inspetor in inspetores %}
                             <div class="form-check">
@@ -102,7 +102,31 @@
                         <div class="dropdown-menu p-3" style="width: 250px;">
                             <p class="fw-bold mx-2 my-1">Filter Inspections</p>
                             <hr>
-                            <input id="pesquisar-peca-inspecionados" type="text" class="form-control mb-3" placeholder="Search inspections...">
+                            <input id="pesquisar-peca-inspecionados" type="text" class="form-control mb-3" placeholder="Search inspections...">   
+
+                            <h6>Status da Solda</h6>
+                            <div style="max-height: 160px; overflow-y: auto;">
+                                <div class="form-check">
+                                    <input type="checkbox" id="filter-solda-conformes-tanque" class="filter-solda" value="conforme">
+                                    <label class="form-check-label" for="filter-solda-conformes-tanque">Itens conformes</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="filter-solda-nao-conformes-tanque" class="filter-solda" value="nao_conforme">
+                                    <label class="form-check-label" for="filter-solda-nao-conformes-tanque">Itens não conformes</label>
+                                </div>
+                            </div>
+
+                            <h6 class="my-2">Status do Teste de Estanqueidade</h6>
+                            <div style="max-height: 160px; overflow-y: auto;">
+                                <div class="form-check">
+                                    <input type="checkbox" id="filter-teste-conformes-tanque" class="filter-teste" value="conforme">
+                                    <label class="form-check-label" for="filter-teste-conformes-tanque">Teste conforme</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="filter-teste-nao-conformes-tanque" class="filter-teste" value="nao_conforme">
+                                    <label class="form-check-label" for="filter-teste-nao-conformes-tanque">Teste não conforme</label>
+                                </div>
+                            </div>
                     
                             <h6 class="mt-3">Inspetor</h6>
                             {% for inspetor in inspetores %}
@@ -136,6 +160,8 @@
         <span id="itens-filtrados-inspecionados-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
         <span id="itens-filtrados-inspecionados-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
         <span id="itens-filtrados-inspecionados-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+        <span id="itens-filtrados-inspecionados-solda" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Status Solda: </span>
+        <span id="itens-filtrados-inspecionados-teste" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Status Teste: </span>
     </div>
     <!-- Cards -->
     <div class="row" style="padding-right: 0;" id="cards-inspecionados"></div>
@@ -143,6 +169,7 @@
 </div>
 
 {% include 'modal_inspecao/modal_inspecao_tanque.html' %}
+{% include 'modal_inspecao/modal_inspecao_solda_estanqueidade.html' %}
 
 {% endblock %}
 
@@ -151,11 +178,13 @@
 <script src="{% static 'js/estanqueidade/tanque/events_inputs_estanqueidade_tanque.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/inspecao/modal-inspecao.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/inspecao/envio_formulario_tanque.js' %}"></script>
+<script src="{% static 'js/estanqueidade/tanque/inspecao/envio_formulario_solda_tanque.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/reinspecao-tanque.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/reinspecionar/modal-reinspecionar.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/reinspecionar/envio-reinspecao.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/inspecionados-tanque.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/inspecionados/modal-inspecionados.js' %}"></script>
+<script src="{% static 'js/estanqueidade/tanque/inspecionados/modal-solda-tanque.js' %}"></script>
 
 <script>
 
