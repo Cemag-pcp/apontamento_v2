@@ -21,6 +21,9 @@ class InspecaoAdmin(admin.ModelAdmin):
         "pecas_ordem_pintura",
         "pecas_ordem_montagem",
         "pecas_ordem_estamparia",
+        "pecas_ordem_serra",
+        "pecas_ordem_usinagem",
+        "estanqueidade",
     )
     list_display_links = ("data_inspecao",)
 
