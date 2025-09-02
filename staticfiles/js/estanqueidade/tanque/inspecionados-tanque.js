@@ -30,6 +30,8 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
     let itensFiltradosData = document.getElementById("itens-filtrados-inspecionados-data");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
+    let itensFiltradosSolda = document.getElementById("itens-filtrados-inspecionados-solda");
+    let itensFiltradosTeste = document.getElementById("itens-filtrados-inspecionados-teste");
     let paginacao = document.getElementById("paginacao-inspecionados-tanque");
 
     // Limpa os cards antes de buscar novos
@@ -40,10 +42,20 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                                 </div>`;
     paginacao.innerHTML = "";
 
-
     let inspetorSelecionado = [];
     document.querySelectorAll('.form-check-input-inspecionados-inspetores:checked').forEach(checkbox => {
         inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
+    });
+
+    // Capturar os novos filtros
+    let statusSoldaSelecionado = [];
+    document.querySelectorAll('.filter-solda:checked').forEach(checkbox => {
+        statusSoldaSelecionado.push(checkbox.value);
+    });
+    
+    let statusTesteSelecionado = [];
+    document.querySelectorAll('.filter-teste:checked').forEach(checkbox => {
+        statusTesteSelecionado.push(checkbox.value);
     });
 
     let dataSelecionada = document.getElementById('data-filtro-inspecionados').value;
@@ -74,6 +86,23 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
         itensFiltradosInspetor.textContent = "Inspetores: " + inspetorSelecionado.join(", ");
     } else {
         itensFiltradosInspetor.style.display = "none";
+    }
+
+    // Adicionar os novos parâmetros à URL
+    if (statusSoldaSelecionado.length > 0) {
+        params.append("status_solda", statusSoldaSelecionado.join(","));
+        itensFiltradosSolda.style.display = "block";
+        itensFiltradosSolda.textContent = "Status Solda: " + statusSoldaSelecionado.join(", ");
+    } else {
+        itensFiltradosSolda.style.display = "none";
+    }
+    
+    if (statusTesteSelecionado.length > 0) {
+        params.append("status_teste", statusTesteSelecionado.join(","));
+        itensFiltradosTeste.style.display = "block";
+        itensFiltradosTeste.textContent = "Status Teste: " + statusTesteSelecionado.join(", ");
+    } else {
+        itensFiltradosTeste.style.display = "none";
     }
 
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
@@ -108,13 +137,11 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         items.dados.forEach(item => {
-            let borderColors = {
-                "Laranja": "orange", "Verde": "green",
-                "Vermelho": "red", "Azul": "blue",
-                "Amarelo": "yellow", "Cinza": "gray"
-            };
-
             let iconeNaoConformidade;
+            let iconeNaoConformidadeSolda;
+            let status;
+            let inspectionType;
+            let isCompliance
 
             if (item.possui_nao_conformidade) {
                 iconeNaoConformidade = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
@@ -122,19 +149,54 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                 iconeNaoConformidade = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
             }
 
-            let color = borderColors[item.cor];
+            if (item.possui_nao_conformidade_inspecao_solda) {
+                iconeNaoConformidadeSolda = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
+            } else {
+                iconeNaoConformidadeSolda = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
+            }
+
+            if (item.inspecao_geral_realizada === false) {
+                status = 'cancelado';
+                inspectionType = 'inspecionar-solda'
+                isCompliance = 'Solda não inspecionada'
+            } else {
+                status = 'entregue';
+                inspectionType = 'get-inspecionar-solda'
+                isCompliance = 'Solda inspecionada'
+            }
 
             const cards = `
             <div class="col-md-4 mb-4">
-                <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
+                    <div class="d-flex justify-content-between">
+                        <h5 style="width:70%;"> ${item.peca}</h5>
+                        <div class="text-center">
+                            <p class="status-badge status-${status} ${inspectionType}" 
+                            style="font-size:13px; cursor:pointer;" data-id="${item.id}" 
+                            data-nome="${item.peca}">${isCompliance}</p>
+                        </div>
+                    </div>
                     <h6 class="card-subtitle mb-2 text-muted">Inspeção #${item.id}</h6>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
-                    <div>
+                    <div class="d-flex justify-content-between align-items-center">
+                            <div class="col-sm-8">
+                                <div class="d-flex gap-2 align-items-center">
+                                    ${iconeNaoConformidade}
+                                    <span style="font-size: 0.875rem; color:#71717a; font-weight:bold;">
+                                        Possui não conformidade no teste de estanqueidade?
+                                    </span>
+                                </div>
+                                <div class="d-flex gap-2 align-items-center">
+                                    ${iconeNaoConformidadeSolda}
+                                    <span style="font-size: 0.875rem; color:#71717a; font-weight:bold;">
+                                        Possui não conformidade na Solda ?
+                                    </span>
+                                </div>
+                            </div>
                         <button 
                             data-id="${item.id}"
                             data-data="${item.data}"
@@ -144,7 +206,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                             data-conformidade="${item.conformidade}"
                             data-cor="${item.cor}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
-                        class="btn btn-white historico-inspecao w-100 d-flex justify-content-center align-items-center gap-2">              
+                        class="btn btn-white historico-inspecao d-flex gap-2 justify-content-between align-items-center">              
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>
                             Ver detalhes
                         </button>
