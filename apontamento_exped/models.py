@@ -8,6 +8,7 @@ class Carga(models.Model):
     data_carga = models.DateField(null=True, blank=True)  # Data da carga
     cliente = models.CharField(max_length=100)  # Ex: Cliente X
     obs_pacote = models.TextField(blank=True)  # Observações gerais sobre o pacote
+    stage = models.CharField(max_length=50, choices=[('planejamento', 'Planejamento'), ('apontamento', 'Apontamento'), ('verificacao', 'Verificação'), ('despachado','Despachado')], default='planejamento')
 
     responsavel_criacao = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
@@ -30,6 +31,7 @@ class Pacote(models.Model):
     carga = models.ForeignKey(Carga, related_name='pacotes', on_delete=models.CASCADE)
     criado_por = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
+    
     confirmado_por = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True, related_name='confirmou_pacotes')
     data_confirmacao = models.DateTimeField(null=True, blank=True)
     status_confirmacao = models.CharField(max_length=50, choices=[('pendente', 'Pendente'), ('ok', 'Confirmado'), ('erro', 'Erro identificado')], default='pendente')

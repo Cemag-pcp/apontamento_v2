@@ -128,7 +128,7 @@ def criar_caixa(request):
 
 def buscar_cargas(request):
 
-    cargas = Carga.objects.all().values('id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'status', 'data_criacao')
+    cargas = Carga.objects.all().values('id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'stage', 'data_criacao')
     return JsonResponse(list(cargas), safe=False)
 
 @csrf_exempt
@@ -200,7 +200,68 @@ def buscar_pacotes_carga(request, id):
             'itens': itens,
         })
 
-    return JsonResponse({'pacotes': dados})
+    return JsonResponse({'pacotes': dados, 'status_carga': carga.stage})
 
+@csrf_exempt
+def alterar_stage(request, id):
+    if request.method != 'POST':
+        return JsonResponse({'erro': 'Método não permitido'}, status=405)
 
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'erro': 'JSON inválido.'}, status=400)
 
+    novo_stage = data.get('stage', None)
+    carga = get_object_or_404(Carga, id=id)
+    stage_atual = carga.stage
+
+    # Regras de avanço de estágio
+    if stage_atual == 'planejamento':
+        pacotes = Pacote.objects.filter(carga_id=id).count()
+        if pacotes == 0:
+            return JsonResponse(
+                {'erro': 'Você precisa criar ao menos 1 pacote antes de avançar para Apontamento.'},
+                status=400
+            )
+
+    if stage_atual == 'apontamento':
+        total = Pacote.objects.filter(carga_id=id).count()
+        confirmados = Pacote.objects.filter(carga_id=id, status_confirmacao='ok').count()
+        if total == 0 or confirmados < total:
+            return JsonResponse(
+                {'erro': 'Todos os pacotes precisam estar confirmados para avançar para Verificação.'},
+                status=400
+            )
+
+    # Atualização do estágio
+    if not novo_stage:
+        if stage_atual == 'planejamento':
+            carga.stage = 'apontamento'
+        elif stage_atual == 'apontamento':
+            carga.stage = 'verificacao'
+        elif stage_atual == 'verificacao':
+            carga.stage = 'despachado'
+        else:
+            return JsonResponse({'erro': 'Estágio atual inválido para avanço automático.'}, status=400)
+    else:
+        carga.stage = novo_stage
+
+    carga.save()
+
+    return JsonResponse({
+        'mensagem': 'Estágio alterado com sucesso!',
+        'novo_stage': carga.stage
+    }, status=200)
+
+@csrf_exempt
+def confirmar_pacote(request, id):
+
+    pacote = get_object_or_404(Pacote, id=id)
+
+    pacote.status_confirmacao = 'ok'
+    pacote.save()    
+
+    return JsonResponse({
+        'mensagem': 'Pacote confirmado com sucesso!',
+    }, status=200)

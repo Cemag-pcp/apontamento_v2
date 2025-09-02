@@ -680,7 +680,7 @@ function mostrarModalFinalizar(ordemId, maquina, max_itens) {
     operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
     todosOperadorFinal.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
 
-    fetch(`api/listar-operadores/?maquina=${maquina}`)
+    fetch(`api/listar-operadores/?maquina=${maquina}&ordem=${ordemId}`)
     .then(response => {
         if (!response.ok) {
             throw new Error("Erro ao buscar operadores");
@@ -688,23 +688,26 @@ function mostrarModalFinalizar(ordemId, maquina, max_itens) {
         return response.json();
     })
     .then(data => {
-    
+        const operadorInicioId = data.operador_inicio_id;
+
         if (data.operadores_maquina.length === 0) {
             operadorSelect.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
         } else {
             data.operadores_maquina.forEach(operador => {
-                operadorSelect.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+                const selected = operador.id === operadorInicioId ? 'selected' : '';
+                operadorSelect.innerHTML += `<option value="${operador.id}" ${selected}>${operador.matricula} - ${operador.nome}</option>`;
             });
-            operadorSelect.disabled = false; // Habilita o select após carregar os dados
+            operadorSelect.disabled = false;
         }
 
         if (data.operadores.length === 0) {
             todosOperadorFinal.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
         } else {
             data.operadores.forEach(operador => {
-                todosOperadorFinal.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+                const selected = operador.id === operadorInicioId ? 'selected' : '';
+                todosOperadorFinal.innerHTML += `<option value="${operador.id}" ${selected}>${operador.matricula} - ${operador.nome}</option>`;
             });
-            todosOperadorFinal.disabled = false; // Habilita o select após carregar os dados
+            todosOperadorFinal.disabled = false;
         }
     })
     .catch(error => {

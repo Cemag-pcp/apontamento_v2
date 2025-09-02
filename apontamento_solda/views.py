@@ -658,22 +658,25 @@ def ordens_interrompidas(request):
 
 def listar_operadores(request):
     maquina_id = request.GET.get('maquina')
-    
-    # Operadores do setor de solda
+    ordem = request.GET.get('ordem')
+
+    processo = PecasOrdem.objects.filter(ordem_id=ordem).order_by('-data').first()
+    operador_inicio_id = processo.operador_inicio.id if processo and processo.operador_inicio else None
+
     operadores = Operador.objects.filter(setor__nome='solda')
-    
-    # Operadores do setor de solda que estão vinculados à máquina específica
+
     if maquina_id:
         operadores_maquina = Operador.objects.filter(
             setor__nome='solda',
             maquinas__nome=maquina_id 
-        ).distinct() 
+        ).distinct()
     else:
         operadores_maquina = Operador.objects.none()
-    
+
     return JsonResponse({
         "operadores": list(operadores.values()),
-        "operadores_maquina": list(operadores_maquina.values())
+        "operadores_maquina": list(operadores_maquina.values()),
+        "operador_inicio_id": operador_inicio_id
     })
 
 def percentual_concluido_carga(request):

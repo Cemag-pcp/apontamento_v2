@@ -25,7 +25,7 @@ class Maquina(models.Model):
         ]
 
     def __str__(self):
-        return self.nome
+        return f'{self.nome} - {self.setor}'
 
 class MotivoInterrupcao(models.Model):
     

@@ -55,6 +55,11 @@ def inspecao_estamparia(request):
         for inspetor in inspetores
     ]
 
+    maquinas = [
+        {"nome": maquina.nome}
+        for maquina in maquinas
+    ]
+
     user_profile = Profile.objects.filter(user=request.user).first()
     if (
         user_profile
