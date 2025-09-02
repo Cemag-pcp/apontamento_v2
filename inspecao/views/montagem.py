@@ -42,6 +42,8 @@ def inspecao_montagem(request):
         )
     )
 
+    maquinas.append('TANQUE')
+
     list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
 
     lista_inspetores = [
@@ -306,7 +308,7 @@ def get_itens_reinspecao_montagem(request):
                 # Item de montagem
                 item = {
                     "id": data.id,
-                    "tipo": "montagem",
+                    "tipo": "Montagem",
                     "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                     "peca": data.pecas_ordem_montagem.peca,
                     "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
@@ -322,7 +324,7 @@ def get_itens_reinspecao_montagem(request):
                 # Item de tanque
                 item = {
                     "id": data.id,
-                    "tipo": "tanque",
+                    "tipo": "Tanque",
                     "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                     "peca": f"{data.estanqueidade.peca.codigo} - {data.estanqueidade.peca.descricao}",
                     "maquina": "Tanque",  # Ou outro identificador apropriado
@@ -382,6 +384,7 @@ def get_itens_inspecionados_montagem(request):
     # CORREÇÃO: Filtra tanto inspeções de montagem quanto de tanque
     datas = Inspecao.objects.filter(
         (Q(pecas_ordem_montagem__isnull=False) | Q(estanqueidade__isnull=False)),
+        dadosexecucaoinspecao__num_execucao=0,
         id__in=inspecionados_ids
     )
 
@@ -389,10 +392,14 @@ def get_itens_inspecionados_montagem(request):
 
     # CORREÇÃO: Aplica filtro de máquinas apenas para itens de montagem
     if maquinas_filtradas:
-        datas = datas.filter(
-            Q(pecas_ordem_montagem__ordem__maquina__nome__in=maquinas_filtradas) |
-            Q(estanqueidade__isnull=False)  # Mantém os tanques mesmo com filtro de máquinas
-        ).distinct()
+        q = Q(pecas_ordem_montagem__ordem__maquina__nome__in=maquinas_filtradas)
+        
+        # monta OR dinâmico em case-insensitive para estanqueidade
+        q_estanqueidade = Q()
+        for m in maquinas_filtradas:
+            q_estanqueidade |= Q(estanqueidade__peca__tipo__iexact=m)
+        
+        datas = datas.filter(q | q_estanqueidade).distinct()
 
     if data_filtrada:
         datas = datas.filter(
@@ -467,7 +474,7 @@ def get_itens_inspecionados_montagem(request):
                 # Item de montagem
                 item = {
                     "id": data.id,
-                    "tipo": "montagem",
+                    "tipo": "Montagem",
                     "id_dados_execucao": de.id,
                     "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                     "peca": data.pecas_ordem_montagem.peca,
@@ -481,7 +488,7 @@ def get_itens_inspecionados_montagem(request):
                 # Item de tanque
                 item = {
                     "id": data.id,
-                    "tipo": "tanque",
+                    "tipo": "Tanque",
                     "id_dados_execucao": de.id,
                     "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                     "peca": f"{data.estanqueidade.peca.codigo} - {data.estanqueidade.peca.descricao}",

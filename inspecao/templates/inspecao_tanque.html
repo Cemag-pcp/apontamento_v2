@@ -107,11 +107,11 @@
                             <h6>Status da Solda</h6>
                             <div style="max-height: 160px; overflow-y: auto;">
                                 <div class="form-check">
-                                    <input type="checkbox" id="filter-solda-conformes-tanque" value="">
+                                    <input type="checkbox" id="filter-solda-conformes-tanque" class="filter-solda" value="conforme">
                                     <label class="form-check-label" for="filter-solda-conformes-tanque">Itens conformes</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" id="filter-solda-nao-conformes-tanque" value="">
+                                    <input type="checkbox" id="filter-solda-nao-conformes-tanque" class="filter-solda" value="nao_conforme">
                                     <label class="form-check-label" for="filter-solda-nao-conformes-tanque">Itens não conformes</label>
                                 </div>
                             </div>
@@ -119,12 +119,12 @@
                             <h6 class="my-2">Status do Teste de Estanqueidade</h6>
                             <div style="max-height: 160px; overflow-y: auto;">
                                 <div class="form-check">
-                                    <input type="checkbox" id="filter-teste-conformes-tanque" value="">
-                                    <label class="form-check-label" for="filter-teste-conformes-tanque">Solda inspecionada</label>
+                                    <input type="checkbox" id="filter-teste-conformes-tanque" class="filter-teste" value="conforme">
+                                    <label class="form-check-label" for="filter-teste-conformes-tanque">Teste conforme</label>
                                 </div>
                                 <div class="form-check">
-                                    <input type="checkbox" id="filter-teste-nao-conformes-tanque" value="">
-                                    <label class="form-check-label" for="filter-teste-nao-conformes-tanque">Solda não inspecionada</label>
+                                    <input type="checkbox" id="filter-teste-nao-conformes-tanque" class="filter-teste" value="nao_conforme">
+                                    <label class="form-check-label" for="filter-teste-nao-conformes-tanque">Teste não conforme</label>
                                 </div>
                             </div>
                     
@@ -160,6 +160,8 @@
         <span id="itens-filtrados-inspecionados-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
         <span id="itens-filtrados-inspecionados-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
         <span id="itens-filtrados-inspecionados-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+        <span id="itens-filtrados-inspecionados-solda" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Status Solda: </span>
+        <span id="itens-filtrados-inspecionados-teste" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Status Teste: </span>
     </div>
     <!-- Cards -->
     <div class="row" style="padding-right: 0;" id="cards-inspecionados"></div>

@@ -22,6 +22,19 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (event.target.classList.contains('get-inspecionar-solda')){
             const idTanque = event.target.getAttribute('data-id');
             buscarDadosInspecaoTanque(idTanque);
+        } else if (event.target.classList.contains('modal-image-trigger')) {
+            const imageUrl = event.target.getAttribute('data-image-url');
+            document.getElementById('imagemAmpliada').src = imageUrl;
+            
+            // Fechar o modal principal primeiro
+            const modalPrincipal = bootstrap.Modal.getInstance(document.getElementById('modal-inspecionar-solda-tanque-get'));
+            if (modalPrincipal) {
+                modalPrincipal.hide();
+            }
+            
+            // Abrir o modal de imagem
+            const modalImagem = new bootstrap.Modal(document.getElementById('modalImagemUnico'));
+            modalImagem.show();
         }
     });
 
@@ -133,24 +146,11 @@ document.addEventListener("DOMContentLoaded", () => {
                             <div class="mt-3">
                                 <strong>Imagens:</strong>
                                 <div class="d-flex flex-wrap gap-2 mt-2">
-                                    ${causa.imagens.map(img => `
-                                        <img src="${img.url}" class="img-thumbnail" style="width: 100px; height: 100px; object-fit: cover;" 
-                                            alt="Imagem da causa" data-bs-toggle="modal" data-bs-target="#modalImagem${index}">
-                                        
-                                        <!-- Modal para imagem ampliada -->
-                                        <div class="modal fade" id="modalImagem${index}" tabindex="-1" aria-hidden="true">
-                                            <div class="modal-dialog modal-lg">
-                                                <div class="modal-content">
-                                                    <div class="modal-header">
-                                                        <h5 class="modal-title">Imagem da Causa</h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <div class="modal-body text-center">
-                                                        <img src="${img.url}" class="img-fluid" alt="Imagem ampliada">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                    ${causa.imagens.map((img, imgIndex) => `
+                                        <img src="${img.url}" class="img-thumbnail modal-image-trigger" 
+                                            style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;" 
+                                            alt="Imagem da causa" 
+                                            data-image-url="${img.url}">
                                     `).join('')}
                                 </div>
                             </div>

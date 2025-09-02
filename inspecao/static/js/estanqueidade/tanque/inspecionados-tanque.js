@@ -30,6 +30,8 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
     let itensFiltradosData = document.getElementById("itens-filtrados-inspecionados-data");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
+    let itensFiltradosSolda = document.getElementById("itens-filtrados-inspecionados-solda");
+    let itensFiltradosTeste = document.getElementById("itens-filtrados-inspecionados-teste");
     let paginacao = document.getElementById("paginacao-inspecionados-tanque");
 
     // Limpa os cards antes de buscar novos
@@ -40,10 +42,20 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                                 </div>`;
     paginacao.innerHTML = "";
 
-
     let inspetorSelecionado = [];
     document.querySelectorAll('.form-check-input-inspecionados-inspetores:checked').forEach(checkbox => {
         inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
+    });
+
+    // Capturar os novos filtros
+    let statusSoldaSelecionado = [];
+    document.querySelectorAll('.filter-solda:checked').forEach(checkbox => {
+        statusSoldaSelecionado.push(checkbox.value);
+    });
+    
+    let statusTesteSelecionado = [];
+    document.querySelectorAll('.filter-teste:checked').forEach(checkbox => {
+        statusTesteSelecionado.push(checkbox.value);
     });
 
     let dataSelecionada = document.getElementById('data-filtro-inspecionados').value;
@@ -74,6 +86,23 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
         itensFiltradosInspetor.textContent = "Inspetores: " + inspetorSelecionado.join(", ");
     } else {
         itensFiltradosInspetor.style.display = "none";
+    }
+
+    // Adicionar os novos parâmetros à URL
+    if (statusSoldaSelecionado.length > 0) {
+        params.append("status_solda", statusSoldaSelecionado.join(","));
+        itensFiltradosSolda.style.display = "block";
+        itensFiltradosSolda.textContent = "Status Solda: " + statusSoldaSelecionado.join(", ");
+    } else {
+        itensFiltradosSolda.style.display = "none";
+    }
+    
+    if (statusTesteSelecionado.length > 0) {
+        params.append("status_teste", statusTesteSelecionado.join(","));
+        itensFiltradosTeste.style.display = "block";
+        itensFiltradosTeste.textContent = "Status Teste: " + statusTesteSelecionado.join(", ");
+    } else {
+        itensFiltradosTeste.style.display = "none";
     }
 
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros

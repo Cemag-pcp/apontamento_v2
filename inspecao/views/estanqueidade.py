@@ -1120,7 +1120,7 @@ def get_itens_inspecionados_tanque(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # Filtra apenas peças do tipo "tubo" ou "cilindro"
+    # Filtra apenas peças do tipo "tanque"
     pecas_filtradas = PecasEstanqueidade.objects.filter(tipo="tanque")
     inspecionados_ids = set(
         DadosExecucaoInspecaoEstanqueidade.objects.filter(
@@ -1136,6 +1136,20 @@ def get_itens_inspecionados_tanque(request):
     )
     data_filtrada = request.GET.get("data", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
+    
+    # Novos filtros
+    status_solda_filtrado = (
+        request.GET.get("status_solda", "").split(",")
+        if request.GET.get("status_solda")
+        else []
+    )
+    
+    status_teste_filtrado = (
+        request.GET.get("status_teste", "").split(",")
+        if request.GET.get("status_teste")
+        else []
+    )
+    
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
 
@@ -1161,6 +1175,45 @@ def get_itens_inspecionados_tanque(request):
         datas = datas.filter(
             dadosexecucaoinspecaoestanqueidade__inspetor__user__username__in=inspetores_filtrados
         ).distinct()
+        
+    # Aplicar filtros de status da solda
+    if status_solda_filtrado:
+        # Primeiro, obtenha os IDs das inspeções com não conformidade na solda
+        ids_com_nao_conformidade_solda = set(
+            DadosExecucaoInspecao.objects.filter(
+                inspecao__estanqueidade_id__in=datas.values_list('id', flat=True),
+                nao_conformidade__gt=0
+            ).values_list("inspecao__estanqueidade_id", flat=True)
+        )
+        
+        if "conforme" in status_solda_filtrado and "nao_conforme" in status_solda_filtrado:
+            # Mostrar todos (não filtrar)
+            pass
+        elif "conforme" in status_solda_filtrado:
+            # Filtrar apenas soldas conformes (sem não conformidade)
+            datas = datas.exclude(id__in=ids_com_nao_conformidade_solda)
+        elif "nao_conforme" in status_solda_filtrado:
+            # Filtrar apenas soldas não conformes
+            datas = datas.filter(id__in=ids_com_nao_conformidade_solda)
+    
+    # Aplicar filtros de status do teste de estanqueidade
+    if status_teste_filtrado:
+        # Primeiro, obtenha os IDs dos testes com não conformidade
+        ids_com_nao_conformidade_teste = set(
+            InspecaoEstanqueidade.objects.filter(
+                dadosexecucaoinspecaoestanqueidade__detalhespressaotanque__nao_conformidade__gt=0
+            ).values_list('id', flat=True)
+        )
+        
+        if "conforme" in status_teste_filtrado and "nao_conforme" in status_teste_filtrado:
+            # Mostrar todos (não filtrar)
+            pass
+        elif "conforme" in status_teste_filtrado:
+            # Filtrar apenas testes conformes (sem não conformidade)
+            datas = datas.exclude(id__in=ids_com_nao_conformidade_teste)
+        elif "nao_conforme" in status_teste_filtrado:
+            # Filtrar apenas testes não conformes
+            datas = datas.filter(id__in=ids_com_nao_conformidade_teste)
 
     datas = datas.select_related("peca").order_by("-id")
 
@@ -1226,6 +1279,8 @@ def get_itens_inspecionados_tanque(request):
         ).values_list("inspecao__estanqueidade_id", flat=True)
     )
 
+    print(ids_com_nao_conformidade)
+
     dados = []
     for data in pagina_obj:
         de_info = dados_execucao_dict.get(data.id)
@@ -1283,7 +1338,7 @@ def itens_enviados_tanque(request, tanque_id):
                 "causasnaoconformidade_set__causa",
                 "causasnaoconformidade_set__arquivos",
             )
-            .order_by("-num_execucao")
+            .order_by("num_execucao")
             .first()
         )
 

@@ -1,7 +1,7 @@
 from django.db import models
 from core.models import Profile
 from cadastro.models import PecasEstanqueidade
-
+from storages.backends.s3boto3 import S3Boto3Storage
 
 class Inspecao(models.Model):
 
@@ -57,8 +57,8 @@ class Inspecao(models.Model):
             setor_inspecao = f"Serra - {self.pecas_ordem_serra.id}"
         elif self.pecas_ordem_usinagem:
             setor_inspecao = f"Usinagem - {self.pecas_ordem_usinagem.id}"
-        elif self.tanque:
-            setor_inspecao = f"Tanque - {self.tanque.id}"
+        elif self.estanqueidade:
+            setor_inspecao = f"Tanque - {self.estanqueidade.id}"
         else:
             setor_inspecao = f"Estamparia - {self.pecas_ordem_estamparia.id}"
 
@@ -157,7 +157,10 @@ class ArquivoCausa(models.Model):
         CausasNaoConformidade, on_delete=models.CASCADE, related_name="arquivos"
     )
     arquivo = models.ImageField(
-        upload_to="causas_nao_conformidade/", null=True, blank=True
+        upload_to="causas_nao_conformidade/", 
+        null=True, 
+        blank=True,
+        storage=S3Boto3Storage(),
     )
 
 
@@ -258,7 +261,12 @@ class InfoAdicionaisExecTubosCilindros(models.Model):
     nao_conformidade_refugo = models.IntegerField(null=False, blank=False)
     qtd_inspecionada = models.IntegerField(null=False, blank=False)
     observacao = models.CharField(max_length=100, null=True, blank=True)
-    ficha = models.ImageField(upload_to="ficha_tubos_cilindros/", null=True, blank=True)
+    ficha = models.ImageField(
+        upload_to="ficha_tubos_cilindros/", 
+        null=True, 
+        blank=True, 
+        storage=S3Boto3Storage(),
+    )
 
 
 class CausasNaoConformidadeEstanqueidade(models.Model):
@@ -282,5 +290,8 @@ class ArquivoCausaEstanqueidade(models.Model):
         related_name="arquivos_estanqueidade",
     )
     arquivos = models.ImageField(
-        upload_to="causas_nao_conformidade_estanqueidade/", null=True, blank=True
+        upload_to="causas_nao_conformidade_estanqueidade/",
+        null=True,
+        blank=True,
+        storage=S3Boto3Storage(),
     )
