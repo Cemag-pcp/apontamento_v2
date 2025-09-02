@@ -54,8 +54,8 @@
                         <div style="max-height: 160px; overflow-y: auto;">
                             {% for maquina in maquinas %}
                                 <div class="form-check">
-                                    <input class="form-check-input-inspecao-serra-usinagem" id="{{maquina|lower}}-inspecao-serra-usinagem" type="checkbox" value="">
-                                    <label class="form-check-label" for="{{maquina|lower}}-inspecao-serra-usinagem">{{maquina}}</label>
+                                    <input class="form-check-input-inspecao-serra-usinagem" id="{{maquina.nome|lower}}-inspecao-serra-usinagem" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{maquina.nome|lower}}-inspecao-serra-usinagem">{{maquina.nome}}</label>
                                 </div>
                             {% endfor %}
                         </div>
@@ -120,8 +120,8 @@
                         <div style="max-height: 160px; overflow-y: auto;">
                             {% for maquina in maquinas %}
                                 <div class="form-check">
-                                    <input class="form-check-input-reinspecao-serra-usinagem" id="{{maquina|lower}}-reinspecao" type="checkbox" value="">
-                                    <label class="form-check-label" for="{{maquina|lower}}-reinspecao">{{maquina}}</label>
+                                    <input class="form-check-input-reinspecao-serra-usinagem" id="{{maquina.nome|lower}}-reinspecao" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{maquina.nome|lower}}-reinspecao">{{maquina.nome}}</label>
                                 </div>
                             {% endfor %}
                         </div>
@@ -196,8 +196,8 @@
                             <div style="max-height: 160px; overflow-y: auto;">
                                 {% for maquina in maquinas %}
                                     <div class="form-check">
-                                        <input class="form-check-input-inspecionados" id="{{maquina|lower}}-inspecionados" type="checkbox" value="">
-                                        <label class="form-check-label" for="{{maquina|lower}}-inspecionados">{{maquina}}</label>
+                                        <input class="form-check-input-inspecionados" id="{{maquina.nome|lower}}-inspecionados" type="checkbox" value="">
+                                        <label class="form-check-label" for="{{maquina.nome|lower}}-inspecionados">{{maquina.nome}}</label>
                                     </div>
                                 {% endfor %}
                             </div>
