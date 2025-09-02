@@ -1,4 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
+    
+    const dataInspecao = document.getElementById('data-inspecao-solda-tanque');
+    const hoje = new Date().toISOString().split('T')[0];
+    dataInspecao.value = hoje;
+    
     document.addEventListener("click", function(event) {
         if (event.target.classList.contains('historico-inspecao')) {
 

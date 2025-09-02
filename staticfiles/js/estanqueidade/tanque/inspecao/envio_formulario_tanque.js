@@ -1,4 +1,5 @@
 const form = document.querySelector('#modal-inspecao-tanque form');
+const modalSoldaTanque = document.getElementById('modal-inspecionar-solda-tanque');
 const submitButton = document.getElementById('inspecionar-tanque');
 const spinnerTanqueEstanqueidade = document.getElementById("spinner-tanque-estanqueidade");
 const statusButtonTanqueEstanqueidade = document.getElementById("status-button-tanque-estanqueidade");
@@ -64,22 +65,24 @@ form.addEventListener('submit', async (event) => {
 
         // Processar a resposta aqui
         if (response.ok) {
-            // Se a resposta for OK, mostre uma mensagem de sucesso
-            const Toast = Swal.mixin({
-                toast: true,
-                position: "bottom-end",
-                showConfirmButton: false,
-                timer: 2000,
-                timerProgressBar: true,
-                didOpen: (toast) => {
-                    toast.onmouseenter = Swal.stopTimer;
-                    toast.onmouseleave = Swal.resumeTimer;
-                }
+            const modalEstanqueidade = bootstrap.Modal.getInstance(document.getElementById("modal-inspecao-tanque"));
+            modalEstanqueidade.hide();
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: 'Inspeção de estanqueidade registrada. Preencha agora a inspeção de solda.',
+                timer: 3000,
+                showConfirmButton: false
             });
-            Toast.fire({
-                icon: "success",
-                title: "Inspeção registrada com sucesso!"
-            });
+            
+            document.getElementById('id-inspecao-solda-tanque').value = result.id_inspecao; // ID da inspeção recém-criada
+            document.getElementById('peca-inspecao-solda-tanque').value = document.getElementById('produto-estanqueidade-tanque').value; // Nome da peça ou conjunto
+            document.getElementById('qtd-produzida-solda-tanque').value = 1; // Quantidade da OP
+
+            const modalSolda = new bootstrap.Modal(document.getElementById('modal-inspecionar-solda-tanque'));
+            modalSolda.show();
+
             buscarItensInspecionadosEstanqueidadeTanque(1);
             buscarItensReinspecaoEstanqueidadeTanque(1);
         } else {
