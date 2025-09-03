@@ -86,7 +86,8 @@ urlpatterns += [
     path('dashboard/pintura/', pintura.dashboard_pintura, name='dasdashboard_pinturahboard'),
     path('dashboard/montagem/', montagem.dashboard_montagem, name='dasdashboard_montagemhboard'),
     path('dashboard/estamparia/', estamparia.dashboard_estamparia, name='dasdashboard_estampariahboard'),
-    path('dashboard/serra-usinagem/', serra_usinagem.dashboard_serra_usinagem, name='dasdashboard_serra_usinagemboard'),
+    path('dashboard/serra/', serra_usinagem.dashboard_serra, name='dasdashboard_serraboard'),
+    path('dashboard/usinagem/', serra_usinagem.dashboard_usinagem, name='dasdashboard_usinagemboard'),
     path('dashboard/tanque/', estanqueidade.dashboard_tanque, name='dashboard-tanque'),
     path('dashboard/tubos-cilindros/', estanqueidade.dashboard_tubos_cilindros, name='dashboard-tubos-cilindros')
 ]
@@ -110,11 +111,17 @@ urlpatterns += [
     path('estamparia/api/imagens-nao-conformidade/', estamparia.imagens_nao_conformidade_estamparia, name='imagens_nao_conformidade_estamparia'),
     path('estamparia/api/fichas-inspecao/', estamparia.ficha_inspecao_estamparia, name='ficha_inspecao_estamparia'),
 
-    path('serra-usinagem/api/indicador-serra-usinagem-analise-temporal/', serra_usinagem.indicador_serra_usinagem_analise_temporal, name='indicador_serra_usinagem_analise_temporal'),
-    path('serra-usinagem/api/indicador-serra-usinagem-resumo-analise-temporal/', serra_usinagem.indicador_serra_usinagem_resumo_analise_temporal, name='indicador_serra_usinagem_resumo_analise_temporal'),
-    path('serra-usinagem/api/causas-nao-conformidade/', serra_usinagem.causas_nao_conformidade_mensal_serra_usinagem, name='causas_nao_conformidade_mensal'),
-    path('serra-usinagem/api/imagens-nao-conformidade/', serra_usinagem.imagens_nao_conformidade_serra_usinagem, name='imagens_nao_conformidade_serra_usinagem'),
-    path('serra-usinagem/api/fichas-inspecao/', serra_usinagem.ficha_inspecao_serra_usinagem, name='ficha_inspecao_serra_usinagem'),
+    path('serra/api/indicador-serra-analise-temporal/', serra_usinagem.indicador_serra_analise_temporal, name='indicador_serra_analise_temporal'),
+    path('serra/api/indicador-serra-resumo-analise-temporal/', serra_usinagem.indicador_serra_resumo_analise_temporal, name='indicador_serra_resumo_analise_temporal'),
+    path('serra/api/causas-nao-conformidade/', serra_usinagem.causas_nao_conformidade_mensal_serra, name='causas_nao_conformidade_mensal_serra'),
+    path('serra/api/imagens-nao-conformidade/', serra_usinagem.imagens_nao_conformidade_serra, name='imagens_nao_conformidade_serra'),
+    path('serra/api/fichas-inspecao/', serra_usinagem.ficha_inspecao_serra, name='ficha_inspecao_serra'),
+
+    path('usinagem/api/indicador-usinagem-analise-temporal/', serra_usinagem.indicador_usinagem_analise_temporal, name='indicador_usinagem_analise_temporal'),
+    path('usinagem/api/indicador-usinagem-resumo-analise-temporal/', serra_usinagem.indicador_usinagem_resumo_analise_temporal, name='indicador_usinagem_resumo_analise_temporal'),
+    path('usinagem/api/causas-nao-conformidade/', serra_usinagem.causas_nao_conformidade_mensal_usinagem, name='causas_nao_conformidade_mensal_usinagem'),
+    path('usinagem/api/imagens-nao-conformidade/', serra_usinagem.imagens_nao_conformidade_usinagem, name='imagens_nao_conformidade_usinagem'),
+    path('usinagem/api/fichas-inspecao/', serra_usinagem.ficha_inspecao_usinagem, name='ficha_inspecao_usinagem'),
 
     path('tanque/api/indicador-tanque-analise-temporal/', estanqueidade.indicador_tanque_analise_temporal, name='indicador_tanque_analise_temporal'),
     path('tanque/api/indicador-tanque-resumo-analise-temporal/', estanqueidade.indicador_tanque_resumo_analise_temporal, name='indicador_tanque_resumo_analise_temporal'),
