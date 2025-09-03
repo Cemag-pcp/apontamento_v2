@@ -1584,7 +1584,6 @@ def indicador_tanque_resumo_analise_temporal(request):
 
 
 def causas_nao_conformidade_mensal_tanque(request):
-
     data_inicio = request.GET.get("data_inicio")
     data_fim = request.GET.get("data_fim")
 
@@ -1614,7 +1613,7 @@ def causas_nao_conformidade_mensal_tanque(request):
             dados_exec_inspecao__data_exec__lte=data_fim
         )
 
-    # Agrupa por mês e conta as ocorrências
+    # Agrupa por mês e peça (codigo - descricao), contando as ocorrências
     resultados = (
         nao_conformidades.annotate(
             mes_formatado=Concat(
@@ -1622,17 +1621,24 @@ def causas_nao_conformidade_mensal_tanque(request):
                 Value("-"),
                 ExtractMonth("dados_exec_inspecao__data_exec"),
                 output_field=CharField(),
+            ),
+            peca_info=Concat(
+                'dados_exec_inspecao__inspecao_estanqueidade__peca__codigo',
+                Value(' - '),
+                'dados_exec_inspecao__inspecao_estanqueidade__peca__descricao',
+                output_field=CharField()
             )
         )
-        .values("mes_formatado")
+        .values("mes_formatado", "peca_info")
         .annotate(quantidade=Count("id"))
-        .order_by("mes_formatado")
+        .order_by("mes_formatado", "peca_info")
     )
 
     # Formata a resposta conforme solicitado
     resposta = [
         {
             "data": item["mes_formatado"],
+            "peca": item["peca_info"],
             "causa": "Vazamento",
             "quantidade": item["quantidade"],
         }
@@ -1828,10 +1834,17 @@ def causas_nao_conformidade_mensal_tubos_cilindros(request):
                 ExtractMonth("info_tubos_cilindros__dados_exec_inspecao__data_exec"),
                 output_field=CharField(),
             ),
+            # Adiciona a concatenação do código e descrição da peça
+            peca_info=Concat(
+                'info_tubos_cilindros__dados_exec_inspecao__inspecao_estanqueidade__peca__codigo',
+                Value(' - '),
+                'info_tubos_cilindros__dados_exec_inspecao__inspecao_estanqueidade__peca__descricao',
+                output_field=CharField(),
+            )
         )
-        .values("mes_formatado", "causa__nome")
+        .values("mes_formatado", "causa__nome", "peca_info")
         .annotate(total_nao_conformidades=Sum("quantidade"))
-        .order_by("mes_formatado", "causa__nome")
+        .order_by("mes_formatado", "causa__nome", "peca_info")
     )
 
     # Formatação final
@@ -1839,6 +1852,7 @@ def causas_nao_conformidade_mensal_tubos_cilindros(request):
         {
             "Data": item["mes_formatado"],
             "Causa": item["causa__nome"],
+            "Peca": item["peca_info"],  # Adiciona a informação da peça
             "Soma do N° Total de não conformidades": item["total_nao_conformidades"],
         }
         for item in resultados

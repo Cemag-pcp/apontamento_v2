@@ -144,6 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const row = `
                     <tr>
                         <td>${item.Data}</td>
+                        <td>${item.Peca}</td>
                         <td>${item.Causa}</td>
                         <td>${item["Soma do N° Total de não conformidades"]}</td>
                     </tr>
