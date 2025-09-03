@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (startDate) queryParams.append('data_inicio', startDate);
         if (endDate) queryParams.append('data_fim', endDate);
 
-        const url = `/inspecao/serra-usinagem/api/indicador-serra-usinagem-analise-temporal/?${queryParams.toString()}`;
+        const url = `/inspecao/serra/api/indicador-serra-analise-temporal/?${queryParams.toString()}`;
 
         try {
             const response = await fetch(url);
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarGraficoCausas(startDate, endDate) {
 
-        let url = '/inspecao/serra-usinagem/api/causas-nao-conformidade/';
+        let url = '/inspecao/serra/api/causas-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarCarrosselImagens(startDate, endDate) {
 
-        let url = '/inspecao/serra-usinagem/api/imagens-nao-conformidade/';
+        let url = '/inspecao/serra/api/imagens-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function carregarCarrosselFichas(startDate, endDate) {
-        let url = '/inspecao/serra-usinagem/api/fichas-inspecao/';
+        let url = '/inspecao/serra/api/fichas-inspecao/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarTabelaCausas(startDate, endDate) {
 
-        let url = '/inspecao/serra-usinagem/api/causas-nao-conformidade/';
+        let url = '/inspecao/serra/api/causas-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarTabelaProducao(startDate, endDate) {
 
-        let url = '/inspecao/serra-usinagem/api/indicador-serra-usinagem-resumo-analise-temporal/';
+        let url = '/inspecao/serra/api/indicador-serra-resumo-analise-temporal/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate) params.push(`data_fim=${endDate}`);
