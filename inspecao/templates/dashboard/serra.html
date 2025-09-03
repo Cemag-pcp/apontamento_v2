@@ -2,7 +2,7 @@
 
 {% load static %}
 
-{% block title %} <title>Tubos e Cilindros</title> {% endblock %}
+{% block title %} <title>Serra</title> {% endblock %}
 
 {% block links %}
     <link rel="stylesheet" href="/static/css/dashboard/dashboard.css">
@@ -24,7 +24,7 @@
 <!-- Filtro de Datas -->
 <div class="row mb-4">
     <div class="col-12">
-        <h2 class="my-4">Dashboard Tubos e Cilindros</h2>
+        <h2 class="my-4">Dashboard Serra</h2>
         <div class="card">
             <div class="card-header">
                 Filtrar por Período
@@ -77,10 +77,11 @@
                     <table class="table table-striped table-hover" id="table-producao">
                         <thead>
                             <tr>
-                                <th>Data</th>
+                                <th>Data Referência</th>
+                                <th>N° de peças produzidas</th>
                                 <th>N° de inspeções</th>
                                 <th>N° de não conformidades</th>
-                                <th>% de não conformidades</th>
+                                <th>% de inspeção</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -97,14 +98,15 @@
                 Causas de Não Conformidades
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover" id="table-causas">
+                <div class="table-container">
+                    <table class="table table-striped table-hover table-fixed-header" id="table-causas">
                         <thead>
                             <tr>
-                                <th>Data</th>
+                                <th>Data Inspeção</th>
                                 <th>Peça</th>
                                 <th>Causa</th>
-                                <th>Ñ conformidades</th>
+                                <th>Total Ñ conformidades</th>
+                                <th>Destino</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -158,11 +160,36 @@
     </div>
 </div>
 
+<!-- Carrossel de Imagens -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                Fichas de Inspeção
+            </div>
+            <div class="card-body">
+                <div id="fichaCarousel" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#fichaCarousel" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Anterior</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#fichaCarousel" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Próximo</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 {% endblock %}
 
 {% block scripts %}
 
-    <script src="{% static 'js/dashboard/dash-tubos-cilindros.js' %}"></script>
+    <script src="{% static 'js/dashboard/dash-serra.js' %}"></script>
 
 {% endblock %}

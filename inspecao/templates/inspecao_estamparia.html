@@ -54,8 +54,8 @@
                         <div style="max-height: 160px; overflow-y: auto;">
                             {% for maquina in maquinas %}
                                 <div class="form-check">
-                                    <input class="form-check-input-inspecao-estamparia" id="{{maquina|lower}}-inspecao-estamparia" type="checkbox" value="">
-                                    <label class="form-check-label" for="{{maquina|lower}}-inspecao-estamparia">{{maquina}}</label>
+                                    <input class="form-check-input-inspecao-estamparia" id="{{maquina.nome|lower}}-inspecao-estamparia" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{maquina.nome|lower}}-inspecao-estamparia">{{maquina.nome}}</label>
                                 </div>
                             {% endfor %}
                         </div>
@@ -107,8 +107,8 @@
                         <div style="max-height: 160px; overflow-y: auto;">
                             {% for maquina in maquinas %}
                                 <div class="form-check">
-                                    <input class="form-check-input-reinspecao-estamparia" id="{{maquina|lower}}-reinspecao" type="checkbox" value="">
-                                    <label class="form-check-label" for="{{maquina|lower}}-reinspecao">{{maquina}}</label>
+                                    <input class="form-check-input-reinspecao-estamparia" id="{{maquina.nome|lower}}-reinspecao" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{maquina.nome|lower}}-reinspecao">{{maquina.nome}}</label>
                                 </div>
                             {% endfor %}
                         </div>
@@ -183,8 +183,8 @@
                             <div style="max-height: 160px; overflow-y: auto;">
                                 {% for maquina in maquinas %}
                                     <div class="form-check">
-                                        <input class="form-check-input-inspecionados" id="{{maquina|lower}}-inspecionados" type="checkbox" value="">
-                                        <label class="form-check-label" for="{{maquina|lower}}-inspecionados">{{maquina}}</label>
+                                        <input class="form-check-input-inspecionados" id="{{maquina.nome|lower}}-inspecionados" type="checkbox" value="">
+                                        <label class="form-check-label" for="{{maquina.nome|lower}}-inspecionados">{{maquina.nome}}</label>
                                     </div>
                                 {% endfor %}
                             </div>
