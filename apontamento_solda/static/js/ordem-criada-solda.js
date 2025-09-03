@@ -1636,6 +1636,134 @@ function restaurarFiltros() {
     }
 }
 
+// Finalizar parcial e continuar ordem
+document.getElementById('confirmFinalizarEContinuar').addEventListener('click', function () {
+    const ordemId = document.getElementById('ordemIdFinalizar').value;
+    const operadorFinal = document.getElementById('operadorFinal');
+    const todosOperadorFinal = document.getElementById('todosOperadorFinal');
+    const qtRealizada = document.getElementById('qtRealizada');
+    const obsFinalizar = document.getElementById('obsFinalizar').value;
+    const qtMaxima = qtRealizada.getAttribute('max');
+    const continua = 'true';
+
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
+
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
+
+    // Validação: A quantidade realizada não pode ser maior que a máxima
+    if (parseInt(qtRealizada.value) > parseInt(qtMaxima)) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'A quantidade realizada não pode ser maior que a quantidade máxima permitida.'
+        });
+        return;
+    }
+
+    // Determinar qual select está ativo e obter o valor do operador
+    let operadorId;
+    if (operadorFinal.style.display !== 'none' && operadorFinal.getAttribute('data-active') === 'true') {
+        if (!operadorFinal.value || operadorFinal.value === "") {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Por favor, selecione um operador da máquina.'
+            });
+            return;
+        }
+        operadorId = operadorFinal.value;
+    } else if (todosOperadorFinal.style.display !== 'none' && todosOperadorFinal.getAttribute('data-active') === 'true') {
+        if (!todosOperadorFinal.value || todosOperadorFinal.value === "") {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Por favor, selecione um operador da lista geral.'
+            });
+            return;
+        }
+        operadorId = todosOperadorFinal.value;
+    } else {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Por favor, selecione um operador válido.'
+        });
+        return;
+    }
+
+    // Validação: Quantidade realizada é obrigatória
+    if (!qtRealizada.value) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Por favor, informe a quantidade realizada.'
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: 'Finalizando...',
+        text: 'Por favor, aguarde enquanto a ordem está sendo finalizada.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    const payload = {
+        status: "finalizada",
+        ordem_id: parseInt(ordemId),
+        operador_final: parseInt(operadorId),
+        obs_finalizar: obsFinalizar,
+        qt_realizada: parseInt(qtRealizada.value),
+        continua: continua
+    };
+
+    fetch("api/ordens/atualizar-status/", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Erro ao finalizar a ordem.');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        carregarOrdensIniciadas(filtros);
+        resetarCardsInicial(filtros);
+
+        // Fechar o modal após a finalização bem-sucedida
+        const modalElement = document.getElementById('finalizarModal');
+        const finalizarModal = bootstrap.Modal.getInstance(modalElement);
+        finalizarModal.hide();
+
+        // fechar modal de confirmação
+        const modalElementConfirmacao = document.getElementById('modalFinalizarParcial');
+        const finalizarModalConfirmacao = bootstrap.Modal.getInstance(modalElementConfirmacao);
+        finalizarModalConfirmacao.hide();
+
+        Swal.close();
+    })
+    .catch(error => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message || 'Erro ao finalizar a ordem. Tente novamente.'
+        });
+    });
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     // Restaurar os filtros ao carregar a página
     restaurarFiltros();

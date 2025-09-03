@@ -18,5 +18,8 @@ urlpatterns = [
     path('api/buscar-pacote/<int:id>/', views.buscar_pacotes_carga, name='buscar_pacotes_carga'),
     path('api/alterar-stage/<int:id>/', views.alterar_stage, name='alterar_stage'),
     path('api/confirmar-pacote/<int:id>/', views.confirmar_pacote, name='confirmar_pacote'),
+    path('api/pacotes/mover-item/', views.mover_item, name='mover_item'),
+    path('api/impressao/', views.impressao_pacote, name='impressao_pacote'),
+    path('api/salvar-foto/', views.salvar_foto, name='salvar_foto'),
 
 ]

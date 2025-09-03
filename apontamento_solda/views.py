@@ -160,6 +160,34 @@ def criar_ordem(request):
 @csrf_exempt
 def atualizar_status_ordem(request):
 
+    """
+    Para iniciar uma ordem:
+
+    {
+        "status": "iniciada",
+        "ordem_id": 21101,
+    }
+
+    Para interromper uma ordem:
+
+    {
+        "status": "interrompida",
+        "ordem_id": 21101,
+        "motivo": 2
+    }
+
+    Para finalizar uma ordem:
+
+    {
+        "status": "finalizada",
+        "ordem_id": 21103,
+        "operador_final": 2,
+        "obs_finalizar": "teste",
+        "qt_realizada": 2,
+        "qt_mortas": 0
+    }
+    """
+
     try:
         # Parse do corpo da requisição
         body = json.loads(request.body)
@@ -168,6 +196,9 @@ def atualizar_status_ordem(request):
         ordem_id = body.get('ordem_id')
         grupo_maquina = 'solda'
         qt_produzida = body.get('qt_realizada', 0)
+        continua = body.get('continua', 'false').lower() == 'true'
+
+        print(body)
 
         if not ordem_id or not grupo_maquina or not status:
             return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
@@ -177,57 +208,6 @@ def atualizar_status_ordem(request):
 
         # Validações básicas
         if ordem.status_atual == status:
-            
-            if ordem.status_atual == 'iniciada':
-                operador_inicio = body.get('operador_inicio', None)
-
-                # verifica se a quantidade restante para a ordem é maior q eu 1
-                # mas tem que coletar todas as ordems cuja ordem_pai seja a ordem atual
-                ordens_filhas = Ordem.objects.filter(Q(ordem_pai=ordem) | Q(id=ordem.id))
-                pecas_ordem = PecasOrdem.objects.filter(ordem__in=ordens_filhas)
-                qtd_planejada_total = pecas_ordem.aggregate(total_planejada=Coalesce(Sum('qtd_planejada'), Value(0), output_field=FloatField()))['total_planejada']
-                qtd_planejada_total = qtd_planejada_total / pecas_ordem.count()
-
-                qtd_boa_total = pecas_ordem.aggregate(total_boa=Coalesce(Sum('qtd_boa'), Value(0), output_field=FloatField()))['total_boa']
-                qtd_restante = qtd_planejada_total - qtd_boa_total
-                if qtd_restante <= 1:
-                    return JsonResponse({'error': f'Essa ordem já está iniciada e não possui quantidade restante suficiente para criar uma nova ordem. Atualize a página.'}, status=400)
-            
-                # criar nova ordem clone da ordem atual apenas alterando a coluna ordem e a coluna ordem_pai que será a referencia da própria ordem
-                nova_ordem = Ordem.objects.create(
-                    grupo_maquina=ordem.grupo_maquina,
-                    status_atual='iniciada',
-                    data_carga=ordem.data_carga,
-                    data_programacao=ordem.data_programacao,
-                    maquina=ordem.maquina,
-                    ordem_pai=ordem,
-                    obs=ordem.obs,
-                )
-
-                # Cria o novo processo
-                novo_processo = OrdemProcesso.objects.create(
-                    ordem=nova_ordem,
-                    status='iniciada',
-                    data_inicio=now(),
-                )
-
-                # cria um novo registro em "pecasordem" com a nova ordem e com a mesma peça da ordem original
-                peca = PecasOrdem.objects.filter(ordem=ordem).first()
-                nova_peca_ordem = PecasOrdem.objects.create(
-                    ordem=nova_ordem,
-                    peca=peca.peca,
-                    qtd_planejada=qtd_planejada_total,
-                    qtd_boa=0,
-                    operador_inicio_id=operador_inicio,
-                    processo_ordem=novo_processo
-                )
-                
-                notificar_ordem(nova_ordem)
-
-                return JsonResponse({
-                    'message': 'Ordem iniciada com sucesso.',
-                })
-            
             return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
 
         if status == 'retorno' and ordem.status_atual == 'iniciada':
@@ -249,7 +229,9 @@ def atualizar_status_ordem(request):
             )
 
             if status == 'iniciada':
-                operador_inicio = body.get('operador_inicio', None)
+                
+                operador_inicial = body.get('operador_inicio')
+                operador_inicial = get_object_or_404(Operador, pk=int(operador_inicial)) 
 
                 # Validações básicas
                 if ordem.status_atual == 'interrompida':
@@ -272,7 +254,7 @@ def atualizar_status_ordem(request):
                     peca=peca.peca,
                     qtd_planejada=peca.qtd_planejada,
                     qtd_boa=0,
-                    operador_inicio_id=operador_inicio,
+                    operador_inicio=operador_inicial,
                     processo_ordem=novo_processo
                 )
 
@@ -323,21 +305,54 @@ def atualizar_status_ordem(request):
                 ultimo_peca_ordem.qtd_boa=int(qt_produzida)
                 ultimo_peca_ordem.processo_ordem=novo_processo
                 ultimo_peca_ordem.operador_final=operador_final
-                ultimo_peca_ordem.ordem=ordem.ordem_pai if ordem.ordem_pai else ordem
-                
                 ultimo_peca_ordem.save()
+
+                if "-" in peca.peca:
+                    codigo = peca.peca.split(" - ", maxsplit=1)[0]
+                else:
+                    codigo = peca.peca
                 
+                # verifica se ta na lista de itens a ser inspecionado pelo setor da solda
+                conjuntos_inspecionados = ConjuntosInspecionados.objects.filter(codigo=codigo)
+                if conjuntos_inspecionados:
+                    Inspecao.objects.create(
+                        pecas_ordem_solda=ultimo_peca_ordem,
+                    )
+
                 # Verificar novamente a quantidade finalizada após o novo registro
                 sum_pecas_finalizadas = PecasOrdem.objects.filter(ordem=ordem).aggregate(Sum('qtd_boa'))['qtd_boa__sum']
 
                 # Se a quantidade finalizada atingir a planejada, muda status para concluída
                 if sum_pecas_finalizadas == peca.qtd_planejada:
                     ordem.status_atual = status
+                    ordem.status_prioridade = 3
+                    ordem.save()
                 else:
-                    ordem.status_atual = 'aguardando_iniciar'
 
-                ordem.status_prioridade = 3
-                ordem.save()
+                    # se o operador desejar continuar a ordem em aberto?
+                    # continua = True
+                    # mas e se o operador clicar sem querer?
+                    # Como ele finaliza apenas sem computar a ordem?
+                    if continua == True:
+                        ordem.status_atual = 'iniciada'
+                        ordem.status_prioridade = 1
+                        ordem.save()
+
+                        nova_peca_ordem = PecasOrdem.objects.create(
+                            ordem=ordem,
+                            peca=peca.peca,
+                            qtd_planejada=peca.qtd_planejada,
+                            qtd_boa=0,
+                            operador_inicio=operador_final,
+                            processo_ordem=novo_processo
+                        )
+
+                        nova_peca_ordem.save()
+
+                    else:
+                        ordem.status_atual = 'aguardando_iniciar'
+                        ordem.status_prioridade = 1
+                        ordem.save()
 
             elif status == 'interrompida':
                 novo_processo.motivo_interrupcao = get_object_or_404(MotivoInterrupcao, pk=body['motivo'])
@@ -364,7 +379,6 @@ def atualizar_status_ordem(request):
                 ultimo_peca_ordem.save()
 
             ordem.save()
-            notificar_ordem(ordem)
 
             return JsonResponse({
                 'message': 'Status atualizado com sucesso.',
@@ -376,8 +390,8 @@ def atualizar_status_ordem(request):
     except Ordem.DoesNotExist:
         return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-    
+        return JsonResponse({'error': str(e)}, status=500)    
+
 def ordens_criadas(request):
    
     """

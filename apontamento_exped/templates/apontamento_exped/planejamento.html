@@ -86,7 +86,7 @@
                             <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
                                 Pacotes Hoje
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="pacotesHoje">24</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="pacotesHoje">-</div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-box fa-2x text-gray-300"></i>
@@ -104,7 +104,7 @@
                             <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
                                 Despachados
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="despachados">18</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="despachados">-</div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-truck fa-2x text-gray-300"></i>
@@ -122,7 +122,7 @@
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
                                 Pendentes
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="pendentes">6</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="pendentes">-</div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-clock fa-2x text-gray-300"></i>
@@ -140,7 +140,7 @@
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
                                 Carretas Ativas
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="carretasAtivas">8</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="carretasAtivas">-</div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-trailer fa-2x text-gray-300"></i>
@@ -164,17 +164,17 @@
                     <div class="kanban d-flex gap-3 flex-wrap">
                     <!-- Coluna: Planejamento -->
                     <div class="kanban-col flex-fill" data-stage="planejamento">
-                        <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Planejamento</div>
+                        <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Planejamento (TADEU)</div>
                         <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-planejamento"></div>
                     </div>
                     <!-- Coluna: Apontamento -->
                     <div class="kanban-col flex-fill" data-stage="apontamento">
-                        <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Apontamento</div>
+                        <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Apontamento (EXPEDIÇÃO)</div>
                         <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-apontamento"></div>
                     </div>
                     <!-- Coluna: Verificação -->
                     <div class="kanban-col flex-fill" data-stage="verificacao">
-                        <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Verificação</div>
+                        <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Verificação (QUALIDADE)</div>
                         <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-verificacao"></div>
                     </div>
                     <!-- Coluna: Despachado -->
@@ -325,7 +325,7 @@
 
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" id="btnVoltarVisualizarPacote">Voltar</button>
-        <button type="submit" class="btn btn-primary" form="formCriar">Salvar</button>
+        <button type="submit" class="btn btn-primary" form="formCriar" id="btnFormCriar">Salvar</button>
       </div>
 
     </div>
@@ -334,16 +334,37 @@
 
 <!-- Modal de Confirmação de Pacote -->
 <div class="modal fade" id="modalConfirmarPacote" tabindex="-1" aria-labelledby="modalConfirmarPacoteLabel" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-sm">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Confirmar Pacote</h5>
+      <div class="modal-header py-2">
+        <h5 class="modal-title" id="modalConfirmarPacoteLabel">Confirmar pacote</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
+
       <div class="modal-body">
         <form id="formConfirmarPacote">
-          <input type="hidden" id="idPacoteConfirmar">
-          <button type="submit" class="btn btn-success w-100">Confirmar</button>
+          <input type="hidden" id="idPacoteConfirmar" name="pacote_id">
+
+          <div class="mb-2">
+            <label for="obsConfirmarPacote" class="form-label">Observação (opcional)</label>
+            <textarea
+              class="form-control"
+              id="obsConfirmarPacote"
+              name="obsConfirmarPacote"
+              rows="3"
+              maxlength="280"
+              placeholder="Ex.: embalado e etiquetado; faltou 1 etiqueta; revisar parafusos."
+              style="min-height:84px; resize:vertical;"></textarea>
+            <div class="d-flex justify-content-between mt-1 small text-muted">
+              <span>Será registrado no histórico do pacote.</span>
+              <span><span id="obsCount">0</span>/280</span>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100" id="btnConfirmarPacote">
+            <span class="spinner-border spinner-border-sm me-2 d-none" id="spinConfirmar" role="status" aria-hidden="true"></span>
+            Confirmar
+          </button>
         </form>
       </div>
     </div>
@@ -373,7 +394,7 @@
 
           <div class="d-flex justify-content-end gap-2">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-primary">Confirmar avanço</button>
+            <button type="submit" class="btn btn-primary" id="btnConfirmarAvanco">Confirmar avanço</button>
           </div>
         </form>
       </div>
@@ -382,6 +403,39 @@
   </div>
 </div>
 
+<!-- Modal para alterar item de pacote -->
+<div class="modal fade" id="modalAlterarPacote" tabindex="-1" aria-labelledby="modalAlterarPacoteLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title" id="modalAlterarPacoteLabel">Alterar pacote</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formAlterarPacote">
+          <input type="hidden" id="pacoteOrigemId" name="pacote_origem_id">
+          <input type="hidden" id="itemId" name="item_id">
+          <input type="hidden" id="cargaId" name="cargaId">
+
+          <div class="mb-2">
+            <label class="form-label">Mover para</label>
+            <select id="pacoteDestinoId" name="pacote_destino_id" class="form-select" required>
+              <!-- opções geradas via JS -->
+            </select>
+            <div class="form-text" id="helperPacoteDestino"></div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">Salvar</button>
+            <button type="button" class="btn btn-light btn-sm w-100" data-bs-dismiss="modal">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 {% endblock %}
 
 {% block scripts %}
@@ -389,123 +443,6 @@
 <script type="module" src="{% static 'js/carregar_cargas.js' %}"></script>
 <script type="module" src="{% static 'js/kanbans.js' %}"></script>
 <script type="module" src="{% static 'js/confirmar_pacote.js' %}"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-
-    const itensContainer = document.getElementById('itensPacote');
-    const btnAdicionar = document.getElementById('btnAdicionarItem');
-    const formCriarPacote = document.getElementById('formCriar');
-    const btnVoltar = document.getElementById('btnVoltarVisualizarPacote');
-
-    // Adicionar novo item
-    btnAdicionar.addEventListener('click', () => {
-        const item = document.createElement('div');
-        item.className = 'row g-2 align-items-end item-pacote mt-2';
-        item.innerHTML = `
-            <div class="col-md-8">
-                <input type="text" name="descricao[]" class="form-control" placeholder="Descrição do item" required>
-            </div>
-            <div class="col-md-3">
-                <input type="number" name="quantidade[]" class="form-control" placeholder="Qtd" min="1" required>
-            </div>
-            <div class="col-md-1 text-end">
-                <button type="button" class="btn btn-danger btn-sm btnRemoverItem" title="Remover item">✕</button>
-            </div>
-        `;
-        itensContainer.appendChild(item);
-    });
-
-    // Remover item
-    itensContainer.addEventListener('click', function (e) {
-        if (e.target.classList.contains('btnRemoverItem')) {
-            const itemRow = e.target.closest('.item-pacote');
-            if (itemRow) itemRow.remove();
-        }
-    });
-
-    // Submeter formulário
-    formCriarPacote.addEventListener('submit', async function (e) {
-        e.preventDefault();
-
-        const form = e.currentTarget;
-        const fd = new FormData(form);
-
-        // Coleta múltiplos valores
-        const descricoes  = fd.getAll('descricao[]');    // ["Item A", "Item B", ...]
-        const quantidades = fd.getAll('quantidade[]');   // ["2", "5", ...]
-
-        // Monta itens pareando descrição x quantidade
-        const itens = descricoes.map((desc, i) => ({
-            descricao: (desc || '').trim(),
-            quantidade: Number(quantidades[i] || 0)
-        }))
-        // filtra linhas vazias ou quantidade inválida
-        .filter(it => it.descricao && Number.isFinite(it.quantidade) && it.quantidade > 0);
-
-        // Payload final
-        const payload = {
-            nomePacote: fd.get('nomePacote'),
-            observacoesPacote: fd.get('observacoesPacote') || '',
-            idCargaPacote: fd.get('idCargaPacote'),
-            itens
-        };
-
-        console.log('Payload para enviar:', payload);
-
-        // Exemplo de POST em JSON (Django/DRF)
-        try {
-            const resp = await fetch('api/guardar-pacote/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                // Se usar CSRF no Django:
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-                body: JSON.stringify(payload)
-            });
-
-            if (!resp.ok) {
-                const erro = await resp.text();
-                console.error('Erro ao salvar pacote:', erro);
-                alert('Erro ao salvar o pacote.');
-                return;
-            }
-
-            // Fecha este modal e abre o visualizar
-            const modalCriar = bootstrap.Modal.getInstance(document.getElementById('criarPacoteModal'));
-            const modalVisualizar = new bootstrap.Modal(document.getElementById('visualizarPacote'));
-            modalCriar.hide();
-            setTimeout(() => modalVisualizar.show(), 300);
-
-        } catch (err) {
-            console.error(err);
-            alert('Falha na comunicação com o servidor.');
-        }
-    });
-
-    // Botão voltar (sem salvar, só troca os modais)
-    btnVoltar.addEventListener('click', function () {
-        const modalCriar = bootstrap.Modal.getInstance(document.getElementById('criarPacoteModal'));
-        const modalVisualizar = new bootstrap.Modal(document.getElementById('visualizarPacote'));
-        modalCriar.hide();
-        setTimeout(() => modalVisualizar.show(), 300);
-    });
-});
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-</script>
+<script type="module" src="{% static 'js/criar_pacote.js' %}"></script>
 
 {% endblock %}

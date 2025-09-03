@@ -3,11 +3,14 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
 
 from cargas.utils import get_data_from_sheets,tratando_dados
-from .models import Carga,ItemPacote,Pacote,VerificacaoPacote, CarretaCarga
+from .models import Carga,ItemPacote,Pacote,VerificacaoPacote, CarretaCarga, ImagemPacote
+from .utils import chamar_impressora
 
 import json
+import boto3
 
 def planejamento(request):
 
@@ -181,6 +184,7 @@ def buscar_pacotes_carga(request, id):
     pacotes = Pacote.objects.filter(carga=carga).prefetch_related('itens')
 
     dados = []
+
     for pacote in pacotes:
         itens = []
         for item in pacote.itens.all():
@@ -195,12 +199,17 @@ def buscar_pacotes_carga(request, id):
         dados.append({
             'id': pacote.id,
             'nome': pacote.nome,
-            'status': pacote.status_confirmacao,
+            'status_expedicao': pacote.status_confirmacao_expedicao,
+            'status_qualidade': pacote.status_confirmacao_qualidade,
             'data_criacao': pacote.data_criacao.strftime('%Y-%m-%d %H:%M'),
             'itens': itens,
+            'cliente': carga.cliente,
+            'data_carga': carga.data_carga
         })
 
-    return JsonResponse({'pacotes': dados, 'status_carga': carga.stage})
+    return JsonResponse({'pacotes': dados, 'status_carga': carga.stage,
+                        'cliente_carga': carga.cliente, 'data_carga': carga.data_carga,
+                        'carga':carga.carga})
 
 @csrf_exempt
 def alterar_stage(request, id):
@@ -227,7 +236,7 @@ def alterar_stage(request, id):
 
     if stage_atual == 'apontamento':
         total = Pacote.objects.filter(carga_id=id).count()
-        confirmados = Pacote.objects.filter(carga_id=id, status_confirmacao='ok').count()
+        confirmados = Pacote.objects.filter(carga_id=id, status_confirmacao_expedicao='ok').count()
         if total == 0 or confirmados < total:
             return JsonResponse(
                 {'erro': 'Todos os pacotes precisam estar confirmados para avançar para Verificação.'},
@@ -256,12 +265,110 @@ def alterar_stage(request, id):
 
 @csrf_exempt
 def confirmar_pacote(request, id):
+    
+    data = json.loads(request.body)
+
+    obs = data.get('observacao')
 
     pacote = get_object_or_404(Pacote, id=id)
 
-    pacote.status_confirmacao = 'ok'
+    # identificar em qual estage está esse pacote
+    stage = pacote.carga.stage
+
+    # verifica se o pacote ja tem imagem
+    # if stage == 'apontamento':
+    #     imagens = ImagemPacote.objects.filter(pacote=pacote, stage=stage)
+    if stage == 'verificacao':
+        imagens = ImagemPacote.objects.filter(pacote=pacote, stage=stage)
+
+        if not imagens.exists():
+            return JsonResponse({'erro': 'É necessário anexar ao menos uma foto antes de confirmar o pacote.'}, status=400)
+
+
+    if stage == 'apontamento':
+        pacote.status_confirmacao_expedicao = 'ok'
+        pacote.data_confirmacao_expedicao = timezone.now()
+        pacote.obs_expedicao = obs
+    elif stage == 'verificacao':
+        pacote.status_confirmacao_qualidade = 'ok'
+        pacote.data_confirmacao_qualidade = timezone.now()
+        pacote.obs_qualidade = obs
+    
     pacote.save()    
 
     return JsonResponse({
         'mensagem': 'Pacote confirmado com sucesso!',
     }, status=200)
+
+def mover_item(request):
+    
+    data = json.loads(request.body)
+
+    item_id = data.get('item_id')
+    pacote_destino_id = data.get('pacote_destino_id')
+
+    item_pacote_atual = get_object_or_404(ItemPacote, id=item_id)
+    item_pacote_atual.pacote_id = pacote_destino_id
+    item_pacote_atual.save()
+
+    return JsonResponse({
+        'mensagem': 'Pacote alterado com sucesso.',
+    }, status=200)
+
+def impressao_pacote(request):
+
+    data = json.loads(request.body)
+
+    id_pacote = data.get('pacote_id')
+    cliente = data.get('cliente')
+    data_carga = data.get('data_carga')
+    nome_pacote = data.get('nome_pacote')
+
+    # buscar observações do pacote
+    pacote = get_object_or_404(Pacote, id=id_pacote)
+    obs_qualidade = pacote.obs_qualidade
+    obs_expedicao = pacote.obs_expedicao
+
+
+    # juntar observações
+    if obs_qualidade and obs_expedicao:
+        obs_completa = f"Expedição: {obs_expedicao} | Qualidade: {obs_qualidade}"
+    elif obs_qualidade:
+        obs_completa = f"Qualidade: {obs_qualidade}"
+    elif obs_expedicao:
+        obs_completa = f"Expedição: {obs_expedicao}"
+    else:
+        obs_completa = "Sem observações"
+
+    chamar_impressora(cliente, data_carga, nome_pacote, obs_completa)
+
+    return JsonResponse({'status': 'ok'})
+
+@csrf_exempt
+def salvar_foto(request):
+    if request.method == 'POST' and request.FILES.get('foto'):
+        foto = request.FILES['foto']
+        pacote_id = request.POST.get('pacote')
+
+        pacote_object = get_object_or_404(Pacote, id=pacote_id)
+
+        # stage atual do pacote
+        stage = pacote_object.carga.stage
+
+        # Gera nome customizado
+        extensao = foto.name.split('.')[-1]  # preserva extensão original
+        nome_arquivo = f"fotos_pacotes/pacote_{pacote_id}_{timezone.now().strftime('%Y%m%d%H%M%S')}.{extensao}"
+
+        # Sobrescreve o nome do arquivo
+        foto.name = nome_arquivo
+
+        imagem = ImagemPacote.objects.create(
+            pacote=pacote_object,
+            arquivo=foto,
+            stage=stage
+        )
+
+        return JsonResponse({'status': 'ok', 'url': imagem.arquivo.url})
+
+    return JsonResponse({'erro': 'Foto não recebida'}, status=400)
+

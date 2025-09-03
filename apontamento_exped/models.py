@@ -31,10 +31,20 @@ class Pacote(models.Model):
     carga = models.ForeignKey(Carga, related_name='pacotes', on_delete=models.CASCADE)
     criado_por = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
-    
-    confirmado_por = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True, related_name='confirmou_pacotes')
-    data_confirmacao = models.DateTimeField(null=True, blank=True)
-    status_confirmacao = models.CharField(max_length=50, choices=[('pendente', 'Pendente'), ('ok', 'Confirmado'), ('erro', 'Erro identificado')], default='pendente')
+
+    # ETAPA DA EXPEDIÇÃO 
+
+    confirmado_por_expedicao = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True, related_name='confirmou_pacotes_expedicao')
+    data_confirmacao_expedicao = models.DateTimeField(null=True, blank=True)
+    status_confirmacao_expedicao = models.CharField(max_length=50, choices=[('pendente', 'Pendente'), ('ok', 'Confirmado'), ('erro', 'Erro identificado')], default='pendente')
+    obs_expedicao = models.TextField(blank=True)
+
+    # ETAPA DA QUALIDADE
+
+    confirmado_por_qualidade = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True, related_name='confirmou_pacotes_qualidade')
+    data_confirmacao_qualidade = models.DateTimeField(null=True, blank=True)
+    status_confirmacao_qualidade = models.CharField(max_length=50, choices=[('pendente', 'Pendente'), ('ok', 'Confirmado'), ('erro', 'Erro identificado')], default='pendente')
+    obs_qualidade = models.TextField(blank=True) 
 
     def __str__(self):
         return self.nome
@@ -58,3 +68,12 @@ class VerificacaoPacote(models.Model):
 
     def __str__(self):
         return f"Verificação do {self.pacote.numero}"
+
+class ImagemPacote(models.Model):
+
+    pacote = models.ForeignKey(Pacote, on_delete=models.CASCADE, related_name='pacote_imagem')
+    arquivo = models.ImageField(
+        upload_to="imagem_pacote/", null=True, blank=True
+    )
+    stage = models.CharField(max_length=50, choices=[('verificacao', 'Verificação'), ('despachado','Despachado')])
+

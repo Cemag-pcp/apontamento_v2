@@ -1,4 +1,5 @@
-import { popularPacotesDaCarga } from './carregar_cargas.js';
+import { popularPacotesDaCarga, wireModalAlterarPacote } from './carregar_cargas.js';
+import { getCookie } from './criar_caixa.js';
 
 function mapStage(carga) {
   // se já vier "estagio" do backend, use direto:
@@ -95,6 +96,10 @@ document.getElementById('formAvancarEstagio').addEventListener('submit', async f
 
     const id = document.getElementById('idItemAvancar').value;
 
+    const btnConfirmarAvanco = document.getElementById('btnConfirmarAvanco');
+    btnConfirmarAvanco.disabled = true;
+    btnConfirmarAvanco.innerHTML = 'Confirmando...';
+
     try {
         const resp = await fetch(`api/alterar-stage/${id}/`, {
         method: 'POST',
@@ -109,9 +114,14 @@ document.getElementById('formAvancarEstagio').addEventListener('submit', async f
 
         bootstrap.Modal.getInstance(document.getElementById('modalAvancarEstagio')).hide();
         carregarCargasKanban();
-        // ou recarregue a UI: carregarCargasKanban() ou popularPacotesDaCarga()
-    } catch (err) {
+
+        btnConfirmarAvanco.disabled = false;
+        btnConfirmarAvanco.innerHTML = 'Confirmar avanço';
+
+      } catch (err) {
         alert('Erro ao avançar estágio.');
+        btnConfirmarAvanco.disabled = false;
+        btnConfirmarAvanco.innerHTML = 'Confirmar avanço';
         console.error(err);
     }
 });
@@ -195,7 +205,8 @@ function formatarData(iso) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  setupDropZones();
+  // setupDropZones();
+  wireModalAlterarPacote();
   carregarCargasKanban();
   document.getElementById('btnRefreshKanban')?.addEventListener('click', carregarCargasKanban);
 });
