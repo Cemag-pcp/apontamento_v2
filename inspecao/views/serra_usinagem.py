@@ -1118,14 +1118,14 @@ def indicador_serra_usinagem_analise_temporal(request):
                 output_field=CharField()
             )
         )
-        .values("mes", "setor")
+        .values("mes")
         .annotate(
             qtd_peca_produzida=Count("id"),
             qtd_peca_inspecionada=Count("dadosexecucaoinspecao__id"),
             soma_conformidade=Sum("conformidade"),
             soma_nao_conformidade=Sum("nao_conformidade"),
         )
-        .order_by("mes", "setor")
+        .order_by("mes")
     )
 
     resultado = []
@@ -1134,14 +1134,9 @@ def indicador_serra_usinagem_analise_temporal(request):
         nao_conformidade = item["soma_nao_conformidade"] or 0
         taxa_nc = (nao_conformidade / conformidade) if conformidade else 0
 
-        print(conformidade)
-        print(nao_conformidade)
-        print(taxa_nc)
-        print(round(taxa_nc, 4))
-
         resultado.append({
             "mes": item["mes"][:7],
-            "setor": item["setor"],
+            "setor": "serra+usinagem",  # Nome combinado
             "qtd_peca_produzida": item["qtd_peca_produzida"] or 0,
             "qtd_peca_inspecionada": item["qtd_peca_inspecionada"] or 0,
             "taxa_nao_conformidade": round(taxa_nc, 4),
@@ -1190,20 +1185,20 @@ def indicador_serra_usinagem_resumo_analise_temporal(request):
                 output_field=CharField()
             )
         )
-        .values("ano", "mes_num", "setor")
+        .values("ano", "mes_num")  # Removido "setor" para agrupar apenas por ano/mês
         .annotate(
             total_produzida=Count("id"),
             total_inspecionada=Count("dadosexecucaoinspecao__id"),
-            total_nao_conforme=Count(
-                "dadosexecucaoinspecao__id", filter=Q(nao_conformidade__gt=0)
+            total_nao_conforme=Sum(
+                "dadosexecucaoinspecao__nao_conformidade"
             ),
         )
-        .order_by("ano", "mes_num", "setor")
+        .order_by("ano", "mes_num")
     )
 
     resultado = []
     for item in queryset:
-        mes_formatado = f"{item['ano']}-{item['mes_num']}"
+        mes_formatado = f"{item['ano']}-{str(item['mes_num']).zfill(2)}"
 
         total_prod = item["total_produzida"] or 0
         total_insp = item["total_inspecionada"] or 0
@@ -1213,7 +1208,7 @@ def indicador_serra_usinagem_resumo_analise_temporal(request):
 
         resultado.append({
             "Data": mes_formatado,
-            "Setor": item["setor"],
+            "Setor": "serra+usinagem",  # Nome combinado
             "N° de peças produzidas": int(total_prod),
             "N° de inspeções": int(total_insp),
             "N° de não conformidades": int(total_nc),
@@ -1247,6 +1242,8 @@ def causas_nao_conformidade_mensal_serra_usinagem(request):
         queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
     if data_fim:
         queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
+
+    print(queryset)
 
     resultados = (
         queryset.annotate(
@@ -1326,8 +1323,9 @@ def imagens_nao_conformidade_serra_usinagem(request):
 
     # Query otimizada para buscar causas de não conformidade com arquivos
     queryset = CausasNaoConformidade.objects.filter(
-        Q(dados_execucao__isnull=False),
-        Q(arquivos__isnull=False)
+        Q(dados_execucao__inspecao__pecas_ordem_serra__isnull=False) |
+        Q(dados_execucao__inspecao__pecas_ordem_usinagem__isnull=False),
+        arquivos__isnull=False
     ).select_related(
         'dados_execucao',
         'dados_execucao__inspecao',

@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const row = `
                     <tr>
                         <td>${item.data}</td>
+                        <td>${item.peca}</td>
                         <td>${item.causa}</td>
                         <td>${item.quantidade}</td>
                     </tr>
