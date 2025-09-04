@@ -198,8 +198,6 @@ def atualizar_status_ordem(request):
         qt_produzida = body.get('qt_realizada', 0)
         continua = body.get('continua', 'false').lower() == 'true'
 
-        print(body)
-
         if not ordem_id or not grupo_maquina or not status:
             return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
 
@@ -208,7 +206,56 @@ def atualizar_status_ordem(request):
 
         # Validações básicas
         if ordem.status_atual == status:
-            return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
+            
+            if ordem.status_atual == 'iniciada':
+                operador_inicio = body.get('operador_inicio', None)
+
+                # verifica se a quantidade restante para a ordem é maior q eu 1
+                # mas tem que coletar todas as ordems cuja ordem_pai seja a ordem atual
+                ordens_filhas = Ordem.objects.filter(Q(ordem_pai=ordem) | Q(id=ordem.id))
+                pecas_ordem = PecasOrdem.objects.filter(ordem__in=ordens_filhas)
+                qtd_planejada_total = pecas_ordem.aggregate(total_planejada=Coalesce(Sum('qtd_planejada'), Value(0), output_field=FloatField()))['total_planejada']
+                qtd_planejada_total = qtd_planejada_total / pecas_ordem.count()
+
+                qtd_boa_total = pecas_ordem.aggregate(total_boa=Coalesce(Sum('qtd_boa'), Value(0), output_field=FloatField()))['total_boa']
+                qtd_restante = qtd_planejada_total - qtd_boa_total
+                if qtd_restante <= 1:
+                    return JsonResponse({'error': f'Essa ordem já está iniciada e não possui quantidade restante suficiente para criar uma nova ordem. Atualize a página.'}, status=400)
+            
+                # criar nova ordem clone da ordem atual apenas alterando a coluna ordem e a coluna ordem_pai que será a referencia da própria ordem
+                nova_ordem = Ordem.objects.create(
+                    grupo_maquina=ordem.grupo_maquina,
+                    status_atual='iniciada',
+                    data_carga=ordem.data_carga,
+                    data_programacao=ordem.data_programacao,
+                    maquina=ordem.maquina,
+                    ordem_pai=ordem,
+                    obs=ordem.obs,
+                )
+
+                # Cria o novo processo
+                novo_processo = OrdemProcesso.objects.create(
+                    ordem=nova_ordem,
+                    status='iniciada',
+                    data_inicio=now(),
+                )
+
+                # cria um novo registro em "pecasordem" com a nova ordem e com a mesma peça da ordem original
+                peca = PecasOrdem.objects.filter(ordem=ordem).first()
+                nova_peca_ordem = PecasOrdem.objects.create(
+                    ordem=nova_ordem,
+                    peca=peca.peca,
+                    qtd_planejada=qtd_planejada_total,
+                    qtd_boa=0,
+                    operador_inicio_id=operador_inicio,
+                    processo_ordem=novo_processo
+                )
+                
+                notificar_ordem(nova_ordem)
+
+                return JsonResponse({
+                    'message': 'Ordem iniciada com sucesso.',
+                })
 
         if status == 'retorno' and ordem.status_atual == 'iniciada':
             return JsonResponse({'error': f'Essa ordem já está iniciada. Atualize a página.'}, status=400)
@@ -229,7 +276,7 @@ def atualizar_status_ordem(request):
             )
 
             if status == 'iniciada':
-                
+
                 operador_inicial = body.get('operador_inicio')
                 operador_inicial = get_object_or_404(Operador, pk=int(operador_inicial)) 
 
@@ -305,6 +352,7 @@ def atualizar_status_ordem(request):
                 ultimo_peca_ordem.qtd_boa=int(qt_produzida)
                 ultimo_peca_ordem.processo_ordem=novo_processo
                 ultimo_peca_ordem.operador_final=operador_final
+                ultimo_peca_ordem.ordem=ordem.ordem_pai if ordem.ordem_pai else ordem
                 ultimo_peca_ordem.save()
 
                 if "-" in peca.peca:
@@ -379,6 +427,8 @@ def atualizar_status_ordem(request):
                 ultimo_peca_ordem.save()
 
             ordem.save()
+            notificar_ordem(ordem)
+            
 
             return JsonResponse({
                 'message': 'Status atualizado com sucesso.',
