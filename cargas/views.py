@@ -648,6 +648,100 @@ def historico_ordens_pintura(request):
         "pagina_atual": page
     })
 
+def historico_ordens_solda(request):
+    """
+    View que agrega os dados de PecasOrdem (por ordem) e junta com a model Ordem,
+    trazendo algumas colunas da Ordem e calculando o saldo:
+        saldo = soma(qtd_planejada) - soma(qtd_boa)
+    
+    Parâmetros esperados na URL (via GET):
+      - data_carga: data da carga (default: hoje)
+      - maquina: nome da máquina (opcional)
+      - status: status da ordem (opcional)
+      - page: número da página
+      - limit: quantidade de itens por página
+
+    """
+
+    data_carga = request.GET.get('data_carga')
+    maquina_param = request.GET.get('setor', None) # Chassi, Içamento...
+    status_param = request.GET.get('status', None)
+    ordem_param = request.GET.get('ordem', None)
+    conjunto_param = request.GET.get('conjunto', '')
+
+    # Paginação
+    page = request.GET.get('page', 1)
+    limit = request.GET.get('limit', 10)  # Default: 10 itens por página
+
+    try:
+        limit = int(limit)
+        page = int(page)
+    except ValueError:
+        return JsonResponse({"error": "Parâmetros de paginação inválidos."}, status=400)
+
+    # Monta os filtros para a model Ordem
+    filtros_ordem = {
+        'grupo_maquina': 'solda'
+    }
+
+    if data_carga:
+        try:
+            data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
+            filtros_ordem['data_carga'] = data_carga  # Removida a vírgula extra
+        except ValueError:
+            return JsonResponse({"error": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
+    if maquina_param:
+        maquina = get_object_or_404(Maquina, pk=maquina_param)
+        filtros_ordem['maquina'] = maquina
+    if status_param:
+        filtros_ordem['status_atual'] = status_param
+    if ordem_param:
+        filtros_ordem['id'] = ordem_param
+    if conjunto_param:
+        filtros_ordem['ordem_pecas_solda__peca__icontains'] = conjunto_param
+
+    # Recupera os IDs das ordens que atendem aos filtros
+    ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
+
+    # Consulta na PecasOrdem filtrando pelas ordens identificadas,
+    # trazendo alguns campos da Ordem (usando a notação "ordem__<campo>"),
+    # e agrupando para calcular as somas e o saldo.
+    pecas_ordem_agg = POSolda.objects.filter(ordem_id__in=ordem_ids).values(
+        'ordem',                    # id da ordem (chave para o agrupamento)
+        'ordem__data_carga',        # data da carga da ordem
+        'ordem__data_programacao',  # data da programação da ordem
+        'ordem__maquina__nome',     # nome da máquina (ajuste se necessário)
+        'ordem__status_atual',      # status atual da ordem
+        'peca',                     # nome da peça
+    ).annotate(
+        total_planejada=Coalesce(
+            Avg('qtd_planejada'), Value(0.0, output_field=models.FloatField())
+        ),
+        total_produzido=Coalesce(
+            Sum('qtd_boa'), Value(0.0, output_field=models.FloatField())
+        )
+    )
+
+    # Aplicando a paginação
+    paginator = Paginator(pecas_ordem_agg, limit)
+    
+    try:
+        ordens_paginadas = paginator.page(page)
+    except PageNotAnInteger:
+        ordens_paginadas = paginator.page(1)
+    except EmptyPage:
+        ordens_paginadas = []
+
+    maquinas = Ordem.objects.filter(id__in=ordem_ids).values('maquina__nome', 'maquina__id').distinct()
+
+    return JsonResponse({
+        "ordens": list(ordens_paginadas),
+        "maquinas": list(maquinas),
+        "total_ordens": paginator.count,
+        "total_paginas": paginator.num_pages,
+        "pagina_atual": page
+    })
+
 @csrf_exempt
 def editar_planejamento(request):
     if request.method != "POST":

@@ -1,5 +1,6 @@
 const tituloSetor = document.getElementById('titulo-setor');
 const btnSetorMontagem = document.getElementById('setor-montagem');
+const btnSetorSolda = document.getElementById('setor-solda');
 const btnSetorPintura = document.getElementById('setor-pintura');
 const setorSelecionado = document.getElementById('setor-selecionado');
 const colunaSetor = document.getElementById('colunaSetor');
@@ -55,7 +56,20 @@ function carregarTabela(pagina = 1) {
                     .catch(error => {
                         console.error("Erro ao carregar a tabela:", error);
                         reject(error); // Rejeita a Promise em caso de erro
-                    });
+                    })
+            } else if (setor === 'solda'){
+                fetch(`/cargas/api/historico-planejamento-solda/?data_carga=${filtros.dataCargaEscolhida || ''}&setor=${filtros.setor || ''}&ordem=${filtros.ordem || ''}&conjunto=${filtros.conjunto || ''}&page=${pagina}&limit=${limiteRegistros}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data);
+                        atualizarTabela(data.ordens, setor);
+                        atualizarPaginacao(data.total_ordens, pagina, data.total_paginas);
+                        resolve(); // Resolve a Promise após o sucesso
+                    })
+                    .catch(error => {
+                        console.error("Erro ao carregar a tabela:", error);
+                        reject(error); // Rejeita a Promise em caso de erro
+                    })
             } else {
                 fetch(`/cargas/api/historico-planejamento-pintura/?data_carga=${filtros.dataCargaEscolhida || ''}&cor=${filtros.cor || ''}&ordem=${filtros.ordem || ''}&conjunto=${filtros.conjunto || ''}&page=${pagina}&limit=${limiteRegistros}`)
                     .then(response => response.json())
@@ -88,7 +102,7 @@ function atualizarTabela(ordens, setor) {
 
     ordens.forEach(ordem => {
 
-        const colunaSetor = setor === "montagem" 
+        const colunaSetor = setor === "montagem" || setor === "solda" 
             ? `<td>${ordem.ordem__maquina__nome}</td>` 
             : `<td>${ordem.ordem__cor}</td>`;
 
@@ -467,6 +481,15 @@ function alternarSetor(event) {
         colunaFiltroMontagem.style.display = 'block';
         colunaFiltroPintura.style.display = 'none';
 
+    } else if (setor === 'solda') {
+        tituloSetor.innerHTML = '<i class="bi bi-tools me-1"></i>Setor: Solda';
+        // Colunas de cor e setor
+        colunaSetor.style.display = 'block';
+        colunaCor.style.display = 'none';
+        // Campos de filtro para cor e setor
+        colunaFiltroMontagem.style.display = 'block';
+        colunaFiltroPintura.style.display = 'none';
+
     } else {
         tituloSetor.innerHTML = '<i class="bi bi-brush me-1"></i>Setor: Pintura';
         // Colunas de cor e setor
@@ -527,6 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnSetorMontagem.addEventListener('change', alternarSetor);
     btnSetorPintura.addEventListener('change', alternarSetor);
+    btnSetorSolda.addEventListener('change', alternarSetor);
 
     // Ação do botão de filtro
     document.getElementById("filtro-form").addEventListener("submit", (event) => {
