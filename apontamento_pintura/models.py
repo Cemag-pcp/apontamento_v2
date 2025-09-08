@@ -58,3 +58,23 @@ class Retrabalho(models.Model):
     data_inicio = models.DateTimeField(null=True, blank=True)
     data_fim = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20,choices=TIPO_CHOICES, null=False, blank=False)
+
+class TesteFuncional(models.Model):
+    STATUS_CHOICES = (
+        ("pendente","Pendente"),
+        ("aprovado","Aprovado"),
+        ("reprovado","Reprovado"),
+    )
+
+    peca_ordem = models.ForeignKey(PecasOrdem, on_delete=models.CASCADE, related_name='teste_funcional_peca_ordem_pintura')
+    polimerizacao = models.BooleanField(null=True, blank=True) # apenas para PÓ
+    aderencia = models.BooleanField(null=True, blank=True, default=False)
+    espessura_camada_1 = models.FloatField(null=True, blank=True)
+    espessura_camada_2 = models.FloatField(null=True, blank=True)
+    espessura_camada_3 = models.FloatField(null=True, blank=True)
+    tonalidade = models.BooleanField(null=True, blank=True, default=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
+    observacao = models.TextField(null=True, blank=True)
+    data_inicial = models.DateTimeField(auto_now_add=True,null=True, blank=True)
+    data_atualizacao = models.DateTimeField(auto_now=True,null=True, blank=True)
+

@@ -11,11 +11,13 @@ from django.db import transaction, models, IntegrityError, connection
 import json
 from datetime import date, datetime, timedelta
 from pytz import timezone
+import random
+from collections import defaultdict
 
 from core.models import Profile
 from apontamento_pintura.models import Retrabalho
 from inspecao.models import Reinspecao, DadosExecucaoInspecao, Inspecao
-from .models import PecasOrdem, CambaoPecas, Cambao
+from .models import PecasOrdem, CambaoPecas, Cambao, TesteFuncional
 from core.models import Ordem
 from cadastro.models import Operador, Conjuntos
 from inspecao.models import Inspecao
@@ -265,7 +267,21 @@ def adicionar_pecas_cambao(request):
             cambao.cor = cor  # Atualiza a cor caso necessário
             cambao.tipo = tipo_tinta
 
+            tipo_pu = cambao.tipo == 'PU'
+
+
             with transaction.atomic():
+                if tipo_pu:
+                    peca_sorteada = verificar_cor_cambao(cambao.cor, cambao.nome)
+                    if peca_sorteada:
+                        try:
+                            #Registro de teste inicial sem nenhum dado de realização do teste de verificação funcional
+                            registro_teste_funcional_pintura = TesteFuncional.objects.create(
+                                peca_ordem=peca_sorteada.peca_ordem
+                            )
+                        except Exception as e:
+                            print('teste:',e)
+
                 pecas_selecionadas = []
 
                 # Valida e adiciona peças ao cambão
@@ -439,6 +455,8 @@ def finalizar_cambao(request):
 
             cambao = get_object_or_404(Cambao, id=cambao_id)
 
+            tipo_po = cambao.tipo == "PÓ"
+
             if cambao.status != "em uso":
                 return JsonResponse(
                     {"error": "Apenas cambões em uso podem ser finalizados!"}, status=400
@@ -476,9 +494,22 @@ def finalizar_cambao(request):
                         },
                         status=400,
                     )
-
+            
             # Se passou pela validação, executa a finalização em bloco atômico
             with transaction.atomic():
+                # Só verificar a cor do cambao caso na finalização se o tipo da cor for PÓ
+                if tipo_po:
+                    # Verificar cor e sortear uma peca
+                    peca_sorteada = verificar_cor_cambao(cambao.cor,cambao.nome)
+                    if peca_sorteada:
+                        #Registro de teste inicial sem nenhum dado de realização do teste de verificação funcional
+                        try:
+                            registro_teste_funcional_pintura = TesteFuncional.objects.create(
+                                peca_ordem=peca_sorteada.peca_ordem
+                            )
+                        except Exception as e:
+                            print(e)
+                
                 for item in pecas_no_cambao:
                     peca_ordem_original = item.peca_ordem
 
@@ -1248,3 +1279,160 @@ def api_tempos(request):
         })
 
     return JsonResponse(final_results, safe=False)
+
+def verificar_cor_cambao(cor_antes_de_finalizar, cambao_nome):
+    # Verificar o tipo de pintura do cambão
+    # cambao_nome = 'Único 3'  # Exemplo de ID do cambão
+    # cor_antes_de_finalizar = 'Laranja' # Cor do cambao finalizado ou aberto
+
+    cambao = Cambao.objects.filter(nome=cambao_nome).first()
+    if 'manual' in cambao.nome.lower():
+        print("Cambão é manual, não verificar cor.")
+        return None
+
+    tipo = cambao.tipo if cambao else None
+    cor = cambao.cor if cambao else None
+
+    print(cor)
+
+    # Tipo de pintura igual a PÓ?
+    if tipo == 'PÓ':
+        cambao_pecas_finalizadas = CambaoPecas.objects.filter(
+            status='finalizada', 
+            cambao__tipo=tipo
+        ).exclude(
+            cambao__nome__istartswith='manual'
+        ).exclude(
+            cambao__id=cambao.id
+        ).order_by('-data_fim')
+
+        primeira_peca = cambao_pecas_finalizadas.first()
+
+
+        print(f"{primeira_peca.cambao.nome} - {primeira_peca.peca_ordem.ordem.cor} {primeira_peca.cambao.tipo} - {primeira_peca.peca_ordem.id}")
+        # Cor do útlimo cambão finalizada igual a cor do cambão atual?
+        if primeira_peca.peca_ordem.ordem.cor == cor_antes_de_finalizar:
+            print(f"Último cambão finalizado com cor {primeira_peca.peca_ordem.ordem.cor} e tipo {primeira_peca.cambao.tipo} é igual ao cambão atual.")
+            return None
+        else:
+            print("Escolhendo peça do cmabão anterior ao acaso para fazer o teste.")
+            if primeira_peca:
+                ultima_data = primeira_peca.data_fim
+                # Define a janela de proximidade (ex: 1 minuto)
+                delta = timedelta(minutes=1)
+
+                # Filtra todas as peças finalizadas próximas da última data
+                cambao_pecas_finalizadas = cambao_pecas_finalizadas.filter(
+                    data_fim__gte=ultima_data - delta
+                )
+            else:
+                cambao_pecas_finalizadas = cambao_pecas_finalizadas.none()
+                
+            cont = cambao_pecas_finalizadas.count()
+            if cont > 0:
+                random_index = random.randint(0, cont - 1)
+                peca_aleatoria = cambao_pecas_finalizadas[random_index]
+                print("Escolher uma peça aleatória do cambão passado")
+            else:
+                peca_aleatoria = None
+
+            if peca_aleatoria:
+                print(f"Registrar teste com a peça: {peca_aleatoria.peca_ordem.id} - {peca_aleatoria.peca_ordem.ordem.cor} - {peca_aleatoria.cambao.tipo}")
+            else:
+                print("Nenhuma peça encontrada para registrar teste.")
+            
+            return peca_aleatoria
+            
+        
+    elif tipo == 'PU':
+        if 'manual' in cambao.nome.lower():
+            print("Cambão é manual, não verificar cor.")
+            return None
+        
+        # Pegando o nome do ultimo do cambão finalizado antes do atual (por ex: 7 aberto, 6 fechado)
+        cambao_nome = str(int(cambao.nome) - 1)
+        if cambao_nome == 0:
+            cambao_nome = 8
+        qs = CambaoPecas.objects.filter(
+            status='finalizada', 
+            cambao__tipo=tipo,
+        ).exclude(
+            Q(cambao__nome__istartswith='manual') | Q(cambao__nome__istartswith='Único')
+        ).exclude(
+            cambao__id=cambao.id
+        ).order_by('-data_fim')
+        
+
+        # Pega a data_fim mais recente
+        primeira_peca_cambao_anterior = qs.first()
+
+        print(f"cambao primeira peca {primeira_peca_cambao_anterior.peca_ordem.id} - {primeira_peca_cambao_anterior.peca_ordem.ordem.cor} e tipo {primeira_peca_cambao_anterior.cambao.tipo} e nome {primeira_peca_cambao_anterior.cambao.nome}")
+
+        if primeira_peca_cambao_anterior.peca_ordem.ordem.cor == cor_antes_de_finalizar:
+            print(f"Último cambão finalizado com cor {primeira_peca_cambao_anterior.peca_ordem.ordem.cor} e tipo {primeira_peca_cambao_anterior.cambao.tipo} é igual ao cambão atual.")
+            return None
+        else:
+            # CASO 2:
+            cor_primeira_peca = primeira_peca_cambao_anterior.peca_ordem.ordem.cor
+            lista_pecas_selecao = []
+            cambao_nome_inicial = int(cambao_nome)
+            for cambao_peca in qs:
+                if cambao_peca.peca_ordem.ordem.cor != cor_primeira_peca:
+                    print(f"Encontrada peça com cor diferente da primeira finalizada antes do cambao atual: {cambao_peca.peca_ordem.id} - {cambao_peca.peca_ordem.ordem.cor} - {cambao_peca.cambao.tipo}")
+                    # Registrar teste com essa peça
+                    print(cambao_nome_inicial)
+                    break
+
+                lista_pecas_selecao.append(cambao_peca)
+
+            
+            print(f"Total de peças encontradas para seleção: {lista_pecas_selecao}")
+
+            # Agrupa peças por cambao.id
+            if len(lista_pecas_selecao) > 0:
+                pecas_por_cambao = defaultdict(list)
+                for p in lista_pecas_selecao:
+                    pecas_por_cambao[p.cambao.nome].append(p)
+                print(pecas_por_cambao)
+                for chave, pecas in pecas_por_cambao.items():
+                    print(f"{chave} - {[p.peca_ordem.id for p in pecas]}")
+
+                peca_escolhida = random.choice(lista_pecas_selecao)
+
+                # Sorteia 1 peça de todos os cambões
+                print(f"{len(lista_pecas_selecao)} selecionadas para sorteio")
+                print("Escolher uma peça aleatória de todos os cambãos anteriores com a mesma cor")
+
+                # for peca in pecas_sorteadas:
+                print(f"Registrar teste com a peça: {peca_escolhida.peca_ordem.id} - {peca_escolhida.peca_ordem.ordem.cor} - {peca_escolhida.cambao.tipo} - {peca_escolhida.cambao.nome}")
+
+                return peca_escolhida
+            else:
+                print("Nenhuma peça encontrada para registrar teste.")
+                return None
+             
+    # if request.method == 'POST':
+    #     peca_ordem_id = request.POST.get('peca_ordem')
+    #     polimerizacao = request.POST.get('polimerizacao',None)
+        
+    #     teste_funcional_pintura = TesteFuncional.objects.get(
+    #             peca_ordem=peca_ordem_id
+    #         )
+        
+    #     if teste_funcional_pintura:
+    #         try:
+    #             # teste_funcional_pintura.polimerizacao = 
+    #         except Exception as e:
+    #             print(e)
+
+
+    #     peca_ordem = models.ForeignKey(PecasOrdem, on_delete=models.CASCADE, related_name='teste_funcional_peca_ordem_pintura')
+    #     polimerizacao = models.BooleanField(null=True, blank=True) # apenas para PÓ
+    #     aderencia = models.BooleanField(default=False)
+    #     espessura_camada_1 = models.FloatField(null=True, blank=True)
+    #     espessura_camada_2 = models.FloatField(null=True, blank=True)
+    #     espessura_camada_3 = models.FloatField(null=True, blank=True)
+    #     tonalidade = models.BooleanField(default=False)
+    #     # status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
+    #     observacao = models.TextField(null=True, blank=True)
+    # pass

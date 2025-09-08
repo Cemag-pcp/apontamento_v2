@@ -1,0 +1,126 @@
+<div class="modal fade" data-bs-backdrop="static" id="modal-verificacao-funcional" tabindex="-1" role="dialog"
+     aria-labelledby="tubosModalLabel" style="overflow-y: auto;">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <form id="form-registro-teste-verificacao-funcional">
+        <div class="modal-header">
+          <h5 class="modal-title" id="tubosModalTitle">Verificação Funcional Peça</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body p-4" style="font-size: 14px; overflow-y: auto; max-height: 650px;">
+
+          <!-- Dados da peça -->
+          <div class="row">
+            <h5 id="peca"></h5>
+            <p id="registroId"></p>
+            <p>
+              <strong>📅 Dt. Carga:</strong> <span id="dataCarga"></span><br>
+              <strong>📍 Tipo:</strong> <span id="tipoPintura"></span> <br>
+              <strong>🎨 Cor:</strong> <span id="cor"></span><br>
+            </p>
+          </div>
+
+          <!-- Teste de Polimerização -->
+          <div class="card mb-3 shadow-sm" id="testePolimerizacao">
+            <div class="card-body">
+              <h6 class="card-title font-weight-bold text-dark">Polimerização (apenas PÓ)</h6>
+              <div class="d-inline-block me-3">
+                <input type="radio" class="form-check-input" name="statusPolimerizacao"
+                      id="status-polimerizacao-aprovado" value="aprovado" required>
+                <label for="status-polimerizacao-aprovado" class="form-check-label">Aprovado</label>
+              </div>
+              <div class="d-inline-block">
+                <input type="radio" class="form-check-input" name="statusPolimerizacao"
+                      id="status-polimerizacao-reprovado" value="reprovado">
+                <label for="status-polimerizacao-reprovado" class="form-check-label">Reprovado</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Teste de Aderência -->
+          <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+              <h6 class="card-title font-weight-bold text-dark">Teste de Aderência</h6>
+              <div class="d-inline-block me-3">
+                <input type="radio" class="form-check-input" name="statusAderencia"
+                      id="status-aderencia-aprovado" value="aprovado" required>
+                <label for="status-aderencia-aprovado" class="form-check-label">Aprovado</label>
+              </div>
+              <div class="d-inline-block">
+                <input type="radio" class="form-check-input" name="statusAderencia"
+                      id="status-aderencia-reprovado" value="reprovado">
+                <label for="status-aderencia-reprovado" class="form-check-label">Reprovado</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Espessura de camada -->
+          <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+              <h6 class="card-title font-weight-bold text-dark">Espessura de camada</h6>
+              <div class="row align-items-end">
+                <div class="col-sm-4 mb-3">
+                  <label class="form-label" for="espessura-camada-1">Espessura 1</label>
+                  <input type="number" min="0" step=".01" class="form-control"
+                        id="espessura-camada-1" required>
+                </div>
+                <div class="col-sm-4 mb-3">
+                  <label class="form-label" for="espessura-camada-2">Espessura 2</label>
+                  <input type="number" min="0" step=".01" class="form-control"
+                        id="espessura-camada-2" required>
+                </div>
+                <div class="col-sm-4 mb-3">
+                  <label class="form-label" for="espessura-camada-3">Espessura 3</label>
+                  <input type="number" min="0" step=".01" class="form-control"
+                        id="espessura-camada-3" required>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Teste de Tonalidade -->
+          <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+              <h6 class="card-title font-weight-bold text-dark">Teste de Tonalidade</h6>
+              <div class="d-inline-block me-3">
+                <input type="radio" class="form-check-input" name="statusTonalidade"
+                      id="status-tonalidade-aprovado" value="aprovado" required>
+                <label for="status-tonalidade-aprovado" class="form-check-label">Aprovado</label>
+              </div>
+              <div class="d-inline-block">
+                <input type="radio" class="form-check-input" name="statusTonalidade"
+                      id="status-tonalidade-reprovado" value="reprovado">
+                <label for="status-tonalidade-reprovado" class="form-check-label">Reprovado</label>
+              </div>
+            </div>
+          </div>
+
+          
+
+          <!-- Upload e Observações -->
+          <div class="row">
+            <div class="col-sm-12">
+              <div class="mb-3">
+                <label for="upload-imagem-teste" class="form-label">Imagem</label>
+                <input class="form-control form-control-sm" id="upload-imagem-teste" type="file">
+              </div>
+
+              <div class="mb-3">
+                <label for="observacoes-teste" class="form-label">Observações</label>
+                <textarea class="form-control" id="observacoes-teste" rows="3"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-dark" id="btn-registrar-teste" type="submit">
+            <span id="spinner-teste" class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+            <span id="status-btn-teste" role="status">Registrar Teste</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
