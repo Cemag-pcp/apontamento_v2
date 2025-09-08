@@ -6,59 +6,61 @@
 {% endblock %}
 
 {% block links %}
-    <link rel="stylesheet" href="{% static 'css/badges.css' %}">
-    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
-    <link rel="stylesheet" href="{% static 'css/table-fixed-header.css' %}">
-    <style>
-        .table-container {
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        .table-fixed-header thead th {
-            position: sticky;
-            top: 0;
-            background-color: #f8f9fa;
-            z-index: 10;
-        }
-        .status-badge {
-            font-size: 0.8rem;
-            padding: 0.25rem 0.5rem;
-        }
-        .carreta-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
-        }
+    
+  <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+  <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+  <link rel="stylesheet" href="{% static 'css/table-fixed-header.css' %}">
+  <style>
+      .table-container {
+          max-height: 500px;
+          overflow-y: auto;
+      }
+      .table-fixed-header thead th {
+          position: sticky;
+          top: 0;
+          background-color: #f8f9fa;
+          z-index: 10;
+      }
+      .status-badge {
+          font-size: 0.8rem;
+          padding: 0.25rem 0.5rem;
+      }
+      .carreta-color {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          display: inline-block;
+          margin-right: 8px;
+      }
 
-        /* cada coluna do kanban já existe */
-        .kanban-list {
-            display: flex;            /* empilha itens em coluna */
-            flex-direction: column;
-            gap: .5rem;               /* espaçamento vertical entre cards */
-            min-height: 60vh;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
+      /* cada coluna do kanban já existe */
+      .kanban-list {
+          display: flex;            /* empilha itens em coluna */
+          flex-direction: column;
+          gap: .5rem;               /* espaçamento vertical entre cards */
+          min-height: 60vh;
+          max-height: 70vh;
+          overflow-y: auto;
+      }
 
-        /* garante 1 por linha dentro da coluna */
-        .kanban-list .card,
-        .kanban-list .card-kanban {
-            width: 100%;
-            display: block;           /* evita qualquer inline side-by-side */
-            margin: 0;                /* o gap cuida do espaçamento */
-        }
+      /* garante 1 por linha dentro da coluna */
+      .kanban-list .card,
+      .kanban-list .card-kanban {
+          width: 100%;
+          display: block;           /* evita qualquer inline side-by-side */
+          margin: 0;                /* o gap cuida do espaçamento */
+      }
 
-        /* estética opcional (mantém compacto) */
-        .card-kanban {
-            cursor: grab;
-        }
-        .card-kanban:active {
-            cursor: grabbing;
-        }
+      /* estética opcional (mantém compacto) */
+      .card-kanban {
+          cursor: grab;
+      }
+      .card-kanban:active {
+          cursor: grabbing;
+      }
 
-    </style>
+  </style>
+
 {% endblock %}
 
 {% block content %}
@@ -189,7 +191,7 @@
     </div>
 </div>
 
-<!-- Modal para criar Caixa -->
+<!-- Modal: para criar Caixa -->
 <div class="modal fade" id="criarCaixaModal" tabindex="-1" aria-labelledby="criarCaixaModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -254,7 +256,7 @@
     </div>
 </div>
 
-<!-- Modal para visualizar pacote dentro da caixa -->
+<!-- Modal: para visualizar pacote dentro da caixa -->
 <div class="modal fade" id="visualizarPacote" tabindex="-1" aria-labelledby="visualizarPacoteLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -274,7 +276,7 @@
     </div>
 </div>
 
-<!-- Modal para criar pacote -->
+<!-- Modal: para criar pacote -->
 <div class="modal fade" id="criarPacoteModal" tabindex="-1" aria-labelledby="criarPacoteModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -332,7 +334,7 @@
   </div>
 </div>
 
-<!-- Modal de Confirmação de Pacote -->
+<!-- Modal: de Confirmação de Pacote -->
 <div class="modal fade" id="modalConfirmarPacote" tabindex="-1" aria-labelledby="modalConfirmarPacoteLabel" aria-hidden="true">
   <div class="modal-dialog modal-sm">
     <div class="modal-content">
@@ -403,7 +405,7 @@
   </div>
 </div>
 
-<!-- Modal para alterar item de pacote -->
+<!-- Modal: para alterar item de pacote -->
 <div class="modal fade" id="modalAlterarPacote" tabindex="-1" aria-labelledby="modalAlterarPacoteLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-sm">
     <div class="modal-content">
@@ -435,10 +437,10 @@
   </div>
 </div>
 
-
 {% endblock %}
 
 {% block scripts %}
+
 <script type="module" src="{% static 'js/criar_caixa.js' %}"></script>
 <script type="module" src="{% static 'js/carregar_cargas.js' %}"></script>
 <script type="module" src="{% static 'js/kanbans.js' %}"></script>

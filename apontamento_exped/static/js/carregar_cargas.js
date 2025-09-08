@@ -151,9 +151,6 @@ export async function popularPacotesDaCarga(cargaId) {
 
           li.appendChild(info);
           
-          console.log(data)
-          console.log(pacote)
-
           // mesma regra de visibilidade do botão Confirmar (apenas em "apontamento" e pacote != ok)
           if (data.status_carga === 'apontamento' && pacote.status_expedicao !== 'ok') {
             li.appendChild(btnAlterar);
@@ -442,8 +439,6 @@ export function wireModalAlterarPacote(){
 }
 
 function impressaoZebra(id_pacote, cliente, data_carga, nome_pacote){
-
-  console.log(id_pacote)
 
   const resp = fetch('api/impressao/', {
     method: 'POST',

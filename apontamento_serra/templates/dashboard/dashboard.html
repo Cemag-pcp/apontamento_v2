@@ -52,13 +52,13 @@
                             <!-- Data Inicial -->
                             <div class="col-md-3">
                                 <label for="dataInicial" class="form-label">Data Inicial:</label>
-                                <input type="date" id="dataInicial" class="form-control" value="2025-06-01" required>
+                                <input type="date" id="dataInicial" class="form-control" required>
                             </div>
                             
                             <!-- Data Final -->
                             <div class="col-md-3">
                                 <label for="dataFinal" class="form-label">Data Final:</label>
-                                <input type="date" id="dataFinal" class="form-control" value="2025-06-30" required>
+                                <input type="date" id="dataFinal" class="form-control" required>
                             </div>
                             
                             <!-- Botão Filtrar -->
@@ -603,8 +603,26 @@
             atualizarGraficos();
         });
 
+        // Função para definir datas padrão
+        function setDefaultDates() {
+            const today = new Date();
+            
+            const dataInicial = new Date(today);
+            dataInicial.setDate(today.getDate() - 15);
+            
+            const dataFinal = new Date(today);
+            dataFinal.setDate(today.getDate());
+            
+            const dataFinalStr = dataFinal.toISOString().split('T')[0];
+            const dataInicialStr = dataInicial.toISOString().split('T')[0];
+            
+            document.getElementById('dataInicial').value = dataInicialStr;
+            document.getElementById('dataFinal').value = dataFinalStr;
+        }
+
         // Carregar dados iniciais ao carregar a página
         window.onload = function() {
+            setDefaultDates();
             atualizarGraficos();
         };
     </script>

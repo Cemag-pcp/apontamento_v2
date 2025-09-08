@@ -35,6 +35,7 @@ def cor_recurso(recurso):
         return 'laranja'
 
 # ============ apis ===============
+
 def cargas(request):
     data_carga = request.GET.get('data_carga')
 
@@ -132,6 +133,20 @@ def criar_caixa(request):
 def buscar_cargas(request):
 
     cargas = Carga.objects.all().values('id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'stage', 'data_criacao')
+
+    # verifica se todos os pacotes dessa carga contém foto
+    for carga in cargas:
+        pacotes = Pacote.objects.filter(carga_id=carga['id'])
+        total_pacotes = pacotes.count()
+        pacotes_com_foto_verificacao = ImagemPacote.objects.filter(pacote__in=pacotes, stage='verificacao').values('pacote').distinct().count()
+        pacotes_com_foto_despachado = ImagemPacote.objects.filter(pacote__in=pacotes, stage='despachado').values('pacote').distinct().count()
+        
+        carga['todos_pacotes_tem_foto_verificacao'] = (total_pacotes > 0 and total_pacotes == pacotes_com_foto_verificacao)
+        carga['todos_pacotes_tem_foto_despachado'] = (total_pacotes > 0 and total_pacotes == pacotes_com_foto_despachado)
+        
+
+    print(list(cargas))
+
     return JsonResponse(list(cargas), safe=False)
 
 @csrf_exempt
@@ -196,6 +211,9 @@ def buscar_pacotes_carga(request, id):
                 'quantidade': item.quantidade,
             })
 
+        # Verifica se o pacote tem foto
+        tem_foto = ImagemPacote.objects.filter(pacote=pacote).exists()
+
         dados.append({
             'id': pacote.id,
             'nome': pacote.nome,
@@ -204,7 +222,8 @@ def buscar_pacotes_carga(request, id):
             'data_criacao': pacote.data_criacao.strftime('%Y-%m-%d %H:%M'),
             'itens': itens,
             'cliente': carga.cliente,
-            'data_carga': carga.data_carga
+            'data_carga': carga.data_carga,
+            'tem_foto': tem_foto
         })
 
     return JsonResponse({'pacotes': dados, 'status_carga': carga.stage,
@@ -228,6 +247,7 @@ def alterar_stage(request, id):
     # Regras de avanço de estágio
     if stage_atual == 'planejamento':
         pacotes = Pacote.objects.filter(carga_id=id).count()
+        
         if pacotes == 0:
             return JsonResponse(
                 {'erro': 'Você precisa criar ao menos 1 pacote antes de avançar para Apontamento.'},
@@ -235,6 +255,7 @@ def alterar_stage(request, id):
             )
 
     if stage_atual == 'apontamento':
+        # VERIFICA SE TODOS PACOTES FORAM CONFIRMADOS
         total = Pacote.objects.filter(carga_id=id).count()
         confirmados = Pacote.objects.filter(carga_id=id, status_confirmacao_expedicao='ok').count()
         if total == 0 or confirmados < total:
@@ -347,6 +368,7 @@ def impressao_pacote(request):
 @csrf_exempt
 def salvar_foto(request):
     if request.method == 'POST' and request.FILES.get('foto'):
+
         foto = request.FILES['foto']
         pacote_id = request.POST.get('pacote')
 
@@ -371,4 +393,3 @@ def salvar_foto(request):
         return JsonResponse({'status': 'ok', 'url': imagem.arquivo.url})
 
     return JsonResponse({'erro': 'Foto não recebida'}, status=400)
-

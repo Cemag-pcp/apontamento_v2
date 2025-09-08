@@ -14,6 +14,7 @@ function mapStage(carga) {
 }
 
 function createKanbanCard(carga) {
+  
     const card = document.createElement('div');
     card.className = 'card card-kanban shadow-sm mb-2';
     card.draggable = true;
@@ -26,14 +27,27 @@ function createKanbanCard(carga) {
     `;
     
     let btnElementAvancarEstagio = '';
-    if (carga.stage !== 'despachado'){
+    console.log(carga)
+    if (carga.stage === 'verificacao' && carga.todos_pacotes_tem_foto_verificacao) {
         btnElementAvancarEstagio =`
         <button class="btn btn-sm btn-outline-primary avancar-estagio" title="Proximo estágio"
                 data-bs-toggle="modal" data-bs-target="#modalAvancarEstagio" data-id-carga="${carga.id}">
             <i class="fas fa-arrow-right ms-1"></i>
         </button>
         `
-    };
+    } else if (carga.stage === 'apontamento') {
+        btnElementAvancarEstagio =`
+        <button class="btn btn-sm btn-outline-primary avancar-estagio" title="Proximo estágio"
+                data-bs-toggle="modal" data-bs-target="#modalAvancarEstagio" data-id-carga="${carga.id}">
+            <i class="fas fa-arrow-right ms-1"></i>
+        </button>
+        `
+    } else if (carga.stage === 'despachado' && carga.todos_pacotes_tem_foto_despachado) {
+        btnElementAvancarEstagio =`
+        <span class="badge bg-success">Despachado</span>`
+    } else {
+        btnElementAvancarEstagio = '<span class="badge bg-warning">Aguardando fotos</span>';
+    }
 
     const body = document.createElement('div');
     body.className = 'card-body py-2';
@@ -109,7 +123,7 @@ document.getElementById('formAvancarEstagio').addEventListener('submit', async f
         },
             body: JSON.stringify({ stage: '' })
         });
-
+        console.log(resp);
         if (!resp.ok) throw new Error('Falha ao avançar estágio');
 
         bootstrap.Modal.getInstance(document.getElementById('modalAvancarEstagio')).hide();
