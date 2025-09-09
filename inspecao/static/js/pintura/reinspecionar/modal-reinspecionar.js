@@ -26,22 +26,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const qtdInspecao = parseFloat(document.getElementById("qtd-reinspecao-pintura").value) || 0;
         const conformidade = parseFloat(this.value) || 0;
         const naoConformidade = qtdInspecao - conformidade;
+        
         const containerInspecao = document.getElementById("containerReinspecao");
         const addRemoveContainer = document.getElementById("addRemoveContainerReinspecao");
-
+        
+        // **NOVA LINHA: Pegar o container de imagens conformes**
+        const containerImagensConforme = document.getElementById("containerImagensConforme");
 
         document.getElementById("nao-conformidade-reinspecao-pintura").value = naoConformidade;
 
         if (naoConformidade <= 0) {
+            // **Caso CONFORME**
             containerInspecao.style.display = "none";
             addRemoveContainer.style.display = "none";
+            containerImagensConforme.style.display = "block"; // **MOSTRAR container de imagens conformes**
     
-            // Remove o atributo 'required' de todos os inputs (exceto file) e selects dentro do containerInspecao
+            // Remove o atributo 'required' dos campos de não conformidade
             const inputs = containerInspecao.querySelectorAll('input');
             const selects = containerInspecao.querySelectorAll('select');
 
             inputs.forEach(input => {
-                if (input.type !== 'file') { // Ignora inputs do tipo file
+                if (input.type !== 'file') {
                     input.removeAttribute('required');
                 }
                 input.value = "";
@@ -51,15 +56,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 select.removeAttribute('required');
             });
         } else {
+            // **Caso NÃO CONFORME**
             containerInspecao.style.display = "block";
             addRemoveContainer.style.display = "flex";
+            containerImagensConforme.style.display = "none"; // **ESCONDER container de imagens conformes**
     
-            // Adiciona o atributo 'required' de volta a todos os inputs (exceto file) e selects dentro do containerInspecao
+            // Adiciona o atributo 'required' de volta aos campos de não conformidade
             const inputs = containerInspecao.querySelectorAll('input');
             const selects = containerInspecao.querySelectorAll('select');
     
             inputs.forEach(input => {
-                if (input.type !== 'file') { // Ignora inputs do tipo file
+                if (input.type !== 'file') {
                     input.setAttribute('required', 'required');
                 }
             });
