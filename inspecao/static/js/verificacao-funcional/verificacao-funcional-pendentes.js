@@ -78,8 +78,9 @@ function buscarItensPendentes(pagina) {
     }
 
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
-
-    fetch(`/inspecao/api/testes-funcionais-pintura-pendentes/?${params.toString()}`, {
+    params.append("status", "pendente"); // Garante apenas os itens pendentes
+    
+    fetch(`/inspecao/api/testes-funcionais-pintura/?${params.toString()}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -121,14 +122,14 @@ function buscarItensPendentes(pagina) {
                     <h5> ${item.peca}</h5>
                     <p>Registro #${item.id}</p>
                     <p>
-                        <strong>📅 Dt. Carga:</strong> ${item.data_carga}<br>
+                        <strong>📅 Dt. Criação:</strong> ${item.data_inicial}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo_pintura}<br>
-                        <strong>🎨 Cor:</strong> ${item.cor}<br>
+                        <strong>🎨 Cor:</strong> ${item.cor}<br> 
                     </p>
                     <hr>
                     <button 
                         data-id="${item.id}"
-                        data-data="${item.data_carga}"
+                        data-data="${item.data_inicial}"
                         data-tipo="${item.tipo_pintura}"
                         data-cor="${item.cor}"
                         data-peca="${item.peca}"
@@ -190,16 +191,14 @@ function buscarItensPendentes(pagina) {
     });
 }
 
-async function itemsPendentes(){
-    try {
-        const response = await fetch('/inspecao/api/testes-funcionais-pintura-pendentes/');
-        const data = await response.json();
-        console.log(data);
-        console.log(data.length);
-        return data.testes; // agora sim retorna para quem chamou
-    } catch (error) {
-        console.error('Erro:', error);
-        return []; // retorna lista vazia em caso de erro
-    }
-}
+// async function itemsPendentes(){
+//     try {
+//         const response = await fetch('/inspecao/api/testes-funcionais-pintura/?status=pendente');
+//         const data = await response.json();
+//         return data.testes; // agora sim retorna para quem chamou
+//     } catch (error) {
+//         console.error('Erro:', error);
+//         return []; // retorna lista vazia em caso de erro
+//     }
+// }
 

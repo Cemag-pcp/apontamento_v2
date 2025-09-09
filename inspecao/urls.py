@@ -72,10 +72,11 @@ urlpatterns = [
     path('api/delete-execucao/', views_general.delete_execution, name='delete-execution'),
     path('api/delete-execucao-estanqueidade/', views_general.delete_execution_estanqueidade, name='delete-execution-estanqueidade'),
 
-    path('api/testes-funcionais-pintura-pendentes/',verificacao_funcional.api_testes_funcionais_pintura_pendentes, name='testes-funcionais-pintura-pendentes'),
-    path('api/testes-funcionais-pintura-finalizados/',verificacao_funcional.api_testes_funcionais_pintura_finalizados, name='testes-funcionais-pintura-finalizados'),
+    path('api/testes-funcionais-pintura/',verificacao_funcional.api_testes_funcionais_pintura, name='testes-funcionais-pintura'),
+    # path('api/testes-funcionais-pintura-finalizados/',verificacao_funcional.api_testes_funcionais_pintura_finalizados, name='testes-funcionais-pintura-finalizados'),
 
     path('api/realizar-verificacao-funcional/', verificacao_funcional.realizar_verificacao_funcional, name='realizar-verificacao-funcional'),
+
 ]
 
 # templates

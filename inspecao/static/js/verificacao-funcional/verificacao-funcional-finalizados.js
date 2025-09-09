@@ -29,7 +29,7 @@ function buscarItensFinalizados(pagina) {
     let itensInspecionar = document.getElementById("itens-testados");
     let itensFiltradosCor = document.getElementById("itens-filtrados-verificacao-finalizados-cor");
     let itensFiltradosData = document.getElementById("itens-filtrados-verificacao-finalizados-data");
-    let itensFiltradosInspetor = document.getElementById("itens-filtrados-verificacao-finalizados-inspetor");
+    // let itensFiltradosInspetor = document.getElementById("itens-filtrados-verificacao-finalizados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-verificacao-finalizados-pesquisa");
     let itensFiltradosStatusConformidade = document.getElementById("itens-filtrados-verificacao-finalizados-status");
     let paginacao = document.getElementById("paginacao-verificacao-finalizados-pintura");
@@ -48,19 +48,19 @@ function buscarItensFinalizados(pagina) {
         coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let inspetorSelecionado = [];
-    document.querySelectorAll('.form-check-input-verificacao-finalizados-inspetores:checked').forEach(checkbox => {
-        inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
-    });
+    // let inspetorSelecionado = [];
+    // document.querySelectorAll('.form-check-input-verificacao-finalizados-inspetores:checked').forEach(checkbox => {
+    //     inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
+    // });
 
     let statusConformidade = [];    
     if (document.getElementById('filter-itens-verificacao-aprovados-pintura').checked) {
-        statusConformidade.push('conforme');
+        statusConformidade.push('aprovado');
     }
     
     // Verifica se o checkbox de itens não conformes está marcado
     if (document.getElementById('filter-itens-verificacao-reprovados-pintura').checked) {
-        statusConformidade.push('nao_conforme');
+        statusConformidade.push('reprovado');
     }
 
     let dataSelecionada = document.getElementById('data-filtro-verificacao-finalizados').value;
@@ -96,22 +96,23 @@ function buscarItensFinalizados(pagina) {
         params.append("status-conformidade", statusConformidade.join(","));
         itensFiltradosStatusConformidade.style.display = "block";
         itensFiltradosStatusConformidade.textContent = "Status: " + 
-            statusConformidade.map(s => s === 'conforme' ? 'Itens Conformes' : 'Itens Não Conformes').join(", ");
+            statusConformidade.map(s => s === 'aprovado' ? 'Itens Aprovados' : 'Itens Reprovados').join(", ");
     } else {
         itensFiltradosStatusConformidade.style.display = "none";
     }
 
-    if (inspetorSelecionado.length > 0) {
-        params.append("inspetores", inspetorSelecionado.join(","));
-        itensFiltradosInspetor.style.display = "block";
-        itensFiltradosInspetor.textContent = "Inspetores: " + inspetorSelecionado.join(", ");
-    } else {
-        itensFiltradosInspetor.style.display = "none";
-    }
+    // if (inspetorSelecionado.length > 0) {
+    //     params.append("inspetores", inspetorSelecionado.join(","));
+    //     itensFiltradosInspetor.style.display = "block";
+    //     itensFiltradosInspetor.textContent = "Inspetores: " + inspetorSelecionado.join(", ");
+    // } else {
+    //     itensFiltradosInspetor.style.display = "none";
+    // }
 
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
+    params.append("status", "finalizado"); // Garante apenas os itens pendentes
 
-    fetch(`/inspecao/api/itens-inspecionados-pintura/?${params.toString()}`, {
+    fetch(`/inspecao/api/testes-funcionais-pintura/?${params.toString()}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -145,14 +146,14 @@ function buscarItensFinalizados(pagina) {
                 "Amarelo": "yellow", "Cinza": "gray"
             };
 
-            let iconeNaoConformidade;
+            let iconeAprovado;
 
             if (item.possui_nao_conformidade) {
-                iconeNaoConformidade = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
+                iconeAprovado = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
             } else {
-                iconeNaoConformidade = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
+                iconeAprovado = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
             }
-
+            let textoStatus = item.possui_nao_conformidade ? "Aprovado" : "Reprovado";
             let color = borderColors[item.cor];
 
             const cards = `
@@ -161,24 +162,25 @@ function buscarItensFinalizados(pagina) {
                     <h5> ${item.peca}</h5>
                     <p>Inspeção #${item.id}</p>
                     <p>
-                        <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
-                        <strong>📍 Tipo:</strong> ${item.tipo}<br>
+                        <strong>📅 Data de Criação:</strong> ${item.data_inicial}<br>
+                        <strong>📅 Data de Finalização:</strong> ${item.data_atualizacao}<br>
+                        <strong>📍 Tipo:</strong> ${item.tipo_pintura}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
-                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
                     <div class="d-flex justify-content-between">
                         <div class="d-flex align-items-baseline gap-2">
-                            ${iconeNaoConformidade}
-                            <h4 style="font-size: 0.875rem; color:#71717a;">Possui não conformidade?</h4>
+                            ${iconeAprovado}
+                            <h4 style="font-size: 0.875rem; color:#71717a;">${textoStatus}</h4>
                         </div>
                         <button 
                             data-id="${item.id}"
-                            data-data="${item.data}"
+                            data-data-inicial="${item.data_inicial}"
+                            data-data-atualizacao="${item.data_atualizacao}"
                             data-peca="${item.peca}"
-                            data-tipo="${item.tipo}"
-                            data-nao-conformidade="${item.nao_conformidade}"
-                            data-conformidade="${item.conformidade}"
+                            data-tipo="${item.tipo_pintura}"
+                            data-aprovado="${item.nao_conformidade}"
+                            data-reprovado="${item.conformidade}"
                             data-cor="${item.cor}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
                         class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">              
