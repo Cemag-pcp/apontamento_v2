@@ -1,7 +1,7 @@
-name: Django Collect Static and Commit
+name: Django Collect Static and Commit After Merge
 
 on:
-  pull_request:
+  push:
     branches:
       - main
 
@@ -15,11 +15,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # O token é necessário para poder fazer o push de volta para o repositório
         with:
+          # O token é necessário para poder fazer o push de volta para o repositório
           token: ${{ secrets.GITHUB_TOKEN }}
-          # Faz o checkout do "head" do pull request para ter o código mais recente
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,6 +28,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run collectstatic
+        # A flag --clear garante que o diretório staticfiles seja limpo antes da coleta
         run: python manage.py collectstatic --no-input --clear
         env:
           # Secrets da AWS
@@ -62,7 +61,7 @@ jobs:
           # Verifica se há mudanças para commitar
           if ! git diff-index --quiet HEAD; then
             git commit -m "chore: Collect and update static files [ci skip]"
-            # Faz o push para a branch do pull request, não para a main
+            # Faz o push para a branch main, pois o workflow só roda em push para a main
             git push
           else
             echo "No changes to commit."
