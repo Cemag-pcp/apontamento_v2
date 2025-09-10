@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const causas = item.causas.join(', ');
                 const itemHTML = `
                     <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                        <img src="${item.arquivo_url}" class="d-block w-100" alt="Imagem de não conformidade">
+                        <img src="https://apontamentov2-teste.s3.sa-east-1.amazonaws.com/${item.arquivo_url}" class="d-block w-100" alt="Imagem de não conformidade">
                         <div class="carousel-caption d-none d-md-block">
                             <h5>${causas}</h5>
                             <p>Data: ${item.data_execucao} | Quantidade: ${item.quantidade}</p>
