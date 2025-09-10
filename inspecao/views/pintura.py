@@ -21,6 +21,8 @@ from core.models import Profile
 from datetime import datetime, timedelta
 from collections import defaultdict
 
+from storages.backends.s3boto3 import S3Boto3Storage
+
 
 def inspecao_pintura(request):
 
@@ -464,6 +466,24 @@ def get_historico_causas_pintura(request, id):
 
     return JsonResponse({"causas": causas_list}, status=200)
 
+def get_imagens_causas_conformidades_pintura(request, id, num_execucao):
+
+    if not DadosExecucaoInspecao.objects.filter(pk=id).exists():
+        return JsonResponse({'error': 'Execução de Inspeção não encontrada'}, status=404)
+    
+
+    arquivos_qs = ArquivoConformidade.objects.filter(dados_execucao_id=id, dados_execucao__num_execucao=num_execucao).only('arquivo')
+
+    print(arquivos_qs)
+
+    storage = S3Boto3Storage()
+
+    imagens = [
+        {'url': storage.url(arquivo.arquivo.name)}
+        for arquivo in arquivos_qs if arquivo.arquivo
+    ]
+
+    return JsonResponse({'imagens': imagens})
 
 def envio_inspecao_pintura(request):
     if request.method != "POST":
@@ -597,12 +617,10 @@ def envio_reinspecao_pintura(request):
                 # Busca as imagens do campo de conformidade
                 imagens_conformidade = request.FILES.getlist('imagens_conformidade')
 
-                # Salva cada imagem no novo model
-                for imagem in imagens_conformidade:
-                    ArquivoConformidade.objects.create(
-                        dados_execucao=dados_execucao,
-                        arquivo=imagem
-                    )
+                ArquivoConformidade.objects.create(
+                    dados_execucao=dados_execucao,
+                    arquivo=imagens_conformidade[0]
+                )
 
             # Em ambos os cenários, marcamos a reinspeção como concluída
             reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
