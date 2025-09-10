@@ -10,14 +10,21 @@ socket.onmessage = function(e) {
     const data = JSON.parse(e.data);
     console.log("Ordem atualizada:", data);
     
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
+
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
+
     // FUTURAMENTE carregar apenas a ordem que realmente foi atualizada, atualizar o card especificamente
     console.log("chamando carregarOrdensIniciadas");
-    const containerIniciado = document.querySelector('.containerProcesso');
-    carregarOrdensIniciadas(containerIniciado);
+    carregarOrdensIniciadas(filtros);
 
     console.log("chamando containerInterrompido");
-    const containerInterrompido = document.querySelector('.containerInterrompido');
-    carregarOrdensInterrompidas(containerInterrompido);
+    carregarOrdensInterrompidas(filtros);
 
 };
 

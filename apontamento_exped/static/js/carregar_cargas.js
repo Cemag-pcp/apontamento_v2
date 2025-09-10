@@ -13,7 +13,7 @@ export async function popularPacotesDaCarga(cargaId) {
   try {
     const response = await fetch(`api/buscar-pacote/${cargaId}/`);
     const data = await response.json();
-
+    console.log(data);
     let infoHTML = `
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
@@ -61,6 +61,89 @@ export async function popularPacotesDaCarga(cargaId) {
       const header = document.createElement('div');
       header.className = 'card-header d-flex justify-content-between align-items-center py-2 px-3';
       header.innerHTML = `<strong class="text-truncate w-100">${pacote.nome}</strong>`;
+
+      // Flag de foto ao lado do nome do pacote
+      // Ao clicar na flag deverá chamar uma função que trará as fotos em um modal
+
+      if (pacote.tem_foto === true || pacote.tem_foto === "true") {
+        
+        const fotoIcon = document.createElement('button');
+        fotoIcon.className = 'btn btn-outline-primary btn-sm flex-shrink-0';
+        fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
+        fotoIcon.title = 'Este pacote possui foto(s) anexada(s)';
+        fotoIcon.style.cursor = 'pointer';
+
+        fotoIcon.addEventListener('click', (event) => {
+          event.stopPropagation();
+
+          fotoIcon.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+          fotoIcon.disabled = true;
+
+          (async () => {
+            try {
+              const response = await fetch(`api/buscar-fotos/${pacote.id}/`);
+              const data = await response.json();
+
+              const fotosPorEtapa = {};
+              data.fotos.forEach(foto => {
+                if (!fotosPorEtapa[foto.etapa]) {
+                  fotosPorEtapa[foto.etapa] = [];
+                }
+                fotosPorEtapa[foto.etapa].push(foto.url);
+              });
+
+              const conteudoModal = Object.entries(fotosPorEtapa).map(([etapa, urls]) => {
+                const imagens = urls.map(url => `
+                  <a href="${url}" target="_blank" class="d-inline-block me-2 mb-2">
+                    <img src="${url}" class="rounded shadow-sm" style="max-width: 200px; height: auto; cursor: zoom-in;" alt="Foto da etapa ${etapa}" />
+                  </a>
+                `).join('');
+                return `
+                  <h6 class="mt-3">Etapa: ${etapa}</h6>
+                  ${imagens}
+                `;
+              }).join('');
+
+              const modal = document.createElement('div');
+              modal.className = 'modal fade';
+              modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h5 class="modal-title">Fotos do Pacote ${pacote.nome}</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                      ${data.fotos?.length ? conteudoModal : '<p class="text-muted">Nenhuma foto encontrada.</p>'}
+                    </div>
+                  </div>
+                </div>
+              `;
+
+              document.body.appendChild(modal);
+              const bsModal = new bootstrap.Modal(modal);
+              bsModal.show();
+
+              // Remove modal from DOM after hiding
+              modal.addEventListener('hidden.bs.modal', () => {
+                document.body.removeChild(modal);
+              });
+
+              fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
+              fotoIcon.disabled = false;
+
+            } catch (error) {
+              console.error('Erro ao carregar fotos:', error);
+              alert('Erro ao carregar as fotos do pacote.');
+    
+              fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
+              fotoIcon.disabled = false;
+
+            }
+          })();
+        });
+        header.appendChild(fotoIcon);
+      }
 
       const body = document.createElement('div');
       body.className = 'card-body px-3 py-2';
