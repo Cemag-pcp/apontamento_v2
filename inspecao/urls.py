@@ -15,6 +15,7 @@ urlpatterns = [
 
     path('api/historico-pintura/<int:id>', pintura.get_historico_pintura, name='historico-pintura'),
     path('api/historico-causas-pintura/<int:id>', pintura.get_historico_causas_pintura, name='historico-causas-pintura'),
+    path('api/imagens-causas-conformidades-pintura/<int:id>/<int:num_execucao>', pintura.get_imagens_causas_conformidades_pintura, name='historico-causas-pintura'),
 
     path('api/envio-inspecao-pintura/', pintura.envio_inspecao_pintura, name='envio-inspecao-pintura'),
     path('api/envio-reinspecao-pintura/', pintura.envio_reinspecao_pintura, name='envio-reinspecao-pintura'),

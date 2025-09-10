@@ -36,7 +36,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     <li class="timeline-item" style="cursor:pointer;" 
                             data-id="${element.id}" 
                             data-nao-conformidade="${element.nao_conformidade}" 
-                            data-data="${element.data_execucao}">
+                            data-data="${element.data_execucao}"
+                            data-execucao="${element.num_execucao}">
                         <span class="timeline-icon ${element.nao_conformidade == 0 ? 'success' : 'danger'}">
                             <i class="bi ${element.nao_conformidade == 0 ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
                         </span>
@@ -128,14 +129,17 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target.closest(".timeline-item")) { 
 
             const naoConformidade = event.target.closest(".timeline-item").getAttribute("data-nao-conformidade");
+            const id = event.target.closest(".timeline-item").getAttribute("data-id");
+            const dataExecucao = event.target.closest(".timeline-item").getAttribute("data-data");
+            const numExecucao = event.target.closest(".timeline-item").getAttribute("data-execucao");
+
             if(parseFloat(naoConformidade) > 0) {
     
                 const modalHistorico = document.getElementById("modal-historico-pintura");
                 const listaCausas = document.getElementById("causas-pintura");
-                const id = event.target.closest(".timeline-item").getAttribute("data-id");
-                const dataExecucao = event.target.closest(".timeline-item").getAttribute("data-data");
                 const confirmModal = bootstrap.Modal.getInstance(modalHistorico);
                 confirmModal.hide();
+                console.log(listaCausas);
 
                 listaCausas.innerHTML = `<div class="card" aria-hidden="true">
                                             <img src="/static/img/fundo cinza.png" class="card-img-top" alt="Tela cinza">
@@ -205,21 +209,68 @@ document.addEventListener("DOMContentLoaded", () => {
                     console.error(error);
                 })
             } else {
-                const Toast = Swal.mixin({
-                    toast: true,
-                    position: "top-end",
-                    showConfirmButton: false,
-                    timer: 3000,
-                    timerProgressBar: true,
-                    didOpen: (toast) => {
-                      toast.onmouseenter = Swal.stopTimer;
-                      toast.onmouseleave = Swal.resumeTimer;
+                // 1. Pega os elementos do modal e esconde o modal pai
+                const modalHistorico = document.getElementById("modal-historico-pintura");
+                const listaConteudo = document.getElementById("causas-pintura"); // Alvo mais específico
+                const confirmModal = bootstrap.Modal.getInstance(modalHistorico);
+                if (confirmModal) {
+                    confirmModal.hide();
+                }
+
+                // 2. Mostra o placeholder de carregamento
+                listaConteudo.innerHTML = `<div class="card" aria-hidden="true">
+                                                <img src="/static/img/fundo cinza.png" class="card-img-top" alt="Carregando...">
+                                                <div class="card-body">
+                                                    <h5 class="card-title placeholder-glow"><span class="placeholder col-6"></span></h5>
+                                                    <p class="card-text placeholder-glow"><span class="placeholder col-12"></span></p>
+                                                </div>
+                                            </div>`;
+                
+                // Abre o modal que exibirá o conteúdo
+                const modalCausas = new bootstrap.Modal(document.getElementById("modal-causas-historico-pintura"));
+                modalCausas.show();
+
+                // 3. Faz a requisição para a nova API de conformidades
+                fetch(`/inspecao/api/imagens-causas-conformidades-pintura/${id}/${numExecucao}`, {
+                    method: "GET",
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erro na requisição HTTP. Status: ${response.status}`);
                     }
-                  });
-                  Toast.fire({
-                    icon: "info",
-                    title: "Não possui não conformidade"
-                  });
+                    return response.json();
+                })
+                .then(data => {
+                    listaConteudo.innerHTML = ""; // Limpa o placeholder
+
+                    if (data.imagens && data.imagens.length > 0) {
+                        let conformidadeHTML = '';
+                        data.imagens.forEach(imagem => {
+                            conformidadeHTML += `
+                                <div class="card mb-3 p-0">
+                                    <img src="${imagem.url}" class="card-img-top" alt="Evidência de Conformidade">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Inspeção Conforme ✅</h5>
+                                        <p class="card-text label-modal">
+                                            <small class="text-muted">Evidência registrada em: ${dataExecucao}</small>
+                                        </p>
+                                    </div>
+                                </div>`;
+                        });
+                        listaConteudo.innerHTML = conformidadeHTML;
+                    } else {
+                        // Caso não haja imagens, exibe uma mensagem
+                        listaConteudo.innerHTML = `<p class="text-center">Esta inspeção foi marcada como conforme, mas não possui imagens de evidência.</p>`;
+                    }
+                })
+                .catch(error => {
+                    console.error("Erro ao buscar imagens de conformidade:", error);
+                    listaConteudo.innerHTML = `<p class="text-center text-danger">Ocorreu um erro ao carregar as imagens.</p>`;
+                });
             }
         }
     });
