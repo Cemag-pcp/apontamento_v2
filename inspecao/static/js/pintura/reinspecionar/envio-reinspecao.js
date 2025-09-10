@@ -11,6 +11,8 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     const naoConformidade = document.getElementById("nao-conformidade-reinspecao-pintura").value;
     const naoConformidadeNum = parseFloat(naoConformidade);
 
+    formData.append('nao-conformidade-reinspecao-pintura', naoConformidade)
+
     // Limpamos campos que podem ter sido adicionados por engano
     formData.delete("quantidade-total-causas");
 
