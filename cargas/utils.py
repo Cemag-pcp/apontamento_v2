@@ -814,6 +814,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('SA', '')
 
             ###### retirando espaco em branco####
 
@@ -1510,6 +1511,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('SA', '')
 
             ###### retirando espaco em branco####
 

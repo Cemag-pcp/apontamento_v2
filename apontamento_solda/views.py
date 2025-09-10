@@ -160,6 +160,34 @@ def criar_ordem(request):
 @csrf_exempt
 def atualizar_status_ordem(request):
 
+    """
+    Para iniciar uma ordem:
+
+    {
+        "status": "iniciada",
+        "ordem_id": 21101,
+    }
+
+    Para interromper uma ordem:
+
+    {
+        "status": "interrompida",
+        "ordem_id": 21101,
+        "motivo": 2
+    }
+
+    Para finalizar uma ordem:
+
+    {
+        "status": "finalizada",
+        "ordem_id": 21103,
+        "operador_final": 2,
+        "obs_finalizar": "teste",
+        "qt_realizada": 2,
+        "qt_mortas": 0
+    }
+    """
+
     try:
         # Parse do corpo da requisição
         body = json.loads(request.body)
@@ -168,6 +196,7 @@ def atualizar_status_ordem(request):
         ordem_id = body.get('ordem_id')
         grupo_maquina = 'solda'
         qt_produzida = body.get('qt_realizada', 0)
+        continua = body.get('continua', 'false').lower() == 'true'
 
         if not ordem_id or not grupo_maquina or not status:
             return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
@@ -227,8 +256,6 @@ def atualizar_status_ordem(request):
                 return JsonResponse({
                     'message': 'Ordem iniciada com sucesso.',
                 })
-            
-            return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
 
         if status == 'retorno' and ordem.status_atual == 'iniciada':
             return JsonResponse({'error': f'Essa ordem já está iniciada. Atualize a página.'}, status=400)
@@ -249,7 +276,9 @@ def atualizar_status_ordem(request):
             )
 
             if status == 'iniciada':
-                operador_inicio = body.get('operador_inicio', None)
+
+                operador_inicial = body.get('operador_inicio')
+                operador_inicial = get_object_or_404(Operador, pk=int(operador_inicial)) 
 
                 # Validações básicas
                 if ordem.status_atual == 'interrompida':
@@ -272,7 +301,7 @@ def atualizar_status_ordem(request):
                     peca=peca.peca,
                     qtd_planejada=peca.qtd_planejada,
                     qtd_boa=0,
-                    operador_inicio_id=operador_inicio,
+                    operador_inicio=operador_inicial,
                     processo_ordem=novo_processo
                 )
 
@@ -324,20 +353,54 @@ def atualizar_status_ordem(request):
                 ultimo_peca_ordem.processo_ordem=novo_processo
                 ultimo_peca_ordem.operador_final=operador_final
                 ultimo_peca_ordem.ordem=ordem.ordem_pai if ordem.ordem_pai else ordem
-                
                 ultimo_peca_ordem.save()
+
+                if "-" in peca.peca:
+                    codigo = peca.peca.split(" - ", maxsplit=1)[0]
+                else:
+                    codigo = peca.peca
                 
+                # verifica se ta na lista de itens a ser inspecionado pelo setor da solda
+                conjuntos_inspecionados = ConjuntosInspecionados.objects.filter(codigo=codigo)
+                if conjuntos_inspecionados:
+                    Inspecao.objects.create(
+                        pecas_ordem_solda=ultimo_peca_ordem,
+                    )
+
                 # Verificar novamente a quantidade finalizada após o novo registro
                 sum_pecas_finalizadas = PecasOrdem.objects.filter(ordem=ordem).aggregate(Sum('qtd_boa'))['qtd_boa__sum']
 
                 # Se a quantidade finalizada atingir a planejada, muda status para concluída
                 if sum_pecas_finalizadas == peca.qtd_planejada:
                     ordem.status_atual = status
+                    ordem.status_prioridade = 3
+                    ordem.save()
                 else:
-                    ordem.status_atual = 'aguardando_iniciar'
 
-                ordem.status_prioridade = 3
-                ordem.save()
+                    # se o operador desejar continuar a ordem em aberto?
+                    # continua = True
+                    # mas e se o operador clicar sem querer?
+                    # Como ele finaliza apenas sem computar a ordem?
+                    if continua == True:
+                        ordem.status_atual = 'iniciada'
+                        ordem.status_prioridade = 1
+                        ordem.save()
+
+                        nova_peca_ordem = PecasOrdem.objects.create(
+                            ordem=ordem,
+                            peca=peca.peca,
+                            qtd_planejada=peca.qtd_planejada,
+                            qtd_boa=0,
+                            operador_inicio=operador_final,
+                            processo_ordem=novo_processo
+                        )
+
+                        nova_peca_ordem.save()
+
+                    else:
+                        ordem.status_atual = 'aguardando_iniciar'
+                        ordem.status_prioridade = 1
+                        ordem.save()
 
             elif status == 'interrompida':
                 novo_processo.motivo_interrupcao = get_object_or_404(MotivoInterrupcao, pk=body['motivo'])
@@ -365,6 +428,7 @@ def atualizar_status_ordem(request):
 
             ordem.save()
             notificar_ordem(ordem)
+            
 
             return JsonResponse({
                 'message': 'Status atualizado com sucesso.',
@@ -376,8 +440,8 @@ def atualizar_status_ordem(request):
     except Ordem.DoesNotExist:
         return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-    
+        return JsonResponse({'error': str(e)}, status=500)    
+
 def ordens_criadas(request):
    
     """

@@ -163,6 +163,26 @@ class ArquivoCausa(models.Model):
         storage=S3Boto3Storage(),
     )
 
+class ArquivoConformidade(models.Model):
+    """
+    Armazena os arquivos/imagens quando uma inspeção/reinspeção
+    resulta em 100% de conformidade.
+    """
+    dados_execucao = models.ForeignKey(
+        DadosExecucaoInspecao, 
+        on_delete=models.CASCADE, 
+        related_name="arquivos_conformidade"
+    )
+    arquivo = models.ImageField(
+        upload_to="conformidades_reinspecao/", 
+        null=True, 
+        blank=True,
+        storage=S3Boto3Storage(), # Mantendo o mesmo storage que você usa
+    )
+
+    def __str__(self):
+        return f"Arquivo para Execução de Inspeção ID {self.dados_execucao.id}"
+
 
 #### Inspecao Estanqueidade ####
 
