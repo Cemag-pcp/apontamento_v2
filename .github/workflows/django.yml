@@ -43,6 +43,7 @@ jobs:
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}
           BASE_TESTE: ${{ secrets.BASE_TESTE }}
+          BASE_PROD: ${{ secrets.BASE_PROD }}
 
           # Outras
           DEBUG: "False"
