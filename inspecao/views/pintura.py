@@ -14,6 +14,7 @@ from ..models import (
     Causas,
     CausasNaoConformidade,
     ArquivoCausa,
+    ArquivoConformidade,
 )
 from core.models import Profile
 
@@ -545,56 +546,79 @@ def envio_reinspecao_pintura(request):
             id_inspecao = request.POST.get("id-reinspecao-pintura")
             data_inspecao = request.POST.get("data-reinspecao-pintura")
             conformidade = request.POST.get("conformidade-reinspecao-pintura")
-            inspetor = request.POST.get("inspetor-reinspecao-pintura")
+            inspetor_id = request.POST.get("inspetor-reinspecao-pintura")
             nao_conformidade = request.POST.get("nao-conformidade-reinspecao-pintura")
-            quantidade_total_causas = request.POST.get("quantidade-total-causas")
+            quantidade_total_causas = request.POST.get("quantidade-total-causas", 0) # Default para 0
+
+            # Validações básicas de entrada
+            if not all([id_inspecao, data_inspecao, conformidade, inspetor_id, nao_conformidade]):
+                return JsonResponse({"error": "Dados essenciais estão faltando."}, status=400)
 
             data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
 
             inspecao = Inspecao.objects.get(id=id_inspecao)
-            inspetor = Profile.objects.get(user__pk=inspetor)
+            inspetor = Profile.objects.get(user__pk=inspetor_id)
 
-            dados_execucao = DadosExecucaoInspecao(
+            # Este objeto é criado em ambos os casos (conforme ou não conforme)
+            dados_execucao = DadosExecucaoInspecao.objects.create(
                 inspecao=inspecao,
                 inspetor=inspetor,
                 data_execucao=data_ajustada,
                 conformidade=int(conformidade),
                 nao_conformidade=int(nao_conformidade),
             )
-            dados_execucao.save()
 
+            # Cenário 1: Existem não conformidades
             if int(nao_conformidade) > 0:
-
                 for i in range(1, int(quantidade_total_causas) + 1):
-                    causas = request.POST.getlist(
-                        f"causas_reinspecao_{i}"
-                    )  # Lista de causas
+                    # O nome da lista de causas no frontend estava errado, corrigido aqui
+                    causas_ids = request.POST.getlist(f"causas_reinspecao_{i}[]") 
                     quantidade = request.POST.get(f"quantidade_reinspecao_{i}")
-                    imagens = request.FILES.getlist(f"imagens_reinspecao_{i}")
+                    # O nome da lista de imagens no frontend estava errado, corrigido aqui
+                    imagens = request.FILES.getlist(f"imagens_reinspecao_{i}[]") 
 
-                    # Obtém todas as causas de uma vez
-                    causas_objs = Causas.objects.filter(id__in=causas)
+                    if not causas_ids or not quantidade:
+                        raise ValueError(f"Causa ou quantidade faltando para o item {i}.")
+
+                    causas_objs = Causas.objects.filter(id__in=causas_ids)
                     causa_nao_conformidade = CausasNaoConformidade.objects.create(
                         dados_execucao=dados_execucao, quantidade=int(quantidade)
                     )
                     causa_nao_conformidade.causa.add(*causas_objs)
 
-                    # Itera sobre cada imagem
                     for imagem in imagens:
                         ArquivoCausa.objects.create(
                             causa_nao_conformidade=causa_nao_conformidade,
                             arquivo=imagem,
                         )
+            
+            # Cenário 2: Tudo está conforme
             else:
-                print(inspecao)
-                reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
+                # Busca as imagens do campo de conformidade
+                imagens_conformidade = request.FILES.getlist('imagens_conformidade')
+
+                # Salva cada imagem no novo model
+                for imagem in imagens_conformidade:
+                    ArquivoConformidade.objects.create(
+                        dados_execucao=dados_execucao,
+                        arquivo=imagem
+                    )
+
+            # Em ambos os cenários, marcamos a reinspeção como concluída
+            reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
+            if reinspecao:
                 reinspecao.reinspecionado = True
                 reinspecao.save()
 
         return JsonResponse({"success": True})
 
+    except Inspecao.DoesNotExist:
+        return JsonResponse({"error": "Inspeção não encontrada."}, status=404)
+    except Profile.DoesNotExist:
+        return JsonResponse({"error": "Inspetor não encontrado."}, status=404)
     except Exception as e:
-        return JsonResponse({"error": "Erro"}, status=400)
+        # Retorna um erro mais descritivo para depuração
+        return JsonResponse({"error": f"Ocorreu um erro interno: {str(e)}"}, status=500)
 
 
 def dashboard_pintura(request):
