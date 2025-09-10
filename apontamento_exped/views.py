@@ -393,3 +393,10 @@ def salvar_foto(request):
         return JsonResponse({'status': 'ok', 'url': imagem.arquivo.url})
 
     return JsonResponse({'erro': 'Foto não recebida'}, status=400)
+
+def buscar_fotos(request, pacote_id):
+    if request.method == 'GET':
+        imagens = ImagemPacote.objects.filter(pacote_id=pacote_id)
+        fotos = [{'url': img.arquivo.url, 'etapa': img.stage} for img in imagens]
+        return JsonResponse({'fotos': fotos})
+    return JsonResponse({'erro': 'Método não permitido'}, status=405)

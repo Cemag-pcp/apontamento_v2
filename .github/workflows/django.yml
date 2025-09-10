@@ -1,4 +1,4 @@
-name: Django Collect Static and Commit
+name: Django Collect Static and Commit After Merge
 
 on:
   push:
@@ -16,6 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # O token é necessário para poder fazer o push de volta para o repositório
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
@@ -27,7 +28,8 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run collectstatic
-        run: python manage.py collectstatic --no-input
+        # A flag --clear garante que o diretório staticfiles seja limpo antes da coleta
+        run: python manage.py collectstatic --no-input --clear
         env:
           # Secrets da AWS
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
@@ -36,7 +38,7 @@ jobs:
           AWS_STORAGE_BUCKET_NAME: ${{ secrets.AWS_STORAGE_BUCKET_NAME }}
           AWS_S3_REGION_NAME: ${{ secrets.AWS_S3_REGION_NAME }}
           
-          # ✅ Secrets do Banco de Dados
+          # Secrets do Banco de Dados
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
@@ -50,13 +52,16 @@ jobs:
 
       - name: Commit and push static files
         run: |
-          git config --global user.name "SaulSantos1"
-          git config --global user.email "saulsantos111@gmail.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
+          # Adiciona os arquivos estáticos gerados
           git add staticfiles/
           
+          # Verifica se há mudanças para commitar
           if ! git diff-index --quiet HEAD; then
             git commit -m "chore: Collect and update static files [ci skip]"
+            # Faz o push para a branch main, pois o workflow só roda em push para a main
             git push
           else
             echo "No changes to commit."

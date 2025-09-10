@@ -21,5 +21,6 @@ urlpatterns = [
     path('api/pacotes/mover-item/', views.mover_item, name='mover_item'),
     path('api/impressao/', views.impressao_pacote, name='impressao_pacote'),
     path('api/salvar-foto/', views.salvar_foto, name='salvar_foto'),
+    path('api/buscar-fotos/<int:pacote_id>/', views.buscar_fotos, name='buscar_fotos'),
 
 ]
