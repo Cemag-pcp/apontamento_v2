@@ -28,8 +28,10 @@ def api_testes_funcionais_pintura(request):
     cores_filtradas = (
         request.GET.get("cores", "").split(",") if request.GET.get("cores") else []
     )
-    data_filtrada = request.GET.get("data", None)
+    data_inicial_filtrada = request.GET.get("data", None)
+    data_final_filtrada = request.GET.get("dataFinal", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
+    status_teste = request.GET.get("statusTeste", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
 
@@ -42,8 +44,15 @@ def api_testes_funcionais_pintura(request):
     if cores_filtradas:
         datas = datas.filter(peca_ordem__ordem__cor__in=cores_filtradas)
 
-    if data_filtrada:
-        datas = datas.filter(data_inicial__date=data_filtrada)
+    if data_inicial_filtrada:
+        datas = datas.filter(data_inicial__date=data_inicial_filtrada)
+
+    if data_final_filtrada:
+        datas = datas.filter(data_atualizacao__date=data_final_filtrada)
+
+    if status_teste:
+        status_teste = status_teste.split(',')
+        datas = datas.filter(status__in=status_teste)
 
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
@@ -178,4 +187,54 @@ def realizar_verificacao_funcional(request):
             return JsonResponse({'error':'Ocorreu algum erro!'},status=400)
     else:
         return JsonResponse({'error': 'Método não permitido!'},status=405)    
+
+def detalhes_verificacao_funcional(request,id):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método não permitido!'},status=405)
     
+    try:
+        registro_testes = TesteFuncional.objects.get(pk=id)
+
+        #PU - 40 a 60 microns
+        #PÓ - 60 a 80 microns
+        condicao_espessura = [registro_testes.espessura_camada_1, registro_testes.espessura_camada_2, registro_testes.espessura_camada_3]
+
+        
+        meta = ''
+        resultado_espessura = 'Aprovado'
+        if registro_testes.peca_ordem.tipo == 'PU':
+            meta = '40 a 60 microns'
+            for espessura in condicao_espessura:
+                if espessura < 40 or espessura > 60:
+                    resultado_espessura = 'Reprovado'
+                    break
+        else:
+            meta = '60 a 80 microns'
+
+        dados_registro = {
+            'status':'ok',
+            'id': registro_testes.id,
+            'peca': registro_testes.peca_ordem.peca,
+            'cor': registro_testes.peca_ordem.ordem.cor,
+            'tipo_pintura': registro_testes.peca_ordem.tipo,
+            'data_carga': registro_testes.peca_ordem.ordem.data_carga.strftime("%d/%m/%Y"),
+            'status_registro': registro_testes.status.capitalize(),
+            'aderencia': "Aprovado" if registro_testes.aderencia is True else "Reprovado",
+            'tonalidade': "Aprovado" if registro_testes.tonalidade is True else "Reprovado",
+            'polimerizacao': "Aprovado" if registro_testes.polimerizacao is True else ("Reprovado" if registro_testes.polimerizacao else 'Somente para PÓ'),
+            'espessura_camada_1': registro_testes.espessura_camada_1,
+            'espessura_camada_2': registro_testes.espessura_camada_2,
+            'espessura_camada_3': registro_testes.espessura_camada_3,
+            'meta_espessura': meta,
+            'resultado_espessura': resultado_espessura,
+            'observacao': registro_testes.observacao if registro_testes.observacao else 'Nenhuma observação registrada.',
+            'data_inicial': (registro_testes.data_inicial - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S") if registro_testes.data_inicial else None,
+            'data_atualizacao': (registro_testes.data_atualizacao - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S") if registro_testes.data_atualizacao else None,
+        }
+
+        return JsonResponse(dados_registro, status=200)
+    except TesteFuncional.DoesNotExist:
+        return JsonResponse({'error': 'Registro não encontrado!'}, status=404)
+    except Exception as e:
+        print(e)
+        return JsonResponse({'error': 'Ocorreu um erro ao buscar os detalhes!'}, status=500)

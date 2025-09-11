@@ -29,6 +29,7 @@ function buscarItensFinalizados(pagina) {
     let itensInspecionar = document.getElementById("itens-testados");
     let itensFiltradosCor = document.getElementById("itens-filtrados-verificacao-finalizados-cor");
     let itensFiltradosData = document.getElementById("itens-filtrados-verificacao-finalizados-data");
+    let itensFiltradosDataFinal = document.getElementById("itens-filtrados-verificacao-finalizados-data-final");
     // let itensFiltradosInspetor = document.getElementById("itens-filtrados-verificacao-finalizados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-verificacao-finalizados-pesquisa");
     let itensFiltradosStatusConformidade = document.getElementById("itens-filtrados-verificacao-finalizados-status");
@@ -65,6 +66,7 @@ function buscarItensFinalizados(pagina) {
 
     let dataSelecionada = document.getElementById('data-filtro-verificacao-finalizados').value;
     let pesquisarInspecao = document.getElementById('pesquisar-peca-verificacao-finalizados').value;
+    let dataFinalSelecionada = document.getElementById('data-final-filtro-verificacao-pendentes').value;
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
@@ -84,6 +86,14 @@ function buscarItensFinalizados(pagina) {
         itensFiltradosData.style.display = "none";
     }
 
+    if (dataFinalSelecionada) {
+        params.append("dataFinal", dataFinalSelecionada);
+        itensFiltradosDataFinal.style.display = "block";
+        itensFiltradosDataFinal.textContent = "Data Finalização: " + dataFinalSelecionada;
+    } else {
+        itensFiltradosDataFinal.style.display = "none";
+    }
+
     if (pesquisarInspecao) {
         params.append("pesquisar", pesquisarInspecao);
         itensFiltradosPesquisa.style.display = "block";
@@ -93,7 +103,7 @@ function buscarItensFinalizados(pagina) {
     }
 
     if (statusConformidade.length > 0) {
-        params.append("status-conformidade", statusConformidade.join(","));
+        params.append("statusTeste", statusConformidade.join(","));
         itensFiltradosStatusConformidade.style.display = "block";
         itensFiltradosStatusConformidade.textContent = "Status: " + 
             statusConformidade.map(s => s === 'aprovado' ? 'Itens Aprovados' : 'Itens Reprovados').join(", ");
@@ -183,7 +193,7 @@ function buscarItensFinalizados(pagina) {
                             data-reprovado="${item.conformidade}"
                             data-cor="${item.cor}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
-                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">              
+                        class="btn btn-white historico-verificacao-funcional w-50 d-flex justify-content-center align-items-center gap-2">              
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>
                             Ver detalhes
                         </button>
@@ -240,5 +250,7 @@ function buscarItensFinalizados(pagina) {
         }
     }).catch((error) => {
         console.error(error);
+    }).finally(() => {
+        atribuirDadosModalVerDetalhes(); // Reatribui os eventos de clique aos novos botões
     });
 }
