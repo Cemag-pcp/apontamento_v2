@@ -1,0 +1,221 @@
+<div class="modal fade" data-bs-backdrop="static" id="modal-verificacao-funcional" tabindex="-1" role="dialog"
+     aria-labelledby="tubosModalLabel" style="overflow-y: auto;">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <form id="form-registro-teste-verificacao-funcional">
+        <div class="modal-header">
+          <h5 class="modal-title" id="tubosModalTitle">Verificação Funcional Peça</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body p-4" style="font-size: 14px; overflow-y: auto; max-height: 650px;">
+
+          <!-- Dados da peça -->
+          <div class="row">
+            <h5 id="peca"></h5>
+            <p id="ordemId"></p>
+            <p>
+              <strong>📅 Dt. Criação:</strong> <span id="dataCriacao"></span><br>
+              <strong>📍 Tipo:</strong> <span id="tipoPintura"></span> <br>
+              <strong>🎨 Cor:</strong> <span id="cor"></span><br>
+            </p>
+          </div>
+
+          <!-- Teste de Polimerização -->
+          <div class="card mb-3 shadow-sm" id="testePolimerizacao">
+            <div class="card-body">
+              <h6 class="card-title font-weight-bold text-dark">Polimerização (apenas PÓ)</h6>
+              <div class="d-inline-block me-3">
+                <input type="radio" class="form-check-input" name="statusPolimerizacao"
+                      id="status-polimerizacao-aprovado" value="aprovado" required>
+                <label for="status-polimerizacao-aprovado" class="form-check-label">Aprovado</label>
+              </div>
+              <div class="d-inline-block">
+                <input type="radio" class="form-check-input" name="statusPolimerizacao"
+                      id="status-polimerizacao-reprovado" value="reprovado">
+                <label for="status-polimerizacao-reprovado" class="form-check-label">Reprovado</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Teste de Aderência -->
+          <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+              <h6 class="card-title font-weight-bold text-dark">Teste de Aderência</h6>
+              <div class="d-inline-block me-3">
+                <input type="radio" class="form-check-input" name="statusAderencia"
+                      id="status-aderencia-aprovado" value="aprovado" required>
+                <label for="status-aderencia-aprovado" class="form-check-label">Aprovado</label>
+              </div>
+              <div class="d-inline-block">
+                <input type="radio" class="form-check-input" name="statusAderencia"
+                      id="status-aderencia-reprovado" value="reprovado">
+                <label for="status-aderencia-reprovado" class="form-check-label">Reprovado</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Espessura de camada -->
+          <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+              <h6 class="card-title font-weight-bold text-dark">Espessura de camada</h6>
+              <div class="row align-items-end">
+                <div class="col-sm-4 mb-3">
+                  <label class="form-label" for="espessura-camada-1">Espessura 1 (mícrons)</label>
+                  <input type="number" min="0" step=".01" class="form-control"
+                        id="espessura-camada-1" required>
+                </div>
+                <div class="col-sm-4 mb-3">
+                  <label class="form-label" for="espessura-camada-2">Espessura 2 (mícrons)</label>
+                  <input type="number" min="0" step=".01" class="form-control"
+                        id="espessura-camada-2" required>
+                </div>
+                <div class="col-sm-4 mb-3">
+                  <label class="form-label" for="espessura-camada-3">Espessura 3 (mícrons)</label>
+                  <input type="number" min="0" step=".01" class="form-control"
+                        id="espessura-camada-3" required>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Teste de Tonalidade -->
+          <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+              <h6 class="card-title font-weight-bold text-dark">Teste de Tonalidade</h6>
+              <div class="d-inline-block me-3">
+                <input type="radio" class="form-check-input" name="statusTonalidade"
+                      id="status-tonalidade-aprovado" value="aprovado" required>
+                <label for="status-tonalidade-aprovado" class="form-check-label">Aprovado</label>
+              </div>
+              <div class="d-inline-block">
+                <input type="radio" class="form-check-input" name="statusTonalidade"
+                      id="status-tonalidade-reprovado" value="reprovado">
+                <label for="status-tonalidade-reprovado" class="form-check-label">Reprovado</label>
+              </div>
+            </div>
+          </div>
+
+          
+
+          <!-- Upload e Observações -->
+          <div class="row">
+            <div class="col-sm-12">
+              <div class="mb-3">
+                <label for="upload-imagem-teste" class="form-label">Imagem</label>
+                <input class="form-control form-control-sm" id="upload-imagem-teste" type="file" accept="image/*">
+              </div>
+
+              <div class="mb-3">
+                <label for="observacoes-teste" class="form-label">Observações</label>
+                <textarea class="form-control" id="observacoes-teste" rows="3"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-dark" id="btn-registrar-teste" type="submit">
+            <span id="spinner-teste" class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+            <span id="status-btn-teste" role="status">Registrar Teste</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal Ver Detalhes -->
+<div class="modal fade" id="detalhesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content shadow-lg rounded-3">
+      
+      <!-- Cabeçalho -->
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">Detalhes do Teste</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <!-- Corpo do modal -->
+      <div class="modal-body">
+
+        <!-- Dados da Peça -->
+        <div class="card mb-3 shadow-sm">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3">Dados da Peça</h5>
+            <div class="row">
+              <div class="col-md-4"><strong>Peça:</strong> <span id="modalPeca"></span></div>
+              <div class="col-md-4"><strong>Data Inicial:</strong> <span id="modalDataInicial"></span></div>
+              <div class="col-md-4"><strong>Data Atualização:</strong> <span id="modalDataAtualizacao"></span></div>
+              <div class="col-md-4 mt-2"><strong>Tipo:</strong> <span id="modalTipo"></span></div>
+              <div class="col-md-4 mt-2"><strong>Cor:</strong> <span id="modalCor"></span></div>
+              
+            </div>
+          </div>
+        </div>
+
+        <!-- Resultados dos Testes -->
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3">Resultados do Teste</h5>
+            
+            <p><strong>Resultado Final:</strong> <span id="modalStatus"></span></p>
+            
+            <div class="row">
+              <div class="col-md-4"><strong>Aderência:</strong> <span id="modalAderencia"></span></div>
+              <div class="col-md-4"><strong>Tonalidade:</strong> <span id="modalTonalidade"></span></div>
+              <div class="col-md-4"><strong>Polimerização:</strong> <span id="modalPolimerizacao"></span></div>
+            </div>
+
+            <h6 class="mt-3">Espessuras (µm)</h6>
+            <div class="table-responsive">
+              <table class="table table-bordered align-middle text-center mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 12%;">Camada 1</th>
+                    <th style="width: 12%;">Camada 2</th>
+                    <th style="width: 12%;">Camada 3</th>
+                    <th style="width: 12%;">Média</th>
+                    <th style="width: 12%;">Meta</th>
+                    <th style="width: 12%;">Resultado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td id="modalEsp1"></td>
+                    <td id="modalEsp2"></td>
+                    <td id="modalEsp3"></td>
+                    <td id="modalMedia"></td>
+                    <td id="modalMetaEsp"></td>
+                    <td id="modalResultadoEsp"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <div class="mt-2 text-center">
+              <span class="col-md-2"><strong>Imagem:</strong></span>
+              <a id="img-link" href="#" target="_blank">Ver em tela cheia</a><br>
+              <img id="modalImagem" class="img-fluid mt-3 text-center" alt="Imagem do Teste" style="max-width: 100%; max-height: 300px;">
+            </div><br>
+            
+            
+            <p class="mt-3"><strong>Observações:</strong> <span id="modalObservacao"></span></p>
+
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+
+
