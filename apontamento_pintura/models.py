@@ -72,6 +72,8 @@ class TesteFuncional(models.Model):
     espessura_camada_1 = models.FloatField(null=True, blank=True)
     espessura_camada_2 = models.FloatField(null=True, blank=True)
     espessura_camada_3 = models.FloatField(null=True, blank=True)
+    meta_espessura_camada = models.CharField(max_length=20, null=True, blank=True)
+    imagem = models.ImageField(upload_to='imagens_verificacao_funcional/', null=True, blank=True)
     tonalidade = models.BooleanField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
     observacao = models.TextField(null=True, blank=True)

@@ -34,6 +34,15 @@ function atribuirDadosModalVerDetalhes(){
                 console.log(data);
                 document.getElementById("modalStatus").innerHTML = formatBadge(data.status_registro);
                 document.getElementById("modalObservacao").textContent = data.observacao || "Nenhuma observação registrada.";
+                document.getElementById("modalImagem").src = data.imagem_url || "#";
+                document.getElementById("img-link").href = data.imagem_url || "#";
+                if (!data.imagem_url){
+                    document.getElementById("modalImagem").alt = "Nenhuma imagem registrada.";
+                    document.getElementById("img-link").style.display = "none";
+                }else{
+                    document.getElementById("modalImagem").alt = "Imagem do Teste";
+                    document.getElementById("img-link").style.display = "inline";
+                }
 
                 document.getElementById("modalAderencia").innerHTML = formatBadge(data.aderencia);
                 document.getElementById("modalTonalidade").innerHTML = formatBadge(data.tonalidade);
@@ -42,6 +51,7 @@ function atribuirDadosModalVerDetalhes(){
                 document.getElementById("modalEsp1").textContent = data.espessura_camada_1 ? data.espessura_camada_1 + ' µm' : "Não medido";
                 document.getElementById("modalEsp2").textContent = data.espessura_camada_2 ? data.espessura_camada_2 + ' µm' : "Não medido";
                 document.getElementById("modalEsp3").textContent = data.espessura_camada_3 ? data.espessura_camada_3 + ' µm' : "Não medido";
+                document.getElementById("modalMedia").textContent = data.media_espessura ? data.media_espessura.toFixed(2) + ' µm' : "Não medido";
                 document.getElementById("modalMetaEsp").textContent = data.meta_espessura;
                 document.getElementById("modalResultadoEsp").textContent = data.resultado_espessura;
 

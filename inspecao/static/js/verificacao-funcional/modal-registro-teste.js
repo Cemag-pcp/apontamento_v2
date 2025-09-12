@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("click", function(event){
         if (event.target.classList.contains('iniciar-verificacao-pendentes')){
             document.getElementById('peca').textContent = event.target.getAttribute('data-peca');
-            document.getElementById('registroId').textContent = 'Registro #'+event.target.getAttribute('data-id');
+            document.getElementById('ordemId').textContent = 'Ordem #'+event.target.getAttribute('data-ordem');
             document.getElementById('dataCriacao').textContent = event.target.getAttribute('data-data');
             document.getElementById('tipoPintura').textContent = event.target.getAttribute('data-tipo');
             document.getElementById('cor').textContent = event.target.getAttribute('data-cor');
@@ -37,58 +37,79 @@ document.addEventListener("DOMContentLoaded", () => {
         spinnerTeste.classList.remove('d-none');
         statusTeste.textContent = 'Registrando...';
 
-        const dados = {};
+        const formData = new FormData();
+        
+        // const dados = {};
 
         const idRegistro = document.getElementById('btn-registrar-teste').getAttribute('data-id');
 
-        dados['idRegistro'] = idRegistro;
+        // dados['idRegistro'] = idRegistro;
+        formData.append('idRegistro', idRegistro);
 
         // Radios marcados
         document.querySelectorAll("input[type='radio']:checked").forEach(radio => {
-            dados[radio.name] = radio.value;
+            // dados[radio.name] = radio.value;
+            formData.append(radio.name, radio.value);
         });
 
         // Inputs de texto, number, hidden, etc.
         document.querySelectorAll("input[type='text'], input[type='number'], input[type='hidden']").forEach(input => {
             if (input.value.trim() !== "") {
-                dados[input.name || input.id] = input.value;
+                // dados[input.name || input.id] = input.value;
+                formData.append(input.name || input.id, input.value);
             }
         });
 
         // Textareas
         document.querySelectorAll("textarea").forEach(textarea => {
             if (textarea.value.trim() !== "") {
-                dados[textarea.name || textarea.id] = textarea.value;
+                // dados[textarea.name || textarea.id] = textarea.value;
+                formData.append(textarea.name || textarea.id, textarea.value);
             }
         });
 
         // Selects
         document.querySelectorAll("select").forEach(select => {
             if (select.value) {
-                dados[select.name || select.id] = select.value;
+                // dados[select.name || select.id] = select.value;
+                formData.append(select.name || select.id, select.value);
             }
         });
 
-        console.log("Dados coletados:", dados);
-
-        for (const key in dados){
-            if (dados[key] === 'aprovado'){
-                dados[key] = true;
-            }else if (dados[key] === 'reprovado'){
-                dados[key] = false;
-            }
+        // Imagem
+        const imagemInput = document.getElementById("upload-imagem-teste");
+        if (imagemInput && imagemInput.files.length > 0) {
+            formData.append("imagem", imagemInput.files[0]);
         }
+
+        console.log("Dados coletados:", formData);
+
+        formData.forEach((value, key) => {
+            if (value === 'aprovado'){
+                formData.set(key, true);
+            }else if (value === 'reprovado'){
+                formData.set(key, false);
+            }
+        });
+
+        // for (const key in formData){
+        //     console.log(key);
+        //     if (formData[key] === 'aprovado'){
+        //         formData[key] = true;
+        //     }else if (formData[key] === 'reprovado'){
+        //         formData[key] = false;
+        //     }
+        // }
 
         // Exemplo: enviar via fetch
         
         fetch("/inspecao/api/realizar-verificacao-funcional/", {
             method: "POST",
             headers: { 
-                "Content-Type": "application/json",
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
              },
             
-            body: JSON.stringify(dados)
+            body: formData,
         })
         .then(res => res.json())
         .then(data => { 
@@ -97,7 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (data.status === 'ok' && data.causa_reprovacao){
                 Swal.fire({
                     title: 'Teste registrado',
-                    text: 'Peça reprovada! Causa da reprovação: ' + data.causa_reprovacao,
+                    text: 'Peça reprovada!',
                     icon: 'success', // você pode usar 'success', 'warning', 'info', 'error'
                     confirmButtonText: 'OK'
                 });
@@ -128,6 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             modalTesteVerificacaoFuncional.hide();
             buscarItensPendentes(1);
+            buscarItensFinalizados(1);
         });
         
     });

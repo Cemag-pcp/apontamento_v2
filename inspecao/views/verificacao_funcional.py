@@ -1,9 +1,13 @@
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.utils import timezone
 from apontamento_pintura.models import TesteFuncional
 from django.core.paginator import Paginator
 import json
+import os
+import traceback
 from datetime import timedelta
+
 
 def verificacao_funcional_pintura(request):
     if request.method == 'GET':
@@ -37,9 +41,16 @@ def api_testes_funcionais_pintura(request):
 
     # Filtra os dados
     # datas = Inspecao.objects.filter(pecas_ordem_pintura__isnull=False)
-    datas = TesteFuncional.objects.filter(status__in=status_url).values('id','peca_ordem__id','peca_ordem__peca','peca_ordem__ordem_id__cor','status','peca_ordem__tipo','peca_ordem__ordem__data_carga', 'data_inicial', 'data_atualizacao')
+    datas = TesteFuncional.objects.filter(status__in=status_url).values(
+        'id','peca_ordem__id','peca_ordem__peca','peca_ordem__ordem_id__cor','status','peca_ordem__tipo','peca_ordem__ordem__data_carga', 'data_inicial', 'data_atualizacao','peca_ordem__ordem__ordem'
+        )
 
     quantidade_total = datas.count()  # Total de itens sem filtro
+
+    if 'pendente' in status_url:
+        datas = datas.order_by('-data_inicial')
+    else:
+        datas = datas.order_by('-data_atualizacao')
 
     if cores_filtradas:
         datas = datas.filter(peca_ordem__ordem__cor__in=cores_filtradas)
@@ -87,6 +98,7 @@ def api_testes_funcionais_pintura(request):
                 'id': data['id'],
                 'peca_ordem_id':data['peca_ordem__id'],
                 'peca': data['peca_ordem__peca'],
+                'ordem': data['peca_ordem__ordem__ordem'],
                 'cor': data['peca_ordem__ordem_id__cor'],
                 'status': data['status'],
                 'tipo_pintura': data['peca_ordem__tipo'],
@@ -110,46 +122,72 @@ def api_testes_funcionais_pintura(request):
 
 
 def realizar_verificacao_funcional(request):
-    dados = json.loads(request.body)
+    """
+    Função que vai realizar a verificação funcional de uma peça
+    Meta de espessura: PO - 60 a 80 microns (µm)
+                       PU - 40 a 60 microns (µm)
+    Modificar a meta caso seja necessário
+    """
     if request.method == 'POST':
-        print(dados)
+        print(request.POST)
+        print(request.FILES)
+        idRegistro = request.POST.get('idRegistro', None)
+        polimerizacao  = request.POST.get('statusPolimerizacao', None)
+        aderencia = request.POST.get('statusAderencia', None)
+        tonalidade = request.POST.get('statusTonalidade', None)
+        espessura_camada_1 = request.POST.get('espessura-camada-1', None)
+        espessura_camada_2 = request.POST.get('espessura-camada-2', None)
+        espessura_camada_3 = request.POST.get('espessura-camada-3', None)
+        observacao = request.POST.get('observacoes-teste', None)
+
         try:
-            registro_teste = TesteFuncional.objects.get(pk=int(dados['idRegistro']))
+            registro_teste = TesteFuncional.objects.get(pk=int(idRegistro))
             campos_obrigatorios = ['idRegistro','statusAderencia','statusTonalidade', 'espessura-camada-1','espessura-camada-2', 'espessura-camada-3']
-            if "statusPolimerizacao" in dados: # PO
+            if polimerizacao: # PO
+                polimerizacao = bool(polimerizacao)
                 campos_obrigatorios.append('statusPolimerizacao')
                 for campo in campos_obrigatorios:
-                    if campo not in dados:
+                    if campo not in request.POST:
                         return JsonResponse({'error': f'Campo {campo} é obrigatório!'},status=400)
                 
-                if type(dados['statusPolimerizacao']) is not bool:
+                if type(polimerizacao) is not bool:
                     return JsonResponse({'error':'Os campos de status devem ser booleanos!'}, status=400)
                 
                 # Registra o teste de polimerização
-                registro_teste.polimerizacao = dados['statusPolimerizacao']
+                registro_teste.polimerizacao = polimerizacao
             
-            if type(dados['statusAderencia']) is not bool or type(dados['statusTonalidade']) is not bool:
+            aderencia = aderencia == 'true'
+            tonalidade = tonalidade == 'true'
+
+            if type(aderencia) is not bool or type(tonalidade) is not bool:
                 return JsonResponse({'error':'Os campos de status devem ser booleanos!'}, status=400)
             
-            registro_teste.aderencia = dados['statusAderencia']
-            registro_teste.tonalidade = dados['statusTonalidade']
+            
+            registro_teste.aderencia = aderencia
+            registro_teste.tonalidade = tonalidade
 
-            if 'observacoes-teste' in dados:
-                registro_teste.observacao = dados['observacoes-teste']
+            if observacao:
+                registro_teste.observacao = observacao
             # CAMPO DE IMAGEM A SER FEITO DEPOIS
+            if 'imagem' in request.FILES:
+                ext = os.path.splitext(request.FILES['imagem'].name)[1]  # pega a extensão, ex: ".jpg"
+                nome_arquivo = f"{timezone.now().strftime('%Y%m%d%H%M%S')}{ext}"
+                registro_teste.imagem = request.FILES['imagem']
+                registro_teste.imagem.name = nome_arquivo
 
             try:
-                registro_teste.espessura_camada_1 = float(dados['espessura-camada-1'])
-                registro_teste.espessura_camada_2 = float(dados['espessura-camada-2'])
-                registro_teste.espessura_camada_3 = float(dados['espessura-camada-3'])
+                registro_teste.espessura_camada_1 = float(espessura_camada_1)
+                registro_teste.espessura_camada_2 = float(espessura_camada_2)
+                registro_teste.espessura_camada_3 = float(espessura_camada_3)
             except ValueError:
                 return JsonResponse({'error':'Os campos de espessura devem ser numéricos!'}, status=400)
             
             resultados_espessura_camada = [registro_teste.espessura_camada_1,registro_teste.espessura_camada_2,registro_teste.espessura_camada_3]
 
             causa_reprovacao = []
-            if "statusPolimerizacao" in dados: # PO
-                if dados['statusPolimerizacao'] and dados['statusAderencia'] and dados['statusTonalidade']:
+            if polimerizacao: # PO
+                registro_teste.meta_espessura_camada = '60 a 80'
+                if polimerizacao and aderencia and tonalidade:
                     registro_teste.status = 'aprovado'
                     for espessura in resultados_espessura_camada:
                         if not (60 <= espessura <= 80):
@@ -163,7 +201,8 @@ def realizar_verificacao_funcional(request):
                     causa_reprovacao.append('falha em algum teste (polimerização, aderência ou tonalidade)')
                     registro_teste.status = 'reprovado'
             else: # PU
-                if dados['statusAderencia'] and dados['statusTonalidade']:
+                registro_teste.meta_espessura_camada = '40 a 60'
+                if aderencia and tonalidade:
                     registro_teste.status = 'aprovado'
                     for espessura in resultados_espessura_camada:
                         if not (40 <= espessura <= 60):
@@ -174,8 +213,7 @@ def realizar_verificacao_funcional(request):
                     registro_teste.status = 'reprovado'
                     causa_reprovacao.append('falha em algum teste (aderência ou tonalidade)')
             
-            print(registro_teste.status)
-            # registro_teste.save()
+            registro_teste.save()
             if registro_teste.status == 'aprovado':
                 return JsonResponse({'status':'ok'},status=200)
             elif registro_teste.status == 'reprovado':
@@ -197,19 +235,15 @@ def detalhes_verificacao_funcional(request,id):
 
         #PU - 40 a 60 microns
         #PÓ - 60 a 80 microns
-        condicao_espessura = [registro_testes.espessura_camada_1, registro_testes.espessura_camada_2, registro_testes.espessura_camada_3]
+        media_condicao_espessura = (int(registro_testes.espessura_camada_1) + int(registro_testes.espessura_camada_2) + int(registro_testes.espessura_camada_3)) / 3
 
-        
-        meta = ''
         resultado_espessura = 'Aprovado'
         if registro_testes.peca_ordem.tipo == 'PU':
-            meta = '40 a 60 microns'
-            for espessura in condicao_espessura:
-                if espessura < 40 or espessura > 60:
-                    resultado_espessura = 'Reprovado'
-                    break
+            if media_condicao_espessura < 40 or media_condicao_espessura > 60:
+                resultado_espessura = 'Reprovado'
         else:
-            meta = '60 a 80 microns'
+            if media_condicao_espessura < 60 or media_condicao_espessura > 80:
+                resultado_espessura = 'Reprovado'
 
         dados_registro = {
             'status':'ok',
@@ -221,11 +255,13 @@ def detalhes_verificacao_funcional(request,id):
             'status_registro': registro_testes.status.capitalize(),
             'aderencia': "Aprovado" if registro_testes.aderencia is True else "Reprovado",
             'tonalidade': "Aprovado" if registro_testes.tonalidade is True else "Reprovado",
-            'polimerizacao': "Aprovado" if registro_testes.polimerizacao is True else ("Reprovado" if registro_testes.polimerizacao else 'Somente para PÓ'),
+            'polimerizacao': ("Aprovado" if registro_testes.polimerizacao is True else "Reprovado" if registro_testes.polimerizacao is False else "Somente para PÓ"),
             'espessura_camada_1': registro_testes.espessura_camada_1,
             'espessura_camada_2': registro_testes.espessura_camada_2,
             'espessura_camada_3': registro_testes.espessura_camada_3,
-            'meta_espessura': meta,
+            'meta_espessura': registro_testes.meta_espessura_camada + ' µm' if registro_testes.meta_espessura_camada else 'Não definida',
+            'media_espessura': round(media_condicao_espessura,2),
+            'imagem_url': registro_testes.imagem.url if registro_testes.imagem else None,
             'resultado_espessura': resultado_espessura,
             'observacao': registro_testes.observacao if registro_testes.observacao else 'Nenhuma observação registrada.',
             'data_inicial': (registro_testes.data_inicial - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S") if registro_testes.data_inicial else None,
@@ -236,5 +272,6 @@ def detalhes_verificacao_funcional(request,id):
     except TesteFuncional.DoesNotExist:
         return JsonResponse({'error': 'Registro não encontrado!'}, status=404)
     except Exception as e:
-        print(e)
+        traceback.print_exc(e)
         return JsonResponse({'error': 'Ocorreu um erro ao buscar os detalhes!'}, status=500)
+    

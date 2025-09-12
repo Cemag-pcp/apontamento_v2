@@ -120,7 +120,7 @@ function buscarItensPendentes(pagina) {
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <h5> ${item.peca}</h5>
-                    <p>Registro #${item.id}</p>
+                    <p>Ordem #${item.ordem}</p>
                     <p>
                         <strong>📅 Dt. Criação:</strong> ${item.data_inicial}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo_pintura}<br>
@@ -129,6 +129,7 @@ function buscarItensPendentes(pagina) {
                     <hr>
                     <button 
                         data-id="${item.id}"
+                        data-ordem="${item.ordem}"
                         data-data="${item.data_inicial}"
                         data-tipo="${item.tipo_pintura}"
                         data-cor="${item.cor}"

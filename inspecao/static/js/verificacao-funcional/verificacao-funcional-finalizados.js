@@ -158,19 +158,19 @@ function buscarItensFinalizados(pagina) {
 
             let iconeAprovado;
 
-            if (item.possui_nao_conformidade) {
+            if (item.status === 'aprovado') {
                 iconeAprovado = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
             } else {
                 iconeAprovado = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
             }
-            let textoStatus = item.possui_nao_conformidade ? "Aprovado" : "Reprovado";
+            let textoStatus = item.status === "aprovado" ? "Aprovado" : "Reprovado";
             let color = borderColors[item.cor];
 
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <h5> ${item.peca}</h5>
-                    <p>Inspeção #${item.id}</p>
+                    <p>Ordem #${item.ordem}</p>
                     <p>
                         <strong>📅 Data de Criação:</strong> ${item.data_inicial}<br>
                         <strong>📅 Data de Finalização:</strong> ${item.data_atualizacao}<br>
@@ -189,10 +189,9 @@ function buscarItensFinalizados(pagina) {
                             data-data-atualizacao="${item.data_atualizacao}"
                             data-peca="${item.peca}"
                             data-tipo="${item.tipo_pintura}"
-                            data-aprovado="${item.nao_conformidade}"
-                            data-reprovado="${item.conformidade}"
+                            data-aprovado="${item.status}"
+                            data-reprovado="${item.status}"
                             data-cor="${item.cor}"
-                            data-id-dados-execucao="${item.id_dados_execucao}"
                         class="btn btn-white historico-verificacao-funcional w-50 d-flex justify-content-center align-items-center gap-2">              
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>
                             Ver detalhes
