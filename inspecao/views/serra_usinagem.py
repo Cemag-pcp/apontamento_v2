@@ -442,8 +442,12 @@ def get_itens_reinspecao_serra_usinagem(request):
         # Pega a última execução de inspeção (para mostrar dados da inspeção original)
         ultima_execucao = inspecao.execucoes[-1] if inspecao.execucoes else None
 
+        print("ULTIMA EXECUCAO")
+        print(ultima_execucao.num_execucao)
+
         item = {
             "id": inspecao.id,
+            "num_execucao": ultima_execucao.num_execucao,
             "id_inspecao": inspecao.id,
             "data": data_ajustada.strftime(
                 "%d/%m/%Y %H:%M:%S"
