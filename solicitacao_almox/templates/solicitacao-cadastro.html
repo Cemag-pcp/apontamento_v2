@@ -308,9 +308,9 @@
         
         if (isMatricula){
             var matricula = button.getAttribute('data-matricula');
-            url = `/cadastro-item/edit/${matricula}`
+            url = `/almox/api/cadastro-item/edit/${matricula}`
         }else{
-            url = `/cadastro-item/edit/${solicitacaoId}/${tipoSolicitacao}`;
+            url = `/almox/api/cadastro-item/edit/${solicitacaoId}/${tipoSolicitacao}`;
         }
         
         $.ajax({
@@ -370,7 +370,7 @@
 
         $.ajax({
             type: "POST",
-            url: `/cadastro-item/edit/${solicitacaoId}/${tipoSolicitacao}`,
+            url: `/almox/api/cadastro-item/edit/${solicitacaoId}/${tipoSolicitacao}`,
             success: function(response) {   
                 alert("OK!")
             },

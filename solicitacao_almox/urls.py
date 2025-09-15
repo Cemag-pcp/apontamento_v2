@@ -12,31 +12,31 @@ urlpatterns = [
     path('api/historico/processa-historico-requisicao/', views.solicitacao_data_requisicao, name='solicitacao_data_requisicao'),
     
     path('historico/transferencia', views.historico_transferencia, name='historico_transferencia'),
-    path('historico/processa-historico-transferencia/', views.solicitacao_data_transferencia, name='solicitacao_data_transferencia'),
+    path('api/historico/processa-historico-transferencia/', views.solicitacao_data_transferencia, name='solicitacao_data_transferencia'),
 
-    path('cadastrar-novo-item/', views.cadastro_novo_item, name='cadastro_novo_item'),
-    path('cadastrar-nova-matricula/', views.cadastro_nova_matricula, name='cadastro_nova_matricula'),
+    path('api/cadastrar-novo-item/', views.cadastro_novo_item, name='cadastro_novo_item'),
+    path('api/cadastrar-nova-matricula/', views.cadastro_nova_matricula, name='cadastro_nova_matricula'),
 
     path('gerir-solicitacao-cadastro/', views.gerir_solicitacoes, name='gerir_solicitacoes'),
     
-    path('cadastro-item/edit/<int:pk>/<str:tipo_cadastro>', views.edit_solicitacao_cadastro_item, name='edit_solicitacao_cadastro_item'),
-    path('cadastro-item/edit/<int:pk>', views.edit_solicitacao_cadastro_matricula, name='edit_solicitacao_cadastro_matricula'),
+    path('api/cadastro-item/edit/<int:pk>/<str:tipo_cadastro>', views.edit_solicitacao_cadastro_item, name='edit_solicitacao_cadastro_item'),
+    path('api/cadastro-item/edit/<int:pk>', views.edit_solicitacao_cadastro_matricula, name='edit_solicitacao_cadastro_matricula'),
 
-    path('editar/<str:tipo_solicitacao>/<int:requisicao_id>/', views.edit_solicitacao, name='edit_solicitacao'),
+    path('api/editar/<str:tipo_solicitacao>/<int:requisicao_id>/', views.edit_solicitacao, name='edit_solicitacao'),
 
     path('erros/', views.home_erros, name='home_erros'),
-    path('erros/data-transferencia/', views.data_erros_transferencia, name='data_erros_transferencia'),
-    path('erros/data-requisicao/', views.data_erros_requisicao, name='data_erros_requisicao'),
+    path('api/erros/data-transferencia/', views.data_erros_transferencia, name='data_erros_transferencia'),
+    path('api/erros/data-requisicao/', views.data_erros_requisicao, name='data_erros_requisicao'),
 
-    path('get-dados/', views.get_data_solicitacao, name='get_data_solicitacao'),
-    path('get-recursos/', views.get_recursos, name='get_recursos'),
+    path('api/get-dados/', views.get_data_solicitacao, name='get_data_solicitacao'),
+    path('api/get-recursos/', views.get_recursos, name='get_recursos'),
 
-    path('receber-edicao/', views.receber_edicao, name='receber_edicao'),
-    path('receber-ajuste-manual/', views.receber_ajuste_manual, name='receber_edicao'),
+    path('api/receber-edicao/', views.receber_edicao, name='receber_edicao'),
+    path('api/receber-ajuste-manual/', views.receber_ajuste_manual, name='receber_edicao'),
 
 
     # teste
-    path('receber-form-edit/', views.receberFormEdit, name='receberFormEdit'),
+    path('api/receber-form-edit/', views.receberFormEdit, name='receberFormEdit'),
 
 ]
 

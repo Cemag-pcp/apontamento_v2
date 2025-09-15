@@ -139,7 +139,6 @@ def criar_solicitacoes(request):
 
 def get_cc_by_matricula(request):
     matricula = request.GET.get("matricula")
-    print(matricula)
     if matricula:
         try:
             funcionario = Funcionario.objects.get(pk=matricula)
