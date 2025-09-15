@@ -142,6 +142,7 @@ function buscarItensReinspecao(pagina) {
                     <hr>
                     <button 
                         data-id="${item.id}"
+                        num-execucao="${item.num_execucao}"
                         data-data="${item.data}"
                         data-nao-conformidade="${item.nao_conformidade}"
                         data-conformidade="${item.conformidade}"
