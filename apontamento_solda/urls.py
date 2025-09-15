@@ -26,6 +26,7 @@ urlpatterns = [
 # templates
 urlpatterns += [
     path('', views.planejamento, name='planejamento'),
+    path('historico/', views.historico_ordens, name='historico'),
 ]
 
 # Google sheets

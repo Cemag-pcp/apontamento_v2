@@ -6,6 +6,7 @@ from django.db import transaction, models, IntegrityError, connection
 from django.shortcuts import get_object_or_404
 from django.db.models.functions import Coalesce
 from django.shortcuts import render
+from django.core.paginator import Paginator
 from django.core.exceptions import ObjectDoesNotExist
 
 import json
@@ -854,6 +855,16 @@ def planejamento(request):
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='solda').exclude(nome='Finalizada parcial')
 
     return render(request, 'apontamento_solda/planejamento.html', {'motivos_maquina_parada': motivos_maquina_parada})
+
+
+def historico_ordens(request):
+
+    ordens = PecasOrdem.objects.select_related('ordem').order_by('-data')
+    paginator = Paginator(ordens, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'apontamento_solda/historico.html', {'page_obj': page_obj})
 
 def buscar_maquinas(request):
 
