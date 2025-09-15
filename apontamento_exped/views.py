@@ -379,7 +379,7 @@ def salvar_foto(request):
 
         # Gera nome customizado
         extensao = foto.name.split('.')[-1]  # preserva extensão original
-        nome_arquivo = f"fotos_pacotes/pacote_{pacote_id}_{timezone.now().strftime('%Y%m%d%H%M%S')}.{extensao}"
+        nome_arquivo = f"pacote_{pacote_id}_{timezone.now().strftime('%Y%m%d%H%M%S')}.{extensao}"
 
         # Sobrescreve o nome do arquivo
         foto.name = nome_arquivo
