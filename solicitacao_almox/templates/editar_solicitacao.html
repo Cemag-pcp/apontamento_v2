@@ -1,0 +1,289 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="container mt-5">
+    
+    <!-- Formulários em collapse -->
+    <div class="accordion" id="formAccordion">
+        
+        {% if tipo_solicitacao == 'requisicao' %}
+
+        <!-- Formulário de Requisição -->
+        <div id="blocoEditarRequisicao">
+            <div class="card card-header">
+                <div class="d-flex justify-content-between">
+                    <h5>Edição</h5>
+                </div>
+            </div>
+            <div class="card card-body">
+                <form id="formRequisicao" method="post" class="container">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="requisicao">
+                    
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6">
+                            <label for="id_requisicao-funcionario" class="form-label">Matrícula:</label>
+                            <input class="form-control" type="text" value="{{solicitante}}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_requisicao-cc" class="form-label">Centro de custo:</label>
+                            <select id="id_requisicao-cc" class="form-select js-example-basic-single" name="requisicao-cc" required>
+                                {% for cc in ccs %}
+                                    <option value="{{cc.id}}">{{cc.nome}}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_requisicao-item" class="form-label">Item:</label>
+                            <select id="id_requisicao-item" class="form-select js-example-basic-single" name="requisicao-item" required>
+                                <option value="">Selecione...</option>
+                                {% for item in itens %}
+                                    <option value="{{ item.id }}" {% if item_escolhido_codigo == item.codigo %} selected="selected" {% endif %}>
+                                        {{ item.codigo }} - {{ item.nome }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            {{form_requisicao.label}}
+                            <label for="id_requisicao-classe_requisicao" class="form-label">Classe de Requisição:</label>
+                            <select class="form-select" name="requisicao-classe_requisicao" id="id_requisicao-classe_requisicao" required>
+                                <option value="">Selecione...</option>
+                                {% for classe in classes %}
+                                    <option value="{{ classe.id }}" {% if classe_escolhida == classe.id %} selected="selected" {% endif %}>
+                                        {{ classe.nome }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_requisicao-quantidade" class="form-label">Quantidade:</label>
+                            <input type="number" class="form-control" id="id_requisicao-quantidade" name="requisicao-quantidade" value="{{quantidade}}" step="0.01" required>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <label for="unidade" class="form-label">Unidade:</label>
+                            <input type="text" class="form-control" id="unidade" name="unidade" value="{{unidade}}" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-8">
+                            <label for="id_requisicao-obs" class="form-label">Obs:</label>
+                            <textarea class="form-control" name="requisicao-obs" rows="3" id="id_requisicao-obs" readonly>{{obs}}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="row justify-content-center">
+                        <div class="col-md-8 text-end">
+                            <button type="submit" class="btn btn-success">Enviar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        {% else %}
+
+        <!-- Formulário de Transferência -->
+        <div id="blocoEditarTransferencia">
+            <div class="card card-header">
+                <div class="d-flex justify-content-between">
+                    <h5>Edição</h5>
+                </div>
+            </div>
+            <div class="card card-body">
+                <form id="formTransferencia" method="post" class="container">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="transferencia">
+                
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6">
+                            <label for="id_transferencia-funcionario" class="form-label">Matrícula:</label>
+                            <input class="form-control" type="text" value="{{solicitante}}" readonly>
+                        </div>
+                    </div>
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_transferencia-deposito_destino" class="form-label">Depósito Destino:</label>
+                            <select id="id_transferencia-deposito_destino" class="form-select js-example-basic-single" name="transferencia-deposito_destino" required>
+                                <option value="">Selecione...</option>
+                                {% for deposito in depositos %}
+                                    <option value="{{ deposito.id }}" {% if deposito_destino_escolhido == deposito.nome %} selected="selected" {% endif %}>
+                                        {{ deposito.nome }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_transferencia-item" class="form-label">Item:</label>
+                            <select id="id_transferencia-item" class="form-select js-example-basic-single" name="transferencia-item" required>
+                                <option value="">Selecione...</option>
+                                {% for item in itens %}
+                                    <option value="{{ item.id }}" {% if item_escolhido_codigo == item.codigo %} selected="selected" {% endif %}>
+                                        {{ item.codigo }} - {{ item.nome }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_transferencia-quantidade" class="form-label">Quantidade:</label>
+                            <input type="number" class="form-control" id="id_transferencia-quantidade" name="transferencia-quantidade" value="{{quantidade}}" step="0.01" required>
+                        </div>
+                    </div>
+                
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-8">
+                            <label for="id_transferencia-obs" class="form-label">Obs:</label>
+                            <textarea class="form-control" name="transferencia-obs" id="id_transferencia-obs" rows="3" readonly>{{obs}}</textarea>
+                        </div>
+                    </div>
+                
+                    <div class="row justify-content-center">
+                        <div class="col-md-8 text-end">
+                            <button type="submit" class="btn btn-success">Enviar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% endif %}
+
+    </div>
+</div>
+
+<!-- Funções para chamar centro de custo e unidade -->
+
+<script>
+    // Função para fazer requisições AJAX
+    function ajax(url, callback) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4) {
+                if (xhr.status == 200) {
+                    callback(JSON.parse(xhr.responseText));
+                } else {
+                    console.error('Erro na requisição AJAX. Status:', xhr.status);
+                }
+            }
+        };
+        xhr.onerror = function() {
+            console.error('Erro na requisição AJAX.');
+        };
+        xhr.send();
+    }
+
+    // Função para inicializar select2 e adicionar evento change
+    function initSelect2(selectElementId, ajaxUrl, updateElementId, dataField) {
+        var selectElement = document.getElementById(selectElementId);
+        if (selectElement) {
+            $(selectElement).select2({
+                placeholder: "Selecione...",
+                allowClear: true,
+                dropdownCssClass: 'form-control', 
+                containerCssClass: 'form-control',
+                width: '100%'
+            });
+
+            // Use o evento 'select2:select' em vez de 'change'
+            $(selectElement).on('select2:select', function() {
+                var value = $(this).val();
+                if (value) {
+                    ajax(ajaxUrl + encodeURIComponent(value), function(data) {
+                        var updateElement = document.getElementById(updateElementId);
+                        if (updateElement.tagName.toLowerCase() === 'select') {
+                            // Limpar opções existentes
+                            updateElement.options.length = 0;
+
+                            // Verificar se os dados retornados são uma lista
+                            if (Array.isArray(data[dataField])) {
+                                data[dataField].forEach(function(item) {
+                                    var option = document.createElement('option');
+                                    option.value = item.id;
+                                    option.text = item.nome;
+                                    updateElement.add(option);
+                                });
+                            } else {
+                                console.error('Dados retornados não são uma lista:', data[dataField]);
+                            }
+                        } else {
+                            if (data[dataField]) {
+                                updateElement.value = data[dataField];
+                            } else {
+                                updateElement.value = '';
+                            }
+                        }
+                    });
+                } else {
+                    var updateElement = document.getElementById(updateElementId);
+                    if (updateElement.tagName.toLowerCase() === 'select') {
+                        updateElement.options.length = 0;
+                    } else {
+                        updateElement.value = '';
+                    }
+                }
+            });
+        }
+    }
+
+    // Inicialização de todos os campos select2 e AJAX após o DOM estar pronto
+    document.addEventListener('DOMContentLoaded', function() {
+        // Requisição - Matrícula (Centro de Custo)
+        initSelect2(
+            'id_requisicao-funcionario', 
+            '{% url "get_cc_by_matricula" %}?matricula=',
+            'id_requisicao-cc', 
+            'cc'
+        );
+
+        // Requisição - Item (Unidade)
+        initSelect2(
+            'id_requisicao-item', 
+            '{% url "get_unidade_by_item" %}?item_id=', 
+            'unidade', 
+            'unidade'
+        );
+
+        // Requisição - classe
+        initSelect2(
+            'id_requisicao-item',
+            '{% url "ajax_carregar_classes" %}?item_id=',
+            'id_requisicao-classe_requisicao',
+            'classes'
+        );
+
+        // Requisição - classe dentro do modal de novo item
+        initSelect2(
+            'id-funcionario-cadastro-item',
+            '{% url "get_cc_by_matricula" %}?matricula=',
+            'id_requisicao-cc-novo-item',
+            'cc'
+        );
+
+        // Transferência - Funcionario
+        initSelect2('id_transferencia-funcionario', '', '', '');
+
+        // Transferência - Depósito Destino
+        initSelect2('id_transferencia-deposito_destino', '', '', '');
+
+        // Transferência - Item
+        initSelect2('id_transferencia-item', '', '', '');
+
+        // Classe de requisição - Item
+        initSelect2('id_requisicao-classe_requisicao', '', '', '');
+
+    });
+</script>
+
+{% endblock %}

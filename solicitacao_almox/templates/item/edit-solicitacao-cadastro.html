@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <form method="POST">
+        {% csrf_token %}
+        
+        {{form.as_p}}
+
+        <button type="submit" class="btn btn-success">Editar</button>
+    </form>
+</div>
+    
+{% endblock %}
+
+{% block scripts %}
+
+<script>
+
+// Função para fazer requisições AJAX
+    function ajax(url, callback) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4) {
+                if (xhr.status == 200) {
+                    callback(JSON.parse(xhr.responseText));
+                } else {
+                    console.error('Erro na requisição AJAX. Status:', xhr.status);
+                }
+            }
+        };
+        xhr.onerror = function() {
+            console.error('Erro na requisição AJAX.');
+        };
+        xhr.send();
+    }
+
+    function initSelect2(selectElementId, ajaxUrl, updateElementId, dataField) {
+        var selectElement = document.getElementById(selectElementId);
+        if (selectElement) {
+            $(selectElement).select2({
+                placeholder: "Selecione...",
+                allowClear: true,
+                dropdownCssClass: 'form-control', 
+                containerCssClass: 'form-control',
+                width: '100%'
+            });
+
+            // Evento 'select2:select' para lidar com as mudanças
+            $(selectElement).on('select2:select', function() {
+                var value = $(this).val();
+                if (value) {
+                    ajax(ajaxUrl + encodeURIComponent(value), function(data) {
+                        var updateElement = document.getElementById(updateElementId);
+                        if (updateElement.tagName.toLowerCase() === 'select') {
+                            // Limpar opções existentes
+                            updateElement.options.length = 0;
+
+                            // Verificar se os dados retornados são uma lista
+                            if (Array.isArray(data[dataField])) {
+                                data[dataField].forEach(function(item) {
+                                    var option = document.createElement('option');
+                                    option.value = item.id;
+                                    option.text = item.nome;
+                                    updateElement.add(option);
+                                });
+                            } else {
+                                console.error('Dados retornados não são uma lista:', data[dataField]);
+                            }
+                        } else {
+                            if (data[dataField]) {
+                                updateElement.value = data[dataField];
+                            } else {
+                                updateElement.value = '';
+                            }
+                        }
+                    });
+                } else {
+                    var updateElement = document.getElementById(updateElementId);
+                    if (updateElement.tagName.toLowerCase() === 'select') {
+                        updateElement.options.length = 0;
+                    } else {
+                        updateElement.value = '';
+                    }
+                }
+            });
+
+            // Verificar se já há um valor selecionado no select e disparar o evento manualmente
+            var initialValue = $(selectElement).val();
+            if (initialValue) {
+                $(selectElement).trigger('select2:select'); // Dispara o evento manualmente
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializa os campos Select2
+        initSelect2(
+            'id_funcionario', 
+            '{% url "get_cc_by_matricula" %}?matricula=',
+            'id_cc', 
+            'cc'
+        );
+    });
+
+</script>
+
+{% endblock %}

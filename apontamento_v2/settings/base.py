@@ -26,6 +26,10 @@ INSTALLED_APPS = [
     'inspecao',
     'sucata',
 
+    'cadastro_almox',
+    'core_almox',
+    'solicitacao_almox',
+
     'apontamento_serra',
     'apontamento_usinagem',
     'apontamento_corte',

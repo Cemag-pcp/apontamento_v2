@@ -16,17 +16,20 @@ class RotaAccessMiddleware:
         # Obtém o caminho da requisição, removendo "/" inicial e final
         path = request.path.strip("/")
         
-        login_url = reverse('core:login')
+        PUBLIC_PATHS = [
+            "core/login",
+            "almox"
+        ]
 
         # Se o usuário não estiver autenticado, redireciona para o login
-        if not request.user.is_authenticated and path != login_url.strip("/"):
-            print(login_url.strip("/"))
+        if not request.user.is_authenticated and path not in PUBLIC_PATHS:
+            login_url = reverse('core:login')
             if path == "":
                 return redirect(f"{login_url}")
             return redirect(f"{login_url}?next={request.path}")
 
         # Ignorar rotas administrativas
-        EXCLUDED_PATHS = ['admin', 'login', 'logout', 'core']
+        EXCLUDED_PATHS = ['admin', 'login', 'logout', 'core', 'almox']
         if any(path.startswith(excluded) for excluded in EXCLUDED_PATHS):
             return self.get_response(request)
 

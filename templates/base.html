@@ -232,6 +232,45 @@
                                     <a class="nav-link" href="{% url 'solda:planejamento' %}">Ordens</a>
                                 </nav>
                             </div>
+
+                            <div class="sb-sidenav-menu-heading">Almoxarifado</div>
+
+                             <a class="nav-link" href="{% url 'solicitacoes_page' %}">Home</a>
+                                <a class="nav-link" href="{% url 'dashboard' %}">Dashboard</a>
+                                <a class="nav-link" href="{% url 'criar_solicitacoes' %}">Solicitar</a>
+                            
+                                <a class="nav-link collapsed" href="#" data-bs-toggle="collapse"
+                                    data-bs-target="#collapseHistorico" aria-expanded="false" aria-controls="collapseHistorico">
+                                    <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
+                                    Historico
+                                    <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                </a>
+                                <div class="collapse" id="collapseHistorico" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'historico_requisicao' %}">Requisição</a>
+                                    </nav>
+                                </div>
+                                <div class="collapse" id="collapseHistorico" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'historico_transferencia' %}">Transferência</a>
+                                    </nav>
+                                </div>
+                                <div class="collapse" id="collapseHistorico" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'home_erros' %}">Erros</a>
+                                    </nav>
+                                </div>
+                                <a class="nav-link collapsed" href="#" data-bs-toggle="collapse"
+                                    data-bs-target="#collapseGerCadastro" aria-expanded="false" aria-controls="collapseGerCadastro">
+                                    <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
+                                    Gerenciar cadastro
+                                    <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                </a>
+                                <div class="collapse" id="collapseGerCadastro" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'gerir_solicitacoes' %}">Solicitações</a>
+                                    </nav>
+                                </div>
                             
                             <div class="sb-sidenav-menu-heading">Inspeção</div>
 
@@ -350,7 +389,11 @@
                     <div class="sb-sidenav-footer">
                         <div class="small">
                             <!-- Exibe o tipo de acesso do usuário -->
-                            Logado: <strong>{{ request.user.username }}</strong> 
+                            {% if request.user.username %}
+                                Logado: <strong>{{ request.user.username }}</strong> 
+                            {% else %}
+                                Usuário nao autenticado
+                            {% endif %}
                             <br>
                         </div>
                         <!-- Botão de Logout -->

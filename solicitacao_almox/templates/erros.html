@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block links %}
+<style>
+    .modal {
+        overflow-y: auto;
+    }
+
+    body {
+        overflow-x: hidden; /* Evita que o conteúdo salte */
+    }
+    .card-text {
+        font-size: 1.5rem;
+    }
+    .card.title{
+        font-size: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6 d-flex justify-content-center align-items-center">
+        <div class="card text-dark bg-light mb-4 mt-5" 
+            style="max-width: 30rem; font-size: 1.2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <div class="card-header d-flex flex-column align-items-center">
+                <h4 class="fw-bold">Erros</h4>
+            </div>
+            <div class="card-body d-flex justify-content-between">
+                <div class="card-body d-flex flex-column align-items-center">
+                    <h5 class="card-title">Requisições</h5>
+                    <p class="card-text">{{qtdRequisicaoErros}}</p>
+                </div>
+                <div class="card-body d-flex flex-column align-items-center">
+                    <h5 class="card-title">Transferências</h5>
+                    <p class="card-text">{{qtdTransferenciaErros}}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 d-flex justify-content-center align-items-center">
+        <div class="card text-dark bg-light mb-4 mt-5" 
+            style="max-width: 30rem; font-size: 1.2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <div class="card-header d-flex flex-column align-items-center">
+                <h4 class="fw-bold">Pendentes</h4>
+            </div>
+            <div class="card-body d-flex justify-content-between">
+                <div class="card-body d-flex flex-column align-items-center">
+                    <h5 class="card-title">Requisições</h5>
+                    <p class="card-text">{{qtdRequisicaoNa}}</p>
+                </div>
+                <div class="card-body d-flex flex-column align-items-center">
+                    <h5 class="card-title">Transferências</h5>
+                    <p class="card-text">{{qtdTransferenciaNa}}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="mt-4 mb-3">
+    <h1 class="text-center">Tabela de Erros Transferência</h1>
+    <div class="table-responsive" id="table-transferencia-container" style="max-height: 400px; overflow-y: auto;">
+        <table class="table table-bordered table-hover table-striped" id="table-transferencia-erros">
+            <thead class="table-light">
+                <tr>
+                    <th>Chave</th>
+                    <th>Item</th>
+                    <th>Quantidade</th>
+                    <th>Data Solicitação</th>
+                    <th>Data Entrega</th>
+                    <th>Destino</th>
+                    <th>Solicitante</th>
+                    <th>Erro</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="table-body-transferencia">
+                <!-- Dados serão carregados aqui dinamicamente -->
+            </tbody>
+        </table>
+        <div id="spinner-transferencia" class="text-center py-2" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 mb-3">
+    <h1 class="text-center">Tabela de Erros Requisição</h1>
+    <div class="table-responsive" id="table-requisicao-container" style="max-height: 400px; overflow-y: auto;">
+        <table class="table table-bordered table-hover table-striped" id="table-requisicao-erros">
+            <thead class="table-light">
+                <tr>
+                    <th>Chave</th>
+                    <th>Item</th>
+                    <th>Quantidade</th>
+                    <th>Data Solicitação</th>
+                    <th>Data Entrega</th>
+                    <th>Classe</th>
+                    <th>Solicitante</th>
+                    <th>CC</th>
+                    <th>Erro</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="table-body-requisicao">
+                <!-- Dados serão carregados aqui dinamicamente -->
+            </tbody>
+        </table>
+        <div id="spinner-requisicao" class="text-center py-2" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Edição -->
+<div class="modal fade" id="modalEditar" aria-labelledby="modalEditarLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEditarLabel">Editar Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditar">
+                    <input type="hidden" name="editarChave" id="editarChave">
+                    <input type="hidden" name="editarType" id="editarType">
+                    <div class="mb-3">
+                        <label for="editarQuantidade" class="form-label">Quantidade</label>
+                        <input type="number" name="editarQuantidade" step="0.1" class="form-control" id="editarQuantidade" required>
+                    </div>
+                    <div id="recursos-container" class="mb-3">
+                        <!-- Campos de recurso dinâmicos aparecerão aqui -->
+                    </div>
+                    <div class="mb-3" id="editarClasseContainer">
+                        <label for="editarClasse" class="form-label">Classe</label>
+                        <select class="form-control" name="editarClasse" id="editarClasse">
+                            <option value="3">Req p Produção</option>
+                            <option value="4">Req p Consumo</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="btnSalvarEditar">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação de ajuste manual -->
+<div class="modal fade" id="modalConfirmar" tabindex="-1" aria-labelledby="modalConfirmarLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalConfirmarLabel">Confirmar ajuste manual</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarManual">
+                    <p>Tem certeza de que deseja confirmar o ajuste manual do item <strong id="confirmarChave"></strong>?</p>
+                    
+                    <input type="hidden" name="manualChave" id="manualChave">
+                    <input type="hidden" name="manualTipo" id="manualTipo">
+                    
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="btnConfirmarManual">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'js/datatable-erros.js' %}"></script>
+{% endblock %}

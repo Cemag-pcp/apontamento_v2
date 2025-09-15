@@ -1,0 +1,232 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% block title %}
+    <title></title>
+    {% endblock %}
+
+    <link href="{% static 'css/styles.css' %}" rel="stylesheet" />
+    <link href="{% static 'css/scroll.css' %}" rel="stylesheet" />
+
+    <!-- Inclua o CSS do DataTables -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css"/>
+
+    <!-- FontAwesome -->
+    <script src="https://use.fontawesome.com/releases/v6.3.0/js/all.js" crossorigin="anonymous"></script>
+
+
+    {% block links %}
+    {% endblock %}
+</head>
+<body class="bg-body">
+    
+    <div class="p-5">
+        <h1 class="fw-bold" style="text-align: center;">Solicitações Pendentes</h1>
+        <div class="row" id="dados-container">
+            {% for requisicao in requisicoes %}
+            <div class="col-lg-3">
+                <div class="card text-dark bg-light mb-4 mt-5" 
+                    style="max-width: 30rem; font-size: 1.2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                    <div class="card-header">
+                        <h4 class="fw-bold">Requisição</h4>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ requisicao.funcionario.matricula }} - {{ requisicao.funcionario.nome }}</h5>
+                        <p class="card-text">{{ requisicao.item }}</p>
+
+                        <p class="card-text mt-2">{{ requisicao.data_solicitacao|date:"d/m/Y H:i:s" }}</p>
+                        <span class="card-text fw-bold bg-warning" style="font-size: 1.5rem; border-radius: 5px; padding: 5px;" id="contador_{{ requisicao.pk }}"></span>
+                    </div>
+                    <div class="card-footer bg-light text-secondary" style="border-radius: 0 0 12px 12px;">
+                        <small class="text-muted">Quantidade - {{ requisicao.quantidade }}</small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+        
+            {% for transferencia in transferencias %}
+            <div class="col-lg-3">
+                <div class="card text-dark bg-light mb-4 mt-5" 
+                    style="max-width: 30rem; font-size: 1.2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                    <div class="card-header">
+                        <h4 class="fw-bold">Transferência</h4>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ transferencia.funcionario.matricula }} - {{ transferencia.funcionario.nome }}</h5>
+                        <p class="card-text">{{ transferencia.item }}</p>
+                        
+                        <p class="card-text mt-2">{{ transferencia.data_solicitacao|date:"d/m/Y H:i:s" }}</p>
+                        <span class="card-text fw-bold bg-warning" style="font-size: 1.5rem; border-radius: 5px; padding: 5px;" id="contador_{{ transferencia.pk }}"></span>
+                    </div>
+                    <div class="card-footer bg-light text-secondary" style="border-radius: 0 0 12px 12px;">
+                        <small class="text-muted">Quantidade - {{ transferencia.quantidade }}</small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+
+    {{ requisicoes_datas|json_script:"dataRequisicoes" }}
+    
+    {{ transferencias_datas|json_script:"dataTransferencias" }}
+    
+    <script>
+        function atualizarDados() {
+            fetch("{% url 'atualizar_dados' %}")
+                .then(response => response.json())
+                .then(data => {
+                    // console.log('atualizarDadosFunc');
+                    const requisicoes = data.requisicoes; // Não precisa usar JSON.parse
+                    const transferencias = data.transferencias; // Não precisa usar JSON.parse
+
+                    // Limpa as divs existentes
+                    const dadosContainer = document.querySelector("#dados-container");
+                    dadosContainer.innerHTML = "";
+
+                    if (requisicoes.length > 0 || transferencias.length > 0) {
+                        // Atualiza as requisições
+                        requisicoes.forEach(item => {
+                            
+                            dadosContainer.innerHTML += `
+                                <div class="col-lg-3">
+                                    <div class="card text-dark bg-light mb-4 mt-5"
+                                        style="max-width: 30rem; font-size: 1.2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                                        <div class="card-header">
+                                            <h4 class="fw-bold">Requisição</h4>
+                                        </div>
+                                        <div class="card-body">
+                                            <h5 class="card-title">${item.funcionario}</h5>
+                                            <p class="card-text">${item.item}</p>
+                                            <p class="card-text mt-2">${item.data_solicitacao}</p>
+                                            <span class="card-text fw-bold bg-warning" style="font-size: 1.5rem; border-radius: 5px; padding: 5px;" id="contador_${item.id}"></span>
+                                        </div>
+                                        <div class="card-footer bg-light text-secondary" style="border-radius: 0 0 12px 12px;">
+                                            <small class="text-muted">Quantidade - ${item.quantidade}</small>
+                                        </div>
+                                    </div>
+                                </div>`;
+                        });
+
+                        // Atualiza as transferências
+                        transferencias.forEach(item => {
+                            dadosContainer.innerHTML += `
+                                <div class="col-lg-3">
+                                    <div class="card text-dark bg-light mb-4 mt-5"
+                                        style="max-width: 30rem; font-size: 1.2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                                        <div class="card-header">
+                                            <h4 class="fw-bold">Transferência</h4>
+                                        </div>
+                                        <div class="card-body">
+                                            <h5 class="card-title">${item.funcionario}</h5>
+                                            <p class="card-text">${item.item}</p>
+
+                                            <p class="card-text mt-2">${item.data_solicitacao}</p>
+                                            <span class="card-text fw-bold bg-warning" style="font-size: 1.5rem; border-radius: 5px; padding: 5px;" id="contador_${item.id}"></span>
+                                        </div>
+                                        <div class="card-footer bg-light text-secondary" style="border-radius: 0 0 12px 12px;">
+                                            <small class="text-muted">Quantidade - ${item.quantidade}</small>
+                                        </div>
+                                    </div>
+                                </div>`;
+                        });
+
+                    // Inicializa os contadores
+                    dataRequisicoesList.forEach(req => {
+                        atualizarContador(req.id, req.data_solicitacao);
+                        // console.log('requisicoes');
+                    });
+
+                    dataTransferenciasList.forEach(tra => {
+                        atualizarContador(tra.id, tra.data_solicitacao);
+                        // console.log('transferencias');
+                    });
+                } else {
+                    // Se não houver nenhuma requisição ou transferência, exibe a mensagem
+                    dadosContainer.innerHTML = `
+                        <div class="col-lg-6">
+                            <div class="card text-dark bg-light mb-4 mt-5" 
+                                style="max-width: 30rem; font-size: 1.2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                                <div class="card-header">
+                                    <h4 class="fw-bold"><i class="fa-solid fa-check" style="color: green;"></i></h4>
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title">Sem requisições e sem transferências</h5>
+                                    <p class="card-text">...</p>
+                                </div>
+                            </div>
+                        </div>`;
+                }
+
+            })
+                .catch(error => console.error('Erro ao atualizar os dados:', error));
+        }
+        // Atualiza a cada 60 segundos
+        setInterval(atualizarDados, 60000);
+        // setInterval(atualizarDados, 5000);
+    
+    
+        // Chama a função ao carregar a página para obter os dados iniciais
+        
+        
+
+        var dataRequisicoesList = JSON.parse(document.getElementById('dataRequisicoes').textContent);
+        var dataTransferenciasList = JSON.parse(document.getElementById('dataTransferencias').textContent);
+
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            atualizarDados();
+
+            dataRequisicoesList.forEach(req => {
+                atualizarContador(req.id, req.data_solicitacao);
+                // console.log('requisicoes');
+            });
+
+            dataTransferenciasList.forEach(tra => {
+                atualizarContador(tra.id, tra.data_solicitacao);
+                // console.log('transferencias');
+            });
+        });
+
+        // Função para calcular o tempo decorrido
+        function atualizarContador(idSolicitacao,dataSolicitacao) {
+            var dataSolicitacaoDate = new Date(dataSolicitacao);
+
+            const contador = document.querySelector(`#contador_${idSolicitacao}`);
+            
+
+            // Função que calcula e atualiza o tempo
+            function atualizarTempo() {
+                var agora = new Date(); // Data e hora atuais
+                var tempoDecorrido = Math.floor((agora - dataSolicitacaoDate) / 1000); // Tempo em segundos
+
+                var dias = Math.floor(tempoDecorrido / 86400); // Calcula os dias
+                var horas = Math.floor((tempoDecorrido % 86400) / 3600); // Calcula as horas
+                var minutos = Math.floor((tempoDecorrido % 3600) / 60); // Calcula os minutos
+                var segundos = tempoDecorrido % 60; // Calcula os segundos
+
+                // Atualiza o contador no formato: dias, horas, minutos e segundos
+                contador.innerHTML = `${dias}d ${horas}h ${minutos}m ${segundos}s`;
+            }
+            // Atualiza o contador a cada 1 segundo (1000 milissegundos)
+            setInterval(atualizarTempo, 1000);
+
+        }
+
+        
+    </script>
+    
+    
+
+</body>
+</html>

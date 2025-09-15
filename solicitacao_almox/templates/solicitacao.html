@@ -1,0 +1,706 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="container mt-5">
+    <!-- Grupo de botões de rádio -->
+    <div class="btn-group mb-4" role="group" aria-label="Basic radio toggle button group">
+        <input type="radio" class="btn-check" name="btnradio" id="btnradio1" autocomplete="off" data-bs-target="#collapseRequisicao" checked>
+        <label class="btn btn-outline-primary" for="btnradio1">Formulário de Requisição</label>
+
+        <input type="radio" class="btn-check" name="btnradio" id="btnradio2" autocomplete="off" data-bs-target="#collapseTransferencia">
+        <label class="btn btn-outline-primary" for="btnradio2">Formulário de Transferência</label>
+    </div>
+
+    <!-- Formulários em collapse -->
+    <div class="accordion" id="formAccordion">
+        
+        <!-- Formulário de Requisição -->
+        <div id="collapseRequisicao" class="collapse show" data-bs-parent="#formAccordion">
+            <div class="card card-header">
+                <div class="d-flex justify-content-between">
+                    <h5>Formulário de Requisição</h5>
+                    <div>
+                        <button type="button" class="badge rounded-pill btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#adicionarNovoItem" 
+                            data-tipo-solicitacao="requisicao">Não encontrou o item?</button>
+                        <button type="button" class="badge rounded-pill btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#adicionarNovaMatricula" 
+                            data-tipo-solicitacao="requisicao">Não encontrou sua matrícula?</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card card-body">
+                <form id="formRequisicao" method="post" class="container">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="requisicao">
+                    <div class="d-flex justify-content-end mb-4">
+                        <div class="alert alert-info">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-box-open me-3 fs-4"></i>
+                                <p class="mb-0 fw-semibold">Você está solicitando um material para consumo interno</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6">
+                            <label for="id_requisicao-funcionario" class="form-label">Matrícula: (Caso seja operador, a requisição será entregue automaticamente)</label>
+                            <select id="id_requisicao-funcionario" class="form-select js-example-basic-single" name="requisicao-funcionario" required>
+                                <option value="">Selecione...</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}">{{ funcionario.matricula }} - {{ funcionario.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_requisicao-cc" class="form-label">Centro de custo:</label>
+                            <select id="id_requisicao-cc" class="form-select js-example-basic-single" name="requisicao-cc" required>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_requisicao-item" class="form-label">Item:</label>
+                            <select id="id_requisicao-item" class="form-select js-example-basic-single" name="requisicao-item" required>
+                                <option value="">Selecione...</option>
+                                {% for item in itens %}
+                                <option value="{{ item.id }}">{{ item.codigo }} - {{ item.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            {{form_requisicao.label}}
+                            <label for="id_requisicao-classe_requisicao" class="form-label">Classe de Requisição:</label>
+                            <select class="form-select" name="requisicao-classe_requisicao" id="id_requisicao-classe_requisicao" required>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_requisicao-quantidade" class="form-label">Quantidade:</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="id_requisicao-quantidade" name="requisicao-quantidade" required>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <label for="unidade" class="form-label">Unidade:</label>
+                            <input type="text" class="form-control" id="unidade" name="unidade" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-8">
+                            <label for="id_requisicao-obs" class="form-label">Obs:</label>
+                            <textarea class="form-control" name="requisicao-obs" rows="3" id="id_requisicao-obs"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex mb-3 justify-content-end">
+                        <div class="col-md-3">
+                            <button class="btn btn-success submit-button" type="submit">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                <span class="button-text">Enviar</span>
+                            </button>
+                        </div>
+                    </div>                    
+                </form>
+            </div>
+        </div>
+        
+        <!-- Formulário de Transferência -->
+        <div id="collapseTransferencia" class="collapse" data-bs-parent="#formAccordion">
+            <div class="card card-header">
+                <div class="d-flex justify-content-between">
+                    <h5>Formulário de Transferência</h5>
+                    <div>
+                        <button type="button" class="badge rounded-pill btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#adicionarNovoItem" 
+                            data-tipo-solicitacao="transferencia">Não encontrou o item?</button>
+                        <button type="button" class="badge rounded-pill btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#adicionarNovaMatricula" 
+                            data-tipo-solicitacao="transferencia">Não encontrou sua matrícula?</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card card-body">
+                <form id="formTransferencia" method="post" class="container">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="transferencia">
+                    
+                    <div class="d-flex justify-content-end mb-4">
+                        <div class="alert alert-info">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-tools me-3 fs-4"></i>
+                                <p class="mb-0 fw-semibold">Você está solicitando um material para uso nas máquinas</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6">
+                            <label for="id_transferencia-funcionario" class="form-label">Matrícula: (Caso seja operador, a transferência será entregue automaticamente)</label>
+                            <select id="id_transferencia-funcionario" class="form-select js-example-basic-single" name="transferencia-funcionario" required>
+                                <option value="">Selecione...</option>
+                                {% for funcionario in funcionarios %}
+                                <option value="{{ funcionario.id }}">{{ funcionario.matricula }} - {{ funcionario.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_transferencia-deposito_destino" class="form-label">Depósito Destino:</label>
+                            <select id="id_transferencia-deposito_destino" class="form-select js-example-basic-single" name="transferencia-deposito_destino" required>
+                                <option value="">Selecione...</option>
+                                {% for deposito in depositos %}
+                                    <option value="{{ deposito.id }}">{{ deposito.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_transferencia-item" class="form-label">Item:</label>
+                            <select id="id_transferencia-item" class="form-select js-example-basic-single" name="transferencia-item" required>
+                                <option value="">Selecione...</option>
+                                {% for item in itens_transferencia %}
+                                <option value="{{ item.id }}">{{ item.codigo }} - {{ item.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-6 col-lg-4">
+                            <label for="id_transferencia-quantidade" class="form-label">Quantidade:</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="id_transferencia-quantidade" name="transferencia-quantidade" required>
+                        </div>
+                    </div>
+                
+                    <div class="row mb-3 justify-content-center">
+                        <div class="col-md-8">
+                            <label for="id_transferencia-obs" class="form-label">Obs:</label>
+                            <textarea class="form-control" name="transferencia-obs" id="id_transferencia-obs" rows="3"></textarea>
+                        </div>
+                    </div>
+                
+                    <div class="d-flex mb-3 justify-content-end">
+                        <div class="col-md-3">
+                            <button class="btn btn-success submit-button" type="submit">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                <span class="button-text">Enviar</span>
+                            </button>
+                        </div>
+                    </div> 
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal para adicionar nova matricula -->
+
+<div class="modal fade" id="adicionarNovaMatricula" tabindex="-1" aria-labelledby="adicionarNovaMatriculaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title" id="adicionarNovaMatriculaLabel">Solicitação para adicionar nova matrícula</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <form method="post" id="formCadastroMatricula" action="{% url 'cadastro_nova_matricula' %}">
+            {% csrf_token %}
+            <input type="hidden" name="tipo_solicitacao" id="tipoSolicitacao">
+            <div class="mb-3">
+                <label for="id-matricula-solicitante">Matrícula</label>
+                <input type="text" id="id-matricula-solicitante" name="id-matricula-solicitante" class="form-control" placeholder="Digite sua matrícula" required>
+            </div>
+            <div class="mb-3">
+                <label for="id-nome-solicitante">Nome</label>
+                <input type="text" id="id-nome-solicitante" name="id-nome-solicitante" class="form-control" placeholder="Digite seu nome" required>
+            </div>
+            <div class="mb-3">
+                <label for="id-ccusto-solicitante" class="form-label">Centro de custo:</label>
+                <select id="id-ccusto-solicitante" class="form-select js-example-basic-single" name="id-ccusto-solicitante" required>
+                    <option value="">Selecione...</option>
+                    {% for cc in centro_custo %}
+                        <option value="{{ cc.id }}">{{ cc.codigo }} - {{ cc.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="d-flex mb-3 justify-content-end">
+                <button class="btn btn-success submit-button" type="submit">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    <span class="button-text">Solicitar</span>
+                </button>
+            </div> 
+            </form>
+        </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para adicionar novo item -->
+
+<div class="modal fade" id="adicionarNovoItem" tabindex="-1" aria-labelledby="adicionarNovoItemLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title" id="adicionarNovoItemLabel">Solicitação para adicionar novo item</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <form method="post" id="formCadastroNovoItem" action="{% url 'cadastro_novo_item' %}">
+            {% csrf_token %}
+            <input type="hidden" name="tipo_solicitacao" id="tipoSolicitacao">
+            <div class="mb-3">
+                <label for="id-funcionario-cadastro-item" class="form-label">Matrícula:</label>
+                <select id="id-funcionario-cadastro-item" class="form-select js-example-basic-single" name="id-funcionario-cadastro-item" required>
+                    <option value="">Selecione...</option>
+                    {% for funcionario in funcionarios %}
+                    <option value="{{ funcionario.id }}">{{ funcionario.matricula }} - {{ funcionario.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div id="campo-requisicao" class="mb-3 campo-alternativo-requisicao">
+                <div class="mb-3">
+                    <label for="id_requisicao-cc-novo-item" class="form-label">Centro de custo:</label>
+                    <select id="id_requisicao-cc-novo-item" class="form-select js-example-basic-single" name="requisicao-cc-novo-item" required>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="id-codigo-item">Código</label>
+                <input name="id-codigo-item" type="text" id="id-codigo-item" class="form-control" placeholder="Digite o código do item">
+            </div>
+            <div class="mb-3">
+                <label for="id-descricao-item">Descrição</label>
+                <input type="text" id="id-descricao-item" name="id-descricao-item" class="form-control" placeholder="Digite a descrição do item">
+            </div>
+            <!-- Campo para 'transferencia' -->
+            <div id="campo-transferencia" class="mb-3 campo-alternativo" style="display: none;">
+                <label for="id-cadastrar-deposito" class="form-label">Depósito Destino:</label>
+                <select id="id-cadastrar-deposito" class="form-select js-example-basic-single" name="id-cadastrar-deposito" required>
+                    <option value="">Selecione...</option>
+                    {% for deposito in depositos %}
+                        <option value="{{ deposito.id }}">{{ deposito.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="id-quantidade-solicitante">Quantidade</label>
+                <input class="form-control" type="number" step="0.01" min="0" id="id-quantidade-solicitante" name="id-quantidade-solicitante" required>
+            </div>
+            <div class="d-flex mb-3 justify-content-end">
+                <button class="btn btn-success submit-button" type="submit">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    <span class="button-text">Solicitar</span>
+                </button>
+            </div> 
+            </form>
+        </div>
+        </div>
+    </div>
+</div>
+
+
+<div id="notificacaoSucesso" class="toast align-items-center text-white bg-success border-0 position-fixed bottom-0 end-0 p-3" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="3000">
+    <div class="d-flex">
+        <div class="toast-body">
+            Solicitação enviada com sucesso!
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+</div>
+
+<div id="notificacaoErro" class="toast align-items-center text-white bg-danger border-0 position-fixed bottom-0 end-0 p-3" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="3000">
+    <div class="d-flex">
+        <div class="toast-body">
+            Erro na solicitação. Tente novamente!
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+</div>
+
+
+<!-- Rádio para navegar entre os forms -->
+
+<script>
+    document.querySelectorAll('input[name="btnradio"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            let target = document.querySelector(this.dataset.bsTarget);
+            document.querySelectorAll('.accordion .collapse').forEach(collapse => {
+                collapse.classList.remove('show');
+            });
+            target.classList.add('show');
+        });
+    });
+</script>
+
+<!-- Funções para chamar centro de custo e unidade -->
+
+<script>
+    // Função para fazer requisições AJAX
+    function ajax(url, callback) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4) {
+                if (xhr.status == 200) {
+                    callback(JSON.parse(xhr.responseText));
+                } else {
+                    console.error('Erro na requisição AJAX. Status:', xhr.status);
+                }
+            }
+        };
+        xhr.onerror = function() {
+            console.error('Erro na requisição AJAX.');
+        };
+        xhr.send();
+    }
+
+    // Função para inicializar select2 e adicionar evento change
+    function initSelect2(selectElementId, ajaxUrl, updateElementId, dataField) {
+        var selectElement = document.getElementById(selectElementId);
+        var updateElement = document.getElementById(updateElementId);
+
+        if (selectElement) {
+            $(selectElement).select2({
+                placeholder: "Selecione...",
+                allowClear: true,
+                dropdownCssClass: 'form-control', 
+                containerCssClass: 'form-control',
+                width: '100%'
+            });
+
+            // Use o evento 'select2:select' em vez de 'change'
+            $(selectElement).on('select2:select', function() {
+                var value = $(this).val();
+                var updateElement = document.getElementById(updateElementId);
+                updateElement.value = "";
+                if (updateElement.tagName.toLowerCase() === 'select') {
+                    updateElement.options.length = 0;
+                    var placeholderOption = document.createElement('option');
+                    placeholderOption.value = ""; // Valor vazio para o placeholder
+                    placeholderOption.text = "Carregando...";
+                    placeholderOption.disabled = true; // Não pode ser selecionado
+                    placeholderOption.selected = true; // Define como selecionado
+                    updateElement.add(placeholderOption);
+                } else {
+                    updateElement.setAttribute('placeholder','Carregando...')
+                }
+                if (value) {
+                    ajax(ajaxUrl + encodeURIComponent(value), function(data) {
+                        if (updateElement.tagName.toLowerCase() === 'select') {
+                            // Limpar opções existentes
+                            updateElement.options.length = 0;
+
+                            // Verificar se os dados retornados são uma lista
+                            if (Array.isArray(data[dataField])) {
+                                data[dataField].forEach(function(item) {
+                                    var option = document.createElement('option');
+                                    option.value = item.id;
+                                    option.text = item.nome;
+                                    updateElement.add(option);
+                                });
+                            } else {
+                                console.error('Dados retornados não são uma lista:', data[dataField]);
+                            }
+                        } else {
+                            if (data[dataField]) {
+                                updateElement.value = data[dataField];
+                            } else {
+                                updateElement.value = '';
+                            }
+                        }
+                    });
+                } else {
+                    var updateElement = document.getElementById(updateElementId);
+                    if (updateElement.tagName.toLowerCase() === 'select') {
+                        updateElement.options.length = 0;
+                    } else {
+                        updateElement.value = '';
+                    }
+                }
+            });
+        }
+    }
+
+    // Inicialização de todos os campos select2 e AJAX após o DOM estar pronto
+    document.addEventListener('DOMContentLoaded', function() {
+        // Requisição - Matrícula (Centro de Custo)
+        initSelect2(
+            'id_requisicao-funcionario', 
+            '{% url "get_cc_by_matricula" %}?matricula=',
+            'id_requisicao-cc', 
+            'cc'
+        );
+
+        // Requisição - Item (Unidade)
+        initSelect2(
+            'id_requisicao-item', 
+            '{% url "get_unidade_by_item" %}?item_id=', 
+            'unidade', 
+            'unidade'
+        );
+
+        // Requisição - classe
+        initSelect2(
+            'id_requisicao-item',
+            '{% url "ajax_carregar_classes" %}?item_id=',
+            'id_requisicao-classe_requisicao',
+            'classes'
+        );
+
+        // Requisição - classe dentro do modal de novo item
+        initSelect2(
+            'id-funcionario-cadastro-item',
+            '{% url "get_cc_by_matricula" %}?matricula=',
+            'id_requisicao-cc-novo-item',
+            'cc'
+        );
+
+        // Transferência - Funcionario
+        initSelect2('id_transferencia-funcionario', '', '', '');
+
+        // Transferência - Depósito Destino
+        initSelect2('id_transferencia-deposito_destino', '', '', '');
+
+        // Transferência - Item
+        initSelect2('id_transferencia-item', '', '', '');
+
+        // Classe de requisição - Item
+        initSelect2('id_requisicao-classe_requisicao', '', '', '');
+
+    });
+</script>
+
+<!-- Carregar modal de solicitação de matricula -->
+
+<script>
+
+    $(document).ready(function() {
+        function initSelect2_(selector) {
+            $(selector).select2({
+                placeholder: 'Selecione...',
+                dropdownParent: $('#adicionarNovoItem'),
+                allowClear: true,
+                dropdownCssClass: 'form-control', 
+                containerCssClass: 'form-control',
+                width: '100%'
+            });
+
+            // Ajustando o z-index
+            $(selector).on('select2:open', function() {
+                $('.select2-dropdown').css('z-index', 9999);
+            });
+        }
+
+        // Inicializa os campos Select2
+        initSelect2_('#id-cadastrar-deposito');
+        initSelect2_('#id-funcionario-cadastro-item');
+    });
+
+    var adicionarMatriculaModal = document.getElementById('adicionarNovaMatricula');
+    adicionarMatriculaModal.addEventListener('show.bs.modal', function (event) {
+
+        var button = event.relatedTarget;
+        var tipoSolicitacao = button.getAttribute('data-tipo-solicitacao');
+
+        // Atualiza os campos do formulário no modal
+        var tipoSolicitacaoInput = adicionarMatriculaModal.querySelector('#tipoSolicitacao');
+
+        tipoSolicitacaoInput.value = tipoSolicitacao;
+
+    });
+
+    var adicionarNovoItemModal = document.getElementById('adicionarNovoItem');
+    adicionarNovoItemModal.addEventListener('show.bs.modal', function (event) {
+
+        var button = event.relatedTarget;
+        var tipoSolicitacao = button.getAttribute('data-tipo-solicitacao');
+
+        // Atualiza os campos do formulário no modal
+        var tipoSolicitacaoInput = adicionarNovoItemModal.querySelector('#tipoSolicitacao');
+        tipoSolicitacaoInput.value = tipoSolicitacao;
+
+        document.querySelectorAll('.campo-alternativo-requisicao').forEach(function(campo) {
+            campo.style.display = 'block';  // Esconde todos os campos alternativos
+        });
+
+        document.querySelectorAll('.campo-alternativo').forEach(function(campo) {
+            campo.style.display = 'none';  // Esconde todos os campos alternativos
+            campo.querySelectorAll('input, select').forEach(function(input) {
+                input.removeAttribute('required');  // Remove o atributo required dos campos escondidos
+            });
+        });
+
+        if (tipoSolicitacao === 'transferencia') {
+            var campoTransferencia = document.getElementById('campo-transferencia');
+            var campoRequisicao = document.getElementById('campo-requisicao');
+
+            campoRequisicao.style.display = 'none';
+
+            campoTransferencia.style.display = 'block';
+            campoTransferencia.querySelector('select').setAttribute('required', 'required');  // Adiciona o atributo required ao campo visível
+        }
+    });
+
+
+</script>
+
+<!-- Carregar modal de solicitação de novo item -->
+
+<script>
+    document.getElementById('formCadastroNovoItem').addEventListener('submit', function(event) {
+        var codigo = document.getElementById('id-codigo-item').value.trim();
+        var descricao = document.getElementById('id-descricao-item').value.trim();
+
+        if (!codigo && !descricao) {
+            event.preventDefault();
+            alert('Por favor, preencha o Código ou a Descrição.');
+        }
+
+        console.log('Cadastro enviado com sucesso');
+
+    });
+</script>
+
+<script>
+    function handleFormSubmit(event) {
+
+        const submitButton = event.target.querySelector('.submit-button');
+        submitButton.disabled = true;
+
+        const spinner = submitButton.querySelector('.spinner-border');
+        const buttonText = submitButton.querySelector('.button-text');
+
+        spinner.classList.remove('d-none');
+        buttonText.textContent = "Enviando...";
+    }
+
+    const formRequisicao = document.getElementById('formRequisicao');
+    if (formRequisicao) {
+        formRequisicao.addEventListener('submit', handleFormSubmit);
+    }
+    const formTransferencia = document.getElementById('formTransferencia');
+    if (formTransferencia) {
+        formTransferencia.addEventListener('submit', handleFormSubmit);
+    }
+    const formCadastroNovoItem = document.getElementById('formCadastroNovoItem');
+    if (formCadastroNovoItem) {
+        formCadastroNovoItem.addEventListener('submit', handleFormSubmit);
+    }
+    const formCadastroMatricula = document.getElementById('formCadastroMatricula');
+    if (formCadastroMatricula) {
+        formCadastroMatricula.addEventListener('submit', handleFormSubmit);
+    }
+
+</script>
+
+<script>
+    $('#formRequisicao').on('submit', function(event) {
+        event.preventDefault();
+
+        const formData = new FormData(this);
+
+            fetch('', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok){
+                    throw new Error('Erro na resposta');
+                }
+                
+                return response.json();
+            })
+            .then(data => {
+                var notificacaoRequisicao = document.getElementById('notificacaoSucesso')
+                var toastSucesso = new bootstrap.Toast(notificacaoRequisicao);
+
+                if (data.operador == true){
+                    notificacaoRequisicao.textContent = "Solicitação enviada e entregue por Operador!";
+                }else{
+                    notificacaoRequisicao.textContent = "Solicitação enviada com sucesso!";
+                }
+                
+                toastSucesso.show();
+            })
+            .catch(error => {
+                console.error('Erro ao enviar o formulário:', error);
+                var toastErro = new bootstrap.Toast(document.getElementById('notificacaoErro'));
+                toastErro.show();
+            })
+            .finally(() => {
+                const submitButton = event.target.querySelector('.submit-button');
+                submitButton.disabled = false;
+
+                const spinner = submitButton.querySelector('.spinner-border');
+                const buttonText = submitButton.querySelector('.button-text');
+
+                spinner.classList.add('d-none');
+                buttonText.textContent = "Enviar";
+
+                $('#id_requisicao-item').val('').trigger('change');
+                $('#id_requisicao-classe_requisicao').val('').trigger('change');
+                $('#id_requisicao-quantidade').val('');
+                $('#id_requisicao-obs').val('');
+                
+                
+            });
+    });
+
+
+    $('#formTransferencia').on('submit', function(event) {
+        event.preventDefault();
+
+        const formData = new FormData(this);
+
+            fetch('', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok){
+                    throw new Error('Erro na resposta');
+                }
+                
+                return response.json();
+                
+            })
+            .then(data => {
+                console.log('Resposta do servidor:', data.status);
+                var notificacaoTransferencia = document.getElementById('notificacaoSucesso');
+                var toastSucesso = new bootstrap.Toast(notificacaoTransferencia);
+
+                if (data.operador == true){
+                    notificacaoTransferencia.textContent = "Solicitação enviada e entregue por Operador!";
+                }else{
+                    notificacaoTransferencia.textContent = "Solicitação enviada com sucesso!";
+                }
+                toastSucesso.show();
+            })
+            .catch(error => {
+                console.error('Erro ao enviar o formulário:', error);
+                var toastErro = new bootstrap.Toast(document.getElementById('notificacaoErro'));
+                toastErro.show();
+            })
+            .finally(() => {
+                const submitButton = event.target.querySelector('.submit-button');
+                submitButton.disabled = false;
+
+                const spinner = submitButton.querySelector('.spinner-border');
+                const buttonText = submitButton.querySelector('.button-text');
+
+                spinner.classList.add('d-none');
+                buttonText.textContent = "Enviar";
+
+                $('#id_transferencia-item').val('').trigger('change');
+                $('#id_transferencia-quantidade').val('');
+                $('#id_transferencia-obs').val('');
+                
+                
+            });
+    });
+</script>
+
+{% endblock %}
