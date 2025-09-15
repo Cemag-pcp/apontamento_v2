@@ -1025,7 +1025,7 @@ def api_tempos(request):
             LEFT JOIN apontamento_v2.core_ordemprocesso op ON op.ordem_id = o.id
             LEFT JOIN apontamento_v2.apontamento_solda_pecasordem po ON po.processo_ordem_id = op.id
             LEFT JOIN apontamento_v2.cadastro_maquina m ON o.maquina_id = m.id
-            WHERE o.grupo_maquina = 'solda' AND op.data_inicio IS NOT NULL
+            WHERE o.grupo_maquina = 'solda' AND op.data_inicio IS NOT null and o.ordem_pai_id is null and qtd_planejada notnull 
             ORDER BY o.ordem, op.data_inicio
         """)
         columns = [col[0] for col in cursor.description]
