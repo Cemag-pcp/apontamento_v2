@@ -32,17 +32,25 @@ def api_testes_funcionais_pintura(request):
     cores_filtradas = (
         request.GET.get("cores", "").split(",") if request.GET.get("cores") else []
     )
-    data_inicial_filtrada = request.GET.get("data", None)
-    data_final_filtrada = request.GET.get("dataFinal", None)
+
+    data_criacao_inicial_filtrada = request.GET.get("dataCriacaoInicio", None)
+    data_criacao_final_filtrada = request.GET.get("dataCriacaoFinal", None)
+
+    data_finalizacao_inicial_filtrada = request.GET.get("dataFinalizacaoInicial", None)
+    data_finalizacao_final_filtrada = request.GET.get("dataFinalizacaoFinal", None)
+    
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     status_teste = request.GET.get("statusTeste", None)
+    tipo_pintura_filtrada = request.GET.get("tipoPintura", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
 
     # Filtra os dados
     # datas = Inspecao.objects.filter(pecas_ordem_pintura__isnull=False)
     datas = TesteFuncional.objects.filter(status__in=status_url).values(
-        'id','peca_ordem__id','peca_ordem__peca','peca_ordem__ordem_id__cor','status','peca_ordem__tipo','peca_ordem__ordem__data_carga', 'data_inicial', 'data_atualizacao','peca_ordem__ordem__ordem'
+        'id','peca_ordem__id','peca_ordem__peca','peca_ordem__ordem_id__cor','status','peca_ordem__tipo',
+        'peca_ordem__ordem__data_carga', 'data_inicial', 'data_atualizacao','peca_ordem__ordem__ordem',
+        'peca_ordem__tipo','aderencia','tonalidade','polimerizacao','espessura_camada_1','espessura_camada_2','espessura_camada_3',
         )
 
     quantidade_total = datas.count()  # Total de itens sem filtro
@@ -55,15 +63,32 @@ def api_testes_funcionais_pintura(request):
     if cores_filtradas:
         datas = datas.filter(peca_ordem__ordem__cor__in=cores_filtradas)
 
-    if data_inicial_filtrada:
-        datas = datas.filter(data_inicial__date=data_inicial_filtrada)
+    # Filtro de data de criação
+    if data_criacao_inicial_filtrada or data_criacao_final_filtrada:
+        if data_criacao_inicial_filtrada and data_criacao_final_filtrada:
+            datas = datas.filter(data_inicial__date__range=[data_criacao_inicial_filtrada, data_criacao_final_filtrada])
+        elif data_criacao_inicial_filtrada:
+            datas = datas.filter(data_inicial__date__gte=data_criacao_inicial_filtrada)
+        elif data_criacao_final_filtrada:
+            datas = datas.filter(data_inicial__date__lte=data_criacao_final_filtrada)
 
-    if data_final_filtrada:
-        datas = datas.filter(data_atualizacao__date=data_final_filtrada)
+    # Filtro de data de finalização
+    if data_finalizacao_inicial_filtrada or data_finalizacao_final_filtrada:
+        if data_finalizacao_inicial_filtrada and data_finalizacao_final_filtrada:
+            datas = datas.filter(data_atualizacao__date__range=[data_finalizacao_inicial_filtrada, data_finalizacao_final_filtrada])
+        elif data_finalizacao_inicial_filtrada:
+            datas = datas.filter(data_atualizacao__date__gte=data_finalizacao_inicial_filtrada)
+        elif data_finalizacao_final_filtrada:
+            datas = datas.filter(data_atualizacao__date__lte=data_finalizacao_final_filtrada)
 
     if status_teste:
         status_teste = status_teste.split(',')
         datas = datas.filter(status__in=status_teste)
+    
+    if tipo_pintura_filtrada:
+        tipo_pintura_filtrada = tipo_pintura_filtrada.split(',')
+        tipo_pintura_filtrada = ['PU' if tipo == 'pu' else 'PÓ' for tipo in tipo_pintura_filtrada]
+        datas = datas.filter(peca_ordem__tipo__in=tipo_pintura_filtrada)
 
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
@@ -93,6 +118,21 @@ def api_testes_funcionais_pintura(request):
         #     "tipo": data.pecas_ordem_pintura.tipo,
         #     "operador": matricula_nome_operador,
         # }
+        espessura_camada_resultado = None
+        if data['status'] == 'reprovado':
+            media_espessura = (float(data['espessura_camada_1'] or 0) + float(data['espessura_camada_2'] or 0) + float(data['espessura_camada_3'] or 0))/3
+            if data['peca_ordem__tipo'] == 'PU':
+                if media_espessura < 40 or media_espessura > 60:
+                    espessura_camada_resultado = 'Reprovado'
+                else:
+                    espessura_camada_resultado = 'Aprovado'
+            elif data['peca_ordem__tipo'] == 'PÓ':
+                if media_espessura < 60 or media_espessura > 80:
+                    espessura_camada_resultado = 'Reprovado'
+                else:
+                    espessura_camada_resultado = 'Aprovado'
+        elif data['status'] == 'aprovado':
+            espessura_camada_resultado = 'Aprovado'
 
         item = {
                 'id': data['id'],
@@ -105,6 +145,10 @@ def api_testes_funcionais_pintura(request):
                 'data_carga': data['peca_ordem__ordem__data_carga'].strftime("%d/%m/%Y"),
                 'data_inicial': data_ajustada.strftime("%d/%m/%Y %H:%M:%S") if data_ajustada else None,
                 'data_atualizacao': (data['data_atualizacao'] - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S") if data['data_atualizacao'] else None,
+                'aderencia': 'Aprovado' if data['aderencia'] else ('Reprovado' if data['aderencia'] is False else 'Não verificado'),
+                'tonalidade': 'Aprovado' if data['tonalidade'] else ('Reprovado' if data['tonalidade'] is False else 'Não verificado'),
+                'polimerizacao': 'Aprovado' if data['polimerizacao'] else ('Reprovado' if data['polimerizacao'] is False else 'Somente para PÓ'),
+                'resultado_espessura': espessura_camada_resultado if espessura_camada_resultado else 'Não verificado',
             }
 
         dados.append(item)
@@ -182,19 +226,17 @@ def realizar_verificacao_funcional(request):
             except ValueError:
                 return JsonResponse({'error':'Os campos de espessura devem ser numéricos!'}, status=400)
             
-            resultados_espessura_camada = [registro_teste.espessura_camada_1,registro_teste.espessura_camada_2,registro_teste.espessura_camada_3]
+            media_espessura = (registro_teste.espessura_camada_1 + registro_teste.espessura_camada_2 + registro_teste.espessura_camada_3) / 3
+
 
             causa_reprovacao = []
             if polimerizacao: # PO
                 registro_teste.meta_espessura_camada = '60 a 80'
                 if polimerizacao and aderencia and tonalidade:
                     registro_teste.status = 'aprovado'
-                    for espessura in resultados_espessura_camada:
-                        if not (60 <= espessura <= 80):
-                            registro_teste.status = 'reprovado'
-                            causa_reprovacao.append('espessura fora do padrão (60-80 microns)')
-                            break
-
+                    if not (60 <= media_espessura <= 80):
+                        registro_teste.status = 'reprovado'
+                        causa_reprovacao.append('espessura fora do padrão (60-80 microns)')
                     #PU - 40 a 60 microns
 	                #PÓ - 60 a 80 microns
                 else:
@@ -204,11 +246,9 @@ def realizar_verificacao_funcional(request):
                 registro_teste.meta_espessura_camada = '40 a 60'
                 if aderencia and tonalidade:
                     registro_teste.status = 'aprovado'
-                    for espessura in resultados_espessura_camada:
-                        if not (40 <= espessura <= 60):
-                            registro_teste.status = 'reprovado'
-                            causa_reprovacao.append('espessura fora do padrão (40-60 microns)')
-                            break
+                    if not (40 <= media_espessura <= 60):
+                        registro_teste.status = 'reprovado'
+                        causa_reprovacao.append('espessura fora do padrão (40-60 microns)')
                 else:
                     registro_teste.status = 'reprovado'
                     causa_reprovacao.append('falha em algum teste (aderência ou tonalidade)')
@@ -235,7 +275,7 @@ def detalhes_verificacao_funcional(request,id):
 
         #PU - 40 a 60 microns
         #PÓ - 60 a 80 microns
-        media_condicao_espessura = (int(registro_testes.espessura_camada_1) + int(registro_testes.espessura_camada_2) + int(registro_testes.espessura_camada_3)) / 3
+        media_condicao_espessura = (float(registro_testes.espessura_camada_1) + float(registro_testes.espessura_camada_2) + float(registro_testes.espessura_camada_3)) / 3
 
         resultado_espessura = 'Aprovado'
         if registro_testes.peca_ordem.tipo == 'PU':

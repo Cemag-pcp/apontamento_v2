@@ -51,16 +51,39 @@
                             </div>
                         {% endfor %}
                 
-                        <!-- <h6 class="mt-3">Inspetor</h6>
-                        {% for inspetor in inspetores %}
+                        <h6 class="mt-3">Tipo Pintura</h6>
                             <div class="form-check">
-                                <input class="form-check-input" id="{{inspetor|lower}}-verificacao" type="checkbox" value="">
-                                <label class="form-check-label" for="{{inspetor|lower}}-verificacao">{{inspetor.nome_usuario}}</label>
+                                <input id="pintura-po-verificacao-pendentes" type="checkbox" value="">
+                                <label class="form-check-label" for="pintura-po-verificacao-pendentes">PÓ</label>
                             </div>
-                        {% endfor %} -->
+                            <div class="form-check">
+                                <input id="pintura-pu-verificacao-pendentes" type="checkbox" value="">
+                                <label class="form-check-label" for="pintura-pu-verificacao-pendentes">PU</label>
+                            </div>
                 
                         <h6 class="mt-3">Data Criação</h6>
-                        <input type="date" class="form-control" id="data-filtro-verificacao-pendentes">
+                        <div class="form-check d-flex flex-column gap-3">
+                            <!-- Data início -->
+                            <div class="d-flex justify-content-between">
+                                <label for="data-inicio-filtro-verificacao-pendentes" class="form-label me-2">Início:</label>
+                                <input type="date" id="data-inicio-filtro-verificacao-pendentes" 
+                                    class="form-control form-control-sm" 
+                                    name="data-inicio-filtro-verificacao-pendentes"
+                                    style="width:fit-content;"
+                                    onchange="document.getElementById('data-fim-filtro-verificacao-pendentes').min=this.value">
+                            </div>
+
+                            <!-- Data fim -->
+                            <div class="d-flex justify-content-between">
+                                <label for="data-fim-filtro-verificacao-pendentes" class="form-label me-2">Fim:</label>
+                                <input type="date" id="data-fim-filtro-verificacao-pendentes" 
+                                    class="form-control form-control-sm" 
+                                    name="data-fim-filtro-verificacao-pendentes"
+                                    style="width:fit-content;">
+                            </div>
+                        </div>
+
+
                 
                         <div class="d-flex justify-content-between mt-3">
                             <button id="btn-limpar-verificacao-pendentes"  class="btn btn-outline-secondary">Limpar</button>
@@ -77,6 +100,7 @@
     </div>
     <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
         <span id="itens-filtrados-verificacao-pendentes-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-verificacao-pendentes-tipo-pintura" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Tipo Pintura: </span>
         <span id="itens-filtrados-verificacao-pendentes-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data Criação: </span>
         <span id="itens-filtrados-verificacao-pendentes-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
     </div>
@@ -100,11 +124,11 @@
                     </button>
                     <form id="form-filtrar-verificacao-finalizados" action="">
                         <div class="dropdown-menu p-3" style="width: 250px;">
-                            <p class="fw-bold mx-2 my-1">Filtrar testes finalizados</p>
+                            <p class="fw-bold mx-2 my-1">Filtrar Testes Finalizados</p>
                             <hr>
-                            <input id="pesquisar-peca-verificacao-finalizados" type="text" class="form-control mb-3" placeholder="Search inspections...">
+                            <input id="pesquisar-peca-verificacao-finalizados" type="text" class="form-control mb-3" placeholder="Buscar Testes Finalizados...">
 
-                            <h6>Filtrar por</h6>
+                            <h6>Status</h6>
                             <div style="max-height: 160px; overflow-y: auto;">
                                 <div class="form-check">
                                     <input type="checkbox" id="filter-itens-verificacao-aprovados-pintura" value="">
@@ -115,6 +139,16 @@
                                     <label class="form-check-label" for="filter-itens-verificacao-reprovados-pintura">Reprovados</label>
                                 </div>
                             </div>
+
+                            <h6 class="mt-3">Tipo Pintura</h6>
+                                <div class="form-check">
+                                    <input id="pintura-po-verificacao-finalizados" type="checkbox" value="">
+                                    <label class="form-check-label" for="pintura-po-verificacao-finalizados">PÓ</label>
+                                </div>
+                                <div class="form-check">
+                                    <input id="pintura-pu-verificacao-finalizados" type="checkbox" value="">
+                                    <label class="form-check-label" for="pintura-pu-verificacao-finalizados">PU</label>
+                                </div>
                             
                             <h6>Cor</h6>
                             {% for cor in cores %}
@@ -125,10 +159,50 @@
                             {% endfor %}
                                 
                             <h6 class="mt-3">Data Criação</h6>
-                            <input id="data-filtro-verificacao-finalizados" type="date" class="form-control">
+                            <!-- <input id="data-filtro-verificacao-finalizados" type="date" class="form-control"> -->
+                            <div class="form-check d-flex flex-column gap-3">
+                            <!-- Data início -->
+                                <div class="d-flex justify-content-between">
+                                    <label for="data-criacao-inicial-filtro-verificacao-finalizadas" class="form-label me-2">Início:</label>
+                                    <input type="date" id="data-criacao-inicial-filtro-verificacao-finalizadas" 
+                                        class="form-control form-control-sm" 
+                                        name="data-criacao-inicial-filtro-verificacao-finalizadas"
+                                        style="width:fit-content;"
+                                        onchange="document.getElementById('data-criacao-final-filtro-verificacao-finalizadas').min=this.value">
+                                </div>
+
+                                <!-- Data fim -->
+                                <div class="d-flex justify-content-between">
+                                    <label for="data-criacao-final-filtro-verificacao-finalizadas" class="form-label me-2">Fim:</label>
+                                    <input type="date" id="data-criacao-final-filtro-verificacao-finalizadas" 
+                                        class="form-control form-control-sm" 
+                                        name="data-criacao-final-filtro-verificacao-finalizadas"
+                                        style="width:fit-content;">
+                                </div>
+                            </div>
 
                             <h6 class="mt-3">Data Finalização</h6>
-                            <input type="date" class="form-control" id="data-final-filtro-verificacao-pendentes">
+                            <!-- <input id="data-filtro-verificacao-finalizados" type="date" class="form-control"> -->
+                            <div class="form-check d-flex flex-column gap-3">
+                            <!-- Data início -->
+                                <div class="d-flex justify-content-between">
+                                    <label for="data-finalizacao-inicial-filtro-verificacao-finalizadas" class="form-label me-2">Início:</label>
+                                    <input type="date" id="data-finalizacao-inicial-filtro-verificacao-finalizadas" 
+                                        class="form-control form-control-sm" 
+                                        name="data-finalizacao-inicial-filtro-verificacao-finalizadas"
+                                        style="width:fit-content;"
+                                        onchange="document.getElementById('data-finalizacao-final-filtro-verificacao-finalizadas').min=this.value">
+                                </div>
+
+                                <!-- Data fim -->
+                                <div class="d-flex justify-content-between">
+                                    <label for="data-finalizacao-final-filtro-verificacao-finalizadas" class="form-label me-2">Fim:</label>
+                                    <input type="date" id="data-finalizacao-final-filtro-verificacao-finalizadas" 
+                                        class="form-control form-control-sm" 
+                                        name="data-finalizacao-final-filtro-verificacao-finalizadas"
+                                        style="width:fit-content;">
+                                </div>
+                            </div>
                     
                             <div class="d-flex justify-content-between mt-3">
                                 <button id="btn-limpar-verificacao-finalizados" class="btn btn-outline-secondary">Limpar</button>
@@ -153,6 +227,7 @@
         <span id="itens-filtrados-verificacao-finalizados-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data Criação: </span>
         <span id="itens-filtrados-verificacao-finalizados-data-final" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data Finalização: </span>
         <span id="itens-filtrados-verificacao-finalizados-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+        <span id="itens-filtrados-verificacao-finalizados-tipo-pintura" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Tipo Pintura: </span>
     </div>
     <!-- Cards -->
     <div class="row" style="padding-right: 0;" id="cards-verificacao-finalizados"></div>
