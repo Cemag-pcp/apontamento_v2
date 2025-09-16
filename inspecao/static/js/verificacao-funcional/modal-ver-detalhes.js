@@ -48,10 +48,10 @@ function atribuirDadosModalVerDetalhes(){
                 document.getElementById("modalTonalidade").innerHTML = formatBadge(data.tonalidade);
                 document.getElementById("modalPolimerizacao").innerHTML = formatBadge(data.polimerizacao);
 
-                document.getElementById("modalEsp1").textContent = data.espessura_camada_1 ? data.espessura_camada_1 + ' µm' : "Não medido";
-                document.getElementById("modalEsp2").textContent = data.espessura_camada_2 ? data.espessura_camada_2 + ' µm' : "Não medido";
-                document.getElementById("modalEsp3").textContent = data.espessura_camada_3 ? data.espessura_camada_3 + ' µm' : "Não medido";
-                document.getElementById("modalMedia").textContent = data.media_espessura ? data.media_espessura.toFixed(2) + ' µm' : "Não medido";
+                document.getElementById("modalEsp1").textContent = data.espessura_camada_1 != null && data.espessura_camada_1 != undefined ? data.espessura_camada_1 + ' µm' : "Não medido";
+                document.getElementById("modalEsp2").textContent = data.espessura_camada_2 != null && data.espessura_camada_2 != undefined ? data.espessura_camada_2 + ' µm' : "Não medido";
+                document.getElementById("modalEsp3").textContent = data.espessura_camada_3 != null && data.espessura_camada_3 != undefined ? data.espessura_camada_3 + ' µm' : "Não medido";
+                document.getElementById("modalMedia").textContent = data.media_espessura != null && data.media_espessura != undefined ? data.media_espessura.toFixed(2) + ' µm' : "Não medido";
                 document.getElementById("modalMetaEsp").textContent = data.meta_espessura;
                 document.getElementById("modalResultadoEsp").textContent = data.resultado_espessura;
 

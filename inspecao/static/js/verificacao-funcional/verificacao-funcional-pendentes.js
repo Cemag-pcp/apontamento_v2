@@ -32,6 +32,7 @@ function buscarItensPendentes(pagina) {
     let itensFiltradosCor = document.getElementById("itens-filtrados-verificacao-pendentes-cor");
     let itensFiltradosData = document.getElementById("itens-filtrados-verificacao-pendentes-data");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-verificacao-pendentes-pesquisa");
+    let itensFiltradosTipoPintura = document.getElementById("itens-filtrados-verificacao-pendentes-tipo-pintura");
     let paginacao = document.getElementById("paginacao-verificacao-pendentes-pintura");
 
     // Limpa os cards antes de buscar novos
@@ -48,8 +49,29 @@ function buscarItensPendentes(pagina) {
         coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-verificacao-pendentes').value;
+    let tipoPinturaSelecionadas = [];
+    if (document.getElementById('pintura-po-verificacao-pendentes').checked){
+        tipoPinturaSelecionadas.push('po');
+    }
+
+    if (document.getElementById('pintura-pu-verificacao-pendentes').checked){
+        tipoPinturaSelecionadas.push('pu');
+    }
+
+    let dataInicioCriacaoSelecionada = document.getElementById('data-inicio-filtro-verificacao-pendentes').value;
+    let dataFinalCriacaoSelecionada = document.getElementById('data-fim-filtro-verificacao-pendentes').value;
     let pesquisarVerificacao = document.getElementById('pesquisar-peca-verificacao-pendentes').value;
+
+    // Datas em formato BR para exibição do filtro aplicado
+    let formatadaInicio, formatadaFim;
+
+
+    if (dataInicioCriacaoSelecionada){
+        formatadaInicio = dataPTBR(dataInicioCriacaoSelecionada);
+    }
+    if (dataFinalCriacaoSelecionada){
+        formatadaFim = dataPTBR(dataFinalCriacaoSelecionada);
+    }
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
@@ -61,12 +83,26 @@ function buscarItensPendentes(pagina) {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
+    if (dataInicioCriacaoSelecionada) {
+        params.append("dataCriacaoInicio", dataInicioCriacaoSelecionada);
         itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+        itensFiltradosData.textContent = `Data Criação: ${formatadaInicio} até hoje`;
     } else {
         itensFiltradosData.style.display = "none";
+    }
+
+    if (dataFinalCriacaoSelecionada){
+        params.append("dataCriacaoFim", dataFinalCriacaoSelecionada);
+        itensFiltradosData.style.display = "block";
+        if (dataInicioCriacaoSelecionada){
+            itensFiltradosData.textContent = `Data Criação: ${formatadaInicio} até ${formatadaFim}`;
+        }else{
+            itensFiltradosData.textContent = "Data Criação: até " + formatadaFim;
+        }
+    }else{
+        if (!dataInicioCriacaoSelecionada){
+            itensFiltradosData.style.display = "none";
+        }
     }
 
     if (pesquisarVerificacao) {
@@ -75,6 +111,15 @@ function buscarItensPendentes(pagina) {
         itensFiltradosPesquisa.textContent = "Pesquisa: " + pesquisarVerificacao;
     } else {
         itensFiltradosPesquisa.style.display = "none";
+    }
+
+    if (tipoPinturaSelecionadas.length > 0) {
+        params.append("tipoPintura", tipoPinturaSelecionadas.join(","));
+        itensFiltradosTipoPintura.style.display = "block";
+        itensFiltradosTipoPintura.textContent = "Tipo Pintura: " + 
+            tipoPinturaSelecionadas.map(s => s === 'pu' ? 'Itens PU' : 'Itens PÓ').join(", ");
+    } else {
+        itensFiltradosTipoPintura.style.display = "none";
     }
 
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
@@ -192,6 +237,13 @@ function buscarItensPendentes(pagina) {
     });
 }
 
+function dataPTBR(dataString){
+    // Transforma uma data no formato "YYYY-MM-DD" para "DD/MM/YYYY"
+    let [ano, mes, dia] = dataString.split("-");
+    let formatada = `${dia}/${mes}/${ano}`;
+
+    return formatada;
+}
 // async function itemsPendentes(){
 //     try {
 //         const response = await fetch('/inspecao/api/testes-funcionais-pintura/?status=pendente');

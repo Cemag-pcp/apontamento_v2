@@ -29,11 +29,12 @@ function buscarItensFinalizados(pagina) {
     let itensInspecionar = document.getElementById("itens-testados");
     let itensFiltradosCor = document.getElementById("itens-filtrados-verificacao-finalizados-cor");
     let itensFiltradosData = document.getElementById("itens-filtrados-verificacao-finalizados-data");
-    let itensFiltradosDataFinal = document.getElementById("itens-filtrados-verificacao-finalizados-data-final");
+    let itensFiltradosDataFinalizacao = document.getElementById("itens-filtrados-verificacao-finalizados-data-final");
     // let itensFiltradosInspetor = document.getElementById("itens-filtrados-verificacao-finalizados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-verificacao-finalizados-pesquisa");
     let itensFiltradosStatusConformidade = document.getElementById("itens-filtrados-verificacao-finalizados-status");
     let paginacao = document.getElementById("paginacao-verificacao-finalizados-pintura");
+    let itensFiltradosTipoPintura = document.getElementById("itens-filtrados-verificacao-finalizados-tipo-pintura");
 
     // Limpa os cards antes de buscar novos
     cardsInspecao.innerHTML = `<div class="text-center">
@@ -58,15 +59,47 @@ function buscarItensFinalizados(pagina) {
     if (document.getElementById('filter-itens-verificacao-aprovados-pintura').checked) {
         statusConformidade.push('aprovado');
     }
+
+    let tipoPinturaSelecionadas = [];
+    if (document.getElementById('pintura-po-verificacao-finalizados').checked){
+        tipoPinturaSelecionadas.push('po');
+    }
+
+    if (document.getElementById('pintura-pu-verificacao-finalizados').checked){
+        tipoPinturaSelecionadas.push('pu');
+    }
     
     // Verifica se o checkbox de itens não conformes está marcado
     if (document.getElementById('filter-itens-verificacao-reprovados-pintura').checked) {
         statusConformidade.push('reprovado');
     }
 
-    let dataSelecionada = document.getElementById('data-filtro-verificacao-finalizados').value;
+    let dataCriacaoInicialSelecionada = document.getElementById('data-criacao-inicial-filtro-verificacao-finalizadas').value;
+    let dataCriacaoFinalSelecionada = document.getElementById('data-criacao-final-filtro-verificacao-finalizadas').value;
+    let dataFinalizacaoInicioSelecionada = document.getElementById('data-finalizacao-inicial-filtro-verificacao-finalizadas').value;
+    let dataFinalizacaoFinalSelecionada = document.getElementById('data-finalizacao-final-filtro-verificacao-finalizadas').value;
+
     let pesquisarInspecao = document.getElementById('pesquisar-peca-verificacao-finalizados').value;
-    let dataFinalSelecionada = document.getElementById('data-final-filtro-verificacao-pendentes').value;
+
+    // Datas em formato BR para exibição do filtro aplicado
+    let formatadaCriacaoInicio, formatadaCriacaoFim;
+    let formatadaFinalizacaoInicio, formatadaFinalizacaoFinal;
+
+    if (dataCriacaoInicialSelecionada){
+        formatadaCriacaoInicio = dataPTBR(dataCriacaoInicialSelecionada);
+    }
+
+    if (dataCriacaoFinalSelecionada){
+        formatadaCriacaoFim = dataPTBR(dataCriacaoFinalSelecionada);
+    }
+
+    if (dataFinalizacaoInicioSelecionada){
+        formatadaFinalizacaoInicio = dataPTBR(dataFinalizacaoInicioSelecionada);
+    }
+
+    if (dataFinalizacaoFinalSelecionada){
+        formatadaFinalizacaoFinal = dataPTBR(dataFinalizacaoFinalSelecionada);
+    }
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
@@ -78,20 +111,45 @@ function buscarItensFinalizados(pagina) {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
+    // Data Criação
+    if (dataCriacaoInicialSelecionada) {
+        params.append("dataCriacaoInicio", dataCriacaoInicialSelecionada);
         itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+        itensFiltradosData.textContent = `Data Criação: ${formatadaCriacaoInicio} até hoje`;
     } else {
         itensFiltradosData.style.display = "none";
     }
+    
+    if (dataCriacaoFinalSelecionada){
+        params.append("dataCriacaoFinal", dataCriacaoFinalSelecionada);
+        if (dataCriacaoInicialSelecionada){
+            itensFiltradosData.textContent = `Data Criação: ${formatadaCriacaoInicio} até ${formatadaCriacaoFim}`;
+        } else{
+            itensFiltradosData.textContent = `Data Criação: até ${formatadaCriacaoFim}`;
+        }
+    } else if (!dataCriacaoInicialSelecionada){
+        itensFiltradosData.style.display = "none";
+    }
 
-    if (dataFinalSelecionada) {
-        params.append("dataFinal", dataFinalSelecionada);
-        itensFiltradosDataFinal.style.display = "block";
-        itensFiltradosDataFinal.textContent = "Data Finalização: " + dataFinalSelecionada;
+    // Data Finalização
+
+    if (dataFinalizacaoInicioSelecionada) {
+        params.append("dataFinalizacaoInicial", dataFinalizacaoInicioSelecionada);
+        itensFiltradosDataFinalizacao.style.display = "block";
+        itensFiltradosDataFinalizacao.textContent = `Data Finalização: ${formatadaFinalizacaoInicio} até hoje`;
     } else {
-        itensFiltradosDataFinal.style.display = "none";
+        itensFiltradosDataFinalizacao.style.display = "none";
+    }
+
+    if (dataFinalizacaoFinalSelecionada){
+        params.append("dataFinalizacaoFinal", dataFinalizacaoFinalSelecionada);
+        if (dataFinalizacaoFinalSelecionada){
+            itensFiltradosDataFinalizacao.textContent = `Data Finalização: ${formatadaFinalizacaoInicio} até ${formatadaFinalizacaoFinal}`;
+        } else{
+            itensFiltradosDataFinalizacao.textContent = `Data Finalização: até ${formatadaFinalizacaoFinal}`;
+        }
+    } else if (!dataFinalizacaoInicioSelecionada){
+        itensFiltradosDataFinalizacao.style.display = "none";
     }
 
     if (pesquisarInspecao) {
@@ -111,13 +169,14 @@ function buscarItensFinalizados(pagina) {
         itensFiltradosStatusConformidade.style.display = "none";
     }
 
-    // if (inspetorSelecionado.length > 0) {
-    //     params.append("inspetores", inspetorSelecionado.join(","));
-    //     itensFiltradosInspetor.style.display = "block";
-    //     itensFiltradosInspetor.textContent = "Inspetores: " + inspetorSelecionado.join(", ");
-    // } else {
-    //     itensFiltradosInspetor.style.display = "none";
-    // }
+    if (tipoPinturaSelecionadas.length > 0) {
+        params.append("tipoPintura", tipoPinturaSelecionadas.join(","));
+        itensFiltradosTipoPintura.style.display = "block";
+        itensFiltradosTipoPintura.textContent = "Tipo Pintura: " + 
+            tipoPinturaSelecionadas.map(s => s === 'pu' ? 'Itens PU' : 'Itens PÓ').join(", ");
+    } else {
+        itensFiltradosTipoPintura.style.display = "none";
+    }
 
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
     params.append("status", "finalizado"); // Garante apenas os itens pendentes
@@ -166,6 +225,21 @@ function buscarItensFinalizados(pagina) {
             let textoStatus = item.status === "aprovado" ? "Aprovado" : "Reprovado";
             let color = borderColors[item.cor];
 
+            let causasReprovacao = [];
+            let textoCausasReprovacao = '';
+            // 'aderencia': 'Aprovado' if data['aderencia'] else ('Reprovado' if data['aderencia'] is False else 'Não verificado'),
+            //     'tonalidade': 'Aprovado' if data['tonalidade'] else ('Reprovado' if data['tonalidade'] is False else 'Não verificado'),
+            //     'polimerizacao': 'Aprovado' if data['polimerizacao'] else ('Reprovado' if data['polimerizacao'] is False else 'Somente para PÓ'),
+            //     'resultado_espessura': espessura_camada_resultado if espessura_camada_resultado else 'Não verificado',
+            if (item.status === 'reprovado'){
+                if (item.aderencia === 'Reprovado') causasReprovacao.push('Aderência');
+                if (item.tonalidade === 'Reprovado') causasReprovacao.push('Tonalidade');
+                if (item.resultado_espessura === 'Reprovado') causasReprovacao.push('Espessura de Camada');
+                if (item.polimerizacao != null){
+                    if (item.polimerizacao === 'Reprovado') causasReprovacao.push('Polimerização');
+                }
+                textoCausasReprovacao = `<strong>❌ Motivo Reprovação:</strong> ${causasReprovacao.length > 0 ? causasReprovacao.join(', '): 'Aprovado'}<br></br>`
+            }
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
@@ -176,6 +250,7 @@ function buscarItensFinalizados(pagina) {
                         <strong>📅 Data de Finalização:</strong> ${item.data_atualizacao}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo_pintura}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
+                        ${textoCausasReprovacao}              
                     </p>
                     <hr>
                     <div class="d-flex justify-content-between">
