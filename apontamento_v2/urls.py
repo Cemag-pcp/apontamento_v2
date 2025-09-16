@@ -12,7 +12,7 @@ urlpatterns = [
 
     path('cadastro/', include('cadastro.urls')),
 
-    path('core/almox/', include('core_almox.urls')),
+    path('almox/', include('core_almox.urls')),
     path('almox/', include('solicitacao_almox.urls')),
     
     path('serra/', include('apontamento_serra.urls')),

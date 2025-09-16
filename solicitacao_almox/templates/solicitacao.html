@@ -1,5 +1,12 @@
 {% extends 'base.html' %}
 
+{% load static %}
+
+{% block links %}
+    <link rel="stylesheet" href="/static/css/inspecao.css">
+    <link rel="stylesheet" href="/static/css/select2.css">
+{% endblock %}
+
 {% block content %}
 
 <div class="container mt-5">
@@ -41,8 +48,8 @@
                         </div>
                     </div>
 
-                    <div class="row mb-3 justify-content-center">
-                        <div class="col-md-6">
+                    <div class="row mb-3 justify-content-center align-items-end">
+                        <div class="col-md-6 col-lg-4">
                             <label for="id_requisicao-funcionario" class="form-label">Matrícula: (Caso seja operador, a requisição será entregue automaticamente)</label>
                             <select id="id_requisicao-funcionario" class="form-select js-example-basic-single" name="requisicao-funcionario" required>
                                 <option value="">Selecione...</option>
@@ -51,7 +58,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 col-lg-4 mt-4">
                             <label for="id_requisicao-cc" class="form-label">Centro de custo:</label>
                             <select id="id_requisicao-cc" class="form-select js-example-basic-single" name="requisicao-cc" required>
                             </select>
@@ -88,7 +95,7 @@
                     </div>
                     
                     <div class="row mb-3 justify-content-center">
-                        <div class="col-md-8">
+                        <div class="col-md-12 col-lg-8">
                             <label for="id_requisicao-obs" class="form-label">Obs:</label>
                             <textarea class="form-control" name="requisicao-obs" rows="3" id="id_requisicao-obs"></textarea>
                         </div>
@@ -133,8 +140,8 @@
                         </div>
                     </div>
 
-                    <div class="row mb-3 justify-content-center">
-                        <div class="col-md-6">
+                    <div class="row mb-3 justify-content-center align-items-end">
+                        <div class="col-md-6 col-lg-4">
                             <label for="id_transferencia-funcionario" class="form-label">Matrícula: (Caso seja operador, a transferência será entregue automaticamente)</label>
                             <select id="id_transferencia-funcionario" class="form-select js-example-basic-single" name="transferencia-funcionario" required>
                                 <option value="">Selecione...</option>
@@ -143,9 +150,6 @@
                                 {% endfor %}
                             </select>
                         </div>
-                    </div>
-                
-                    <div class="row mb-3 justify-content-center">
                         <div class="col-md-6 col-lg-4">
                             <label for="id_transferencia-deposito_destino" class="form-label">Depósito Destino:</label>
                             <select id="id_transferencia-deposito_destino" class="form-select js-example-basic-single" name="transferencia-deposito_destino" required>
@@ -155,6 +159,9 @@
                                 {% endfor %}
                             </select>
                         </div>
+                    </div>
+                
+                    <div class="row mb-3 justify-content-center">
                         <div class="col-md-6 col-lg-4">
                             <label for="id_transferencia-item" class="form-label">Item:</label>
                             <select id="id_transferencia-item" class="form-select js-example-basic-single" name="transferencia-item" required>
@@ -164,17 +171,15 @@
                                 {% endfor %}
                             </select>
                         </div>
-                    </div>
-                
-                    <div class="row mb-3 justify-content-center">
+
                         <div class="col-md-6 col-lg-4">
                             <label for="id_transferencia-quantidade" class="form-label">Quantidade:</label>
                             <input type="number" step="0.01" min="0" class="form-control" id="id_transferencia-quantidade" name="transferencia-quantidade" required>
                         </div>
                     </div>
-                
+
                     <div class="row mb-3 justify-content-center">
-                        <div class="col-md-8">
+                        <div class="col-md-12 col-lg-8">
                             <label for="id_transferencia-obs" class="form-label">Obs:</label>
                             <textarea class="form-control" name="transferencia-obs" id="id_transferencia-obs" rows="3"></textarea>
                         </div>
@@ -602,7 +607,7 @@
 
         const formData = new FormData(this);
 
-            fetch('/almox/', {
+            fetch('/almox/solicitar/', {
                 method: 'POST',
                 body: formData
             })
@@ -655,7 +660,7 @@
 
         const formData = new FormData(this);
 
-            fetch('/almox/', {
+            fetch('/almox/solicitar/', {
                 method: 'POST',
                 body: formData
             })

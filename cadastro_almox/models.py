@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib import admin
 
 class Cc(models.Model):
 
@@ -61,15 +60,3 @@ class OperadorAlmox(models.Model):
     def __str__(self):
 
         return f'{self.matricula} - {self.nome}'
-
-class FuncionarioAdmin(admin.ModelAdmin):
-    search_fields = ['nome', 'matricula', 'cc__nome']
-
-class ItensSolicitacaoAdmin(admin.ModelAdmin):
-    search_fields = ['codigo', 'nome', 'classe_requisicao__nome']
-
-class ItensTransferenciaAdmin(admin.ModelAdmin):
-    search_fields = ['codigo', 'nome']
-
-class DepositoDestinoAdmin(admin.ModelAdmin):
-    search_fields = ['nome']

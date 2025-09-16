@@ -250,6 +250,7 @@ class Profile(models.Model):
         ('pcp', 'PCP'),
         ('inspetor', 'Inspetor'),
         ('almoxarifado', 'Almoxarifado'),
+        ('admin', 'Admin'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')

@@ -535,7 +535,7 @@ def gerir_solicitacoes(request):
                         SolicitacaoNovaMatricula, pk=solicitacao_id
                     )
                     solicitacao.aprovado = True
-                    solicitacao.data_aprovacao = datetime.datetime.now()
+                    solicitacao.data_aprovacao = datetime.now()
                     solicitacao.save()
 
                     try:
