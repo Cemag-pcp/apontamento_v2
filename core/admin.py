@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import MaquinaParada, Profile, Ordem, Versao, RotaAcesso
+from .models import MaquinaParada, Profile, Ordem, Versao, RotaAcesso, Notificacao
 
 
 class ProfilePermissionMixin:
@@ -74,6 +74,7 @@ class ProfileAdmin(admin.ModelAdmin):
 admin.site.register(MaquinaParada, RestrictedAdmin)
 admin.site.register(Versao, RestrictedAdmin)
 admin.site.register(RotaAcesso, RestrictedAdmin)
+admin.site.register(Notificacao, RestrictedAdmin)
 
 admin.site.register(Ordem, OrdemAdmin)
 

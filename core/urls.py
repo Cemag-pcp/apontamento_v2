@@ -29,6 +29,10 @@ urlpatterns = [
     path('api/status_maquinas/', views.get_status_maquinas, name='status_maquinas'),
     path('api/buscar-maquinas-disponiveis/', views.get_maquinas_disponiveis, name='buscar_maquinas_disponiveis'),
 
+    path('notificacoes/', views.notificacoes_pagina, name='notificacoes'),
+    path('api/notificacoes/', views.notificacoes_api, name='api_notificacoes'),
+    path('api/notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, name='api_marcar_como_lidas'),
+
 ]
 
 #consulta de peças

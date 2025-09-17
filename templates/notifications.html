@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Notificações</title>
+{% endblock %}
+
+{% block content %}
+<div id="notification-list" style="max-width: 900px; margin: auto;">
+    <!-- Cabeçalho -->
+    <h2 class="my-4">Notificações</h2>
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-bell fs-5"></i>
+            <!-- A contagem será preenchida pelo JavaScript -->
+            <span id="unread-count" class="text-muted">Carregando...</span>
+        </div>
+        <button id="mark-all-read" class="btn btn-outline-secondary btn-sm">Marcar todas como lidas</button>
+    </div>
+
+    <!-- Container onde as notificações são renderizadas pelo JS -->
+    <div id="notifications-container" class="mb-3">
+        <!-- Opcional: Adicione um loader inicial -->
+        <div class="text-center" id="initial-loader">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botão de "Carregar mais", inicialmente escondido -->
+    <div class="text-center pt-2" id="load-more-container" style="display: none;">
+        <button class="btn btn-outline-secondary w-100 mb-4" id="load-more-btn">Ver mais notificações</button>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    let currentPage = 1;
+    const notificationsContainer = document.getElementById('notifications-container');
+    const markAllReadBtn = document.getElementById('mark-all-read');
+    const unreadCountSpan = document.getElementById('unread-count');
+    const loadMoreContainer = document.getElementById('load-more-container');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    const initialLoader = document.getElementById('initial-loader');
+
+    // Função para criar o HTML de um card de notificação (sem alterações)
+    function createNotificationCard(n) {
+        let iconHtml = '';
+        let borderColorClass = '';
+        switch (n.tipo) {
+            case 'sucesso': iconHtml = '<i class="bi bi-check-circle text-success fs-5"></i>'; borderColorClass = 'border-success'; break;
+            case 'info': iconHtml = '<i class="bi bi-info-circle text-primary fs-5"></i>'; borderColorClass = 'border-primary'; break;
+            case 'aviso': iconHtml = '<i class="bi bi-exclamation-triangle text-warning fs-5"></i>'; borderColorClass = 'border-warning'; break;
+            case 'erro': iconHtml = '<i class="bi bi-x-circle text-danger fs-5"></i>'; borderColorClass = 'border-danger'; break;
+            default: iconHtml = '<i class="bi bi-bell text-secondary fs-5"></i>';
+        }
+        // A lógica de `lido` aqui irá renderizar corretamente com base nos dados da API
+        const lidoClass = n.lido ? '' : 'border-start border-4 ' + borderColorClass;
+        const novoBadge = n.lido ? '' : '<span class="badge bg-secondary ms-2">Nova</span>';
+        return `<div class="card mb-3 ${lidoClass}" id="notificacao-${n.id}"><div class="card-body d-flex align-items-start"><div class="flex-shrink-0 mt-1 me-3">${iconHtml}</div><div class="flex-grow-1"><div class="d-flex align-items-center justify-content-between"><div><strong>${n.titulo}</strong> ${novoBadge}</div></div><div class="text-muted small my-1">${n.mensagem}</div><span class="text-muted small">${n.tempo_atras}</span></div></div></div>`;
+    }
+    
+    // Função para atualizar o contador de não lidas
+    function updateUnreadCount(count) {
+        unreadCountSpan.textContent = `${count} ${count === 1 ? 'notificação não lida' : 'notificações não lidas'}`;
+    }
+
+    // Função para buscar notificações de uma página específica
+    function fetchNotifications(page, onComplete) {
+        fetch(`{% url 'core:api_notificacoes' %}?page=${page}`)
+            .then(response => response.json())
+            .then(data => {
+                if (page === 1 && initialLoader) {
+                    initialLoader.remove();
+                }
+                if (data.notificacoes.length > 0) {
+                    data.notificacoes.forEach(n => {
+                        notificationsContainer.insertAdjacentHTML('beforeend', createNotificationCard(n));
+                    });
+                } else if (page === 1) {
+                    notificationsContainer.innerHTML = '<div class="card mb-3"><div class="card-body text-center text-muted">Você não tem nenhuma notificação.</div></div>';
+                }
+                // A contagem já virá zerada da API se a função de marcar como lida for chamada antes
+                updateUnreadCount(data.unread_count);
+                if (data.has_next) {
+                    loadMoreContainer.style.display = 'block';
+                } else {
+                    loadMoreContainer.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error("Erro ao buscar notificações:", error);
+                if (page === 1) {
+                    if (initialLoader) initialLoader.remove();
+                    notificationsContainer.innerHTML = '<div class="alert alert-danger">Ocorreu um erro ao carregar as notificações.</div>';
+                }
+            })
+            .finally(() => {
+                if (onComplete) {
+                    onComplete();
+                }
+            });
+    }
+
+    // **NOVA FUNÇÃO** para encapsular a lógica de marcar como lidas
+    function handleMarkAllAsRead() {
+        const csrfToken = '{{ csrf_token }}';
+        fetch('{% url "core:api_marcar_como_lidas" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Atualiza a UI otimisticamente
+                document.querySelectorAll('#notifications-container .card').forEach(card => {
+                    card.classList.remove('border-start', 'border-4', 'border-primary', 'border-success', 'border-warning', 'border-danger');
+                    const badge = card.querySelector('.badge');
+                    if (badge) badge.remove();
+                });
+                updateUnreadCount(0);
+            }
+        });
+    }
+
+    // --- Event Listeners ---
+
+    // Carregar mais notificações
+    loadMoreBtn.addEventListener('click', function () {
+        const originalButtonText = this.innerHTML;
+        this.disabled = true;
+        this.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Carregando...`;
+        currentPage++;
+        const onFetchComplete = () => {
+            this.disabled = false;
+            this.innerHTML = originalButtonText;
+        };
+        fetchNotifications(currentPage, onFetchComplete);
+    });
+
+    // Marcar todas como lidas (agora chama a função encapsulada)
+    markAllReadBtn.addEventListener('click', handleMarkAllAsRead);
+
+    // --- Carga Inicial ---
+    
+    // **NOVA LÓGICA**: Primeiro marca tudo como lido, depois busca as notificações.
+    // Isso garante que os dados já venham com 'lido: true' do backend.
+    handleMarkAllAsRead();
+    fetchNotifications(currentPage);
+});
+</script>
+{% endblock %}

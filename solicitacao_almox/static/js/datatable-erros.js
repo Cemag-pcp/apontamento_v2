@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const transferenciaConfig = {
         containerId: 'table-transferencia-container',
         tbodyId: 'table-body-transferencia',
-        url: 'data-transferencia/', // Substitua pela URL correta
+        url: '/almox/api/erros/data-transferencia/', // Substitua pela URL correta
         start: 0,
         length: 10,
         isLoading: false,
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const requisicaoConfig = {
         containerId: 'table-requisicao-container',
         tbodyId: 'table-body-requisicao',
-        url: 'data-requisicao/', // Substitua pela URL correta
+        url: '/almox/api/erros/data-requisicao/', // Substitua pela URL correta
         start: 0,
         length: 10,
         isLoading: false,

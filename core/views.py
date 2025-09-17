@@ -8,15 +8,17 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
+from django.utils.timesince import timesince
 from django.db import transaction
 from django.db.models import Prefetch, Count
 from django.contrib.auth.models import User
 from django.contrib import messages
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
+from django.core.paginator import Paginator
 
 from .models import Ordem, Versao
 from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina,CarretasExplodidas
-from core.models import Ordem,MaquinaParada,OrdemProcesso,Profile,RotaAcesso
+from core.models import Ordem,MaquinaParada,OrdemProcesso,Profile,RotaAcesso, Notificacao
 
 import json
 import time
@@ -578,3 +580,58 @@ def mostrar_pecas_completa(request):
     )
 
     return JsonResponse({'pecas': list(pecas)})
+
+
+login_required
+def notificacoes_pagina(request):
+    """
+    View para renderizar o 'shell' da página de notificações.
+    Os dados serão carregados via API pelo JavaScript.
+    """
+    # A view agora só precisa renderizar o template, sem contexto extra.
+    return render(request, 'notifications.html')
+
+
+@login_required
+def notificacoes_api(request):
+    """
+    API que retorna uma página de notificações e a contagem total de não lidas.
+    """
+    page_number = request.GET.get('page', 1)
+    
+    notificacoes_qs = Notificacao.objects.filter(profile=request.user.profile).order_by('-criado_em')
+    
+    # A contagem de não lidas é calculada sobre a queryset completa.
+    unread_count = notificacoes_qs.filter(lido=False).count()
+
+    paginator = Paginator(notificacoes_qs, 8)
+    page_obj = paginator.get_page(page_number)
+
+    notificacoes_json = [
+        {
+            'id': n.id,
+            'titulo': n.titulo,
+            'mensagem': n.mensagem,
+            'tipo': n.tipo,
+            'lido': n.lido,
+            'tempo_atras': f"há {timesince(n.criado_em, now()).split(',')[0]}",
+        }
+        for n in page_obj.object_list
+    ]
+    
+    data = {
+        'notificacoes': notificacoes_json,
+        'has_next': page_obj.has_next(),
+        'unread_count': unread_count, # Enviando a contagem na API
+    }
+    return JsonResponse(data)
+
+
+@login_required
+@require_POST
+def marcar_notificacoes_como_lidas(request):
+    """
+    View para a ação de marcar todas as notificações como lidas.
+    """
+    Notificacao.objects.filter(profile=request.user.profile, lido=False).update(lido=True)
+    return JsonResponse({'status': 'success', 'message': 'Todas as notificações foram marcadas como lidas.'})

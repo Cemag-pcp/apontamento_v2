@@ -23,7 +23,7 @@ class RotaAccessMiddleware:
         
         print(path)
         # Se o usuário não estiver autenticado, redireciona para o login
-        if not request.user.is_authenticated and path not in PUBLIC_PATHS:
+        if request.user and not request.user.is_authenticated and path not in PUBLIC_PATHS:
             login_url = reverse('core:login')
             if path == "":
                 return redirect(f"{login_url}")

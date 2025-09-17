@@ -265,6 +265,29 @@ class Profile(models.Model):
         """ Verifica se o usuário tem acesso a uma determinada rota """
         return self.permissoes.filter(nome=rota_nome).exists()
 
+class Notificacao(models.Model):
+    TIPO_NOTIFICACAO_CHOICES = [
+        ('info', 'Informação'),
+        ('alerta', 'Alerta'),
+        ('aviso', 'Aviso'),
+        ('erro', 'Erro'),
+    ]
+
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="notificacoes")
+    titulo = models.CharField(max_length=100)
+    mensagem = models.TextField()
+    tipo = models.CharField(max_length=10, choices=TIPO_NOTIFICACAO_CHOICES, default='info')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    lido = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Notificação para {self.profile.user.username} - {self.titulo}"
+    
+    def marcar_como_lida(self):
+        self.lido = True
+        self.save()
+
+
 class Versao(models.Model):
     
     TIPO_CHOICES = (
