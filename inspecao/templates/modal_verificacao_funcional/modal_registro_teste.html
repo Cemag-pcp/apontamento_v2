@@ -112,6 +112,11 @@
               </div>
             </div>
           </div>
+          <!-- Seleção de Inspetor -->
+          <div class="mt-2">
+            <label for="usuarioSelect" class="form-label">Inspetor</label>
+            <select name="inspetorResponsavel" id="usuarioSelect" class="form-select w-50"></select>
+          </div>
         </div>
 
         <div class="modal-footer">
@@ -158,9 +163,9 @@
         <!-- Resultados dos Testes -->
         <div class="card shadow-sm">
           <div class="card-body">
-            <h5 class="fw-bold mb-3">Resultados do Teste</h5>
+            <h5 class="fw-bold mb-3">Resultados do Teste - <span id="modalStatus"></span></h5>
             
-            <p><strong>Resultado Final:</strong> <span id="modalStatus"></span></p>
+            <!-- <h5 class="fw-bold mb-3">Resultado Final: </h5> -->
             
             <div class="row">
               <div class="col-md-4"><strong>Aderência:</strong> <span id="modalAderencia"></span></div>

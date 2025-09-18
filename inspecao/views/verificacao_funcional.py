@@ -3,6 +3,9 @@ from django.http import JsonResponse
 from django.utils import timezone
 from apontamento_pintura.models import TesteFuncional
 from django.core.paginator import Paginator
+from core.models import Profile
+
+# Bibliotecas padrão do Python
 import json
 import os
 import traceback
@@ -51,6 +54,7 @@ def api_testes_funcionais_pintura(request):
         'id','peca_ordem__id','peca_ordem__peca','peca_ordem__ordem_id__cor','status','peca_ordem__tipo',
         'peca_ordem__ordem__data_carga', 'data_inicial', 'data_atualizacao','peca_ordem__ordem__ordem',
         'peca_ordem__tipo','aderencia','tonalidade','polimerizacao','espessura_camada_1','espessura_camada_2','espessura_camada_3',
+        'inspetor__user__username','inspetor_id'
         )
 
     quantidade_total = datas.count()  # Total de itens sem filtro
@@ -149,9 +153,19 @@ def api_testes_funcionais_pintura(request):
                 'tonalidade': 'Aprovado' if data['tonalidade'] else ('Reprovado' if data['tonalidade'] is False else 'Não verificado'),
                 'polimerizacao': 'Aprovado' if data['polimerizacao'] else ('Reprovado' if data['polimerizacao'] is False else 'Somente para PÓ'),
                 'resultado_espessura': espessura_camada_resultado if espessura_camada_resultado else 'Não verificado',
+                'inspetor': data['inspetor__user__username'] if data['inspetor_id'] else 'Não atribuído',
             }
 
         dados.append(item)
+
+    usuario_logado = Profile.objects.filter(user=request.user).values('tipo_acesso', 'user__id', 'user__username').first()
+    usuarios_list = [usuario_logado]
+    if usuario_logado['tipo_acesso'].lower() == 'supervisor':
+        inspetores_list = list(Profile.objects.filter(tipo_acesso='inspetor').values('tipo_acesso','user__id', 'user__username'))
+        # print(inspetores_list)
+        usuarios_list.extend(inspetores_list)
+    elif usuario_logado['tipo_acesso'].lower() != 'pcp':
+        usuarios_list = []
 
     return JsonResponse(
         {
@@ -160,6 +174,8 @@ def api_testes_funcionais_pintura(request):
             "total_filtrado": paginador.count,  # Total de itens após filtro
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
+            "inspetores_list": usuarios_list,
+            "usuario_logado": usuario_logado['user__id'],
         },
         status=200,
     )
@@ -173,8 +189,6 @@ def realizar_verificacao_funcional(request):
     Modificar a meta caso seja necessário
     """
     if request.method == 'POST':
-        print(request.POST)
-        print(request.FILES)
         idRegistro = request.POST.get('idRegistro', None)
         polimerizacao  = request.POST.get('statusPolimerizacao', None)
         aderencia = request.POST.get('statusAderencia', None)
@@ -183,10 +197,12 @@ def realizar_verificacao_funcional(request):
         espessura_camada_2 = request.POST.get('espessura-camada-2', None)
         espessura_camada_3 = request.POST.get('espessura-camada-3', None)
         observacao = request.POST.get('observacoes-teste', None)
+        usuario_id = request.POST.get('inspetorResponsavel', None) # ID do usuário logado e não do profile
+
 
         try:
             registro_teste = TesteFuncional.objects.get(pk=int(idRegistro))
-            campos_obrigatorios = ['idRegistro','statusAderencia','statusTonalidade', 'espessura-camada-1','espessura-camada-2', 'espessura-camada-3']
+            campos_obrigatorios = ['idRegistro','statusAderencia','statusTonalidade', 'espessura-camada-1','espessura-camada-2', 'espessura-camada-3','inspetorResponsavel']
             if polimerizacao: # PO
                 polimerizacao = bool(polimerizacao)
                 campos_obrigatorios.append('statusPolimerizacao')
@@ -209,6 +225,9 @@ def realizar_verificacao_funcional(request):
             
             registro_teste.aderencia = aderencia
             registro_teste.tonalidade = tonalidade
+
+            inspetor_responsavel = Profile.objects.get(user_id=int(usuario_id))
+            registro_teste.inspetor = inspetor_responsavel
 
             if observacao:
                 registro_teste.observacao = observacao
