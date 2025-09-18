@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.timezone import now
 
-from core.models import Ordem
+from core.models import Ordem, Profile
 from cadastro.models import Operador
 from inspecao.models import Reinspecao
 
@@ -79,4 +79,5 @@ class TesteFuncional(models.Model):
     observacao = models.TextField(null=True, blank=True)
     data_inicial = models.DateTimeField(auto_now_add=True,null=True, blank=True)
     data_atualizacao = models.DateTimeField(auto_now=True,null=True, blank=True)
+    inspetor = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True)
 
