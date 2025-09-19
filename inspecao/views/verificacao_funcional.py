@@ -164,7 +164,7 @@ def api_testes_funcionais_pintura(request):
         inspetores_list = list(Profile.objects.filter(tipo_acesso='inspetor').values('tipo_acesso','user__id', 'user__username'))
         # print(inspetores_list)
         usuarios_list.extend(inspetores_list)
-    elif usuario_logado['tipo_acesso'].lower() != 'pcp':
+    elif usuario_logado['tipo_acesso'].lower() != 'inspetor':
         usuarios_list = []
 
     return JsonResponse(
