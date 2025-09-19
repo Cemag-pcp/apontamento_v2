@@ -42,8 +42,8 @@ def enviar_notificacao_em_tempo_real(sender, instance, created, **kwargs):
     # Formata o objeto de notificação completo. Este formato será usado em ambos os casos.
     notificacao_data = {
         "id": instance.id,
-        "titulo": instance.titulo,
-        "mensagem": instance.mensagem,
+        "titulo": instance.titulo if len(instance.titulo) < 45 else f"{instance.titulo[0:44]}...",
+        "mensagem": instance.mensagem if len(instance.mensagem) < 45 else f"{instance.mensagem[0:44]}...",
         "tempo": localtime(instance.criado_em).strftime("%d/%m %H:%M"),
         "tipo": instance.tipo,
         "rota": "#",  # Substitua se tiver uma lógica de rota

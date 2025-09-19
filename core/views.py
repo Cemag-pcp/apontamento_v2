@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.views import LoginView
@@ -612,6 +612,7 @@ def notificacoes_api(request):
             'id': n.id,
             'titulo': n.titulo,
             'mensagem': n.mensagem,
+            'rota_acesso': n.rota_acesso,
             'tipo': n.tipo,
             'lido': n.lido,
             'tempo_atras': f"há {timesince(n.criado_em, now()).split(',')[0]}",
@@ -630,8 +631,32 @@ def notificacoes_api(request):
 @login_required
 @require_POST
 def marcar_notificacoes_como_lidas(request):
-    """
-    View para a ação de marcar todas as notificações como lidas.
-    """
-    Notificacao.objects.filter(profile=request.user.profile, lido=False).update(lido=True)
-    return JsonResponse({'status': 'success', 'message': 'Todas as notificações foram marcadas como lidas.'})
+    try:
+        data = json.loads(request.body)
+        notification_ids = data.get('ids')
+
+        if not isinstance(notification_ids, list):
+            return HttpResponseBadRequest("O corpo da requisição deve conter uma lista de 'ids'.")
+
+        notificacoes_para_marcar = Notificacao.objects.filter(
+            profile=request.user.profile, 
+            id__in=notification_ids,
+            lido=False
+        )
+        
+        count = 0
+        # **A MUDANÇA ESSENCIAL ESTÁ AQUI**
+        # Em vez de .update(), iteramos sobre a queryset.
+        for notificacao in notificacoes_para_marcar:
+            notificacao.lido = True
+            # .save() DISPARA o sinal post_save para esta instância.
+            notificacao.save(update_fields=['lido']) # Opcional: otimiza o SQL gerado
+            count += 1
+
+        return JsonResponse({
+            'status': 'success', 
+            'message': f'{count} notificações foram marcadas como lidas.'
+        })
+
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest("JSON inválido.")

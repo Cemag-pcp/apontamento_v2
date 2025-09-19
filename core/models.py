@@ -278,6 +278,7 @@ class Notificacao(models.Model):
     mensagem = models.TextField()
     tipo = models.CharField(max_length=10, choices=TIPO_NOTIFICACAO_CHOICES, default='info')
     criado_em = models.DateTimeField(auto_now_add=True)
+    rota_acesso = models.CharField(max_length=100, blank=True, null=True)
     lido = models.BooleanField(default=False)
 
     def __str__(self):
@@ -286,6 +287,16 @@ class Notificacao(models.Model):
     def marcar_como_lida(self):
         self.lido = True
         self.save()
+
+class RegistroNotificacao(models.Model):
+    """
+    Registra o último envio de uma notificação periódica para evitar duplicidade.
+    """
+    chave = models.CharField(max_length=150, unique=True, primary_key=True, help_text="Chave única para identificar a notificação periódica, ex: 'solicitacao_diaria_almoxarifado'")
+    ultimo_envio = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.chave} (último envio: {self.ultimo_envio.strftime('%d/%m/%Y %H:%M')})"
 
 
 class Versao(models.Model):

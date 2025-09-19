@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import MaquinaParada, Profile, Ordem, Versao, RotaAcesso, Notificacao
+from .models import (
+    MaquinaParada,
+    Profile,
+    Ordem,
+    Versao,
+    RotaAcesso,
+    Notificacao,
+    RegistroNotificacao,
+)
 
 
 class ProfilePermissionMixin:
@@ -52,29 +60,30 @@ class OrdemAdmin(ProfilePermissionMixin, admin.ModelAdmin):
 
 
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'tipo_acesso')
-    list_filter = ('tipo_acesso',)
-    search_fields = ('user__username',)
+    list_display = ("user", "tipo_acesso")
+    list_filter = ("tipo_acesso",)
+    search_fields = ("user__username",)
 
     def has_module_permission(self, request):
 
         if request.user.is_superuser:
             return True
-        
+
         try:
             profile = request.user.profile
-            if profile.tipo_acesso.lower() != 'almoxarifado':
+            if profile.tipo_acesso.lower() != "almoxarifado":
                 return True
         except Profile.DoesNotExist:
             return False
-        
+
         return False
 
 
 admin.site.register(MaquinaParada, RestrictedAdmin)
 admin.site.register(Versao, RestrictedAdmin)
 admin.site.register(RotaAcesso, RestrictedAdmin)
-admin.site.register(Notificacao, RestrictedAdmin)
+admin.site.register(Notificacao)
+admin.site.register(RegistroNotificacao)
 
 admin.site.register(Ordem, OrdemAdmin)
 

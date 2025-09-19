@@ -56,9 +56,9 @@
                 <div id="notificationDropdown" class="dropdown-menu dropdown-menu-end shadow" 
                     style="min-width: 320px; right: 0; left: auto; top: 32px; display: none;">
                     <h6 class="dropdown-header">Notificações</h6>
-                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-divider m-0"></div>
                     <div id="notificationList"></div>
-                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-divider m-0"></div>
                     <a class="dropdown-item text-center" href="{% url 'core:notificacoes' %}">
                         Ver mais notificações
                     </a>
@@ -498,7 +498,7 @@
 
         <!-- Script personalizado -->
         <script src="{% static 'js/scripts.js' %}"></script>
-        <script src="{% static 'js/notificacoes.js' %}"></script>
+        <script src="{% static 'js/notificacoes-dropdown.js' %}"></script>
 
         {% block scripts %}
         {% endblock %}

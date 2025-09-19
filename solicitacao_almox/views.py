@@ -33,14 +33,17 @@ from .models import (
     SolicitacaoNovaMatricula,
 )
 from cadastro_almox.models import Cc
-
+from core.utils import (
+    notificacao_almoxarifado,
+    verificar_e_notificar_requisicoes_pendentes,
+    verificar_e_notificar_transferencias_pendentes,
+)
 
 from datetime import datetime
 import json
 
 
 def criar_solicitacoes(request):
-
     funcionarios = Funcionario.objects.all()
     itens_requisicao = ItensSolicitacao.objects.all()
     itens_transferencia = ItensTransferencia.objects.all()
@@ -55,75 +58,54 @@ def criar_solicitacoes(request):
                 request.POST, prefix="requisicao"
             )
             if form_requisicao.is_valid():
-                # Pegando o id da solicitação ao salvar o form
                 solicitacao_id = form_requisicao.save().id
                 solicitacao = get_object_or_404(
                     SolicitacaoRequisicao, id=solicitacao_id
                 )
-
-                # Verificar se o funcionario é um operador pela matricula
                 matricula = solicitacao.funcionario.matricula
                 try:
-                    # Procurando o operador pelo número de matrícula e verificando se está ativo
                     operador = get_object_or_404(
                         OperadorAlmox, matricula=matricula, status=True
                     )
-                    # Obtém a data e hora atual
                     now = datetime.now()
-                    # Formata a data no formato desejado: YYYY-MM-DDTHH:MM
                     data_entrega = now.strftime("%Y-%m-%dT%H:%M")
-
                     solicitacao.entregue_por = operador
                     solicitacao.data_entrega = data_entrega
                     solicitacao.save()
-
                     return JsonResponse({"status": "sucesso", "operador": True})
                 except Http404:
                     print(f"Operador com matrícula: {matricula} não encontrado!")
+                    verificar_e_notificar_requisicoes_pendentes()
                     return JsonResponse({"status": "sucesso", "operador": False})
             else:
-                return JsonResponse(
-                    {
-                        "status": "erro",
-                    }
-                )
+                return JsonResponse({"status": "erro"})
+
         elif form_type == "transferencia":
             form_transferencia = SolicitacaoTransferenciaForm(
                 request.POST, prefix="transferencia"
             )
             if form_transferencia.is_valid():
-                # Pegando o id da solicitação ao salvar o form
                 solicitacao_id = form_transferencia.save().id
                 solicitacao = get_object_or_404(
                     SolicitacaoTransferencia, id=solicitacao_id
                 )
-
-                # Verificar se o funcionario é um operador pela matricula
                 matricula = solicitacao.funcionario.matricula
                 try:
-                    # Procurando o operador pelo número de matrícula e verificando se está ativo
                     operador = get_object_or_404(
                         OperadorAlmox, matricula=matricula, status=True
                     )
-                    # Obtém a data e hora atual
                     now = datetime.now()
-                    # Formata a data no formato desejado: YYYY-MM-DDTHH:MM
                     data_entrega = now.strftime("%Y-%m-%dT%H:%M")
-
                     solicitacao.entregue_por = operador
                     solicitacao.data_entrega = data_entrega
                     solicitacao.save()
-
                     return JsonResponse({"status": "sucesso", "operador": True})
                 except Http404:
                     print(f"Operador com matrícula: {matricula} não encontrado!")
+                    verificar_e_notificar_transferencias_pendentes()
                     return JsonResponse({"status": "sucesso", "operador": False})
             else:
-                return JsonResponse(
-                    {
-                        "status": "erro",
-                    }
-                )
+                return JsonResponse({"status": "erro"})
 
     context = {
         "form_requisicao": form_requisicao,
@@ -401,6 +383,12 @@ def cadastro_novo_item(request):
                 deposito_destino=deposito_destino_object,
             )
 
+            notificacao_almoxarifado(
+                titulo="Nova Solicitação para criação de itens para Transferência",
+                rota_acesso="/almox/gerir-solicitacao-cadastro/",
+                mensagem=f"O colaborador {funcionario.matricula} - {funcionario.nome} solicitou um novo item para cadastro: {codigo} - {descricao}.",
+            )
+
         else:
 
             cc_object = get_object_or_404(Cc, pk=cc)
@@ -412,6 +400,12 @@ def cadastro_novo_item(request):
                 descricao=descricao,
                 quantidade=quantidade,
                 cc=cc_object,
+            )
+
+            notificacao_almoxarifado(
+                titulo="Nova Solicitação para criação de itens para Requição",
+                rota_acesso="/almox/gerir-solicitacao-cadastro/",
+                mensagem=f"O colaborador {funcionario.matricula} - {funcionario.nome} solicitou um novo item para cadastro: {codigo} - {descricao}.",
             )
 
     return redirect("criar_solicitacoes")
@@ -429,6 +423,12 @@ def cadastro_nova_matricula(request):
 
         SolicitacaoNovaMatricula.objects.create(
             matricula=matricula, nome=nome, cc=cc_object
+        )
+
+        notificacao_almoxarifado(
+            titulo="Nova Solicitação de Matrícula",
+            rota_acesso="/almox/gerir-solicitacao-cadastro/",
+            mensagem=f"Nova Solicitação de Matrícula: {matricula} - {nome} para o CC {cc_object.codigo} - {cc_object.nome}.",
         )
 
     return redirect("criar_solicitacoes")
