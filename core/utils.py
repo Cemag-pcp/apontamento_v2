@@ -6,6 +6,10 @@ from django.utils import timezone as dj_timezone
 from .models import Profile, Notificacao, RegistroNotificacao
 from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
 
+# Constantes de alerta
+LIMITE_ERROS = 20
+FREQUENCIA_ALERTA_ERROS = dt_timedelta(days=1)  # ajuste conforme desejado
+
 def notificar_ordem(ordem):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
@@ -113,4 +117,47 @@ def verificar_e_notificar_transferencias_pendentes():
             tipo="alerta",
             chave="alerta_transferencias_pendentes_almox",
             frequencia=dt_timedelta(days=2),  # ajuste aqui
+        )
+
+def contar_erros_requisicoes() -> int:
+    # rpa diferente de 'OK' (case-insensitive), desconsiderando nulos e vazios
+    return (
+        SolicitacaoRequisicao.objects
+        .filter(rpa__isnull=False)
+        .exclude(rpa__iexact="OK")
+        .exclude(rpa__exact="")
+        .count()
+    )
+
+def contar_erros_transferencias() -> int:
+    return (
+        SolicitacaoTransferencia.objects
+        .filter(rpa__isnull=False)
+        .exclude(rpa__iexact="OK")
+        .exclude(rpa__exact="")
+        .count()
+    )
+
+def notificar_erro_requisicoes_se_acima_limite():
+    qtd = contar_erros_requisicoes()
+    if qtd > LIMITE_ERROS:
+        notificacao_almoxarifado(
+            titulo="Alerta: Requisições com erro no RPA",
+            mensagem=f"Existem {qtd} requisições com erro (RPA != OK). Verifique o painel do Almox.",
+            rota_acesso="/almox/erros/",
+            tipo="aviso",
+            chave="alerta_erros_requisicoes_almox",
+            frequencia=FREQUENCIA_ALERTA_ERROS,
+        )
+
+def notificar_erro_transferencias_se_acima_limite():
+    qtd = contar_erros_transferencias()
+    if qtd > LIMITE_ERROS:
+        notificacao_almoxarifado(
+            titulo="Alerta: Transferências com erro no RPA",
+            mensagem=f"Existem {qtd} transferências com erro (RPA != OK). Verifique o painel do Almox.",
+            rota_acesso="/almox/erros/",
+            tipo="aviso",
+            chave="alerta_erros_transferencias_almox",
+            frequencia=FREQUENCIA_ALERTA_ERROS,
         )
