@@ -24,7 +24,7 @@ class NotificacaoConsumer(AsyncWebsocketConsumer):
         from .models import Notificacao
 
         user_profile = user.profile
-        ultimas_notificacoes = Notificacao.objects.filter(profile=user_profile).order_by("-criado_em")[:3]
+        ultimas_notificacoes = Notificacao.objects.filter(profile=user_profile).order_by("-criado_em")[:5]
         
         notificacoes_data = [
             {

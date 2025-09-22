@@ -3,6 +3,7 @@ from django.contrib.auth import views as auth_views
 
 from . import views
 from .views import CustomLoginView
+from . import api_view
 
 app_name = 'core'
 
@@ -32,6 +33,8 @@ urlpatterns = [
     path('notificacoes/', views.notificacoes_pagina, name='notificacoes'),
     path('api/notificacoes/', views.notificacoes_api, name='api_notificacoes'),
     path('api/notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, name='api_marcar_como_lidas'),
+
+    path('api/rpa/update-transfer/', api_view.rpa_update_transfer, name='rpa_update_transfer'),
 
 ]
 

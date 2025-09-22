@@ -104,6 +104,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     oldElement.outerHTML = novoItemHtml;
                 }
             }
+            list.style.height = "390px";
+            list.style.overflowY = "auto";
         };
 
         socket.onclose = function(e) {
