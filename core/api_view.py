@@ -2,7 +2,9 @@ from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
+from datetime import timedelta as dt_timedelta
 from .models import Notificacao
+from .utils import notificacao_almoxarifado
 from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
 from django.conf import settings
 
@@ -11,6 +13,8 @@ from django.conf import settings
 def rpa_update_status(request):
     # 1. Segurança
     api_key = request.headers.get("X-API-KEY")
+    print(api_key)
+    print(settings.RPA_API_KEY)
     if not api_key or api_key != settings.RPA_API_KEY:
         return HttpResponseForbidden("Chave de API inválida.")
 
@@ -33,13 +37,13 @@ def rpa_update_status(request):
             requisicao.classe_requisicao_id = 3 if tipo_requisicao == 'Req p Consumo' else 4
         requisicao.save() # O ORM salva no banco
 
-        # 4. Cria a Notificação (isso dispara o sinal para o WebSocket)
-        profile_alvo = requisicao.profile # Ajuste conforme seu modelo
-        Notificacao.objects.create(
-            profile=profile_alvo,
+        notificacao_almoxarifado(
             titulo=f"Requisição #{requisicao.id} Processada",
             mensagem=f"Status do RPA: '{status}'",
-            tipo="info"
+            rota_acesso="/almox/solicitacoes-page/",
+            tipo="info",
+            chave="alerta_requisicoes_pendentes_almox",
+            frequencia=dt_timedelta(days=2),
         )
         return JsonResponse({"success": True})
     except SolicitacaoRequisicao.DoesNotExist:
@@ -79,7 +83,6 @@ def rpa_update_transfer(request):
         # Opcional: cria uma notificação para o dono/solicitante da transferência
         # Ajuste 'profile' conforme o seu modelo (ex: transf.profile ou transf.solicitante.profile)
         try:
-            profile_alvo = transf.profile  # ajuste conforme seu modelo
             titulo = f"Transferência #{transf.id} processada"
             msg_partes = [f"Status: {status}"]
             if dep_destino:
@@ -92,11 +95,13 @@ def rpa_update_transfer(request):
                 msg_partes.append(f"Obs: {observacao}")
             mensagem = " | ".join(msg_partes)
 
-            Notificacao.objects.create(
-                profile=profile_alvo,
+            notificacao_almoxarifado(
                 titulo=titulo,
                 mensagem=mensagem,
+                rota_acesso="/almox/solicitacoes-page/",
                 tipo="info",
+                chave="alerta_transferencias_pendentes_almox",
+                frequencia=dt_timedelta(days=2),
             )
         except Exception:
             # Evita derrubar a API se a notificação falhar
