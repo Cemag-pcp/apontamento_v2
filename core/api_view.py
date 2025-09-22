@@ -11,6 +11,8 @@ from django.conf import settings
 def rpa_update_status(request):
     # 1. Segurança
     api_key = request.headers.get("X-API-KEY")
+    print(api_key)
+    print(settings.RPA_API_KEY)
     if not api_key or api_key != settings.RPA_API_KEY:
         return HttpResponseForbidden("Chave de API inválida.")
 
