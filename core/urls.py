@@ -3,6 +3,7 @@ from django.contrib.auth import views as auth_views
 
 from . import views
 from .views import CustomLoginView
+from . import api_view
 
 app_name = 'core'
 
@@ -28,6 +29,12 @@ urlpatterns = [
     path('api/status_ordem/', views.get_contagem_status_ordem, name='status_ordem'),
     path('api/status_maquinas/', views.get_status_maquinas, name='status_maquinas'),
     path('api/buscar-maquinas-disponiveis/', views.get_maquinas_disponiveis, name='buscar_maquinas_disponiveis'),
+
+    path('notificacoes/', views.notificacoes_pagina, name='notificacoes'),
+    path('api/notificacoes/', views.notificacoes_api, name='api_notificacoes'),
+    path('api/notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, name='api_marcar_como_lidas'),
+
+    path('api/rpa/update-transfer/', api_view.rpa_update_transfer, name='rpa_update_transfer'),
 
 ]
 

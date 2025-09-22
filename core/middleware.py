@@ -16,17 +16,21 @@ class RotaAccessMiddleware:
         # Obtém o caminho da requisição, removendo "/" inicial e final
         path = request.path.strip("/")
         
-        login_url = reverse('core:login')
-
+        PUBLIC_PATHS = [
+            "core/login",
+            "almox/solicitar"
+        ]
+        
+        print(path)
         # Se o usuário não estiver autenticado, redireciona para o login
-        if not request.user.is_authenticated and path != login_url.strip("/"):
-            print(login_url.strip("/"))
+        if request.user and not request.user.is_authenticated and path not in PUBLIC_PATHS:
+            login_url = reverse('core:login')
             if path == "":
                 return redirect(f"{login_url}")
             return redirect(f"{login_url}?next={request.path}")
 
         # Ignorar rotas administrativas
-        EXCLUDED_PATHS = ['admin', 'login', 'logout', 'core']
+        EXCLUDED_PATHS = ['admin', 'login', 'logout', 'core', 'almox/solicitar']
         if any(path.startswith(excluded) for excluded in EXCLUDED_PATHS):
             return self.get_response(request)
 
@@ -38,7 +42,11 @@ class RotaAccessMiddleware:
         profile = getattr(request.user, 'profile', None)
 
         # Se o usuário for do tipo "pcp", permite acesso irrestrito
-        if profile and getattr(profile, "tipo_acesso", "").lower() == "pcp":
+        if profile and getattr(profile, "tipo_acesso", "").lower() == "admin":
+            return self.get_response(request)
+        elif profile and getattr(profile, "tipo_acesso", "").lower() == "pcp" and not 'almox' in path:
+            return self.get_response(request)
+        elif profile and getattr(profile, "tipo_acesso", "").lower() == "almoxarifado" and 'almox' in path:
             return self.get_response(request)
 
         # Busca a rota no banco de dados

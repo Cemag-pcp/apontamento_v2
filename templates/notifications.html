@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Notificações</title>
+{% endblock %}
+
+{% block content %}
+<div id="notification-list" style="max-width: 900px; margin: auto;">
+    <!-- Cabeçalho -->
+    <h2 class="my-4">Notificações</h2>
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-bell fs-5"></i>
+            <!-- A contagem será preenchida pelo JavaScript -->
+            <span id="unread-count" class="text-muted">Carregando...</span>
+        </div>
+        <div class="d-flex flex-column gap-4">
+            <button id="mark-all-read" class="btn btn-outline-primary btn-sm">Marcar todas como lidas</button>
+            <button id="update-notification" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-clockwise"></i> Atualizar notificações
+            </button>
+        </div>
+    </div>
+
+    <!-- Container onde as notificações são renderizadas pelo JS -->
+    <div id="notifications-container" class="mb-3">
+        <!-- Opcional: Adicione um loader inicial -->
+        <div class="text-center" id="initial-loader">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botão de "Carregar mais", inicialmente escondido -->
+    <div class="text-center pt-2" id="load-more-container" style="display: none;">
+        <button class="btn btn-outline-secondary w-100 mb-4" id="load-more-btn">Ver mais notificações</button>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+    <script src="{% static 'js/notificacoes.js' %}"></script>
+{% endblock %}
