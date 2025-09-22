@@ -3,6 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
 from .models import Notificacao
+from .utils import notificacao_almoxarifado
 from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
 from django.conf import settings
 
@@ -35,13 +36,13 @@ def rpa_update_status(request):
             requisicao.classe_requisicao_id = 3 if tipo_requisicao == 'Req p Consumo' else 4
         requisicao.save() # O ORM salva no banco
 
-        # 4. Cria a Notificação (isso dispara o sinal para o WebSocket)
-        profile_alvo = requisicao.profile # Ajuste conforme seu modelo
-        Notificacao.objects.create(
-            profile=profile_alvo,
+        notificacao_almoxarifado(
             titulo=f"Requisição #{requisicao.id} Processada",
             mensagem=f"Status do RPA: '{status}'",
-            tipo="info"
+            rota_acesso="/almox/solicitacoes-page/",
+            tipo="info",
+            chave="alerta_requisicoes_pendentes_almox",
+            frequencia=2
         )
         return JsonResponse({"success": True})
     except SolicitacaoRequisicao.DoesNotExist:
