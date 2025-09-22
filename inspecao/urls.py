@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views_general
-from .views import estamparia, estanqueidade, montagem, pintura, serra_usinagem
+from .views import estamparia, estanqueidade, montagem, pintura, serra_usinagem, verificacao_funcional
 
 app_name = "inspecao"
 
@@ -73,7 +73,12 @@ urlpatterns = [
     path('api/<int:id>/historico-tanque/', estanqueidade.get_historico_tanque, name='historico-tanque'),
 
     path('api/delete-execucao/', views_general.delete_execution, name='delete-execution'),
-    path('api/delete-execucao-estanqueidade/', views_general.delete_execution_estanqueidade, name='delete-execution-estanqueidade')
+    path('api/delete-execucao-estanqueidade/', views_general.delete_execution_estanqueidade, name='delete-execution-estanqueidade'),
+
+    path('api/testes-funcionais-pintura/',verificacao_funcional.api_testes_funcionais_pintura, name='testes-funcionais-pintura'),
+    path('api/realizar-verificacao-funcional/', verificacao_funcional.realizar_verificacao_funcional, name='realizar-verificacao-funcional'),
+    path('api/detalhes-verificacao-funcional/<int:id>/', verificacao_funcional.detalhes_verificacao_funcional, name='detalhes-verificacao-funcional'),
+
 ]
 
 # templates
@@ -83,6 +88,7 @@ urlpatterns += [
     path('serra-usinagem/', serra_usinagem.inspecao_serra_usinagem, name='inspecao-serra-usinagem'),
     path('estamparia/', estamparia.inspecao_estamparia, name='inspecao-estamparia'),
     path('pintura/', pintura.inspecao_pintura, name='inspecao-pintura'),
+    path('verificacao-funcional-pintura/', verificacao_funcional.verificacao_funcional_pintura, name='verificacao-funcional-pintura'),
     path('tubos-cilindros/', estanqueidade.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),
     path('dashboard/pintura/', pintura.dashboard_pintura, name='dasdashboard_pinturahboard'),
     path('dashboard/montagem/', montagem.dashboard_montagem, name='dasdashboard_montagemhboard'),
@@ -90,7 +96,7 @@ urlpatterns += [
     path('dashboard/serra/', serra_usinagem.dashboard_serra, name='dasdashboard_serraboard'),
     path('dashboard/usinagem/', serra_usinagem.dashboard_usinagem, name='dasdashboard_usinagemboard'),
     path('dashboard/tanque/', estanqueidade.dashboard_tanque, name='dashboard-tanque'),
-    path('dashboard/tubos-cilindros/', estanqueidade.dashboard_tubos_cilindros, name='dashboard-tubos-cilindros')
+    path('dashboard/tubos-cilindros/', estanqueidade.dashboard_tubos_cilindros, name='dashboard-tubos-cilindros'),
 ]
 
 # dashboard

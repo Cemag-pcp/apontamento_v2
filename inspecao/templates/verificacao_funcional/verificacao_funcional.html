@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %} <title>Verificação Funcional Pintura</title> {% endblock %}
+
+{% block links %}
+
+    <link rel="stylesheet" href="/static/css/inspecao.css">
+    <link rel="stylesheet" href="/static/css/select2.css">
+
+{% endblock %}
+
+{% block content %}
+<h2 class="my-4">Verificação Funcional - Pintura</h2>
+<ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
+    <li class="nav-item" style="width: 50%;">
+        <a id="itens-testar" class="nav-link tab-active active text-center" style="font-size: 0.875rem;"  onclick="activeRow('itens-pendentes','itens-finalizados', this)">
+            <span class="mx-2"></span>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </a>
+    </li>
+    <li class="nav-item" style="width: 50%;">
+        <a id="itens-testados" class="nav-link tab-active text-center text-center" style="font-size: 0.875rem;" onclick="activeRow('itens-finalizados','itens-pendentes', this)">
+            <span class="mx-2"></span>
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </a>
+    </li>
+</ul>
+
+<div id="itens-pendentes" class="row mt-3">
+
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Testes pendentes</h4>
+        <div>
+            <div class="btn-group">
+                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <form id="form-filtrar-verificacao-pendentes">
+                    <div class="dropdown-menu p-3" style="width: 250px;">
+                        <p class="fw-bold mx-2 my-1">Filtrar testes</p>
+                        <hr>
+                        <input type="text" class="form-control mb-3" id="pesquisar-peca-verificacao-pendentes" placeholder="Pesquisar as peças...">
+                        
+                        <h6>Cor</h6>
+                        {% for cor in cores %}
+                            <div class="form-check">
+                                <input class="form-check-input-verificacao-pendentes" id="{{cor|lower}}-verificacao-pendentes" type="checkbox" value="">
+                                <label class="form-check-label" for="{{cor|lower}}-verificacao-pendentes">{{cor}}</label>
+                            </div>
+                        {% endfor %}
+                
+                        <h6 class="mt-3">Tipo Pintura</h6>
+                            <div class="form-check">
+                                <input id="pintura-po-verificacao-pendentes" type="checkbox" value="">
+                                <label class="form-check-label" for="pintura-po-verificacao-pendentes">PÓ</label>
+                            </div>
+                            <div class="form-check">
+                                <input id="pintura-pu-verificacao-pendentes" type="checkbox" value="">
+                                <label class="form-check-label" for="pintura-pu-verificacao-pendentes">PU</label>
+                            </div>
+                
+                        <h6 class="mt-3">Data Criação</h6>
+                        <div class="form-check d-flex flex-column gap-3">
+                            <!-- Data início -->
+                            <div class="d-flex justify-content-between">
+                                <label for="data-inicio-filtro-verificacao-pendentes" class="form-label me-2">Início:</label>
+                                <input type="date" id="data-inicio-filtro-verificacao-pendentes" 
+                                    class="form-control form-control-sm" 
+                                    name="data-inicio-filtro-verificacao-pendentes"
+                                    style="width:fit-content;"
+                                    onchange="document.getElementById('data-fim-filtro-verificacao-pendentes').min=this.value">
+                            </div>
+
+                            <!-- Data fim -->
+                            <div class="d-flex justify-content-between">
+                                <label for="data-fim-filtro-verificacao-pendentes" class="form-label me-2">Fim:</label>
+                                <input type="date" id="data-fim-filtro-verificacao-pendentes" 
+                                    class="form-control form-control-sm" 
+                                    name="data-fim-filtro-verificacao-pendentes"
+                                    style="width:fit-content;">
+                            </div>
+                        </div>
+
+
+                
+                        <div class="d-flex justify-content-between mt-3">
+                            <button id="btn-limpar-verificacao-pendentes"  class="btn btn-outline-secondary">Limpar</button>
+                            <button id="btn-filtrar-verificacao-pendentes" class="btn btn-dark">Filtrar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-pendente-verificacao-pendentes" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <span id="qtd-filtrada-verificacao-pendentes" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="itens-filtrados-verificacao-pendentes-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-verificacao-pendentes-tipo-pintura" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Tipo Pintura: </span>
+        <span id="itens-filtrados-verificacao-pendentes-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data Criação: </span>
+        <span id="itens-filtrados-verificacao-pendentes-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+    </div>
+    <!-- Cards -->
+     <div class="row" style="padding-right: 0;" id="cards-verificacao-pendentes"></div>
+
+     <div id="paginacao-verificacao-pendentes-pintura"></div>
+
+</div>
+
+<div id="itens-finalizados" class="row mt-3" style="display: none;">
+
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Testes realizados</h4>
+        <div class="d-flex gap-2">
+            <!-- <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar</button> -->
+            <div>
+                <div class="btn-group">
+                    <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                    <form id="form-filtrar-verificacao-finalizados" action="">
+                        <div class="dropdown-menu p-3" style="width: 250px;">
+                            <p class="fw-bold mx-2 my-1">Filtrar Testes Finalizados</p>
+                            <hr>
+                            <input id="pesquisar-peca-verificacao-finalizados" type="text" class="form-control mb-3" placeholder="Buscar Testes Finalizados...">
+
+                            <h6>Status</h6>
+                            <div style="max-height: 160px; overflow-y: auto;">
+                                <div class="form-check">
+                                    <input type="checkbox" id="filter-itens-verificacao-aprovados-pintura" value="">
+                                    <label class="form-check-label" for="filter-itens-verificacao-aprovados-pintura">Aprovados</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" id="filter-itens-verificacao-reprovados-pintura" value="">
+                                    <label class="form-check-label" for="filter-itens-verificacao-reprovados-pintura">Reprovados</label>
+                                </div>
+                            </div>
+
+                            <h6 class="mt-3">Tipo Pintura</h6>
+                                <div class="form-check">
+                                    <input id="pintura-po-verificacao-finalizados" type="checkbox" value="">
+                                    <label class="form-check-label" for="pintura-po-verificacao-finalizados">PÓ</label>
+                                </div>
+                                <div class="form-check">
+                                    <input id="pintura-pu-verificacao-finalizados" type="checkbox" value="">
+                                    <label class="form-check-label" for="pintura-pu-verificacao-finalizados">PU</label>
+                                </div>
+                            
+                            <h6>Cor</h6>
+                            {% for cor in cores %}
+                                <div class="form-check">
+                                    <input class="form-check-input-verificacao-finalizados" id="{{cor|lower}}-verificacao-finalizados" type="checkbox" value="">
+                                    <label class="form-check-label" for="{{cor|lower}}-verificacao-finalizados">{{cor}}</label>
+                                </div>
+                            {% endfor %}
+                                
+                            <h6 class="mt-3">Data Criação</h6>
+                            <!-- <input id="data-filtro-verificacao-finalizados" type="date" class="form-control"> -->
+                            <div class="form-check d-flex flex-column gap-3">
+                            <!-- Data início -->
+                                <div class="d-flex justify-content-between">
+                                    <label for="data-criacao-inicial-filtro-verificacao-finalizadas" class="form-label me-2">Início:</label>
+                                    <input type="date" id="data-criacao-inicial-filtro-verificacao-finalizadas" 
+                                        class="form-control form-control-sm" 
+                                        name="data-criacao-inicial-filtro-verificacao-finalizadas"
+                                        style="width:fit-content;"
+                                        onchange="document.getElementById('data-criacao-final-filtro-verificacao-finalizadas').min=this.value">
+                                </div>
+
+                                <!-- Data fim -->
+                                <div class="d-flex justify-content-between">
+                                    <label for="data-criacao-final-filtro-verificacao-finalizadas" class="form-label me-2">Fim:</label>
+                                    <input type="date" id="data-criacao-final-filtro-verificacao-finalizadas" 
+                                        class="form-control form-control-sm" 
+                                        name="data-criacao-final-filtro-verificacao-finalizadas"
+                                        style="width:fit-content;">
+                                </div>
+                            </div>
+
+                            <h6 class="mt-3">Data Finalização</h6>
+                            <!-- <input id="data-filtro-verificacao-finalizados" type="date" class="form-control"> -->
+                            <div class="form-check d-flex flex-column gap-3">
+                            <!-- Data início -->
+                                <div class="d-flex justify-content-between">
+                                    <label for="data-finalizacao-inicial-filtro-verificacao-finalizadas" class="form-label me-2">Início:</label>
+                                    <input type="date" id="data-finalizacao-inicial-filtro-verificacao-finalizadas" 
+                                        class="form-control form-control-sm" 
+                                        name="data-finalizacao-inicial-filtro-verificacao-finalizadas"
+                                        style="width:fit-content;"
+                                        onchange="document.getElementById('data-finalizacao-final-filtro-verificacao-finalizadas').min=this.value">
+                                </div>
+
+                                <!-- Data fim -->
+                                <div class="d-flex justify-content-between">
+                                    <label for="data-finalizacao-final-filtro-verificacao-finalizadas" class="form-label me-2">Fim:</label>
+                                    <input type="date" id="data-finalizacao-final-filtro-verificacao-finalizadas" 
+                                        class="form-control form-control-sm" 
+                                        name="data-finalizacao-final-filtro-verificacao-finalizadas"
+                                        style="width:fit-content;">
+                                </div>
+                            </div>
+                    
+                            <div class="d-flex justify-content-between mt-3">
+                                <button id="btn-limpar-verificacao-finalizados" class="btn btn-outline-secondary">Limpar</button>
+                                <button id="btn-filtrar-verificacao-finalizados" class="btn btn-dark">Filtrar</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-verificacao-finalizados"class="rounded-pill py-1 px-2" style="background-color: #00940c; color: #fafafa; font-weight: 600; font-size: 0.75rem;"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span></span>
+        <span id="qtd-filtrada-verificacao-finalizados" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="itens-filtrados-verificacao-finalizados-status" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Filtrando por: </span>
+        <span id="itens-filtrados-verificacao-finalizados-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
+        <span id="itens-filtrados-verificacao-finalizados-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
+        <span id="itens-filtrados-verificacao-finalizados-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data Criação: </span>
+        <span id="itens-filtrados-verificacao-finalizados-data-final" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data Finalização: </span>
+        <span id="itens-filtrados-verificacao-finalizados-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+        <span id="itens-filtrados-verificacao-finalizados-tipo-pintura" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Tipo Pintura: </span>
+    </div>
+    <!-- Cards -->
+    <div class="row" style="padding-right: 0;" id="cards-verificacao-finalizados"></div>
+    <div id="paginacao-verificacao-finalizados-pintura"></div>
+</div>
+
+{% include 'modal_verificacao_funcional/modal_registro_teste.html' %}
+
+{% endblock %}
+
+{% block scripts %}
+
+<script src="{% static 'js/verificacao-funcional/verificacao-funcional-pendentes.js' %}"></script>
+<script src="{% static 'js/verificacao-funcional/verificacao-funcional-finalizados.js' %}"></script>
+<script src="{% static 'js/verificacao-funcional/modal-registro-teste.js' %}"></script>
+<script src="{% static 'js/verificacao-funcional/modal-ver-detalhes.js' %}"></script>
+<!-- <script src="{% static 'js/pintura/inspecionados-pintura.js' %}"></script>
+<script src="{% static 'js/pintura/reinspecao-pintura.js' %}"></script>
+<script src="{% static 'js/pintura/inspecionar/enviar-inspecao.js' %}"></script>
+<script src="{% static 'js/pintura/inspecionar/modal-inspecionar.js' %}"></script>
+<script src="{% static 'js/pintura/reinspecionar/modal-reinspecionar.js' %}"></script>
+<script src="{% static 'js/pintura/reinspecionar/envio-reinspecao.js' %}"></script>
+<script src="{% static 'js/pintura/inspecionados/modal-inspecionados.js' %}"></script>
+<script src="{% static 'js/pintura/inspecionados/excluir-execucao.js' %}"></script>
+<script src="{% static 'js/pintura/alerta-reinspecao.js' %}"></script>
+<script src="{% static 'js/geral/utils.js' %}"></script> -->
+
+<script>
+
+    function activeRow(rowVisible, firstRowInvisible, clickedElement) {
+        
+        document.getElementById(rowVisible).style.display = "flex";
+        document.getElementById(firstRowInvisible).style.display = "none";
+
+        const tabs = document.querySelectorAll(".nav-tabs .nav-link");
+
+        tabs.forEach((tab) => {
+            tab.classList.remove("active")
+        })
+
+        clickedElement.classList.add("active");
+    }
+
+</script>
+
+{% endblock %}
