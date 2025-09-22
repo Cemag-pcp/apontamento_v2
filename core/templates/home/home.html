@@ -45,7 +45,7 @@
                     <h5 class="card-title">Corte</h5>
                     <p class="card-text">Gerencie as ordens no setor de corte.</p>
                     <a href="{% url 'corte:planejamento' %}" class="btn btn-primary">Acessar</a>
-                    <a href="{% url 'corte:duplicar_op' %}" class="btn btn-secondary mt-2">Duplicar OP</a>
+                    <a href="{% url 'corte:duplicar_op' %}" class="btn btn-secondary">Duplicar OP</a>
                 </div>
             </div>
         </div>
@@ -57,6 +57,16 @@
                     <h5 class="card-title">Estamparia</h5>
                     <p class="card-text">Gerencie as ordens no setor de estamparia.</p>
                     <a href="{% url 'estamparia:planejamento' %}" class="btn btn-primary">Acessar</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Almoxarifado</h5>
+                    <p class="card-text">Realize requisições e transferência para o almoxarifado.</p>
+                    <a href="{% url 'criar_solicitacoes' %}" class="btn btn-primary">Acessar</a>
                 </div>
             </div>
         </div>

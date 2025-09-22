@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+<div class="container mt-5">
+    <h2>Histórico de Requisições</h2>
+    <table id="execucaoTable" class="display table table-sm table-striped" style="width:100%">
+        <thead>
+            <tr>
+                <th>RPA</th>
+                <th>Innovaro</th>
+                <th>Data de Solicitação</th>
+                <th>Classe de Requisição</th>
+                <th>Item</th>
+                <th>Quantidade</th>
+                <th>Centro de Custo</th>
+                <th>Solicitante</th>
+                <th>Observações</th>
+                <th>Entregue por</th>
+                <th>Data de Entrega</th>
+                <th>Status almox</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- O DataTables preencherá automaticamente as linhas do corpo da tabela -->
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<script src="{% static 'js/datatable-historico-requisicao.js' %}"></script>
+
+{% endblock %}

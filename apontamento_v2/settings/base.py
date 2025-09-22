@@ -26,6 +26,10 @@ INSTALLED_APPS = [
     'inspecao',
     'sucata',
 
+    'cadastro_almox',
+    'core_almox',
+    'solicitacao_almox',
+
     'apontamento_serra',
     'apontamento_usinagem',
     'apontamento_corte',
@@ -136,6 +140,8 @@ MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
 
 # Define o diretório onde os arquivos de mídia serão armazenados
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+RPA_API_KEY = env('RPA_API_KEY')
 
 LOGIN_URL = '/core/login/'
 LOGIN_REDIRECT_URL = '/core/'  

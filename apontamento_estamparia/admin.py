@@ -1,4 +1,5 @@
 from django.contrib import admin
+from core.admin import RestrictedAdmin
 
 from .models import (
     PecasOrdem,
@@ -8,8 +9,8 @@ from .models import (
     ImagemNaoConformidade,
 )
 
-admin.site.register(PecasOrdem)
-admin.site.register(InfoAdicionaisInspecaoEstamparia)
-admin.site.register(MedidasInspecaoEstamparia)
-admin.site.register(DadosNaoConformidade)
-admin.site.register(ImagemNaoConformidade)
+admin.site.register(PecasOrdem, RestrictedAdmin)
+admin.site.register(InfoAdicionaisInspecaoEstamparia, RestrictedAdmin)
+admin.site.register(MedidasInspecaoEstamparia, RestrictedAdmin)
+admin.site.register(DadosNaoConformidade, RestrictedAdmin)
+admin.site.register(ImagemNaoConformidade, RestrictedAdmin)

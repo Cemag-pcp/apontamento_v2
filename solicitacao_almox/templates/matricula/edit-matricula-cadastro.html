@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <form method="POST">
+        {% csrf_token %}
+        
+        {{form.as_p}}
+
+        <button type="submit">Editar</button>
+    </form>
+</div>
+    
+{% endblock %}
+
+{% block scripts %}
+
+<script>
+    $(document).ready(function() {
+        function initSelect2_(selector) {
+            $(selector).select2({
+                placeholder: 'Selecione...',
+                allowClear: true,
+                dropdownCssClass: 'form-control', 
+                containerCssClass: 'form-control',
+                width: '100%'
+            });
+
+            // Ajustando o z-index
+            $(selector).on('select2:open', function() {
+                $('.select2-dropdown').css('z-index', 9999);
+            });
+        }
+
+        // Inicializa os campos Select2
+        initSelect2_('#id_cc');
+
+    });
+</script>
+
+{% endblock %}

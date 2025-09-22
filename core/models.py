@@ -232,6 +232,7 @@ class RotaAcesso(models.Model):
         ('usinagem', 'Usinagem'),
         ('cargas', 'Cargas'),
         ('inspecao', 'Inspeção'),
+        ('almoxarifado', 'Almoxarifado'),
     ]
 
     nome=models.CharField(max_length=50,unique=True) # exemplo: serra/historico
@@ -248,6 +249,8 @@ class Profile(models.Model):
         ('supervisor', 'Supervisor'),
         ('pcp', 'PCP'),
         ('inspetor', 'Inspetor'),
+        ('almoxarifado', 'Almoxarifado'),
+        ('admin', 'Admin'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -261,6 +264,40 @@ class Profile(models.Model):
     def tem_acesso(self, rota_nome):
         """ Verifica se o usuário tem acesso a uma determinada rota """
         return self.permissoes.filter(nome=rota_nome).exists()
+
+class Notificacao(models.Model):
+    TIPO_NOTIFICACAO_CHOICES = [
+        ('info', 'Informação'),
+        ('alerta', 'Alerta'),
+        ('aviso', 'Aviso'),
+        ('erro', 'Erro'),
+    ]
+
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="notificacoes")
+    titulo = models.CharField(max_length=100)
+    mensagem = models.TextField()
+    tipo = models.CharField(max_length=10, choices=TIPO_NOTIFICACAO_CHOICES, default='info')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    rota_acesso = models.CharField(max_length=100, blank=True, null=True)
+    lido = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Notificação para {self.profile.user.username} - {self.titulo}"
+    
+    def marcar_como_lida(self):
+        self.lido = True
+        self.save()
+
+class RegistroNotificacao(models.Model):
+    """
+    Registra o último envio de uma notificação periódica para evitar duplicidade.
+    """
+    chave = models.CharField(max_length=150, unique=True, primary_key=True, help_text="Chave única para identificar a notificação periódica, ex: 'solicitacao_diaria_almoxarifado'")
+    ultimo_envio = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.chave} (último envio: {self.ultimo_envio.strftime('%d/%m/%Y %H:%M')})"
+
 
 class Versao(models.Model):
     
