@@ -43,6 +43,7 @@ def rpa_update_status(request):
             rota_acesso="/almox/solicitacoes-page/",
             tipo="info",
             chave="alerta_requisicoes_pendentes_almox",
+            frequencia=dt_timedelta(days=2),
         )
         return JsonResponse({"success": True})
     except SolicitacaoRequisicao.DoesNotExist:
@@ -100,6 +101,7 @@ def rpa_update_transfer(request):
                 rota_acesso="/almox/solicitacoes-page/",
                 tipo="info",
                 chave="alerta_transferencias_pendentes_almox",
+                frequencia=dt_timedelta(days=2),
             )
         except Exception:
             # Evita derrubar a API se a notificação falhar
