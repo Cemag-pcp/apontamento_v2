@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, name='api_marcar_como_lidas'),
 
     path('api/rpa/update-transfer/', api_view.rpa_update_transfer, name='rpa_update_transfer'),
+    path('api/rpa/update-status/', api_view.rpa_update_status, name='rpa_update_status'),
 
 ]
 
