@@ -143,7 +143,7 @@ def notificar_erro_requisicoes_se_acima_limite():
     if qtd > LIMITE_ERROS:
         notificacao_almoxarifado(
             titulo="Alerta: Requisições com erro no RPA",
-            mensagem=f"Existem {qtd} requisições com erro (RPA != OK). Verifique o painel do Almox.",
+            mensagem=f"Existem {qtd} requisições com erro. Verifique o painel do Almox.",
             rota_acesso="/almox/erros/",
             tipo="aviso",
             chave="alerta_erros_requisicoes_almox",
@@ -155,7 +155,7 @@ def notificar_erro_transferencias_se_acima_limite():
     if qtd > LIMITE_ERROS:
         notificacao_almoxarifado(
             titulo="Alerta: Transferências com erro no RPA",
-            mensagem=f"Existem {qtd} transferências com erro (RPA != OK). Verifique o painel do Almox.",
+            mensagem=f"Existem {qtd} transferências com erro. Verifique o painel do Almox.",
             rota_acesso="/almox/erros/",
             tipo="aviso",
             chave="alerta_erros_transferencias_almox",
