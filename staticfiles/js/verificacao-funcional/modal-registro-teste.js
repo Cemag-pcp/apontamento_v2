@@ -9,6 +9,22 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById('tipoPintura').textContent = event.target.getAttribute('data-tipo');
             document.getElementById('cor').textContent = event.target.getAttribute('data-cor');
             document.getElementById('btn-registrar-teste').setAttribute('data-id', event.target.getAttribute('data-id'));
+            let usuarioLogado = event.target.getAttribute('data-usuario-logado');
+            const inspetoresSelect = document.getElementById('usuarioSelect');
+
+
+            inspetoresList.forEach(usuario => {
+                const option = document.createElement('option');
+                option.value = usuario['user__id'];
+                option.textContent = usuario['user__username'];
+                if (usuario['user__id'] == usuarioLogado) option.selected = true;
+                inspetoresSelect.appendChild(option);
+            })
+            
+            if (inspetoresList.length == 1) {
+                inspetoresSelect.addEventListener('mousedown', function(e) { e.preventDefault(); });
+                inspetoresSelect.addEventListener('keydown', function(e) { e.preventDefault(); });
+            }
 
             if (document.getElementById('tipoPintura').textContent === 'PU'){
                 document.getElementById('testePolimerizacao').style.display = 'none';
