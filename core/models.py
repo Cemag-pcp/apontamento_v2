@@ -7,6 +7,14 @@ from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,Mo
 
 from datetime import timedelta
 
+import qrcode
+from io import BytesIO
+from django.core.files import File
+from django.urls import reverse
+import environ
+
+env = environ.Env()  # Inicializa o objeto env
+
 STATUS_ANDAMENTO_CHOICES = (
     ('aguardando_iniciar', 'Aguardando iniciar'),
     ('iniciada', 'Iniciada'),
@@ -108,6 +116,9 @@ class Ordem(models.Model):
     #Tempo estimado da ordem (apenas para corte)
     tempo_estimado = models.CharField(max_length=20, blank=True, null=True)  # Exemplo: "00:30:00" (HH:MM:SS)
 
+    # Campo para armazenar o QR code gerado
+    qrcode = models.ImageField(upload_to='qrcodes/', blank=True, null=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['ordem', 'maquina'], name='unique_ordem_processo')
@@ -148,7 +159,21 @@ class Ordem(models.Model):
             )['ordem__max'] or 0  # Se não houver ordens, começa do 0
             self.ordem = ultimo_numero + 1
 
+        if not self.qrcode:
+            url = self.get_full_url() + reverse('historico') + f'?instrumento={self.tag}'
+
+            # Cria o QR Code com essa URL
+            qr = qrcode.make(url)
+            qr_io = BytesIO()
+            qr.save(qr_io, 'PNG')
+
+            # Salva o QR Code no campo `qrcode`
+            self.qrcode.save(f'{self.tag}_qrcode.png', File(qr_io), save=False)
+
         super().save(*args, **kwargs)  # Salva normalmente
+
+    def get_full_url(self):
+        return f'http://{env("URL")}'
 
     def __str__(self):
         return f"Ordem {self.ordem} - {self.maquina}"
