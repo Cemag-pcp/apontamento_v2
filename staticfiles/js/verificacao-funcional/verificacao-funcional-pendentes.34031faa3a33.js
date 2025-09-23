@@ -1,9 +1,6 @@
 // Sample data for different inspection categories
 document.addEventListener("DOMContentLoaded", () => {
-<<<<<<< HEAD
-=======
     let inspetoresList = [];
->>>>>>> melhoria/notificacao-admin
     buscarItensPendentes(1); // Chama a função quando a página carrega, começando na página 1
 });
 
@@ -141,11 +138,8 @@ function buscarItensPendentes(pagina) {
         }
         return response.json();
     }).then(items => {
-<<<<<<< HEAD
-=======
         inspetoresList = items.inspetores_list;
 
->>>>>>> melhoria/notificacao-admin
         cardsVerificacao.innerHTML = "";
 
         const quantidadeInspecoes = items.total;
@@ -188,10 +182,7 @@ function buscarItensPendentes(pagina) {
                         data-tipo="${item.tipo_pintura}"
                         data-cor="${item.cor}"
                         data-peca="${item.peca}"
-<<<<<<< HEAD
-=======
                         data-usuario-logado="${items.usuario_logado}"
->>>>>>> melhoria/notificacao-admin
                     class="btn btn-dark w-100 iniciar-verificacao-pendentes">
                     Iniciar Teste</button>
                 </div>

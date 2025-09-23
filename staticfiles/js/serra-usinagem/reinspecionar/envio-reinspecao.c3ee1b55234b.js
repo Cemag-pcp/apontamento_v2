@@ -23,15 +23,15 @@ document.getElementById('saveReinspection').addEventListener('click', function (
     }
 
     // Validação da ficha de inspeção (campo obrigatório)
-    if (!fichaReinspection) {
-        Toast.fire({
-            icon: "error",
-            title: "Por favor, anexe a ficha de inspeção 100%."
-        });
-        this.disabled = false;
-        this.innerHTML = 'Salvar';
-        return;
-    }
+    // if (!fichaReinspection) {
+    //     Toast.fire({
+    //         icon: "error",
+    //         title: "Por favor, anexe a ficha de inspeção 100%."
+    //     });
+    //     this.disabled = false;
+    //     this.innerHTML = 'Salvar';
+    //     return;
+    // }
 
     if(parseInt(quantidadeConformidade) > parseInt(pecasProduzidas)) {
         Toast.fire({

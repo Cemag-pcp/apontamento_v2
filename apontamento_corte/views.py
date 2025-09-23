@@ -648,7 +648,8 @@ def excluir_op_padrao(request):
         
         # Marca como excluída e salva
         ordem.excluida = True
-        ordem.save()
+
+        ordem.save(update_fields=['excluida'])  # NÃO atualiza `ultima_atualizacao`
         
         return JsonResponse({'success': True, 'message': f'Ordem {ordem_id} marcada como excluída'})
     
@@ -973,6 +974,7 @@ def excluir_ordem(request):
         ordem.sequenciada = None
         ordem.status_atual = 'aguardando_iniciar'
         ordem.motivo_retirar_sequenciada = motivo
+        
         ordem.save()
 
         # Apaga os processos associados a essa ordem

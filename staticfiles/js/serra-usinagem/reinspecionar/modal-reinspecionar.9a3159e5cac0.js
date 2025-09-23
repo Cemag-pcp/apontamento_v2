@@ -67,7 +67,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const itemPeca = btn.getAttribute('data-peca');
             const itemMaquina = btn.getAttribute('data-maquina');
             const itemPecasBoas = btn.getAttribute('data-qtd-total');
-            console.log(btn.getAttribute('data-qtd-total'));
+            const itemNaoConformidade = btn.getAttribute('data-nao-conformidade');
+            const numExecucao = btn.getAttribute('num-execucao');
+
+            const pecasTotal = numExecucao >= 1 ? itemNaoConformidade : itemPecasBoas;
             
             const modalInspecao = document.getElementById('reinspectionModal');
             
@@ -78,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
             modalInspecao.querySelector('#dataReinspecao').value = formattedDate;
             modalInspecao.querySelector('#conjuntoNameReinspecao').value = itemPeca;
             modalInspecao.querySelector('#maquinaReinspecao').value = itemMaquina;
-            modalInspecao.querySelector('#pecasProduzidasReinspecao').value = itemPecasBoas;
+            modalInspecao.querySelector('#pecasProduzidasReinspecao').value = pecasTotal;
             modalInspecao.querySelector('#id-reinspecao').value = itemId;
 
             console.log(itemId, itemPeca, itemMaquina, itemPecasBoas);

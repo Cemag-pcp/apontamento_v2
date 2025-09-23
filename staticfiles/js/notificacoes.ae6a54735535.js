@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>`;
 
     // Função para criar o HTML de um card de notificação (sem alterações)
-    function createNotificationCard(n, userTipoAcesso) {
+    function createNotificationCard(n) {
         let iconHtml = '';
         let borderColorClass = '';
         switch (n.tipo) {
@@ -24,14 +24,6 @@ document.addEventListener('DOMContentLoaded', function () {
             case 'erro': iconHtml = '<i class="bi bi-x-circle text-danger fs-5"></i>'; borderColorClass = 'border-danger'; break;
             default: iconHtml = '<i class="bi bi-bell text-secondary fs-5"></i>';
         }
-
-        // --- LÓGICA CONDICIONAL PARA EXIBIR O NOME ---
-        // Se o usuário logado for 'admin', cria o HTML para mostrar o nome do perfil da notificação.
-        let profileInfoHtml = '';
-        if (userTipoAcesso === 'admin') {
-            profileInfoHtml = `<span class="text-info fst-italic ms-2">${n.profile_nome}</span>`;
-        }
-
         const hasRoute = n.rota_acesso && n.rota_acesso !== '#';
         const lidoClass = n.lido ? '' : 'border-start border-4 ' + borderColorClass;
         const novoBadge = n.lido ? '' : '<span class="badge bg-secondary ms-2">Nova</span>';
@@ -39,9 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const actionIcon = hasRoute ? '<div class="ms-3"><i class="bi bi-arrow-right-circle fs-4 text-muted"></i></div>' : '';
         const rotaHref = hasRoute ? n.rota_acesso : 'javascript:void(0);';
         const isLink = hasRoute;
-
-        const cardContent = `<div class="card mb-3 ${lidoClass} ${clicavelClass}" id="notificacao-${n.id}"><div class="card-body d-flex align-items-center"><div class="flex-shrink-0 me-3">${iconHtml}</div><div class="flex-grow-1"><div class="d-flex align-items-center justify-content-between"><div><strong>${n.titulo}</strong> ${novoBadge}</div></div><div class="text-muted small my-1">${n.mensagem}</div><span class="text-muted small">${n.tempo_atras}</span>${profileInfoHtml}</div>${actionIcon}</div></div>`;
-        
+        const cardContent = `<div class="card mb-3 ${lidoClass} ${clicavelClass}" id="notificacao-${n.id}"><div class="card-body d-flex align-items-center"><div class="flex-shrink-0 me-3">${iconHtml}</div><div class="flex-grow-1"><div class="d-flex align-items-center justify-content-between"><div><strong>${n.titulo}</strong> ${novoBadge}</div></div><div class="text-muted small my-1">${n.mensagem}</div><span class="text-muted small">${n.tempo_atras}</span></div>${actionIcon}</div></div>`;
         return isLink ? `<a href="${rotaHref}" style="text-decoration: none; color: inherit;">${cardContent}</a>` : cardContent;
     }
 
@@ -71,9 +61,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }).catch(error => console.error(error));
     }
 
-    let currentUserTipoAcesso = '';
-
     function fetchNotifications(page, onComplete) {
+        // Se for a primeira página, limpa o conteúdo atual antes de buscar.
+        // Isso é importante para a função de atualização.
         if (page === 1) {
             notificationsContainer.innerHTML = spinnerHtml;
             loadMoreContainer.style.display = 'none';
@@ -82,28 +72,19 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch(`/core/api/notificacoes/?page=${page}`)
             .then(response => response.json())
             .then(data => {
+                // Se for a primeira página, remove o spinner antes de adicionar o novo conteúdo.
                 if (page === 1) {
                     notificationsContainer.innerHTML = '';
                 }
-
-                currentUserTipoAcesso = data.user_tipo_acesso; 
                 
                 if (data.notificacoes.length > 0) {
                     const unreadIds = data.notificacoes.filter(n => !n.lido).map(n => n.id);
-                    
                     data.notificacoes.forEach(n => {
-                        notificationsContainer.insertAdjacentHTML('beforeend', createNotificationCard(n, currentUserTipoAcesso));
+                        notificationsContainer.insertAdjacentHTML('beforeend', createNotificationCard(n));
                     });
-
-                    // Verifica se o usuário logado NÃO é um administrador.
-                    if (currentUserTipoAcesso !== 'admin') {
-                        markAsRead(unreadIds);
-                        const newUnreadCount = Math.max(0, data.unread_count - unreadIds.length);
-                        updateUnreadCount(newUnreadCount);
-                    } else {
-                        updateUnreadCount(data.unread_count);
-                    }
-
+                    markAsRead(unreadIds);
+                    const newUnreadCount = Math.max(0, data.unread_count - unreadIds.length);
+                    updateUnreadCount(newUnreadCount);
                 } else if (page === 1) {
                     notificationsContainer.innerHTML = '<div class="card mb-3"><div class="card-body text-center text-muted">Você não tem nenhuma notificação.</div></div>';
                     updateUnreadCount(0);
