@@ -595,18 +595,35 @@ def notificacoes_pagina(request):
 @login_required
 def notificacoes_api(request):
     """
-    API que retorna uma página de notificações e a contagem total de não lidas.
+    API que retorna uma página de notificações e a contagem total de não lidas de forma otimizada.
     """
     page_number = request.GET.get('page', 1)
-    
-    notificacoes_qs = Notificacao.objects.filter(profile=request.user.profile).order_by('-criado_em')
-    
-    # A contagem de não lidas é calculada sobre a queryset completa.
+
+    try:
+        profile = request.user.profile
+    except Profile.DoesNotExist:
+        return JsonResponse({'error': 'Perfil de usuário não encontrado.'}, status=404)
+
+    # Define a queryset base
+    if profile.tipo_acesso != 'admin':
+        notificacoes_qs = Notificacao.objects.filter(profile=profile)
+    else:
+        # Admin vê todas as notificações
+        notificacoes_qs = Notificacao.objects.all()
+
+    # Otimização com select_related já garante que profile e user sejam carregados
+    notificacoes_qs = notificacoes_qs.select_related('profile__user').order_by('-criado_em')
+
+    # Contagem de não lidas
     unread_count = notificacoes_qs.filter(lido=False).count()
 
+    # Paginação
     paginator = Paginator(notificacoes_qs, 8)
     page_obj = paginator.get_page(page_number)
 
+    # --- MODIFICAÇÃO AQUI ---
+    # Adicionamos o campo 'profile_nome' na serialização.
+    # O acesso a `n.profile.user.username` é performático graças ao select_related.
     notificacoes_json = [
         {
             'id': n.id,
@@ -616,14 +633,16 @@ def notificacoes_api(request):
             'tipo': n.tipo,
             'lido': n.lido,
             'tempo_atras': f"há {timesince(n.criado_em, now()).split(',')[0]}",
+            'profile_nome': n.profile.user.username, # <-- CAMPO ADICIONADO
         }
         for n in page_obj.object_list
     ]
-    
+
     data = {
         'notificacoes': notificacoes_json,
         'has_next': page_obj.has_next(),
-        'unread_count': unread_count, # Enviando a contagem na API
+        'unread_count': unread_count,
+        'user_tipo_acesso': profile.tipo_acesso,
     }
     return JsonResponse(data)
 
