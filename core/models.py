@@ -160,7 +160,7 @@ class Ordem(models.Model):
             self.ordem = ultimo_numero + 1
 
         if not self.qrcode:
-            url = self.get_full_url() + reverse('historico') + f'?instrumento={self.tag}'
+            url = reverse('historico') + f'?instrumento={self.tag}'
 
             # Cria o QR Code com essa URL
             qr = qrcode.make(url)
