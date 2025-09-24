@@ -3,12 +3,10 @@ document.addEventListener('DOMContentLoaded', function () {
     let html5QrcodeScanner;
 
     function startScanner() {
-        // Se o scanner não foi inicializado, cria uma nova instância
         if (!html5QrcodeScanner) {
             html5QrcodeScanner = new Html5Qrcode("qr-reader");
         }
         
-        // Limpa qualquer resultado anterior e garante que o leitor esteja visível
         document.getElementById('qr-reader-results').innerHTML = '';
         document.getElementById('qr-reader').style.display = 'block';
 
@@ -34,7 +32,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
     
-    // Função para validar se o texto é uma URL HTTP/HTTPS
     function isValidHttpUrl(string) {
         try {
             const newUrl = new URL(string);
@@ -44,49 +41,74 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Função chamada quando um QR Code é lido com sucesso
     function onScanSuccess(decodedText, decodedResult) {
         console.log(`Scan result: ${decodedText}`, decodedResult);
 
-        // Para o scanner
         html5QrcodeScanner.stop().then(() => {
             console.log("Scanner parado com sucesso.");
-
-            // Esconde o leitor de QR code para não ficar atrás do SweetAlert
             document.getElementById('qr-reader').style.display = 'none';
 
             if (isValidHttpUrl(decodedText)) {
-                // Se for uma URL válida, mostra o loading e redireciona
                 Swal.fire({
-                    title: 'QR Code Válido!',
-                    text: 'Redirecionando...',
-                    icon: 'success',
-                    showConfirmButton: false,
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                        // Inicia o redirecionamento imediatamente
-                        window.location.href = decodedText;
+                    title: 'Setor de Destino',
+                    html: `QR Code lido com sucesso. Selecione o setor de destino.`,
+                    icon: 'question',
+                    showDenyButton: true,
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fas fa-hammer me-1"></i> Solda',
+                    denyButtonText: '<i class="fas fa-cogs me-1"></i> Montagem',
+                    cancelButtonText: '<i class="bi bi-qr-code-scan me-1"></i> Ler Novamente',
+                    confirmButtonColor: '#0d6efd',
+                    denyButtonColor: '#198754',
+                    cancelButtonColor: '#6c757d',
+                    allowOutsideClick: false
+                }).then((result) => {
+                    let finalUrl = '';
+                    let setor = '';
+
+                    if (result.isConfirmed) {
+                        // Botão Solda: substitui 'montagem' por 'solda' na URL
+                        finalUrl = decodedText.replace(/montagem/gi, 'solda');
+                        setor = 'Solda';
+                    } else if (result.isDenied) {
+                        // Botão Montagem: mantém a URL original
+                        finalUrl = decodedText;
+                        setor = 'Montagem';
+                    } else if (result.isDismissed) {
+                        // Botão Ler Novamente
+                        startScanner();
+                        return;
+                    }
+
+                    // Se escolheu Solda ou Montagem, redireciona
+                    if (finalUrl) {
+                        Swal.fire({
+                            title: `Redirecionando para ${setor}...`,
+                            icon: 'success',
+                            showConfirmButton: false,
+                            allowOutsideClick: false,
+                            didOpen: () => {
+                                Swal.showLoading();
+                                window.location.href = finalUrl;
+                            }
+                        });
                     }
                 });
             } else {
-                // "Em caso de erro" (não é uma URL válida)
+                // Se não for uma URL válida, mantém o comportamento de erro
                 Swal.fire({
                     title: 'Conteúdo Inválido',
                     html: `O QR Code não contém um link válido.<br><br><b>Conteúdo Lido:</b> <span class="text-break">${decodedText}</span>`,
                     icon: 'error',
-                    showCancelButton: false, 
                     confirmButtonColor: '#0d6efd',
                     confirmButtonText: '<i class="bi bi-qr-code-scan me-1"></i> Ler Novamente',
                     allowOutsideClick: false
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        // Se o usuário clicar em "Ler Novamente"
                         startScanner();
                     }
                 });
             }
-
         }).catch(err => {
             console.error("Erro ao parar o scanner:", err);
             Swal.fire({
@@ -97,24 +119,20 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Função para tratar erros de leitura (chamada continuamente quando nenhum QR code é encontrado)
     function onScanFailure(error) {
-        // Deixamos em branco para não exibir alertas contínuos de falha na leitura.
+        // Deixamos em branco para não poluir o console com falhas de leitura.
     }
 
-    // Evento disparado quando o modal do scanner é aberto
     modalElement.addEventListener('shown.bs.modal', startScanner);
 
-    // Evento disparado quando o modal é fechado
     modalElement.addEventListener('hidden.bs.modal', function () {
-        // Limpa os resultados ao fechar, para que na próxima vez comece do zero
         document.getElementById('qr-reader-results').innerHTML = '';
         document.getElementById('qr-reader').style.display = 'block';
 
         if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
             html5QrcodeScanner.stop()
-                .then(() => console.log("Leitor de QR Code parado com sucesso."))
-                .catch(err => console.error("Falha ao parar o leitor de QR Code.", err));
+                .then(() => console.log("Leitor de QR Code parado."))
+                .catch(err => console.error("Falha ao parar o leitor.", err));
         }
     });
 
