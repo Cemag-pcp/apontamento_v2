@@ -1294,6 +1294,7 @@ def verificar_cor_cambao(cor_antes_de_finalizar, cambao_nome):
     cor = cambao.cor if cambao else None
 
     print(cor)
+    print(cor_antes_de_finalizar)
 
     # Tipo de pintura igual a PÓ?
     if tipo == 'PÓ':
@@ -1302,8 +1303,6 @@ def verificar_cor_cambao(cor_antes_de_finalizar, cambao_nome):
             cambao__tipo=tipo
         ).exclude(
             cambao__nome__istartswith='manual'
-        ).exclude(
-            cambao__id=cambao.id
         ).order_by('-data_fim')
 
         primeira_peca = cambao_pecas_finalizadas.first()
