@@ -8,6 +8,10 @@ from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 from datetime import datetime, date
+import qrcode
+from io import BytesIO
+from django.core.files import File
+from django.urls import reverse
 
 from django.db.models import Max
 from django.utils.timezone import now
@@ -1710,7 +1714,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
     
     return tab_resultado
 
-def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
+def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
 
     if not ordens_data:
         return {"error": "Nenhuma ordem nova adicionada, caso tivesse ordem para ser excluída, foi excluída.", "status": 400}
@@ -1819,6 +1823,9 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
             })
 
         Ordem.objects.bulk_create(ordens_objs)
+
+        for ordem in ordens_objs:
+            gerar_e_salvar_qrcode(request, ordem)
 
         pecas_objs = [
             POM(
@@ -2072,3 +2079,34 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
                 } for ordem, meta in zip(ordens_objs, ordens_metadata)
             ]
         }
+
+def gerar_e_salvar_qrcode(request, ordem_obj):
+    """
+    Verifica as condições de uma ordem e, se atendidas,
+    gera um QR Code e o salva no objeto.
+    """
+
+    # 74 = Chassi de Montagem, 37 = PLAT. TANQUE. CAÇAM.
+    if (
+        ordem_obj.maquina
+        and ordem_obj.maquina.nome in ["CHASSI", "PLAT. TANQUE. CAÇAM."]
+        and ordem_obj.maquina.setor.nome == "montagem"
+        and ordem_obj.grupo_maquina == "montagem"
+    ):
+
+        # Gera a URL para o QR Code (agora temos certeza que o .pk existe)
+        caminho_relativo = (
+            reverse("montagem:api_apontamento_qrcode") + f"?ordem_id={ordem_obj.pk}"
+        )
+
+        url_completa = request.build_absolute_uri(caminho_relativo)
+
+        print(url_completa)
+
+        qr = qrcode.make(url_completa)
+        qr_io = BytesIO()
+        qr.save(qr_io, "PNG")
+
+        file_name = f"ordem_{ordem_obj.pk}_qrcode.png"
+
+        ordem_obj.qrcode.save(file_name, File(qr_io), save=True)
