@@ -17,23 +17,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const ordem = data.dados;
 
+                const statusClass =
+                    ordem.status === 'finalizada' ? 'bg-success' :
+                    ordem.status === 'iniciada' ? 'bg-warning text-dark' :
+                    ordem.status === 'aguardando_iniciar' ? 'bg-secondary' : 
+                    ordem.status === 'interrompida' ? 'bg-danger' : 'bg-secondary';
+
                 cardApontamentoQrCode.innerHTML = `
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
                         <h6 class="card-title fw-bold mb-0 fs-5">#${ordem.peca}</h6>
-                        <span class="badge bg-secondary">Status: Iniciado</span>
+                        <span class="badge ${statusClass}">Status: ${ordem.status}</span>
                     </div>
                     <div class="card-body bg-white p-3">
                         <p class="card-text mb-3">
-                            <strong>Data Carga:</strong> 23/09/2025
+                            <strong>Data Carga:</strong> ${ordem.data_carga}
                         </p>
                         <p class="card-text mb-3">
-                            <strong>Quantidade a fazer:</strong> 5
-                        </p>
-                        <p class="card-text mb-3">
-                            <strong>Quantidade feita:</strong> 2
+                            <strong>Quantidade a fazer:</strong> ${ordem.qtd_planejada}
                         </p>
                         <p class="card-text mb-0">
-                            <strong>Observação:</strong> Sem observações
+                            <strong>Quantidade feita:</strong> ${ordem.qtd_boa}
                         </p>
                     </div>
                     <div class="card-footer d-flex justify-content-end align-items-center bg-white p-3 border-top">
