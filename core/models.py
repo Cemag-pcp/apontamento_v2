@@ -7,14 +7,6 @@ from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,Mo
 
 from datetime import timedelta
 
-import qrcode
-from io import BytesIO
-from django.core.files import File
-from django.urls import reverse
-import environ
-
-env = environ.Env()  # Inicializa o objeto env
-
 STATUS_ANDAMENTO_CHOICES = (
     ('aguardando_iniciar', 'Aguardando iniciar'),
     ('iniciada', 'Iniciada'),
@@ -115,7 +107,7 @@ class Ordem(models.Model):
 
     #Tempo estimado da ordem (apenas para corte)
     tempo_estimado = models.CharField(max_length=20, blank=True, null=True)  # Exemplo: "00:30:00" (HH:MM:SS)
-
+    
     # Campo para armazenar o QR code gerado
     qrcode = models.ImageField(upload_to='qrcodes/', blank=True, null=True)
 

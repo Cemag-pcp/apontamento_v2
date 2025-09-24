@@ -8,6 +8,10 @@ from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 from datetime import datetime, date
+import qrcode
+from io import BytesIO
+from django.core.files import File
+from django.urls import reverse
 
 from django.db.models import Max
 from django.utils.timezone import now
@@ -1820,6 +1824,9 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
 
         Ordem.objects.bulk_create(ordens_objs)
 
+        for ordem in ordens_objs:
+            gerar_e_salvar_qrcode(ordem)
+
         pecas_objs = [
             POM(
                 ordem=ordem,
@@ -2072,3 +2079,23 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
                 } for ordem, meta in zip(ordens_objs, ordens_metadata)
             ]
         }
+
+def gerar_e_salvar_qrcode(ordem_obj):
+    """
+    Verifica as condições de uma ordem e, se atendidas,
+    gera um QR Code e o salva no objeto.
+    """
+
+    # 74 = Chassi de Montagem, 37 = PLAT. TANQUE. CAÇAM.
+    if ordem_obj.maquina and ordem_obj.maquina.id in [47, 37] and ordem_obj.grupo_maquina == 'montagem':
+        
+        # Gera a URL para o QR Code (agora temos certeza que o .pk existe)
+        url = reverse('apontamento_montagem_qrcode') + f'?ordem_id={ordem_obj.pk}'
+
+        qr = qrcode.make(url)
+        qr_io = BytesIO()
+        qr.save(qr_io, 'PNG')
+        
+        file_name = f'ordem_{ordem_obj.pk}_qrcode.png'
+
+        ordem_obj.qrcode.save(file_name, File(qr_io), save=True)
