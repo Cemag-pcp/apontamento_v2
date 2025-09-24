@@ -2087,17 +2087,26 @@ def gerar_e_salvar_qrcode(request, ordem_obj):
     """
 
     # 74 = Chassi de Montagem, 37 = PLAT. TANQUE. CAÇAM.
-    if ordem_obj.maquina and ordem_obj.maquina.id in [47, 37] and ordem_obj.grupo_maquina == 'montagem':
-        
+    if (
+        ordem_obj.maquina
+        and ordem_obj.maquina.nome in ["CHASSI", "PLAT. TANQUE. CAÇAM."]
+        and ordem_obj.maquina.setor.nome == "montagem"
+        and ordem_obj.grupo_maquina == "montagem"
+    ):
+
         # Gera a URL para o QR Code (agora temos certeza que o .pk existe)
-        caminho_relativo = reverse('montagem:api_apontamento_qrcode') + f'?ordem_id={ordem_obj.pk}'
+        caminho_relativo = (
+            reverse("montagem:api_apontamento_qrcode") + f"?ordem_id={ordem_obj.pk}"
+        )
 
         url_completa = request.build_absolute_uri(caminho_relativo)
 
+        print(url_completa)
+
         qr = qrcode.make(url_completa)
         qr_io = BytesIO()
-        qr.save(qr_io, 'PNG')
-        
-        file_name = f'ordem_{ordem_obj.pk}_qrcode.png'
+        qr.save(qr_io, "PNG")
+
+        file_name = f"ordem_{ordem_obj.pk}_qrcode.png"
 
         ordem_obj.qrcode.save(file_name, File(qr_io), save=True)

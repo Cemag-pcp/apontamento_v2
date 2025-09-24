@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.timezone import now
 from django.db.models import Max
 from django.contrib.auth.models import User
+from storages.backends.s3boto3 import S3Boto3Storage
 
 from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao,Maquina,Pecas,Setor
 
@@ -109,7 +110,7 @@ class Ordem(models.Model):
     tempo_estimado = models.CharField(max_length=20, blank=True, null=True)  # Exemplo: "00:30:00" (HH:MM:SS)
     
     # Campo para armazenar o QR code gerado
-    qrcode = models.ImageField(upload_to='qrcodes/', blank=True, null=True)
+    qrcode = models.ImageField(upload_to='qrcodes/', storage=S3Boto3Storage(), blank=True, null=True)
 
     class Meta:
         constraints = [
