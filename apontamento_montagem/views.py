@@ -1028,7 +1028,7 @@ def api_apontamento_qrcode(request):
         )
 
     try:
-        ordem_id = request.GET.get('ordemId')
+        ordem_id = request.GET.get('ordem_id')
 
         ordem = Ordem.objects.get(pk=ordem_id)
         ordem_peca = ordem.ordem_pecas_montagem.first() # É pra ter só uma peça por ordem
