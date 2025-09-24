@@ -159,21 +159,9 @@ class Ordem(models.Model):
             )['ordem__max'] or 0  # Se não houver ordens, começa do 0
             self.ordem = ultimo_numero + 1
 
-        if not self.qrcode:
-            url = self.get_full_url() + reverse('historico') + f'?instrumento={self.tag}'
-
-            # Cria o QR Code com essa URL
-            qr = qrcode.make(url)
-            qr_io = BytesIO()
-            qr.save(qr_io, 'PNG')
-
-            # Salva o QR Code no campo `qrcode`
-            self.qrcode.save(f'{self.tag}_qrcode.png', File(qr_io), save=False)
 
         super().save(*args, **kwargs)  # Salva normalmente
 
-    def get_full_url(self):
-        return f'http://{env("URL")}'
 
     def __str__(self):
         return f"Ordem {self.ordem} - {self.maquina}"
