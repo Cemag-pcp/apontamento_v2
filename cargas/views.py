@@ -143,7 +143,7 @@ def gerar_dados_sequenciamento(request):
         })
 
     if setor.lower() == 'montagem':
-        resultado = processar_ordens_montagem(ordens, grupo_maquina=setor.lower())
+        resultado = processar_ordens_montagem(request, ordens, grupo_maquina=setor.lower())
     elif setor.lower() == 'pintura':
         resultado = processar_ordens_pintura(ordens, grupo_maquina=setor.lower())
     else:
@@ -296,7 +296,7 @@ def atualizar_ordem_existente(request):
 
     # Processar novas ordens
     if setor == 'montagem':
-        resultado = processar_ordens_montagem(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
+        resultado = processar_ordens_montagem(request, ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
     elif setor == 'pintura':
         resultado = processar_ordens_pintura(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
     else:

@@ -1714,7 +1714,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
     
     return tab_resultado
 
-def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
+def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
 
     if not ordens_data:
         return {"error": "Nenhuma ordem nova adicionada, caso tivesse ordem para ser excluída, foi excluída.", "status": 400}
@@ -1825,7 +1825,7 @@ def processar_ordens_montagem(ordens_data, atualizacao_ordem=None, grupo_maquina
         Ordem.objects.bulk_create(ordens_objs)
 
         for ordem in ordens_objs:
-            gerar_e_salvar_qrcode(ordem)
+            gerar_e_salvar_qrcode(request, ordem)
 
         pecas_objs = [
             POM(
@@ -2080,7 +2080,7 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
             ]
         }
 
-def gerar_e_salvar_qrcode(ordem_obj):
+def gerar_e_salvar_qrcode(request, ordem_obj):
     """
     Verifica as condições de uma ordem e, se atendidas,
     gera um QR Code e o salva no objeto.
@@ -2090,9 +2090,11 @@ def gerar_e_salvar_qrcode(ordem_obj):
     if ordem_obj.maquina and ordem_obj.maquina.id in [47, 37] and ordem_obj.grupo_maquina == 'montagem':
         
         # Gera a URL para o QR Code (agora temos certeza que o .pk existe)
-        url = reverse('apontamento_montagem_qrcode') + f'?ordem_id={ordem_obj.pk}'
+        caminho_relativo = reverse('montagem:api_apontamento_qrcode') + f'?ordem_id={ordem_obj.pk}'
 
-        qr = qrcode.make(url)
+        url_completa = request.build_absolute_uri(caminho_relativo)
+
+        qr = qrcode.make(url_completa)
         qr_io = BytesIO()
         qr.save(qr_io, 'PNG')
         

@@ -27,7 +27,7 @@ urlpatterns = [
 # templates
 urlpatterns += [
     path('', views.planejamento, name='planejamento'),
-    path('apontamento-qrcode/', views.apontamento_qrcode, name='apontamento_montagem_qrcode'),
+    path('apontamento-qrcode/', views.apontamento_qrcode, name='apontamento_qrcode'),
 ]
 
 # Google sheets
