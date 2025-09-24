@@ -1016,3 +1016,39 @@ def retornar_processo(request):
             {'status': 'error', 'message': str(e)}, 
             status=500
         )
+
+def apontamento_qrcode(request):
+    return render(request, 'apontamento_montagem/apontamento_qrcode.html')
+
+def api_apontamento_qrcode(request):
+    if request.method != 'GET':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Método não permitido'}, 
+            status=405
+        )
+
+    try:
+        ordem_id = request.GET.get('ordemId')
+
+        ordem = Ordem.objects.get(pk=ordem_id)
+
+        dados = {
+            'ordem': ordem.ordem if ordem else None,
+            'maquina': ordem.maquina.nome if ordem and ordem.maquina else None,
+            'status_atual': ordem.status_atual if ordem else None,
+            'peca': ordem.ordem_pecas_montagem.peca if ordem else None,
+            'qtd_planejada': ordem.ordem_pecas_montagem.qtd_planejada if ordem else 0,
+            'qtd_boa': ordem.ordem_pecas_montagem.qtd_boa if ordem else 0,
+        }
+        
+
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Dados recebidos com sucesso',
+            'dados': dados,
+        })
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': str(e)}, 
+            status=500
+        )
