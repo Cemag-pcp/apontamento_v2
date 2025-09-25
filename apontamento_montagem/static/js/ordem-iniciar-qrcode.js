@@ -29,8 +29,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const statusClass =
                     ordem.status === 'finalizada' ? 'bg-success' :
-                    ordem.status === 'iniciada' ? 'bg-warning text-dark' :
-                    ordem.status === 'aguardando_iniciar' ? 'bg-secondary' : 
+                    ordem.status === 'iniciada' ? 'bg-primary' :
+                    ordem.status === 'aguardando_iniciar' ? 'bg-warning' : 
                     ordem.status === 'interrompida' ? 'bg-danger' : 'bg-secondary';
 
                 cardApontamentoQrCode.innerHTML = `

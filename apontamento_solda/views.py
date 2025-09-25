@@ -1106,3 +1106,41 @@ def retornar_processo(request):
             {'status': 'error', 'message': str(e)}, 
             status=500
         )
+    
+def apontamento_qrcode(request):
+    return render(request, 'apontamento_solda/apontamento_solda_qrcode.html')
+
+def api_apontamento_qrcode(request):
+    if request.method != 'GET':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Método não permitido'}, 
+            status=405
+        )
+
+    try:
+        ordem_id = request.GET.get('ordem_id')
+
+        ordem = Ordem.objects.get(pk=ordem_id)
+        ordem_peca = ordem.ordem_pecas_solda.first() # É pra ter só uma peça por ordem
+
+        dados = {
+            'ordem': ordem.ordem if ordem else None,
+            'maquina': ordem.maquina.nome if ordem and ordem.maquina else None,
+            'status': ordem.status_atual if ordem else None,
+            'peca': ordem_peca.peca if ordem else None,
+            'qtd_planejada': ordem_peca.qtd_planejada if ordem else 0,
+            'qtd_boa': ordem_peca.qtd_boa if ordem else 0,
+            'data_carga': ordem.data_carga.strftime('%d/%m/%Y') if ordem and ordem.data_carga else None,
+        }
+        
+
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Dados recebidos com sucesso',
+            'dados': dados,
+        })
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': str(e)}, 
+            status=500
+        )

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Apontamento QR CODE - SOLDA</title>
+{% endblock %}
+
+{% block content %}
+
+<div class="container my-3 mt-3">
+    <h2 class="text-center">Apontamento QR CODE - SOLDA</h2>
+    <div id='cardApontamentoQrCode' class="card shadow-lg border-0 rounded-4 mb-3 mx-auto w-100 mt-5" style="max-width: 420px; min-height: 270px;">
+        <!-- Dados gerados dinamicamente -->
+  </div>
+</div>
+
+<!-- Modal de Confirmação para iniciar -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalLabel">Confirmar Início da Ordem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <input type="hidden" id="ordemIdIniciar">
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label id="labelOperadoresInicial" data-maquina="" for="operadorInicial" class="form-label">Operador</label>
+                    <select id="operadorInicial" data-active="true" class="form-select" required>
+                        <option value="">Selecione um operador...</option>
+                        <!-- Operadores serão carregados dinamicamente -->
+                    </select>
+                    <select id="todosOperadorInicial" data-active="false" class="form-select" style="display: none;" required>
+                        <option value="">Selecione um operador...</option>
+                        <!-- Operadores serão carregados dinamicamente -->
+                    </select>
+                    <p id="descricaoBotaoListaOperadorInicial" style="font-size: 12px; text-align: end;">Não encontrou seu nome na lista? <a id="direcionarTodosOperadoresOperadorInicial" style="color: #0d6efd; cursor: pointer;">Clique aqui</a></p>
+                    <p id="descricaoBotaoVoltarOperadorInicial" style="display: none; font-size: 12px; text-align: end;">Deseja voltar a lista anterior? <a id="botaoVoltarOperadoresMaquinaOperadorInicial" style="color: #0d6efd; cursor: pointer;">Voltar</a></p>
+                </div>            
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmStartButton">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/ordem-solda-iniciar-qrcode.js' %}"></script>
+{% endblock %}
