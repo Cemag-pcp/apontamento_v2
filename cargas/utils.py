@@ -2096,7 +2096,7 @@ def gerar_e_salvar_qrcode(request, ordem_obj):
 
         # Gera a URL para o QR Code (agora temos certeza que o .pk existe)
         caminho_relativo = (
-            reverse("montagem:api_apontamento_qrcode") + f"?ordem_id={ordem_obj.pk}"
+            reverse("montagem:apontamento_qrcode") + f"?ordem_id={ordem_obj.pk}"
         )
 
         url_completa = request.build_absolute_uri(caminho_relativo)

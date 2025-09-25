@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     `;
 
+
     fetch(`/montagem/api/apontamento-qrcode/?ordem_id=${ordemId}`)
         .then(response => response.json())
         .then(data => {
