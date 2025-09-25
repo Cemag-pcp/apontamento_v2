@@ -21,11 +21,13 @@ urlpatterns = [
     path('api/listar-conjuntos/', views.listar_conjuntos, name='listar_conjuntos'),
     path('api/criar-ordem-fora-sequenciamento/', views.criar_ordem_fora_sequenciamento, name='criar_ordem_fora_sequenciamento'),
     path('api/retornar-processo/', views.retornar_processo, name='retornar_processo'),
+    path('api/apontamento-qrcode/', views.api_apontamento_qrcode, name='api_apontamento_qrcode'),
 ]
 
 # templates
 urlpatterns += [
     path('', views.planejamento, name='planejamento'),
+    path('apontamento-qrcode/', views.apontamento_qrcode, name='apontamento_qrcode'),
 ]
 
 # Google sheets
