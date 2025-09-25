@@ -3,10 +3,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const params = new URLSearchParams(window.location.search);
 
     // Para pegar um parâmetro específico, por exemplo 'ordem_id':
-    const ordemId = params.get('ordem_id');
+    const ordemId = params.get('ordemId');
     const cardApontamentoQrCode = document.getElementById('cardApontamentoQrCode');
 
-    fetch(`/montagem/api/apontamento-qrcode/?ordem_id=${ordemId}`)
+    console.log("Ordem ID:", ordemId);
+
+    fetch(`/montagem/api/apontamento-qrcode/?ordemId=${ordemId}`)
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
@@ -51,13 +53,6 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Erro ao chamar a API:', error);
         });
-
-    document.addEventListener('click', function(event) {
-        if (event.target.closest('.btn-warning')) {
-            // Lógica para iniciar a ordem
-            console.log('Iniciar ordem');
-
-        }
-    });
+    
 
 });
