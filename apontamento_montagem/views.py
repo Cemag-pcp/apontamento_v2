@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
 from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q
@@ -13,6 +13,7 @@ from datetime import datetime, date, timedelta
 import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados
+from core.utils import carregar_planilha_base_geral
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos
 from inspecao.models import Inspecao
@@ -788,14 +789,39 @@ def listar_conjuntos(request):
     return JsonResponse({"conjuntos": list(conjuntos)})
 
 def listar_pecas_disponiveis(request):
-
-    conjunto = request.GET.get('conjunto')
+    """
+    Retorna uma lista de peças disponíveis (Pecas) para um Conjunto específico, 
+    usando a coluna de código puro.
+    """
     
-    conjunto_object = get_object_or_404(Conjuntos, codigo=conjunto)
+    conjunto_input = request.GET.get('conjunto')
+    if not conjunto_input:
+        return JsonResponse({'erro': 'Parâmetro "conjunto" é obrigatório.'}, status=400)
 
-    pecas_disponiveis = Pecas.objects.filter(conjunto=conjunto_object)
+    try:
+        codigo_conjunto_param = conjunto_input.split(' - ')[0].strip()
+    except IndexError:
+        return JsonResponse({'erro': 'Formato de "conjunto" inválido. Esperado: "CODIGO - NOME".'}, status=400)
+    
+    df_base = carregar_planilha_base_geral() 
+    if df_base is None:
+        return JsonResponse({'erro': 'Dados da planilha base não disponíveis.'}, status=503)
 
-    return JsonResponse({'pecas':list(pecas_disponiveis.values())})
+    df_conjunto = df_base[df_base['CONJUNTO_CODIGO_PURO'] == codigo_conjunto_param]
+    
+    if df_conjunto.empty:
+         return JsonResponse({'erro': f'Nenhuma peça encontrada para o conjunto: {codigo_conjunto_param}.'}, status=404)
+
+    df_processo_nao_nulo = df_conjunto[df_conjunto['2 PROCESSO'].str.strip() != '']
+
+    colunas_para_duplicatas = ['DESCRIÇÃO']
+    df_final = df_processo_nao_nulo.drop_duplicates(subset=colunas_para_duplicatas, keep='first')
+
+    print(df_final)
+
+    pecas_disponiveis = df_final[['CODIGO', 'DESCRIÇÃO']].to_dict('records')
+
+    return JsonResponse({'pecas': pecas_disponiveis, 'conjunto_filtrado': codigo_conjunto_param}, status=200)
 
 @csrf_exempt
 def criar_ordem_fora_sequenciamento(request):

@@ -518,7 +518,7 @@ function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) 
     motivoInterrupcaoSelect.off("change").on("change", function () {
         const motivoSelecionado = motivoInterrupcaoSelect.find(":selected").text();
 
-        if (motivoSelecionado === "Falta de peça") {
+        if (motivoSelecionado === "Falta peça") {
             selectPecasContainer.show(); // Exibe o campo de peças
             carregarPecasDisponiveis(codigoConjunto); // Chama apenas uma vez
         } else {
@@ -597,24 +597,74 @@ function carregarPecasDisponiveis(codigoConjunto) {
     .then(response => response.json())
     .then(data => {
         pecasDisponiveisSelect.empty(); // Limpa o select
-        pecasDisponiveisSelect.append(new Option("Selecione uma peça...", "", true, true));
 
         if (data.pecas.length === 0) {
             pecasDisponiveisSelect.append(new Option("Nenhuma peça disponível", "", false, false));
         } else {
             data.pecas.forEach(peca => {
-                pecasDisponiveisSelect.append(new Option(`${peca.codigo} - ${peca.descricao}`, peca.id, false, false));
+                pecasDisponiveisSelect.append(new Option(`${peca['CODIGO']} - ${peca['DESCRIÇÃO']}`, peca['CODIGO'], false, false));
             });
         }
 
-        pecasDisponiveisSelect.prop("disabled", false);
-        pecasDisponiveisSelect.select2({
-            dropdownParent: $('#modalInterromper') // ID do modal onde o select está
-        }); // Inicializa Select2
+        if (pecasDisponiveisSelect.hasClass('select2-hidden-accessible')) {
+            pecasDisponiveisSelect.select2('destroy');
+        }
+
+        pecasDisponiveisSelect
+        .select2({
+            placeholder: 'Selecione uma peça',
+            allowClear: true,
+            dropdownParent: $('#modalInterromper')
+        })
+        .off('select2:select.gerarQtd select2:clear.gerarQtd change.gerarQtd')
+        .on('select2:select.gerarQtd select2:clear.gerarQtd change.gerarQtd', gerarInputsQuantidade);
+
+        // Opcional: force mostrar placeholder
+        pecasDisponiveisSelect.val(null).trigger('change');
     })
     .catch(error => {
         console.error("Erro ao carregar peças disponíveis:", error);
         pecasDisponiveisSelect.append(new Option("Erro ao carregar peças", "", false, false));
+    });
+}
+
+function gerarInputsQuantidade() {
+    const pecasSelecionadas = $('#pecasDisponiveis').find(':selected');
+    const container = $('#pecasQuantidadeContainer');
+    container.empty(); // Limpa a área antes de gerar novos inputs
+
+    if (pecasSelecionadas.length === 0) {
+        return; // Não faz nada se nenhuma peça estiver selecionada
+    }
+
+    // Título da seção
+    container.append('<h6 class="mt-3">Informe a Quantidade em Falta:</h6>');
+
+    pecasSelecionadas.each(function() {
+        const codigo = $(this).val(); // O CÓDIGO da peça
+        const descricao = $(this).text(); // A DESCRIÇÃO da peça
+        
+        // Cria um elemento de input (usando Bootstrap form-group)
+        const inputGroup = `
+            <hr>
+            <div class="mb-3 px-3 pb-3">
+                <label for="qtd-${codigo}" class="form-label fw-bold">
+                    ${descricao}:
+                </label>
+                <input 
+                    type="number" 
+                    class="form-control" 
+                    id="qtd-${codigo}" 
+                    name="qtd-${codigo}" 
+                    min="1" 
+                    value="1"
+                    required
+                    data-peca-codigo="${codigo}"
+                    data-peca-descricao="${descricao}"
+                >
+            </div>
+        `;
+        container.append(inputGroup);
     });
 }
 
