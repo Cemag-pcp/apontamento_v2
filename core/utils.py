@@ -8,7 +8,7 @@ from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransfere
 
 # Constantes de alerta
 LIMITE_ERROS = 20
-FREQUENCIA_ALERTA_ERROS = dt_timedelta(days=1)  # ajuste conforme desejado
+FREQUENCIA_ALERTA_ERROS = dt_timedelta(days=2)  # ajuste conforme desejado
 
 def notificar_ordem(ordem):
     channel_layer = get_channel_layer()
@@ -142,7 +142,7 @@ def notificar_erro_requisicoes_se_acima_limite():
     qtd = contar_erros_requisicoes()
     if qtd > LIMITE_ERROS:
         notificacao_almoxarifado(
-            titulo="Alerta: Requisições com erro no RPA",
+            titulo="Alerta: Requisições com erro",
             mensagem=f"Existem {qtd} requisições com erro. Verifique o painel do Almox.",
             rota_acesso="/almox/erros/",
             tipo="aviso",
@@ -154,7 +154,7 @@ def notificar_erro_transferencias_se_acima_limite():
     qtd = contar_erros_transferencias()
     if qtd > LIMITE_ERROS:
         notificacao_almoxarifado(
-            titulo="Alerta: Transferências com erro no RPA",
+            titulo="Alerta: Transferências com erro",
             mensagem=f"Existem {qtd} transferências com erro. Verifique o painel do Almox.",
             rota_acesso="/almox/erros/",
             tipo="aviso",
