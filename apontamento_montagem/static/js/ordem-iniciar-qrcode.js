@@ -108,6 +108,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Atualizar a interface do usuário conforme necessário
             } else {
                 console.error('Erro na resposta da API:', data.message);
+
+                cardApontamentoQrCode.innerHTML = `<div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 270px;">
+                    <div class="alert alert-danger w-100 text-center mb-4" role="alert" style="max-width: 380px;">
+                        <i class="fa fa-exclamation-triangle me-2"></i>
+                        <strong>Erro:</strong> ${data.message}
+                        <div class="mt-2 small text-muted">
+                            Verifique se o QR Code ou o link está correto.
+                        </div>
+                    </div>
+                    <a href="/montagem/" class="btn btn-primary btn-lg">
+                        <i class="fa fa-arrow-left me-2"></i> Voltar para Montagem
+                    </a>
+                </div>`;
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: data.message || 'Ocorreu um erro ao tentar iniciar a ordem. Tente novamente.',
+                });
             }
         })
         .catch(error => {
@@ -119,6 +138,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
             document.getElementById('confirmModal').removeAttribute("aria-hidden");
             modal.show();
+        }
+
+        if (event.target.closest('.btn.btn-primary.btn-lg')){
+            const btn = event.target.closest('.btn.btn-primary.btn-lg');
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Carregando...`;
         }
     });
 

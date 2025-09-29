@@ -1049,6 +1049,12 @@ def api_apontamento_qrcode(request):
             'message': 'Dados recebidos com sucesso',
             'dados': dados,
         })
+    except Ordem.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ordem não encontrada'}, 
+            status=404
+        )
+    
     except Exception as e:
         return JsonResponse(
             {'status': 'error', 'message': str(e)}, 

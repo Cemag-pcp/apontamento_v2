@@ -112,8 +112,17 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 console.error('Erro na resposta da API:', data.message);
                 cardApontamentoQrCode.innerHTML = `
-                    <div class="alert alert-danger" role="alert">
-                        Erro: ${data.message}
+                    <div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 270px;">
+                        <div class="alert alert-danger w-100 text-center mb-4" role="alert" style="max-width: 380px;">
+                            <i class="fa fa-exclamation-triangle me-2"></i>
+                            <strong>Erro:</strong> ${data.message}
+                            <div class="mt-2 small text-muted">
+                                Verifique se o QR Code ou o link está correto.
+                            </div>
+                        </div>
+                        <a href="/solda/" class="btn btn-primary btn-lg">
+                            <i class="fa fa-arrow-left me-2"></i> Voltar para Solda
+                        </a>
                     </div>
                 `;
                 Swal.fire({
@@ -134,6 +143,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             mostrarModalIniciar(ordemId, maquinaNome);
             
+        }
+
+        if (event.target.closest('.btn.btn-primary.btn-lg')){
+            const btn = event.target.closest('.btn.btn-primary.btn-lg');
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Carregando...`;
         }
     });
 
@@ -343,7 +358,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // const currentOrdemId = document.getElementById('ordemIdIniciar').value;
 
-        const currentOrdemId = document.getElementById('ordemIdSoldaInput').value;
+        const currentOrdemId = ordemIdSoldaInput.value;
         try {
             const response = await fetch(`/solda/api/verificar-qt-restante/?ordem_id=${currentOrdemId}`);
             if (!response.ok) {
