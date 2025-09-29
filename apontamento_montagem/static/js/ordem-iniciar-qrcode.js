@@ -4,6 +4,56 @@ document.addEventListener('DOMContentLoaded', function() {
     // Pega a string de parâmetros da URL atual
     const params = new URLSearchParams(window.location.search);
 
+    const selecaoPendente = params.get('selecao_setor') === 'pendente';
+    const ordemUrl = window.location.href; 
+    
+    if (selecaoPendente) {
+        params.delete('selecao_setor'); 
+        const urlSemParametro = `${window.location.pathname}?${params.toString()}`;
+        
+        Swal.fire({
+            title: 'Setor de Destino',
+            html: `QR Code lido com sucesso. Selecione o setor de destino.`,
+            icon: 'question',
+            showDenyButton: true,
+            showCancelButton: true,
+            confirmButtonText: '<i class="fas fa-hammer me-1"></i> Solda',
+            denyButtonText: '<i class="fas fa-cogs me-1"></i> Montagem',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#0d6efd',
+            denyButtonColor: '#198754',
+            cancelButtonColor: '#6c757d',
+            allowOutsideClick: false
+        }).then((result) => {
+            let finalUrl = '';
+            let setor = '';
+            
+            if (result.isConfirmed) {
+                finalUrl = urlSemParametro.replace(/\/montagem\//gi, '/solda/');
+                setor = 'Solda';
+            } else if (result.isDenied) {
+                finalUrl = urlSemParametro;
+                setor = 'Montagem';
+            } else {
+                window.location.href = "/"; 
+                return;
+            }
+
+            Swal.fire({
+                title: `Redirecionando para ${setor}...`,
+                icon: 'success',
+                showConfirmButton: false,
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                    window.location.href = finalUrl;
+                }
+            });
+
+        });
+        
+        return; 
+    }
     // Para pegar um parâmetro específico, por exemplo 'ordem_id':
     const ordemId = params.get('ordem_id');
     const cardApontamentoQrCode = document.getElementById('cardApontamentoQrCode');

@@ -49,51 +49,28 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('qr-reader').style.display = 'none';
 
             if (isValidHttpUrl(decodedText)) {
+                // 1. Esconder o modal do QR Code
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if(modal) modal.hide();
+                
+                // 2. Adicionar parâmetro para sinalizar a seleção de setor na próxima página
+                const url = new URL(decodedText);
+                url.searchParams.set('selecao_setor', 'pendente');
+
                 Swal.fire({
-                    title: 'Setor de Destino',
-                    html: `QR Code lido com sucesso. Selecione o setor de destino.`,
-                    icon: 'question',
-                    showDenyButton: true,
-                    showCancelButton: true,
-                    confirmButtonText: '<i class="fas fa-hammer me-1"></i> Solda',
-                    denyButtonText: '<i class="fas fa-cogs me-1"></i> Montagem',
-                    cancelButtonText: '<i class="bi bi-qr-code-scan me-1"></i> Ler Novamente',
-                    confirmButtonColor: '#0d6efd',
-                    denyButtonColor: '#198754',
-                    cancelButtonColor: '#6c757d',
-                    allowOutsideClick: false
-                }).then((result) => {
-                    let finalUrl = '';
-                    let setor = '';
-
-                    if (result.isConfirmed) {
-                        // Botão Solda: substitui 'montagem' por 'solda' na URL
-                        finalUrl = decodedText.replace(/montagem/gi, 'solda');
-                        setor = 'Solda';
-                    } else if (result.isDenied) {
-                        // Botão Montagem: mantém a URL original
-                        finalUrl = decodedText;
-                        setor = 'Montagem';
-                    } else if (result.isDismissed) {
-                        // Botão Ler Novamente
-                        startScanner();
-                        return;
-                    }
-
-                    // Se escolheu Solda ou Montagem, redireciona
-                    if (finalUrl) {
-                        Swal.fire({
-                            title: `Redirecionando para ${setor}...`,
-                            icon: 'success',
-                            showConfirmButton: false,
-                            allowOutsideClick: false,
-                            didOpen: () => {
-                                Swal.showLoading();
-                                window.location.href = finalUrl;
-                            }
-                        });
+                    title: 'QR Code Lido!',
+                    text: 'Processando informações de ordem...',
+                    icon: 'success',
+                    showConfirmButton: false,
+                    allowOutsideClick: false,
+                    timer: 1500, // Tempo suficiente para o usuário ver
+                    didOpen: () => {
+                        Swal.showLoading();
+                        // Redireciona para o ordem-iniciar-qrcode.js (que está na URL lida, e agora com 'selecao_setor=pendente')
+                        window.location.href = url.toString();
                     }
                 });
+
             } else {
                 // Se não for uma URL válida, mantém o comportamento de erro
                 Swal.fire({
