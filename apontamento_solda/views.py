@@ -1155,7 +1155,6 @@ def api_apontamento_qrcode(request):
         ordem_pecas_solda = ordem_solda.ordem_pecas_solda.first() if ordem_solda else None
 
         # ordem_peca = ordem.ordem_pecas_solda.first() # É pra ter só uma peça por ordem
-        print(ordem_solda)
         dados = {
             'ordem': ordem_solda.id if ordem_solda else None,
             'maquina': ordem_solda.maquina.nome if ordem_solda and ordem_solda.maquina else None,
