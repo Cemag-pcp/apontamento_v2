@@ -1120,25 +1120,63 @@ def api_apontamento_qrcode(request):
     try:
         ordem_id = request.GET.get('ordem_id')
 
-        ordem = Ordem.objects.get(pk=ordem_id)
-        ordem_peca = ordem.ordem_pecas_solda.first() # É pra ter só uma peça por ordem
+        print(ordem_id)
 
+        ordem = Ordem.objects.get(pk=ordem_id)
+        print(ordem)
+        data_carga_montagem = ordem.data_carga if ordem.data_carga else None
+        ordem_peca_montagem = ordem.ordem_pecas_montagem.first() # É pra ter só uma peça por ordem
+        peca_montagem = ordem_peca_montagem.peca if ordem_peca_montagem else None
+
+        codigo_peca = peca_montagem.split("-", maxsplit=1)[0].strip() if peca_montagem else None
+        
+        ordem_solda = None
+
+
+        print(peca_montagem, codigo_peca)
+
+        if peca_montagem is None or codigo_peca is None or data_carga_montagem is None:
+            """
+                Verificando se a ordem buscada(montagem) tem a peça e a data de carga preenchida.
+                Se não tiver, não tem como buscar a ordem de solda relacionada.
+            """
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Não foram encontrados dados de montagem para esta ordem de montagem',
+                'dados': None
+            }, status=400)
+        
+        ordem_solda = Ordem.objects.filter(
+            data_carga=data_carga_montagem,
+            grupo_maquina='solda',
+            ordem_pecas_solda__peca__startswith=codigo_peca
+        ).first()
+
+        ordem_pecas_solda = ordem_solda.ordem_pecas_solda.first() if ordem_solda else None
+
+        # ordem_peca = ordem.ordem_pecas_solda.first() # É pra ter só uma peça por ordem
+        print(ordem_solda)
         dados = {
-            'ordem': ordem.ordem if ordem else None,
-            'maquina': ordem.maquina.nome if ordem and ordem.maquina else None,
-            'status': ordem.status_atual if ordem else None,
-            'peca': ordem_peca.peca if ordem else None,
-            'qtd_planejada': ordem_peca.qtd_planejada if ordem else 0,
-            'qtd_boa': ordem_peca.qtd_boa if ordem else 0,
-            'data_carga': ordem.data_carga.strftime('%d/%m/%Y') if ordem and ordem.data_carga else None,
+            'ordem': ordem_solda.id if ordem_solda else None,
+            'maquina': ordem_solda.maquina.nome if ordem_solda and ordem_solda.maquina else None,
+            'status': ordem_solda.status_atual if ordem_solda else None,
+            'peca': ordem_pecas_solda.peca if ordem_solda else None,
+            'qtd_planejada': ordem_pecas_solda.qtd_planejada if ordem_solda else 0,
+            'qtd_boa': ordem_pecas_solda.qtd_boa if ordem_solda else 0,
+            'data_carga': ordem_solda.data_carga.strftime('%d/%m/%Y') if ordem_solda and ordem_solda.data_carga else None,
         }
         
 
         return JsonResponse({
             'status': 'success', 
             'message': 'Dados recebidos com sucesso',
-            'dados': dados,
+            'dados': dados if ordem_solda else None,
         })
+    except Ordem.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ordem não encontrada'}, 
+            status=404
+        )
     except Exception as e:
         return JsonResponse(
             {'status': 'error', 'message': str(e)}, 
