@@ -1350,8 +1350,8 @@ def verificar_cor_cambao(cor_antes_de_finalizar, cambao_nome):
         
         # Pegando o nome do ultimo do cambão finalizado antes do atual (por ex: 7 aberto, 6 fechado)
         cambao_nome = str(int(cambao.nome) - 1)
-        if cambao_nome == 0:
-            cambao_nome = 8
+        if cambao_nome == '0':
+            cambao_nome = '8'
         qs = CambaoPecas.objects.filter(
             status='finalizada', 
             cambao__tipo=tipo,
