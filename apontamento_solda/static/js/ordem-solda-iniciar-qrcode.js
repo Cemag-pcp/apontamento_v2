@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Para pegar um parâmetro específico, por exemplo 'ordem_id':
     const ordemId = params.get('ordem_id');
     const cardApontamentoQrCode = document.getElementById('cardApontamentoQrCode');
+    const ordemIdSoldaInput = document.getElementById('ordemIdSolda');
 
     // Exibe loader antes do fetch
     cardApontamentoQrCode.innerHTML = `
@@ -35,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 cardApontamentoQrCode.innerHTML = `
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
-                        <h6 class="card-title fw-bold mb-0 fs-5">#${ordem.peca}</h6>
+                        <h6 class="card-title fw-bold mb-0 fs-5">#${ordem.peca ? ordem.peca : 'Ordem Inexistente'}</h6>
                     </div>
                     <div class="card-body bg-white p-3">
                         <p class="card-text mb-3">
@@ -55,9 +56,23 @@ document.addEventListener('DOMContentLoaded', function() {
                         </button>
                     </div>
                 `
+                if (ordem){
+                    ordemIdSoldaInput.value = ordem.ordem;
+                }
+                
                 // Atualizar a interface do usuário conforme necessário
             } else {
                 console.error('Erro na resposta da API:', data.message);
+                cardApontamentoQrCode.innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        Erro: ${data.message}
+                    </div>
+                `;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: data.message || 'Ocorreu um erro ao tentar iniciar a ordem. Tente novamente.',
+                });
             }
         })
         .catch(error => {
@@ -70,7 +85,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const maquinaNome = maquina.getAttribute('data-maquina-nome');
 
             mostrarModalIniciar(ordemId, maquinaNome);
-
             
         }
     });
@@ -279,8 +293,9 @@ document.addEventListener('DOMContentLoaded', function() {
             },
         });
 
-        const currentOrdemId = document.getElementById('ordemIdIniciar').value;
+        // const currentOrdemId = document.getElementById('ordemIdIniciar').value;
 
+        const currentOrdemId = document.getElementById('ordemIdSoldaInput').value;
         try {
             const response = await fetch(`/solda/api/verificar-qt-restante/?ordem_id=${currentOrdemId}`);
             if (!response.ok) {
