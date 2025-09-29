@@ -27,7 +27,7 @@ export async function popularPacotesDaCarga(cargaId) {
     if (data.status_carga !== 'despachado') {
       infoHTML += `
         <div>
-          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal" id='btnAbrirModalCriarPacote'>
             <i class="fas fa-plus me-2"></i>Criar Pacote
           </button>
         </div>
@@ -179,7 +179,7 @@ export async function popularPacotesDaCarga(cargaId) {
           info.className = 'me-2';
           info.innerHTML = `
             <div><strong>${item.codigo_peca}</strong> - ${item.descricao || ''}</div>
-            <small class="text-muted">Cor: ${item.cor || 'N/A'} | Qtde: ${item.quantidade}</small>
+            <small class="text-muted">Qtde: ${item.quantidade}</small>
           `;
 
           // Botão "Alterar pacote"
@@ -235,7 +235,7 @@ export async function popularPacotesDaCarga(cargaId) {
           li.appendChild(info);
           
           // mesma regra de visibilidade do botão Confirmar (apenas em "apontamento" e pacote != ok)
-          if (data.status_carga === 'apontamento' && pacote.status_expedicao !== 'ok') {
+          if (data.status_carga === 'planejamento' && pacote.status_expedicao !== 'ok') {
             li.appendChild(btnAlterar);
           } else if (data.status_carga === 'verificacao' && pacote.status_qualidade !== 'ok') {
             li.appendChild(btnAlterar);
@@ -280,14 +280,14 @@ export async function popularPacotesDaCarga(cargaId) {
       footer.className = 'card-footer d-flex flex-column gap-2';
 
       // adiciona botões conforme status
-      if (data.status_carga === 'apontamento' && pacote.status_expedicao !== 'ok') {
-        footer.appendChild(btnConfirmarExpedicao);
-      } else if (data.status_carga === 'apontamento' && pacote.status_expedicao === 'ok') {
-        const span = document.createElement('span');
-        span.className = 'text-success fw-bold text-center';
-        span.textContent = 'Pacote confirmado';
-        footer.appendChild(span);
-      }
+      // if (data.status_carga === 'apontamento' && pacote.status_expedicao !== 'ok') {
+      //   footer.appendChild(btnConfirmarExpedicao);
+      // } else if (data.status_carga === 'apontamento' && pacote.status_expedicao === 'ok') {
+      //   const span = document.createElement('span');
+      //   span.className = 'text-success fw-bold text-center';
+      //   span.textContent = 'Pacote confirmado';
+      //   footer.appendChild(span);
+      // }
 
       // Botão de adicionar foto
       const btnFoto = document.createElement('button');

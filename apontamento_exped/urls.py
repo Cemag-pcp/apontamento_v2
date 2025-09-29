@@ -22,5 +22,7 @@ urlpatterns = [
     path('api/impressao/', views.impressao_pacote, name='impressao_pacote'),
     path('api/salvar-foto/', views.salvar_foto, name='salvar_foto'),
     path('api/buscar-fotos/<int:pacote_id>/', views.buscar_fotos, name='buscar_fotos'),
+    path('api/pendencias/<int:carregamento_id>/', views.mostrar_pendencias, name='mostrar_pendencias'),
+    path('api/verificar-pendencias/<int:carregamento_id>/', views.verificar_pendencias, name='verificar_pendencias'),
 
 ]

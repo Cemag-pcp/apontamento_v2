@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="{% static 'css/badges.css' %}">
   <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
   <link rel="stylesheet" href="{% static 'css/table-fixed-header.css' %}">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
   <style>
       .table-container {
           max-height: 500px;
@@ -72,7 +74,7 @@
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="mb-0">Apontamentos - Setor de Expedição</h2>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarCaixaModal">
-                    <i class="fas fa-plus me-2"></i>Criar Caixa
+                    <i class="fas fa-plus me-2"></i>Criar Carregamento
                 </button>
             </div>
         </div>
@@ -169,11 +171,6 @@
                         <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Planejamento</div>
                         <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-planejamento"></div>
                     </div>
-                    <!-- Coluna: Apontamento -->
-                    <div class="kanban-col flex-fill" data-stage="apontamento">
-                        <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Apontamento</div>
-                        <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-apontamento"></div>
-                    </div>
                     <!-- Coluna: Verificação -->
                     <div class="kanban-col flex-fill" data-stage="verificacao">
                         <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Verificação</div>
@@ -266,7 +263,7 @@
             </div>
             <div class="modal-body">
                 <div class="text-end">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal">
+                    <button type="button" id="btnAbrirModalCriarPacote" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal">
                         <i class="fas fa-plus me-2"></i>Criar Pacote
                     </button>
                 </div>
@@ -304,15 +301,10 @@
           <div id="itensPacote">
             <div class="row g-2 align-items-end item-pacote">
               <div class="col-md-8">
-                <label class="form-label">Descrição do Item</label>
-                <input type="text" name="descricao[]" class="form-control" required>
               </div>
               <div class="col-md-3">
-                <label class="form-label">Quantidade</label>
-                <input type="number" name="quantidade[]" class="form-control" min="1" required>
               </div>
               <div class="col-md-1 text-end">
-                <button type="button" class="btn btn-danger btn-sm btnRemoverItem" title="Remover item">✕</button>
               </div>
             </div>
           </div>
@@ -440,6 +432,8 @@
 {% endblock %}
 
 {% block scripts %}
+
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script type="module" src="{% static 'js/criar_caixa.js' %}"></script>
 <script type="module" src="{% static 'js/carregar_cargas.js' %}"></script>
