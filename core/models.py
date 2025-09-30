@@ -351,3 +351,24 @@ class SolicitacaoPeca(models.Model):
 
     def __str__(self):
         return f"{self.peca} - {self.setor_solicitante}"
+    
+class PecasFaltantes(models.Model):
+    """
+    Modelo para registrar peças faltantes que causaram a interrupção de uma Ordem.
+    Pode haver múltiplas peças faltantes por Ordem.
+    """
+    ordem = models.ForeignKey(
+        Ordem, 
+        on_delete=models.CASCADE, 
+        related_name='pecas_faltantes'
+    )
+    nome_peca = models.CharField(max_length=255, verbose_name="Nome da Peça Faltante")
+    quantidade = models.FloatField(verbose_name="Quantidade Faltante")
+    data_registro = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Peça Faltante"
+        verbose_name_plural = "Peças Faltantes"
+
+    def __str__(self):
+        return f"Ordem {self.ordem.ordem} - Peça: {self.nome_peca} ({self.quantidade} faltante)"

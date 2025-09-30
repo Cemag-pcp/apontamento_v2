@@ -14,7 +14,7 @@ import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados
 from core.utils import carregar_planilha_base_geral
-from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile
+from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile, PecasFaltantes
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos
 from inspecao.models import Inspecao
 
@@ -354,26 +354,37 @@ def atualizar_status_ordem(request):
                 novo_processo.save()
                 ordem.status_prioridade = 2
 
-                peca_falta = body.get('peca_falta')
-                maquina_id = body.get('maquina_id')
-                data_carga = body.get('data_carga')
-
-                if peca_falta:
-                    solicitacao_peca=SolicitacaoPeca.objects.create(
-                        peca=get_object_or_404(Pecas, pk=peca_falta),
-                        localizacao_solicitante=get_object_or_404(Maquina, pk=maquina_id),
-                        data_carga=datetime.strptime(data_carga, "%Y-%m-%d").date()
-                    )
+                if 'pecas_faltantes' in body and isinstance(body['pecas_faltantes'], list):
+                    
+                    pecas_a_criar = []
+                    for peca_faltante in body['pecas_faltantes']:
+                        nome = peca_faltante.get('nome')
+                        quantidade = peca_faltante.get('quantidade')
+                        
+                        if nome and isinstance(quantidade, (int, float)) and quantidade > 0:
+                            pecas_a_criar.append(
+                                PecasFaltantes(
+                                    ordem=ordem,
+                                    nome_peca=nome,
+                                    quantidade=quantidade
+                                )
+                            )
+                    
+                    if pecas_a_criar:
+                        PecasFaltantes.objects.bulk_create(pecas_a_criar)
+                        nomes_pecas = ", ".join([p.nome_peca for p in pecas_a_criar])
+                        ordem.obs_operador = (ordem.obs_operador or "") + f"\n[INTERROMPIDA POR PEÇAS] Faltando: {nomes_pecas}"
 
                 # Atualiza o status da ordem
                 ordem.status_atual = status
 
+                # Associa o processo à última PecasOrdem (mantido da sua lógica original)
                 ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
-                ultimo_peca_ordem.processo_ordem=novo_processo
-                
-                ultimo_peca_ordem.save()
+                if ultimo_peca_ordem: # Adicionada verificação para evitar erro se não houver PecasOrdem
+                    ultimo_peca_ordem.processo_ordem=novo_processo
+                    ultimo_peca_ordem.save()
 
-            ordem.save()
+                ordem.save()
 
             return JsonResponse({
                 'message': 'Status atualizado com sucesso.',
@@ -814,10 +825,10 @@ def listar_pecas_disponiveis(request):
 
     df_processo_nao_nulo = df_conjunto[df_conjunto['2 PROCESSO'].str.strip() != '']
 
+    df_processo_nao_nulo['DESCRIÇÃO'] = df_processo_nao_nulo['DESCRIÇÃO'].str.upper()
+
     colunas_para_duplicatas = ['DESCRIÇÃO']
     df_final = df_processo_nao_nulo.drop_duplicates(subset=colunas_para_duplicatas, keep='first')
-
-    print(df_final)
 
     pecas_disponiveis = df_final[['CODIGO', 'DESCRIÇÃO']].to_dict('records')
 

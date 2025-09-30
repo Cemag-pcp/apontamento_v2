@@ -592,18 +592,23 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
 // Função para carregar peças disponíveis para a ordem selecionada
 function carregarPecasDisponiveis(codigoConjunto) {
     const pecasDisponiveisSelect = $('#pecasDisponiveis');
+    const confirmInterromperButton = $('#confirmInterromper'); // Pega o botão
+
+    // 1. DESABILITA O BOTÃO antes de começar a requisição
+    confirmInterromperButton.prop('disabled', true);
 
     fetch(`api/listar-pecas-disponiveis/?conjunto=${codigoConjunto}`)
     .then(response => response.json())
     .then(data => {
         pecasDisponiveisSelect.empty(); // Limpa o select
 
-        if (data.pecas.length === 0) {
-            pecasDisponiveisSelect.append(new Option("Nenhuma peça disponível", "", false, false));
-        } else {
+        if (data.pecas.length !== 0) {
             data.pecas.forEach(peca => {
                 pecasDisponiveisSelect.append(new Option(`${peca['CODIGO']} - ${peca['DESCRIÇÃO']}`, peca['CODIGO'], false, false));
             });
+        } else {
+            // Se não houver peças, adiciona uma mensagem
+            pecasDisponiveisSelect.append(new Option("Nenhuma peça disponível", "", true, true));
         }
 
         if (pecasDisponiveisSelect.hasClass('select2-hidden-accessible')) {
@@ -625,8 +630,24 @@ function carregarPecasDisponiveis(codigoConjunto) {
     .catch(error => {
         console.error("Erro ao carregar peças disponíveis:", error);
         pecasDisponiveisSelect.append(new Option("Erro ao carregar peças", "", false, false));
+    })
+    .finally(() => {
+        // 2. REABILITA O BOTÃO após a finalização da requisição (sucesso ou erro)
+        confirmInterromperButton.prop('disabled', false);
     });
 }
+
+$(document).ready(function() {
+    $('#modalInterromper').on('hidden.bs.modal', function () {
+        $('#pecasQuantidadeContainer').empty(); 
+        
+        $('#motivoInterrupcao').val('').trigger('change');
+        
+        $('#pecasDisponiveis').val(null).trigger('change');
+        $('#selectPecasContainer').hide();
+
+    });
+});
 
 function gerarInputsQuantidade() {
     const pecasSelecionadas = $('#pecasDisponiveis').find(':selected');
