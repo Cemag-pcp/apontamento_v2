@@ -231,6 +231,10 @@
                 <div id="qr-reader" class="position-relative">
                         <div id="qr-reader-scan-line"></div>
                 </div>
+                <div id="zoom-controls" class="mt-3 p-2 bg-light rounded" style="display: none;">
+                    <label for="zoom-slider" class="form-label d-block text-center mb-1">Zoom: <span id="current-zoom-level">2.0</span>x</label>
+                    <input type="range" class="form-range" min="1.0" max="5.0" step="0.5" value="2.0" id="zoom-slider">
+                </div>
                 <div id="qr-reader-results" class="mt-3 text-center"></div>
             </div>
         </div>

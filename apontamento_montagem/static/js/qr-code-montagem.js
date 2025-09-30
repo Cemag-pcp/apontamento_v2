@@ -1,7 +1,58 @@
 document.addEventListener('DOMContentLoaded', function () {
     const modalElement = document.getElementById('qrScannerModal');
     let html5QrcodeScanner;
+    let currentZoom = 2.0; // Variável para rastrear o zoom atual
+    
+    // =========================================================================
+    // NOVIDADE: Função para aplicar o zoom dinamicamente
+    // =========================================================================
+    function applyDynamicZoom(zoomValue) {
+        if (!html5QrcodeScanner || !html5QrcodeScanner.isScanning) {
+            console.warn("Scanner não está rodando para aplicar zoom.");
+            return;
+        }
+        
+        // Aplica as novas restrições de zoom
+        html5QrcodeScanner.applyVideoConstraints({
+            advanced: [{ zoom: zoomValue }]
+        }).then(() => {
+            currentZoom = zoomValue;
+            document.getElementById('current-zoom-level').textContent = zoomValue.toFixed(1);
+            console.log(`Zoom ajustado para: ${zoomValue}x`);
+        }).catch(e => {
+            // Se o zoom não for suportado, desabilita os controles
+            console.warn("Falha ao ajustar zoom. Recurso não suportado.", e);
+            document.getElementById('zoom-controls').style.display = 'none';
+        });
+    }
 
+    // =========================================================================
+    // NOVIDADE: Configura o slider e aplica o zoom inicial
+    // =========================================================================
+    function setupZoomControls() {
+        const slider = document.getElementById('zoom-slider');
+        const zoomControlsDiv = document.getElementById('zoom-controls');
+
+        // Mostra os controles
+        zoomControlsDiv.style.display = 'block';
+
+        // Garante que o slider comece no valor inicial que definimos para o zoom
+        slider.value = currentZoom;
+        document.getElementById('current-zoom-level').textContent = currentZoom.toFixed(1);
+
+        // Evento para atualizar o zoom ao arrastar o slider
+        slider.addEventListener('input', (e) => {
+            const newZoom = parseFloat(e.target.value);
+            applyDynamicZoom(newZoom);
+        });
+        
+        // Aplica o zoom inicial de 2.0x
+        applyDynamicZoom(currentZoom);
+    }
+    
+    // =========================================================================
+    // startScanner AGORA VAI CHAMAR setupZoomControls
+    // =========================================================================
     function startScanner() {
         if (!html5QrcodeScanner) {
             html5QrcodeScanner = new Html5Qrcode("qr-reader");
@@ -10,25 +61,48 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('qr-reader-results').innerHTML = '';
         document.getElementById('qr-reader').style.display = 'block';
 
-        const config = { 
+        // 1. Configuração do Leitor (Visualização)
+        const readerConfig = { 
             fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true
-            },
-            facingMode: "environment" 
+            qrbox: { width: 150, height: 150 },
         };
 
-        html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
+        // 2. Configuração Otimizada para Foco (Alta Resolução)
+        // OBS: O zoom inicial de 2.0x foi removido daqui
+        const cameraConfigHighRes = { 
+            facingMode: "environment",
+            constraints: {
+                width: { ideal: 1920 }, // Tenta forçar alta nitidez
+                height: { ideal: 1080 },
+                facingMode: "environment" 
+            }
+        };
+        
+        // 3. Configuração de Fallback (Mais simples para garantir que a câmera abra)
+        const cameraConfigFallback = { 
+            facingMode: "environment"
+        };
+
+        // Lógica com Fallback
+        html5QrcodeScanner.start(cameraConfigHighRes, readerConfig, onScanSuccess, onScanFailure)
+            .then(setupZoomControls) // CHAMA O SETUP DE CONTROLES NO SUCESSO
             .catch(err => {
-                console.error("Não foi possível iniciar o leitor de QR Code.", err);
-                const modal = bootstrap.Modal.getInstance(modalElement);
-                if(modal) modal.hide();
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro ao Iniciar Câmera',
-                    text: 'Não foi possível acessar a câmera. Por favor, verifique as permissões no seu navegador.'
-                });
+                console.warn("Falha ao iniciar com alta resolução. Tentando fallback...", err);
+                
+                // Tenta Iniciar com a Configuração de Fallback
+                html5QrcodeScanner.start(cameraConfigFallback, readerConfig, onScanSuccess, onScanFailure)
+                    .then(setupZoomControls) // CHAMA O SETUP DE CONTROLES NO SUCESSO DO FALLBACK
+                    .catch(errFallback => {
+                        // Se falhar o fallback, mostra o erro final
+                        console.error("Não foi possível iniciar o leitor de QR Code mesmo com fallback.", errFallback);
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+                        if(modal) modal.hide();
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro ao Iniciar Câmera',
+                            text: 'Não foi possível acessar a câmera. Verifique as permissões ou se há outro aplicativo usando-a.'
+                        });
+                    });
             });
     }
     
