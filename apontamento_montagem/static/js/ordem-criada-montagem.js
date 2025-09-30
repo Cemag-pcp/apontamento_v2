@@ -592,25 +592,33 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
 // Função para carregar peças disponíveis para a ordem selecionada
 function carregarPecasDisponiveis(codigoConjunto) {
     const pecasDisponiveisSelect = $('#pecasDisponiveis');
-    const confirmInterromperButton = $('#confirmInterromper'); // Pega o botão
+    const confirmInterromperButton = $('#confirmInterromper');
+    // NOVO: Pegando o select do motivo
+    const motivoInterrupcaoSelect = $('#motivoInterrupcao'); 
+    
+    // Elementos do carregamento
+    const loadingPecasDiv = $('#loadingPecas');
+    const selectPecasContainer = $('#selectPecasContainer');
 
-    // 1. DESABILITA O BOTÃO antes de começar a requisição
+    // 1. ANTES DA REQUISIÇÃO
     confirmInterromperButton.prop('disabled', true);
+    motivoInterrupcaoSelect.prop('disabled', true); // DESABILITA o select do motivo
+    
+    selectPecasContainer.hide();
+    pecasDisponiveisSelect.empty();
+    loadingPecasDiv.show(); // MOSTRA O SPINNER
 
     fetch(`api/listar-pecas-disponiveis/?conjunto=${codigoConjunto}`)
     .then(response => response.json())
     .then(data => {
-        pecasDisponiveisSelect.empty(); // Limpa o select
 
         if (data.pecas.length !== 0) {
             data.pecas.forEach(peca => {
                 pecasDisponiveisSelect.append(new Option(`${peca['CODIGO']} - ${peca['DESCRIÇÃO']}`, peca['CODIGO'], false, false));
             });
-        } else {
-            // Se não houver peças, adiciona uma mensagem
-            pecasDisponiveisSelect.append(new Option("Nenhuma peça disponível", "", true, true));
         }
 
+        // Destroi e recria o select2
         if (pecasDisponiveisSelect.hasClass('select2-hidden-accessible')) {
             pecasDisponiveisSelect.select2('destroy');
         }
@@ -624,16 +632,29 @@ function carregarPecasDisponiveis(codigoConjunto) {
         .off('select2:select.gerarQtd select2:clear.gerarQtd change.gerarQtd')
         .on('select2:select.gerarQtd select2:clear.gerarQtd change.gerarQtd', gerarInputsQuantidade);
 
-        // Opcional: force mostrar placeholder
         pecasDisponiveisSelect.val(null).trigger('change');
     })
     .catch(error => {
         console.error("Erro ao carregar peças disponíveis:", error);
-        pecasDisponiveisSelect.append(new Option("Erro ao carregar peças", "", false, false));
+        
+        // Lógica de erro do select2
+        if (pecasDisponiveisSelect.hasClass('select2-hidden-accessible')) {
+            pecasDisponiveisSelect.select2('destroy');
+        }
+        pecasDisponiveisSelect.select2({
+            placeholder: 'Erro ao carregar peças',
+            allowClear: true,
+            dropdownParent: $('#modalInterromper')
+        });
+        pecasDisponiveisSelect.val(null).trigger('change');
     })
     .finally(() => {
-        // 2. REABILITA O BOTÃO após a finalização da requisição (sucesso ou erro)
-        confirmInterromperButton.prop('disabled', false);
+        // 2. APÓS A REQUISIÇÃO (sucesso ou erro)
+        loadingPecasDiv.hide(); // ESCONDE O SPINNER
+        selectPecasContainer.show(); // Mostra o select container
+        
+        confirmInterromperButton.prop('disabled', false); // Reabilita o botão
+        motivoInterrupcaoSelect.prop('disabled', false); // REABILITA o select do motivo
     });
 }
 
@@ -691,19 +712,17 @@ function gerarInputsQuantidade() {
 
 // Função para finalizar interrupção e enviar para API
 function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveisSelect, modal, maquinaId, dataCarga) {
-    const motivoSelecionado = motivoInterrupcaoSelect.val(); // Pegando o valor do select corretamente via jQuery
-    const pecaSelecionada = pecasDisponiveisSelect.val(); // Pegando a peça selecionada
-    const filtroDataCarga = document.getElementById('filtro-data-carga');
-    const filtroSetor = document.getElementById('filtro-setor');
-
-    // Captura os valores atualizados dos filtros
-    const filtros = {
-        data_carga: filtroDataCarga.value,
-        setor: filtroSetor.value
-    };
-    // **Verificação segura para evitar erro caso não haja seleção**
+    const motivoSelecionado = motivoInterrupcaoSelect.val();
+    // Usamos 'find(":selected").text()' para garantir que pegamos o texto que o backend usa para obs_operador
     const motivoTexto = motivoInterrupcaoSelect.find(":selected").text() ?? 'N/A';
+    const filtros = {
+        data_carga: document.getElementById('filtro-data-carga').value,
+        setor: document.getElementById('filtro-setor').value
+    };
 
+    let pecasFaltantesPayload = [];
+
+    // --- 1. Validação do Motivo ---
     if (!motivoSelecionado) {
         Swal.fire({
             icon: 'warning',
@@ -713,16 +732,49 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
         return;
     }
 
-    // Se o motivo for "Falta de peça", a peça deve ser obrigatória
-    if (motivoTexto === "Falta de peça" && (!pecaSelecionada || pecaSelecionada === "")) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Atenção',
-            text: 'Você deve selecionar uma peça para continuar.'
-        });
-        return;
-    }
+    // --- 2. Lógica e Coleta para "Falta peça" ---
+    if (motivoTexto === "Falta peça") {
+        const pecasSelecionadas = pecasDisponiveisSelect.val(); // Array de códigos (ex: ["P001", "P002"])
 
+        if (!pecasSelecionadas || pecasSelecionadas.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Você deve selecionar a(s) peça(s) que estão em falta.'
+            });
+            return;
+        }
+
+        pecasSelecionadas.forEach(codigoPeca => {
+            // Obtém o texto completo (Nome/Descrição) da OPTION
+            const optionElement = pecasDisponiveisSelect.find(`option[value="${codigoPeca}"]`);
+            const nomePeca = optionElement.text().trim(); // Ex: "P001 - DESCRIÇÃO"
+
+            // *** COLETANDO A QUANTIDADE DO INPUT GERADO ***
+            // Usa o ID que você definiu: id="qtd-{codigo}"
+            const inputQtd = $(`#qtd-${codigoPeca}`);
+            let quantidade = parseInt(inputQtd.val() || '0');
+
+            if (quantidade > 0) {
+                // Adiciona o objeto com 'nome' e 'quantidade' para o payload, conforme o backend espera
+                pecasFaltantesPayload.push({
+                    nome: nomePeca,
+                    quantidade: quantidade
+                });
+            }
+        });
+
+        // Valida se, após a coleta, alguma quantidade > 0 foi informada
+        if (pecasFaltantesPayload.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Informe a quantidade em falta (maior que zero) para a(s) peça(s) selecionada(s).'
+            });
+            return;
+        }
+    }
+    
     Swal.fire({
         title: 'Interrompendo...',
         text: 'Por favor, aguarde enquanto a ordem está sendo interrompida.',
@@ -739,9 +791,8 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
         motivo: parseInt(motivoSelecionado)
     };
 
-    // Se o motivo for "Falta de peça", adiciona a peça ao JSON
-    if (motivoTexto === "Falta de peça") {
-        payload.peca_falta = parseInt(pecaSelecionada);
+    if (motivoTexto === "Falta peça") {
+        payload.pecas_faltantes = pecasFaltantesPayload; 
         payload.maquina_id = parseInt(maquinaId);
         payload.data_carga = dataCarga;
     }
