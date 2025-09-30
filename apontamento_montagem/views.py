@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
-from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q
+from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q, IntegerField
 from django.db import transaction, models, IntegrityError, connection
 from django.shortcuts import get_object_or_404
 from django.db.models.functions import Coalesce
@@ -525,7 +525,7 @@ def ordens_iniciadas(request):
         'grupo_maquina': 'montagem',
         'status_atual': 'iniciada',
     }
-    
+
     # Adicionar chave id caso exista o parametro ordem_id
     if ordem_id:
         filtros_ordem['id'] = ordem_id # ordem id --> core_ordem
@@ -1037,7 +1037,13 @@ def api_apontamento_qrcode(request):
         ordem_id = request.GET.get('ordem_id')
 
         ordem = Ordem.objects.get(pk=ordem_id)
-        ordem_peca = ordem.ordem_pecas_montagem.first() # É pra ter só uma peça por ordem
+        ordem_pecas = ordem.ordem_pecas_montagem.all() # Pega todas as ordem peças relacionadas à ordem
+        total_feito = ordem_pecas.aggregate(
+            total_feito=Coalesce(Sum('qtd_boa', output_field=IntegerField()), Value(0, output_field=IntegerField()))
+        )['total_feito'] or 0 # Soma a quantidade boa feita, ou 0 se não houver
+
+        ordem_peca = ordem_pecas.first()  # Pega a primeira peça da ordem
+        
 
         dados = {
             'ordem': ordem.ordem if ordem else None,
@@ -1045,7 +1051,7 @@ def api_apontamento_qrcode(request):
             'status': ordem.status_atual if ordem else None,
             'peca': ordem_peca.peca if ordem else None,
             'qtd_planejada': ordem_peca.qtd_planejada if ordem else 0,
-            'qtd_boa': ordem_peca.qtd_boa if ordem else 0,
+            'qtd_boa': total_feito if ordem else 0,
             'data_carga': ordem.data_carga.strftime('%d/%m/%Y') if ordem and ordem.data_carga else None,
         }
         
