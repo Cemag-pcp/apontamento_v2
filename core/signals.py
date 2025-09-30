@@ -19,9 +19,6 @@ def save_user_profile(sender, instance, **kwargs):
         instance.profile.save()
 
 
-print("✅ Módulo core/signals.py foi carregado com sucesso!")
-
-
 @receiver(post_save, sender=Notificacao)
 def enviar_notificacao_em_tempo_real(sender, instance, created, **kwargs):
     """
