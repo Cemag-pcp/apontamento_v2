@@ -112,6 +112,8 @@ class Ordem(models.Model):
     # Campo para armazenar o QR code gerado
     qrcode = models.ImageField(upload_to='qrcodes/', storage=S3Boto3Storage(), blank=True, null=True)
 
+    caminho_relativo_qr_code = models.CharField(max_length=255, blank=True, null=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['ordem', 'maquina'], name='unique_ordem_processo')

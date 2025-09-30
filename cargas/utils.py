@@ -1823,9 +1823,26 @@ def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grup
             })
 
         Ordem.objects.bulk_create(ordens_objs)
+        
+        ordens_numbers = [o.ordem for o in ordens_objs] 
 
-        for ordem in ordens_objs:
-            gerar_e_salvar_qrcode(request, ordem)
+        ordens_criadas = list(Ordem.objects.filter(
+            ordem__in=ordens_numbers, 
+            grupo_maquina=grupo_maquina
+        ).order_by('ordem'))
+
+        ordens_a_atualizar = []
+
+        for ordem in ordens_criadas:
+            
+            caminho_qr_code = gerar_e_salvar_qrcode(request, ordem)
+            
+            if caminho_qr_code:
+                ordem.caminho_relativo_qr_code = caminho_qr_code
+                ordens_a_atualizar.append(ordem)
+
+        if ordens_a_atualizar:
+            Ordem.objects.bulk_update(ordens_a_atualizar, ['caminho_relativo_qr_code'])
 
         pecas_objs = [
             POM(
@@ -2080,7 +2097,7 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
             ]
         }
 
-def gerar_e_salvar_qrcode(request, ordem_obj):
+def gerar_e_salvar_qrcode(request, ordem):
     """
     Verifica as condições de uma ordem e, se atendidas,
     gera um QR Code e o salva no objeto.
@@ -2088,15 +2105,15 @@ def gerar_e_salvar_qrcode(request, ordem_obj):
 
     # 74 = Chassi de Montagem, 37 = PLAT. TANQUE. CAÇAM.
     if (
-        ordem_obj.maquina
-        and ordem_obj.maquina.nome in ["CHASSI", "PLAT. TANQUE. CAÇAM."]
-        and ordem_obj.maquina.setor.nome == "montagem"
-        and ordem_obj.grupo_maquina == "montagem"
+        ordem.maquina
+        and ordem.maquina.nome in ["CHASSI", "PLAT. TANQUE. CAÇAM."]
+        and ordem.maquina.setor.nome == "montagem"
+        and ordem.grupo_maquina == "montagem"
     ):
 
         # Gera a URL para o QR Code (agora temos certeza que o .pk existe)
         caminho_relativo = (
-            reverse("montagem:apontamento_qrcode") + f"?ordem_id={ordem_obj.pk}&selecao_setor=pendente"
+            reverse("montagem:apontamento_qrcode") + f"?ordem_id={ordem.pk}&selecao_setor=pendente"
         )
 
         url_completa = request.build_absolute_uri(caminho_relativo)
@@ -2107,6 +2124,10 @@ def gerar_e_salvar_qrcode(request, ordem_obj):
         qr_io = BytesIO()
         qr.save(qr_io, "PNG")
 
-        file_name = f"ordem_{ordem_obj.pk}_qrcode.png"
+        file_name = f"ordem_{ordem.pk}_qrcode.png"
 
-        ordem_obj.qrcode.save(file_name, File(qr_io), save=True)
+        ordem.qrcode.save(file_name, File(qr_io), save=False) 
+        
+        ordem.save(update_fields=['qrcode']) 
+        
+        return caminho_relativo
