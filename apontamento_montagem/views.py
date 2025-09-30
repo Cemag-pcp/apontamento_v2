@@ -519,10 +519,16 @@ def ordens_iniciadas(request):
 
     maquina_param = request.GET.get('setor', '')
 
+    ordem_id = request.GET.get('ordem_id', None)
+
     filtros_ordem = {
         'grupo_maquina': 'montagem',
-        'status_atual': 'iniciada'
+        'status_atual': 'iniciada',
     }
+    
+    # Adicionar chave id caso exista o parametro ordem_id
+    if ordem_id:
+        filtros_ordem['id'] = ordem_id # ordem id --> core_ordem
 
     if maquina_param:
         maquina = get_object_or_404(Maquina, pk=maquina_param)
