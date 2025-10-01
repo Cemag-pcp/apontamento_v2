@@ -306,6 +306,21 @@ document.addEventListener('DOMContentLoaded', function() {
             const finalizarModal = bootstrap.Modal.getInstance(modalElement);
             finalizarModal.hide();
             Swal.close();
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: 'Ordem finalizada com sucesso.'
+
+            });
+
+            //Redirecionando para a tela de apontamento de montagem
+            setTimeout(function(){
+                window.location.href = '/montagem/';
+            }, 1000);
+            
+
+
         })
         .catch(error => {
             Swal.fire({
@@ -317,10 +332,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function fetchOrdensIniciadas(){
+        const listaContainer = document.getElementById('listaOrdensIniciadas');
+        // Exibe loader antes do fetch
+        listaContainer.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center" style="min-height: 200px;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        `;
         fetch(`/montagem/api/ordens-iniciadas/?ordem_id=${ordemId}`)
             .then(response => response.json())
-            .then(data => {
-                const listaContainer = document.getElementById('listaOrdensIniciadas');
+            .then(data => {       
                 console.log(data);
                 if (data.ordens) {
                     // Monta a lista de ordens
