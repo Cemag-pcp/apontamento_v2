@@ -560,10 +560,60 @@ def ordens_iniciadas(request):
 
     maquina_param = request.GET.get('setor', '')
 
+    ordem_id_montagem = request.GET.get('ordem_id', None)
+
     filtros_ordem = {
-        'grupo_maquina': 'solda',
+        # 'grupo_maquina': 'solda',
         'status_atual': 'iniciada'
     }
+
+    # Adicionar chave id caso exista o parametro ordem_id
+    if ordem_id_montagem:
+        # filtros_ordem['id'] = ordem_id_montagem # ordem id --> core_ordem --> montagem
+
+        
+        ordem = Ordem.objects.get(pk=ordem_id_montagem)
+        print(ordem)
+
+        data_carga_montagem = ordem.data_carga if ordem.data_carga else None
+        ordem_peca_montagem = ordem.ordem_pecas_montagem.first() # É pra ter só uma peça por ordem
+        peca_montagem = ordem_peca_montagem.peca if ordem_peca_montagem else None
+
+        codigo_peca = peca_montagem.split("-", maxsplit=1)[0].strip() if peca_montagem else None
+        
+        ordem_solda = None
+
+
+        print(peca_montagem, codigo_peca, data_carga_montagem)
+
+        if peca_montagem is None or codigo_peca is None or data_carga_montagem is None:
+            """
+                Verificando se a ordem buscada(montagem) tem a peça e a data de carga preenchida.
+                Se não tiver, não tem como buscar a ordem de solda relacionada.
+            """
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Não foram encontrados dados de montagem para esta ordem de montagem',
+                'dados': None
+            }, status=400)
+        
+        ordem_solda = Ordem.objects.filter(
+            data_carga=data_carga_montagem,
+            grupo_maquina='solda',
+            ordem_pecas_solda__peca__istartswith=codigo_peca
+        ).distinct()
+
+        print(ordem_solda)
+        filtros_ordem['id__in'] = [ordem.id for ordem in ordem_solda]
+        print(filtros_ordem)
+        # ordem_pecas_solda = []
+        # for ordem in ordem_solda:
+        #     for i in ordem.ordem_pecas_solda.all():
+        #         ordem_pecas_solda.append(i)
+
+        # print(ordem_pecas_solda)
+        # for i in ordem_pecas_solda:
+        #     print(i)
 
     if maquina_param:
         maquina = get_object_or_404(Maquina, pk=maquina_param)
@@ -1149,11 +1199,10 @@ def api_apontamento_qrcode(request):
         ordem_solda = Ordem.objects.filter(
             data_carga=data_carga_montagem,
             grupo_maquina='solda',
-            ordem_pecas_solda__peca__startswith=codigo_peca
+            ordem_pecas_solda__peca__istartswith=codigo_peca
         ).first()
 
-        ordem_pecas_solda = ordem_solda.ordem_pecas_solda.first() if ordem_solda else None
-
+        ordem_pecas_solda = ordem_solda.ordem_pecas_solda.first()
         # ordem_peca = ordem.ordem_pecas_solda.first() # É pra ter só uma peça por ordem
         dados = {
             'ordem': ordem_solda.id if ordem_solda else None,
@@ -1169,7 +1218,7 @@ def api_apontamento_qrcode(request):
         return JsonResponse({
             'status': 'success', 
             'message': 'Dados recebidos com sucesso',
-            'dados': dados if ordem_solda else None,
+            'dados': dados,
         })
     except Ordem.DoesNotExist:
         return JsonResponse(

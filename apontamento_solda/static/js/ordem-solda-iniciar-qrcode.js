@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     `;
 
+    fetchOrdensIniciadas();
 
     fetch(`/solda/api/apontamento-qrcode/?ordem_id=${ordemId}`)
         .then(response => response.json())
@@ -394,4 +395,68 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    function fetchOrdensIniciadas(){
+        const listaContainer = document.getElementById('listaOrdensIniciadas');
+        // Exibe loader antes do fetch
+        listaContainer.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center" style="min-height: 200px;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        `;
+        fetch(`/solda/api/ordens-iniciadas/?ordem_id=${ordemId}`)
+            .then(response => response.json())
+            .then(data => {       
+                console.log(data);
+                if (data.ordens) {
+                    // Monta a lista de ordens
+                    if (data.ordens && data.ordens.length > 0) {
+                        let html = '<ul class="list-group mt-2">';
+                        data.ordens.forEach((ordem, idx) => {
+                        html += `
+                            <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                                <div>
+                                    <span class="badge bg-primary me-2">${idx + 1}</span>
+                                    <strong>Ordem:</strong> <span class="text-dark">${ordem.ordem_id}</span>
+                                    <span class="mx-2">|</span>
+                                    <strong>Máquina:</strong> <span class="text-dark">${ordem.maquina}</span>
+                                    <span class="mx-2">|</span>
+                                    <strong>Data Carga:</strong> <span class="text-dark">${ordem.data_carga}</span>
+                                </div>
+                                <div class="mt-2 mt-md-0">
+                                    <strong>Qt. Restante:</strong> <span class="text-dark">${ordem.qtd_restante}</span>
+                                    <span class="mx-2">|</span>
+                                    <strong>Status:</strong> <span class="badge ${
+                                        ordem.status_atual === 'finalizada' ? 'bg-success' :
+                                        ordem.status_atual === 'iniciada' ? 'bg-primary' :
+                                        ordem.status_atual === 'interrompida' ? 'bg-danger' : 'bg-secondary'
+                                    }">${ordem.status_atual}</span>
+                                    ${
+                                        ordem.status_atual !== 'finalizada'
+                                        ? `<button class="btn btn-success btn-sm btn-finalizar-lista ms-2" data-ordem-id="${ordem.ordem_id}"
+                                        data-maquina="${ordem.maquina}" data-max-itens="${ordem.qtd_restante}">
+                                            <i class="fa fa-check"></i> Finalizar
+                                        </button>`
+                                        : ''
+                                    }
+                                </div>
+                            </li>
+                        `;
+                    });
+                        html += '</ul>';
+                        listaContainer.innerHTML = html;
+                    } else {
+                        listaContainer.innerHTML = '<div class="alert alert-info">Nenhuma ordem iniciada encontrada.</div>';
+                    }
+                } else {
+                    listaContainer.innerHTML = `<div class="alert alert-danger">Algum erro encontrado</div>`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('listaOrdensIniciadas').innerHTML =
+                    `<div class="alert alert-danger">Erro ao chamar a API: ${error}</div>`;
+            });
+    }
 });
