@@ -372,19 +372,17 @@ def atualizar_status_ordem(request):
                     
                     if pecas_a_criar:
                         PecasFaltantes.objects.bulk_create(pecas_a_criar)
-                        nomes_pecas = ", ".join([p.nome_peca for p in pecas_a_criar])
-                        ordem.obs_operador = (ordem.obs_operador or "") + f"\n[INTERROMPIDA POR PEÇAS] Faltando: {nomes_pecas}"
 
                 # Atualiza o status da ordem
                 ordem.status_atual = status
 
-                # Associa o processo à última PecasOrdem (mantido da sua lógica original)
-                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
-                if ultimo_peca_ordem: # Adicionada verificação para evitar erro se não houver PecasOrdem
-                    ultimo_peca_ordem.processo_ordem=novo_processo
-                    ultimo_peca_ordem.save()
+            # Associa o processo à última PecasOrdem (mantido da sua lógica original)
+            ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
+            if ultimo_peca_ordem: # Adicionada verificação para evitar erro se não houver PecasOrdem
+                ultimo_peca_ordem.processo_ordem=novo_processo
+                ultimo_peca_ordem.save()
 
-                ordem.save()
+            ordem.save()
 
             return JsonResponse({
                 'message': 'Status atualizado com sucesso.',
@@ -621,6 +619,16 @@ def ordens_interrompidas(request):
             total_boa=Sum('qtd_boa', default=0.0)
         )
 
+        pecas_faltantes_list = [
+            {
+                "id": peca_faltante.id,
+                "nome_peca": peca_faltante.nome_peca,
+                "quantidade": peca_faltante.quantidade,
+                "data_registro": peca_faltante.data_registro
+            }
+            for peca_faltante in ordem.pecas_faltantes.all()
+        ]
+
         resultado.append({
             "ordem_id": ordem.id,
             "ordem_numero": ordem.ordem,
@@ -632,6 +640,7 @@ def ordens_interrompidas(request):
             "ultima_atualizacao": ordem.ultima_atualizacao,
             "pecas": pecas_unicas,  # Lista apenas os nomes das peças (sem repetições)
             "qtd_restante": agregacoes['total_planejada'] - agregacoes['total_boa'],  # Soma total de qtd_planejada
+            "pecas_faltantes": pecas_faltantes_list,  # Lista de peças faltantes
             "processos": [
                 {
                     "processo_id": processo.id,

@@ -383,8 +383,6 @@ export function carregarOrdensInterrompidas(filtros = {}) {
     </div>`;
 
     // Fetch para buscar ordens interrompidas
-
-
     fetch(`api/ordens-interrompidas/?setor=${filtros.setor || ''}`)
     .then(response => response.json())
     .then(data => {
@@ -415,6 +413,32 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                 `).join("");
             }
 
+            // Formata as peças faltantes
+            let pecasFaltantesInfo = "";
+            if (ordem.pecas_faltantes && ordem.pecas_faltantes.length > 0) {
+                pecasFaltantesInfo = `
+                    <div class="mt-3 mb-2">
+                        <h6 class="text-danger mb-2">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            Peças Faltantes:
+                        </h6>
+                        <div class="list-group">
+                            ${ordem.pecas_faltantes.map(peca => `
+                                <div class="list-group-item list-group-item-danger p-2 mb-1">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center">
+                                        <span class="fw-bold" style="font-size:13px;">${peca.nome_peca}</span>
+                                        <span class="badge bg-danger rounded-pill">Qtd: ${peca.quantidade}</span>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">
+                                        Registrado em: ${new Date(peca.data_registro).toLocaleString('pt-BR')}
+                                    </small>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
+                `;
+            }
+
             card.innerHTML = `
             <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
                 <!-- Contador fixado no topo direito -->
@@ -439,6 +463,9 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                             ${ordem.pecas}
                         </a>
                     </p>
+
+                    <!-- Seção de Peças Faltantes -->
+                    ${pecasFaltantesInfo}
 
                     <!-- Seção de Processos -->
                     <div class="mt-3">
@@ -474,7 +501,6 @@ export function carregarOrdensInterrompidas(filtros = {}) {
         });
     })
     .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
-
 };
 
 // Modal para "Interromper"
@@ -613,7 +639,7 @@ function carregarPecasDisponiveis(codigoConjunto) {
     .then(data => {
 
         if (data.pecas.length !== 0) {
-            data.pecas.forEach(peca => {
+            data.pecas.forEach((peca, index)=> {
                 pecasDisponiveisSelect.append(new Option(`${peca['CODIGO']} - ${peca['DESCRIÇÃO']}`, peca['CODIGO'], false, false));
             });
         }
@@ -642,7 +668,7 @@ function carregarPecasDisponiveis(codigoConjunto) {
             pecasDisponiveisSelect.select2('destroy');
         }
         pecasDisponiveisSelect.select2({
-            placeholder: 'Erro ao carregar peças',
+            placeholder: 'Não possui peças disponíveis na base referente a esse conjunto',
             allowClear: true,
             dropdownParent: $('#modalInterromper')
         });
@@ -732,38 +758,30 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
         return;
     }
 
-    // --- 2. Lógica e Coleta para "Falta peça" ---
-    if (motivoTexto === "Falta peça") {
-        const pecasSelecionadas = pecasDisponiveisSelect.val(); // Array de códigos (ex: ["P001", "P002"])
+    const pecasSelecionadas = pecasDisponiveisSelect.val(); // Array de códigos (ex: ["P001", "P002"])
 
-        if (!pecasSelecionadas || pecasSelecionadas.length === 0) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Atenção',
-                text: 'Você deve selecionar a(s) peça(s) que estão em falta.'
-            });
-            return;
-        }
+    console.log(pecasSelecionadas);
+
+    // --- 2. Lógica e Coleta para "Falta peça" ---
+    if (motivoTexto === "Falta peça" && Array.isArray(pecasSelecionadas) && pecasSelecionadas.length > 0) {
 
         pecasSelecionadas.forEach(codigoPeca => {
-            // Obtém o texto completo (Nome/Descrição) da OPTION
-            const optionElement = pecasDisponiveisSelect.find(`option[value="${codigoPeca}"]`);
-            const nomePeca = optionElement.text().trim(); // Ex: "P001 - DESCRIÇÃO"
+            const optionElement = pecasDisponiveisSelect.find(`option[value="${codigoPeca}"]`).first();
+            
+            const nomePeca = optionElement.data('descricao') 
+                ? `${codigoPeca} - ${optionElement.data('descricao')}` 
+                : optionElement.text().trim();
 
-            // *** COLETANDO A QUANTIDADE DO INPUT GERADO ***
-            // Usa o ID que você definiu: id="qtd-{codigo}"
             const inputQtd = $(`#qtd-${codigoPeca}`);
             let quantidade = parseInt(inputQtd.val() || '0');
 
             if (quantidade > 0) {
-                // Adiciona o objeto com 'nome' e 'quantidade' para o payload, conforme o backend espera
                 pecasFaltantesPayload.push({
                     nome: nomePeca,
                     quantidade: quantidade
                 });
             }
         });
-
         // Valida se, após a coleta, alguma quantidade > 0 foi informada
         if (pecasFaltantesPayload.length === 0) {
             Swal.fire({
