@@ -1,7 +1,7 @@
 from django.http import JsonResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
-from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q
+from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q, Max
 from django.db import transaction, models, IntegrityError, connection
 from django.shortcuts import get_object_or_404
 from django.db.models.functions import Coalesce
@@ -355,6 +355,15 @@ def atualizar_status_ordem(request):
                 ordem.status_prioridade = 2
 
                 if 'pecas_faltantes' in body and isinstance(body['pecas_faltantes'], list):
+    
+                    # 1. Encontrar o último número de interrupção para esta Ordem
+                    ultimo_numero = PecasFaltantes.objects.filter(ordem=ordem).aggregate(
+                        Max('numero_interrupcao')
+                    )['numero_interrupcao__max']
+                    
+                    # 2. Definir o próximo número. Se for a primeira vez, será 1 (0+1);
+                    #    caso contrário, será o máximo + 1.
+                    proximo_numero_interrupcao = (ultimo_numero or 0) + 1
                     
                     pecas_a_criar = []
                     for peca_faltante in body['pecas_faltantes']:
@@ -365,11 +374,14 @@ def atualizar_status_ordem(request):
                             pecas_a_criar.append(
                                 PecasFaltantes(
                                     ordem=ordem,
+                                    # 3. Atribuir o número de interrupção calculado a todos
+                                    #    os registros deste lote (interrupção)
+                                    numero_interrupcao=proximo_numero_interrupcao,
                                     nome_peca=nome,
                                     quantidade=quantidade
                                 )
                             )
-                    
+                            
                     if pecas_a_criar:
                         PecasFaltantes.objects.bulk_create(pecas_a_criar)
 
@@ -619,15 +631,29 @@ def ordens_interrompidas(request):
             total_boa=Sum('qtd_boa', default=0.0)
         )
 
-        pecas_faltantes_list = [
-            {
-                "id": peca_faltante.id,
-                "nome_peca": peca_faltante.nome_peca,
-                "quantidade": peca_faltante.quantidade,
-                "data_registro": peca_faltante.data_registro
-            }
-            for peca_faltante in ordem.pecas_faltantes.all()
-        ]
+        ultima_interrupcao_data = ordem.pecas_faltantes.aggregate(
+            Max('numero_interrupcao')
+        )
+        ultima_interrupcao_num = ultima_interrupcao_data['numero_interrupcao__max']
+        
+        pecas_faltantes_list = []
+        
+        if ultima_interrupcao_num is not None:
+            
+            ultima_interrupcao_pecas = ordem.pecas_faltantes.filter(
+                numero_interrupcao=ultima_interrupcao_num
+            )
+            
+            pecas_faltantes_list = [
+                {
+                    "id": peca_faltante.id,
+                    "nome_peca": peca_faltante.nome_peca,
+                    "quantidade": peca_faltante.quantidade,
+                    "data_registro": peca_faltante.data_registro,
+                    "numero_interrupcao": peca_faltante.numero_interrupcao 
+                }
+                for peca_faltante in ultima_interrupcao_pecas
+            ]
 
         resultado.append({
             "ordem_id": ordem.id,

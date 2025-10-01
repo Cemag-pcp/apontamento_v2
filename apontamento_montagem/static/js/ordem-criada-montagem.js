@@ -423,17 +423,25 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                             Peças Faltantes:
                         </h6>
                         <div class="list-group">
-                            ${ordem.pecas_faltantes.map(peca => `
-                                <div class="list-group-item list-group-item-danger p-2 mb-1">
-                                    <div class="d-flex flex-wrap justify-content-between align-items-center">
-                                        <span class="fw-bold" style="font-size:13px;">${peca.nome_peca}</span>
-                                        <span class="badge bg-danger rounded-pill">Qtd: ${peca.quantidade}</span>
+                            ${ordem.pecas_faltantes.map(peca => {
+                                const pecaJsonString = JSON.stringify(peca).replace(/"/g, '&quot;');
+
+                                return `
+                                    <div 
+                                        class="list-group-item list-group-item-danger p-2 mb-1 click-peca-faltante"
+                                        data-peca-info="${pecaJsonString}" 
+                                        style="cursor: pointer;"
+                                    >
+                                        <div class="d-flex flex-wrap justify-content-between align-items-center">
+                                            <span class="fw-bold text-truncate" style="font-size:13px; max-width: 70%;">${peca.nome_peca}</span>
+                                            <span class="badge bg-danger rounded-pill">Qtd: ${peca.quantidade}</span>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">
+                                            Registrado em: ${new Date(peca.data_registro).toLocaleDateString('pt-BR')}
+                                        </small>
                                     </div>
-                                    <small class="text-muted d-block mt-1">
-                                        Registrado em: ${new Date(peca.data_registro).toLocaleString('pt-BR')}
-                                    </small>
-                                </div>
-                            `).join("")}
+                                `;
+                            }).join("")}
                         </div>
                     </div>
                 `;
@@ -441,7 +449,6 @@ export function carregarOrdensInterrompidas(filtros = {}) {
 
             card.innerHTML = `
             <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
-                <!-- Contador fixado no topo direito -->
                 <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
                     id="contador-${ordem.ordem_id}" 
                     style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
@@ -464,10 +471,8 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                         </a>
                     </p>
 
-                    <!-- Seção de Peças Faltantes -->
                     ${pecasFaltantesInfo}
 
-                    <!-- Seção de Processos -->
                     <div class="mt-3">
                         ${processosInfo}
                     </div>
@@ -475,10 +480,24 @@ export function carregarOrdensInterrompidas(filtros = {}) {
 
                 <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
                     <div class="d-flex flex-wrap justify-content-center gap-2">
-                        ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
-                    </div>
+                        ${botaoAcao} </div>
                 </div>
             </div>`;
+
+            const pecaCards = card.querySelectorAll('.click-peca-faltante');
+            
+            // 2. Adiciona o Event Listener para CADA item
+            pecaCards.forEach(pecaCard => {
+                pecaCard.addEventListener('click', () => {
+                    const pecaDataString = pecaCard.dataset.pecaInfo.replace(/&quot;/g, '"');
+                    try {
+                        const peca = JSON.parse(pecaDataString);
+                        mostrarDetalhesPeca(peca); 
+                    } catch (e) {
+                        console.error('Erro ao fazer parse dos dados da peça:', e);
+                    }
+                });
+            });
 
             const buttonRetornar = card.querySelector('.btn-retornar');
             const buttonDeletar = card.querySelector('.btn-deletar');
@@ -502,6 +521,18 @@ export function carregarOrdensInterrompidas(filtros = {}) {
     })
     .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
 };
+
+function mostrarDetalhesPeca(peca) {
+    // 1. Preenche os campos do Modal
+    document.getElementById('modalPecaNome').textContent = peca.nome_peca || 'N/A';
+    document.getElementById('modalPecaQuantidade').textContent = peca.quantidade || 0;
+    document.getElementById('modalPecaDataRegistro').textContent = new Date(peca.data_registro).toLocaleString('pt-BR');
+
+    // 2. Abre o Modal (Requer a biblioteca JS do Bootstrap)
+    const modalElement = document.getElementById('modalDetalhesPeca');
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+}
 
 // Modal para "Interromper"
 function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) {

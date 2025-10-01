@@ -362,6 +362,11 @@ class PecasFaltantes(models.Model):
         on_delete=models.CASCADE, 
         related_name='pecas_faltantes'
     )
+    # Novo campo para identificar a interrupção (1ª, 2ª, 3ª, etc.)
+    numero_interrupcao = models.IntegerField(
+        default=1, 
+        verbose_name="Número da Interrupção"
+    ) 
     nome_peca = models.CharField(max_length=255, verbose_name="Nome da Peça Faltante")
     quantidade = models.FloatField(verbose_name="Quantidade Faltante")
     data_registro = models.DateTimeField(auto_now_add=True)
@@ -371,4 +376,5 @@ class PecasFaltantes(models.Model):
         verbose_name_plural = "Peças Faltantes"
 
     def __str__(self):
-        return f"Ordem {self.ordem.ordem} - Peça: {self.nome_peca} ({self.quantidade} faltante)"
+        # Atualiza a representação para incluir o número da interrupção
+        return f"Ordem {self.ordem.ordem}, Int. {self.numero_interrupcao} - Peça: {self.nome_peca} ({self.quantidade} faltante)"
