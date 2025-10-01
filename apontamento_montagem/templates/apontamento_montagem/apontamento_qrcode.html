@@ -12,6 +12,9 @@
     <div id='cardApontamentoQrCode' class="card shadow-lg border-0 rounded-4 mb-3 mx-auto w-100 mt-5" style="max-width: 420px; min-height: 270px;">
         <!-- Dados gerados dinamicamente -->
     </div>
+
+    <h3>Finalizar Ordens</h3>
+    <div id="listaOrdensIniciadas"></div>
     
 </div>
 
@@ -29,6 +32,49 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-primary" id="confirmStartButton">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Modal de Finalização de Ordem -->
+<div class="modal fade" id="finalizarModal" tabindex="-1" aria-labelledby="finalizarModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="finalizarModalLabel">Finalizar Ordem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="finalizarForm">
+                <input type="hidden" id="ordemIdFinalizar">
+                <div class="mb-3">
+                    <label id="labelOperadores" data-maquina="" for="operadorFinal" class="form-label">Operador</label>
+                    <select id="operadorFinal" data-active="true" class="form-select" required>
+                        <option value="">Selecione um operador...</option>
+                        <!-- Operadores serão carregados dinamicamente -->
+                    </select>
+                    <select id="todosOperadorFinal" data-active="false" class="form-select" style="display: none;" required>
+                        <option value="">Selecione um operador...</option>
+                        <!-- Operadores serão carregados dinamicamente -->
+                    </select>
+                    <p id="descricaoBotaoLista" style="font-size: 12px; text-align: end;">Não encontrou seu nome na lista? <a id="direcionarTodosOperadores" style="color: #0d6efd; cursor: pointer;">Clique aqui</a></p>
+                    <p id="descricaoBotaoVoltar" style="display: none; font-size: 12px; text-align: end;">Deseja voltar a lista anterior? <a id="botaoVoltarOperadoresMaquina" style="color: #0d6efd; cursor: pointer;">Voltar</a></p>
+                </div>
+                <div class="mb-3">
+                    <label for="qtRealizada" class="form-label">Quantidade Realizada</label>
+                    <input type="number" class="form-control" id="qtRealizada" required>
+                </div>
+                <div class="mb-3">
+                    <label for="obsFinalizar" class="form-label">Observação</label>
+                    <textarea class="form-control" id="obsFinalizar" rows="3"></textarea>
+                </div>
+                </form>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-success" id="confirmFinalizar">Finalizar</button>
             </div>
         </div>
     </div>
