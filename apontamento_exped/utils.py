@@ -64,6 +64,32 @@ def chamar_impressora(cliente, data_carga, nome_pacote, obs):
     r.rpush("print-zebra", json.dumps(payload))
     print(job_id)
 
+def chamar_impressora_qrcode():
+
+    # Monta o ZPL final
+    zpl = f"""
+
+
+^XA
+^MMT
+^PW799
+^LL0400
+^LS0
+^PR1,1,1
+~SD14
+^FT40,350^BQN,2,7
+^FDLA,https://apontamento-v2-testes.onrender.com/montagem/apontamento-qrcode/?ordem_id=36680&selecao_setor=pendente^FS
+^PQ1,0,1,Y
+^XZ
+    """
+
+    r = redis.from_url("redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210")
+
+    job_id = str(uuid.uuid4())
+    payload = {"job_id": job_id, "zpl": zpl}
+    r.rpush("print-zebra", json.dumps(payload))
+    print(job_id)
+
 def buscar_conjuntos_carreta(carretas):
 
     """

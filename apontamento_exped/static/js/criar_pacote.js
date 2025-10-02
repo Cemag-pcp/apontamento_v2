@@ -1,5 +1,6 @@
 import { popularPacotesDaCarga } from './carregar_cargas.js';
-import { carregarCargasKanban } from './kanbans.js';
+import { atualizarSlotAvancar } from './kanbans.js';
+
 
 document.addEventListener('DOMContentLoaded', function () {
     const itensContainer  = document.getElementById('itensPacote');
@@ -11,7 +12,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function invalidatePendencias(carregamentoId) {
         if (pendenciasCache.has(carregamentoId)) pendenciasCache.delete(carregamentoId);
     }
-
 
     // --- Util: CSRF (se já tiver essa função em outro lugar, pode remover daqui)
     function getCookie(name) {
@@ -70,71 +70,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         return row;
-    }
-
-    async function resetFormCriarPacote({ novaLinha = true } = {}) {
-    const formCriarPacote = document.getElementById('formCriar');
-    const itensContainer  = document.getElementById('itensPacote');
-
-    if (!formCriarPacote || !itensContainer) {
-        console.warn('Form ou container não encontrados para reset.');
-        return;
-    }
-
-    // 1) destruir Select2 das linhas atuais
-    itensContainer.querySelectorAll('select.campo-item').forEach(sel => {
-        if (window.$ && $(sel).data('select2')) $(sel).select2('destroy');
-    });
-
-    // 2) resetar o form (mantém o hidden; remova se quiser limpar também)
-    formCriarPacote.reset();
-
-    // 3) limpar o container
-    itensContainer.innerHTML = '';
-
-    // 4) criar uma nova linha + recarregar pendências
-    if (!novaLinha) return;
-
-    const idCargaEl = document.getElementById('idCargaPacote');
-    const idCarga   = idCargaEl?.value;
-
-    // cria a linha vazia
-    const row = criarRowItem(); // sua função já existente que cria a <div class="item-pacote"> com o <select.campo-item>
-    itensContainer.appendChild(row);
-
-    const selectEl = row.querySelector('.campo-item');
-
-    // estado de carregamento no select (visual)
-    if (selectEl) {
-        const optLoading = document.createElement('option');
-        optLoading.value = '';
-        optLoading.textContent = 'Carregando pendências...';
-        selectEl.appendChild(optLoading);
-    }
-
-    // se não houver idCarga, não tem como buscar pendências
-    if (!idCarga) {
-        console.warn('idCargaPacote vazio. Não é possível carregar pendências.');
-        return;
-    }
-
-    try {
-        const itens = await carregarPendencias(idCarga); // sua função util já criada
-        // limpa opções placeholder
-        if (selectEl) selectEl.innerHTML = '';
-        // inicializa Select2 com os itens
-        initSelect2Local(selectEl, itens); // ou initSelect2Ajax(selectEl, idCarga) se preferir modo AJAX
-    } catch (e) {
-        console.error('Falha ao recarregar pendências:', e);
-        // fallback visual de erro
-        if (selectEl) {
-        selectEl.innerHTML = '';
-        const optErr = document.createElement('option');
-        optErr.value = '';
-        optErr.textContent = 'Erro ao carregar pendências';
-        selectEl.appendChild(optErr);
-        }
-    }
     }
 
     // Inicializa Select2 com dados pré-carregados
@@ -303,17 +238,20 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        if (itens.length === 0) {
-            alert('Adicione pelo menos um item válido (pendência + quantidade > 0).');
-            btnFormCriar.disabled = false;
-            btnFormCriar.innerHTML = 'Salvar';
-            return;
-        }
+        // if (itens.length === 0) {
+        //     alert('Adicione pelo menos um item válido (pendência + quantidade > 0).');
+        //     btnFormCriar.disabled = false;
+        //     btnFormCriar.innerHTML = 'Salvar';
+        //     return;
+        // }
+        
+        const pacoteExistenteVal = fd.get('pacoteExistente'); // <select id="pacoteExistente">
 
         const payload = {
             nomePacote: fd.get('nomePacote'),
             observacoesPacote: fd.get('observacoesPacote') || '',
             idCargaPacote: fd.get('idCargaPacote'),
+            pacoteExistenteId: pacoteExistenteVal ? Number(pacoteExistenteVal) : null,
             itens
         };
 
@@ -328,11 +266,14 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             if (!resp.ok) {
-            const erro = await resp.text();
-            console.error('Erro ao salvar pacote:', erro);
-            alert(erro);
-            return;
+                const erro = await resp.text();
+                console.error('Erro ao salvar pacote:', erro);
+                alert(erro);
+                return;
             }
+
+            const data = await resp.json();
+            console.log(data);
 
             // Fecha este modal e abre o visualizar
             const modalCriarEl = document.getElementById('criarPacoteModal');
@@ -342,7 +283,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const onHidden = async () => {
             modalCriarEl.removeEventListener('hidden.bs.modal', onHidden);
                 // força recarregar pendências no reset
-                await resetFormCriarPacote({ novaLinha: true, refresh: true });
+                await resetFormCriarPacote({ novaLinha: false, refresh: true });
             };
             modalCriarEl.addEventListener('hidden.bs.modal', onHidden);
 
@@ -357,15 +298,15 @@ document.addEventListener('DOMContentLoaded', function () {
             if (idCarga) invalidatePendencias(idCarga);
 
             if (idCarga) {
-            popularPacotesDaCarga(idCarga);
+                popularPacotesDaCarga(idCarga);
             }
 
             if (idCargaPacoteEl?.value) {
                 // sua função já existente
                 popularPacotesDaCarga(idCargaPacoteEl.value);
             }
-
-            carregarCargasKanban();
+            
+            atualizarSlotAvancar(idCarga, data.info_add.todos_pacotes_tem_foto_verificacao, data.etapa);
 
         } catch (err) {
             console.error(err);
@@ -384,3 +325,58 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => modalVisualizar.show(), 300);
     });
 });
+
+export async function resetFormCriarPacote({ novaLinha = false, refresh = false } = {}) {
+    const formCriarPacote = document.getElementById('formCriar');
+    const itensContainer  = document.getElementById('itensPacote');
+    if (!formCriarPacote || !itensContainer) return;
+
+    // destruir Select2 existentes
+    itensContainer.querySelectorAll('select.campo-item').forEach(sel => {
+        if (window.$ && $(sel).data('select2')) $(sel).select2('destroy');
+    });
+
+    // resetar form e limpar container
+    formCriarPacote.reset();
+    itensContainer.innerHTML = '';
+
+    if (!novaLinha) return;
+
+    const idCarga = document.getElementById('idCargaPacote')?.value;
+
+    // cria nova linha
+    const row = criarRowItem();
+    itensContainer.appendChild(row);
+    const selectEl = row.querySelector('.campo-item');
+
+    // placeholder visual
+    if (selectEl) {
+        selectEl.innerHTML = '';
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Carregando pendências...';
+        selectEl.appendChild(opt);
+    }
+
+    if (!idCarga) {
+        console.warn('idCargaPacote vazio ao resetar.');
+        return;
+    }
+
+    try {
+        // aqui forçamos nova leitura do backend se refresh = true
+        const itens = await carregarPendencias(idCarga, { refresh });
+        if (selectEl) selectEl.innerHTML = '';
+        initSelect2Local(selectEl, itens);   // ou initSelect2Ajax(selectEl, idCarga)
+    } catch (e) {
+        console.error('Falha ao recarregar pendências no reset:', e);
+        if (selectEl) {
+        selectEl.innerHTML = '';
+        const optErr = document.createElement('option');
+        optErr.value = '';
+        optErr.textContent = 'Erro ao carregar pendências';
+        selectEl.appendChild(optErr);
+        }
+    }
+}
+

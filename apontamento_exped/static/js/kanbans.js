@@ -1,5 +1,6 @@
 import { popularPacotesDaCarga, wireModalAlterarPacote } from './carregar_cargas.js';
 import { getCookie } from './criar_caixa.js';
+import { renderStatusCarretas } from './verificar_carretas.js'
 
 // Cache simples para não bombardear a API ao renderizar vários cards
 const _pendenciasCache = new Map();
@@ -22,10 +23,6 @@ function mapStage(carga) {
 export async function verificarPendencias(carregamentoId) {
   if (!carregamentoId) return null;
 
-  if (_pendenciasCache.has(carregamentoId)) {
-    return _pendenciasCache.get(carregamentoId);
-  }
-
   try {
     const resp = await fetch(`api/verificar-pendencias/${encodeURIComponent(carregamentoId)}/`, {
       headers: { 'Accept': 'application/json' }
@@ -33,7 +30,6 @@ export async function verificarPendencias(carregamentoId) {
     if (!resp.ok) throw new Error(await resp.text());
     const data = await resp.json();
     const total = Number(data?.total_itens_pendente ?? 0);
-    _pendenciasCache.set(carregamentoId, total);
     return total;
   } catch (e) {
     console.error('Falha ao verificar pendências:', e);
@@ -45,7 +41,7 @@ export async function verificarPendencias(carregamentoId) {
  * Cria o botão "Avançar estágio" com os mesmos atributos que você já usava
  * e conecta o listener de abertura do modal.
  */
-function criarBotaoAvancar(cargaId) {
+export function criarBotaoAvancar(cargaId) {
   const btn = document.createElement('button');
   btn.className = 'btn btn-sm btn-outline-primary avancar-estagio';
   btn.title = 'Proximo estágio';
@@ -77,50 +73,146 @@ export async function preencherSlotAvancar(carga, slotEl) {
   slotEl.innerHTML = '';
 
   if (carga.stage === 'planejamento') {
+    // container horizontal para botão + avisos
+    const row = document.createElement('div');
+    row.className = 'd-flex align-items-center gap-2';
 
-    const totalPend = await verificarPendencias(carga.id);
+    // botão sempre presente
+    const btn = criarBotaoAvancar(carga.id);
+    row.appendChild(btn);
 
-    // Se a API falhar, por segurança não avança automaticamente
-    if (totalPend === null) {
+    // verificar pendências
+    let totalPend = null;
+    try {
+      totalPend = await verificarPendencias(carga.id);
+    } catch (_) {
+      totalPend = null;
+    }
+
+    const pend = (totalPend === null || totalPend === undefined) ? null : Number(totalPend);
+
+    if (pend === null) {
       const warn = document.createElement('div');
       warn.className = 'alert alert-secondary mb-0 py-1 px-2 small';
       warn.textContent = 'Não foi possível verificar pendências.';
-      slotEl.replaceChildren(warn);
-      return;
-    }
-
-    if (totalPend > 0) {
-      // ALERTA no lugar do botão
+      row.appendChild(warn);
+    } else if (pend > 0) {
       const warn = document.createElement('div');
       warn.className = 'alert alert-warning mb-0 py-1 px-2 small';
-      warn.textContent = '';
-      warn.textContent = `Contém ${totalPend} item(ns) sem pacotes.`;
-      slotEl.replaceChildren(warn);
-    } else {
-      // Sem pendências -> renderiza o botão
-      slotEl.replaceChildren(criarBotaoAvancar(carga.id));
+      warn.textContent = `Contém ${pend} item(ns) sem pacotes.`;
+      row.appendChild(warn);
     }
 
+    slotEl.replaceChildren(row);
     return;
   }
 
-  // --- Demais estágios: mantém sua lógica
+  // --- Demais estágios ---
   if (carga.stage === 'verificacao' && carga.todos_pacotes_tem_foto_verificacao) {
-    slotEl.replaceChildren(criarBotaoAvancar(carga.id));
-  } else if (carga.stage === 'planejamento') {
-    // (fallback: se chegar aqui por algum motivo, mantém botão)
+    // Verificação ok -> botão avançar
     slotEl.replaceChildren(criarBotaoAvancar(carga.id));
   } else if (carga.stage === 'despachado' && carga.todos_pacotes_tem_foto_despachado) {
+    // Despachado -> badge OK
     const ok = document.createElement('span');
     ok.className = 'badge bg-success';
     ok.textContent = 'Despachado';
     slotEl.replaceChildren(ok);
   } else {
-    const pend = document.createElement('span');
-    pend.className = 'badge bg-warning';
-    pend.textContent = 'Aguardando fotos';
-    slotEl.replaceChildren(pend);
+    // Aguardando fotos -> badge + (novo) warning de pendências ao lado
+    const row = document.createElement('div');
+    row.className = 'd-flex align-items-center gap-2';
+
+    const pendBadge = document.createElement('span');
+    pendBadge.className = 'badge bg-warning';
+    pendBadge.textContent = 'Aguardando fotos';
+    row.appendChild(pendBadge);
+
+    // buscar pendências para exibir ao lado
+    let totalPend = null;
+    try {
+      totalPend = await verificarPendencias(carga.id);
+    } catch (_) {
+      totalPend = null;
+    }
+    const pend = (totalPend === null || totalPend === undefined) ? null : Number(totalPend);
+
+    if (pend === null) {
+      const warn = document.createElement('div');
+      warn.className = 'alert alert-secondary mb-0 py-1 px-2 small';
+      warn.textContent = 'Não foi possível verificar pendências.';
+      row.appendChild(warn);
+    } else if (pend > 0) {
+      const warn = document.createElement('div');
+      warn.className = 'alert alert-warning mb-0 py-1 px-2 small';
+      warn.textContent = `Contém ${pend} item(ns) sem pacotes.`;
+      row.appendChild(warn);
+    }
+    // se pend === 0, não mostra o warning (fica só o badge)
+
+    slotEl.replaceChildren(row);
   }
+}
+
+export async function atualizarSlotAvancar(dataId, todas_fotos_verificacao, etapa_atual) {
+  // acha o card/slot
+  const card = document.querySelector(`.card[data-id='${dataId}']`);
+  if (!card) return;
+  const slotEl = card.querySelector('.slot-avancar');
+  if (!slotEl) return;
+
+  // container horizontal para botão + aviso
+  const row = document.createElement('div');
+  row.className = 'd-flex align-items-center gap-2';
+
+  if (etapa_atual === 'verificacao' && todas_fotos_verificacao){
+    const btn = criarBotaoAvancar(dataId);
+    row.appendChild(btn);
+
+  } else if (etapa_atual === 'planejamento') {
+    const btn = criarBotaoAvancar(dataId);
+    row.appendChild(btn);
+  }
+
+  const pendBadge = document.createElement('span');
+  pendBadge.innerHTML = '';
+  
+  if (!todas_fotos_verificacao){
+    pendBadge.className = 'badge bg-warning';
+    pendBadge.textContent = 'Aguardando fotos';
+    row.appendChild(pendBadge);
+  }
+
+  // busca pendências
+  let totalPend = null;
+  try {
+    totalPend = await verificarPendencias(dataId);
+  } catch (_) {
+    totalPend = null;
+  }
+
+  // normaliza para número
+  const pend = (totalPend === null || totalPend === undefined) ? null : Number(totalPend);
+
+  // adiciona aviso à direita do botão (quando aplicável)
+  if (pend === null) {
+    const note = document.createElement('span');
+    note.className = 'badge rounded-pill bg-secondary';
+    note.title = 'Não foi possível verificar pendências agora';
+    note.textContent = 'indefinido';
+    row.appendChild(note);
+  } else if (pend > 0) {
+    // ALERTA (texto) como antes
+    const warn = document.createElement('div');
+    warn.className = 'alert alert-warning mb-0 py-1 px-2 small';
+    warn.textContent = `Contém ${pend} item(ns) sem pacotes.`;
+    row.appendChild(warn);
+  }
+  // se pend === 0, não mostra nada além do botão
+
+  // !!! Um único replaceChildren no final (não sobrescreve o aviso)
+  slotEl.replaceChildren(row);
+
+  console.log('alterado com sucesso', pend);
 }
 
 /**
@@ -128,11 +220,18 @@ export async function preencherSlotAvancar(carga, slotEl) {
  * Observação: o "slot" do avançar é preenchido depois (assíncrono),
  * para permitir a chamada na API de pendências sem travar a renderização.
  */
-function createKanbanCard(carga) {
+export function createKanbanCard(carga) {
+  
   const card = document.createElement('div');
   card.className = 'card card-kanban shadow-sm mb-2';
   card.draggable = true;
+  
+  console.log(carga);
+
   card.dataset.id = carga.id;
+  card.dataset.stage = (carga.stage || '').toLowerCase();
+  card.dataset.cliente = (carga.cliente || '').toLowerCase();
+  card.dataset.dataCarga = (carga.data_carga || ''); // formato YYYY-MM-DD
 
   const header = document.createElement('div');
   header.className = 'card-header py-1 d-flex justify-content-between align-items-center';
@@ -144,7 +243,11 @@ function createKanbanCard(carga) {
   const body = document.createElement('div');
   body.className = 'card-body py-2';
   body.innerHTML = `
-    <div class="small text-muted mb-1">Dt. Carga: ${formatarData(carga.data_carga)}</div>
+    <div class="small text-muted mb-1">
+      Dt. Carga: ${formatarData(carga.data_carga)}
+      <span class="status-carretas align-middle ms-2"></span>
+      <span class="status-por-carreta align-middle ms-2"></span>
+    </div>
     <div class="small text-muted">${carga.cliente}</div>
     <div class="mt-2 d-flex gap-2 align-items-start">
       <button class="btn btn-sm btn-outline-primary ver-pacotes" title="Ver pacotes"
@@ -154,6 +257,9 @@ function createKanbanCard(carga) {
       <span class="slot-avancar d-inline-flex"></span>
     </div>
   `;
+
+  // Renderiza o badge de status assim que o card for montado:
+  renderStatusCarretas(body.querySelector('.status-carretas'), carga.id);
 
   // Evento: abrir modal de pacotes (mantido)
   body.querySelector('.ver-pacotes').addEventListener('click', function () {
@@ -166,8 +272,8 @@ function createKanbanCard(carga) {
   });
 
   // Preencher o slot do avançar (botão/alerta) de forma assíncrona
-  const slotAvancar = body.querySelector('.slot-avancar');
-  preencherSlotAvancar(carga, slotAvancar);
+  // const slotAvancar = body.querySelector('.slot-avancar');
+  // preencherSlotAvancar(carga, slotAvancar);
 
   // Drag events (mantidos)
   card.addEventListener('dragstart', (e) => {
@@ -182,39 +288,63 @@ function createKanbanCard(carga) {
   return card;
 }
 
-document.getElementById('formAvancarEstagio').addEventListener('submit', async function(e) {
-    e.preventDefault();
+document.getElementById('formAvancarEstagio').addEventListener('submit', async function (e) {
+  e.preventDefault();
 
-    const id = document.getElementById('idItemAvancar').value;
+  const id = document.getElementById('idItemAvancar').value;
+  const btnConfirmarAvanco = document.getElementById('btnConfirmarAvanco');
+  btnConfirmarAvanco.disabled = true;
+  btnConfirmarAvanco.innerHTML = 'Confirmando...';
 
-    const btnConfirmarAvanco = document.getElementById('btnConfirmarAvanco');
-    btnConfirmarAvanco.disabled = true;
-    btnConfirmarAvanco.innerHTML = 'Confirmando...';
-
-    try {
-      const resp = await fetch(`api/alterar-stage/${id}/`, {
+  try {
+    const resp = await fetch(`api/alterar-stage/${id}/`, {
       method: 'POST',
       headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCookie('csrftoken')
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
       },
-          body: JSON.stringify({ stage: '' })
-      });
-      console.log(resp);
-      if (!resp.ok) throw new Error('Falha ao avançar estágio');
+      body: JSON.stringify({ stage: '' })
+    });
 
-      bootstrap.Modal.getInstance(document.getElementById('modalAvancarEstagio')).hide();
-      carregarCargasKanban();
+    if (!resp.ok) throw new Error('Falha ao avançar estágio');
 
-      btnConfirmarAvanco.disabled = false;
-      btnConfirmarAvanco.innerHTML = 'Confirmar avanço';
+    const data = await resp.json(); // espera { stage_antigo, novo_stage, ... }
 
-    } catch (err) {
-      alert('Erro ao avançar estágio.');
-      btnConfirmarAvanco.disabled = false;
-      btnConfirmarAvanco.innerHTML = 'Confirmar avanço';
-      console.error(err);
+    // Fecha modal
+    bootstrap.Modal.getInstance(document.getElementById('modalAvancarEstagio'))?.hide();
+
+    // === 1) Seleciona o card atual pelo data-id
+    const cardEl = document.querySelector(`.card.card-kanban[data-id='${id}']`);
+    if (!cardEl) {
+      console.warn('Card não encontrado no DOM:', id);
+    } else {
+      // === 2) Acha a nova lista do kanban (#col-<stage>) e move o card pra lá
+      const stageKey = String(data.novo_stage || '').toLowerCase(); // ex.: 'verificacao'
+      const destinoCol = document.getElementById(`col-${stageKey}`);
+
+      if (!destinoCol) {
+        console.error('Coluna destino não encontrada:', `col-${stageKey}`);
+      } else {
+        destinoCol.appendChild(cardEl);          // move o card
+        cardEl.dataset.stage = data.novo_stage;  // opcional
+      }
     }
+
+    // Atualiza o slot do botão + warning do próprio card movido
+    try {
+      await atualizarSlotAvancar(id, false, data.novo_stage);
+    } catch (e2) {
+      console.warn('Falha ao atualizar slot avançar:', e2);
+    }
+
+    btnConfirmarAvanco.disabled = false;
+    btnConfirmarAvanco.innerHTML = 'Confirmar avanço';
+  } catch (err) {
+    alert('Erro ao avançar estágio.');
+    btnConfirmarAvanco.disabled = false;
+    btnConfirmarAvanco.innerHTML = 'Confirmar avanço';
+    console.error(err);
+  }
 });
 
 function setupDropZones() {
@@ -268,14 +398,8 @@ export async function carregarCargasKanban() {
     // limpar colunas
     [colPlanej, colVerif, colDesp].forEach(col => col.innerHTML = '');
 
-    if (!Array.isArray(cargas) || cargas.length === 0) {
-      [colPlanej, colVerif, colDesp].forEach(col => {
-        col.innerHTML = '<div class="text-muted small">Sem cargas</div>';
-      });
-      return;
-    }
-
     cargas.forEach((carga) => {
+      
       const stage = mapStage(carga);
       const card  = createKanbanCard(carga); // cria card com .slot-avancar
 
@@ -293,7 +417,8 @@ export async function carregarCargasKanban() {
         // não bloqueia a UI — roda async
         preencherSlotAvancar(carga, slot);
       }
-    });
+
+    }); 
 
   } catch (err) {
     console.error(err);
