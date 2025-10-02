@@ -54,85 +54,92 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return; 
     }
+    
     // Para pegar um parâmetro específico, por exemplo 'ordem_id':
     const ordemId = params.get('ordem_id');
-    const cardApontamentoQrCode = document.getElementById('cardApontamentoQrCode');
 
-    // Exibe loader antes do fetch
-    cardApontamentoQrCode.innerHTML = `
-        <div class="d-flex justify-content-center align-items-center" style="min-height: 270px;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-        </div>
-    `;
-
+    // Carrega os dados iniciais da ordem
+    carregarDadosOrdem(ordemId);
     fetchOrdensIniciadas();
 
-    fetch(`/montagem/api/apontamento-qrcode/?ordem_id=${ordemId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                // Processar os dados recebidos
-                console.log(data);
+    // Função para carregar os dados da ordem
+    function carregarDadosOrdem(ordemId) {
+        const cardApontamentoQrCode = document.getElementById('cardApontamentoQrCode');
 
-                const ordem = data.dados;
+        // Exibe loader antes do fetch
+        cardApontamentoQrCode.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center" style="min-height: 270px;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        `;
 
-                const statusClass =
-                    ordem.status === 'finalizada' ? 'bg-success' :
-                    ordem.status === 'iniciada' ? 'bg-primary' :
-                    ordem.status === 'aguardando_iniciar' ? 'bg-warning' : 
-                    ordem.status === 'interrompida' ? 'bg-danger' : 'bg-secondary';
+        fetch(`/montagem/api/apontamento-qrcode/?ordem_id=${ordemId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Processar os dados recebidos
+                    console.log(data);
 
-                cardApontamentoQrCode.innerHTML = `
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
-                        <h6 class="card-title fw-bold mb-0 fs-5">#${ordem.peca}</h6>
-                    </div>
-                    <div class="card-body bg-white p-3">
-                        <p class="card-text mb-3">
-                            <strong>Data Carga:</strong> ${ordem.data_carga}
-                        </p>
-                        <p class="card-text mb-3">
-                            <strong>Quantidade a fazer:</strong> ${ordem.qtd_planejada}
-                        </p>
-                        <p class="card-text mb-3">
-                            <strong>Quantidade feita:</strong> ${ordem.qtd_boa}
-                        </p>
-                        <p class="card-text mb-0"><strong>Status: </strong><span class="badge ${statusClass}">${ordem.status}</span></p>
-                    </div>
-                    <div class="card-footer d-flex justify-content-end align-items-center bg-white p-3 border-top">
-                        <button class="btn btn-warning btn-sm" title="Iniciar">
-                            <i class="fa fa-play"></i> Iniciar
-                        </button>
-                    </div>
-                `
-                // Atualizar a interface do usuário conforme necessário
-            } else {
-                console.error('Erro na resposta da API:', data.message);
+                    const ordem = data.dados;
 
-                cardApontamentoQrCode.innerHTML = `<div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 270px;">
-                    <div class="alert alert-danger w-100 text-center mb-4" role="alert" style="max-width: 380px;">
-                        <i class="fa fa-exclamation-triangle me-2"></i>
-                        <strong>Erro:</strong> ${data.message}
-                        <div class="mt-2 small text-muted">
-                            Verifique se o QR Code ou o link está correto.
+                    const statusClass =
+                        ordem.status === 'finalizada' ? 'bg-success' :
+                        ordem.status === 'iniciada' ? 'bg-primary' :
+                        ordem.status === 'aguardando_iniciar' ? 'bg-warning' : 
+                        ordem.status === 'interrompida' ? 'bg-danger' : 'bg-secondary';
+
+                    cardApontamentoQrCode.innerHTML = `
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
+                            <h6 class="card-title fw-bold mb-0 fs-5">#${ordem.peca}</h6>
                         </div>
-                    </div>
-                    <a href="/montagem/" class="btn btn-primary btn-lg">
-                        <i class="fa fa-arrow-left me-2"></i> Voltar para Montagem
-                    </a>
-                </div>`;
+                        <div class="card-body bg-white p-3">
+                            <p class="card-text mb-3">
+                                <strong>Data Carga:</strong> ${ordem.data_carga}
+                            </p>
+                            <p class="card-text mb-3">
+                                <strong>Quantidade a fazer:</strong> ${ordem.qtd_planejada}
+                            </p>
+                            <p class="card-text mb-3">
+                                <strong>Quantidade feita:</strong> ${ordem.qtd_boa}
+                            </p>
+                            <p class="card-text mb-0"><strong>Status: </strong><span class="badge ${statusClass}">${ordem.status}</span></p>
+                        </div>
+                        <div class="card-footer d-flex justify-content-end align-items-center bg-white p-3 border-top">
+                            <button class="btn btn-warning btn-sm" title="Iniciar">
+                                <i class="fa fa-play"></i> Iniciar
+                            </button>
+                        </div>
+                    `
+                    // Atualizar a interface do usuário conforme necessário
+                } else {
+                    console.error('Erro na resposta da API:', data.message);
 
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: data.message || 'Ocorreu um erro ao tentar iniciar a ordem. Tente novamente.',
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao chamar a API:', error);
-        });
+                    cardApontamentoQrCode.innerHTML = `<div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 270px;">
+                        <div class="alert alert-danger w-100 text-center mb-4" role="alert" style="max-width: 380px;">
+                            <i class="fa fa-exclamation-triangle me-2"></i>
+                            <strong>Erro:</strong> ${data.message}
+                            <div class="mt-2 small text-muted">
+                                Verifique se o QR Code ou o link está correto.
+                            </div>
+                        </div>
+                        <a href="/montagem/" class="btn btn-primary btn-lg">
+                            <i class="fa fa-arrow-left me-2"></i> Voltar para Montagem
+                        </a>
+                    </div>`;
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Ocorreu um erro ao tentar carregar a ordem. Tente novamente.',
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao chamar a API:', error);
+            });
+    }
 
     document.addEventListener('click', function(event) {
         if (event.target.closest('.btn-warning')) {
@@ -154,9 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const maxItens = btn.getAttribute('data-max-itens');
 
             mostrarModalFinalizar(ordemIdFinalizar, maquina, maxItens);
-
         }
-
     });
 
     document.getElementById('confirmStartButton').addEventListener('click', async function() {
@@ -164,7 +169,9 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(ordemFoiIniciada);
 
         if (ordemFoiIniciada){
-            window.location.href = "/montagem/";
+            // Ao invés de redirecionar, recarrega os dados
+            carregarDadosOrdem(ordemId);
+            fetchOrdensIniciadas();
         }
     });
 
@@ -307,20 +314,20 @@ document.addEventListener('DOMContentLoaded', function() {
             finalizarModal.hide();
             Swal.close();
 
+            // Ao invés de redirecionar, recarrega os dados
+            const params = new URLSearchParams(window.location.search);
+            const currentOrdemId = params.get('ordem_id');
+            
             Swal.fire({
                 icon: 'success',
                 title: 'Sucesso!',
                 text: 'Ordem finalizada com sucesso.'
-
+            }).then(() => {
+                // Recarrega o card com os dados atualizados da ordem
+                carregarDadosOrdem(currentOrdemId);
+                // Atualiza a lista de ordens iniciadas
+                fetchOrdensIniciadas();
             });
-
-            //Redirecionando para a tela de apontamento de montagem
-            setTimeout(function(){
-                window.location.href = '/montagem/';
-            }, 1000);
-            
-
-
         })
         .catch(error => {
             Swal.fire({
