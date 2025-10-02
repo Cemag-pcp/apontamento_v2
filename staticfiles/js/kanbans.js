@@ -27,7 +27,7 @@ function createKanbanCard(carga) {
     `;
     
     let btnElementAvancarEstagio = '';
-    console.log(carga)
+
     if (carga.stage === 'verificacao' && carga.todos_pacotes_tem_foto_verificacao) {
         btnElementAvancarEstagio =`
         <button class="btn btn-sm btn-outline-primary avancar-estagio" title="Proximo estágio"
@@ -35,7 +35,14 @@ function createKanbanCard(carga) {
             <i class="fas fa-arrow-right ms-1"></i>
         </button>
         `
-    } else if (carga.stage === 'apontamento') {
+      } else if (carga.stage === 'planejamento') {
+        btnElementAvancarEstagio =`
+        <button class="btn btn-sm btn-outline-primary avancar-estagio" title="Proximo estágio"
+                data-bs-toggle="modal" data-bs-target="#modalAvancarEstagio" data-id-carga="${carga.id}">
+            <i class="fas fa-arrow-right ms-1"></i>
+        </button>
+      `
+      } else if (carga.stage === 'apontamento') {
         btnElementAvancarEstagio =`
         <button class="btn btn-sm btn-outline-primary avancar-estagio" title="Proximo estágio"
                 data-bs-toggle="modal" data-bs-target="#modalAvancarEstagio" data-id-carga="${carga.id}">

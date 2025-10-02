@@ -29,6 +29,7 @@ $(document).ready(function () {
             },  // Coluna para o botão de expansão dos detalhes
             {
                 data: 'rpa',
+                orderable: false,
                 render: function (data, type, row) {
                     if (data === 'OK') {
                         return '<span class="badge bg-success">Ok</span>';
@@ -39,17 +40,18 @@ $(document).ready(function () {
                     }
                 }
             },
-            { data: 'data_solicitacao' },
-            { data: 'classe_requisicao' },
-            { data: 'item__nome' },
-            { data: 'quantidade' },
-            { data: 'cc__nome' },
-            { data: 'funcionario__nome' },
-            { data: 'obs' },
-            { data: 'entregue_por__nome' },
-            { data: 'data_entrega' },
+            { data: 'data_solicitacao', orderable: false },
+            { data: 'classe_requisicao', orderable: false },
+            { data: 'item__nome', orderable: false },
+            { data: 'quantidade', orderable: false },
+            { data: 'cc__nome', orderable: false },
+            { data: 'funcionario__nome', orderable: false },
+            { data: 'obs', orderable: false },
+            { data: 'entregue_por__nome', orderable: false },
+            { data: 'data_entrega', orderable: false },
             {
                 data: 'status',  // Nome diferente para evitar conflito
+                orderable: false,
                 render: function (data, type, row) {
                     if (data === 'Entregue') {
                         return '<span class="badge bg-success">Entregue</span>';
@@ -60,7 +62,7 @@ $(document).ready(function () {
             },
             
         ],
-        order: [[1, 'asc']],
+        order: [[2, 'desc']],
         language: {
             search: "Procurar pelo nome do item"
         }

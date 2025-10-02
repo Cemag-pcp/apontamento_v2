@@ -39,7 +39,7 @@ from core.utils import (
     verificar_e_notificar_transferencias_pendentes,
 )
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 
@@ -173,29 +173,6 @@ def solicitacao_data_requisicao(request):
         start = int(request.POST.get("start", 0))
         length = int(request.POST.get("length", 10))
 
-        # Ordenação
-        order_column_index = int(request.POST.get("order[0][column]", 0))
-        order_dir = request.POST.get("order[0][dir]", "asc")
-
-        # Mapeamento do índice da coluna para o campo correspondente no banco de dados
-        columns = [
-            "classe_requisicao",
-            "quantidade",
-            "obs",
-            "data_solicitacao",
-            "cc__nome",
-            "funcionario__nome",
-            "item__nome",
-            "entregue_por__nome",
-            "data_entrega",
-            "rpa",
-        ]
-
-        order_column = columns[order_column_index]
-
-        if order_dir == "desc":
-            order_column = "-" + order_column
-
         # Filtro de busca
         search_value = request.POST.get("search[value]", "")
 
@@ -209,7 +186,7 @@ def solicitacao_data_requisicao(request):
             )
 
         # Ordenação
-        solicitacoes = solicitacoes.order_by(order_column)
+        solicitacoes = solicitacoes.order_by('-data_solicitacao')
 
         # Paginação
         paginator = Paginator(solicitacoes, length)
@@ -222,6 +199,15 @@ def solicitacao_data_requisicao(request):
                 "Pendente entrega" if solicitacao.entregue_por is None else "Entregue"
             )
 
+            data_ajustada_solicitacao = solicitacao.data_solicitacao - timedelta(hours=3)
+            data_ajustada_entrega = solicitacao.data_solicitacao - timedelta(hours=3) if solicitacao.data_entrega else ""
+
+            if solicitacao.data_entrega:
+                data_ajustada_entrega = solicitacao.data_solicitacao - timedelta(hours=3)
+                data_ajustada_entrega = data_ajustada_entrega.strftime("%d/%m/%Y %H:%M")
+            else:
+                data_ajustada_entrega = ""
+
             # Acessando centros de custo (cc) do Funcionario
             cc_nomes = ", ".join([cc.nome for cc in solicitacao.funcionario.cc.all()])
 
@@ -230,7 +216,7 @@ def solicitacao_data_requisicao(request):
                     "classe_requisicao": solicitacao.classe_requisicao.nome,  # Ajustado para evitar a serialização do objeto
                     "quantidade": solicitacao.quantidade,
                     "obs": solicitacao.obs,
-                    "data_solicitacao": solicitacao.data_solicitacao.strftime(
+                    "data_solicitacao": data_ajustada_solicitacao.strftime(
                         "%d/%m/%Y %H:%M"
                     ),
                     "cc__nome": cc_nomes,  # Agora pegando corretamente os centros de custo
@@ -244,13 +230,9 @@ def solicitacao_data_requisicao(request):
                     "ultima_atualizacao": solicitacao.data_solicitacao.strftime(
                         "%d/%m/%Y %H:%M"
                     ),
-                    "data_entrega": (
-                        solicitacao.data_entrega.strftime("%d/%m/%Y %H:%M")
-                        if solicitacao.data_entrega
-                        else ""
-                    ),
+                    "data_entrega": data_ajustada_entrega,
                     "status": status,
-                    "rpa": solicitacao.rpa,
+                    "rpa": None if not solicitacao.rpa else (solicitacao.rpa if len(solicitacao.rpa) <= 45 else f"{solicitacao.rpa[:45]}..."),
                 }
             )
 
@@ -277,10 +259,6 @@ def solicitacao_data_transferencia(request):
         start = int(request.POST.get("start", 0))
         length = int(request.POST.get("length", 10))
 
-        # Ordenação
-        order_column_index = int(request.POST.get("order[0][column]", 0))
-        order_dir = request.POST.get("order[0][dir]", "asc")
-
         # Mapeamento do índice da coluna para o campo correspondente no banco de dados
         columns = [
             "quantidade",
@@ -295,11 +273,6 @@ def solicitacao_data_transferencia(request):
             "rpa",
         ]
 
-        order_column = columns[order_column_index]
-
-        if order_dir == "desc":
-            order_column = "-" + order_column
-
         # Filtrando as execuções (se houver busca)
         search_value = request.POST.get("search[value]", "")
 
@@ -309,7 +282,7 @@ def solicitacao_data_transferencia(request):
             solicitacoes = solicitacoes.filter(item__nome__contains=search_value)
 
         # Aplicando ordenação
-        solicitacoes = solicitacoes.order_by(order_column)
+        solicitacoes = solicitacoes.order_by('-data_solicitacao')
 
         # Paginação
         paginator = Paginator(solicitacoes, length)
@@ -320,11 +293,21 @@ def solicitacao_data_transferencia(request):
             status = (
                 "Pendente entrega" if solicitacao.entregue_por is None else "Entregue"
             )
+
+            data_ajustada_solicitacao = solicitacao.data_solicitacao - timedelta(hours=3)
+            data_ajustada_entrega = solicitacao.data_solicitacao - timedelta(hours=3) if solicitacao.data_entrega else ""
+
+            if solicitacao.data_entrega:
+                data_ajustada_entrega = solicitacao.data_solicitacao - timedelta(hours=3)
+                data_ajustada_entrega = data_ajustada_entrega.strftime("%d/%m/%Y %H:%M")
+            else:
+                data_ajustada_entrega = ""
+
             data.append(
                 {
                     "quantidade": solicitacao.quantidade,
                     "obs": solicitacao.obs,
-                    "data_solicitacao": solicitacao.data_solicitacao.strftime(
+                    "data_solicitacao": data_ajustada_solicitacao.strftime(
                         "%d/%m/%Y %H:%M"
                     ),
                     "deposito_destino__nome": solicitacao.deposito_destino.nome,
@@ -335,13 +318,9 @@ def solicitacao_data_transferencia(request):
                         if solicitacao.entregue_por
                         else ""
                     ),
-                    "data_entrega": (
-                        solicitacao.data_entrega.strftime("%d/%m/%Y %H:%M")
-                        if solicitacao.data_entrega
-                        else ""
-                    ),
+                    "data_entrega": data_ajustada_entrega,
                     "status": status,
-                    "rpa": solicitacao.rpa,
+                    "rpa": None if not solicitacao.rpa else (solicitacao.rpa if len(solicitacao.rpa) <= 45 else f"{solicitacao.rpa[:45]}..."),
                 }
             )
 
