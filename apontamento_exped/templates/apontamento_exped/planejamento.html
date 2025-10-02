@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="{% static 'css/badges.css' %}">
   <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
   <link rel="stylesheet" href="{% static 'css/table-fixed-header.css' %}">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
   <style>
       .table-container {
           max-height: 500px;
@@ -71,15 +73,12 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="mb-0">Apontamentos - Setor de Expedição</h2>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarCaixaModal">
-                    <i class="fas fa-plus me-2"></i>Criar Caixa
-                </button>
             </div>
         </div>
     </div>
 
     <!-- Cards de Indicadores -->
-    <div class="row mb-4">
+    <!-- <div class="row mb-4">
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
@@ -151,7 +150,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </div> -->
 
     <!-- Tabela de Apontamentos -->
     <!-- Kanban de Expedições -->
@@ -160,19 +159,41 @@
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
                     <h6 class="m-0 font-weight-bold text-primary">Quadro de Expedições</h6>
-                    <button class="btn btn-sm btn-outline-secondary" id="btnRefreshKanban">Atualizar</button>
+                    <!-- <button class="btn btn-sm btn-outline-secondary" id="btnRefreshKanban">Atualizar</button> -->
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarCaixaModal">
+                      <i class="fas fa-plus me-2"></i>Criar Carregamento
+                    </button>
+
                 </div>
                 <div class="card-body">
+                    <form id="filtrosKanban" class="row g-2 align-items-end mb-3">
+                      <div class="col-12 col-md-5">
+                        <label class="form-label mb-1" for="filtroCliente">Cliente</label>
+                        <input type="text" id="filtroCliente" class="form-control" placeholder="Digite parte do nome do cliente">
+                      </div>
+                      <div class="col-6 col-md-3">
+                        <label class="form-label mb-1" for="filtroDataCarga">Data da Carga</label>
+                        <input type="date" id="filtroDataCarga" class="form-control">
+                      </div>
+                      <div class="col-6 col-md-2">
+                        <label class="form-label mb-1" for="filtroStage">Etapa</label>
+                        <select id="filtroStage" class="form-select">
+                          <option value="">Todos</option>
+                          <option value="planejamento">Planejamento</option>
+                          <option value="verificacao">Verificação</option>
+                          <option value="despachado">Despachado</option>
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-2 d-flex gap-2">
+                        <!-- <button type="button" id="btnAplicarFiltros" class="btn btn-primary flex-fill">Filtrar</button> -->
+                        <button type="button" id="btnLimparFiltros" class="btn btn-outline-secondary flex-fill">Limpar</button>
+                      </div>
+                    </form>
                     <div class="kanban d-flex gap-3 flex-wrap">
                     <!-- Coluna: Planejamento -->
                     <div class="kanban-col flex-fill" data-stage="planejamento">
-                        <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Planejamento</div>
-                        <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-planejamento"></div>
-                    </div>
-                    <!-- Coluna: Apontamento -->
-                    <div class="kanban-col flex-fill" data-stage="apontamento">
                         <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Apontamento</div>
-                        <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-apontamento"></div>
+                        <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-planejamento"></div>
                     </div>
                     <!-- Coluna: Verificação -->
                     <div class="kanban-col flex-fill" data-stage="verificacao">
@@ -258,7 +279,7 @@
 
 <!-- Modal: para visualizar pacote dentro da caixa -->
 <div class="modal fade" id="visualizarPacote" tabindex="-1" aria-labelledby="visualizarPacoteLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="visualizarPacoteLabel">Visualizar pacotes</h5>
@@ -266,9 +287,6 @@
             </div>
             <div class="modal-body">
                 <div class="text-end">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal">
-                        <i class="fas fa-plus me-2"></i>Criar Pacote
-                    </button>
                 </div>
                 <!-- cards mostrando os pacotes -->
             </div>
@@ -288,11 +306,31 @@
 
       <div class="modal-body">
         <form id="formCriar">
-          <div class="mb-3">
+          <div class="mb-2">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="modoPacote" id="modoNovo" value="novo" checked>
+              <label class="form-check-label" for="modoNovo">Criar novo</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="modoPacote" id="modoExistente" value="existente">
+              <label class="form-check-label" for="modoExistente">Usar existente</label>
+            </div>
+          </div>
+
+          <!-- Novo pacote -->
+          <div class="mb-3" id="grupoNovoPacote">
             <label for="nomePacote" class="form-label">Nome do Pacote</label>
             <input type="text" class="form-control" id="nomePacote" name="nomePacote" placeholder="Ex: PACOTE_001" required>
           </div>
 
+          <!-- Pacote existente -->
+          <div class="mb-3 d-none" id="grupoPacoteExistente">
+            <label for="pacoteExistente" class="form-label">Selecionar pacote existente</label>
+            <select class="form-select" id="pacoteExistente" name="pacoteExistente">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+          
           <div class="mb-3">
             <label for="observacoesPacote" class="form-label">Observações</label>
             <textarea class="form-control" id="observacoesPacote" name="observacoesPacote" rows="3" placeholder="Informações adicionais..."></textarea>
@@ -304,15 +342,10 @@
           <div id="itensPacote">
             <div class="row g-2 align-items-end item-pacote">
               <div class="col-md-8">
-                <label class="form-label">Descrição do Item</label>
-                <input type="text" name="descricao[]" class="form-control" required>
               </div>
               <div class="col-md-3">
-                <label class="form-label">Quantidade</label>
-                <input type="number" name="quantidade[]" class="form-control" min="1" required>
               </div>
               <div class="col-md-1 text-end">
-                <button type="button" class="btn btn-danger btn-sm btnRemoverItem" title="Remover item">✕</button>
               </div>
             </div>
           </div>
@@ -428,8 +461,8 @@
           </div>
 
           <div class="d-flex gap-2">
+            <button type="button" class="btn btn-light btn-sm w-100" data-bs-dismiss="modal" id="btnCancelarAlterarPacote">Voltar</button>
             <button type="submit" class="btn btn-primary btn-sm w-100">Salvar</button>
-            <button type="button" class="btn btn-light btn-sm w-100" data-bs-dismiss="modal">Cancelar</button>
           </div>
         </form>
       </div>
@@ -441,10 +474,13 @@
 
 {% block scripts %}
 
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script type="module" src="{% static 'js/criar_caixa.js' %}"></script>
 <script type="module" src="{% static 'js/carregar_cargas.js' %}"></script>
 <script type="module" src="{% static 'js/kanbans.js' %}"></script>
 <script type="module" src="{% static 'js/confirmar_pacote.js' %}"></script>
 <script type="module" src="{% static 'js/criar_pacote.js' %}"></script>
+<script type="module" src="{% static 'js/filtros.js' %}"></script>
 
 {% endblock %}

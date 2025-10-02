@@ -5,13 +5,13 @@ document.getElementById('formConfirmarPacote').addEventListener('submit', async 
 
   const btnConfirmarPacote = document.getElementById('btnConfirmarPacote');
   btnConfirmarPacote.disabled = true;
-  btnConfirmarPacote.innerHTML = 'Confirmando...'
+  btnConfirmarPacote.innerHTML = 'Confirmando...';
 
-  const id = document.getElementById('idPacoteConfirmar').value;
+  const id  = document.getElementById('idPacoteConfirmar').value;
   const obs = document.getElementById('obsConfirmarPacote').value;
 
   try {
-    const resp = await fetch(`api/confirmar-pacote/${id}/`, {
+    const resp = await fetch(`api/confirmar-pacote/${encodeURIComponent(id)}/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -20,29 +20,49 @@ document.getElementById('formConfirmarPacote').addEventListener('submit', async 
       body: JSON.stringify({ observacao: obs })
     });
 
-    const data = await resp.json();
-    console.log('Resposta:', data);
+    // Tenta decodificar JSON; se não for JSON, cai para texto bruto
+    let payload = null;
+    const ct = resp.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      payload = await resp.json();
+    } else {
+      const txt = await resp.text();
+      payload = { erro: txt };
+    }
 
-    // Fecha o modal e recarrega os pacotes
-    bootstrap.Modal.getInstance(document.getElementById('modalConfirmarPacote')).hide();
+    // IMPORTANTE: verificar status HTTP
+    if (!resp.ok) {
+      // sua view retorna {"erro": "..."} em 400
+      const msg = payload?.erro || 'Falha ao confirmar o pacote.';
+      throw new Error(msg);
+    }
+
+    // Sucesso → fecha modal e atualiza lista
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmarPacote'));
+    if (modal) modal.hide();
+
     const currentCargaId = document.getElementById('idCargaPacote').value;
-
     const modalElVisualizarPacotes = document.getElementById('visualizarPacote');
-    const modalVisualizarPacotes   = bootstrap.Modal.getInstance(modalElVisualizarPacotes) || new bootstrap.Modal(modalElVisualizarPacotes);
+    const modalVisualizarPacotes = bootstrap.Modal.getInstance(modalElVisualizarPacotes) || new bootstrap.Modal(modalElVisualizarPacotes);
     modalVisualizarPacotes.show();
 
-    popularPacotesDaCarga(currentCargaId);
-    
-    const btnConfirmarPacote = document.getElementById('btnConfirmarPacote');
-    btnConfirmarPacote.disabled = false;
-    btnConfirmarPacote.innerHTML = 'Confirmar'
+    if (currentCargaId) {
+      popularPacotesDaCarga(currentCargaId);
+    }
 
+    // (opcional) toast/sucesso
+    // showToast('Pacote confirmado com sucesso!');
 
   } catch (err) {
-    alert('Erro ao confirmar pacote');
+    // Mostra a mensagem vinda do backend (JsonResponse {'erro': '...'})
+    alert(err.message || 'Erro inesperado ao confirmar o pacote.');
     console.error(err);
+  } finally {
+    btnConfirmarPacote.disabled = false;
+    btnConfirmarPacote.innerHTML = 'Confirmar';
   }
 });
+
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;

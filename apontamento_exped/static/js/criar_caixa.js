@@ -1,3 +1,5 @@
+import { createKanbanCard, atualizarSlotAvancar } from './kanbans.js';
+
 document.addEventListener('DOMContentLoaded', function() {
     const dataCarga = document.getElementById('dataCarga');
     const selectCarga = document.getElementById('selectCarga');
@@ -7,6 +9,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const etapa2 = document.getElementById('etapa2');
     const etapa3 = document.getElementById('etapa3');
     const etapa4 = document.getElementById('etapa4');
+    const Toast = Swal.mixin({
+        toast: true,
+        position: "bottom-end",
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+        didOpen: (toast) => {
+        toast.onmouseenter = Swal.stopTimer;
+        toast.onmouseleave = Swal.resumeTimer;
+        }
+    });
 
     // Quando a data é selecionada
     dataCarga.addEventListener('change', function() {
@@ -61,6 +74,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const clienteId = selectCliente.value;
         const observacoes = document.getElementById('observacoes').value;
 
+        btnSalvarPacote.innerHTML = 'salvando...'
+        btnSalvarPacote.disabled = true;
+
         const checkboxesSelecionados = document.querySelectorAll('.carreta-checkbox:checked');
 
         // Constrói os itens do pacote a partir dos checkboxes
@@ -79,47 +95,68 @@ document.addEventListener('DOMContentLoaded', function() {
             itens: itens
         };
 
-        console.log('Enviando pacote para backend:', pacote);
-
         try {
-            const response = await fetch('api/criar-caixa/', {
+        const response = await fetch('api/criar-caixa/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
             body: JSON.stringify(pacote)
-            });
+        });
 
-            if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Erro ao criar pacote');
+        if (!response.ok) {
+            // tenta ler JSON de erro, senão texto cru
+            let msg = 'Erro ao criar pacote';
+            try {
+                const error = await response.json();
+                msg = error.detail || error.erro || msg;
+            } catch {
+                msg = await response.text() || msg;
             }
-
-            const resultado = await response.json();
-            console.log('Pacote criado:', resultado);
-            alert(`✅ Pacote ${resultado.numero} criado com sucesso!`);
-        } catch (err) {
-            console.error('Erro ao criar pacote:', err);
-            alert(`❌ Erro: ${err.message}`);
+            throw new Error(msg);
         }
 
-        alert('Pacote criado com sucesso!');
-        
-        // Reset do formulário
+        const resultado = await response.json(); // <- usa o resultado do POST
+        btnSalvarPacote.innerHTML = 'Salvar';
+        btnSalvarPacote.disabled = false;
+
+        Toast.fire({ icon: 'success', title: 'Caixa criada com sucesso.' });
+
+        // Reset do formulário (só no sucesso)
         document.getElementById('formCriarPacote').reset();
         etapa2.style.display = 'none';
         etapa3.style.display = 'none';
         etapa4.style.display = 'none';
         selectCliente.disabled = true;
         btnSalvarPacote.disabled = true;
-        
+
         // Fecha o modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('criarCaixaModal'));
-        modal.hide();
+        modal?.hide();
+
+        // === Usa o resultado para criar e posicionar o card ===
+        const stage = (resultado.etapa || 'verificacao').toLowerCase();
+        const card  = createKanbanCard(resultado); // <- chamada solicitada
         
-        // Recarrega a tabela
-        // carregarTabelaExpedicoes();
+        const colPlanej = document.getElementById('col-planejamento');
+
+        // escolhe coluna
+        let targetCol = colPlanej;
+
+        // insere o card na coluna
+        targetCol.appendChild(card);
+
+        // popular o slot de avanço do card recém-criado
+        // se você usa atualizarSlotAvancar(id), passe o id da carga retornado
+        await atualizarSlotAvancar(resultado.id, false, 'planejamento');
+
+        } catch (err) {
+            console.error('Erro ao criar pacote:', err);
+            alert(`❌ Erro: ${err.message}`);
+            btnSalvarPacote.innerHTML = 'Salvar';
+            btnSalvarPacote.disabled = false;
+        }
     });
 
 

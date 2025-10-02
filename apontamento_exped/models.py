@@ -49,16 +49,6 @@ class Pacote(models.Model):
     def __str__(self):
         return self.nome
 
-class ItemPacote(models.Model):
-    pacote = models.ForeignKey(Pacote, related_name='itens', on_delete=models.CASCADE)
-    codigo_peca = models.CharField(max_length=50)
-    descricao = models.CharField(max_length=200, blank=True, null=True)
-    cor = models.CharField(max_length=50, blank=True, null=True)
-    quantidade = models.PositiveIntegerField()
-
-    def __str__(self):
-        return f"{self.codigo_peca} - {self.cor}"
-
 class VerificacaoPacote(models.Model):
     pacote = models.OneToOneField(Pacote, on_delete=models.CASCADE, related_name='verificacao')
     verificado_por = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True)
@@ -77,3 +67,35 @@ class ImagemPacote(models.Model):
     )
     stage = models.CharField(max_length=50, choices=[('verificacao', 'Verificação'), ('despachado','Despachado')])
 
+class PendenciasPacote(models.Model):
+
+    """
+    Gerado a partir do momento em que o usuário cria o carregamento
+
+    Busca a informação das peças e quantidades na planilha BASE GERAL
+    """
+
+    carreta_carga = models.ForeignKey(CarretaCarga, related_name='carreta_carga', on_delete=models.CASCADE)
+    codigo = models.CharField(max_length=255, blank=True, null=True)    
+    descricao = models.CharField(max_length=255, blank=True, null=True)
+    qt_necessaria = models.IntegerField()
+    
+    data_criacao = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.codigo}"
+
+class ItemPacote(models.Model):
+
+    """
+    Gerado quando o usuario cria o pacote.
+    """
+
+    pacote = models.ForeignKey(Pacote, related_name='itens', on_delete=models.CASCADE)
+    codigo = models.ForeignKey(PendenciasPacote, related_name='codigo_item_pacote', on_delete=models.CASCADE)
+    quantidade = models.PositiveIntegerField()
+
+    data_criacao = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.codigo}"
