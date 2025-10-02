@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     `;
 
+    fetchOrdensIniciadas();
 
     fetch(`/solda/api/apontamento-qrcode/?ordem_id=${ordemId}`)
         .then(response => response.json())
@@ -149,6 +150,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const btn = event.target.closest('.btn.btn-primary.btn-lg');
             btn.disabled = true;
             btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Carregando...`;
+        }
+
+        if (event.target.closest('.btn-finalizar-lista')) {
+            const btn = event.target.closest('.btn-finalizar-lista');
+            const ordemIdFinalizar = btn.getAttribute('data-ordem-id');
+            const maquina = btn.getAttribute('data-maquina');
+            const maxItens = btn.getAttribute('data-max-itens');
+
+            mostrarModalFinalizar(ordemIdFinalizar, maquina, maxItens);
+
         }
     });
 
@@ -394,4 +405,297 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    function fetchOrdensIniciadas(){
+        const listaContainer = document.getElementById('listaOrdensIniciadas');
+        // Exibe loader antes do fetch
+        listaContainer.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center" style="min-height: 200px;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        `;
+        fetch(`/solda/api/ordens-iniciadas/?ordem_id=${ordemId}`)
+            .then(response => response.json())
+            .then(data => {       
+                console.log(data);
+                if (data.ordens) {
+                    // Monta a lista de ordens
+                    if (data.ordens && data.ordens.length > 0) {
+                        let html = '<ul class="list-group mt-2">';
+                        data.ordens.forEach((ordem, idx) => {
+                        html += `
+                            <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                                <div>
+                                    <span class="badge bg-primary me-2">${idx + 1}</span>
+                                    <strong>Ordem:</strong> <span class="text-dark">${ordem.ordem_id}</span>
+                                    <span class="mx-2">|</span>
+                                    <strong>Máquina:</strong> <span class="text-dark">${ordem.maquina}</span>
+                                    <span class="mx-2">|</span>
+                                    <strong>Data Carga:</strong> <span class="text-dark">${ordem.data_carga}</span>
+                                </div>
+                                <div class="mt-2 mt-md-0">
+                                    <strong>Qt. Restante:</strong> <span class="text-dark">${ordem.qtd_restante}</span>
+                                    <span class="mx-2">|</span>
+                                    <strong>Status:</strong> <span class="badge ${
+                                        ordem.status_atual === 'finalizada' ? 'bg-success' :
+                                        ordem.status_atual === 'iniciada' ? 'bg-primary' :
+                                        ordem.status_atual === 'interrompida' ? 'bg-danger' : 'bg-secondary'
+                                    }">${ordem.status_atual}</span>
+                                    ${
+                                        ordem.status_atual !== 'finalizada'
+                                        ? `<button class="btn btn-success btn-sm btn-finalizar-lista ms-2" data-ordem-id="${ordem.ordem_id}"
+                                        data-maquina="${ordem.maquina}" data-max-itens="${ordem.qtd_restante}">
+                                            <i class="fa fa-check"></i> Finalizar
+                                        </button>`
+                                        : ''
+                                    }
+                                </div>
+                            </li>
+                        `;
+                    });
+                        html += '</ul>';
+                        listaContainer.innerHTML = html;
+                    } else {
+                        listaContainer.innerHTML = '<div class="alert alert-info">Nenhuma ordem iniciada encontrada.</div>';
+                    }
+                } else {
+                    listaContainer.innerHTML = `<div class="alert alert-danger">Algum erro encontrado</div>`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('listaOrdensIniciadas').innerHTML =
+                    `<div class="alert alert-danger">Erro ao chamar a API: ${error}</div>`;
+            });
+    }
+
+    document.getElementById('confirmFinalizar').addEventListener('click', function () {
+        const ordemId = document.getElementById('ordemIdFinalizar').value;
+        const operadorFinal = document.getElementById('operadorFinal');
+        const todosOperadorFinal = document.getElementById('todosOperadorFinal');
+        const qtRealizada = document.getElementById('qtRealizada');
+        const obsFinalizar = document.getElementById('obsFinalizar').value;
+        const qtMaxima = qtRealizada.getAttribute('max');
+        
+    
+        // Validação: A quantidade realizada não pode ser maior que a máxima
+        if (parseInt(qtRealizada.value) > parseInt(qtMaxima)) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'A quantidade realizada não pode ser maior que a quantidade máxima permitida.'
+            });
+            return;
+        }
+    
+        // Determinar qual select está ativo e obter o valor do operador
+        let operadorId;
+        if (operadorFinal.style.display !== 'none' && operadorFinal.getAttribute('data-active') === 'true') {
+            if (!operadorFinal.value || operadorFinal.value === "") {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Atenção',
+                    text: 'Por favor, selecione um operador da máquina.'
+                });
+                return;
+            }
+            operadorId = operadorFinal.value;
+        } else if (todosOperadorFinal.style.display !== 'none' && todosOperadorFinal.getAttribute('data-active') === 'true') {
+            if (!todosOperadorFinal.value || todosOperadorFinal.value === "") {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Atenção',
+                    text: 'Por favor, selecione um operador da lista geral.'
+                });
+                return;
+            }
+            operadorId = todosOperadorFinal.value;
+        } else {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Por favor, selecione um operador válido.'
+            });
+            return;
+        }
+    
+        // Validação: Quantidade realizada é obrigatória
+        if (!qtRealizada.value) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Por favor, informe a quantidade realizada.'
+            });
+            return;
+        }
+    
+        Swal.fire({
+            title: 'Finalizando...',
+            text: 'Por favor, aguarde enquanto a ordem está sendo finalizada.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+    
+        const payload = {
+            status: "finalizada",
+            ordem_id: parseInt(ordemId),
+            operador_final: parseInt(operadorId),
+            obs_finalizar: obsFinalizar,
+            qt_realizada: parseInt(qtRealizada.value)
+        };
+
+        console.log('Payload para finalizar a ordem:', payload);
+        fetch("/solda/api/ordens/atualizar-status/", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Erro ao finalizar a ordem.');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Fechar o modal após a finalização bem-sucedida
+            const modalElement = document.getElementById('finalizarModal');
+            const finalizarModal = bootstrap.Modal.getInstance(modalElement);
+            finalizarModal.hide();
+            Swal.close();
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: 'Ordem finalizada com sucesso.'
+
+            });
+
+            //Redirecionando para a tela de apontamento de montagem
+            setTimeout(function(){
+                window.location.href = '/solda/';
+            }, 1000);
+            
+
+
+        })
+        .catch(error => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: error.message || 'Erro ao finalizar a ordem. Tente novamente.'
+            });
+        });
+    });
+
+    function mostrarModalFinalizar(ordemId, maquina, max_itens) {
+        const modal = new bootstrap.Modal(document.getElementById('finalizarModal'));
+
+        const operadorSelect = document.getElementById('operadorFinal');
+        const qtRealizadaInput = document.getElementById('qtRealizada');
+        const labelOperadores = document.getElementById('labelOperadores');
+
+        const todosOperadorFinal = document.getElementById('todosOperadorFinal');
+        const descricaoBotaoVoltar = document.getElementById('descricaoBotaoVoltar');
+        const descricaoBotaoLista = document.getElementById('descricaoBotaoLista');
+
+        operadorSelect.style.display = 'block';
+        descricaoBotaoLista.style.display = 'block';
+
+        todosOperadorFinal.style.display = 'none';
+        descricaoBotaoVoltar.style.display = 'none';
+        labelOperadores.textContent = `Operador - ${maquina}` 
+
+        document.getElementById('ordemIdFinalizar').value = ordemId;
+
+        operadorSelect.setAttribute('data-active', 'true');
+        todosOperadorFinal.setAttribute('data-active', 'false');
+
+        labelOperadores.setAttribute('data-maquina', maquina)
+        qtRealizadaInput.setAttribute('max', max_itens);
+
+        operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
+        todosOperadorFinal.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
+
+        fetch(`/solda/api/listar-operadores/?maquina=${maquina}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Erro ao buscar operadores");
+            }
+            return response.json();
+        })
+        .then(data => {
+        
+            if (data.operadores_maquina.length === 0) {
+                operadorSelect.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
+            } else {
+                data.operadores_maquina.forEach(operador => {
+                    operadorSelect.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+                });
+                operadorSelect.disabled = false; // Habilita o select após carregar os dados
+            }
+
+            if (data.operadores.length === 0) {
+                todosOperadorFinal.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
+            } else {
+                data.operadores.forEach(operador => {
+                    todosOperadorFinal.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+                });
+                todosOperadorFinal.disabled = false; // Habilita o select após carregar os dados
+            }
+        })
+        .catch(error => {
+            console.error("Erro ao carregar operadores:", error);
+            operadorSelect.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
+            todosOperadorFinal.innerHTML = `<option value="" disabled>Erro ao carregar</option>`;
+        });
+        
+        modal.show();
+    }
+
+    document.getElementById('direcionarTodosOperadores').addEventListener('click', function () {
+        const operadorFinal = document.getElementById('operadorFinal');
+        const todosOperadorFinal = document.getElementById('todosOperadorFinal');
+        const labelOperadores = document.getElementById('labelOperadores');
+
+        const descricaoBotaoVoltar = document.getElementById('descricaoBotaoVoltar');
+        const descricaoBotaoLista = document.getElementById('descricaoBotaoLista');
+        
+        labelOperadores.textContent = `Todos os Operadores` 
+
+        operadorFinal.style.display = 'none';
+        operadorFinal.setAttribute('data-active', 'false');
+        todosOperadorFinal.style.display = 'block';
+        todosOperadorFinal.setAttribute('data-active', 'true');
+
+        descricaoBotaoVoltar.style.display = 'block';
+        descricaoBotaoLista.style.display = 'none';
+    });
+
+    document.getElementById('botaoVoltarOperadoresMaquina').addEventListener('click', function () {
+        const operadorFinal = document.getElementById('operadorFinal');
+        const todosOperadorFinal = document.getElementById('todosOperadorFinal');
+        const labelOperadores = document.getElementById('labelOperadores');
+
+        const descricaoBotaoLista = document.getElementById('descricaoBotaoLista');
+        const descricaoBotaoVoltar = document.getElementById('descricaoBotaoVoltar');
+
+        const maquina = labelOperadores.getAttribute('data-maquina')
+        labelOperadores.textContent = `Operadores - ${maquina}` 
+
+        todosOperadorFinal.style.display = 'none';
+        todosOperadorFinal.setAttribute('data-active', 'false');
+        operadorFinal.style.display = 'block';
+        operadorFinal.setAttribute('data-active', 'true');
+
+        descricaoBotaoLista.style.display = 'block';
+        descricaoBotaoVoltar.style.display = 'none';
+    });
+
 });
