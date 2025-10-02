@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from dotenv import load_dotenv
 from datetime import datetime, date
+import time
 
 from django.db.models import Max
 from django.utils.timezone import now
@@ -19,7 +20,8 @@ from core.models import Ordem
 from cadastro.models import Maquina
 from django.conf import settings
 from django.contrib.staticfiles import finders
-from django.db.models import Max
+from django.db.models import Max,  F
+from apontamento_exped.utils import chamar_impressora_pecas_montagem
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -2072,3 +2074,52 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
                 } for ordem, meta in zip(ordens_objs, ordens_metadata)
             ]
         }
+
+def imprimir_ordens_montagem():
+
+    data_carga= '2025-09-30'
+
+    qs = (POM.objects
+        .filter(
+            ordem__data_carga=data_carga,
+            qtd_boa=0,
+            ordem__maquina__nome__in=['CHASSI'],
+        )
+        .select_related('ordem'))
+
+    for peca in qs:
+        qtd = int(peca.qtd_planejada or 0)
+        if qtd <= 0:
+            continue
+
+        zpl = f"""
+^XA
+^MMT
+^PW799
+^LL0400
+^LS0
+^PR1,1,1
+~SD14
+
+^FX Texto (nome)
+^FO10,10
+^A0N,30,30
+^FB400,10,10,L,0
+^FD{peca.peca[:30]}-{qtd}^FS
+
+^FX Data da carga
+^FO10,280
+^A0N,30,30
+^FB400,10,10,L,0
+^FD{data_carga}^FS
+
+^FT500,350^BQN,2,7
+^FDLA,{peca.ordem.caminho_relativo_qr_code}^FS
+
+^PQ{qtd},0,1,Y
+^XZ
+"""
+        chamar_impressora_pecas_montagem(zpl)
+
+    return {"message": "Ordens impressas com sucesso."}
+

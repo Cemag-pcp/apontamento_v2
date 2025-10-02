@@ -18,7 +18,7 @@ from apontamento_solda.models import PecasOrdem as POSolda
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
-from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem
 
 import pandas as pd
 import os
@@ -96,7 +96,7 @@ def gerar_arquivos_sequenciamento(request):
 def gerar_dados_sequenciamento(request):
 
     """
-    Chama a API 'criar_ordem'.
+        Chama a API 'criar_ordem'.
     """
 
     data_inicio = request.GET.get('data_inicio')
@@ -878,3 +878,9 @@ def excluir_ordens_dia_setor(request):
         "message": f"{total_excluidas} ordens excluídas com sucesso.",
         "ordens_bloqueadas": list(ordens_com_apontamentos.values("id", "data_carga", "grupo_maquina")),
     })    
+
+def enviar_etiqueta_impressora(request):
+
+    data_carga = request.GET('data_carga')
+
+    imprimir_ordens_montagem(data_carga)

@@ -57,3 +57,12 @@ def chamar_impressora(cliente, data_carga, nome_pacote, obs):
     payload = {"job_id": job_id, "zpl": zpl}
     r.rpush("print-zebra", json.dumps(payload))
     print(job_id)
+
+def chamar_impressora_pecas_montagem(zpl):
+
+    r = redis.from_url("redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210")
+
+    job_id = str(uuid.uuid4())
+    payload = {"job_id": job_id, "zpl": zpl}
+    r.rpush("print-zebra", json.dumps(payload))
+    print(job_id)
