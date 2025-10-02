@@ -52,90 +52,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return; 
     }
+    
     // Para pegar um parâmetro específico, por exemplo 'ordem_id':
     const ordemId = params.get('ordem_id');
-    const cardApontamentoQrCode = document.getElementById('cardApontamentoQrCode');
     const ordemIdSoldaInput = document.getElementById('ordemIdSolda');
 
-    // Exibe loader antes do fetch
-    cardApontamentoQrCode.innerHTML = `
-        <div class="d-flex justify-content-center align-items-center" style="min-height: 270px;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-        </div>
-    `;
-
+    // Carrega os dados iniciais da ordem
+    carregarDadosOrdem(ordemId);
     fetchOrdensIniciadas();
-
-    fetch(`/solda/api/apontamento-qrcode/?ordem_id=${ordemId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                // Processar os dados recebidos
-                console.log(data);
-
-                const ordem = data.dados;
-
-                const statusClass =
-                    ordem.status === 'finalizada' ? 'bg-success' :
-                    ordem.status === 'iniciada' ? 'bg-primary' :
-                    ordem.status === 'aguardando_iniciar' ? 'bg-warning' : 
-                    ordem.status === 'interrompida' ? 'bg-danger' : 'bg-secondary';
-
-                cardApontamentoQrCode.innerHTML = `
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
-                        <h6 class="card-title fw-bold mb-0 fs-5">#${ordem.peca ? ordem.peca : 'Ordem Inexistente'}</h6>
-                    </div>
-                    <div class="card-body bg-white p-3">
-                        <p class="card-text mb-3">
-                            <strong>Data Carga:</strong> ${ordem.data_carga}
-                        </p>
-                        <p class="card-text mb-3">
-                            <strong>Quantidade a fazer:</strong> ${ordem.qtd_planejada}
-                        </p>
-                        <p class="card-text mb-3">
-                            <strong>Quantidade feita:</strong> ${ordem.qtd_boa}
-                        </p>
-                        <p class="card-text mb-0"><strong>Status: </strong><span class="badge ${statusClass}">${ordem.status}</span></p>
-                    </div>
-                    <div class="card-footer d-flex justify-content-end align-items-center bg-white p-3 border-top">
-                        <button class="btn btn-warning btn-sm" data-title="Iniciar" data-maquina-nome="${ordem.maquina}">
-                            <i class="fa fa-play"></i> Iniciar
-                        </button>
-                    </div>
-                `
-                if (ordem){
-                    ordemIdSoldaInput.value = ordem.ordem;
-                }
-                
-                // Atualizar a interface do usuário conforme necessário
-            } else {
-                console.error('Erro na resposta da API:', data.message);
-                cardApontamentoQrCode.innerHTML = `
-                    <div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 270px;">
-                        <div class="alert alert-danger w-100 text-center mb-4" role="alert" style="max-width: 380px;">
-                            <i class="fa fa-exclamation-triangle me-2"></i>
-                            <strong>Erro:</strong> ${data.message}
-                            <div class="mt-2 small text-muted">
-                                Verifique se o QR Code ou o link está correto.
-                            </div>
-                        </div>
-                        <a href="/solda/" class="btn btn-primary btn-lg">
-                            <i class="fa fa-arrow-left me-2"></i> Voltar para Solda
-                        </a>
-                    </div>
-                `;
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: data.message || 'Ocorreu um erro ao tentar iniciar a ordem. Tente novamente.',
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao chamar a API:', error);
-        });
 
     document.addEventListener('click', function(event) {
         if (event.target.closest('.btn-warning')) {
@@ -190,6 +114,90 @@ document.addEventListener('DOMContentLoaded', function() {
     //         window.location.href = "/solda/";
     //     }
     // });
+
+    function carregarDadosOrdem(ordemId) {
+        const cardApontamentoQrCode = document.getElementById('cardApontamentoQrCode');
+        const ordemIdSoldaInput = document.getElementById('ordemIdSolda');
+
+        // Exibe loader antes do fetch
+        cardApontamentoQrCode.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center" style="min-height: 270px;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        `;
+
+        fetch(`/solda/api/apontamento-qrcode/?ordem_id=${ordemId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Processar os dados recebidos
+                    console.log(data);
+
+                    const ordem = data.dados;
+
+                    const statusClass =
+                        ordem.status === 'finalizada' ? 'bg-success' :
+                        ordem.status === 'iniciada' ? 'bg-primary' :
+                        ordem.status === 'aguardando_iniciar' ? 'bg-warning' : 
+                        ordem.status === 'interrompida' ? 'bg-danger' : 'bg-secondary';
+
+                    cardApontamentoQrCode.innerHTML = `
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
+                            <h6 class="card-title fw-bold mb-0 fs-5">#${ordem.peca ? ordem.peca : 'Ordem Inexistente'}</h6>
+                        </div>
+                        <div class="card-body bg-white p-3">
+                            <p class="card-text mb-3">
+                                <strong>Data Carga:</strong> ${ordem.data_carga}
+                            </p>
+                            <p class="card-text mb-3">
+                                <strong>Quantidade a fazer:</strong> ${ordem.qtd_planejada}
+                            </p>
+                            <p class="card-text mb-3">
+                                <strong>Quantidade feita:</strong> ${ordem.qtd_boa}
+                            </p>
+                            <p class="card-text mb-0"><strong>Status: </strong><span class="badge ${statusClass}">${ordem.status}</span></p>
+                        </div>
+                        <div class="card-footer d-flex justify-content-end align-items-center bg-white p-3 border-top">
+                            <button class="btn btn-warning btn-sm" data-title="Iniciar" data-maquina-nome="${ordem.maquina}">
+                                <i class="fa fa-play"></i> Iniciar
+                            </button>
+                        </div>
+                    `
+                    if (ordem){
+                        ordemIdSoldaInput.value = ordem.ordem;
+                    }
+                    
+                    // Atualizar a interface do usuário conforme necessário
+                } else {
+                    console.error('Erro na resposta da API:', data.message);
+                    cardApontamentoQrCode.innerHTML = `
+                        <div class="d-flex flex-column justify-content-center align-items-center" style="min-height: 270px;">
+                            <div class="alert alert-danger w-100 text-center mb-4" role="alert" style="max-width: 380px;">
+                                <i class="fa fa-exclamation-triangle me-2"></i>
+                                <strong>Erro:</strong> ${data.message}
+                                <div class="mt-2 small text-muted">
+                                    Verifique se o QR Code ou o link está correto.
+                                </div>
+                            </div>
+                            <a href="/solda/" class="btn btn-primary btn-lg">
+                                <i class="fa fa-arrow-left me-2"></i> Voltar para Solda
+                            </a>
+                        </div>
+                    `;
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Ocorreu um erro ao tentar carregar a ordem. Tente novamente.',
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao chamar a API:', error);
+            });
+    }
+
     function mostrarModalIniciar(ordemId, maquina) {
         const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
 
@@ -393,7 +401,17 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(ordemFoiIniciada);
 
             if (ordemFoiIniciada){
-                window.location.href = "/solda/";
+                // Ao invés de redirecionar, recarrega os dados
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso!',
+                    text: 'A ordem foi iniciada com sucesso.'
+                }).then(() => {
+                    // Recarrega o card com os dados atualizados da ordem
+                    carregarDadosOrdem(ordemId);
+                    // Atualiza a lista de ordens iniciadas
+                    fetchOrdensIniciadas();
+                });
             }
         } catch (error) {
             console.error('Erro ao verificar quantidade pendente:', error);
@@ -434,6 +452,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <strong>Máquina:</strong> <span class="text-dark">${ordem.maquina}</span>
                                     <span class="mx-2">|</span>
                                     <strong>Data Carga:</strong> <span class="text-dark">${ordem.data_carga}</span>
+                                    <span class="mx-2">|</span>
+                                    <strong>Operador:</strong> <span class="text-dark">${ordem.operador_inicio}</span>
                                 </div>
                                 <div class="mt-2 mt-md-0">
                                     <strong>Qt. Restante:</strong> <span class="text-dark">${ordem.qtd_restante}</span>
@@ -570,20 +590,20 @@ document.addEventListener('DOMContentLoaded', function() {
             finalizarModal.hide();
             Swal.close();
 
+            // Ao invés de redirecionar, recarrega os dados
+            const params = new URLSearchParams(window.location.search);
+            const currentOrdemId = params.get('ordem_id');
+            
             Swal.fire({
                 icon: 'success',
                 title: 'Sucesso!',
                 text: 'Ordem finalizada com sucesso.'
-
+            }).then(() => {
+                // Recarrega o card com os dados atualizados da ordem
+                carregarDadosOrdem(currentOrdemId);
+                // Atualiza a lista de ordens iniciadas
+                fetchOrdensIniciadas();
             });
-
-            //Redirecionando para a tela de apontamento de montagem
-            setTimeout(function(){
-                window.location.href = '/solda/';
-            }, 1000);
-            
-
-
         })
         .catch(error => {
             Swal.fire({
@@ -623,7 +643,7 @@ document.addEventListener('DOMContentLoaded', function() {
         operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
         todosOperadorFinal.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
 
-        fetch(`/solda/api/listar-operadores/?maquina=${maquina}`)
+        fetch(`/solda/api/listar-operadores/?maquina=${maquina}&ordem=${ordemId}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error("Erro ao buscar operadores");
@@ -631,23 +651,26 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(data => {
-        
+            const operadorInicioId = data.operador_inicio_id;
+
             if (data.operadores_maquina.length === 0) {
                 operadorSelect.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
             } else {
                 data.operadores_maquina.forEach(operador => {
-                    operadorSelect.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+                    const selected = operador.id === operadorInicioId ? 'selected' : '';
+                    operadorSelect.innerHTML += `<option value="${operador.id}" ${selected}>${operador.matricula} - ${operador.nome}</option>`;
                 });
-                operadorSelect.disabled = false; // Habilita o select após carregar os dados
+                operadorSelect.disabled = false;
             }
 
             if (data.operadores.length === 0) {
                 todosOperadorFinal.innerHTML = `<option value="" disabled>Nenhum operador encontrado</option>`;
             } else {
                 data.operadores.forEach(operador => {
-                    todosOperadorFinal.innerHTML += `<option value="${operador.id}">${operador.matricula} - ${operador.nome}</option>`;
+                    const selected = operador.id === operadorInicioId ? 'selected' : '';
+                    todosOperadorFinal.innerHTML += `<option value="${operador.id}" ${selected}>${operador.matricula} - ${operador.nome}</option>`;
                 });
-                todosOperadorFinal.disabled = false; // Habilita o select após carregar os dados
+                todosOperadorFinal.disabled = false;
             }
         })
         .catch(error => {
