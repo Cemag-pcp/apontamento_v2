@@ -443,38 +443,52 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.ordens && data.ordens.length > 0) {
                         let html = '<ul class="list-group mt-2">';
                         data.ordens.forEach((ordem, idx) => {
-                        html += `
-                            <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-center">
-                                <div>
-                                    <span class="badge bg-primary me-2">${idx + 1}</span>
-                                    <strong>Ordem:</strong> <span class="text-dark">${ordem.ordem_id}</span>
-                                    <span class="mx-2">|</span>
-                                    <strong>Máquina:</strong> <span class="text-dark">${ordem.maquina}</span>
-                                    <span class="mx-2">|</span>
-                                    <strong>Data Carga:</strong> <span class="text-dark">${ordem.data_carga}</span>
-                                    <span class="mx-2">|</span>
-                                    <strong>Operador:</strong> <span class="text-dark">${ordem.operador_inicio}</span>
-                                </div>
-                                <div class="mt-2 mt-md-0">
-                                    <strong>Qt. Restante:</strong> <span class="text-dark">${ordem.qtd_restante}</span>
-                                    <span class="mx-2">|</span>
-                                    <strong>Status:</strong> <span class="badge ${
-                                        ordem.status_atual === 'finalizada' ? 'bg-success' :
-                                        ordem.status_atual === 'iniciada' ? 'bg-primary' :
-                                        ordem.status_atual === 'interrompida' ? 'bg-danger' : 'bg-secondary'
-                                    }">${ordem.status_atual}</span>
-                                    ${
-                                        ordem.status_atual !== 'finalizada'
-                                        ? `<button class="btn btn-success btn-sm btn-finalizar-lista ms-2" data-ordem-id="${ordem.ordem_id}"
-                                        data-maquina="${ordem.maquina}" data-max-itens="${ordem.qtd_restante}">
-                                            <i class="fa fa-check"></i> Finalizar
-                                        </button>`
-                                        : ''
-                                    }
-                                </div>
-                            </li>
-                        `;
-                    });
+                           html += `
+                                <li class="list-group-item rounded-3 shadow-sm mb-3 px-3 py-3">
+                                    <div class="row align-items-center">
+                                        <div class="col-12 col-md-auto mb-2 mb-md-0 d-flex align-items-center">
+                                            <span class="badge bg-primary me-2">${idx + 1}</span>
+                                            <strong class="me-2">Ordem:</strong>
+                                            <span class="text-dark me-3">${ordem.ordem_id}</span>
+                                        </div>
+                                        <div class="col-12 col-md-auto mb-2 mb-md-0">
+                                            <strong class="me-2">Máquina:</strong>
+                                            <span class="text-dark me-3">${ordem.maquina}</span>
+                                        </div>
+                                        <div class="col-12 col-md-auto mb-2 mb-md-0">
+                                            <strong class="me-2">Data Carga:</strong>
+                                            <span class="text-dark me-3">${ordem.data_carga}</span>
+                                        </div>
+                                        <div class="col-12 col-md-auto mb-2 mb-md-0">
+                                            <strong class="me-2">Operador:</strong>
+                                            <span class="text-dark me-3">${ordem.operador_inicio}</span>
+                                        </div>
+                                        <div class="col-12 col-md-auto mb-2 mb-md-0">
+                                            <strong class="me-2">Qt. Restante:</strong>
+                                            <span class="text-dark me-3">${ordem.qtd_restante}</span>
+                                        </div>
+                                        <div class="col-12 col-md-auto mb-2 mb-md-0">
+                                            <strong class="me-2">Status:</strong>
+                                            <span class="badge ${
+                                                ordem.status_atual === 'finalizada' ? 'bg-success' :
+                                                ordem.status_atual === 'iniciada' ? 'bg-primary' :
+                                                ordem.status_atual === 'interrompida' ? 'bg-danger' : 'bg-secondary'
+                                            } me-3">${ordem.status_atual}</span>
+                                        </div>
+                                        ${
+                                            ordem.status_atual !== 'finalizada'
+                                            ? `<div class="col-12 col-md-auto mt-2 mt-md-0 d-grid">
+                                                    <button class="btn btn-success btn-sm btn-finalizar-lista w-100 w-md-auto" data-ordem-id="${ordem.ordem_id}"
+                                                        data-maquina="${ordem.maquina}" data-max-itens="${ordem.qtd_restante}">
+                                                        <i class="fa fa-check"></i> Finalizar
+                                                    </button>
+                                                </div>`
+                                            : ''
+                                        }
+                                    </div>
+                                </li>
+                                `;
+                        });
                         html += '</ul>';
                         listaContainer.innerHTML = html;
                     } else {
