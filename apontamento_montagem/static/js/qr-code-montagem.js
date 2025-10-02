@@ -54,57 +54,75 @@ document.addEventListener('DOMContentLoaded', function () {
     // startScanner AGORA VAI CHAMAR setupZoomControls
     // =========================================================================
     function startScanner() {
-        if (!html5QrcodeScanner) {
-            html5QrcodeScanner = new Html5Qrcode("qr-reader");
-        }
-        
-        document.getElementById('qr-reader-results').innerHTML = '';
-        document.getElementById('qr-reader').style.display = 'block';
-
-        // 1. Configuração do Leitor (Visualização)
-        const readerConfig = { 
-            fps: 10, 
-            qrbox: { width: 150, height: 150 },
-        };
-
-        // 2. Configuração Otimizada para Foco (Alta Resolução)
-        // OBS: O zoom inicial de 2.0x foi removido daqui
-        const cameraConfigHighRes = { 
-            facingMode: "environment",
-            constraints: {
-                width: { ideal: 1920 }, // Tenta forçar alta nitidez
-                height: { ideal: 1080 },
-                facingMode: "environment" 
-            }
-        };
-        
-        // 3. Configuração de Fallback (Mais simples para garantir que a câmera abra)
-        const cameraConfigFallback = { 
-            facingMode: "environment"
-        };
-
-        // Lógica com Fallback
-        html5QrcodeScanner.start(cameraConfigHighRes, readerConfig, onScanSuccess, onScanFailure)
-            .then(setupZoomControls) // CHAMA O SETUP DE CONTROLES NO SUCESSO
-            .catch(err => {
-                console.warn("Falha ao iniciar com alta resolução. Tentando fallback...", err);
-                
-                // Tenta Iniciar com a Configuração de Fallback
-                html5QrcodeScanner.start(cameraConfigFallback, readerConfig, onScanSuccess, onScanFailure)
-                    .then(setupZoomControls) // CHAMA O SETUP DE CONTROLES NO SUCESSO DO FALLBACK
-                    .catch(errFallback => {
-                        // Se falhar o fallback, mostra o erro final
-                        console.error("Não foi possível iniciar o leitor de QR Code mesmo com fallback.", errFallback);
-                        const modal = bootstrap.Modal.getInstance(modalElement);
-                        if(modal) modal.hide();
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Erro ao Iniciar Câmera',
-                            text: 'Não foi possível acessar a câmera. Verifique as permissões ou se há outro aplicativo usando-a.'
-                        });
-                    });
-            });
+    if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5Qrcode("qr-reader");
     }
+    document.getElementById('qr-reader-results').innerHTML = '';
+    document.getElementById('qr-reader').style.display = 'block';
+
+    // Seleção de câmera específica
+    Html5Qrcode.getCameras().then(cameras => {
+        if (!cameras.length) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Nenhuma câmera encontrada',
+                text: 'Verifique se há uma câmera conectada ou disponível.'
+            });
+            return;
+        }
+        let selectedCam = cameras.find(cam =>
+            
+            cam.label.toLowerCase().includes("0") &&
+            cam.label.toLowerCase().includes("facing back")
+        );
+
+        // Se não achou a principal, procura qualquer câmera traseira
+        if (!selectedCam) {
+            selectedCam = cameras.find(cam =>
+                cam.label.toLowerCase().includes("back")
+            );
+        }
+
+        // Se ainda não achou, procura por "traseira" (alguns dispositivos em português)
+        if (!selectedCam) {
+            selectedCam = cameras.find(cam =>
+                cam.label.toLowerCase().includes("traseira")
+            );
+        }
+
+        if (!selectedCam) {
+            selectedCam = cameras[cameras.length - 1]; // fallback para a primeira câmera
+            Swal.fire({
+                icon: 'warning',
+                title: 'Câmera padrão usada',
+                text: 'Câmera "camera 0, facing back" não encontrada. Usando a primeira disponível.'
+            });
+        }
+
+        html5QrcodeScanner.start(
+            selectedCam.id,
+            {
+                fps: 10,
+                qrbox: 250
+            },
+            onScanSuccess,
+            onScanFailure
+        ).then(setupZoomControls)
+         .catch(err => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro ao iniciar câmera',
+                text: err
+            });
+        });
+    }).catch(err => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro ao listar câmeras',
+            text: err
+        });
+    });
+}
     
     function isValidHttpUrl(string) {
         try {
