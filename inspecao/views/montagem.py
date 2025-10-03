@@ -42,8 +42,6 @@ def inspecao_montagem(request):
         )
     )
 
-    maquinas.append('TANQUE')
-
     list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
 
     lista_inspetores = [
@@ -381,37 +379,26 @@ def get_itens_inspecionados_montagem(request):
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
 
-    # CORREÇÃO: Filtra tanto inspeções de montagem quanto de tanque
+    # Filtra os dados
     datas = Inspecao.objects.filter(
-        (Q(pecas_ordem_montagem__isnull=False) | Q(estanqueidade__isnull=False)),
-        dadosexecucaoinspecao__num_execucao=0,
-        id__in=inspecionados_ids
+        id__in=inspecionados_ids, pecas_ordem_montagem__isnull=False
     )
 
     quantidade_total = datas.count()  # Total de itens sem filtro
 
-    # CORREÇÃO: Aplica filtro de máquinas apenas para itens de montagem
     if maquinas_filtradas:
-        q = Q(pecas_ordem_montagem__ordem__maquina__nome__in=maquinas_filtradas)
-        
-        # monta OR dinâmico em case-insensitive para estanqueidade
-        q_estanqueidade = Q()
-        for m in maquinas_filtradas:
-            q_estanqueidade |= Q(estanqueidade__peca__tipo__iexact=m)
-        
-        datas = datas.filter(q | q_estanqueidade).distinct()
+        datas = datas.filter(
+            pecas_ordem_montagem__ordem__maquina__nome__in=maquinas_filtradas
+        ).distinct()
 
     if data_filtrada:
         datas = datas.filter(
             dadosexecucaoinspecao__data_execucao__date=data_filtrada
         ).distinct()
 
-    # CORREÇÃO: Pesquisa tanto em peças de montagem quanto em tanques
     if pesquisa_filtrada:
         datas = datas.filter(
-            Q(pecas_ordem_montagem__peca__icontains=pesquisa_filtrada) |
-            Q(estanqueidade__peca__codigo__icontains=pesquisa_filtrada) |
-            Q(estanqueidade__peca__descricao__icontains=pesquisa_filtrada)
+            pecas_ordem_montagem__peca__icontains=pesquisa_filtrada
         ).distinct()
 
     if inspetores_filtrados:
@@ -437,13 +424,10 @@ def get_itens_inspecionados_montagem(request):
                 dadosexecucaoinspecao__num_execucao=0,
             )
 
-    # CORREÇÃO: Pré-carrega relacionamentos tanto para montagem quanto para tanque
     datas = datas.select_related(
         "pecas_ordem_montagem",
         "pecas_ordem_montagem__ordem",
-        "pecas_ordem_montagem__ordem__maquina",
-        "estanqueidade",
-        "estanqueidade__peca",
+        "pecas_ordem_montagem__operador",
     ).order_by("-dadosexecucaoinspecao__data_execucao")
 
     # Paginação
@@ -469,35 +453,17 @@ def get_itens_inspecionados_montagem(request):
             ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
             possui_nao_conformidade = de.nao_conformidade > 0 or de.num_execucao > 0
 
-            # CORREÇÃO: Determina se é montagem ou tanque
-            if data.pecas_ordem_montagem:
-                # Item de montagem
-                item = {
-                    "id": data.id,
-                    "tipo": "Montagem",
-                    "id_dados_execucao": de.id,
-                    "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                    "peca": data.pecas_ordem_montagem.peca,
-                    "qtd_produzida": data.pecas_ordem_montagem.qtd_boa,
-                    "qtd_inspecionada": de.nao_conformidade + de.conformidade,
-                    "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
-                    "inspetor": de.inspetor.user.username if de.inspetor else None,
-                    "possui_nao_conformidade": possui_nao_conformidade,
-                }
-            else:
-                # Item de tanque
-                item = {
-                    "id": data.id,
-                    "tipo": "Tanque",
-                    "id_dados_execucao": de.id,
-                    "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
-                    "peca": f"{data.estanqueidade.peca.codigo} - {data.estanqueidade.peca.descricao}",
-                    "qtd_produzida": 1,  # Tanques geralmente são unitários
-                    "qtd_inspecionada": de.nao_conformidade + de.conformidade,
-                    "maquina": "Tanque",  # Identificador apropriado para tanques
-                    "inspetor": de.inspetor.user.username if de.inspetor else None,
-                    "possui_nao_conformidade": possui_nao_conformidade,
-                }
+            item = {
+                "id": data.id,
+                "id_dados_execucao": de.id,
+                "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                "peca": data.pecas_ordem_montagem.peca,
+                "qtd_produzida": data.pecas_ordem_montagem.qtd_boa,
+                "qtd_inspecionada": de.nao_conformidade + de.conformidade,
+                "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
+                "inspetor": de.inspetor.user.username if de.inspetor else None,
+                "possui_nao_conformidade": possui_nao_conformidade,
+            }
 
             dados.append(item)
 
