@@ -11,20 +11,23 @@ from datetime import datetime, date
 import time
 import qrcode
 from io import BytesIO
+from pathlib import Path
+import environ
+
 from django.core.files import File
 from django.urls import reverse
-
 from django.db.models import Max
 from django.utils.timezone import now
 from django.db import transaction
+from django.conf import settings
+from django.contrib.staticfiles import finders
+from django.db.models import Max,  F
+
 from apontamento_montagem.models import PecasOrdem as POM
 from apontamento_pintura.models import PecasOrdem as POP
 from apontamento_solda.models import PecasOrdem as POS
 from core.models import Ordem
 from cadastro.models import Maquina
-from django.conf import settings
-from django.contrib.staticfiles import finders
-from django.db.models import Max,  F
 from apontamento_exped.utils import chamar_impressora_pecas_montagem
 
 import warnings
@@ -32,6 +35,11 @@ warnings.filterwarnings("ignore")
 
 # Carregar variáveis do arquivo .env
 load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 google_credentials_json={
             "type":os.environ.get('type'),
@@ -2099,18 +2107,30 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
             ]
         }
 
-def imprimir_ordens_montagem():
+def imprimir_ordens_montagem(data_carga_str):
+    # 1) validar/parse da data
+    try:
+        if isinstance(data_carga_str, (datetime, date)):
+            data_carga = data_carga_str.date() if isinstance(data_carga_str, datetime) else data_carga_str
+        else:
+            data_carga = datetime.strptime(str(data_carga_str), "%Y-%m-%d").date()
+    except Exception:
+        return ({"error": "Formato de data inválido. Use YYYY-MM-DD."}, 400)
 
-    data_carga= '2025-10-07'
-
+    # 2) buscar
     qs = (POM.objects
-        .filter(
-            ordem__data_carga=data_carga,
-            qtd_boa=0,
-            ordem__maquina__nome__in=['CHASSI'],
-        )
-        .select_related('ordem'))
+          .filter(
+              ordem__data_carga=data_carga,
+              qtd_boa=0,
+              ordem__maquina__nome__in=['CHASSI', 'PLAT. TANQUE. CAÇAM.'],
+          )
+          .select_related('ordem'))
 
+    if not qs.exists():
+        return ({"error": "Nenhuma ordem encontrada para esse dia."}, 404)
+
+    # 3) imprimir
+    impressas = 0
     for peca in qs:
         qtd = int(peca.qtd_planejada or 0)
         if qtd <= 0:
@@ -2118,34 +2138,91 @@ def imprimir_ordens_montagem():
 
         zpl = f"""
 ^XA
+
 ^MMT
 ^PW799
 ^LL0400
 ^LS0
 ^PR1,1,1
 ~SD14
-
-^FX Texto (nome)
 ^FO10,10
-^A0N,30,30
+^A0N,40,40
 ^FB400,10,10,L,0
-^FD{peca.peca[:30]}-{qtd}^FS
+^FD{peca.peca[:80]}-{qtd}^FS
 
-^FX Data da carga
 ^FO10,280
-^A0N,30,30
+^A0N,40,40
 ^FB400,10,10,L,0
-^FD{data_carga}^FS
+^FDCarga: {data_carga.strftime("%d/%m/%Y")}^FS
 
-^FT500,350^BQN,2,7
-^FDLA,https://apontamento-v2-testes.onrender.com{peca.ordem.caminho_relativo_qr_code}^FS
-
+^FT500,330^BQN,2,8
+^FDLA,{env('URI_QR_CODE')}{getattr(peca.ordem, 'caminho_relativo_qr_code', '')}^FS
 ^PQ{qtd},0,1,Y
-^XZ
-"""
-        chamar_impressora_pecas_montagem(zpl)
 
-    return {"message": "Ordens impressas com sucesso."}
+^XZ
+""".strip()
+
+        chamar_impressora_pecas_montagem(zpl)
+        impressas += qtd
+
+    if impressas == 0:
+        return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)
+
+    return ({"message": "Impressão enviada com sucesso.", "total_etiquetas": impressas}, 200)
+
+def imprimir_ordens_montagem_unitaria(ordem_id):
+
+    # 1) buscar
+    qs = (POM.objects
+          .filter(
+              ordem__id=ordem_id,
+              qtd_boa=0,
+          )
+          .select_related('ordem'))
+
+    if not qs.exists():
+        return ({"error": "Nenhuma ordem encontrada para esse dia."}, 404)
+
+    # 2) imprimir
+    impressas = 0
+    for peca in qs:
+        qtd = int(peca.qtd_planejada or 0)
+        if qtd <= 0:
+            continue
+
+        zpl = f"""
+^XA
+
+^MMT
+^PW799
+^LL0400
+^LS0
+^PR1,1,1
+~SD14
+^FO10,10
+^A0N,40,40
+^FB400,10,10,L,0
+^FD{peca.peca[:80]}-{qtd}^FS
+
+^FO10,280
+^A0N,40,40
+^FB400,10,10,L,0
+^FDCarga: {peca.ordem.data_carga.strftime("%d/%m/%Y")}^FS
+
+^FT500,330^BQN,2,8
+^FDLA,{env('URI_QR_CODE')}{getattr(peca.ordem, 'caminho_relativo_qr_code', '')}^FS
+^PQ{qtd},0,1,Y
+
+^XZ
+""".strip()
+
+        chamar_impressora_pecas_montagem(zpl)
+        impressas += qtd
+
+    if impressas == 0:
+        return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)
+
+    return ({"message": "Impressão enviada com sucesso.", "total_etiquetas": impressas}, 200)
 
 def gerar_e_salvar_qrcode(request, ordem):
     """

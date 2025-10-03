@@ -134,6 +134,10 @@ function atualizarTabela(ordens, setor) {
                 <button class="btn-confirmar btn btn-sm btn-success d-none" data-id="${ordem.ordem}">
                     <i class="fas fa-check"></i>
                 </button>
+                <button class="btn-etiqueta-qr btn btn-sm btn" data-id="${ordem.ordem}">
+                    <i class="fas fa-qrcode"></i>
+                </button>
+
             </td>
         `;
 
@@ -161,6 +165,59 @@ function adicionarEventosBotoesEdicao() {
             confirmarAlteracao(ordemId, setor);
         });
     });
+
+    document.querySelectorAll('.btn-etiqueta-qr').forEach(botao => {
+        botao.addEventListener('click', function () {
+            const ordemId = this.getAttribute('data-id');
+            imprimirEtiqueta(ordemId, botao);
+        });
+    });
+
+}
+
+async function imprimirEtiqueta(ordemId, btn) {
+  if (!ordemId) {
+    alert('ID da ordem ausente.');
+    return;
+  }
+
+  // Monta querystring
+  const params = new URLSearchParams({ ordem_id: String(ordemId) });
+
+  const url = `/cargas/api/imprimir-etiquetas-unitaria/?${params.toString()}`;
+
+  // UI: loading
+  let originalHTML;
+  if (btn) {
+    originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Imprimindo...`;
+  }
+
+  try {
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok) {
+      const msg = data?.error || `Falha ao imprimir (HTTP ${resp.status}).`;
+      throw new Error(msg);
+    }
+
+    // Sucesso
+    alert(data?.message || 'Impressão enviada com sucesso!');
+  } catch (err) {
+    console.error(err);
+    alert(err.message || 'Erro ao enviar impressão.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+    }
+  }
 }
 
 // Ativa os inputs para edição e exibe o botão de confirmar

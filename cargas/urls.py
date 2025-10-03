@@ -19,5 +19,7 @@ urlpatterns = [
     path('api/editar-planejamento/', views.editar_planejamento, name="editar_planejamento"),
     path('api/historico-planejamento-pintura/', views.historico_ordens_pintura, name="historico_ordens_pintura"),
     path('api/excluir-planejamento/', views.excluir_ordens_dia_setor, name="excluir_ordens_dia_setor"),
+    path('api/imprimir-etiquetas/', views.enviar_etiqueta_impressora, name="enviar_etiqueta_impressora"),
+    path('api/imprimir-etiquetas-unitaria/', views.enviar_etiqueta_unitaria_impressora, name="enviar_etiqueta_unitaria_impressora"),
 
 ]

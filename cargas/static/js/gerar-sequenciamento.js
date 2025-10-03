@@ -113,10 +113,49 @@ function gerarPlanejamento() {
     });
 }
 
+function gerarEtiquetaQrCode() {
+    const btnGerarEtiquetas = document.getElementById("gerarEtiquetas");
+    const dataInicio = document.getElementById("data-inicio").value;
+
+    btnGerarEtiquetas.disabled = true;
+    btnGerarEtiquetas.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+
+    const url = `api/imprimir-etiquetas/?data_carga=${dataInicio}`;
+
+    fetch(url, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+    })
+    .then(response => {
+        return response.json().then(data => {
+            if (!response.ok) {
+                throw data; // Lança o erro para ser tratado no catch
+            }
+            return data;
+        });
+    })
+    .then(data => {
+        alert("Etiquetas geradas com sucesso!");
+    })
+    .catch(error => {
+        console.error("Erro ao gerar etiquetas:", error);
+        if (error && error.error) {
+            alert("Erro ao gerar etiquetas: " + error.error);
+        } else {
+            alert("Erro inesperado ao processar a solicitação.");
+        }
+    })
+    .finally(() => {
+        btnGerarEtiquetas.innerHTML = '<i class="fas fa-qrcode"></i> Gerar Etiquetas';
+    });
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
     const btPesquisar = document.getElementById('pesquisarDados');
     const btngerarSequenciamento = document.getElementById('gerarSequenciamento');
     const btngerarPlanejamento = document.getElementById('gerarPlanejamento');
+    const btnGerarEtiquetas = document.getElementById('gerarEtiquetas');
 
     btPesquisar.addEventListener('click', () => {
         btPesquisar.disabled = true; // Desabilita o botão antes de carregar os dados
@@ -126,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btPesquisar.disabled = false; // Reabilita o botão após a execução
             btngerarSequenciamento.disabled = false;
             btngerarPlanejamento.disabled = false;
+            btnGerarEtiquetas.disabled = false;
             btPesquisar.innerHTML = '<i class="fas fa-search"></i> Pesquisar';
 
         });
@@ -140,5 +180,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btngerarPlanejamento.addEventListener("click", gerarPlanejamento);
+    btnGerarEtiquetas.addEventListener("click", gerarEtiquetaQrCode);
 
 });

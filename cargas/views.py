@@ -9,7 +9,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 from apontamento_pintura.models import PecasOrdem as POPintura
 from apontamento_montagem.models import PecasOrdem as POMontagem
@@ -18,7 +18,7 @@ from apontamento_solda.models import PecasOrdem as POSolda
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
-from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria
 
 import pandas as pd
 import os
@@ -879,8 +879,28 @@ def excluir_ordens_dia_setor(request):
         "ordens_bloqueadas": list(ordens_com_apontamentos.values("id", "data_carga", "grupo_maquina")),
     })    
 
+@require_GET
 def enviar_etiqueta_impressora(request):
+    data_carga = request.GET.get('data_carga')
 
-    data_carga = request.GET('data_carga')
+    payload_status = imprimir_ordens_montagem(data_carga)
+    # aceita tanto (dict, status) quanto apenas dict
+    if isinstance(payload_status, tuple):
+        payload, status = payload_status
+    else:
+        payload, status = payload_status, 200
 
-    imprimir_ordens_montagem(data_carga)
+    return JsonResponse(payload, status=status)
+
+@require_GET
+def enviar_etiqueta_unitaria_impressora(request):
+    ordem_id = request.GET.get('ordem_id')
+
+    payload_status = imprimir_ordens_montagem_unitaria(ordem_id)
+    # aceita tanto (dict, status) quanto apenas dict
+    if isinstance(payload_status, tuple):
+        payload, status = payload_status
+    else:
+        payload, status = payload_status, 200
+
+    return JsonResponse(payload, status=status)

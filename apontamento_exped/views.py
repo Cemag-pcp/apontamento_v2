@@ -600,31 +600,30 @@ def mover_item(request):
 
 def impressao_pacote(request):
 
-    # data = json.loads(request.body)
+    data = json.loads(request.body)
 
-    # id_pacote = data.get('pacote_id')
-    # cliente = data.get('cliente')
-    # data_carga = data.get('data_carga')
-    # nome_pacote = data.get('nome_pacote')
+    id_pacote = data.get('pacote_id')
+    cliente = data.get('cliente')
+    data_carga = data.get('data_carga')
+    nome_pacote = data.get('nome_pacote')
 
-    # # buscar observações do pacote
-    # pacote = get_object_or_404(Pacote, id=id_pacote)
-    # obs_qualidade = pacote.obs_qualidade
-    # obs_expedicao = pacote.obs_expedicao
+    # buscar observações do pacote
+    pacote = get_object_or_404(Pacote, id=id_pacote)
+    obs_qualidade = pacote.obs_qualidade
+    obs_expedicao = pacote.obs_expedicao
 
+    # juntar observações
+    if obs_qualidade and obs_expedicao:
+        obs_completa = f"Expedição: {obs_expedicao} | Qualidade: {obs_qualidade}"
+    elif obs_qualidade:
+        obs_completa = f"Qualidade: {obs_qualidade}"
+    elif obs_expedicao:
+        obs_completa = f"Expedição: {obs_expedicao}"
+    else:
+        obs_completa = "Sem observações"
 
-    # # juntar observações
-    # if obs_qualidade and obs_expedicao:
-    #     obs_completa = f"Expedição: {obs_expedicao} | Qualidade: {obs_qualidade}"
-    # elif obs_qualidade:
-    #     obs_completa = f"Qualidade: {obs_qualidade}"
-    # elif obs_expedicao:
-    #     obs_completa = f"Expedição: {obs_expedicao}"
-    # else:
-    #     obs_completa = "Sem observações"
-
-    # chamar_impressora(cliente, data_carga, nome_pacote, obs_completa)
-    chamar_impressora_qrcode()
+    chamar_impressora(cliente, data_carga, nome_pacote, obs_completa)
+    # chamar_impressora_qrcode()
 
     return JsonResponse({'status': 'ok'})
 

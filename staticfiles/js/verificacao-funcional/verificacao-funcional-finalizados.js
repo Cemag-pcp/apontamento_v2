@@ -250,6 +250,7 @@ function buscarItensFinalizados(pagina) {
                         <strong>📅 Data de Finalização:</strong> ${item.data_atualizacao}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo_pintura}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
+                        <strong>👷‍♂️ Inspetor:</strong> ${item.inspetor}<br>
                         ${textoCausasReprovacao}              
                     </p>
                     <hr>

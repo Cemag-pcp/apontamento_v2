@@ -11,7 +11,7 @@ import re
 
 def chamar_impressora(cliente, data_carga, nome_pacote, obs):
 
-    data_formatada = datetime.strptime(data_carga, "%Y-%m-%d").strftime("%d/%m/%Y")
+    # data_formatada = datetime.strptime(data_carga, "%Y-%m-%d").strftime("%d/%m/%Y")
 
     # Monta o ZPL final
     zpl = f"""
@@ -31,7 +31,7 @@ def chamar_impressora(cliente, data_carga, nome_pacote, obs):
 ^FO50,80
 ^A0N,30,30
 ^FB700,1,0,C,0
-^FDData da Carga: {data_formatada}^FS
+^FDData da Carga: {data_carga}^FS
 
 ^FX Linha separadora
 ^FO40,120
@@ -363,6 +363,7 @@ def limpar_cor(nome_carreta: str) -> str:
 
     # remove uma vez se casar; case-insensitive
     return re.sub(pattern, '', nome_carreta.strip(), flags=re.IGNORECASE)
+
 def chamar_impressora_pecas_montagem(zpl):
 
     r = redis.from_url("redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210")
