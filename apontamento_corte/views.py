@@ -790,7 +790,7 @@ def get_ordens_sequenciadas(request):
     # Converte cada objeto para dicionário e adiciona o display do grupo_maquina
     data = []
     for ordem_obj in ordens_sequenciadas:
-        ordem_dict = model_to_dict(ordem_obj)
+        ordem_dict = model_to_dict(ordem_obj, exclude=['qrcode'])  # << aqui
         ordem_dict['grupo_maquina_display'] = ordem_obj.get_grupo_maquina_display()
 
         propriedade = getattr(ordem_obj, 'propriedade', None)
@@ -804,6 +804,10 @@ def get_ordens_sequenciadas(request):
             ordem_dict['tipo_chapa'] = None
 
         data.append(ordem_dict)
+
+    # excluindo a coluna qr_code
+
+    print(data)
 
     return JsonResponse({'ordens_sequenciadas': data})
 
