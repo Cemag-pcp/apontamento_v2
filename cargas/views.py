@@ -949,10 +949,12 @@ def ordens_em_andamento_finalizada_pintura(request):
             'data_pendura_fmt',
             'data_derruba_fmt',
         )
-        .order_by('data_fim')   # ou '-data_fim' para mais recentes primeiro
+        .order_by('-data_fim')[:1000]
     )
 
-    return JsonResponse(list(qs), safe=False)
+    data = list(qs)[::-1]
+
+    return JsonResponse(data, safe=False)
 
 def verificar_cargas_geradas(request):
 
