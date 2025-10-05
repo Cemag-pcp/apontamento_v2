@@ -1167,10 +1167,12 @@ def api_ordens_finalizadas(request):
 
     resultado = []
     for d in dados:
+        parte_direita = (d.peca or "").partition(" - ")[2]  # '' se não houver ' - '
+
         resultado.append({
             'ordem': d.ordem.ordem,
             'codigo': d.peca.split(" - ")[0],
-            'descricao': d.peca.split(" - ")[1],
+            'descricao': parte_direita,
             'qtd_planejada': d.qtd_planejada,
             'cor': mapa_cor.get(d.ordem.cor, d.ordem.cor),
             'qtd_boa': d.qtd_boa,
