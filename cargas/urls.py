@@ -21,5 +21,9 @@ urlpatterns = [
     path('api/excluir-planejamento/', views.excluir_ordens_dia_setor, name="excluir_ordens_dia_setor"),
     path('api/imprimir-etiquetas/', views.enviar_etiqueta_impressora, name="enviar_etiqueta_impressora"),
     path('api/imprimir-etiquetas-unitaria/', views.enviar_etiqueta_unitaria_impressora, name="enviar_etiqueta_unitaria_impressora"),
+    
+    # google sheets
+    path('api/ordens_em_andamento_finalizada_pintura/', views.ordens_em_andamento_finalizada_pintura, name="ordens_em_andamento_finalizada_pintura"),
+    path('api/verificar_cargas_geradas/', views.verificar_cargas_geradas, name="verificar_cargas_geradas"),
 
 ]
