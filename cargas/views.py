@@ -920,7 +920,7 @@ def ordens_em_andamento_finalizada_pintura(request):
             peca_ordem__ordem__grupo_maquina='pintura',
             status__isnull=False
         )
-        .select_related('peca_ordem', 'peca_ordem__ordem')
+        .select_related('peca_ordem', 'peca_ordem__ordem', 'cambao')
         .annotate(
             id_ordem=F('peca_ordem__ordem__id'),
             ordem=F('peca_ordem__ordem__ordem'),
@@ -933,6 +933,8 @@ def ordens_em_andamento_finalizada_pintura(request):
             data_carga_fmt=ToChar(F('peca_ordem__ordem__data_carga'), Value('DD/MM/YYYY')),
             data_pendura_fmt=ToChar(F('data_pendura'), Value('DD/MM/YYYY HH24:MI:SS')),
             data_derruba_fmt=ToChar(F('data_fim'), Value('DD/MM/YYYY HH24:MI:SS')),
+
+            tipo=F('cambao__tipo'),
         )
         .values(
             'id_ordem',
@@ -948,6 +950,8 @@ def ordens_em_andamento_finalizada_pintura(request):
             'data_carga_fmt',
             'data_pendura_fmt',
             'data_derruba_fmt',
+            
+            'tipo',
         )
         .order_by('-data_fim')[:1000]
     )
