@@ -160,12 +160,7 @@ function buscarItensInspecionados(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">${item.peca}</h5>
-                        <span class="badge ${item.tipo === 'Montagem' ? 'bg-primary' : 'bg-success'}">
-                            ${item.tipo}
-                        </span>
-                    </div>
+                    <h5> ${item.peca}</h5>
                     <p>Inspeção #${item.id}</p>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>

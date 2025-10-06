@@ -4,12 +4,13 @@ from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.db.models.functions import Coalesce
 from django.db import models
-from django.db.models import Sum,Q,Prefetch,Count,OuterRef, Subquery, F, Value, Avg
+from django.db.models import Sum,Q,CharField,Count,OuterRef, Subquery, F, Value, Avg
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.decorators.http import require_POST, require_GET
+from django.db.models import Func
 
 from apontamento_pintura.models import PecasOrdem as POPintura
 from apontamento_montagem.models import PecasOrdem as POMontagem
@@ -19,6 +20,7 @@ from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
 from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria
+from apontamento_pintura.models import CambaoPecas
 
 import pandas as pd
 import os
@@ -904,3 +906,72 @@ def enviar_etiqueta_unitaria_impressora(request):
         payload, status = payload_status, 200
 
     return JsonResponse(payload, status=status)
+
+# API para consulta no google sheets
+
+class ToChar(Func):
+    function = 'to_char'
+    output_field = CharField()
+
+def ordens_em_andamento_finalizada_pintura(request):
+    qs = (
+        CambaoPecas.objects
+        .filter(
+            peca_ordem__ordem__grupo_maquina='pintura',
+            status__isnull=False
+        )
+        .select_related('peca_ordem', 'peca_ordem__ordem', 'cambao')
+        .annotate(
+            id_ordem=F('peca_ordem__ordem__id'),
+            ordem=F('peca_ordem__ordem__ordem'),
+            peca=F('peca_ordem__peca'),
+            qtd_planejada=F('peca_ordem__qtd_planejada'),
+            cor=F('peca_ordem__ordem__cor'),
+
+            # use nomes sem colidir com fields reais
+            data_criacao_fmt=ToChar(F('peca_ordem__ordem__data_criacao'), Value('DD/MM/YYYY')),
+            data_carga_fmt=ToChar(F('peca_ordem__ordem__data_carga'), Value('DD/MM/YYYY')),
+            data_pendura_fmt=ToChar(F('data_pendura'), Value('DD/MM/YYYY HH24:MI:SS')),
+            data_derruba_fmt=ToChar(F('data_fim'), Value('DD/MM/YYYY HH24:MI:SS')),
+
+            tipo=F('cambao__tipo'),
+        )
+        .values(
+            'id_ordem',
+            'ordem',
+            'peca',
+            'qtd_planejada',
+            'cor',
+            'status',
+            'quantidade_pendurada',
+
+            # valores formatados
+            'data_criacao_fmt',
+            'data_carga_fmt',
+            'data_pendura_fmt',
+            'data_derruba_fmt',
+            
+            'tipo',
+        )
+        .order_by('-data_fim')[:1000]
+    )
+
+    data = list(qs)[::-1]
+
+    return JsonResponse(data, safe=False)
+
+def verificar_cargas_geradas(request):
+
+    qs = (
+        Ordem.objects
+        .filter(grupo_maquina__in=['pintura', 'montagem', 'solda'])
+        .order_by('data_carga', 'grupo_maquina', 'data_criacao')  # precisa começar pelos do distinct
+        .distinct('data_carga', 'grupo_maquina')                  # DISTINCT ON (data_carga, grupo_maquina)
+        .annotate(
+            data_criacao_fmt=ToChar(F('data_criacao'), Value('DD/MM/YYYY')),
+            data_carga_fmt=ToChar(F('data_carga'), Value('DD/MM/YYYY'))
+
+        )
+        .values('data_criacao_fmt', 'data_carga_fmt', 'grupo_maquina')
+    )
+    return JsonResponse(list(qs), safe=False)

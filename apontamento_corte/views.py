@@ -805,10 +805,6 @@ def get_ordens_sequenciadas(request):
 
         data.append(ordem_dict)
 
-    # excluindo a coluna qr_code
-
-    print(data)
-
     return JsonResponse({'ordens_sequenciadas': data})
 
 def resequenciar_ordem(request):
