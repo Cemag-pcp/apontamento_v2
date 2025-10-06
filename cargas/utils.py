@@ -2117,14 +2117,19 @@ def imprimir_ordens_montagem(data_carga_str):
     except Exception:
         return ({"error": "Formato de data inválido. Use YYYY-MM-DD."}, 400)
 
-    # 2) buscar
-    qs = (POM.objects
-          .filter(
-              ordem__data_carga=data_carga,
-              qtd_boa=0,
-              ordem__maquina__nome__in=['CHASSI', 'PLAT. TANQUE. CAÇAM.'],
-          )
-          .select_related('ordem'))
+    # 2) buscar peças que existem em ambas as tabelas
+    pecas_pos = POS.objects.values_list('peca', flat=True)
+    qs = (
+        POM.objects
+        .filter(
+            ordem__data_carga=data_carga,
+            qtd_boa=0,
+            ordem__maquina__nome__in=['CHASSI', 'PLAT. TANQUE. CAÇAM.'],
+            peca__in=pecas_pos,
+        )
+        .select_related('ordem')
+        .order_by('ordem__maquina__nome')  # Adiciona a ordenação
+    )
 
     if not qs.exists():
         return ({"error": "Nenhuma ordem encontrada para esse dia."}, 404)
