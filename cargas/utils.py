@@ -2154,6 +2154,14 @@ def imprimir_ordens_montagem(data_carga_str):
         if qtd <= 0:
             continue
 
+        # Adiciona caminho_relativo_qr_code se não existir
+        if not getattr(peca.ordem, 'caminho_relativo_qr_code', None):
+            caminho_relativo = (
+                reverse("montagem:apontamento_qrcode") + f"?ordem_id={peca.ordem.pk}&selecao_setor=pendente"
+            )
+            peca.ordem.caminho_relativo_qr_code = caminho_relativo
+            peca.ordem.save(update_fields=['caminho_relativo_qr_code'])
+
         zpl = f"""
 ^XA
 
@@ -2189,7 +2197,6 @@ def imprimir_ordens_montagem(data_carga_str):
     return ({"message": "Impressão enviada com sucesso.", "total_etiquetas": impressas}, 200)
 
 def imprimir_ordens_montagem_unitaria(ordem_id):
-
     # 1) buscar
     qs = (POM.objects
           .filter(
@@ -2207,6 +2214,14 @@ def imprimir_ordens_montagem_unitaria(ordem_id):
         qtd = int(peca.qtd_planejada or 0)
         if qtd <= 0:
             continue
+
+        # Adiciona caminho_relativo_qr_code se não existir
+        if not getattr(peca.ordem, 'caminho_relativo_qr_code', None):
+            caminho_relativo = (
+                reverse("montagem:apontamento_qrcode") + f"?ordem_id={peca.ordem.pk}&selecao_setor=pendente"
+            )
+            peca.ordem.caminho_relativo_qr_code = caminho_relativo
+            peca.ordem.save(update_fields=['caminho_relativo_qr_code'])
 
         zpl = f"""
 ^XA
