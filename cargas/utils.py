@@ -21,7 +21,7 @@ from django.utils.timezone import now
 from django.db import transaction
 from django.conf import settings
 from django.contrib.staticfiles import finders
-from django.db.models import Max,  F
+from django.db.models import Max, F, Q
 
 from apontamento_montagem.models import PecasOrdem as POM
 from apontamento_pintura.models import PecasOrdem as POP
@@ -2116,6 +2116,18 @@ def imprimir_ordens_montagem(data_carga_str):
             data_carga = datetime.strptime(str(data_carga_str), "%Y-%m-%d").date()
     except Exception:
         return ({"error": "Formato de data inválido. Use YYYY-MM-DD."}, 400)
+    
+    CODIGOS_EXCLUIR = [
+        '023590', '030679', '031517', '032470', '032546', '032531', '032681', '032731', '032871',
+        '411528', '032637', '411267', '030499', '033053', '034015', '033884', '025118', '034316',
+        '033601', '033387', '033400', '033750', '034375', '034306', '034467', '035939', '035945',
+        '032705', '032992', '033121',
+    ]
+
+    # Filtro de exclusão como Q
+    excluir_codigos_q = Q()
+    for codigo in CODIGOS_EXCLUIR:
+        excluir_codigos_q |= Q(peca__startswith=f"{codigo} ")
 
     # 2) buscar peças que existem em ambas as tabelas
     pecas_pos = POS.objects.values_list('peca', flat=True)
@@ -2127,6 +2139,7 @@ def imprimir_ordens_montagem(data_carga_str):
             ordem__maquina__nome__in=['CHASSI', 'PLAT. TANQUE. CAÇAM.'],
             peca__in=pecas_pos,
         )
+        .exclude(excluir_codigos_q)
         .select_related('ordem')
         .order_by('ordem__maquina__nome')  # Adiciona a ordenação
     )
