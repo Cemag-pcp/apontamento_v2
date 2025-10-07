@@ -2124,12 +2124,10 @@ def imprimir_ordens_montagem(data_carga_str):
         '032705', '032992', '033121',
     ]
 
-    # Filtro de exclusão como Q
     excluir_codigos_q = Q()
     for codigo in CODIGOS_EXCLUIR:
         excluir_codigos_q |= Q(peca__startswith=f"{codigo} ")
 
-    # 2) buscar peças que existem em ambas as tabelas
     pecas_pos = POS.objects.values_list('peca', flat=True)
     qs = (
         POM.objects
@@ -2141,28 +2139,24 @@ def imprimir_ordens_montagem(data_carga_str):
         )
         .exclude(excluir_codigos_q)
         .select_related('ordem')
-        .order_by('ordem__maquina__nome')  # Adiciona a ordenação
+        .order_by('ordem__maquina__nome')
     )
 
     if not qs.exists():
         return ({"error": "Nenhuma ordem encontrada para esse dia."}, 404)
 
-    # 3) imprimir
     impressas = 0
     for peca in qs:
         qtd = int(peca.qtd_planejada or 0)
         if qtd <= 0:
             continue
 
-        # Adiciona caminho_relativo_qr_code se não existir
         if not getattr(peca.ordem, 'caminho_relativo_qr_code', None):
-            caminho_relativo = (
-                reverse("montagem:apontamento_qrcode") + f"?ordem_id={peca.ordem.pk}&selecao_setor=pendente"
-            )
+            caminho_relativo = reverse("montagem:apontamento_qrcode") + f"?ordem_id={peca.ordem.pk}&selecao_setor=pendente"
             peca.ordem.caminho_relativo_qr_code = caminho_relativo
             peca.ordem.save(update_fields=['caminho_relativo_qr_code'])
 
-        # Envia uma etiqueta por vez, com pausa
+        # Uma etiqueta por vez, devagar e sem duplicação (^PQ1,0,0)
         for _ in range(qtd):
             zpl = f"""
 ^XA
@@ -2175,20 +2169,20 @@ def imprimir_ordens_montagem(data_carga_str):
 ^FO10,10
 ^A0N,40,40
 ^FB400,10,10,L,0
-^FD{peca.peca[:80]}-1^FS
+^FD{peca.peca[:80]}^FS
 ^FO10,280
 ^A0N,40,40
 ^FB400,10,10,L,0
 ^FDCarga: {data_carga.strftime("%d/%m/%Y")}^FS
 ^FT500,330^BQN,2,8
 ^FDLA,{env('URI_QR_CODE')}{getattr(peca.ordem, 'caminho_relativo_qr_code', '')}^FS
-^PQ1,0,1,Y
+^PQ1,0,0
 ^XZ
 """.strip()
 
             chamar_impressora_pecas_montagem(zpl)
             impressas += 1
-            time.sleep(1)  # Agora sim, pausa entre cada etiqueta física!
+            time.sleep(2)  # controla o ritmo entre etiquetas
 
     if impressas == 0:
         return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)
