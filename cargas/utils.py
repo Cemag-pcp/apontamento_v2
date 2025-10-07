@@ -2176,7 +2176,7 @@ def imprimir_ordens_montagem(data_carga_str):
 ^A0N,40,40
 ^FB400,10,10,L,0
 ^FDCarga: {data_carga.strftime("%d/%m/%Y")}^FS
-^FT470,350^BQN,2,8
+^FT500,330^BQN,2,7
 ^FDLA,{env('URI_QR_CODE')}{getattr(peca.ordem, 'caminho_relativo_qr_code', '')}^FS
 ^PQ1,0,0
 ^XZ
@@ -2237,7 +2237,7 @@ def imprimir_ordens_montagem_unitaria(ordem_id):
 ^FB400,10,10,L,0
 ^FDCarga: {peca.ordem.data_carga.strftime("%d/%m/%Y")}^FS
 
-^FT470,350^BQN,2,8
+^FT500,330^BQN,2,7
 ^FDLA,{env('URI_QR_CODE')}{getattr(peca.ordem, 'caminho_relativo_qr_code', '')}^FS
 ^PQ{qtd},0,1,Y
 
