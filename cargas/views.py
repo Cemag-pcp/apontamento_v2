@@ -21,6 +21,7 @@ from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivo
 from cadastro.models import Maquina
 from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria
 from apontamento_pintura.models import CambaoPecas
+from apontamento_pintura.views import ordens_criadas
 
 import pandas as pd
 import os
@@ -914,6 +915,44 @@ class ToChar(Func):
     output_field = CharField()
 
 def ordens_em_andamento_finalizada_pintura(request):
+    """"
+        traz as ordens aguardando inicio, em andamento e finalizadas na pintura
+    """
+    resultado = ordens_criadas(request)
+
+    resultado_json_ordens_criadas = json.loads(resultado.content)
+
+    cont = 0
+
+    ordens_aguardando_iniciar = []
+
+    mes_atual = datetime.now().date().month
+
+
+
+    for ordem in resultado_json_ordens_criadas['ordens']:
+        data_carga_datetime = datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
+        if data_carga_datetime.month not in (mes_atual, mes_atual - 1):
+            continue
+
+        #adicionar que a ordem aguardando_iniciar criando do mês atual
+        ordens_aguardando_iniciar.append({
+            'status': ordem['status_atual'],
+            'quantidade_pendurada': 0,
+            'id_ordem': ordem['id'],
+            'ordem': ordem['ordem'],
+            'peca': ordem['peca_codigo'],
+            'qtd_planejada': ordem['peca_qt_planejada'],
+            'cor': ordem['cor'],
+            'data_criacao_fmt': formatar_data_str(ordem['data_criacao']) if ordem['data_criacao'] else '',
+            'data_carga_fmt': formatar_data_str(ordem['data_carga']) if ordem['data_carga'] else '',
+            'data_pendura_fmt': '',
+            'data_derruba_fmt': '',
+            'tipo': '',
+            'cambao_nome': '',
+        })
+
+
     qs = (
         CambaoPecas.objects
         .filter(
@@ -935,6 +974,7 @@ def ordens_em_andamento_finalizada_pintura(request):
             data_derruba_fmt=ToChar(F('data_fim'), Value('DD/MM/YYYY HH24:MI:SS')),
 
             tipo=F('cambao__tipo'),
+            cambao_nome=F('cambao__nome'),
         )
         .values(
             'id_ordem',
@@ -952,13 +992,21 @@ def ordens_em_andamento_finalizada_pintura(request):
             'data_derruba_fmt',
             
             'tipo',
+            'cambao_nome',
         )
         .order_by('-data_fim')[:1000]
     )
 
     data = list(qs)[::-1]
 
-    return JsonResponse(data, safe=False)
+    resultado_final_concat = ordens_aguardando_iniciar + data
+
+    resultado_final_concat = sorted(
+        resultado_final_concat,
+        key=lambda x: parse_data_fmt(x.get('data_carga_fmt', ''))
+    )
+
+    return JsonResponse(resultado_final_concat, safe=False)
 
 def verificar_cargas_geradas(request):
 
@@ -975,3 +1023,27 @@ def verificar_cargas_geradas(request):
         .values('data_criacao_fmt', 'data_carga_fmt', 'grupo_maquina')
     )
     return JsonResponse(list(qs), safe=False)
+
+def formatar_data_str(data_str):
+    """
+    Recebe uma string de data (ex: '2025-10-07' ou '2025-10-07T00:00:00')
+    e retorna no formato 'DD/MM/YYYY'.
+    Se não conseguir converter, retorna a string original ou vazio.
+    """
+    if not data_str:
+        return ''
+    try:
+        # Trata ISO completo ou só data
+        if 'T' in data_str:
+            data_obj = datetime.strptime(data_str[:10], "%Y-%m-%d")
+        else:
+            data_obj = datetime.strptime(data_str, "%Y-%m-%d")
+        return data_obj.strftime('%d/%m/%Y')
+    except Exception:
+        return data_str
+
+def parse_data_fmt(data_str):
+    try:
+        return datetime.strptime(data_str, "%d/%m/%Y")
+    except Exception:
+        return datetime.min  # Garante que datas inválidas fiquem no início
