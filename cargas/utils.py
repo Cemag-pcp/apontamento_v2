@@ -2169,7 +2169,7 @@ def imprimir_ordens_montagem(data_carga_str):
 ^FO10,10
 ^A0N,40,40
 ^FB400,10,10,L,0
-^FD{peca.peca[:80]}^FS
+^FD{peca.peca[:80]}-{qtd}^FS
 ^FO10,280
 ^A0N,40,40
 ^FB400,10,10,L,0
