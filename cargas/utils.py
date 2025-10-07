@@ -2190,6 +2190,7 @@ def imprimir_ordens_montagem(data_carga_str):
 
         chamar_impressora_pecas_montagem(zpl)
         impressas += qtd
+        time.sleep(1)
 
     if impressas == 0:
         return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)
