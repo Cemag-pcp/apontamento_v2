@@ -2162,9 +2162,10 @@ def imprimir_ordens_montagem(data_carga_str):
             peca.ordem.caminho_relativo_qr_code = caminho_relativo
             peca.ordem.save(update_fields=['caminho_relativo_qr_code'])
 
-        zpl = f"""
+        # Envia uma etiqueta por vez, com pausa
+        for _ in range(qtd):
+            zpl = f"""
 ^XA
-
 ^MMT
 ^PW799
 ^LL0400
@@ -2174,23 +2175,20 @@ def imprimir_ordens_montagem(data_carga_str):
 ^FO10,10
 ^A0N,40,40
 ^FB400,10,10,L,0
-^FD{peca.peca[:80]}-{qtd}^FS
-
+^FD{peca.peca[:80]}-1^FS
 ^FO10,280
 ^A0N,40,40
 ^FB400,10,10,L,0
 ^FDCarga: {data_carga.strftime("%d/%m/%Y")}^FS
-
 ^FT500,330^BQN,2,8
 ^FDLA,{env('URI_QR_CODE')}{getattr(peca.ordem, 'caminho_relativo_qr_code', '')}^FS
-^PQ{qtd},0,1,Y
-
+^PQ1,0,1,Y
 ^XZ
 """.strip()
 
-        chamar_impressora_pecas_montagem(zpl)
-        impressas += qtd
-        time.sleep(1)
+            chamar_impressora_pecas_montagem(zpl)
+            impressas += 1
+            time.sleep(1)  # Agora sim, pausa entre cada etiqueta física!
 
     if impressas == 0:
         return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)
