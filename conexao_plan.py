@@ -60,17 +60,21 @@ def busca_saldo_recurso_central(codigos):
     itens = itens.drop(index=0)
     data_ultimo_saldo = itens.loc[itens.index[0],'data ultimo saldo']
 
+    # Normaliza os códigos da planilha
+    itens['codigo_normalizado'] = itens['codigo'].apply(normaliza_codigo)
+
     #filtrando pelo codigo
-    itens = itens[itens['codigo'].isin(codigos)]
+    itens = itens[itens['codigo_normalizado'].isin(codigos)]
     if itens.empty:
         cache[codigos_tupla] = dict(),data_ultimo_saldo
         return dict(),data_ultimo_saldo
     else:
-        saldo_dict = dict(zip(itens['codigo'], itens['Saldo']))
+        saldo_dict = dict(zip(itens['codigo_normalizado'], itens['Saldo']))
         # data_ultimo_saldo = itens.loc[itens.index[0],'data ultimo saldo']
         cache[codigos_tupla] = saldo_dict,data_ultimo_saldo
         return saldo_dict,data_ultimo_saldo
  
+def normaliza_codigo(codigo):
+    # Remove 'TRU' do final, se existir
+    return codigo[:-3] if codigo.endswith('TRU') else codigo
 
-# lista = []
-# print(busca_saldo_recurso_central(lista))
