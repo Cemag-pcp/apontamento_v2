@@ -909,6 +909,13 @@ def enviar_etiqueta_unitaria_impressora(request):
     return JsonResponse(payload, status=status)
 
 # API para consulta no google sheets
+class AtTimeZone(Func):
+    function = ''
+    template = "%(expressions)s AT TIME ZONE '%(timezone)s'"
+    output_field = CharField()
+
+    def __init__(self, expression, timezone, **extra):
+        super().__init__(expression, timezone=timezone, **extra)
 
 class ToChar(Func):
     function = 'to_char'
@@ -921,8 +928,6 @@ def ordens_em_andamento_finalizada_pintura(request):
     resultado = ordens_criadas(request)
 
     resultado_json_ordens_criadas = json.loads(resultado.content)
-
-    cont = 0
 
     ordens_aguardando_iniciar = []
 
@@ -970,8 +975,14 @@ def ordens_em_andamento_finalizada_pintura(request):
             # use nomes sem colidir com fields reais
             data_criacao_fmt=ToChar(F('peca_ordem__ordem__data_criacao'), Value('DD/MM/YYYY')),
             data_carga_fmt=ToChar(F('peca_ordem__ordem__data_carga'), Value('DD/MM/YYYY')),
-            data_pendura_fmt=ToChar(F('data_pendura'), Value('DD/MM/YYYY HH24:MI:SS')),
-            data_derruba_fmt=ToChar(F('data_fim'), Value('DD/MM/YYYY HH24:MI:SS')),
+            data_pendura_fmt=ToChar(
+                AtTimeZone(F('data_pendura'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+            data_derruba_fmt=ToChar(
+                AtTimeZone(F('data_fim'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
 
             tipo=F('cambao__tipo'),
             cambao_nome=F('cambao__nome'),
@@ -1003,7 +1014,7 @@ def ordens_em_andamento_finalizada_pintura(request):
 
     resultado_final_concat = sorted(
         resultado_final_concat,
-        key=lambda x: parse_data_fmt(x.get('data_carga_fmt', ''))
+        key=lambda x: parse_data_fmt(x.get('data_derruba_fmt', ''))
     )
 
     return JsonResponse(resultado_final_concat, safe=False)
