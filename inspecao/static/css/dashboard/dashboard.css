@@ -54,15 +54,42 @@ body {
 }
 
 .carousel-item img {
-    max-height: 300px;
-    object-fit: contain;
+    width: 100%;
+    max-height: 70vh; /* aumenta bem em telas grandes */
+    object-fit: contain; /* não corta a imagem */
     background-color: #f8f9fa;
 }
 
+@media (max-width: 576px) {
+  .carousel-item img {
+    max-height: 40vh; /* menor no mobile para não ficar exagerado */
+  }
+}
+
 .carousel-caption {
-    background-color: rgba(0, 0, 0, 0.7);
-    border-radius: 10px;
-    padding: 10px;
+    /* Posição: Move para o inferior, mantendo o padding padrão do Bootstrap */
+    bottom: 0; 
+    top: auto; 
+    
+    /* Cor: Fundo com uma transparência sutil (RGBA) para clarear */
+    background-color: rgba(0, 0, 0, 0.5); /* Preto com 50% de transparência */
+    padding: 0.5rem 1rem; /* Reduz o padding padrão para torná-lo menor */
+    
+    /* Fonte: Torna o texto menor */
+    font-size: 0.8rem; 
+    line-height: 1.2;
+}
+
+/* Estilo para o título (h5) dentro da legenda */
+.carousel-caption h5 {
+    font-size: 1rem; /* Tamanho menor para o título */
+    margin-bottom: 0.2rem; /* Espaçamento menor após o título */
+}
+
+/* Estilo para o parágrafo (p) dentro da legenda */
+.carousel-caption p {
+    font-size: 0.75rem; /* Tamanho ainda menor para os detalhes */
+    margin-bottom: 0; /* Remove a margem inferior padrão */
 }
 
 .chart-container {
