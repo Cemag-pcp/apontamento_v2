@@ -575,7 +575,7 @@ def mostrar_pecas_completa(request):
 
     pecas = (
         CarretasExplodidas.objects
-        .filter(carreta=carreta, conjunto_peca=conjunto, primeiro_processo__in=['CORTAR', 'SERRAR', 'C USINAR'])
+        .filter(carreta=carreta, conjunto_peca=conjunto)
         .values('descricao_peca','mp_peca','total_peca','conjunto_peca','primeiro_processo','segundo_processo')
     )
 
