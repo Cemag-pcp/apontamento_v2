@@ -132,6 +132,7 @@ def get_ordens_criadas(request):
             'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
+            'maquina_id': ordem.maquina.id if ordem.maquina else None,
             'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M'),
             'peca': {
                 'codigo': ordem.peca_codigo,
