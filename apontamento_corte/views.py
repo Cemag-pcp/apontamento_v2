@@ -868,7 +868,8 @@ def api_ordens_finalizadas(request):
                 poc.qtd_morta,
                 CONCAT(op.matricula, ' - ', op.nome) AS operador,
                 TO_CHAR(o.ultima_atualizacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
-                poc.qtd_boa AS total_produzido
+                poc.qtd_boa AS total_produzido,
+                p.retalho 
             FROM apontamento_v2.core_ordem o
             INNER JOIN apontamento_v2.apontamento_corte_pecasordem poc ON poc.ordem_id = o.id
             LEFT JOIN apontamento_v2.core_propriedadesordem p ON o.id = p.ordem_id

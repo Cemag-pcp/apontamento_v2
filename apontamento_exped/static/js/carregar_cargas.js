@@ -547,7 +547,7 @@ export async function popularPacotesDaCarga(cargaId) {
         footer.appendChild(btnGroup);
       }
 
-      if (data.status_carga === 'despachado' && pacote.status_qualidade !== 'ok') {
+      if (data.status_carga === 'despachado' && pacote.status_qualidade === 'ok') {
 
         // Confirmar Qualidade
         // btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm flex-grow-1';
