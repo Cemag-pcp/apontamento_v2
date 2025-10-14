@@ -420,17 +420,31 @@ def ordens_criadas(request):
     if data_programacao:
         filtros_ordem['data_programacao'] = data_programacao
 
-    # Recupera os IDs das ordens que atendem aos filtros
+    # Máquinas a excluir da contagem / retorno
+    maquinas_excluidas = [
+        'PLAT. TANQUE. CAÇAM. 2',
+        'QUALIDADE',
+        'FORJARIA',
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'SERRALHERIA',
+        'ROÇADEIRA'
+    ]
+
+    # Recupera os IDs das ordens que atendem aos filtros (ainda sem excluir máquinas, pois o filtro de máquina pode vir por parâmetro)
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
 
-    # Consulta na PecasOrdem filtrando pelas ordens identificadas,
-    # trazendo alguns campos da Ordem (usando a notação "ordem__<campo>"),
-    # e agrupando para calcular as somas e o saldo.
-    pecas_ordem_agg = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).values(
+    # Consulta em PecasOrdem filtrando pelas ordens e EXCLUINDO as máquinas definidas em maquinas_excluidas
+    pecas_ordem_queryset = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).exclude(
+        ordem__maquina__nome__in=maquinas_excluidas
+    )
+
+    pecas_ordem_agg = pecas_ordem_queryset.values(
         'ordem',                    # id da ordem (chave para o agrupamento)
         'ordem__data_carga',        # data da carga da ordem
         'ordem__data_programacao',  # data da programação da ordem
-        'ordem__maquina__nome',     # nome da máquina (ajuste se necessário)
+        'ordem__maquina__nome',     # nome da máquina
         'ordem__status_atual',      # status atual da ordem
         'peca',                     # nome da peça
     ).annotate(
@@ -446,9 +460,7 @@ def ordens_criadas(request):
         )
     )
 
-    # datas_programacao = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).values_list(
-    #     'ordem__data_programacao', flat=True
-    # ).distinct()
+    # Recalcula datas apenas com as ordens consideradas após exclusões
     datas_programacao = set(item['ordem__data_programacao'] for item in pecas_ordem_agg)
     data_programacao = next(iter(datas_programacao), None)
     data_formatada = data_programacao.strftime('%d/%m/%Y') if data_programacao else None
@@ -457,26 +469,17 @@ def ordens_criadas(request):
     data_carga = next(iter(datas_carga), None)
     data_formatada_carga = data_carga if data_carga else None
 
-    # Máquinas a excluir da contagem
-    maquinas_excluidas = [
-        'PLAT. TANQUE. CAÇAM. 2',
-        'QUALIDADE',
-        'FORJARIA',
-        'ESTAMPARIA',
-        'Carpintaria',
-        'FEIXE DE MOLAS',
-        'SERRALHERIA',
-        'ROÇADEIRA'
-    ]
-
-    maquinas = Ordem.objects.filter(id__in=ordem_ids).exclude(maquina__nome__in=maquinas_excluidas).values('maquina__nome','maquina__id').distinct()
+    # Lista de máquinas (apenas das ordens retornadas)
+    maquinas = Ordem.objects.filter(id__in=ordem_ids).exclude(
+        maquina__nome__in=maquinas_excluidas
+    ).values('maquina__nome', 'maquina__id').distinct()
 
     return JsonResponse({
-                            "ordens": list(pecas_ordem_agg),
-                            "maquinas":list(maquinas),
-                            "data_programacao":data_formatada,
-                            "data_formatada_carga": data_formatada_carga
-                        })
+        "ordens": list(pecas_ordem_agg),
+        "maquinas": list(maquinas),
+        "data_programacao": data_formatada,
+        "data_formatada_carga": data_formatada_carga
+    })
 
 def verificar_qt_restante(request):
 
