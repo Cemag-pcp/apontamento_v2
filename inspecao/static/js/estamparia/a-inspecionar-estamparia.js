@@ -883,8 +883,6 @@ document.addEventListener("change", (event) =>{
         const optionAutoInspecaoNoturna = document.getElementById("optionAutoInspecaoNoturna");
         const selectInspetor = document.getElementById("inspetor");
         const currentDate = new Date();
-        
-        
         if (event.target.checked){
             // Pegar a data atual formatada
             currentDate.setDate(currentDate.getDate() - 1); // Define para o dia anterior
