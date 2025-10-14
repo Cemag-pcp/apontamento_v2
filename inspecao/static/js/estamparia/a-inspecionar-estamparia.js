@@ -878,7 +878,7 @@ document.getElementById('inspectionForm').addEventListener('submit', function(e)
 });
 
 document.addEventListener("change", (event) =>{
-    console.log(event.target);
+    
     if(event.target.id === "autoInspecaoNoturna"){
         const optionAutoInspecaoNoturna = document.getElementById("optionAutoInspecaoNoturna");
         const selectInspetor = document.getElementById("inspetor");
