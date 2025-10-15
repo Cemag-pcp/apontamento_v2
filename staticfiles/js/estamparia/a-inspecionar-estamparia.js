@@ -215,7 +215,9 @@ function buscarItensInspecao(pagina) {
                     modalInspecao.querySelector('#conjuntoName').disabled = true;
 
                     modalInspecao.querySelector('#numPecaDefeituosa').setAttribute("max", itemQtd);                 
+                    modalInspecao.querySelector('#numPecaDefeituosa').setAttribute("max", itemQtd);                 
                     controlarLinhasTabela();
+                    resetInspetorSelect();
                     resetInspetorSelect();
 
                     // Mostrar o modal

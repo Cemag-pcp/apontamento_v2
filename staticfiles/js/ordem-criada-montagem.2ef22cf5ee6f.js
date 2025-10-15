@@ -9,7 +9,7 @@ export const loadOrdens = (container, filtros = {}) => {
 
         document.getElementById('data-entrega-info').textContent = '[carregando...]';
 
-        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&setor=${filtros.setor || ''}&data-programada=${filtros.data_programada || ''}`)
+        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&setor=${filtros.setor || ''}&status=${filtros.status || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -1106,11 +1106,13 @@ export function resetarCardsInicial(filtros = {}) {
     const filtroDataCarga = document.getElementById('filtro-data-carga');
     const filtroSetor = document.getElementById('filtro-setor');
     const filtroDataProgramada = document.getElementById('filtro-data-programada');
+    const filtroStatus = document.getElementById('filtro-status');
 
     const currentFiltros = {
         data_carga: filtroDataCarga.value,
         setor: filtroSetor.value,
         data_programada: filtroDataProgramada.value,
+        status: filtroStatus.value,
     };
 
     // Função para buscar e renderizar ordens sem paginação
