@@ -214,9 +214,9 @@ function buscarItensInspecao(pagina) {
                     modalInspecao.querySelector('#dataInspecao').disabled = true;
                     modalInspecao.querySelector('#conjuntoName').disabled = true;
 
-                    modalInspecao.querySelector('#numPecaDefeituosa').setAttribute("max", itemQtd);
-
+                    modalInspecao.querySelector('#numPecaDefeituosa').setAttribute("max", itemQtd);                 
                     controlarLinhasTabela();
+                    resetInspetorSelect();
 
                     // Mostrar o modal
                     new bootstrap.Modal(modalInspecao).show();
@@ -876,3 +876,54 @@ document.getElementById('inspectionForm').addEventListener('submit', function(e)
     });
 
 });
+
+document.addEventListener("change", (event) =>{
+    
+    if(event.target.id === "autoInspecaoNoturna"){
+        const optionAutoInspecaoNoturna = document.getElementById("optionAutoInspecaoNoturna");
+        const selectInspetor = document.getElementById("inspetor");
+        const currentDate = new Date();
+        if (event.target.checked){
+            // Pegar a data atual formatada
+            currentDate.setDate(currentDate.getDate() - 1); // Define para o dia anterior
+            const formattedDate = currentDate.toISOString().split('T')[0];
+            document.getElementById('inspectionModal').querySelector('#dataInspecao').value = formattedDate;
+
+            for (let i = 0; i < selectInspetor.options.length; i++) {
+                const option = selectInspetor.options[i];
+                option.disabled = true;
+            }
+            optionAutoInspecaoNoturna.textContent = "autoInspecaoNoturna";
+            optionAutoInspecaoNoturna.disabled = false;
+            optionAutoInspecaoNoturna.selected = true;
+             
+        }else{
+            // Pegar a data atual formatada
+            const formattedDate = currentDate.toISOString().split('T')[0];
+            document.getElementById('inspectionModal').querySelector('#dataInspecao').value = formattedDate;
+            
+            for (let i = 0; i < selectInspetor.options.length; i++) {
+                const option = selectInspetor.options[i];
+                option.disabled = false;
+            }
+            optionAutoInspecaoNoturna.textContent = "autoInspecaoNoturna - Indisponível";
+            optionAutoInspecaoNoturna.disabled = true;
+            optionAutoInspecaoNoturna.selected = false;
+        }
+
+    }
+});
+
+function resetInspetorSelect(){
+    const selectInspetor = document.getElementById("inspetor");
+    const optionAutoInspecaoNoturna = document.getElementById("optionAutoInspecaoNoturna");
+
+    for (let i = 0; i < selectInspetor.options.length; i++) {
+        const option = selectInspetor.options[i];
+        option.disabled = false;
+    }
+    
+    optionAutoInspecaoNoturna.textContent = "autoInspecaoNoturna - Indisponível";
+    optionAutoInspecaoNoturna.disabled = true;
+    optionAutoInspecaoNoturna.selected = false;
+}
