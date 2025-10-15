@@ -271,7 +271,11 @@
                                         <option value="">Selecione</option>
                                         {% if not inspetor_logado %}
                                             {% for inspetor in inspetores %}
-                                                <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                                {% if inspetor.nome_usuario == "autoInspecaoNoturna" %}
+                                                    <option value="{{ inspetor.id }}" id="optionAutoInspecaoNoturna" disabled>{{ inspetor.nome_usuario }}</option>
+                                                {% else %}
+                                                    <option value="{{ inspetor.id }}">{{ inspetor.nome_usuario }}</option>
+                                                {% endif %}
                                             {% endfor %}
                                         {% else %}
                                             <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
