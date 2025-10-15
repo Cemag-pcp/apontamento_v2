@@ -279,6 +279,11 @@
                                             {% endfor %}
                                         {% else %}
                                             <option value="{{ inspetor_logado.id }}" selected>{{ inspetor_logado.nome_usuario }}</option>
+                                            {% for inspetor in inspetores %}
+                                                {% if inspetor.nome_usuario == "autoInspecaoNoturna" %}
+                                                    <option value="{{ inspetor.id }}" id="optionAutoInspecaoNoturna" disabled>{{ inspetor.nome_usuario }}</option>
+                                                {% endif %}
+                                            {% endfor %}
                                         {% endif %}
                                     </select>
                                     <div class="d-flex justify-content-end gap-2 mt-2">
