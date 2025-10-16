@@ -97,7 +97,8 @@ def get_ordens_criadas(request):
 
     # Query principal das ordens
     ordens_queryset = Ordem.objects.filter(
-        grupo_maquina='usinagem'
+        grupo_maquina='usinagem',
+        excluida=False
     ).annotate(
         peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
         peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
