@@ -428,7 +428,6 @@ def ordens_criadas(request):
         'ESTAMPARIA',
         'Carpintaria',
         'FEIXE DE MOLAS',
-        'SERRALHERIA',
         'ROÇADEIRA'
     ]
 
