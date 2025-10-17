@@ -10,7 +10,7 @@ from django.utils.timezone import now,localtime
 from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
 
 from .models import Ordem,PecasOrdem
-from core.models import OrdemProcesso, MaquinaParada
+from core.models import OrdemProcesso, MaquinaParada, Profile
 from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada, MotivoExclusao
 from inspecao.models import Inspecao
 from .utils import criar_ordem_usinagem
@@ -97,7 +97,8 @@ def get_ordens_criadas(request):
 
     # Query principal das ordens
     ordens_queryset = Ordem.objects.filter(
-        grupo_maquina='usinagem'
+        grupo_maquina='usinagem',
+        excluida=False
     ).annotate(
         peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
         peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
@@ -370,6 +371,7 @@ def get_ordens_interrompidas(request):
     # Filtra as ordens com base no status 'interrompida'
     ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_usinagem').filter(status_atual='interrompida', grupo_maquina='usinagem')
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
     # Paginação (opcional)
     page = request.GET.get('page', 1)  # Obtém o número da página
     limit = request.GET.get('limit', 10)  # Define o limite padrão por página
@@ -428,6 +430,7 @@ def get_ordens_interrompidas(request):
 
     # Retorna os dados paginados como JSON
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
