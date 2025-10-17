@@ -271,7 +271,11 @@ export function carregarOrdensIniciadas(container, filtros={}) {
                     break;
                 }
             }
-            
+
+            if (data.ordens.length === 0) {
+                houveMudanca = true;
+            }
+
             // 3. Se não mudou nada, sai
             if (!houveMudanca) return;
 
