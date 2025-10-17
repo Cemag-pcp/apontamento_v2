@@ -244,6 +244,11 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
             
             if (response.ok) {
                 modalRetornarProcessoIniciado.hide();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: data.message || 'Ordem retornada para "Aguardando Iniciar".',
+                });
                 carregarOrdensIniciadas(document.querySelector('.containerProcesso'));
                 carregarOrdensInterrompidas(document.querySelector('.containerInterrompido'));
                 carregarOrdensAgProProcesso(document.querySelector('.containerProxProcesso'))
@@ -552,13 +557,24 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
                         ${peca.codigo} - ${peca.descricao}
                     </a>
                 `).join('<br>');
-            
-                // Botões de ação
+                    
+
+                // Define os botões dinamicamente
                 const botaoAcao = `
-                    <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                    ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Deletar">
+                            <i class="bi bi-arrow-left-right"></i>
+                    </button>`: ""} 
+                    <button class="btn btn-warning btn-sm btn-retornar m-2" title="Retornar">
                         <i class="fa fa-undo"></i>
                     </button>
                 `;
+                // // Botões de ação
+                // const botaoAcao = `
+                //     <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
+                //         <i class="fa fa-undo"></i>
+                //     </button>
+                // `;
             
                 // Estrutura do card com fonte menor
                 card.innerHTML = `
@@ -594,6 +610,13 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
                 if (buttonRetornar) {
                     buttonRetornar.addEventListener('click', () => {
                         mostrarModalRetornar(ordem.id, ordem.maquina_id);
+                    });
+                }
+
+                const buttonDeletar = card.querySelector('.btn-deletar');
+                if (buttonDeletar) {
+                    buttonDeletar.addEventListener('click', () => {
+                        mostrarModalRetornarOrdemIniciada(ordem.id, 'usinagem');
                     });
                 }
             
