@@ -901,6 +901,7 @@ def andamento_ultimas_cargas(request):
 def listar_motivos_interrupcao(request):
 
     motivos = MotivoInterrupcao.objects.filter(setor__nome='solda', visivel=True)
+    print(motivos)
 
     return JsonResponse({"motivos": list(motivos.values())})
 
