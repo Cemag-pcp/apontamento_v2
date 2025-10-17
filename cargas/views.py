@@ -2,7 +2,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Now
 from django.db import models
 from django.db.models import Sum,Q,CharField,Count,OuterRef, Subquery, F, Value, Avg
 from django.utils.dateparse import parse_date
@@ -933,6 +933,7 @@ def ordens_em_andamento_finalizada_pintura(request):
 
     mes_atual = datetime.now().date().month
 
+    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
 
     for ordem in resultado_json_ordens_criadas['ordens']:
@@ -955,6 +956,7 @@ def ordens_em_andamento_finalizada_pintura(request):
             'data_derruba_fmt': '',
             'tipo': '',
             'cambao_nome': '',
+            'data_ultima_atualizacao': data_hora_atual,
         })
 
 
@@ -986,6 +988,7 @@ def ordens_em_andamento_finalizada_pintura(request):
 
             tipo=F('cambao__tipo'),
             cambao_nome=F('cambao__nome'),
+            data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()) # já vem string
         )
         .values(
             'id_ordem',
@@ -1004,6 +1007,7 @@ def ordens_em_andamento_finalizada_pintura(request):
             
             'tipo',
             'cambao_nome',
+            'data_ultima_atualizacao',
         )
         .order_by('-data_fim')[:1000]
     )
