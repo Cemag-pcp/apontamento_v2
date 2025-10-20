@@ -23,7 +23,6 @@ from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, pr
 from apontamento_pintura.models import CambaoPecas
 from apontamento_pintura.views import ordens_criadas as ordens_criadas_pintura
 from apontamento_montagem.views import ordens_criadas as ordens_criadas_montagem
-from apontamento_montagem.models import PecasOrdem
 
 import pandas as pd
 import os
@@ -1090,7 +1089,7 @@ def ordens_status_montagem(request):
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
 
     # Consulta em PecasOrdem filtrando pelas ordens e EXCLUINDO as máquinas definidas em maquinas_excluidas
-    pecas_ordem_queryset = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).exclude(
+    pecas_ordem_queryset = POMontagem.objects.filter(ordem_id__in=ordem_ids).exclude(
         ordem__maquina__nome__in=maquinas_excluidas
     )
 
@@ -1113,16 +1112,72 @@ def ordens_status_montagem(request):
             F('total_planejada') - F('total_boa'), output_field=FloatField()
         )
     ).values(
-        'ordem__status_atual',      # status atual da ordem
-        'ordem',                    # id da ordem (chave para o agrupamento)
-        'total_boa',
-        'total_planejada',
-        'restante',
-        'peca',                     # nome da peça
-        'data_carga_fmt',        # data da carga da ordem
-        'data_ultima_atualizacao_ordem',                     # última atualização da ordem'
-        'ordem__maquina__nome',     # nome da máquina   
-        'data_ultima_chamada'   
+        'ordem__status_atual',               # status atual da ordem
+        'ordem',                             # id da ordem (chave para o agrupamento)
+        'total_boa',                         # quantidade feita
+        'total_planejada',                   # quantidade planejada
+        'restante',                          # quantidade restante
+        'peca',                              # nome da peça
+        'data_carga_fmt',                    # data da carga da ordem
+        'data_ultima_atualizacao_ordem',     # última atualização da ordem'
+        'ordem__maquina__nome',              # nome da máquina   
+        'data_ultima_chamada'                # última chamada da API pelo sheets
+    ).order_by('-ordem__ultima_atualizacao')[:1000]
+
+    resultado_final = list(pecas_ordem_agg)
+
+
+    return JsonResponse(resultado_final, safe=False)
+
+def ordens_status_solda(request):
+    """"
+        traz as ordens aguardando inicio, em andamento e finalizadas na solda
+    """
+     
+    # Monta os filtros para a model Ordem
+    filtros_ordem = {
+        'grupo_maquina': 'solda',
+        'ordem_pai__isnull': True
+    }
+
+    # Recupera os IDs das ordens que atendem aos filtros
+    ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
+
+    # Consulta na PecasOrdem filtrando pelas ordens identificadas,
+    # trazendo alguns campos da Ordem (usando a notação "ordem__<campo>"),
+    # e agrupando para calcular as somas e o saldo.
+
+    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    
+    pecas_ordem_queryset = POSolda.objects.filter(ordem_id__in=ordem_ids)
+
+    pecas_ordem_agg = pecas_ordem_queryset.annotate(
+        data_carga_fmt=ToChar(AtTimeZone(F('ordem__data_carga'), 'America/Sao_Paulo'), Value('DD/MM/YYYY')),
+        data_ultima_atualizacao_ordem=ToChar(AtTimeZone(F('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),
+                                           Value('DD/MM/YYYY HH24:MI:SS')),
+        total_boa=Coalesce(
+            Sum('qtd_boa'), Value(0.0, output_field=FloatField())
+        ),
+        total_planejada=Coalesce(
+            Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
+        ),
+        data_ultima_chamada=Value(data_hora_atual, output_field=CharField()),
+
+    ).annotate(
+        restante=ExpressionWrapper(
+            F('total_planejada') - F('total_boa'), output_field=FloatField()
+        )
+    ).values(
+        'ordem__status_atual',               # status atual da ordem
+        'ordem',                             # id da ordem (chave para o agrupamento)
+        'total_boa',                         # quantidade feita
+        'total_planejada',                   # quantidade planejada
+        'restante',                          # quantidade restante
+        'peca',                              # nome da peça
+        'data_carga_fmt',                    # data da carga da ordem
+        'data_ultima_atualizacao_ordem',     # última atualização da ordem'
+        'ordem__maquina__nome',              # nome da máquina   
+        'data_ultima_chamada'                # última chamada da API pelo sheets
     ).order_by('-ordem__ultima_atualizacao')[:1000]
 
     resultado_final = list(pecas_ordem_agg)
