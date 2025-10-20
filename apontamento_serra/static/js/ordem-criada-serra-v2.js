@@ -272,7 +272,8 @@ export function carregarOrdensIniciadas(container, filtros={}) {
                 }
             }
 
-            if (data.ordens.length === 0) {
+            // Adicional: Verifica se não há ordens ou o número de ordens mudou
+            if (data.ordens.length === 0 || Object.keys(cardsAtuais).length !== data.ordens.length) {
                 houveMudanca = true;
             }
 
