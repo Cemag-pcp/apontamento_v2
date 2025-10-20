@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.decorators.http import require_POST, require_GET
-from django.db.models import Func
+from django.db.models import Func, FloatField, ExpressionWrapper
 
 from apontamento_pintura.models import PecasOrdem as POPintura
 from apontamento_montagem.models import PecasOrdem as POMontagem
@@ -21,7 +21,9 @@ from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivo
 from cadastro.models import Maquina
 from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria
 from apontamento_pintura.models import CambaoPecas
-from apontamento_pintura.views import ordens_criadas
+from apontamento_pintura.views import ordens_criadas as ordens_criadas_pintura
+from apontamento_montagem.views import ordens_criadas as ordens_criadas_montagem
+from apontamento_montagem.models import PecasOrdem
 
 import pandas as pd
 import os
@@ -925,7 +927,7 @@ def ordens_em_andamento_finalizada_pintura(request):
     """"
         traz as ordens aguardando inicio, em andamento e finalizadas na pintura
     """
-    resultado = ordens_criadas(request)
+    resultado = ordens_criadas_pintura(request)
 
     resultado_json_ordens_criadas = json.loads(resultado.content)
 
@@ -1062,3 +1064,68 @@ def parse_data_fmt(data_str):
         return datetime.strptime(data_str, "%d/%m/%Y")
     except Exception:
         return datetime.min  # Garante que datas inválidas fiquem no início
+
+def ordens_status_montagem(request):
+    """"
+        traz as ordens aguardando inicio, em andamento e finalizadas na montagem
+    """
+
+    # Monta os filtros para a model Ordem
+    filtros_ordem = {
+        'grupo_maquina': 'montagem'
+    }
+
+    # Máquinas a excluir da contagem / retorno
+    maquinas_excluidas = [
+        'PLAT. TANQUE. CAÇAM. 2',
+        'QUALIDADE',
+        'FORJARIA',
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'ROÇADEIRA'
+    ]
+
+    # Recupera os IDs das ordens que atendem aos filtros (ainda sem excluir máquinas, pois o filtro de máquina pode vir por parâmetro)
+    ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
+
+    # Consulta em PecasOrdem filtrando pelas ordens e EXCLUINDO as máquinas definidas em maquinas_excluidas
+    pecas_ordem_queryset = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).exclude(
+        ordem__maquina__nome__in=maquinas_excluidas
+    )
+
+    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+    pecas_ordem_agg = pecas_ordem_queryset.annotate(
+        data_carga_fmt=ToChar(AtTimeZone(F('ordem__data_carga'), 'America/Sao_Paulo'), Value('DD/MM/YYYY')),
+        data_ultima_atualizacao_ordem=ToChar(AtTimeZone(F('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),
+                                           Value('DD/MM/YYYY HH24:MI:SS')),
+        total_boa=Coalesce(
+            Sum('qtd_boa'), Value(0.0, output_field=FloatField())
+        ),
+        total_planejada=Coalesce(
+            Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
+        ),
+        data_ultima_chamada=Value(data_hora_atual, output_field=CharField()),
+
+    ).annotate(
+        restante=ExpressionWrapper(
+            F('total_planejada') - F('total_boa'), output_field=FloatField()
+        )
+    ).values(
+        'ordem__status_atual',      # status atual da ordem
+        'ordem',                    # id da ordem (chave para o agrupamento)
+        'total_boa',
+        'total_planejada',
+        'restante',
+        'peca',                     # nome da peça
+        'data_carga_fmt',        # data da carga da ordem
+        'data_ultima_atualizacao_ordem',                     # última atualização da ordem'
+        'ordem__maquina__nome',     # nome da máquina   
+        'data_ultima_chamada'   
+    ).order_by('-ordem__ultima_atualizacao')[:1000]
+
+    resultado_final = list(pecas_ordem_agg)
+
+
+    return JsonResponse(resultado_final, safe=False)
