@@ -4,7 +4,7 @@ from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.db.models.functions import Coalesce, Now
 from django.db import models
-from django.db.models import Sum,Q,CharField,Count,OuterRef, Subquery, F, Value, Avg
+from django.db.models import Sum,Q,CharField,Count,OuterRef, Subquery, F, Value, Avg, Max
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
@@ -1095,33 +1095,26 @@ def ordens_status_montagem(request):
 
     data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-    pecas_ordem_agg = pecas_ordem_queryset.annotate(
-        data_carga_fmt=ToChar(AtTimeZone(F('ordem__data_carga'), 'America/Sao_Paulo'), Value('DD/MM/YYYY')),
-        data_ultima_atualizacao_ordem=ToChar(AtTimeZone(F('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),
-                                           Value('DD/MM/YYYY HH24:MI:SS')),
+    pecas_ordem_agg = pecas_ordem_queryset.values(
+        'ordem',                            # id da ordem (chave para o agrupamento)
+        'peca',                              # nome da peça
+        'ordem__maquina__nome',              # nome da máquina   
+        'ordem__status_atual',               # status atual da ordem
+    ).annotate(
         total_boa=Coalesce(
             Sum('qtd_boa'), Value(0.0, output_field=FloatField())
         ),
         total_planejada=Coalesce(
             Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
         ),
+        data_ultima_atualizacao_ordem=ToChar(AtTimeZone(Max('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),Value('DD/MM/YYYY HH24:MI:SS')),
+        data_carga_fmt=ToChar(AtTimeZone(Max('ordem__data_carga'), 'America/Sao_Paulo'), Value('DD/MM/YYYY')),                                       
         data_ultima_chamada=Value(data_hora_atual, output_field=CharField()),
 
     ).annotate(
         restante=ExpressionWrapper(
             F('total_planejada') - F('total_boa'), output_field=FloatField()
         )
-    ).values(
-        'ordem__status_atual',               # status atual da ordem
-        'ordem',                             # id da ordem (chave para o agrupamento)
-        'total_boa',                         # quantidade feita
-        'total_planejada',                   # quantidade planejada
-        'restante',                          # quantidade restante
-        'peca',                              # nome da peça
-        'data_carga_fmt',                    # data da carga da ordem
-        'data_ultima_atualizacao_ordem',     # última atualização da ordem'
-        'ordem__maquina__nome',              # nome da máquina   
-        'data_ultima_chamada'                # última chamada da API pelo sheets
     ).order_by('-ordem__ultima_atualizacao')[:1000]
 
     resultado_final = list(pecas_ordem_agg)
@@ -1151,33 +1144,26 @@ def ordens_status_solda(request):
     
     pecas_ordem_queryset = POSolda.objects.filter(ordem_id__in=ordem_ids)
 
-    pecas_ordem_agg = pecas_ordem_queryset.annotate(
-        data_carga_fmt=ToChar(AtTimeZone(F('ordem__data_carga'), 'America/Sao_Paulo'), Value('DD/MM/YYYY')),
-        data_ultima_atualizacao_ordem=ToChar(AtTimeZone(F('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),
-                                           Value('DD/MM/YYYY HH24:MI:SS')),
+    pecas_ordem_agg = pecas_ordem_queryset.values(
+        'ordem',                            # id da ordem (chave para o agrupamento)
+        'peca',                              # nome da peça
+        'ordem__maquina__nome',              # nome da máquina   
+        'ordem__status_atual',               # status atual da ordem
+    ).annotate(
         total_boa=Coalesce(
             Sum('qtd_boa'), Value(0.0, output_field=FloatField())
         ),
         total_planejada=Coalesce(
             Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
         ),
+        data_ultima_atualizacao_ordem=ToChar(AtTimeZone(Max('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),Value('DD/MM/YYYY HH24:MI:SS')),
+        data_carga_fmt=ToChar(AtTimeZone(Max('ordem__data_carga'), 'America/Sao_Paulo'), Value('DD/MM/YYYY')),                                       
         data_ultima_chamada=Value(data_hora_atual, output_field=CharField()),
 
     ).annotate(
         restante=ExpressionWrapper(
             F('total_planejada') - F('total_boa'), output_field=FloatField()
         )
-    ).values(
-        'ordem__status_atual',               # status atual da ordem
-        'ordem',                             # id da ordem (chave para o agrupamento)
-        'total_boa',                         # quantidade feita
-        'total_planejada',                   # quantidade planejada
-        'restante',                          # quantidade restante
-        'peca',                              # nome da peça
-        'data_carga_fmt',                    # data da carga da ordem
-        'data_ultima_atualizacao_ordem',     # última atualização da ordem'
-        'ordem__maquina__nome',              # nome da máquina   
-        'data_ultima_chamada'                # última chamada da API pelo sheets
     ).order_by('-ordem__ultima_atualizacao')[:1000]
 
     resultado_final = list(pecas_ordem_agg)
