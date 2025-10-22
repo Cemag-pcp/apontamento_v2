@@ -1108,7 +1108,7 @@ def ordens_status_montagem(request):
             Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
         ),
         data_ultima_atualizacao_ordem=ToChar(AtTimeZone(Max('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),Value('DD/MM/YYYY HH24:MI:SS')),
-        data_carga_fmt=ToChar(AtTimeZone(Max('ordem__data_carga'), 'America/Sao_Paulo'), Value('DD/MM/YYYY')),                                       
+        data_carga_fmt=ToChar(Max('ordem__data_carga'), Value('DD/MM/YYYY')),                                       
         data_ultima_chamada=Value(data_hora_atual, output_field=CharField()),
 
     ).annotate(
@@ -1157,7 +1157,7 @@ def ordens_status_solda(request):
             Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
         ),
         data_ultima_atualizacao_ordem=ToChar(AtTimeZone(Max('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),Value('DD/MM/YYYY HH24:MI:SS')),
-        data_carga_fmt=ToChar(AtTimeZone(Max('ordem__data_carga'), 'America/Sao_Paulo'), Value('DD/MM/YYYY')),                                       
+        data_carga_fmt=ToChar(Max('ordem__data_carga'), Value('DD/MM/YYYY')),                                      
         data_ultima_chamada=Value(data_hora_atual, output_field=CharField()),
 
     ).annotate(
