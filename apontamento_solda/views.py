@@ -472,7 +472,8 @@ def ordens_criadas(request):
     filtros_ordem = {
         'data_carga': data_carga,
         'grupo_maquina': 'solda',
-        'ordem_pai__isnull': True
+        'ordem_pai__isnull': True,
+        'excluida': False,
     }
     if maquina_param:
         maquina = get_object_or_404(Maquina, pk=maquina_param)
@@ -569,7 +570,8 @@ def ordens_iniciadas(request):
 
     filtros_ordem = {
         'grupo_maquina': 'solda',
-        'status_atual': 'iniciada'
+        'status_atual': 'iniciada',
+        'excluida': False,
     }
 
     # Adicionar chave id caso exista o parametro ordem_id
@@ -704,7 +706,8 @@ def ordens_interrompidas(request):
 
     filtros_ordem = {
         'grupo_maquina': 'solda',
-        'status_atual': 'interrompida'
+        'status_atual': 'interrompida',
+        'excluida': False,
     }
 
     if maquina_param:
