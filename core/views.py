@@ -58,6 +58,11 @@ def excluir_ordem(request):
                     ordem.motivo_exclusao = motivo_exclusao
                     ordem.save(update_fields=['excluida', 'motivo_exclusao'])
                 return JsonResponse({'success': 'Ordem excluída com sucesso.'}, status=201)
+            elif setor == 'usinagem' and ordem.status_atual != "iniciada":
+                ordem.excluida = True
+                ordem.motivo_exclusao = motivo_exclusao
+                ordem.save(update_fields=['excluida', 'motivo_exclusao'])
+                return JsonResponse({'success': 'Ordem excluída com sucesso.'}, status=201)
             else:
                 return JsonResponse({'error': 'Finalize a ordem para excluí-la.'}, status=400)
 
