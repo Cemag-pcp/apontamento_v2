@@ -26,7 +26,7 @@ import time
 @login_required  # Garante que apenas usuários autenticados possam acessar a view
 def excluir_ordem(request):
     # Verifica se o usuário tem o tipo de acesso "pcp"
-    if not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso not in ['pcp','supervisor']:
+    if not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso not in ['pcp','supervisor','admin']:
         return JsonResponse({'error': 'Acesso negado: você não tem permissão para excluir ordens.'}, status=403)
 
     if request.method == 'POST':
@@ -57,6 +57,11 @@ def excluir_ordem(request):
                     ordem.excluida = True
                     ordem.motivo_exclusao = motivo_exclusao
                     ordem.save(update_fields=['excluida', 'motivo_exclusao'])
+                return JsonResponse({'success': 'Ordem excluída com sucesso.'}, status=201)
+            elif setor == 'usinagem' and ordem.status_atual != "iniciada":
+                ordem.excluida = True
+                ordem.motivo_exclusao = motivo_exclusao
+                ordem.save(update_fields=['excluida', 'motivo_exclusao'])
                 return JsonResponse({'success': 'Ordem excluída com sucesso.'}, status=201)
             else:
                 return JsonResponse({'error': 'Finalize a ordem para excluí-la.'}, status=400)

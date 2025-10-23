@@ -90,6 +90,8 @@ def get_ordens_criadas(request):
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     # obter a primeira peça associada à ordem
     primeira_peca = PecasOrdem.objects.filter(
         ordem=OuterRef('pk')
@@ -144,6 +146,7 @@ def get_ordens_criadas(request):
         })
 
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'has_next': ordens_page.has_next(),
     })
@@ -369,7 +372,7 @@ def get_ordens_iniciadas(request):
 @require_GET
 def get_ordens_interrompidas(request):
     # Filtra as ordens com base no status 'interrompida'
-    ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_usinagem').filter(status_atual='interrompida', grupo_maquina='usinagem')
+    ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_usinagem').filter(status_atual='interrompida', grupo_maquina='usinagem', excluida=False)
 
     usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
     # Paginação (opcional)
@@ -442,8 +445,9 @@ def get_ordens_ag_prox_proc(request):
     # Filtra as ordens com base no status 'agua_prox_proc' e prefetch da peça relacionada
     ordens_queryset = Ordem.objects.prefetch_related(
         'ordem_pecas_usinagem','processos'
-    ).filter(grupo_maquina='usinagem', status_atual='agua_prox_proc')
+    ).filter(grupo_maquina='usinagem', status_atual='agua_prox_proc', excluida=False)
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
     # Paginação
     page = int(request.GET.get('page', 1))  # Obtém o número da página
     limit = int(request.GET.get('limit', 10))  # Define o limite padrão por página
@@ -513,9 +517,9 @@ def get_ordens_ag_prox_proc(request):
             },
             'pecas': pecas_data,  # Lista consolidada de peças
         })
-
     # Retorna os dados paginados como JSON
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
