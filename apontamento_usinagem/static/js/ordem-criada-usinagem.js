@@ -77,7 +77,6 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
                                     <i class="fa fa-trash"></i>
                                 </button>
-                                
                             `;
                         } else if (ordem.status_atual === 'agua_prox_proc') {
                             botaoAcao = `
