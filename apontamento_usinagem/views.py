@@ -90,6 +90,8 @@ def get_ordens_criadas(request):
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     # obter a primeira peça associada à ordem
     primeira_peca = PecasOrdem.objects.filter(
         ordem=OuterRef('pk')
@@ -144,6 +146,7 @@ def get_ordens_criadas(request):
         })
 
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'has_next': ordens_page.has_next(),
     })
