@@ -74,18 +74,21 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                     <i class="fa fa-redo"></i>
                                 </button>
 
-                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
-                                    <i class="fa fa-trash"></i>
-                                </button>
+                                ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor' || data.usuario_tipo_acesso == 'admin'
+                                ? `<button class="btn btn-danger btn-sm btn-excluir m-2" title="Excluir">
+                                                <i class="fa fa-trash"></i>
+                                    </button>`: ""}
+                                
                             `;
                         } else if (ordem.status_atual === 'agua_prox_proc') {
                             botaoAcao = `
                                 <button class="btn btn-warning btn-sm btn-iniciar-proximo-processo" title="Iniciar próximo processo">
                                     <i class="fa fa-play"></i>
                                 </button>
-                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
-                                    <i class="fa fa-trash"></i>
-                                </button>
+                                ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor' || data.usuario_tipo_acesso == 'admin'
+                                ? `<button class="btn btn-danger btn-sm btn-excluir m-2" title="Excluir">
+                                                <i class="fa fa-trash"></i>
+                                    </button>`: ""} 
 
                             `;
                         }
