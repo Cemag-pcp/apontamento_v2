@@ -73,6 +73,11 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-warning btn-sm btn-retornar" title="Retornar">
                                     <i class="fa fa-redo"></i>
                                 </button>
+
+                                <button class="btn btn-danger btn-sm btn-excluir" title="Excluir">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                                
                             `;
                         } else if (ordem.status_atual === 'agua_prox_proc') {
                             botaoAcao = `
@@ -327,6 +332,13 @@ function mostrarModalExcluir(ordemId, setor) {
                 resetarCardsInicial();
                 fetchContagemStatusOrdens();
 
+                const containerInterrompido = document.querySelector('.containerInterrompido');
+                carregarOrdensInterrompidas(containerInterrompido);
+
+                // Atualiza a interface
+                const containerProxProcesso = document.querySelector('.containerProxProcesso')
+                carregarOrdensAgProProcesso(containerProxProcesso);
+
             } else {
                 // Exibe o erro vindo do backend
                 Swal.fire({
@@ -561,13 +573,19 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
 
                 // Define os botões dinamicamente
                 const botaoAcao = `
-                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
-                    ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Deletar">
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor' || data.usuario_tipo_acesso == 'admin'
+                    ? `<button class="btn btn-info btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Deletar">
                             <i class="bi bi-arrow-left-right"></i>
                     </button>`: ""} 
                     <button class="btn btn-warning btn-sm btn-retornar m-2" title="Retornar">
                         <i class="fa fa-undo"></i>
                     </button>
+
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor' || data.usuario_tipo_acesso == 'admin'
+                    ? `<button class="btn btn-danger btn-sm btn-excluir m-2" title="Excluir">
+                                    <i class="fa fa-trash"></i>
+                        </button>`: ""} 
+                    
                 `;
                 // // Botões de ação
                 // const botaoAcao = `
@@ -617,6 +635,13 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
                 if (buttonDeletar) {
                     buttonDeletar.addEventListener('click', () => {
                         mostrarModalRetornarOrdemIniciada(ordem.id, 'usinagem');
+                    });
+                }
+
+                const buttonExcluir= card.querySelector('.btn-excluir');
+                if (buttonExcluir) {
+                    buttonExcluir.addEventListener('click', () => {
+                        mostrarModalExcluir(ordem.id, 'usinagem');
                     });
                 }
             
@@ -682,6 +707,11 @@ export function carregarOrdensAgProProcesso(container, filtros = {}) {
                     <button class="btn btn-warning btn-sm btn-iniciar-proximo-processo" title="Iniciar próximo processo">
                         <i class="fa fa-play"></i>
                     </button>
+                    
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor' || data.usuario_tipo_acesso == 'admin'
+                    ? `<button class="btn btn-danger btn-sm btn-excluir m-2" title="Excluir">
+                                    <i class="fa fa-trash"></i>
+                        </button>`: ""} 
                 `;
 
                 card.innerHTML = `
@@ -723,6 +753,13 @@ export function carregarOrdensAgProProcesso(container, filtros = {}) {
                 if (buttonProxProcesso) {
                     buttonProxProcesso.addEventListener('click', () => {
                         mostrarModalIniciarProxProcesso(ordem.id, ordem.maquina_id);
+                    });
+                }
+
+                const buttonExcluir= card.querySelector('.btn-excluir');
+                if (buttonExcluir) {
+                    buttonExcluir.addEventListener('click', () => {
+                        mostrarModalExcluir(ordem.id, 'usinagem');
                     });
                 }
 
