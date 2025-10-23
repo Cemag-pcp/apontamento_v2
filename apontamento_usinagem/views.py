@@ -444,6 +444,7 @@ def get_ordens_ag_prox_proc(request):
         'ordem_pecas_usinagem','processos'
     ).filter(grupo_maquina='usinagem', status_atual='agua_prox_proc')
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
     # Paginação
     page = int(request.GET.get('page', 1))  # Obtém o número da página
     limit = int(request.GET.get('limit', 10))  # Define o limite padrão por página
@@ -513,9 +514,9 @@ def get_ordens_ag_prox_proc(request):
             },
             'pecas': pecas_data,  # Lista consolidada de peças
         })
-
     # Retorna os dados paginados como JSON
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
