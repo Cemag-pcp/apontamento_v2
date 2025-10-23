@@ -332,6 +332,13 @@ function mostrarModalExcluir(ordemId, setor) {
                 resetarCardsInicial();
                 fetchContagemStatusOrdens();
 
+                const containerInterrompido = document.querySelector('.containerInterrompido');
+                carregarOrdensInterrompidas(containerInterrompido);
+
+                // Atualiza a interface
+                const containerProxProcesso = document.querySelector('.containerProxProcesso')
+                carregarOrdensAgProProcesso(containerProxProcesso);
+
             } else {
                 // Exibe o erro vindo do backend
                 Swal.fire({
