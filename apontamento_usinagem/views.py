@@ -369,7 +369,7 @@ def get_ordens_iniciadas(request):
 @require_GET
 def get_ordens_interrompidas(request):
     # Filtra as ordens com base no status 'interrompida'
-    ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_usinagem').filter(status_atual='interrompida', grupo_maquina='usinagem')
+    ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_usinagem').filter(status_atual='interrompida', grupo_maquina='usinagem', excluida=False)
 
     usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
     # Paginação (opcional)
@@ -442,7 +442,7 @@ def get_ordens_ag_prox_proc(request):
     # Filtra as ordens com base no status 'agua_prox_proc' e prefetch da peça relacionada
     ordens_queryset = Ordem.objects.prefetch_related(
         'ordem_pecas_usinagem','processos'
-    ).filter(grupo_maquina='usinagem', status_atual='agua_prox_proc')
+    ).filter(grupo_maquina='usinagem', status_atual='agua_prox_proc', excluida=False)
 
     usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
     # Paginação
