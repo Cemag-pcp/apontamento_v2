@@ -638,7 +638,15 @@ def api_ordens_finalizadas(request):
                 TO_CHAR(o.data_programacao, 'DD/MM/YYYY HH24:MI') AS data_programacao,
                 TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
                 CONCAT(f.matricula, ' - ', f.nome) AS operador,
-                o.obs_operador AS obs
+                o.obs_operador AS obs,
+                
+                NULL::text AS espaco_1,
+                NULL::text AS espaco_2,
+                NULL::text AS espaco_3,
+                NULL::text AS espaco_4,
+                NULL::text AS espaco_5,
+
+                ope.qtd_morta AS qtd_morta
             FROM apontamento_v2.core_ordem o
             JOIN apontamento_v2.apontamento_estamparia_pecasordem ope ON ope.ordem_id = o.id
             JOIN apontamento_v2.cadastro_pecas p ON ope.peca_id = p.id
@@ -651,8 +659,8 @@ def api_ordens_finalizadas(request):
             ORDER BY o.ultima_atualizacao;
         """)
         columns = [col[0] for col in cursor.description]
-        results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
+        results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     return JsonResponse(results_raw, safe=False)
 

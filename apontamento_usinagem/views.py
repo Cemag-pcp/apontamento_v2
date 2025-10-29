@@ -610,7 +610,8 @@ def api_ordens_finalizadas(request):
                 TO_CHAR(o.data_programacao, 'DD/MM/YYYY HH24:MI') AS data_programacao,
                 TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
                 CONCAT(f.matricula, ' - ', f.nome) AS operador,
-                o.obs_operador AS obs
+                o.obs_operador AS obs,
+                ope.qtd_morta AS total_morta
             FROM apontamento_v2.core_ordem o
             JOIN apontamento_v2.apontamento_usinagem_pecasordem ope ON ope.ordem_id = o.id
             JOIN apontamento_v2.cadastro_pecas p ON ope.peca_id = p.id
