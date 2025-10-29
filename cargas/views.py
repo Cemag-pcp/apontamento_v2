@@ -19,7 +19,7 @@ from apontamento_solda.models import PecasOrdem as POSolda
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
-from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura
 from apontamento_pintura.models import CambaoPecas
 from apontamento_pintura.views import ordens_criadas as ordens_criadas_pintura
 from apontamento_montagem.views import ordens_criadas as ordens_criadas_montagem
@@ -888,6 +888,41 @@ def enviar_etiqueta_impressora(request):
     data_carga = request.GET.get('data_carga')
 
     payload_status = imprimir_ordens_montagem(data_carga)
+    # aceita tanto (dict, status) quanto apenas dict
+    if isinstance(payload_status, tuple):
+        payload, status = payload_status
+    else:
+        payload, status = payload_status, 200
+
+    return JsonResponse(payload, status=status)
+
+@csrf_exempt
+@require_POST
+def enviar_etiqueta_impressora_pintura(request):
+    data = json.loads(request.body)
+
+    data_carga = data.get('data_inicio')
+    carga = data.get('carga')
+
+    itens = gerar_sequenciamento(data_carga,data_carga,'pintura',carga)
+
+    colunas_grupo = [
+        "Código", "Peca", "Célula", "Datas", 
+        "Recurso_cor", "cor", "Carga", "Etapa5", "Etapa6"
+    ]
+
+    itens_agrupado = (
+        itens.groupby(colunas_grupo, as_index=False)
+        ["Qtde_total"]
+        .sum()
+    )
+
+    # filtrando apenas células específicas
+    itens_agrupado = itens_agrupado[
+        itens_agrupado['Célula'].isin(['CHASSI', 'CILINDRO', 'EIXO SIMPLES', 'EIXO COMPLETO'])
+    ]
+    
+    payload_status = imprimir_ordens_pintura(data_carga, carga, itens_agrupado)
     # aceita tanto (dict, status) quanto apenas dict
     if isinstance(payload_status, tuple):
         payload, status = payload_status

@@ -2,7 +2,16 @@ from .base import *
 
 # Configurações específicas de desenvolvimento
 DEBUG = env.bool('DEBUG', default=True)
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost','apontamento-v2-testes.onrender.com', '192.168.3.3', '192.168.3.18', 'mongolia-near-task-mothers.trycloudflare.com','3c8g63hx-8000.brs.devtunnels.ms']
+ALLOWED_HOSTS = ['127.0.0.1',
+                'localhost',
+                'apontamento-v2-testes.onrender.com',
+                '192.168.3.3',
+                '192.168.3.18',
+                'mongolia-near-task-mothers.trycloudflare.com',
+                '3c8g63hx-8000.brs.devtunnels.ms',
+                'formatting-sake-south-subscriber.trycloudflare.com'
+            ]
+
 CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
     'http://127.0.0.1:8000',
@@ -10,7 +19,8 @@ CSRF_TRUSTED_ORIGINS = [
     'https://apontamento-v2-testes.onrender.com',
     'http://192.168.3.18:8084',
     'https://mongolia-near-task-mothers.trycloudflare.com'
-    'https://3c8g63hx-8000.brs.devtunnels.ms'
+    'https://3c8g63hx-8000.brs.devtunnels.ms',
+    'https://formatting-sake-south-subscriber.trycloudflare.com'
 ]
 
 DATABASES = {

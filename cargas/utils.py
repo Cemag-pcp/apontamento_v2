@@ -13,6 +13,7 @@ import qrcode
 from io import BytesIO
 from pathlib import Path
 import environ
+from typing import Optional
 
 from django.core.files import File
 from django.urls import reverse
@@ -113,7 +114,7 @@ def tratando_dados(base_carretas, base_carga, data_carga, cliente=None, carga=No
     if cliente:
         base_carga = base_carga[base_carga['PED_PESSOA.CODIGO'] == cliente]
 
-    base_carga['Ano'] = base_carga['PED_PREVISAOEMISSAODOC'].dt.strftime('%Y')
+    # base_carga['Ano'] = base_carga['PED_PREVISAOEMISSAODOC'].dt.strftime('%Y')
     base_carga['PED_PREVISAOEMISSAODOC'] = base_carga.PED_PREVISAOEMISSAODOC.dt.strftime(
         '%d/%m/%Y')
 
@@ -178,9 +179,11 @@ def consultar_carretas(data_inicial, data_final):
 
     dados_carga_data_filtrada['PED_QUANTIDADE'] = dados_carga_data_filtrada['PED_QUANTIDADE'].astype(float)
 
+    print(dados_carga_data_filtrada)
+
     # Agrupa os dados por data e código do recurso
-    carretas_unica = dados_carga_data_filtrada[['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
-    agrupado = carretas_unica.groupby(['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO'])['PED_QUANTIDADE'].sum().reset_index()
+    carretas_unica = dados_carga_data_filtrada[['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO', 'PED_QUANTIDADE', 'Carga']]
+    agrupado = carretas_unica.groupby(['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO', 'Carga'])['PED_QUANTIDADE'].sum().reset_index()
 
     # Ajusta os códigos dos recursos
     dados_carreta['Recurso'] = dados_carreta['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else x)
@@ -195,7 +198,8 @@ def consultar_carretas(data_inicial, data_final):
             "data_carga": str(row['PED_PREVISAOEMISSAODOC'].date()),  # Convertendo para string
             "codigo_recurso": "0" + str(row['PED_RECURSO.CODIGO']) if len(str(row['PED_RECURSO.CODIGO'])) == 5 else str(row['PED_RECURSO.CODIGO']),
             "quantidade": float(row['PED_QUANTIDADE']),
-            "presente_no_carreta": row['Contém']
+            "presente_no_carreta": row['Contém'],
+            "carga": row['Carga']
         }
         for _, row in agrupado.iterrows()
     ]
@@ -261,7 +265,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
     )
 
     # Pega apenas o ano ANTES de formatar para string
-    base_carga_original['Ano'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.year.astype(str)
+    # base_carga_original['Ano'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.year.astype(str)
 
     # Formata final para o formato desejado
     # base_carga_original['PED_PREVISAOEMISSAODOC'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.strftime('%d/%m/%Y')
@@ -1049,7 +1053,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
     
     return filenames
 
-def gerar_sequenciamento(data_inicial, data_final, setor):
+def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] = None):
     filenames = []
 
     resultado = criar_array_datas(data_inicial, data_final)
@@ -1083,7 +1087,10 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
     resultado = pd.to_datetime(resultado, dayfirst=True, errors='coerce')
 
     # Ajusta colunas
-    base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
+    if carga:
+        base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE', 'Carga']]
+    else:
+        base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
 
     # Converte para datetime
     base_carga_original['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
@@ -1091,7 +1098,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
     )
 
     # Pega apenas o ano ANTES de formatar para string
-    base_carga_original['Ano'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.year.astype(str)
+    # base_carga_original['Ano'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.year.astype(str)
 
     # Formata final para o formato desejado
     # base_carga_original['PED_PREVISAOEMISSAODOC'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.strftime('%d/%m/%Y')
@@ -1196,6 +1203,10 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             filtro_data = base_carga.loc[escolha_data]
             # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
 
+            if carga:
+                escolha_carga = (base_carga['Carga'] == carga)
+                filtro_data = filtro_data.loc[escolha_carga]
+
             # procv e trazendo as colunas que quero ver
 
             filtro_data = filtro_data.reset_index(drop=True)
@@ -1251,8 +1262,13 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             tab_completa = tab_completa.drop(
                 columns=['Recurso', 'Qtde_x', 'Qtde_y', 'LEAD TIME', 'flag peça', 'Etapa2'])
 
-            tab_completa = tab_completa.groupby(
-                ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor']).sum()
+            if carga:
+                tab_completa = tab_completa.groupby(
+                    ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor', 'Carga']).sum()
+            else:
+                tab_completa = tab_completa.groupby(
+                    ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor']).sum()
+
             tab_completa.reset_index(inplace=True)
 
             # linha abaixo exclui eixo simples do sequenciamento da pintura
@@ -1288,6 +1304,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
             tab_completa['cor'] = tab_completa.apply(lambda row: definir_cor(row, 'PRETO', 'Preto'), axis=1)
 
             
+
             ###########################################################################################
 
             # if idx == 0:
@@ -1722,6 +1739,8 @@ def gerar_sequenciamento(data_inicial, data_final, setor):
 
         tab_resultado = pd.concat([tab_completa, tab_resultado], ignore_index=True)
     
+    print(tab_resultado)
+
     return tab_resultado
 
 def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
@@ -2251,6 +2270,77 @@ def imprimir_ordens_montagem_unitaria(ordem_id):
         return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)
 
     return ({"message": "Impressão enviada com sucesso.", "total_etiquetas": impressas}, 200)
+
+def imprimir_ordens_pintura(data_carga, carga, itens_agrupados, pausa_s: float = 2.0):
+    """
+    data_carga: str | datetime | date  -> data que vai na etiqueta
+    carga: str                          -> ex.: "Carga 01"
+    itens_agrupados: pandas.DataFrame   -> precisa ter colunas: ["Código","Peca","Qtde_total"]
+    pausa_s: float                      -> pausa entre etiquetas (segundos)
+    """
+
+    # Normaliza a data para datetime
+    if isinstance(data_carga, str):
+        try:
+            data_carga_dt = datetime.fromisoformat(data_carga)
+        except ValueError:
+            # tenta outro formato comum
+            data_carga_dt = datetime.strptime(data_carga, "%Y-%m-%d")
+    elif isinstance(data_carga, date) and not isinstance(data_carga, datetime):
+        data_carga_dt = datetime.combine(data_carga, datetime.min.time())
+    else:
+        data_carga_dt = data_carga
+
+    total_impressoes = 0
+
+    # Itera por cada linha agrupada
+    for _, row in itens_agrupados.iterrows():
+        codigo = str(row["Código"])
+        peca = str(row["Peca"])[:80]  # limita a 80 chars para caber bem
+        qtde_total = int(row.get("Qtde_total", 0) or 0)
+        cor = str(row['cor'])
+        if qtde_total <= 0:
+            continue
+
+        # Uma etiqueta por unidade: 1/Qtde_total, 2/Qtde_total, ...
+        for i in range(1, qtde_total + 1):
+            zpl = f"""
+^XA
+^MMT
+^PW799
+^LL0400
+^LS0
+^PR1,1,1
+~SD14
+
+^FO10,10
+^A0N,40,40
+^FB760,3,10,L,0
+^FD{codigo} - {peca} - {i}/{qtde_total}^FS
+
+^FO10,160
+^A0N,40,40
+^FB400,10,10,L,0
+^FDCor: {cor}^FS
+
+^FO10,220
+^A0N,40,40
+^FB760,2,10,L,0
+^FDCarga: {carga}^FS
+
+^FO10,280
+^A0N,40,40
+^FB760,2,10,L,0
+^FDData carga: {data_carga_dt.strftime("%d/%m/%Y")}^FS
+
+^XZ
+""".lstrip()
+
+            chamar_impressora_pecas_montagem(zpl)
+            total_impressoes += 1
+            time.sleep(pausa_s)  # controla o ritmo entre etiquetas
+
+    return total_impressoes
 
 def gerar_e_salvar_qrcode(request, ordem):
     """
