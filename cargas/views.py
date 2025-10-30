@@ -19,7 +19,7 @@ from apontamento_solda.models import PecasOrdem as POSolda
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
-from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura
 from apontamento_pintura.models import CambaoPecas
 from apontamento_pintura.views import ordens_criadas as ordens_criadas_pintura
 from apontamento_montagem.views import ordens_criadas as ordens_criadas_montagem
@@ -896,6 +896,41 @@ def enviar_etiqueta_impressora(request):
 
     return JsonResponse(payload, status=status)
 
+@csrf_exempt
+@require_POST
+def enviar_etiqueta_impressora_pintura(request):
+    data = json.loads(request.body)
+
+    data_carga = data.get('data_inicio')
+    carga = data.get('carga')
+
+    itens = gerar_sequenciamento(data_carga,data_carga,'pintura',carga)
+
+    colunas_grupo = [
+        "Código", "Peca", "Célula", "Datas", 
+        "Recurso_cor", "cor", "Carga", "Etapa5", "Etapa6"
+    ]
+
+    itens_agrupado = (
+        itens.groupby(colunas_grupo, as_index=False)
+        ["Qtde_total"]
+        .sum()
+    )
+
+    # filtrando apenas células específicas
+    itens_agrupado = itens_agrupado[
+        itens_agrupado['Célula'].isin(['CHASSI', 'CILINDRO', 'EIXO SIMPLES', 'EIXO COMPLETO'])
+    ]
+    
+    payload_status = imprimir_ordens_pintura(data_carga, carga, itens_agrupado)
+    # aceita tanto (dict, status) quanto apenas dict
+    if isinstance(payload_status, tuple):
+        payload, status = payload_status
+    else:
+        payload, status = payload_status, 200
+
+    return JsonResponse(payload, status=status)
+
 @require_GET
 def enviar_etiqueta_unitaria_impressora(request):
     ordem_id = request.GET.get('ordem_id')
@@ -933,13 +968,19 @@ def ordens_em_andamento_finalizada_pintura(request):
     ordens_aguardando_iniciar = []
 
     mes_atual = datetime.now().date().month
+    ano_atual = datetime.now().date().year
+
+    mes_prev = mes_atual -1 if mes_atual > 1 else 12
+    mes_prox = mes_atual +1 if mes_atual <12 else 1
+
+    meses = [mes_prev, mes_atual, mes_prox]
 
     data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
 
     for ordem in resultado_json_ordens_criadas['ordens']:
         data_carga_datetime = datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
-        if data_carga_datetime.month not in (mes_atual, mes_atual - 1):
+        if data_carga_datetime.month not in meses:
             continue
 
         #adicionar que a ordem aguardando_iniciar criando do mês atual
@@ -965,7 +1006,7 @@ def ordens_em_andamento_finalizada_pintura(request):
         CambaoPecas.objects
         .filter(
             peca_ordem__ordem__grupo_maquina='pintura',
-            status__isnull=False
+            status__isnull=False,
         )
         .select_related('peca_ordem', 'peca_ordem__ordem', 'cambao')
         .annotate(
@@ -991,6 +1032,8 @@ def ordens_em_andamento_finalizada_pintura(request):
             cambao_nome=F('cambao__nome'),
             data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()) # já vem string
         )
+        .filter(peca_ordem__ordem__data_carga__month__in=meses,
+                peca_ordem__ordem__data_carga__year=ano_atual)
         .values(
             'id_ordem',
             'ordem',
@@ -1010,7 +1053,7 @@ def ordens_em_andamento_finalizada_pintura(request):
             'cambao_nome',
             'data_ultima_atualizacao',
         )
-        .order_by('-data_fim')[:1000]
+        .order_by('-data_fim')
     )
 
     data = list(qs)[::-1]
