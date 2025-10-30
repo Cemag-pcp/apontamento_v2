@@ -41,11 +41,13 @@ def planejamento(request):
     operadores = Operador.objects.filter(setor__nome='usinagem')
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='usinagem').exclude(nome='Finalizada parcial')
     motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='usinagem')
+    processos = Maquina.objects.filter(setor__nome='usinagem', tipo='processo')
 
     return render(request, 'apontamento_usinagem/planejamento.html', {'motivos':motivos,
                                                                       'operadores':operadores,
                                                                       'motivos_maquina_parada':motivos_maquina_parada,
-                                                                      'motivos_exclusao': motivos_exclusao})
+                                                                      'motivos_exclusao': motivos_exclusao,
+                                                                      'processos': processos})
 
 def processos(request):
 
