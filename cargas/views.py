@@ -19,10 +19,11 @@ from apontamento_solda.models import PecasOrdem as POSolda
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
-from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura, imprimir_ordens_pcp_qualidade
-from apontamento_pintura.models import CambaoPecas
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura
+from apontamento_pintura.models import CambaoPecas, Retrabalho
 from apontamento_pintura.views import ordens_criadas as ordens_criadas_pintura
 from apontamento_montagem.views import ordens_criadas as ordens_criadas_montagem
+from inspecao.models import DadosExecucaoInspecao, CausasNaoConformidade, Inspecao
 
 import pandas as pd
 import os
@@ -33,6 +34,7 @@ import requests
 import json
 from datetime import timedelta
 import django
+from collections import defaultdict
 
 django.setup()
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
@@ -982,13 +984,19 @@ def ordens_em_andamento_finalizada_pintura(request):
     ordens_aguardando_iniciar = []
 
     mes_atual = datetime.now().date().month
+    ano_atual = datetime.now().date().year
+
+    mes_prev = mes_atual -1 if mes_atual > 1 else 12
+    mes_prox = mes_atual +1 if mes_atual <12 else 1
+
+    meses = [mes_prev, mes_atual, mes_prox]
 
     data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
 
     for ordem in resultado_json_ordens_criadas['ordens']:
         data_carga_datetime = datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
-        if data_carga_datetime.month not in (mes_atual, mes_atual - 1):
+        if data_carga_datetime.month not in meses:
             continue
 
         #adicionar que a ordem aguardando_iniciar criando do mês atual
@@ -1014,7 +1022,7 @@ def ordens_em_andamento_finalizada_pintura(request):
         CambaoPecas.objects
         .filter(
             peca_ordem__ordem__grupo_maquina='pintura',
-            status__isnull=False
+            status__isnull=False,
         )
         .select_related('peca_ordem', 'peca_ordem__ordem', 'cambao')
         .annotate(
@@ -1040,6 +1048,8 @@ def ordens_em_andamento_finalizada_pintura(request):
             cambao_nome=F('cambao__nome'),
             data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()) # já vem string
         )
+        .filter(peca_ordem__ordem__data_carga__month__in=meses,
+                peca_ordem__ordem__data_carga__year=ano_atual)
         .values(
             'id_ordem',
             'ordem',
@@ -1059,7 +1069,7 @@ def ordens_em_andamento_finalizada_pintura(request):
             'cambao_nome',
             'data_ultima_atualizacao',
         )
-        .order_by('-data_fim')[:1000]
+        .order_by('-data_fim')
     )
 
     data = list(qs)[::-1]
@@ -1219,3 +1229,140 @@ def ordens_status_solda(request):
 
 
     return JsonResponse(resultado_final, safe=False)
+
+def pecas_status_retrabalho_pintura(request):
+    """
+        Puxar as ordens que estão em retrabalho na pintura, aguardando retrabalho, aguardando inspeção e retrabalhados
+    """
+    # Puxar as ordens que estão em retrabalho ou aguardando retrabalho na pintura
+
+    mes_atual = datetime.now().date().month
+    ano_atual = datetime.now().date().year
+
+    mes_prev = mes_atual -1 if mes_atual > 1 else 12
+    mes_prox = mes_atual +1 if mes_atual <12 else 1
+
+    meses = [mes_prev, mes_atual, mes_prox]
+
+    meses = [mes_prev, mes_atual, mes_prox]
+
+    retrabalho_qs = (
+        Retrabalho.objects
+        .annotate(
+            dados_execucao_inspecao=Subquery(
+                DadosExecucaoInspecao.objects
+                .filter(inspecao=OuterRef('reinspecao__inspecao__id'))
+                .order_by('-id')  # ou '-num_execucao' conforme seu modelo
+                .values_list('id', flat=True)[:1]
+            ),
+            data_carga_fmt=ToChar(F('reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga'), Value('DD/MM/YYYY')),
+            data_inicio_fmt=ToChar(
+                AtTimeZone(F('data_inicio'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+            data_fim_fmt=ToChar(
+                AtTimeZone(F('data_fim'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+        )
+        .filter(reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga__month__in=meses,
+                reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga__year=ano_atual
+        )
+        .values(
+            'id',
+            'status',
+            'data_inicio_fmt',
+            'data_fim_fmt',
+
+            'reinspecao__inspecao__pecas_ordem_pintura__ordem__id',
+            'reinspecao__inspecao__pecas_ordem_pintura__ordem__ordem',
+            'data_carga_fmt',
+            'reinspecao__inspecao__pecas_ordem_pintura__peca',
+        
+            'reinspecao__inspecao__id',
+            'reinspecao__id',
+            'dados_execucao_inspecao',
+
+        )
+    )
+
+    retr_list = list(retrabalho_qs)
+
+    # 2) buscar causas para os dados_execucao_ids coletados (uma query)
+    dados_ids = {r['dados_execucao_inspecao'] for r in retr_list if r.get('dados_execucao_inspecao')}
+    causas_map = defaultdict(list)
+    if dados_ids:
+        causas_qs = CausasNaoConformidade.objects.filter(dados_execucao__id__in=dados_ids).prefetch_related('causa').values(
+            'id',
+            'dados_execucao__id',
+            'causa__id',
+            'causa__nome'  # ajuste conforme campo de descrição'
+        )
+        for c in causas_qs:
+            causas_map[c['dados_execucao__id']].append({
+                'causa_nao_conformidade_id': c['id'],
+                'causa_id': c['causa__id'],
+                'causa_nome': c.get('causa__nome'),
+            })
+
+    # 3) produzir lista PLANA: cada item de retr_list ganha a chave 'causas_nao_conformidade'
+    flat = []
+    for r in retr_list:
+        causas = causas_map.get(r.get('dados_execucao_inspecao')) or []
+        flat.append({
+            'ordem_id': r.get('reinspecao__inspecao__pecas_ordem_pintura__ordem__id'),
+            'ordem': r.get('reinspecao__inspecao__pecas_ordem_pintura__ordem__ordem'),
+            'data_carga': r.get('data_carga_fmt'),
+            'peca': r.get('reinspecao__inspecao__pecas_ordem_pintura__peca'),
+            'retrabalho_id': r.get('id'),
+            'retrabalho_status': r.get('status'),
+            'retrabalho_data_inicio': r.get('data_inicio_fmt'),
+            'retrabalho_data_fim': r.get('data_fim_fmt'),
+            'causa_nao_conformidade': causas[0].get('causa_nome') if causas else None,
+            'inspecao_id': r.get('reinspecao__inspecao__id'),
+            'reinspecao_id': r.get('reinspecao__id'),
+            'dados_execucao_inspecao': r.get('dados_execucao_inspecao'),
+        })
+
+    
+    # 4) buscar inspeções que ainda aguardam inspeção
+    inspecoes_ids = set(
+        DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
+    )
+
+    # Filtra os dados
+    datas = Inspecao.objects.filter(pecas_ordem_pintura__isnull=False).exclude(
+        id__in=inspecoes_ids
+    )
+
+    datas = datas.select_related(
+        "pecas_ordem_pintura",
+        "pecas_ordem_pintura__ordem",
+        "pecas_ordem_pintura__operador_fim",
+    ).order_by("-id")
+
+
+    for inspecao in datas:
+        flat.append({
+            'ordem_id': inspecao.pecas_ordem_pintura.ordem.id,
+            'ordem': inspecao.pecas_ordem_pintura.ordem.ordem,
+            'data_carga': inspecao.pecas_ordem_pintura.ordem.data_carga.strftime('%d/%m/%Y') if inspecao.pecas_ordem_pintura.ordem.data_carga else '',
+            'peca': inspecao.pecas_ordem_pintura.peca,
+            'retrabalho_id': '',
+            'retrabalho_status': 'aguardando_inspecao',
+            'retrabalho_data_inicio': '',
+            'retrabalho_data_fim': '',
+            'causa_nao_conformidade': '',
+            'inspecao_id': inspecao.id,
+            'reinspecao_id': '',
+            'dados_execucao_inspecao': '',
+        })
+
+    # ordenando por data da carga
+    flat = sorted(
+        flat,
+        key=lambda x: parse_data_fmt(x.get('data_carga', ''))
+    )
+
+    
+    return JsonResponse(flat, safe=False, json_dumps_params={'default': str})

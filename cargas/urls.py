@@ -28,5 +28,6 @@ urlpatterns = [
     path('api/verificar_cargas_geradas/', views.verificar_cargas_geradas, name="verificar_cargas_geradas"),
     path('api/ordens_em_andamento_finalizada_montagem/', views.ordens_status_montagem, name="ordens_status_montagem"),
     path('api/ordens_em_andamento_finalizada_solda/', views.ordens_status_solda, name="ordens_status_solda"),
+    path('api/pecas_status_retrabalho_pintura/', views.pecas_status_retrabalho_pintura, name="pecas_status_retrabalho_pintura"),
 
 ]
