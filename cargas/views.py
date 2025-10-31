@@ -1222,7 +1222,7 @@ def pecas_status_retrabalho_pintura(request):
 
     meses = [mes_prev, mes_atual, mes_prox]
 
-    meses = [mes_prev, mes_atual, mes_prox]
+    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     retrabalho_qs = (
         Retrabalho.objects
@@ -1242,6 +1242,7 @@ def pecas_status_retrabalho_pintura(request):
                 AtTimeZone(F('data_fim'), 'America/Sao_Paulo'),
                 Value('DD/MM/YYYY HH24:MI:SS')
             ),
+            data_ultima_atualizacao_fmt=Value(data_hora_atual, output_field=CharField()) # já vem string
         )
         .filter(reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga__month__in=meses,
                 reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga__year=ano_atual
@@ -1260,6 +1261,8 @@ def pecas_status_retrabalho_pintura(request):
             'reinspecao__inspecao__id',
             'reinspecao__id',
             'dados_execucao_inspecao',
+
+            'data_ultima_atualizacao_fmt',
 
         )
     )
@@ -1300,6 +1303,7 @@ def pecas_status_retrabalho_pintura(request):
             'inspecao_id': r.get('reinspecao__inspecao__id'),
             'reinspecao_id': r.get('reinspecao__id'),
             'dados_execucao_inspecao': r.get('dados_execucao_inspecao'),
+            'data_ultima_atualizacao': r.get('data_ultima_atualizacao_fmt'),
         })
 
     
@@ -1334,6 +1338,7 @@ def pecas_status_retrabalho_pintura(request):
             'inspecao_id': inspecao.id,
             'reinspecao_id': '',
             'dados_execucao_inspecao': '',
+            'data_ultima_atualizacao': data_hora_atual,
         })
 
     # ordenando por data da carga
