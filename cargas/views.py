@@ -1210,12 +1210,22 @@ def ordens_status_solda(request):
 
 def pecas_status_retrabalho_pintura(request):
     """
-        Puxar as ordens que estão em retrabalho na pintura, aguardando retrabalho e aguardando inspeção
+        Puxar as ordens que estão em retrabalho na pintura, aguardando retrabalho, aguardando inspeção e retrabalhados
     """
     # Puxar as ordens que estão em retrabalho ou aguardando retrabalho na pintura
+
+    mes_atual = datetime.now().date().month
+    ano_atual = datetime.now().date().year
+
+    mes_prev = mes_atual -1 if mes_atual > 1 else 12
+    mes_prox = mes_atual +1 if mes_atual <12 else 1
+
+    meses = [mes_prev, mes_atual, mes_prox]
+
+    meses = [mes_prev, mes_atual, mes_prox]
+
     retrabalho_qs = (
         Retrabalho.objects
-        .exclude(status='finalizado')
         .annotate(
             dados_execucao_inspecao=Subquery(
                 DadosExecucaoInspecao.objects
@@ -1232,6 +1242,9 @@ def pecas_status_retrabalho_pintura(request):
                 AtTimeZone(F('data_fim'), 'America/Sao_Paulo'),
                 Value('DD/MM/YYYY HH24:MI:SS')
             ),
+        )
+        .filter(reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga__month__in=meses,
+                reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga__year=ano_atual
         )
         .values(
             'id',
