@@ -171,46 +171,46 @@ async function gerarEtiquetaQrCode() {
         const ensureModal = () => {
             let modal = document.getElementById("modalPintura");
             if (!modal) {
-            modal = document.createElement("div");
-            modal.id = "modalPintura";
-            Object.assign(modal.style, {
-                position: "fixed",
-                inset: "0",
-                background: "rgba(0,0,0,.45)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: "9999",
-            });
+                modal = document.createElement("div");
+                modal.id = "modalPintura";
+                Object.assign(modal.style, {
+                    position: "fixed",
+                    inset: "0",
+                    background: "rgba(0,0,0,.45)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: "9999",
+                });
 
-            const box = document.createElement("div");
-            box.id = "modalPinturaBox";
-            Object.assign(box.style, {
-                background: "#fff",
-                width: "min(720px, 92vw)",
-                maxHeight: "80vh",
-                borderRadius: "12px",
-                boxShadow: "0 10px 30px rgba(0,0,0,.2)",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-            });
-            box.innerHTML = `
-                <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
-                <h3 style="margin:0;font:600 18px/1.2 system-ui">Selecionar carga para Pintura</h3>
-                <button id="fecharModalPintura" style="border:0;background:#f5f5f5;padding:8px 12px;border-radius:8px;cursor:pointer">Fechar</button>
-                </div>
-                <div id="modalPinturaBody" style="padding:12px 20px;overflow:auto"></div>
-                <div style="padding:14px 20px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end">
-                <button id="confirmarCargaPintura" style="background:#10b981;color:#fff;border:0;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer">Confirmar</button>
-                </div>
-            `;
-            modal.appendChild(box);
-            document.body.appendChild(modal);
+                const box = document.createElement("div");
+                box.id = "modalPinturaBox";
+                Object.assign(box.style, {
+                    background: "#fff",
+                    width: "min(720px, 92vw)",
+                    maxHeight: "80vh",
+                    borderRadius: "12px",
+                    boxShadow: "0 10px 30px rgba(0,0,0,.2)",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                });
+                box.innerHTML = `
+                    <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+                    <h3 style="margin:0;font:600 18px/1.2 system-ui">Selecionar carga para Pintura</h3>
+                    <button id="fecharModalPintura" style="border:0;background:#f5f5f5;padding:8px 12px;border-radius:8px;cursor:pointer">Fechar</button>
+                    </div>
+                    <div id="modalPinturaBody" style="padding:12px 20px;overflow:auto"></div>
+                    <div style="padding:14px 20px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end">
+                    <button id="confirmarCargaPintura" style="background:#10b981;color:#fff;border:0;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer">Confirmar</button>
+                    </div>
+                `;
+                modal.appendChild(box);
+                document.body.appendChild(modal);
 
-            document.getElementById("fecharModalPintura").onclick = () => {
-                modal.remove();
-            };
+                document.getElementById("fecharModalPintura").onclick = () => {
+                    modal.remove();
+                };
             }
             return modal;
         };
@@ -236,7 +236,7 @@ async function gerarEtiquetaQrCode() {
             body.innerHTML = "";
 
             if (Object.keys(grupos).length === 0) {
-            body.innerHTML = `<p style="margin:8px 0 16px">Nenhuma carga presente no período informado.</p>`;
+                body.innerHTML = `<p style="margin:8px 0 16px">Nenhuma carga presente no período informado.</p>`;
             } else {
             // monta a lista: carga (checkbox) e, abaixo, carretas com quantidades
             const wrap = document.createElement("div");
@@ -245,10 +245,10 @@ async function gerarEtiquetaQrCode() {
 
             Object.entries(grupos).forEach(([cargaNome, itens]) => {
                 const card = document.createElement("div");
-                Object.assign(card.style, {
-                border: "1px solid #eee",
-                borderRadius: "10px",
-                padding: "12px",
+                    Object.assign(card.style, {
+                    border: "1px solid #eee",
+                    borderRadius: "10px",
+                    padding: "12px",
                 });
 
                 // header da carga com checkbox (apenas uma pode ser marcada)
@@ -266,7 +266,7 @@ async function gerarEtiquetaQrCode() {
                 // garante seleção única
                 if (e.target.checked) {
                     document.querySelectorAll('input[name="cargaEscolhida"]').forEach(el => {
-                    if (el !== e.target) el.checked = false;
+                        if (el !== e.target) el.checked = false;
                     });
                 }
                 });
@@ -285,10 +285,10 @@ async function gerarEtiquetaQrCode() {
                 ul.style.listStyle = "disc";
 
                 itens.forEach(it => {
-                const li = document.createElement("li");
-                li.style.margin = "4px 0";
-                li.textContent = `${it.codigo_recurso} — ${it.quantidade} un.`;
-                ul.appendChild(li);
+                    const li = document.createElement("li");
+                    li.style.margin = "4px 0";
+                    li.textContent = `${it.codigo_recurso} — ${it.quantidade} un.`;
+                    ul.appendChild(li);
                 });
 
                 card.appendChild(ul);
@@ -306,6 +306,9 @@ async function gerarEtiquetaQrCode() {
                 return;
             }
 
+            document.getElementById("confirmarCargaPintura").innerHTML = 'Imprimindo...';
+            document.getElementById("confirmarCargaPintura").disabled = true;
+
             const payload = {
                 data_inicio: dataInicio,
                 carga: selecionada.value
@@ -315,15 +318,31 @@ async function gerarEtiquetaQrCode() {
                 const r = await fetch("api/imprimir-etiquetas-pintura/", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
                 });
 
-                if (!r.ok) {
-                    const txt = await r.text().catch(() => "");
-                    throw new Error(`Falha ao confirmar carga (${r.status}) ${txt}`);
+                let bodyMsg = "";
+                try {
+                    const ct = r.headers.get("content-type") || "";
+                    if (ct.includes("application/json")) {
+                        const data = await r.json();
+                        bodyMsg = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+                    } else {
+                        bodyMsg = (await r.text()) || "(sem corpo)";
+                    }
+                    } catch {
+                        bodyMsg = "(falha ao ler corpo da resposta)";
+                    }
+
+                    if (!r.ok) {
+                    throw new Error(`Falha ao confirmar carga (${r.status})\n${bodyMsg}`);
                 }
 
-                alert("Carga confirmada com sucesso!");
+                alert(`Total de impressões: ${bodyMsg.payload}`);
+
+                document.getElementById("confirmarCargaPintura").innerHTML = 'Confirmar';
+                document.getElementById("confirmarCargaPintura").disabled = false;
+
                 document.getElementById("modalPintura")?.remove();
             } catch (err) {
                 console.error(err);
