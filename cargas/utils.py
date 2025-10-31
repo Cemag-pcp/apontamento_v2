@@ -2342,6 +2342,109 @@ def imprimir_ordens_pintura(data_carga, carga, itens_agrupados, pausa_s: float =
 
     return total_impressoes
 
+def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: float = 0.5):
+    """
+    data_carga: str | datetime | date  -> data que vai na etiqueta
+    carga: str                          -> ex.: "Carga 01"
+    itens_agrupados: pandas.DataFrame   -> precisa ter colunas: ["Código","Peca","Qtde_total","Célula","cor"]
+    pausa_s: float                      -> pausa entre etiquetas (segundos)
+    """
+
+    # Normaliza a data para datetime
+    if isinstance(data_carga, str):
+        try:
+            data_carga_dt = datetime.fromisoformat(data_carga)
+        except ValueError:
+            data_carga_dt = datetime.strptime(data_carga, "%Y-%m-%d")
+    elif isinstance(data_carga, date) and not isinstance(data_carga, datetime):
+        data_carga_dt = datetime.combine(data_carga, datetime.min.time())
+    else:
+        data_carga_dt = data_carga
+
+    total_impressoes = 0
+    ultima_str_celula = ''  # controla mudança de célula
+
+    # Lê o logo e remove a âncora ^FO0,0 para reposicionar
+    logo_gfa = open('logo.zpl').read().strip()
+    logo_gfa_block = logo_gfa.replace("^FO0,0", "", 1)
+
+    # Ordena as peças por célula (importante para o agrupamento)
+    itens_agrupados = itens_agrupados.sort_values(by='Célula')
+
+    # Itera por cada linha agrupada
+    for _, row in itens_agrupados.iterrows():
+        codigo = str(row["Código"])
+        peca = str(row["Peca"])[:80]  # limita a 80 chars
+        qtde_total = int(row.get("Qtde_total", 0) or 0)
+        cor = str(row["cor"])
+        str_celula = str(row["Célula"])
+
+        if qtde_total <= 0:
+            continue
+
+        # --- imprime etiqueta da célula apenas quando muda ---
+        # if str_celula != ultima_str_celula:
+        #     print(f"CELULA DIFERENTE: {str_celula}")
+        #     zpl_celula = f"""
+        #         ^XA
+        #         ^CI28
+        #         ^PW800
+        #         ^LL320
+        #         ^LT0
+        #         ^LH0,0
+        #         ^FO100,100^A0N,100,100^FB600,1,0,C,0^FD{str_celula}^FS
+        #         ^XZ
+        #         """.lstrip()
+        #     chamar_impressora_pecas_montagem(zpl_celula)
+        #     total_impressoes += 1
+        #     time.sleep(2)
+        #     ultima_str_celula = str_celula
+
+        # --- etiqueta normal da peça ---
+        for i in range(1, qtde_total + 1):
+            zpl = f"""
+^XA
+^CI28
+^PW800
+^LL320
+^LT0
+^LH0,0
+
+^FX Logo centralizado
+^FO220,1{logo_gfa_block}
+
+^FX Código da peça e descrição
+^FO50,110^A0N,28,28^FDCódigo: {codigo} - {peca}^FS
+
+^FX Linha divisória vertical
+^FO400,140^GB2,200,2^FS
+
+^FX Coluna PCP (esquerda)
+^FO50,160^A0N,36,36^FB350,1,0,C,0^FDPCP^FS
+^FO60,210^A0N,30,30^FDData: {data_carga_dt.strftime('%d/%m/%Y')}^FS
+^FO60,240^A0N,30,30^FDCélula: {str_celula[:80]}^FS
+^FO60,270^A0N,30,30^FDCor: {cor}^FS
+
+^FX Coluna Qualidade (direita)
+^FO420,160^A0N,36,36^FB330,1,0,C,0^FDQualidade^FS
+^FO430,205^A0N,30,30^FDAprovado:^FS
+^FO560,205^A0N,30,30^FDSim^FS
+^FO610,205^GB20,20,20^FS
+^FO650,205^A0N,30,30^FDNão^FS
+^FO700,205^GB20,20,2^FS
+^FO430,235^A0N,30,30^FDData: ___/___/___^FS
+^FO430,270^A0N,30,30^FDInspetor: _____________^FS
+
+^XZ
+""".lstrip()
+
+            chamar_impressora_pecas_montagem(zpl)
+            total_impressoes += 1
+            # time.sleep(pausa_s)
+
+    print(f"✅ Total de etiquetas impressas: {total_impressoes}")
+    return total_impressoes
+
 def gerar_e_salvar_qrcode(request, ordem):
     """
     Verifica as condições de uma ordem e, se atendidas,

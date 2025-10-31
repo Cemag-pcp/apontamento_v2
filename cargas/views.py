@@ -19,7 +19,7 @@ from apontamento_solda.models import PecasOrdem as POSolda
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
-from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura, imprimir_ordens_pcp_qualidade
 from apontamento_pintura.models import CambaoPecas
 from apontamento_pintura.views import ordens_criadas as ordens_criadas_pintura
 from apontamento_montagem.views import ordens_criadas as ordens_criadas_montagem
@@ -918,18 +918,32 @@ def enviar_etiqueta_impressora_pintura(request):
     )
 
     # filtrando apenas células específicas
+    # itens_agrupado = itens_agrupado[
+    #     itens_agrupado['Célula'].isin(['CHASSI', 'CILINDRO'])
+    # ]
+
+    # reitrando celulas
     itens_agrupado = itens_agrupado[
-        itens_agrupado['Célula'].isin(['CHASSI', 'CILINDRO', 'EIXO SIMPLES', 'EIXO COMPLETO'])
+        ~itens_agrupado['Célula'].isin(['CONJ INTERMED'])
     ]
     
-    payload_status = imprimir_ordens_pintura(data_carga, carga, itens_agrupado)
-    # aceita tanto (dict, status) quanto apenas dict
-    if isinstance(payload_status, tuple):
-        payload, status = payload_status
-    else:
-        payload, status = payload_status, 200
+    substituicoes = {
+        'PLAT.': 'PL.',
+        'TANQUE.': 'TA.',
+        'CAÇAM.': 'CA.',
+        'IÇAMENTO': 'ICAMENTO'
+    }
 
-    return JsonResponse(payload, status=status)
+    # Aplica as substituições
+    itens_agrupado['Célula'] = itens_agrupado['Célula'].replace(substituicoes, regex=True)
+
+    # payload_status = imprimir_ordens_pintura(data_carga, carga, itens_agrupado)
+    # print(itens_agrupado)
+    payload = imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupado)
+
+    # return JsonResponse({"payload": payload})
+    return JsonResponse({"payload": 'payload'})
+    
 
 @require_GET
 def enviar_etiqueta_unitaria_impressora(request):
