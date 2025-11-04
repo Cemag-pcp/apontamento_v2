@@ -15,7 +15,7 @@ from pathlib import Path
 import environ
 from typing import Optional
 import redis, json, uuid
-import win32print
+# import win32print
 
 from django.core.files import File
 from django.urls import reverse
@@ -2344,18 +2344,18 @@ def imprimir_ordens_pintura(data_carga, carga, itens_agrupados, pausa_s: float =
 
     return total_impressoes
 
-def send_raw_windows(zpl: str, printer_name: str) -> int:
-    data = zpl.encode("cp437", errors="replace")
-    h = win32print.OpenPrinter(printer_name)
-    try:
-        win32print.StartDocPrinter(h, 1, ("RAW ZPL", None, "RAW"))
-        win32print.StartPagePrinter(h)
-        written = win32print.WritePrinter(h, data)
-        win32print.EndPagePrinter(h)
-        win32print.EndDocPrinter(h)
-        return written or 0
-    finally:
-        win32print.ClosePrinter(h)
+# def send_raw_windows(zpl: str, printer_name: str) -> int:
+#     data = zpl.encode("cp437", errors="replace")
+#     h = win32print.OpenPrinter(printer_name)
+#     try:
+#         win32print.StartDocPrinter(h, 1, ("RAW ZPL", None, "RAW"))
+#         win32print.StartPagePrinter(h)
+#         written = win32print.WritePrinter(h, data)
+#         win32print.EndPagePrinter(h)
+#         win32print.EndDocPrinter(h)
+#         return written or 0
+#     finally:
+#         win32print.ClosePrinter(h)
 
 def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: float = 1):
     """
