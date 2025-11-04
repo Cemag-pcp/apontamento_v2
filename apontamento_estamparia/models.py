@@ -25,6 +25,7 @@ class InfoAdicionaisInspecaoEstamparia(models.Model):
     qtd_mortas = models.IntegerField(default=0, null=False, blank=False)
     motivo_mortas = models.ManyToManyField(Causas, related_name='motivo_morta_estamparia', blank=True)
     ficha = models.ImageField(upload_to='ficha_estamparia/', null=True, blank=True)
+    inspecao_finalizada = models.BooleanField(default=False)
 
 class MedidasInspecaoEstamparia(models.Model):
 
@@ -52,3 +53,20 @@ class DadosNaoConformidade(models.Model):
 class ImagemNaoConformidade(models.Model):
     nao_conformidade = models.ForeignKey(DadosNaoConformidade, on_delete=models.CASCADE, related_name='imagens')
     imagem = models.ImageField(upload_to='nao_conformidade_estamparia/')
+
+class DetalheMedidaEstamparia(models.Model):
+    medida_processo = models.ForeignKey(
+        MedidasInspecaoEstamparia,
+        on_delete=models.CASCADE,
+        related_name='detalhes_estamparia'
+    )
+    cabecalho = models.CharField(max_length=30)
+    valor = models.FloatField()
+    conforme = models.BooleanField(default=True)
+    amostra = models.IntegerField(default=1)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.cabecalho}: {self.valor}"

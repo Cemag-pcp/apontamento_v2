@@ -35,6 +35,7 @@ from apontamento_estamparia.models import (
     MedidasInspecaoEstamparia,
     DadosNaoConformidade,
     ImagemNaoConformidade,
+    DetalheMedidaEstamparia,
 )
 
 from datetime import datetime, timedelta
@@ -90,12 +91,13 @@ def inspecionar_estamparia(request):
         print(request.POST)
         print(request.FILES)
 
-        itemInspecionado = DadosExecucaoInspecao.objects.filter(
-            inspecao__id=request.POST.get("id-inspecao")
-        )
+        # Dicionários para armazenar os valores dinamicamente
+        medidas_raw = request.POST.get("medidas")
+        medidas = json.loads(medidas_raw) if medidas_raw else []
 
-        if itemInspecionado:
-            return JsonResponse({"error": "Item já inspecionado!"}, status=400)
+        print(medidas[0])
+
+        # return 'oi'
 
         # Coletar dados simples do formulário
         dataInspecao = request.POST.get("dataInspecao")
@@ -126,6 +128,9 @@ def inspecionar_estamparia(request):
             json.loads(nao_conformidades_raw) if nao_conformidades_raw else []
         )
 
+        inspecao_completa = request.POST.get("inspecao_total")  # campo bo  leano
+        auto_inspecao_noturna = request.POST.get("autoInspecaoNoturna")
+
         total_pecas_afetadas = 0
 
         # Faz um loop para percorrer cada não conformidade e somar a quantidade afetada
@@ -146,32 +151,60 @@ def inspecionar_estamparia(request):
 
         with transaction.atomic():
 
-            new_dados_execucao_inspecao = DadosExecucaoInspecao.objects.create(
-                inspecao=inspecao,
-                inspetor=inspetor,
-                conformidade=conformidade,
-                nao_conformidade=nao_conformidade,
-            )
+            dados_execucao_existente = DadosExecucaoInspecao.objects.filter(
+                inspecao__id=request.POST.get("id-inspecao")
+            ).order_by("-num_execucao").first()
 
-            new_dados_execucao_inspecao.data_execucao = dataInspecao
+            if dados_execucao_existente:
+                dados_execucao = dados_execucao_existente
+                dados_execucao.conformidade += conformidade
+                dados_execucao.nao_conformidade += nao_conformidade
+                dados_execucao.data_execucao = dataInspecao
+                dados_execucao.inspetor = inspetor
+                dados_execucao.save()
 
-            new_dados_execucao_inspecao.save()
+                new_info_adicionais, created = (
+                    InfoAdicionaisInspecaoEstamparia.objects.get_or_create(
+                        dados_exec_inspecao=dados_execucao,
+                        defaults={
+                            "inspecao_completa": inspecao_completa,
+                            "autoinspecao_noturna": auto_inspecao_noturna,
+                        },
+                    )
+                )
 
-            # model: InfoAdicionalEstamparia
-            dados_exec_inspecao = get_object_or_404(
-                DadosExecucaoInspecao, inspecao=inspecao
-            )
-            inspecao_completa = request.POST.get("inspecao_total")  # campo boleano
-            auto_inspecao_noturna = request.POST.get("autoInspecaoNoturna")
+                if not created:
+                    new_info_adicionais.inspecao_completa = inspecao_completa
+                    new_info_adicionais.autoinspecao_noturna = auto_inspecao_noturna
+                    new_info_adicionais.qtd_mortas = numPecaDefeituosa
+                    new_info_adicionais.save()
 
-            print(auto_inspecao_noturna)
+            else:
 
-            new_info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.create(
-                dados_exec_inspecao=dados_exec_inspecao,
-                inspecao_completa=True if inspecao_completa == "sim" else False,
-                autoinspecao_noturna=True if auto_inspecao_noturna == "true" else False,
-                qtd_mortas=numPecaDefeituosa if numPecaDefeituosa > 0 else 0,
-            )
+                new_dados_execucao_inspecao = DadosExecucaoInspecao.objects.create(
+                    inspecao=inspecao,
+                    inspetor=inspetor,
+                    conformidade=conformidade,
+                    nao_conformidade=nao_conformidade,
+                )
+
+                new_dados_execucao_inspecao.data_execucao = dataInspecao
+
+                new_dados_execucao_inspecao.save()
+
+                # model: InfoAdicionalEstamparia
+                dados_exec_inspecao = get_object_or_404(
+                    DadosExecucaoInspecao, inspecao=inspecao
+                )
+
+                print(auto_inspecao_noturna)
+
+                new_info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.create(
+                    dados_exec_inspecao=dados_exec_inspecao,
+                    inspecao_completa=True if inspecao_completa == "sim" else False,
+                    autoinspecao_noturna=True if auto_inspecao_noturna == "true" else False,
+                    qtd_mortas=numPecaDefeituosa if numPecaDefeituosa > 0 else 0,
+                )
 
             # Relacionar as causas ao objeto criado
             if causasPecaMorta:
@@ -187,11 +220,14 @@ def inspecionar_estamparia(request):
             # Dicionários para armazenar os valores dinamicamente
             medidas_raw = request.POST.get("medidas")
             medidas = json.loads(medidas_raw) if medidas_raw else []
-
+            amostra = 1
             for linha in medidas:
                 campos = {
                     "informacoes_adicionais_estamparia": informacoes_adicionais_estamparia
                 }
+                conforme = linha.get("conforme", True)
+                print(amostra)
+                print(linha)
 
                 for i in range(1, 5):
                     chave = f"medida{i}"
@@ -204,43 +240,71 @@ def inspecionar_estamparia(request):
                         campos[f"cabecalho_medida_{letra}"] = None
                         campos[f"medida_{letra}"] = None
 
-                MedidasInspecaoEstamparia.objects.create(**campos)
+                medidas_inspecao = MedidasInspecaoEstamparia.objects.create(**campos)
 
-            if medidas:
-                primeira_linha = medidas[0]  # pega a primeira linha de medidas
+                # print(campos)
 
-                cabecalho_medida_a = medida_a = None
-                cabecalho_medida_b = medida_b = None
-                cabecalho_medida_c = medida_c = None
-                cabecalho_medida_d = medida_d = None
+                for i in range(1,5):
+                    chave = f"medida{i}"
+                    letra = chr(96 + i)  # 1→a, 2→b, etc.
 
-                if "medida1" in primeira_linha:
-                    cabecalho_medida_a = primeira_linha["medida1"]["nome"]
-                    medida_a = primeira_linha["medida1"]["valor"]
+                    cabecalho = campos[f"cabecalho_medida_{letra}"]
+                    valor = campos[f"medida_{letra}"]
+                    
 
-                if "medida2" in primeira_linha:
-                    cabecalho_medida_b = primeira_linha["medida2"]["nome"]
-                    medida_b = primeira_linha["medida2"]["valor"]
+                    if cabecalho is not None and valor is not None:
+                        teste_detalhes = DetalheMedidaEstamparia.objects.create(
+                            medida_processo=medidas_inspecao,
+                            cabecalho=cabecalho,
+                            valor=valor,
+                            conforme=conforme,
+                            amostra=amostra
+                        )
+                        print(teste_detalhes.medida_processo)
+                        print(teste_detalhes.cabecalho)
+                        print(teste_detalhes.valor)
+                        print('Conforme:', teste_detalhes.conforme)
+                        print('Amostra:', teste_detalhes.amostra)
+                amostra += 1
 
-                if "medida3" in primeira_linha:
-                    cabecalho_medida_c = primeira_linha["medida3"]["nome"]
-                    medida_c = primeira_linha["medida3"]["valor"]
+            raise RuntimeError("FORCE_ROLLBACK_TEST")
 
-                if "medida4" in primeira_linha:
-                    cabecalho_medida_d = primeira_linha["medida4"]["nome"]
-                    medida_d = primeira_linha["medida4"]["valor"]
+            # if medidas:
+            #     primeira_linha = medidas[0]  # pega a primeira linha de medidas
 
-            MedidasInspecaoEstamparia.objects.create(
-                informacoes_adicionais_estamparia=informacoes_adicionais_estamparia,
-                cabecalho_medida_a=cabecalho_medida_a,
-                medida_a=medida_a,
-                cabecalho_medida_b=cabecalho_medida_b,
-                medida_b=medida_b,
-                cabecalho_medida_c=cabecalho_medida_c,
-                medida_c=medida_c,
-                cabecalho_medida_d=cabecalho_medida_d,
-                medida_d=medida_d,
-            )
+            #     cabecalho_medida_a = medida_a = None
+            #     cabecalho_medida_b = medida_b = None
+            #     cabecalho_medida_c = medida_c = None
+            #     cabecalho_medida_d = medida_d = None
+
+            #     if "medida1" in primeira_linha:
+            #         cabecalho_medida_a = primeira_linha["medida1"]["nome"]
+            #         medida_a = primeira_linha["medida1"]["valor"]
+
+            #     if "medida2" in primeira_linha:
+            #         cabecalho_medida_b = primeira_linha["medida2"]["nome"]
+            #         medida_b = primeira_linha["medida2"]["valor"]
+
+            #     if "medida3" in primeira_linha:
+            #         cabecalho_medida_c = primeira_linha["medida3"]["nome"]
+            #         medida_c = primeira_linha["medida3"]["valor"]
+
+            #     if "medida4" in primeira_linha:
+            #         cabecalho_medida_d = primeira_linha["medida4"]["nome"]
+            #         medida_d = primeira_linha["medida4"]["valor"]
+
+            # MedidasInspecaoEstamparia.objects.create(
+            #     informacoes_adicionais_estamparia=informacoes_adicionais_estamparia,
+            #     cabecalho_medida_a=cabecalho_medida_a,
+            #     medida_a=medida_a,
+            #     cabecalho_medida_b=cabecalho_medida_b,
+            #     medida_b=medida_b,
+            #     cabecalho_medida_c=cabecalho_medida_c,
+            #     medida_c=medida_c,
+            #     cabecalho_medida_d=cabecalho_medida_d,
+            #     medida_d=medida_d,
+            # )
+
 
             soma_qtd_nao_conformidade = 0
             # model: DadosNaoConformidade
