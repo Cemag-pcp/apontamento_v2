@@ -919,10 +919,6 @@ def enviar_etiqueta_impressora_pintura(request):
         .sum()
     )
 
-    # filtrando apenas células específicas
-    # itens_agrupado = itens_agrupado[
-    #     itens_agrupado['Célula'].isin(['CHASSI', 'CILINDRO'])
-    # ]
 
     # reitrando celulas
     itens_agrupado = itens_agrupado[
@@ -936,6 +932,17 @@ def enviar_etiqueta_impressora_pintura(request):
         'IÇAMENTO': 'ICAMENTO'
     }
 
+    # filtrando apenas células específicas
+    # itens_agrupado = itens_agrupado[
+    #     itens_agrupado['Célula'].isin(['CHASSI'])
+    # ]
+
+    # filtrando apenas células específicas
+    # itens_agrupado = itens_agrupado[
+    #     (itens_agrupado['Código'].isin(['460382'])) &
+    #     (itens_agrupado['cor'] == 'Amarelo')
+    # ]
+
     # Aplica as substituições
     itens_agrupado['Célula'] = itens_agrupado['Célula'].replace(substituicoes, regex=True)
 
@@ -944,7 +951,7 @@ def enviar_etiqueta_impressora_pintura(request):
     payload = imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupado)
 
     # return JsonResponse({"payload": payload})
-    return JsonResponse({"payload": 'payload'})
+    return JsonResponse({"payload": payload})
     
 
 @require_GET

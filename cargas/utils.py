@@ -14,6 +14,8 @@ from io import BytesIO
 from pathlib import Path
 import environ
 from typing import Optional
+import redis, json, uuid
+import win32print
 
 from django.core.files import File
 from django.urls import reverse
@@ -29,7 +31,7 @@ from apontamento_pintura.models import PecasOrdem as POP
 from apontamento_solda.models import PecasOrdem as POS
 from core.models import Ordem
 from cadastro.models import Maquina
-from apontamento_exped.utils import chamar_impressora_pecas_montagem
+from apontamento_exped.utils import chamar_impressora_pecas_montagem, chamar_impressora_pecas_montagem_2
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -2342,7 +2344,20 @@ def imprimir_ordens_pintura(data_carga, carga, itens_agrupados, pausa_s: float =
 
     return total_impressoes
 
-def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: float = 0.5):
+def send_raw_windows(zpl: str, printer_name: str) -> int:
+    data = zpl.encode("cp437", errors="replace")
+    h = win32print.OpenPrinter(printer_name)
+    try:
+        win32print.StartDocPrinter(h, 1, ("RAW ZPL", None, "RAW"))
+        win32print.StartPagePrinter(h)
+        written = win32print.WritePrinter(h, data)
+        win32print.EndPagePrinter(h)
+        win32print.EndDocPrinter(h)
+        return written or 0
+    finally:
+        win32print.ClosePrinter(h)
+
+def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: float = 1):
     """
     data_carga: str | datetime | date  -> data que vai na etiqueta
     carga: str                          -> ex.: "Carga 01"
@@ -2371,16 +2386,32 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
     # Ordena as peças por célula (importante para o agrupamento)
     itens_agrupados = itens_agrupados.sort_values(by='Célula')
 
+    reps = itens_agrupados['Qtde_total'].fillna(0).astype(int).clip(lower=0)
+
+    # repete as linhas conforme a quantidade
+    out = itens_agrupados.loc[itens_agrupados.index.repeat(reps)].copy()
+
+    # cada linha passa a representar 1 unidade
+    out['Qtde_total'] = 1
+
+    # (opcional) numeração 1..N por linha original
+    out["seq"] = out.groupby(level=0).cumcount() + 1
+    out["seq_total"] = reps.loc[itens_agrupados.index.repeat(reps)].groupby(level=0).transform("size")
+    out = out.reset_index(drop=True)
+
+    print(out)
+    out.to_csv("out1.csv")  
     # Itera por cada linha agrupada
-    for _, row in itens_agrupados.iterrows():
+    for _, row in out.iterrows():
         codigo = str(row["Código"])
+        print(codigo)
         peca = str(row["Peca"])[:80]  # limita a 80 chars
         qtde_total = int(row.get("Qtde_total", 0) or 0)
         cor = str(row["cor"])
         str_celula = str(row["Célula"])
 
-        if qtde_total <= 0:
-            continue
+        # if qtde_total <= 0:
+        #     continue
 
         # --- imprime etiqueta da célula apenas quando muda ---
         # if str_celula != ultima_str_celula:
@@ -2401,8 +2432,7 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
         #     ultima_str_celula = str_celula
 
         # --- etiqueta normal da peça ---
-        for i in range(1, qtde_total + 1):
-            zpl = f"""
+        zpl = f"""
 ^XA
 ^CI28
 ^PW800
@@ -2438,9 +2468,13 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
 ^XZ
 """.lstrip()
 
-            chamar_impressora_pecas_montagem(zpl)
-            total_impressoes += 1
-            # time.sleep(pausa_s)
+        # time.sleep(3)
+        # chamar_impressora_pecas_montagem(zpl)
+
+        total_impressoes += 1
+        printer = "ZDesigner ZD220-203dpi ZPL"
+        send_raw_windows(zpl, printer)
+
 
     print(f"✅ Total de etiquetas impressas: {total_impressoes}")
     return total_impressoes
