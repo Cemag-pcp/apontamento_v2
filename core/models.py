@@ -178,6 +178,9 @@ class PropriedadesOrdem(models.Model):
     tipo_chapa = models.CharField(max_length=20, choices=TIPO_CHAPA_CHOICES, null=True, blank=True)
     retalho = models.BooleanField(default=False)
     nova_mp = models.ForeignKey(Mp, on_delete=models.CASCADE, related_name='nova_mp', blank=True, null=True) # caso o usuario opte por mudar ao finalizar a ordem
+    
+    apontamento = models.BooleanField(null=True, blank=True)
+    obs_apontamento = models.CharField(max_length=255, null=True, blank=True)
 
 class OrdemProcesso(models.Model):
     
@@ -305,7 +308,6 @@ class RegistroNotificacao(models.Model):
 
     def __str__(self):
         return f"{self.chave} (último envio: {self.ultimo_envio.strftime('%d/%m/%Y %H:%M')})"
-
 
 class Versao(models.Model):
     

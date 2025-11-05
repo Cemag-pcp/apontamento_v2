@@ -1329,3 +1329,90 @@ def indicador_peca_produzida_maquina(request):
     resultado = producao_por_maquina(data_inicio, data_fim)
 
     return JsonResponse(resultado)    
+
+#### apontamento innovaro
+
+@require_GET
+def apontamento(request):
+
+    return render(request, 'apontamento_corte/planilha-apontamento.html')
+
+@require_GET
+def apontamento_innovaro(request):
+    apontado_param = request.GET.get("apontado", "").lower()
+
+    if apontado_param in ("true", "1", "t", "sim"):
+        apontado = True
+    elif apontado_param in ("false", "0", "f", "nao", "não"):
+        apontado = False
+    else:
+        return JsonResponse(
+            {"detail": 'Parâmetro "apontado" deve ser True ou False.'},
+            status=400,
+        )
+
+    qs = (
+        PecasOrdem.objects
+        .filter(apontamento=apontado)
+        .select_related("ordem", "ordem__propriedade")
+        .values(
+            numero_ordem=F("ordem__id"),
+            codigo_peca=F("peca"),
+            qt_planejada=F("qtd_planejada"),
+            tamanho_chapa=F("ordem__propriedade__tamanho"),
+            qt_chapa=F("ordem__propriedade__quantidade"),
+            aproveitamento=F("ordem__propriedade__aproveitamento"),
+            espessura=F("ordem__propriedade__espessura"),
+            mortas=F("qtd_morta"),
+            # ajuste esses campos conforme existirem no model Ordem
+            operador=F("ordem__operador_final"),
+            data_finalizacao=F("data"),
+            qt_produzida=F("qtd_boa"),
+            # ajuste conforme o campo real em PropriedadesOrdem
+            transferida=F("ordem__propriedade__apontamento"),
+        )
+        .order_by('data')
+    )
+
+    return JsonResponse({"apontamentos": list(qs)})
+
+@require_GET
+def transferencia_innovaro(request):
+    apontado_param = request.GET.get("apontado", "").lower()
+
+    if apontado_param in ("true", "1", "t", "sim"):
+        apontado = True
+    elif apontado_param in ("false", "0", "f", "nao", "não"):
+        apontado = False
+    else:
+        return JsonResponse(
+            {"detail": 'Parâmetro "apontado" deve ser True ou False.'},
+            status=400,
+        )
+
+    qs = (
+        PropriedadesOrdem.objects
+        .filter(apontamento=apontado)
+        .select_related("ordem")
+        .values(
+            data_finalizacao=F("ordem__ordem_pecas_corte__data"),
+            numero_ordem=F("ordem__id"),
+            mat_prima=F("descricao_mp"),
+            tamanho_chapa=F("tamanho"),
+            espessura_chapa=F("espessura"),
+            qtd_chapa=F("quantidade"),
+            aproveitamento_chapa=F("aproveitamento"),
+            tipo_chapa=F("tipo_chapa"),
+            retalho=F("retalho"),
+            transferida=F("apontamento"),
+        )
+        .order_by('ordem__ordem_pecas_corte__data')
+    )
+
+    return JsonResponse({"transferencias": list(qs)})
+
+
+
+
+
+

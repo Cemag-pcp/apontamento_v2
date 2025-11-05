@@ -2473,7 +2473,7 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
 
         total_impressoes += 1
         printer = "ZDesigner ZD220-203dpi ZPL"
-        send_raw_windows(zpl, printer)
+        # send_raw_windows(zpl, printer)
 
 
     print(f"✅ Total de etiquetas impressas: {total_impressoes}")

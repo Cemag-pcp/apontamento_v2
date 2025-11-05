@@ -49,3 +49,12 @@ urlpatterns += [
     path('api/dashboard/indicador-finalizacao-maquina', views.indicador_ordem_finalizada_maquina, name='indicador_ordem_finalizada_maquina'),
     path('api/dashboard/indicador-pecas-produzidas-maquina', views.indicador_peca_produzida_maquina, name='indicador_peca_produzida_maquina'),
 ]
+
+# Apontamentos innovaro
+urlpatterns += [
+    path('apontamentos-innovaro', views.apontamento, name='dashboard'),
+
+    path('api/apontamentos', views.apontamento_innovaro, name='apontamento_innovaro'),
+    path('api/transferencias', views.transferencia_innovaro, name='transferencia_innovaro'),
+
+]

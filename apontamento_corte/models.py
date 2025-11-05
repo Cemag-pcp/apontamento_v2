@@ -11,6 +11,9 @@ class PecasOrdem(models.Model):
     qtd_morta=models.FloatField(default=0)
     qtd_boa=models.FloatField(default=0)
     data = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    
+    apontamento = models.BooleanField(null=True, blank=True)
+    obs_apontamento = models.CharField(max_length=255, null=True, blank=True)
 
     # unique constraint de peça e ordem, para evitar duplicidade
     class Meta:
