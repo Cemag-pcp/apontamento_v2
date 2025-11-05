@@ -155,14 +155,24 @@ async function gerarEtiquetaQrCode() {
 
     } else if (setor === 'pintura') {
         // abrir um modal mostrando as cargas e as carretas logo abaixo de cada carga
+
         // carga 1
         //  carreta 1 - 2 un.
         //  carreta 2 - 3 un.
+        //      celula 1
+        //      celula 2
+        //      celula 3
+
         // carga 2
         //  carreta 1 - 2 un.
         //  carreta 2 - 3 un.
+        //      celula 1
+        //      celula 2
+        //      celula 3
+
         // ao lado de cada carga terá um checkbox para marcar
         // será enviado para o backend apenas a carga escolhida e a dataInicio.
+        // terá também um grupo de itens com chckbox, podendo escolher mais de 1 contendo as celulas
 
         const dataFim = dataInicio;
         btnGerarEtiquetas.disabled = true;
@@ -221,6 +231,11 @@ async function gerarEtiquetaQrCode() {
             if (!resp.ok) throw new Error(`Falha ao buscar cargas (${resp.status})`);
             const payload = await resp.json();
             const lista = Array.isArray(payload?.cargas?.cargas) ? payload.cargas.cargas : [];
+            const celulas = Array.isArray(payload?.cargas?.celulas)
+                ? payload.cargas.celulas
+                : Array.isArray(payload?.celulas)
+                ? payload.celulas
+                : [];
 
             // filtra apenas as presentes e agrupa por nome da carga
             const grupos = lista
@@ -249,7 +264,10 @@ async function gerarEtiquetaQrCode() {
                     border: "1px solid #eee",
                     borderRadius: "10px",
                     padding: "12px",
+                    
                 });
+                
+                card.classList.add("card-carga-pintura");
 
                 // header da carga com checkbox (apenas uma pode ser marcada)
                 const header = document.createElement("label");
@@ -292,6 +310,45 @@ async function gerarEtiquetaQrCode() {
                 });
 
                 card.appendChild(ul);
+
+                if (celulas.length) {
+                    const celWrap = document.createElement("div");
+                    celWrap.style.margin = "8px 0 0 28px";
+
+                    const celTitulo = document.createElement("div");
+                    celTitulo.textContent = "Células:";
+                    celTitulo.style.fontSize = "12px";
+                    celTitulo.style.marginBottom = "4px";
+                    celWrap.appendChild(celTitulo);
+
+                    const celList = document.createElement("div");
+                    celList.style.display = "flex";
+                    celList.style.flexWrap = "wrap";
+                    celList.style.gap = "6px 12px";
+
+                    celulas.forEach(obj => {
+                        const celNome = obj?.celula ?? obj; // aceita {celula: 'X'} ou 'X'
+
+                        const lbl = document.createElement("label");
+                        lbl.style.display = "flex";
+                        lbl.style.alignItems = "center";
+                        lbl.style.gap = "4px";
+                        lbl.style.fontSize = "12px";
+
+                        const ck = document.createElement("input");
+                        ck.type = "checkbox";
+                        ck.name = "celulaPintura";
+                        ck.value = celNome;
+
+                        lbl.appendChild(ck);
+                        lbl.appendChild(document.createTextNode(celNome));
+                        celList.appendChild(lbl);
+                    });
+
+                    celWrap.appendChild(celList);
+                    card.appendChild(celWrap);
+                }
+
                 wrap.appendChild(card);
             });
 
@@ -306,12 +363,20 @@ async function gerarEtiquetaQrCode() {
                 return;
             }
 
+            // NOVO: pega apenas as células marcadas dentro do card da carga selecionada
+            const cardSelecionado = selecionada.closest(".card-carga-pintura");
+            const celulasSelecionadas = cardSelecionado
+                ? Array.from(cardSelecionado.querySelectorAll('input[name="celulaPintura"]:checked')).map(el => el.value)
+                : [];
+
             document.getElementById("confirmarCargaPintura").innerHTML = 'Imprimindo...';
             document.getElementById("confirmarCargaPintura").disabled = true;
 
             const payload = {
                 data_inicio: dataInicio,
-                carga: selecionada.value
+                carga: selecionada.value,
+                // NOVO: adiciona as células escolhidas na mesma estrutura
+                celulas: celulasSelecionadas,
             };
 
             try {

@@ -92,6 +92,28 @@ def get_data_from_sheets():
 
     return base_carretas, base_carga
 
+def get_base_carreta(carretas: Optional[list] = None):
+
+    """Carrega os dados das planilhas e retorna como DataFrames."""
+    wks1 = sh.worksheet(worksheet1)
+
+    list1 = wks1.get_all_records()
+
+    # Transformando em dataframes
+    base_carretas = pd.DataFrame(list1)
+
+    if carretas:
+        base_carretas = base_carretas[base_carretas['Recurso'].isin(carretas)]
+
+    return base_carretas
+
+def buscar_celulas(carretas):
+
+    base_carretas = get_base_carreta(carretas)
+    base_carretas[base_carretas['Etapa2'] == 'Pintura']
+
+    return base_carretas['Célula'].unique()
+
 def tratando_dados(base_carretas, base_carga, data_carga, cliente=None, carga=None):
 
     ##### Tratando datas######
@@ -181,8 +203,6 @@ def consultar_carretas(data_inicial, data_final):
 
     dados_carga_data_filtrada['PED_QUANTIDADE'] = dados_carga_data_filtrada['PED_QUANTIDADE'].astype(float)
 
-    print(dados_carga_data_filtrada)
-
     # Agrupa os dados por data e código do recurso
     carretas_unica = dados_carga_data_filtrada[['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO', 'PED_QUANTIDADE', 'Carga']]
     agrupado = carretas_unica.groupby(['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO', 'Carga'])['PED_QUANTIDADE'].sum().reset_index()
@@ -194,7 +214,10 @@ def consultar_carretas(data_inicial, data_final):
         lambda x: '✅' if x in dados_carreta['Recurso'].astype(str).values else '❌'
     )
 
-    # Converte para formato JSON estruturado
+    buscar_cel = buscar_celulas(
+        agrupado['PED_RECURSO.CODIGO'].unique().tolist()
+    )
+
     resultado = [
         {
             "data_carga": str(row['PED_PREVISAOEMISSAODOC'].date()),  # Convertendo para string
@@ -206,7 +229,12 @@ def consultar_carretas(data_inicial, data_final):
         for _, row in agrupado.iterrows()
     ]
 
-    return {"cargas": resultado}
+    celulas = [{"celula": cel} for cel in buscar_cel]
+
+    return {
+        "cargas": resultado,
+        "celulas": celulas,
+    }
 
 def criar_array_datas(data_inicial, data_final):
     # Converte as strings de data para objetos datetime
@@ -1055,7 +1083,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
     
     return filenames
 
-def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] = None):
+def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] = None, celula: Optional[str]= None):
     filenames = []
 
     resultado = criar_array_datas(data_inicial, data_final)
@@ -1093,6 +1121,10 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
         base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE', 'Carga']]
     else:
         base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
+
+    # Apenas para pintura
+    if celula and setor == 'pintura':
+        base_carretas_original = base_carretas_original[(base_carretas_original['Célula'] == celula) & (base_carretas_original['Etapa2'] == 'Pintura')]
 
     # Converte para datetime
     base_carga_original['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
@@ -1741,8 +1773,6 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
         tab_resultado = pd.concat([tab_completa, tab_resultado], ignore_index=True)
     
-    print(tab_resultado)
-
     return tab_resultado
 
 def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
@@ -2399,8 +2429,7 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
     out["seq_total"] = reps.loc[itens_agrupados.index.repeat(reps)].groupby(level=0).transform("size")
     out = out.reset_index(drop=True)
 
-    print(out)
-    out.to_csv("out1.csv")  
+    # out.to_csv("out1.csv")  
     # Itera por cada linha agrupada
     for _, row in out.iterrows():
         codigo = str(row["Código"])
@@ -2414,22 +2443,22 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
         #     continue
 
         # --- imprime etiqueta da célula apenas quando muda ---
-        # if str_celula != ultima_str_celula:
-        #     print(f"CELULA DIFERENTE: {str_celula}")
-        #     zpl_celula = f"""
-        #         ^XA
-        #         ^CI28
-        #         ^PW800
-        #         ^LL320
-        #         ^LT0
-        #         ^LH0,0
-        #         ^FO100,100^A0N,100,100^FB600,1,0,C,0^FD{str_celula}^FS
-        #         ^XZ
-        #         """.lstrip()
-        #     chamar_impressora_pecas_montagem(zpl_celula)
-        #     total_impressoes += 1
-        #     time.sleep(2)
-        #     ultima_str_celula = str_celula
+        if str_celula != ultima_str_celula:
+            print(f"CELULA DIFERENTE: {str_celula}")
+            zpl_celula = f"""
+                ^XA
+                ^CI28
+                ^PW800
+                ^LL320
+                ^LT0
+                ^LH0,0
+                ^FO100,100^A0N,100,100^FB600,1,0,C,0^FD{str_celula}^FS
+                ^XZ
+                """.lstrip()
+            chamar_impressora_pecas_montagem(zpl_celula)
+            total_impressoes += 1
+            time.sleep(2)
+            ultima_str_celula = str_celula
 
         # --- etiqueta normal da peça ---
         zpl = f"""
@@ -2468,12 +2497,44 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
 ^XZ
 """.lstrip()
 
-        # time.sleep(3)
+
         # chamar_impressora_pecas_montagem(zpl)
+
+        import redis, uuid, json
+
+        # verificar a fila
+        REDIS_URL = "redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"
+        QUEUE_NAME = "print-zebra"
+        timeout=60
+        
+        r = redis.from_url(REDIS_URL)
+
+        job_id = str(uuid.uuid4())
+        resposta_queue = f"print-zebra:resposta:{job_id}"
+
+        payload = {
+            "job_id": job_id,
+            "resposta_queue": resposta_queue,
+            "zpl": zpl,
+        }
+
+        # Envia pra fila de impressão
+        r.rpush(QUEUE_NAME, json.dumps(payload))
+
+        # Espera o worker responder
+        res = r.blpop(resposta_queue, timeout=timeout)
+        if not res:
+            raise TimeoutError(f"Sem resposta do worker para job {job_id} em {timeout}s")
+
+        _, raw = res
+        resposta = json.loads(raw)
+
+        # Limpa a fila de resposta (opcional)
+        r.delete(resposta_queue)
 
         total_impressoes += 1
         printer = "ZDesigner ZD220-203dpi ZPL"
-        send_raw_windows(zpl, printer)
+        # send_raw_windows(zpl, printer)
 
 
     print(f"✅ Total de etiquetas impressas: {total_impressoes}")

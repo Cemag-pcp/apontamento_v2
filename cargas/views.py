@@ -905,6 +905,7 @@ def enviar_etiqueta_impressora_pintura(request):
 
     data_carga = data.get('data_inicio')
     carga = data.get('carga')
+    celulas = data.get('celulas', [])
 
     itens = gerar_sequenciamento(data_carga,data_carga,'pintura',carga)
 
@@ -914,11 +915,13 @@ def enviar_etiqueta_impressora_pintura(request):
     ]
 
     itens_agrupado = (
-        itens.groupby(colunas_grupo, as_index=False)
-        ["Qtde_total"]
+        itens.groupby(colunas_grupo, as_index=False)["Qtde_total"]
         .sum()
     )
 
+    # filtrando celulas caso esteja marcada
+    if celulas:
+        itens_agrupado = itens_agrupado[itens_agrupado['Célula'].isin(celulas)]
 
     # reitrando celulas
     itens_agrupado = itens_agrupado[
@@ -948,12 +951,12 @@ def enviar_etiqueta_impressora_pintura(request):
 
     # payload_status = imprimir_ordens_pintura(data_carga, carga, itens_agrupado)
     # print(itens_agrupado)
+    print(itens_agrupado)
     payload = imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupado)
 
+    return JsonResponse({"payload": "payload"})
     # return JsonResponse({"payload": payload})
-    return JsonResponse({"payload": payload})
     
-
 @require_GET
 def enviar_etiqueta_unitaria_impressora(request):
     ordem_id = request.GET.get('ordem_id')
