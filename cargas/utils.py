@@ -2480,9 +2480,8 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
 
 ^FX Coluna PCP (esquerda)
 ^FO50,160^A0N,36,36^FB350,1,0,C,0^FDPCP^FS
-^FO60,210^A0N,30,30^FDData: {data_carga_dt.strftime('%d/%m/%Y')}^FS
-^FO60,240^A0N,30,30^FDCélula: {str_celula[:80]}^FS
-^FO60,270^A0N,30,30^FDCor: {cor}^FS
+^FO60,210^A0N,30,30^FDCélula: {str_celula[:80]}^FS
+^FO60,240^A0N,30,30^FDCor: {cor}^FS
 
 ^FX Coluna Qualidade (direita)
 ^FO420,160^A0N,36,36^FB330,1,0,C,0^FDQualidade^FS
