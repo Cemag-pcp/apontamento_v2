@@ -181,6 +181,8 @@ class PropriedadesOrdem(models.Model):
     
     apontamento = models.BooleanField(null=True, blank=True)
     obs_apontamento = models.CharField(max_length=255, null=True, blank=True)
+    transferido_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='propriedadesordem_transferidas')
+    transferido_em = models.DateTimeField(null=True, blank=True)
 
 class OrdemProcesso(models.Model):
     

@@ -55,6 +55,11 @@ urlpatterns += [
     path('apontamentos-innovaro', views.apontamento, name='dashboard'),
 
     path('api/apontamentos', views.apontamento_innovaro, name='apontamento_innovaro'),
+    path('api/apontamentos/confirmar', views.apontamento_innovaro_confirmar, name='apontamento_innovaro_confirmar'),
+    path('api/apontamentos/confirmar-lote', views.apontamento_innovaro_bulk_confirmar, name='apontamento_innovaro_bulk_confirmar'),
+    
     path('api/transferencias', views.transferencia_innovaro, name='transferencia_innovaro'),
+    path('api/transferencias/confirmar', views.transferencia_innovaro_confirmar, name='transferencia_innovaro_confirmar'),
+    path('api/transferencias/confirmar-lote', views.transferencia_innovaro_bulk_confirmar, name='transferencia_innovaro_bulk_confirmar'),
 
 ]

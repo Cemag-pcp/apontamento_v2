@@ -10,6 +10,7 @@ from django.utils.timezone import now,localtime
 from django.db.models import Q, Count, Sum, F
 from django.forms.models import model_to_dict
 from django.contrib.auth.decorators import login_required
+from django.db.models import F, Min
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso,PropriedadesOrdem,MaquinaParada, Profile
@@ -1335,9 +1336,8 @@ def indicador_peca_produzida_maquina(request):
 @require_GET
 def apontamento(request):
 
-    return render(request, 'apontamento_corte/planilha-apontamento.html')
+    return render(request, 'apontamento_corte/apontamentos_innovaro.html')
 
-@require_GET
 def apontamento_innovaro(request):
     apontado_param = request.GET.get("apontado", "").lower()
 
@@ -1353,9 +1353,13 @@ def apontamento_innovaro(request):
 
     qs = (
         PecasOrdem.objects
-        .filter(apontamento=apontado)
+        .filter(
+            apontamento=False,                    # acp.apontamento = false
+            ordem__propriedade__apontamento=True  # cp.apontamento = true
+        )
         .select_related("ordem", "ordem__propriedade")
         .values(
+            "obs_apontamento",
             numero_ordem=F("ordem__id"),
             codigo_peca=F("peca"),
             qt_planejada=F("qtd_planejada"),
@@ -1364,19 +1368,16 @@ def apontamento_innovaro(request):
             aproveitamento=F("ordem__propriedade__aproveitamento"),
             espessura=F("ordem__propriedade__espessura"),
             mortas=F("qtd_morta"),
-            # ajuste esses campos conforme existirem no model Ordem
-            operador=F("ordem__operador_final"),
+            operador=F("ordem__operador_final__nome"),
             data_finalizacao=F("data"),
             qt_produzida=F("qtd_boa"),
-            # ajuste conforme o campo real em PropriedadesOrdem
             transferida=F("ordem__propriedade__apontamento"),
         )
-        .order_by('data')
+        .order_by("data")
     )
 
     return JsonResponse({"apontamentos": list(qs)})
 
-@require_GET
 def transferencia_innovaro(request):
     apontado_param = request.GET.get("apontado", "").lower()
 
@@ -1392,24 +1393,222 @@ def transferencia_innovaro(request):
 
     qs = (
         PropriedadesOrdem.objects
-        .filter(apontamento=apontado)
-        .select_related("ordem")
-        .values(
-            data_finalizacao=F("ordem__ordem_pecas_corte__data"),
+        .filter(
+            apontamento=apontado,
+            ordem__ordem_pecas_corte__data__isnull=False,
+        )
+        .annotate(
+            data_finalizacao=Min("ordem__ordem_pecas_corte__data"),  # pega a menor data
             numero_ordem=F("ordem__id"),
             mat_prima=F("descricao_mp"),
-            tamanho_chapa=F("tamanho"),
-            espessura_chapa=F("espessura"),
             qtd_chapa=F("quantidade"),
-            aproveitamento_chapa=F("aproveitamento"),
-            tipo_chapa=F("tipo_chapa"),
-            retalho=F("retalho"),
             transferida=F("apontamento"),
         )
-        .order_by('ordem__ordem_pecas_corte__data')
+        .values(
+            "tamanho",
+            "espessura",
+            "aproveitamento",
+            "tipo_chapa",
+            "retalho",
+            "data_finalizacao",
+            "numero_ordem",
+            "mat_prima",
+            "qtd_chapa",
+            "transferida",
+        )
+        .order_by("data_finalizacao")
     )
 
     return JsonResponse({"transferencias": list(qs)})
+
+@csrf_exempt
+def apontamento_innovaro_confirmar(request):
+    if request.method != 'POST':
+        return JsonResponse({"detail": "Método não permitido."}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        return JsonResponse({"detail": "JSON inválido."}, status=400)
+
+    numero_ordem = payload.get('numero_ordem')
+    codigo_peca = payload.get('codigo_peca')
+    observacao = payload.get('observacao') or ''
+
+    if not numero_ordem or not codigo_peca:
+        return JsonResponse({"detail": "Campos obrigatórios: numero_ordem e codigo_peca."}, status=400)
+
+    try:
+        ordem = Ordem.objects.get(id=int(numero_ordem))
+    except (Ordem.DoesNotExist, ValueError):
+        return JsonResponse({"detail": "Ordem não encontrada."}, status=404)
+
+    try:
+        peca_ordem = PecasOrdem.objects.get(ordem=ordem, peca=str(codigo_peca))
+    except PecasOrdem.DoesNotExist:
+        return JsonResponse({"detail": "Peça da ordem não encontrada."}, status=404)
+
+    from django.utils.timezone import now as tz_now
+    peca_ordem.apontamento = True
+    peca_ordem.obs_apontamento = observacao
+    peca_ordem.apontado_em = tz_now()
+    if request.user.is_authenticated:
+        try:
+            from django.contrib.auth.models import User  # garantia de import
+            peca_ordem.apontado_por = request.user
+        except Exception:
+            pass
+    peca_ordem.save(update_fields=["apontamento", "obs_apontamento", "apontado_por", "apontado_em"]) 
+
+    return JsonResponse({
+        "ok": True,
+        "numero_ordem": numero_ordem,
+        "codigo_peca": codigo_peca,
+        "apontamento": True,
+        "observacao": observacao,
+    })
+
+@csrf_exempt
+def transferencia_innovaro_confirmar(request):
+    if request.method != 'POST':
+        return JsonResponse({"detail": "Método não permitido."}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        return JsonResponse({"detail": "JSON inválido."}, status=400)
+
+    numero_ordem = payload.get('numero_ordem')
+    observacao = payload.get('observacao') or ''
+
+    if not numero_ordem:
+        return JsonResponse({"detail": "Campo obrigatório: numero_ordem."}, status=400)
+
+    try:
+        ordem = Ordem.objects.get(id=int(numero_ordem))
+    except (Ordem.DoesNotExist, ValueError):
+        return JsonResponse({"detail": "Ordem não encontrada."}, status=404)
+
+    try:
+        prop = PropriedadesOrdem.objects.get(ordem=ordem)
+    except PropriedadesOrdem.DoesNotExist:
+        return JsonResponse({"detail": "Propriedades da ordem não encontradas."}, status=404)
+
+    from django.utils.timezone import now as tz_now
+    prop.apontamento = True
+    prop.obs_apontamento = observacao
+    prop.transferido_em = tz_now()
+    if request.user.is_authenticated:
+        try:
+            from django.contrib.auth.models import User
+            prop.transferido_por = request.user
+        except Exception:
+            pass
+    prop.save(update_fields=["apontamento", "obs_apontamento", "transferido_por", "transferido_em"]) 
+
+    return JsonResponse({
+        "ok": True,
+        "numero_ordem": numero_ordem,
+        "transferida": True,
+        "observacao": observacao,
+    })
+
+@csrf_exempt
+def apontamento_innovaro_bulk_confirmar(request):
+    if request.method != 'POST':
+        return JsonResponse({"detail": "Método não permitido."}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+        itens = payload.get('itens', [])
+    except Exception:
+        return JsonResponse({"detail": "JSON inválido."}, status=400)
+
+    if not isinstance(itens, list) or not itens:
+        return JsonResponse({"detail": "Envie uma lista em 'itens'."}, status=400)
+
+    atualizados = []
+    erros = []
+    for item in itens:
+        try:
+            numero_ordem = item.get('numero_ordem')
+            codigo_peca = item.get('codigo_peca')
+            observacao = item.get('observacao') or ''
+            if not numero_ordem or not codigo_peca:
+                raise ValueError('numero_ordem e codigo_peca são obrigatórios')
+            ordem = Ordem.objects.get(id=int(numero_ordem))
+            peca_ordem = PecasOrdem.objects.get(ordem=ordem, peca=str(codigo_peca))
+            from django.utils.timezone import now as tz_now
+            peca_ordem.apontamento = True
+            peca_ordem.obs_apontamento = observacao
+            peca_ordem.apontado_em = tz_now()
+            if request.user.is_authenticated:
+                try:
+                    from django.contrib.auth.models import User
+                    peca_ordem.apontado_por = request.user
+                except Exception:
+                    pass
+            peca_ordem.save(update_fields=["apontamento", "obs_apontamento", "apontado_por", "apontado_em"]) 
+            atualizados.append({"numero_ordem": numero_ordem, "codigo_peca": codigo_peca})
+        except Exception as e:
+            erros.append({"item": item, "erro": str(e)})
+
+    return JsonResponse({
+        "ok": True,
+        "atualizados": atualizados,
+        "erros": erros,
+        "total": len(itens),
+        "sucesso": len(atualizados),
+        "falhas": len(erros),
+    })
+
+@csrf_exempt
+def transferencia_innovaro_bulk_confirmar(request):
+    if request.method != 'POST':
+        return JsonResponse({"detail": "Método não permitido."}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+        itens = payload.get('itens', [])
+    except Exception:
+        return JsonResponse({"detail": "JSON inválido."}, status=400)
+
+    if not isinstance(itens, list) or not itens:
+        return JsonResponse({"detail": "Envie uma lista em 'itens'."}, status=400)
+
+    atualizados = []
+    erros = []
+    for item in itens:
+        try:
+            numero_ordem = item.get('numero_ordem')
+            observacao = item.get('observacao') or ''
+            if not numero_ordem:
+                raise ValueError('numero_ordem é obrigatório')
+            ordem = Ordem.objects.get(id=int(numero_ordem))
+            prop = PropriedadesOrdem.objects.get(ordem=ordem)
+            from django.utils.timezone import now as tz_now
+            prop.apontamento = True
+            prop.obs_apontamento = observacao
+            prop.transferido_em = tz_now()
+            if request.user.is_authenticated:
+                try:
+                    from django.contrib.auth.models import User
+                    prop.transferido_por = request.user
+                except Exception:
+                    pass
+            prop.save(update_fields=["apontamento", "obs_apontamento", "transferido_por", "transferido_em"]) 
+            atualizados.append({"numero_ordem": numero_ordem})
+        except Exception as e:
+            erros.append({"item": item, "erro": str(e)})
+
+    return JsonResponse({
+        "ok": True,
+        "atualizados": atualizados,
+        "erros": erros,
+        "total": len(itens),
+        "sucesso": len(atualizados),
+        "falhas": len(erros),
+    })
 
 
 
