@@ -75,3 +75,32 @@ class NotificacaoConsumer(AsyncWebsocketConsumer):
         
         # Envia os dados para o cliente WebSocket conectado
         await self.send(text_data=json.dumps(dados_para_enviar))
+
+
+class InnovaroAtualizacoesConsumer(AsyncWebsocketConsumer):
+    """
+    Consumer para atualizações em tempo real das tabelas de
+    Apontamentos e Transferências (Innovaro) na tela de corte.
+
+    Envie eventos para o grupo "innovaro_atualizacoes" com os types:
+      - "apontamento.atualizado"  -> chama apontamento_atualizado
+      - "transferencia.atualizada" -> chama transferencia_atualizada
+
+    O payload deve vir em event["data"], por ex:
+      { "tipo": "apontamento", "numero_ordem": "123", ... }
+    """
+
+    GROUP_NAME = "innovaro_atualizacoes"
+
+    async def connect(self):
+        await self.channel_layer.group_add(self.GROUP_NAME, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)
+
+    async def apontamento_atualizado(self, event):
+        await self.send(text_data=json.dumps(event.get("data", {"tipo": "apontamento"})))
+
+    async def transferencia_atualizada(self, event):
+        await self.send(text_data=json.dumps(event.get("data", {"tipo": "transferencia"})))

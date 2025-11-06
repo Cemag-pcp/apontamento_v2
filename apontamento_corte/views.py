@@ -6,6 +6,10 @@ from django.shortcuts import get_object_or_404, render
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
+from core.utils import (
+    notificar_innovaro_apontamento,
+    notificar_innovaro_transferencia,
+)
 from django.utils.timezone import now,localtime
 from django.db.models import Q, Count, Sum, F
 from django.forms.models import model_to_dict
@@ -1460,6 +1464,15 @@ def apontamento_innovaro_confirmar(request):
             pass
     peca_ordem.save(update_fields=["apontamento", "obs_apontamento", "apontado_por", "apontado_em"]) 
 
+    # Notifica outras telas para remover a linha correspondente
+    try:
+        notificar_innovaro_apontamento({
+            "numero_ordem": str(numero_ordem),
+            "codigo_peca": str(codigo_peca),
+        })
+    except Exception:
+        pass
+
     return JsonResponse({
         "ok": True,
         "numero_ordem": numero_ordem,
@@ -1505,6 +1518,14 @@ def transferencia_innovaro_confirmar(request):
         except Exception:
             pass
     prop.save(update_fields=["apontamento", "obs_apontamento", "transferido_por", "transferido_em"]) 
+
+    # Notifica outras telas para remover a linha correspondente
+    try:
+        notificar_innovaro_transferencia({
+            "numero_ordem": str(numero_ordem),
+        })
+    except Exception:
+        pass
 
     return JsonResponse({
         "ok": True,
@@ -1553,6 +1574,15 @@ def apontamento_innovaro_bulk_confirmar(request):
         except Exception as e:
             erros.append({"item": item, "erro": str(e)})
 
+    # Notifica outras telas para remover as linhas correspondentes
+    try:
+        if atualizados:
+            notificar_innovaro_apontamento({
+                "itens": [{"numero_ordem": str(i["numero_ordem"]), "codigo_peca": str(i["codigo_peca"])} for i in atualizados]
+            })
+    except Exception:
+        pass
+
     return JsonResponse({
         "ok": True,
         "atualizados": atualizados,
@@ -1600,6 +1630,15 @@ def transferencia_innovaro_bulk_confirmar(request):
             atualizados.append({"numero_ordem": numero_ordem})
         except Exception as e:
             erros.append({"item": item, "erro": str(e)})
+
+    # Notifica outras telas para remover as linhas correspondentes
+    try:
+        if atualizados:
+            notificar_innovaro_transferencia({
+                "itens": [{"numero_ordem": str(i["numero_ordem"]) } for i in atualizados]
+            })
+    except Exception:
+        pass
 
     return JsonResponse({
         "ok": True,

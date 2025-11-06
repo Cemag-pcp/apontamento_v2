@@ -1,0 +1,27 @@
+﻿  // ConfirmaÃ§Ã£o e tentativa de envio (POST) â€” backend de atualizaÃ§Ã£o deve ser implementado
+  async function confirmarAcao(titulo, texto, payload, postUrl) {
+    const result = await Swal.fire({
+      title: titulo,
+      text: texto,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Confirmar',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!result.isConfirmed) return { ok: false };
+
+    try {
+      const res = await fetch(postUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        throw new Error('A API de atualizaÃ§Ã£o nÃ£o estÃ¡ disponÃ­vel (' + res.status + ').');
+      }
+      return { ok: true };
+    } catch (err) {
+      await Swal.fire({ icon: 'warning', title: 'NÃ£o atualizado', text: err.message });
+      return { ok: false };
+    }
+  }

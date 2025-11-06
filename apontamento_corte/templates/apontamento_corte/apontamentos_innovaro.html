@@ -8,10 +8,33 @@
 {% block links %}
 <style>
   .tab-pane { padding-top: 1rem; }
-  table th, table td { vertical-align: middle; }
-  .obs-input { min-width: 200px; }
   .nowrap { white-space: nowrap; }
   .small-muted { font-size: .85rem; color: #6c757d; }
+
+  /* Compact tables with consistent row height and ellipses */
+  .compact-table { font-size: 0.85rem; table-layout: fixed; }
+  .compact-table th, .compact-table td {
+    padding: .35rem .5rem;
+    height: 2.25rem;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Sticky header within scrollable table container */
+  .table-scroll { max-height: 60vh; overflow: auto; }
+  .table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f8f9fa;
+  }
+
+  /* Slightly tighter controls inside compact rows */
+  .compact-table .btn { padding: .2rem .4rem; }
+  .compact-table .form-control { padding: .25rem .4rem; }
+  .obs-input { min-width: 160px; max-width: 220px; }
 </style>
 {% endblock %}
 
@@ -69,20 +92,20 @@
           <button id="refresh-apontamentos" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-repeat"></i> Atualizar</button>
         </div>
       </div>
-      <div class="table-responsive">
-        <table class="table table-striped table-hover table-sm align-middle" id="table-apontamentos">
+      <div class="table-responsive table-scroll">
+        <table class="table table-striped table-hover table-sm align-middle compact-table" id="table-apontamentos">
           <thead class="table-light">
             <tr>
               <th class="text-center" style="width:28px"><input type="checkbox" id="sel-all-apontamentos"></th>
-              <th class="nowrap">Ordem</th>
-              <th>Peça</th>
-              <th class="text-end">Qt Planejada</th>
-              <th class="text-end">Qt Produzida</th>
-              <th class="text-end">Mortas</th>
-              <th>Espessura</th>
-              <th>Tamanho</th>
-              <th class="text-end">Qt Chapas</th>
-              <th class="text-end">Aproveitamento</th>
+              <th style="width:80px" class="nowrap">Ordem</th>
+              <th style="width:200px">Peça</th>
+              <th style="width:50px" class="text-end">Plan.</th>
+              <th style="width:70px" class="text-end">Prod.</th>
+              <th style="width:70px" class="text-end">Mortas</th>
+              <!-- <th>Espessura</th> -->
+              <th style="width:240px">Tamanho</th>
+              <th class="text-end" style="width:80px">Chapas</th>
+              <th style="width:70px" class="text-end">Aprov.</th>
               <th>Operador</th>
               <th>Observação</th>
               <th class="text-center">Ação</th>
@@ -101,20 +124,18 @@
           <button id="refresh-transferencias" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-repeat"></i> Atualizar</button>
         </div>
       </div>
-      <div class="table-responsive">
-        <table class="table table-striped table-hover table-sm align-middle" id="table-transferencias">
+      <div class="table-responsive table-scroll">
+        <table class="table table-striped table-hover table-sm align-middle compact-table" id="table-transferencias">
           <thead class="table-light">
             <tr>
               <th class="text-center" style="width:28px"><input type="checkbox" id="sel-all-transferencias"></th>
               <th class="nowrap">Ordem</th>
-              <th>Matéria‑Prima</th>
-              <th>Tamanho</th>
-              <th>Espessura</th>
+              <th style="width:260px">Matéria‑Prima</th>
               <th class="text-end">Qt Chapas</th>
               <th class="text-end">Aproveitamento</th>
               <th>Tipo Chapa</th>
               <th>Retalho</th>
-              <th>Data Finalização</th>
+              <th style="width:240px">Data Finalização</th>
               <th>Observação</th>
               <th class="text-center">Ação</th>
             </tr>
@@ -152,6 +173,12 @@
     el.textContent = next.toLocaleString('pt-BR');
   }
 
+  function updateCounterFromTable(tableSelector, counterId) {
+    const rows = Array.from(document.querySelectorAll(`${tableSelector} tbody tr`));
+    const empty = rows.length === 1 && rows[0].querySelector('.small-muted');
+    setCount(counterId, empty ? 0 : rows.length);
+  }
+
   async function fetchJson(url) {
     const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
     if (!res.ok) throw new Error('Erro ao buscar dados: ' + res.status);
@@ -167,8 +194,7 @@
       <td class="text-end">${fmtNum(a.qt_planejada)}</td>
       <td class="text-end">${fmtNum(a.qt_produzida)}</td>
       <td class="text-end">${fmtNum(a.mortas)}</td>
-      <td>${fmt(a.espessura)}</td>
-      <td>${fmt(a.tamanho_chapa)}</td>
+      <td>${fmt(a.espessura)} - ${fmt(a.tamanho_chapa)}</td>
       <td class="text-end">${fmtNum(a.qt_chapa)}</td>
       <td class="text-end">${fmtNum(a.aproveitamento)}</td>
       <td>${fmt(a.operador)}</td>
@@ -186,8 +212,6 @@
       <td class="text-center"><input type="checkbox" class="row-select" data-numero-ordem="${fmt(t.numero_ordem)}"></td>
       <td class="nowrap">${fmt(t.numero_ordem)}</td>
       <td>${fmt(t.mat_prima)}</td>
-      <td>${fmt(t.tamanho)}</td>
-      <td>${fmt(t.espessura)}</td>
       <td class="text-end">${fmtNum(t.qtd_chapa)}</td>
       <td class="text-end">${fmtNum(t.aproveitamento)}</td>
       <td>${fmt(t.tipo_chapa)}</td>
@@ -214,10 +238,14 @@
       tbody.innerHTML = '';
       if (!items.length) {
         tbody.innerHTML = `<tr><td colspan="${getColspan('#table-apontamentos')}" class="text-center small-muted py-3">Nenhum registro pendente.</td></tr>`;
+        setCount('count-apontamentos', 0);
+      } else {
+        items.forEach(a => tbody.appendChild(rowApontamento(a)));
+        setCount('count-apontamentos', items.length);
       }
-      items.forEach(a => tbody.appendChild(rowApontamento(a)));
     } catch (e) {
       tbody.innerHTML = `<tr><td colspan="12" class="text-center text-danger py-3">${e.message}</td></tr>`;
+      setCount('count-apontamentos', 0);
     }
   }
 
@@ -230,10 +258,14 @@
       tbody.innerHTML = '';
       if (!items.length) {
         tbody.innerHTML = `<tr><td colspan="${getColspan('#table-transferencias')}" class="text-center small-muted py-3">Nenhum registro pendente.</td></tr>`;
+        setCount('count-transferencias', 0);
+      } else {
+        items.forEach(t => tbody.appendChild(rowTransferencia(t)));
+        setCount('count-transferencias', items.length);
       }
-      items.forEach(t => tbody.appendChild(rowTransferencia(t)));
     } catch (e) {
       tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-3">${e.message}</td></tr>`;
+      setCount('count-transferencias', 0);
     }
   }
 
@@ -265,6 +297,60 @@
     }
   }
 
+  // Override: confirmação + tratamento de 'já processado' com opção de atualizar tabela
+  async function confirmarAcao(titulo, texto, payload, postUrl) {
+    const result = await Swal.fire({
+      title: titulo,
+      text: texto,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Confirmar',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!result.isConfirmed) return { ok: false };
+
+    try {
+      const res = await fetch(postUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        let status = res.status;
+        let message = 'A API de atualização não está disponível (' + status + ').';
+        try {
+          const data = await res.json();
+          message = data?.detail || data?.message || data?.error || message;
+        } catch (_) { /* ignore parse errors */ }
+
+        const alreadyProcessed = status === 409 || /j[a\u00E1]\s*(foi\s*)?(apontad|transferid)/i.test(message || '');
+
+        if (alreadyProcessed) {
+          const which = (postUrl === URL_APONTAMENTOS_CONFIRMAR || postUrl === URL_APONTAMENTOS_BULK) ? 'ap' : 'tr';
+          const ask = await Swal.fire({
+            icon: 'error',
+            title: 'Já processado',
+            text: 'Este item já foi atualizado. Deseja atualizar a tabela?',
+            showCancelButton: true,
+            confirmButtonText: 'Atualizar tabela',
+            cancelButtonText: 'Fechar'
+          });
+          if (ask.isConfirmed) {
+            if (which === 'ap') { await loadApontamentos(); }
+            else { await loadTransferencias(); }
+          }
+        } else {
+          await Swal.fire({ icon: 'warning', title: 'Não atualizado', text: message });
+        }
+        return { ok: false, status, message };
+      }
+      return { ok: true };
+    } catch (err) {
+      await Swal.fire({ icon: 'warning', title: 'Não atualizado', text: err.message });
+      return { ok: false, error: err.message };
+    }
+  }
+
   function removeRowAndMaybeEmpty(tr, tableSelector) {
     const tbody = document.querySelector(`${tableSelector} tbody`);
     tr.remove();
@@ -273,6 +359,28 @@
       empty.innerHTML = `<td colspan="${getColspan(tableSelector)}" class="text-center small-muted py-3">Nenhum registro pendente.</td>`;
       tbody.appendChild(empty);
     }
+  }
+
+  // Remoção direcionada via WebSocket (sem recarregar toda a tabela)
+  function removeApontamentoFromWS(numero_ordem, codigo_peca) {
+    if (!numero_ordem || !codigo_peca) return false;
+    const sel = `#table-apontamentos tbody input.row-select[data-numero-ordem="${numero_ordem}"][data-codigo-peca="${codigo_peca}"]`;
+    const el = document.querySelector(sel);
+    if (!el) return false;
+    const tr = el.closest('tr');
+    if (tr) removeRowAndMaybeEmpty(tr, '#table-apontamentos');
+    return !!tr;
+  }
+
+  function removeTransferenciaFromWS(numero_ordem) {
+    if (!numero_ordem) return false;
+    const nodes = document.querySelectorAll(`#table-transferencias tbody input.row-select[data-numero-ordem="${numero_ordem}"]`);
+    if (!nodes.length) return false;
+    nodes.forEach(el => {
+      const tr = el.closest('tr');
+      if (tr) removeRowAndMaybeEmpty(tr, '#table-transferencias');
+    });
+    return true;
   }
 
   // Delegação de eventos para botões de ação
@@ -293,6 +401,7 @@
       if (ok.ok) {
         await Swal.fire({ icon: 'success', title: 'Apontado', timer: 900, showConfirmButton: false });
         removeRowAndMaybeEmpty(tr, '#table-apontamentos');
+        decCount('count-apontamentos', 1);
       }
     }
 
@@ -308,6 +417,7 @@
       if (ok.ok) {
         await Swal.fire({ icon: 'success', title: 'Transferido', timer: 900, showConfirmButton: false });
         removeRowAndMaybeEmpty(tr, '#table-transferencias');
+        decCount('count-transferencias', 1);
       }
     }
   });
@@ -337,6 +447,7 @@
     if (ok.ok) {
       selecionados.forEach(tr => removeRowAndMaybeEmpty(tr, '#table-apontamentos'));
       await Swal.fire({ icon: 'success', title: 'Apontamentos confirmados', timer: 1200, showConfirmButton: false });
+      decCount('count-apontamentos', selecionados.length);
     }
   }
 
@@ -376,6 +487,18 @@
       setCount('count-transferencias', empty ? 0 : rows.length);
     });
   });
+  
+  // Observa mutações nas tabelas para atualizar contadores dinamicamente
+  const apTbody = document.querySelector('#table-apontamentos tbody');
+  const trTbody = document.querySelector('#table-transferencias tbody');
+  if (apTbody) {
+    const apObs = new MutationObserver(() => updateCounterFromTable('#table-apontamentos', 'count-apontamentos'));
+    apObs.observe(apTbody, { childList: true });
+  }
+  if (trTbody) {
+    const trObs = new MutationObserver(() => updateCounterFromTable('#table-transferencias', 'count-transferencias'));
+    trObs.observe(trTbody, { childList: true });
+  }
 
   // Carrega dados ao abrir as abas
   document.getElementById('tab-apontamentos-tab').addEventListener('shown.bs.tab', loadApontamentos);
@@ -384,5 +507,54 @@
   // Carrega padrão
   loadApontamentos();
   // Deixa transferências carregar sob demanda
+  // WebSocket para atualizações em tempo real (apontamentos/transferências)
+  (function initInnovaroWS() {
+    try {
+      // const scheme = (window.location.protocol === 'https:') ? 'wss' : 'ws';
+      // const url = `${scheme}://${window.location.host}/ws/innovaro/atualizacoes/`;
+      // const socket = new WebSocket(url);
+
+      const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+      socket = new WebSocket(wsProtocol + window.location.host + "/ws/innovaro/atualizacoes/");
+
+      socket.onopen = function(e) {
+          console.log("WebSocket conectado com sucesso!");
+          retryTimeout = 1000; // Reseta o timer de tentativa ao conectar
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data || '{}');
+          const tipo = (data.tipo || '').toLowerCase();
+          const itens = Array.isArray(data.itens) ? data.itens : null;
+
+          if (tipo === 'apontamento') {
+            if (itens && itens.length) {
+              itens.forEach(it => removeApontamentoFromWS(it.numero_ordem, it.codigo_peca));
+            } else if (data.numero_ordem && data.codigo_peca) {
+              removeApontamentoFromWS(data.numero_ordem, data.codigo_peca);
+            }
+          } else if (tipo === 'transferencia' || tipo === 'transferência') {
+            if (itens && itens.length) {
+              itens.forEach(it => removeTransferenciaFromWS(it.numero_ordem));
+            } else if (data.numero_ordem) {
+              removeTransferenciaFromWS(data.numero_ordem);
+            }
+          } else {
+            // Se não houver tipo claro, não faça reload; opcional: tratar conforme necessário
+          }
+        } catch (_) {
+          // Payload inesperado: ignore para evitar recarregar a tabela inteira
+        }
+      };
+
+      socket.onclose = () => {
+        // Tentativa simples de reconexão após 2s
+        setTimeout(initInnovaroWS, 2000);
+      };
+    } catch (_) {
+      // Ignora se o navegador não suportar ou em erro inicial
+    }
+  })();
 </script>
 {% endblock %}

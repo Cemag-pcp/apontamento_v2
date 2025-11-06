@@ -83,7 +83,7 @@ class Mp(models.Model):
 
 class Espessura(models.Model):
 
-    nome=models.CharField(max_length=10, unique=True)
+    nome=models.CharField(max_length=10, unique=True) # Ex.: 3/4...
 
     def __str__(self):
 

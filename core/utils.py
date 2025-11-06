@@ -23,6 +23,34 @@ def notificar_ordem(ordem):
         }
     )
 
+
+def notificar_innovaro_apontamento(payload: dict):
+    """Notifica via WebSocket que um apontamento foi atualizado.
+    payload: dict com chaves livres, ideal incluir {"tipo": "apontamento", ...}
+    """
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "innovaro_atualizacoes",
+        {
+            "type": "apontamento.atualizado",
+            "data": {"tipo": "apontamento", **(payload or {})},
+        },
+    )
+
+
+def notificar_innovaro_transferencia(payload: dict):
+    """Notifica via WebSocket que uma transferência foi atualizada.
+    payload: dict com chaves livres, ideal incluir {"tipo": "transferencia", ...}
+    """
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "innovaro_atualizacoes",
+        {
+            "type": "transferencia.atualizada",
+            "data": {"tipo": "transferencia", **(payload or {})},
+        },
+    )
+
 def notificacao_almoxarifado(
     titulo: str,
     mensagem: str,
