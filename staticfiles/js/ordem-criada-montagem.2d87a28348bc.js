@@ -348,8 +348,6 @@ export function carregarOrdensInterrompidas(filtros = {}) {
     </div>`;
 
     // Fetch para buscar ordens interrompidas
-
-
     fetch(`api/ordens-interrompidas/?setor=${filtros.setor || ''}`)
     .then(response => response.json())
     .then(data => {
@@ -380,9 +378,42 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                 `).join("");
             }
 
+            // Formata as peças faltantes
+            let pecasFaltantesInfo = "";
+            if (ordem.pecas_faltantes && ordem.pecas_faltantes.length > 0) {
+                pecasFaltantesInfo = `
+                    <div class="mt-3 mb-2">
+                        <h6 class="text-danger mb-2">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            Peças Faltantes:
+                        </h6>
+                        <div class="list-group">
+                            ${ordem.pecas_faltantes.map(peca => {
+                                const pecaJsonString = JSON.stringify(peca).replace(/"/g, '&quot;');
+
+                                return `
+                                    <div 
+                                        class="list-group-item list-group-item-danger p-2 mb-1 click-peca-faltante"
+                                        data-peca-info="${pecaJsonString}" 
+                                        style="cursor: pointer;"
+                                    >
+                                        <div class="d-flex flex-wrap justify-content-between align-items-center">
+                                            <span class="fw-bold text-truncate" style="font-size:13px; max-width: 70%;">${peca.nome_peca}</span>
+                                            <span class="badge bg-danger rounded-pill">Qtd: ${peca.quantidade}</span>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">
+                                            Registrado em: ${new Date(peca.data_registro).toLocaleDateString('pt-BR')}
+                                        </small>
+                                    </div>
+                                `;
+                            }).join("")}
+                        </div>
+                    </div>
+                `;
+            }
+
             card.innerHTML = `
             <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
-                <!-- Contador fixado no topo direito -->
                 <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
                     id="contador-${ordem.ordem_id}" 
                     style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
@@ -405,7 +436,8 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                         </a>
                     </p>
 
-                    <!-- Seção de Processos -->
+                    ${pecasFaltantesInfo}
+
                     <div class="mt-3">
                         ${processosInfo}
                     </div>
@@ -413,10 +445,24 @@ export function carregarOrdensInterrompidas(filtros = {}) {
 
                 <div class="card-footer d-flex justify-content-between align-items-center bg-white small" style="border-top: 1px solid #dee2e6;">
                     <div class="d-flex flex-wrap justify-content-center gap-2">
-                        ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
-                    </div>
+                        ${botaoAcao} </div>
                 </div>
             </div>`;
+
+            const pecaCards = card.querySelectorAll('.click-peca-faltante');
+            
+            // 2. Adiciona o Event Listener para CADA item
+            pecaCards.forEach(pecaCard => {
+                pecaCard.addEventListener('click', () => {
+                    const pecaDataString = pecaCard.dataset.pecaInfo.replace(/&quot;/g, '"');
+                    try {
+                        const peca = JSON.parse(pecaDataString);
+                        mostrarDetalhesPeca(peca); 
+                    } catch (e) {
+                        console.error('Erro ao fazer parse dos dados da peça:', e);
+                    }
+                });
+            });
 
             const buttonRetornar = card.querySelector('.btn-retornar');
             const buttonDeletar = card.querySelector('.btn-deletar');
@@ -439,8 +485,19 @@ export function carregarOrdensInterrompidas(filtros = {}) {
         });
     })
     .catch(error => console.error('Erro ao buscar ordens iniciadas:', error));
-
 };
+
+function mostrarDetalhesPeca(peca) {
+    // 1. Preenche os campos do Modal
+    document.getElementById('modalPecaNome').textContent = peca.nome_peca || 'N/A';
+    document.getElementById('modalPecaQuantidade').textContent = peca.quantidade || 0;
+    document.getElementById('modalPecaDataRegistro').textContent = new Date(peca.data_registro).toLocaleString('pt-BR');
+
+    // 2. Abre o Modal (Requer a biblioteca JS do Bootstrap)
+    const modalElement = document.getElementById('modalDetalhesPeca');
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+}
 
 // Modal para "Interromper"
 function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) {
@@ -483,7 +540,7 @@ function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) 
     motivoInterrupcaoSelect.off("change").on("change", function () {
         const motivoSelecionado = motivoInterrupcaoSelect.find(":selected").text();
 
-        if (motivoSelecionado === "Falta de peça") {
+        if (motivoSelecionado === "Falta peça") {
             selectPecasContainer.show(); // Exibe o campo de peças
             carregarPecasDisponiveis(codigoConjunto); // Chama apenas uma vez
         } else {
@@ -557,47 +614,137 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
 // Função para carregar peças disponíveis para a ordem selecionada
 function carregarPecasDisponiveis(codigoConjunto) {
     const pecasDisponiveisSelect = $('#pecasDisponiveis');
+    const confirmInterromperButton = $('#confirmInterromper');
+    // NOVO: Pegando o select do motivo
+    const motivoInterrupcaoSelect = $('#motivoInterrupcao'); 
+    
+    // Elementos do carregamento
+    const loadingPecasDiv = $('#loadingPecas');
+    const selectPecasContainer = $('#selectPecasContainer');
+
+    // 1. ANTES DA REQUISIÇÃO
+    confirmInterromperButton.prop('disabled', true);
+    motivoInterrupcaoSelect.prop('disabled', true); // DESABILITA o select do motivo
+    
+    selectPecasContainer.hide();
+    pecasDisponiveisSelect.empty();
+    loadingPecasDiv.show(); // MOSTRA O SPINNER
 
     fetch(`api/listar-pecas-disponiveis/?conjunto=${codigoConjunto}`)
     .then(response => response.json())
     .then(data => {
-        pecasDisponiveisSelect.empty(); // Limpa o select
-        pecasDisponiveisSelect.append(new Option("Selecione uma peça...", "", true, true));
 
-        if (data.pecas.length === 0) {
-            pecasDisponiveisSelect.append(new Option("Nenhuma peça disponível", "", false, false));
-        } else {
-            data.pecas.forEach(peca => {
-                pecasDisponiveisSelect.append(new Option(`${peca.codigo} - ${peca.descricao}`, peca.id, false, false));
+        if (data.pecas.length !== 0) {
+            data.pecas.forEach((peca, index)=> {
+                pecasDisponiveisSelect.append(new Option(`${peca['CODIGO']} - ${peca['DESCRIÇÃO']}`, peca['CODIGO'], false, false));
             });
         }
 
-        pecasDisponiveisSelect.prop("disabled", false);
-        pecasDisponiveisSelect.select2({
-            dropdownParent: $('#modalInterromper') // ID do modal onde o select está
-        }); // Inicializa Select2
+        // Destroi e recria o select2
+        if (pecasDisponiveisSelect.hasClass('select2-hidden-accessible')) {
+            pecasDisponiveisSelect.select2('destroy');
+        }
+
+        pecasDisponiveisSelect
+        .select2({
+            placeholder: 'Selecione uma peça',
+            allowClear: true,
+            dropdownParent: $('#modalInterromper')
+        })
+        .off('select2:select.gerarQtd select2:clear.gerarQtd change.gerarQtd')
+        .on('select2:select.gerarQtd select2:clear.gerarQtd change.gerarQtd', gerarInputsQuantidade);
+
+        pecasDisponiveisSelect.val(null).trigger('change');
     })
     .catch(error => {
         console.error("Erro ao carregar peças disponíveis:", error);
-        pecasDisponiveisSelect.append(new Option("Erro ao carregar peças", "", false, false));
+        
+        // Lógica de erro do select2
+        if (pecasDisponiveisSelect.hasClass('select2-hidden-accessible')) {
+            pecasDisponiveisSelect.select2('destroy');
+        }
+        pecasDisponiveisSelect.select2({
+            placeholder: 'Não possui peças disponíveis na base referente a esse conjunto',
+            allowClear: true,
+            dropdownParent: $('#modalInterromper')
+        });
+        pecasDisponiveisSelect.val(null).trigger('change');
+    })
+    .finally(() => {
+        // 2. APÓS A REQUISIÇÃO (sucesso ou erro)
+        loadingPecasDiv.hide(); // ESCONDE O SPINNER
+        selectPecasContainer.show(); // Mostra o select container
+        
+        confirmInterromperButton.prop('disabled', false); // Reabilita o botão
+        motivoInterrupcaoSelect.prop('disabled', false); // REABILITA o select do motivo
+    });
+}
+
+$(document).ready(function() {
+    $('#modalInterromper').on('hidden.bs.modal', function () {
+        $('#pecasQuantidadeContainer').empty(); 
+        
+        $('#motivoInterrupcao').val('').trigger('change');
+        
+        $('#pecasDisponiveis').val(null).trigger('change');
+        $('#selectPecasContainer').hide();
+
+    });
+});
+
+function gerarInputsQuantidade() {
+    const pecasSelecionadas = $('#pecasDisponiveis').find(':selected');
+    const container = $('#pecasQuantidadeContainer');
+    container.empty(); // Limpa a área antes de gerar novos inputs
+
+    if (pecasSelecionadas.length === 0) {
+        return; // Não faz nada se nenhuma peça estiver selecionada
+    }
+
+    // Título da seção
+    container.append('<h6 class="mt-3">Informe a Quantidade em Falta:</h6>');
+
+    pecasSelecionadas.each(function() {
+        const codigo = $(this).val(); // O CÓDIGO da peça
+        const descricao = $(this).text(); // A DESCRIÇÃO da peça
+        
+        // Cria um elemento de input (usando Bootstrap form-group)
+        const inputGroup = `
+            <hr>
+            <div class="mb-3 px-3 pb-3">
+                <label for="qtd-${codigo}" class="form-label fw-bold">
+                    ${descricao}:
+                </label>
+                <input 
+                    type="number" 
+                    class="form-control" 
+                    id="qtd-${codigo}" 
+                    name="qtd-${codigo}" 
+                    min="1" 
+                    value="1"
+                    required
+                    data-peca-codigo="${codigo}"
+                    data-peca-descricao="${descricao}"
+                >
+            </div>
+        `;
+        container.append(inputGroup);
     });
 }
 
 // Função para finalizar interrupção e enviar para API
 function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveisSelect, modal, maquinaId, dataCarga) {
-    const motivoSelecionado = motivoInterrupcaoSelect.val(); // Pegando o valor do select corretamente via jQuery
-    const pecaSelecionada = pecasDisponiveisSelect.val(); // Pegando a peça selecionada
-    const filtroDataCarga = document.getElementById('filtro-data-carga');
-    const filtroSetor = document.getElementById('filtro-setor');
-
-    // Captura os valores atualizados dos filtros
-    const filtros = {
-        data_carga: filtroDataCarga.value,
-        setor: filtroSetor.value
-    };
-    // **Verificação segura para evitar erro caso não haja seleção**
+    const motivoSelecionado = motivoInterrupcaoSelect.val();
+    // Usamos 'find(":selected").text()' para garantir que pegamos o texto que o backend usa para obs_operador
     const motivoTexto = motivoInterrupcaoSelect.find(":selected").text() ?? 'N/A';
+    const filtros = {
+        data_carga: document.getElementById('filtro-data-carga').value,
+        setor: document.getElementById('filtro-setor').value
+    };
 
+    let pecasFaltantesPayload = [];
+
+    // --- 1. Validação do Motivo ---
     if (!motivoSelecionado) {
         Swal.fire({
             icon: 'warning',
@@ -607,16 +754,41 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
         return;
     }
 
-    // Se o motivo for "Falta de peça", a peça deve ser obrigatória
-    if (motivoTexto === "Falta de peça" && (!pecaSelecionada || pecaSelecionada === "")) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Atenção',
-            text: 'Você deve selecionar uma peça para continuar.'
-        });
-        return;
-    }
+    const pecasSelecionadas = pecasDisponiveisSelect.val(); // Array de códigos (ex: ["P001", "P002"])
 
+    console.log(pecasSelecionadas);
+
+    // --- 2. Lógica e Coleta para "Falta peça" ---
+    if (motivoTexto === "Falta peça" && Array.isArray(pecasSelecionadas) && pecasSelecionadas.length > 0) {
+
+        pecasSelecionadas.forEach(codigoPeca => {
+            const optionElement = pecasDisponiveisSelect.find(`option[value="${codigoPeca}"]`).first();
+            
+            const nomePeca = optionElement.data('descricao') 
+                ? `${codigoPeca} - ${optionElement.data('descricao')}` 
+                : optionElement.text().trim();
+
+            const inputQtd = $(`#qtd-${codigoPeca}`);
+            let quantidade = parseInt(inputQtd.val() || '0');
+
+            if (quantidade > 0) {
+                pecasFaltantesPayload.push({
+                    nome: nomePeca,
+                    quantidade: quantidade
+                });
+            }
+        });
+        // Valida se, após a coleta, alguma quantidade > 0 foi informada
+        if (pecasFaltantesPayload.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Informe a quantidade em falta (maior que zero) para a(s) peça(s) selecionada(s).'
+            });
+            return;
+        }
+    }
+    
     Swal.fire({
         title: 'Interrompendo...',
         text: 'Por favor, aguarde enquanto a ordem está sendo interrompida.',
@@ -633,9 +805,8 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
         motivo: parseInt(motivoSelecionado)
     };
 
-    // Se o motivo for "Falta de peça", adiciona a peça ao JSON
-    if (motivoTexto === "Falta de peça") {
-        payload.peca_falta = parseInt(pecaSelecionada);
+    if (motivoTexto === "Falta peça") {
+        payload.pecas_faltantes = pecasFaltantesPayload; 
         payload.maquina_id = parseInt(maquinaId);
         payload.data_carga = dataCarga;
     }
