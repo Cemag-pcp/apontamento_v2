@@ -356,7 +356,6 @@ class SolicitacaoPeca(models.Model):
     data_solicitacao=models.DateField(auto_now_add=True)
     data_carga=models.DateField(blank=True, null=True)
     
-
     def __str__(self):
         return f"{self.peca} - {self.setor_solicitante}"
     
