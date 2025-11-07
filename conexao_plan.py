@@ -72,5 +72,3 @@ def busca_saldo_recurso_central(codigos):
         return saldo_dict,data_ultimo_saldo
  
 
-# lista = []
-# print(busca_saldo_recurso_central(lista))

@@ -658,6 +658,30 @@ def excluir_op_padrao(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+def excluir_op_lote(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        ordem_ids = data.get('ordem_ids', [])
+
+        if not isinstance(ordem_ids, list) or not ordem_ids:
+            return JsonResponse({'error': 'ordem_ids deve ser uma lista não vazia'}, status=400)
+
+        # Garante inteiros
+        try:
+            ordem_ids = [int(i) for i in ordem_ids]
+        except Exception:
+            return JsonResponse({'error': 'ordem_ids contém valores inválidos'}, status=400)
+
+        updated = Ordem.objects.filter(pk__in=ordem_ids).update(excluida=True)
+        return JsonResponse({'success': True, 'atualizadas': updated})
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 def gerar_op_duplicada(request, pk_ordem):
 
     """
@@ -790,7 +814,7 @@ def get_ordens_sequenciadas(request):
     # Converte cada objeto para dicionário e adiciona o display do grupo_maquina
     data = []
     for ordem_obj in ordens_sequenciadas:
-        ordem_dict = model_to_dict(ordem_obj)
+        ordem_dict = model_to_dict(ordem_obj, exclude=['qrcode'])  # << aqui
         ordem_dict['grupo_maquina_display'] = ordem_obj.get_grupo_maquina_display()
 
         propriedade = getattr(ordem_obj, 'propriedade', None)
@@ -868,7 +892,8 @@ def api_ordens_finalizadas(request):
                 poc.qtd_morta,
                 CONCAT(op.matricula, ' - ', op.nome) AS operador,
                 TO_CHAR(o.ultima_atualizacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
-                poc.qtd_boa AS total_produzido
+                poc.qtd_boa AS total_produzido,
+                p.retalho 
             FROM apontamento_v2.core_ordem o
             INNER JOIN apontamento_v2.apontamento_corte_pecasordem poc ON poc.ordem_id = o.id
             LEFT JOIN apontamento_v2.core_propriedadesordem p ON o.id = p.ordem_id

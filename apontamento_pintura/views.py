@@ -1167,10 +1167,12 @@ def api_ordens_finalizadas(request):
 
     resultado = []
     for d in dados:
+        parte_direita = (d.peca or "").partition(" - ")[2]  # '' se não houver ' - '
+
         resultado.append({
             'ordem': d.ordem.ordem,
             'codigo': d.peca.split(" - ")[0],
-            'descricao': d.peca.split(" - ")[1],
+            'descricao': parte_direita,
             'qtd_planejada': d.qtd_planejada,
             'cor': mapa_cor.get(d.ordem.cor, d.ordem.cor),
             'qtd_boa': d.qtd_boa,
@@ -1350,8 +1352,8 @@ def verificar_cor_cambao(cor_antes_de_finalizar, cambao_nome):
         
         # Pegando o nome do ultimo do cambão finalizado antes do atual (por ex: 7 aberto, 6 fechado)
         cambao_nome = str(int(cambao.nome) - 1)
-        if cambao_nome == 0:
-            cambao_nome = 8
+        if cambao_nome == '0':
+            cambao_nome = '8'
         qs = CambaoPecas.objects.filter(
             status='finalizada', 
             cambao__tipo=tipo,
@@ -1367,6 +1369,11 @@ def verificar_cor_cambao(cor_antes_de_finalizar, cambao_nome):
 
         print(f"cambao primeira peca {primeira_peca_cambao_anterior.peca_ordem.id} - {primeira_peca_cambao_anterior.peca_ordem.ordem.cor} e tipo {primeira_peca_cambao_anterior.cambao.tipo} e nome {primeira_peca_cambao_anterior.cambao.nome}")
 
+        if primeira_peca_cambao_anterior.cambao.nome != cambao_nome:
+            # último cambão finalizado não é o anterior ao atual (ex: 7 aberto, 5 fechado)
+            print(f"Cambão anterior {cambao_nome} não encontrado, último encontrado foi {primeira_peca_cambao_anterior.cambao.nome}.")
+            return None
+        
         if primeira_peca_cambao_anterior.peca_ordem.ordem.cor == cor_antes_de_finalizar:
             print(f"Último cambão finalizado com cor {primeira_peca_cambao_anterior.peca_ordem.ordem.cor} e tipo {primeira_peca_cambao_anterior.cambao.tipo} é igual ao cambão atual.")
             return None

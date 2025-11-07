@@ -10,7 +10,7 @@ from django.utils.timezone import now,localtime
 from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
 
 from .models import Ordem,PecasOrdem
-from core.models import OrdemProcesso, MaquinaParada
+from core.models import OrdemProcesso, MaquinaParada, Profile
 from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada, MotivoExclusao
 from inspecao.models import Inspecao
 from .utils import criar_ordem_usinagem
@@ -41,11 +41,13 @@ def planejamento(request):
     operadores = Operador.objects.filter(setor__nome='usinagem')
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='usinagem').exclude(nome='Finalizada parcial')
     motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='usinagem')
+    processos = Maquina.objects.filter(setor__nome='usinagem', tipo='processo')
 
     return render(request, 'apontamento_usinagem/planejamento.html', {'motivos':motivos,
                                                                       'operadores':operadores,
                                                                       'motivos_maquina_parada':motivos_maquina_parada,
-                                                                      'motivos_exclusao': motivos_exclusao})
+                                                                      'motivos_exclusao': motivos_exclusao,
+                                                                      'processos': processos})
 
 def processos(request):
 
@@ -90,6 +92,8 @@ def get_ordens_criadas(request):
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+
     # obter a primeira peça associada à ordem
     primeira_peca = PecasOrdem.objects.filter(
         ordem=OuterRef('pk')
@@ -97,7 +101,8 @@ def get_ordens_criadas(request):
 
     # Query principal das ordens
     ordens_queryset = Ordem.objects.filter(
-        grupo_maquina='usinagem'
+        grupo_maquina='usinagem',
+        excluida=False
     ).annotate(
         peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
         peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
@@ -132,6 +137,7 @@ def get_ordens_criadas(request):
             'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
+            'maquina_id': ordem.maquina.id if ordem.maquina else None,
             'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M'),
             'peca': {
                 'codigo': ordem.peca_codigo,
@@ -142,6 +148,7 @@ def get_ordens_criadas(request):
         })
 
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'has_next': ordens_page.has_next(),
     })
@@ -367,8 +374,9 @@ def get_ordens_iniciadas(request):
 @require_GET
 def get_ordens_interrompidas(request):
     # Filtra as ordens com base no status 'interrompida'
-    ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_usinagem').filter(status_atual='interrompida', grupo_maquina='usinagem')
+    ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_usinagem').filter(status_atual='interrompida', grupo_maquina='usinagem', excluida=False)
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
     # Paginação (opcional)
     page = request.GET.get('page', 1)  # Obtém o número da página
     limit = request.GET.get('limit', 10)  # Define o limite padrão por página
@@ -427,6 +435,7 @@ def get_ordens_interrompidas(request):
 
     # Retorna os dados paginados como JSON
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
@@ -438,8 +447,9 @@ def get_ordens_ag_prox_proc(request):
     # Filtra as ordens com base no status 'agua_prox_proc' e prefetch da peça relacionada
     ordens_queryset = Ordem.objects.prefetch_related(
         'ordem_pecas_usinagem','processos'
-    ).filter(grupo_maquina='usinagem', status_atual='agua_prox_proc')
+    ).filter(grupo_maquina='usinagem', status_atual='agua_prox_proc', excluida=False)
 
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
     # Paginação
     page = int(request.GET.get('page', 1))  # Obtém o número da página
     limit = int(request.GET.get('limit', 10))  # Define o limite padrão por página
@@ -509,9 +519,9 @@ def get_ordens_ag_prox_proc(request):
             },
             'pecas': pecas_data,  # Lista consolidada de peças
         })
-
     # Retorna os dados paginados como JSON
     return JsonResponse({
+        'usuario_tipo_acesso': usuario_tipo,
         'ordens': data,
         'page': ordens_page.number,
         'total_pages': paginator.num_pages,
@@ -598,11 +608,12 @@ def api_ordens_finalizadas(request):
                 p.codigo AS peca,
                 p.descricao AS descricao,
                 ope.qtd_planejada AS total_planejada,
-                ope.qtd_boa AS total_produzido,
+                ope.qtd_boa - ope.qtd_morta as total_produzido,
                 TO_CHAR(o.data_programacao, 'DD/MM/YYYY HH24:MI') AS data_programacao,
                 TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
                 CONCAT(f.matricula, ' - ', f.nome) AS operador,
-                o.obs_operador AS obs
+                o.obs_operador AS obs,
+                ope.qtd_morta AS total_morta
             FROM apontamento_v2.core_ordem o
             JOIN apontamento_v2.apontamento_usinagem_pecasordem ope ON ope.ordem_id = o.id
             JOIN apontamento_v2.cadastro_pecas p ON ope.peca_id = p.id

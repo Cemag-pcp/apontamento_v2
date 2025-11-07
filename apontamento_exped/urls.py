@@ -22,5 +22,10 @@ urlpatterns = [
     path('api/impressao/', views.impressao_pacote, name='impressao_pacote'),
     path('api/salvar-foto/', views.salvar_foto, name='salvar_foto'),
     path('api/buscar-fotos/<int:pacote_id>/', views.buscar_fotos, name='buscar_fotos'),
+    path('api/pendencias/<int:carregamento_id>/', views.mostrar_pendencias, name='mostrar_pendencias'),
+    path('api/verificar-pendencias/<int:carregamento_id>/', views.verificar_pendencias, name='verificar_pendencias'),
+    path('api/comparar-carretas-geradas/<int:carga_id>/', views.comparar_carretas_geradas, name='comparar_carretas_geradas'),
+    path('api/qt-pendente-carretas/<int:carga_id>/', views.quantidade_pendente_carretas, name='quantidade_pendente_carretas'),
+    path('api/listar-pacotes-criados/<int:id>/', views.listar_pacotes_criados, name='listar_pacotes_criados'),
 
 ]

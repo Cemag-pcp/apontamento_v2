@@ -443,15 +443,21 @@ def atualizar_status_ordem(request):
         return JsonResponse({'error': str(e)}, status=500)    
 
 def ordens_criadas(request):
-   
     """
     View que agrega os dados de PecasOrdem (por ordem) e junta com a model Ordem,
     trazendo algumas colunas da Ordem e calculando o saldo:
         saldo = soma(qtd_planejada) - soma(qtd_boa)
     
+    O status_atual é calculado com base nas regras (ordem de prioridade):
+        1. Se pelo menos uma ordem tiver status "iniciada" → "iniciada"
+        2. Se qtd_planejada == qtd_boa → "finalizada"
+        3. Se todas forem "retorno" → "retorno"
+        4. Se todas forem "interrompida" → "interrompida"
+        5. Se todas forem "aguardando_iniciar" → "aguardando_iniciar"
+    
     Parâmetros esperados na URL (via GET):
       - data_carga: data da carga (default: hoje)
-      - maquina: nome da máquina (opcional)
+      - setor: nome da máquina (opcional)
       - status: status da ordem (opcional)
     """
 
@@ -466,7 +472,8 @@ def ordens_criadas(request):
     filtros_ordem = {
         'data_carga': data_carga,
         'grupo_maquina': 'solda',
-        'ordem_pai__isnull': True
+        'ordem_pai__isnull': True,
+        'excluida': False,
     }
     if maquina_param:
         maquina = get_object_or_404(Maquina, pk=maquina_param)
@@ -511,7 +518,6 @@ def ordens_criadas(request):
         'SERRALHERIA',
         'TRANSBORDO',
         'ROÇADEIRA'
-
     ]
 
     maquinas = Ordem.objects.filter(id__in=ordem_ids).exclude(maquina__nome__in=maquinas_excluidas).values('maquina__nome','maquina__id').distinct()
@@ -560,10 +566,61 @@ def ordens_iniciadas(request):
 
     maquina_param = request.GET.get('setor', '')
 
+    ordem_id_montagem = request.GET.get('ordem_id', None)
+
     filtros_ordem = {
         'grupo_maquina': 'solda',
-        'status_atual': 'iniciada'
+        'status_atual': 'iniciada',
+        'excluida': False,
     }
+
+    # Adicionar chave id caso exista o parametro ordem_id
+    if ordem_id_montagem:
+        # filtros_ordem['id'] = ordem_id_montagem # ordem id --> core_ordem --> montagem
+
+        
+        ordem = Ordem.objects.get(pk=ordem_id_montagem)
+        print(ordem)
+
+        data_carga_montagem = ordem.data_carga if ordem.data_carga else None
+        ordem_peca_montagem = ordem.ordem_pecas_montagem.first() # É pra ter só uma peça por ordem
+        peca_montagem = ordem_peca_montagem.peca if ordem_peca_montagem else None
+
+        codigo_peca = peca_montagem.split("-", maxsplit=1)[0].strip() if peca_montagem else None
+        
+        ordem_solda = None
+
+
+        print(peca_montagem, codigo_peca, data_carga_montagem)
+
+        if peca_montagem is None or codigo_peca is None or data_carga_montagem is None:
+            """
+                Verificando se a ordem buscada(montagem) tem a peça e a data de carga preenchida.
+                Se não tiver, não tem como buscar a ordem de solda relacionada.
+            """
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Não foram encontrados dados de montagem para esta ordem de montagem',
+                'dados': None
+            }, status=400)
+        
+        ordem_solda = Ordem.objects.filter(
+            data_carga=data_carga_montagem,
+            grupo_maquina='solda',
+            ordem_pecas_solda__peca__istartswith=codigo_peca
+        ).distinct()
+
+        print(ordem_solda)
+        filtros_ordem['id__in'] = [ordem.id for ordem in ordem_solda]
+        print(filtros_ordem)
+        # ordem_pecas_solda = []
+        # for ordem in ordem_solda:
+        #     for i in ordem.ordem_pecas_solda.all():
+        #         ordem_pecas_solda.append(i)
+
+        # print(ordem_pecas_solda)
+        # for i in ordem_pecas_solda:
+        #     print(i)
 
     if maquina_param:
         maquina = get_object_or_404(Maquina, pk=maquina_param)
@@ -649,7 +706,8 @@ def ordens_interrompidas(request):
 
     filtros_ordem = {
         'grupo_maquina': 'solda',
-        'status_atual': 'interrompida'
+        'status_atual': 'interrompida',
+        'excluida': False,
     }
 
     if maquina_param:
@@ -846,6 +904,7 @@ def andamento_ultimas_cargas(request):
 def listar_motivos_interrupcao(request):
 
     motivos = MotivoInterrupcao.objects.filter(setor__nome='solda', visivel=True)
+    print(motivos)
 
     return JsonResponse({"motivos": list(motivos.values())})
 
@@ -1096,6 +1155,151 @@ def retornar_processo(request):
             {'status': 'error', 'message': 'JSON inválido'}, 
             status=400
         )
+    except Ordem.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ordem não encontrada'}, 
+            status=404
+        )
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': str(e)}, 
+            status=500
+        )
+    
+def apontamento_qrcode(request):
+    return render(request, 'apontamento_solda/apontamento_solda_qrcode.html')
+
+def api_apontamento_qrcode(request):
+    """
+    API para buscar dados de ordem de solda relacionada a uma ordem de montagem.
+    
+    O status é calculado com base nas regras (ordem de prioridade):
+        1. Se pelo menos uma tiver status "iniciada" → "iniciada"
+        2. Se qtd_planejada == qtd_boa (somando todas as qtd_boa) → "finalizada"
+        3. Se todas forem "retorno" → "retorno"
+        4. Se todas forem "interrompida" → "interrompida"
+        5. Se todas forem "aguardando_iniciar" → "aguardando_iniciar"
+    """
+    if request.method != 'GET':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Método não permitido'}, 
+            status=405
+        )
+
+    try:
+        ordem_id = request.GET.get('ordem_id')
+
+        print(ordem_id)
+
+        ordem = Ordem.objects.get(pk=ordem_id)
+        print(ordem)
+        data_carga_montagem = ordem.data_carga if ordem.data_carga else None
+        ordem_peca_montagem = ordem.ordem_pecas_montagem.first() # É pra ter só uma peça por ordem
+        peca_montagem = ordem_peca_montagem.peca if ordem_peca_montagem else None
+
+        codigo_peca = peca_montagem.split("-", maxsplit=1)[0].strip() if peca_montagem else None
+        
+        ordem_solda = None
+
+        print(peca_montagem, codigo_peca)
+
+        if peca_montagem is None or codigo_peca is None or data_carga_montagem is None:
+            """
+                Verificando se a ordem buscada(montagem) tem a peça e a data de carga preenchida.
+                Se não tiver, não tem como buscar a ordem de solda relacionada.
+            """
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'Não foram encontrados dados de montagem para esta ordem de montagem',
+                'dados': None
+            }, status=400)
+        
+        ordem_solda = Ordem.objects.filter(
+            data_carga=data_carga_montagem,
+            grupo_maquina='solda',
+            ordem_pecas_solda__peca__istartswith=codigo_peca
+        ).first()
+
+        if not ordem_solda:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Ordem de solda não encontrada',
+                'dados': None
+            }, status=404)
+
+        # Busca a ordem principal E todas as sub-ordens (filhas) relacionadas
+        ordens_relacionadas = list(Ordem.objects.filter(
+            Q(id=ordem_solda.id) | Q(ordem_pai=ordem_solda)
+        ))
+
+        print(f"Total de ordens relacionadas encontradas: {len(ordens_relacionadas)}")
+
+        # Coleta todos os status das ordens relacionadas
+        status_list = [
+            ordem.status_atual.lower() if ordem.status_atual else ''
+            for ordem in ordens_relacionadas
+        ]
+
+        print(f"Status coletados: {status_list}")
+
+        # Busca todas as peças da ordem de solda principal
+        todas_pecas_solda = ordem_solda.ordem_pecas_solda.all()
+        ordem_pecas_solda = todas_pecas_solda.first()
+
+        # Pega a qtd_planejada da ordem principal (não soma)
+        qtd_planejada = ordem_pecas_solda.qtd_planejada if ordem_pecas_solda else 0
+
+        # Calcula apenas o total de qtd_boa de TODAS as ordens relacionadas
+        qtd_boa_total = 0
+
+        for ordem_rel in ordens_relacionadas:
+            pecas = ordem_rel.ordem_pecas_solda.all()
+            for peca in pecas:
+                qtd_boa_total += peca.qtd_boa if peca.qtd_boa else 0
+
+        print(f"Qtd Planejada: {qtd_planejada}, Qtd Boa Total: {qtd_boa_total}")
+
+        # Calcula o status baseado nas regras de negócio (analisando TODAS as ordens)
+        
+        # Regra 1: Se pelo menos uma for "iniciada" → "iniciada"
+        if 'iniciada' in status_list:
+            status_calculado = 'iniciada'
+            print("Status calculado: iniciada (pelo menos uma iniciada)")
+        # Regra 2: Se qtd_planejada == qtd_boa_total → "finalizada"
+        elif qtd_planejada > 0 and qtd_planejada == qtd_boa_total:
+            status_calculado = 'finalizada'
+            print("Status calculado: finalizada (qtd planejada == qtd boa)")
+        # Regra 3: Se todas forem "retorno" → "retorno"
+        elif status_list and all(s == 'retorno' for s in status_list):
+            status_calculado = 'retorno'
+            print("Status calculado: retorno (todas retorno)")
+        # Regra 4: Se todas forem "interrompida" → "interrompida"
+        elif status_list and all(s == 'interrompida' for s in status_list):
+            status_calculado = 'interrompida'
+            print("Status calculado: interrompida (todas interrompidas)")
+        # Regra 5: Padrão → "aguardando_iniciar"
+        else:
+            status_calculado = 'aguardando_iniciar'
+            print("Status calculado: aguardando_iniciar (padrão)")
+
+        dados = {
+            'ordem': ordem_solda.id,
+            'maquina': ordem_solda.maquina.nome if ordem_solda.maquina else None,
+            'status': status_calculado,
+            'peca': ordem_pecas_solda.peca if ordem_pecas_solda else None,
+            'qtd_planejada': qtd_planejada,
+            'qtd_boa': qtd_boa_total,
+            'data_carga': ordem_solda.data_carga.strftime('%d/%m/%Y') if ordem_solda.data_carga else None,
+            'total_ordens_relacionadas': len(ordens_relacionadas),  # Info adicional para debug
+        }
+
+        print(dados)
+        
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Dados recebidos com sucesso',
+            'dados': dados,
+        })
     except Ordem.DoesNotExist:
         return JsonResponse(
             {'status': 'error', 'message': 'Ordem não encontrada'}, 

@@ -144,9 +144,19 @@
                     <label for="filtro-data-carga" class="form-label fw-semibold">Data da Carga</label>
                     <input type="date" id="filtro-data-carga" class="form-control">
                 </div>
-
+                <div class="col-md-4 mb-2">
+                    <label for="filtro-status" class="form-label">Status</label>
+                    <select class="form-select" id="filtro-status">
+                        <option class="text-muted" value="">Filtrar por status</option>
+                        <option value="aguardando_iniciar">Aguardando iniciar</option>
+                        <option value="iniciada">Iniciada</option>
+                        <option value="interrompida">Interrompida</option>
+                        <option value="finalizada">Finalizada</option>
+                        <option value="agua_prox_proc">Próximo processo</option>
+                    </select>
+                </div>
                 <!-- Filtro por Setor -->
-                <div class="col-md-5">
+                <div class="col-md-4">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <label class="form-label fw-semibold mb-0">Setor</label>
                         <button type="button" id="limpar-filtro" class="btn btn-outline-secondary btn-sm">
@@ -166,9 +176,13 @@
                 </div>
 
                 <!-- Botão Filtrar -->
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
+                <div class="d-flex align-items-end justify-content-between">
+                    <button type="submit" class="btn btn-primary w-25" style="min-width: 200px;">
                         <i class="fas fa-filter me-1"></i> Filtrar
+                    </button>
+
+                    <button type="button" class="btn btn-primary" id="btnQrCode" data-bs-toggle="modal" data-bs-target="#qrScannerModal">
+                        <i class="bi bi-qr-code-scan"></i> Qr Code
                     </button>
                 </div>
             </div>
@@ -213,6 +227,28 @@
         </div>
     </div>
 
+</div>
+
+<!-- Modal do Leitor de QR Code -->
+<div class="modal fade" id="qrScannerModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="qrScannerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="qrScannerModalLabel">Aponte a câmera para o QR Code</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="close-scanner-btn"></button>
+            </div>
+            <div class="modal-body">
+                <div id="qr-reader" class="position-relative">
+                        <div id="qr-reader-scan-line"></div>
+                </div>
+                <div id="zoom-controls" class="mt-3 p-2 bg-light rounded" style="display: none;">
+                    <label for="zoom-slider" class="form-label d-block text-center mb-1">Zoom: <span id="current-zoom-level">2.0</span>x</label>
+                    <input type="range" class="form-range" min="1.0" max="5.0" step="0.5" value="2.0" id="zoom-slider">
+                </div>
+                <div id="qr-reader-results" class="mt-3 text-center"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal de Confirmação para iniciar -->
@@ -520,5 +556,7 @@
 {% block scripts %}
 <script type="module" src="{% static 'js/ordem-criada-montagem.js' %}"></script>
 <script type="module" src="{% static 'js/ordem-fora-sequenciamento.js' %}"></script>
+<script src="https://unpkg.com/html5-qrcode@2.0.9/dist/html5-qrcode.min.js"></script>
+<script src="{% static 'js/qr-code-montagem.js' %}"></script>
 {% endblock %}
 

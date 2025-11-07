@@ -158,13 +158,13 @@ function buscarItensInspecionados(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                     <p>Inspeção #${item.id}</p>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
-                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
+                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}<br>
                     </p>
                     <hr>
                     <div class="d-flex justify-content-between">
@@ -239,4 +239,13 @@ function buscarItensInspecionados(pagina) {
     }).catch((error) => {
         console.error(error);
     });
+}
+
+function pegarCodigoPeca(peca){
+    if (peca.includes("-")) {
+        // Se a peça contém um hífen, divide a string e retorna a parte antes do hífen
+        const partes = peca.split("-");
+        return partes[0].trim(); // Retorna a parte antes do hífen
+    }
+    return peca; // Se não houver hífen, retorna a peça completa
 }

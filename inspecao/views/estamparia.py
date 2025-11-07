@@ -106,6 +106,12 @@ def inspecionar_estamparia(request):
             if request.POST.get("numPecaDefeituosa", None)
             else 0
         )
+        # Definindo a data de inspeção manualmente
+        if dataInspecao == datetime.now().date().isoformat():
+            dataInspecao = datetime.now()
+        else:
+            data_ontem = datetime.now() - timedelta(days=1)
+            dataInspecao = data_ontem.replace(hour=20, minute=0, second=0, microsecond=0)
 
         # Coletar causas de peças mortas (JSON convertido para lista)
         causasPecaMorta_raw = request.POST.get("causasPecaMorta")
@@ -146,6 +152,10 @@ def inspecionar_estamparia(request):
                 conformidade=conformidade,
                 nao_conformidade=nao_conformidade,
             )
+
+            new_dados_execucao_inspecao.data_execucao = dataInspecao
+
+            new_dados_execucao_inspecao.save()
 
             # model: InfoAdicionalEstamparia
             dados_exec_inspecao = get_object_or_404(

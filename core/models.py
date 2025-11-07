@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.timezone import now
 from django.db.models import Max
 from django.contrib.auth.models import User
+from storages.backends.s3boto3 import S3Boto3Storage
 
 from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao,Maquina,Pecas,Setor
 
@@ -107,6 +108,11 @@ class Ordem(models.Model):
 
     #Tempo estimado da ordem (apenas para corte)
     tempo_estimado = models.CharField(max_length=20, blank=True, null=True)  # Exemplo: "00:30:00" (HH:MM:SS)
+    
+    # Campo para armazenar o QR code gerado
+    qrcode = models.ImageField(upload_to='qrcodes/', storage=S3Boto3Storage(), blank=True, null=True)
+
+    caminho_relativo_qr_code = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         constraints = [
@@ -148,7 +154,9 @@ class Ordem(models.Model):
             )['ordem__max'] or 0  # Se não houver ordens, começa do 0
             self.ordem = ultimo_numero + 1
 
+
         super().save(*args, **kwargs)  # Salva normalmente
+
 
     def __str__(self):
         return f"Ordem {self.ordem} - {self.maquina}"

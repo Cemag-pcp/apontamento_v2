@@ -617,10 +617,11 @@ def envio_reinspecao_pintura(request):
                 # Busca as imagens do campo de conformidade
                 imagens_conformidade = request.FILES.getlist('imagens_conformidade')
 
-                ArquivoConformidade.objects.create(
-                    dados_execucao=dados_execucao,
-                    arquivo=imagens_conformidade[0]
-                )
+                if imagens_conformidade:
+                    ArquivoConformidade.objects.create(
+                        dados_execucao=dados_execucao,
+                        arquivo=imagens_conformidade[0]
+                    )
 
             # Em ambos os cenários, marcamos a reinspeção como concluída
             reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()

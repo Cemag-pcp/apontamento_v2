@@ -1,6 +1,48 @@
 import { getCookie } from './criar_caixa.js';
+import { resetFormCriarPacote } from './criar_pacote.js';
+import { atualizarSlotAvancar } from './kanbans.js';
+
+// helper pra mapear a cor (pt-BR) -> classe do Bootstrap
+function classeCorBadge(cor) {
+  const c = String(cor || '').toLowerCase();
+  switch (c) {
+    case 'amarelo':  return 'bg-warning text-dark';
+    case 'laranja':  return 'bg-orange text-dark'; // se não tiver, usa 'bg-warning'
+    case 'cinza':    return 'bg-secondary';
+    case 'azul':     return 'bg-primary';
+    case 'verde':    return 'bg-success';
+    case 'preto':    return 'bg-dark';
+    case 'branco':   return 'bg-light text-dark';
+    case 'vermelho': return 'bg-danger';
+    default:         return 'bg-secondary';
+  }
+}
+
+// se quiser garantir classe para laranja no Bootstrap 5 padrão:
+(function ensureOrange() {
+  const css = `.bg-orange{background-color:#fd7e14!important;color:#212529!important}`;
+  if (!document.getElementById('css-orange-badge')) {
+    const s = document.createElement('style');
+    s.id = 'css-orange-badge';
+    s.textContent = css;
+    document.head.appendChild(s);
+  }
+})();
 
 export async function popularPacotesDaCarga(cargaId) {
+
+  const Toast = Swal.mixin({
+    toast: true,
+    position: "bottom-end",
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true,
+    didOpen: (toast) => {
+    toast.onmouseenter = Swal.stopTimer;
+    toast.onmouseleave = Swal.resumeTimer;
+    }
+  });
+
   const modal = document.getElementById('visualizarPacote');
   const modalBody = modal.querySelector('.modal-body');
 
@@ -13,30 +55,123 @@ export async function popularPacotesDaCarga(cargaId) {
   try {
     const response = await fetch(`api/buscar-pacote/${cargaId}/`);
     const data = await response.json();
-    console.log(data);
+
+    // monta a linha das carretas
+    const carretas = Array.isArray(data.carretas) ? data.carretas : [];
+    const carretasChips = carretas.length
+      ? carretas.map(({ carreta, quantidade, cor }) => {
+          const cls = classeCorBadge(cor);
+          const tip = `${cor ?? '—'} • qtd: ${quantidade ?? 0}`;
+          return `
+            <span class="badge rounded-pill ${cls}" 
+                  data-bs-toggle="tooltip" data-bs-placement="top" 
+                  data-bs-title="${tip}">
+              ${carreta} × ${quantidade}
+            </span>`;
+        }).join(' ')
+      : `<span class="text-muted">Sem carretas</span>`;
+
     let infoHTML = `
-      <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-3" id="cabecalhoPacotes">
         <div>
           <strong>Cliente:</strong> ${data.cliente_carga} |
           <strong>Dt. Carga:</strong> ${data.data_carga} |
           <strong>Carga:</strong> ${data.carga}
+          <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+            ${carretasChips}
+          </div>
         </div>
     `;
 
-    // Só adiciona o botão se não estiver despachado
     if (data.status_carga !== 'despachado') {
       infoHTML += `
         <div>
-          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal" id='btnAbrirModalCriarPacote'>
             <i class="fas fa-plus me-2"></i>Criar Pacote
           </button>
         </div>
       `;
+      
     }
 
     infoHTML += `</div>`; // fecha a div de linha
     
     modalBody.innerHTML = infoHTML;
+
+    if (data.status_carga !== 'despachado') {
+      // Busca o botão dentro do escopo do modal, que é mais eficiente
+      const btnAbrirModal = modalBody.querySelector('#btnAbrirModalCriarPacote');
+
+      if (btnAbrirModal) {
+
+        const modoNovoEl = document.getElementById('modoNovo');
+        const modoExistenteEl = document.getElementById('modoExistente');
+        const grupoNovoPacote = document.getElementById('grupoNovoPacote');
+        const grupoPacoteExistente = document.getElementById('grupoPacoteExistente');
+        const nomePacoteEl = document.getElementById('nomePacote');
+        const pacoteExistenteEl = document.getElementById('pacoteExistente');
+        const idCargaPacoteEl = document.getElementById('idCargaPacote');
+
+        // Alterna entre "novo" e "existente"
+        function toggleModoPacote(modo) {
+          const usarExistente = (modo === 'existente');
+          grupoNovoPacote.classList.toggle('d-none', usarExistente);
+          grupoPacoteExistente.classList.toggle('d-none', !usarExistente);
+          nomePacoteEl.required = !usarExistente;
+          if (usarExistente) {
+            nomePacoteEl.value = '';
+          } else {
+            pacoteExistenteEl.value = '';
+          }
+        }
+
+        modoNovoEl.addEventListener('change', () => toggleModoPacote('novo'));
+        modoExistenteEl.addEventListener('change', () => toggleModoPacote('existente'));
+
+        // Carrega pacotes existentes da carga
+        async function carregarPacotesExistentes(cargaId) {
+          const resp = await fetch(`api/listar-pacotes-criados/${cargaId}/`, {
+            headers: { 'Accept': 'application/json' }
+          });
+          if (!resp.ok) throw new Error(await resp.text());
+          const data = await resp.json();
+          
+          const lista = Array.isArray(data.pacotes) ? data.pacotes : [];
+
+          // popula o select
+          pacoteExistenteEl.innerHTML = `<option value="">Selecione...</option>` + 
+            lista.map(p => `<option value="${p.id_pacote}">${p.nome_pacote}</option>`).join('');
+        }
+
+        // No botão que abre o modal:
+        const btnAbrirModal = modalBody.querySelector('#btnAbrirModalCriarPacote');
+        if (btnAbrirModal) {
+          btnAbrirModal.addEventListener('click', async function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            resetFormCriarPacote(false, false);
+
+            // defina o modo
+            modoNovoEl.checked = true;
+            toggleModoPacote('novo');
+
+            // pegue/defina cargaId antes de usar
+            // const cargaId = this.getAttribute('data-carga-id') || (window.cargaAtualId ?? '');
+            console.log(cargaId);
+            if (cargaId) {
+              try {
+                console.log(cargaId);
+                await carregarPacotesExistentes(cargaId);
+              } catch (e) {
+                console.warn('Falha ao carregar pacotes existentes:', e);
+              }
+            }
+
+          });
+        }
+      }
+    }
 
     if (!data.pacotes || data.pacotes.length === 0) {
       modalBody.appendChild(document.createElement('hr'));
@@ -179,7 +314,7 @@ export async function popularPacotesDaCarga(cargaId) {
           info.className = 'me-2';
           info.innerHTML = `
             <div><strong>${item.codigo_peca}</strong> - ${item.descricao || ''}</div>
-            <small class="text-muted">Cor: ${item.cor || 'N/A'} | Qtde: ${item.quantidade}</small>
+            <small class="text-muted">Qtde: ${item.quantidade}</small>
           `;
 
           // Botão "Alterar pacote"
@@ -235,7 +370,7 @@ export async function popularPacotesDaCarga(cargaId) {
           li.appendChild(info);
           
           // mesma regra de visibilidade do botão Confirmar (apenas em "apontamento" e pacote != ok)
-          if (data.status_carga === 'apontamento' && pacote.status_expedicao !== 'ok') {
+          if (data.status_carga === 'planejamento' && pacote.status_expedicao !== 'ok') {
             li.appendChild(btnAlterar);
           } else if (data.status_carga === 'verificacao' && pacote.status_qualidade !== 'ok') {
             li.appendChild(btnAlterar);
@@ -278,16 +413,6 @@ export async function popularPacotesDaCarga(cargaId) {
 
       const footer = document.createElement('div');
       footer.className = 'card-footer d-flex flex-column gap-2';
-
-      // adiciona botões conforme status
-      if (data.status_carga === 'apontamento' && pacote.status_expedicao !== 'ok') {
-        footer.appendChild(btnConfirmarExpedicao);
-      } else if (data.status_carga === 'apontamento' && pacote.status_expedicao === 'ok') {
-        const span = document.createElement('span');
-        span.className = 'text-success fw-bold text-center';
-        span.textContent = 'Pacote confirmado';
-        footer.appendChild(span);
-      }
 
       // Botão de adicionar foto
       const btnFoto = document.createElement('button');
@@ -356,7 +481,14 @@ export async function popularPacotesDaCarga(cargaId) {
             })
             .then(res => res.json())
             .then(data => {
-              alert('Foto salva com sucesso!');
+              Toast.fire({
+                  icon: "success",
+                  title: "Foto salva com sucesso."
+              });
+
+              console.log(data.info_add.carga_id, data.info_add.etapa, data.info_add.todos_pacotes_tem_foto_verificacao);
+
+              atualizarSlotAvancar(data.info_add.carga_id, data.info_add.todos_pacotes_tem_foto_verificacao, data.info_add.etapa);
 
               btn.innerHTML = 'Confirmar';
               btn.disabled = false;
@@ -390,7 +522,7 @@ export async function popularPacotesDaCarga(cargaId) {
       };
 
       const btnGroup = document.createElement('div');
-      btnGroup.className = 'd-flex gap-2 justify-content-between';
+      btnGroup.className = 'd-flex gap-2';
 
       if (data.status_carga === 'verificacao' && pacote.status_qualidade !== 'ok') {
 
@@ -408,14 +540,14 @@ export async function popularPacotesDaCarga(cargaId) {
         span.className = 'text-success fw-bold text-center ms-2';
         span.textContent = 'Pacote confirmado';
 
+        btnGroup.appendChild(span);
         btnGroup.appendChild(btnPrint);
         btnGroup.appendChild(btnFoto);
-        btnGroup.appendChild(span);   // ✅ span junto com os botões
 
         footer.appendChild(btnGroup);
       }
 
-      if (data.status_carga === 'despachado' && pacote.status_qualidade !== 'ok') {
+      if (data.status_carga === 'despachado' && pacote.status_qualidade === 'ok') {
 
         // Confirmar Qualidade
         // btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm flex-grow-1';

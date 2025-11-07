@@ -1,7 +1,7 @@
 from django.http import JsonResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
-from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q, Max
+from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q, IntegerField
 from django.db import transaction, models, IntegrityError, connection
 from django.shortcuts import get_object_or_404
 from django.db.models.functions import Coalesce
@@ -432,7 +432,8 @@ def ordens_criadas(request):
     # Monta os filtros para a model Ordem
     filtros_ordem = {
         'data_carga': data_carga,
-        'grupo_maquina': 'montagem'
+        'grupo_maquina': 'montagem',
+        'excluida': False,
     }
     if maquina_param:
         maquina = get_object_or_404(Maquina, pk=maquina_param)
@@ -442,17 +443,30 @@ def ordens_criadas(request):
     if data_programacao:
         filtros_ordem['data_programacao'] = data_programacao
 
-    # Recupera os IDs das ordens que atendem aos filtros
+    # Máquinas a excluir da contagem / retorno
+    maquinas_excluidas = [
+        'PLAT. TANQUE. CAÇAM. 2',
+        'QUALIDADE',
+        'FORJARIA',
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'ROÇADEIRA'
+    ]
+
+    # Recupera os IDs das ordens que atendem aos filtros (ainda sem excluir máquinas, pois o filtro de máquina pode vir por parâmetro)
     ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
 
-    # Consulta na PecasOrdem filtrando pelas ordens identificadas,
-    # trazendo alguns campos da Ordem (usando a notação "ordem__<campo>"),
-    # e agrupando para calcular as somas e o saldo.
-    pecas_ordem_agg = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).values(
+    # Consulta em PecasOrdem filtrando pelas ordens e EXCLUINDO as máquinas definidas em maquinas_excluidas
+    pecas_ordem_queryset = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).exclude(
+        ordem__maquina__nome__in=maquinas_excluidas
+    )
+
+    pecas_ordem_agg = pecas_ordem_queryset.values(
         'ordem',                    # id da ordem (chave para o agrupamento)
         'ordem__data_carga',        # data da carga da ordem
         'ordem__data_programacao',  # data da programação da ordem
-        'ordem__maquina__nome',     # nome da máquina (ajuste se necessário)
+        'ordem__maquina__nome',     # nome da máquina
         'ordem__status_atual',      # status atual da ordem
         'peca',                     # nome da peça
     ).annotate(
@@ -468,9 +482,7 @@ def ordens_criadas(request):
         )
     )
 
-    # datas_programacao = PecasOrdem.objects.filter(ordem_id__in=ordem_ids).values_list(
-    #     'ordem__data_programacao', flat=True
-    # ).distinct()
+    # Recalcula datas apenas com as ordens consideradas após exclusões
     datas_programacao = set(item['ordem__data_programacao'] for item in pecas_ordem_agg)
     data_programacao = next(iter(datas_programacao), None)
     data_formatada = data_programacao.strftime('%d/%m/%Y') if data_programacao else None
@@ -479,26 +491,17 @@ def ordens_criadas(request):
     data_carga = next(iter(datas_carga), None)
     data_formatada_carga = data_carga if data_carga else None
 
-    # Máquinas a excluir da contagem
-    maquinas_excluidas = [
-        'PLAT. TANQUE. CAÇAM. 2',
-        'QUALIDADE',
-        'FORJARIA',
-        'ESTAMPARIA',
-        'Carpintaria',
-        'FEIXE DE MOLAS',
-        'SERRALHERIA',
-        'ROÇADEIRA'
-    ]
-
-    maquinas = Ordem.objects.filter(id__in=ordem_ids).exclude(maquina__nome__in=maquinas_excluidas).values('maquina__nome','maquina__id').distinct()
+    # Lista de máquinas (apenas das ordens retornadas)
+    maquinas = Ordem.objects.filter(id__in=ordem_ids).exclude(
+        maquina__nome__in=maquinas_excluidas
+    ).values('maquina__nome', 'maquina__id').distinct()
 
     return JsonResponse({
-                            "ordens": list(pecas_ordem_agg),
-                            "maquinas":list(maquinas),
-                            "data_programacao":data_formatada,
-                            "data_formatada_carga": data_formatada_carga
-                        })
+        "ordens": list(pecas_ordem_agg),
+        "maquinas": list(maquinas),
+        "data_programacao": data_formatada,
+        "data_formatada_carga": data_formatada_carga
+    })
 
 def verificar_qt_restante(request):
 
@@ -541,10 +544,17 @@ def ordens_iniciadas(request):
 
     maquina_param = request.GET.get('setor', '')
 
+    ordem_id = request.GET.get('ordem_id', None)
+
     filtros_ordem = {
         'grupo_maquina': 'montagem',
-        'status_atual': 'iniciada'
+        'status_atual': 'iniciada',
+        'excluida': False,
     }
+
+    # Adicionar chave id caso exista o parametro ordem_id
+    if ordem_id:
+        filtros_ordem['id'] = ordem_id # ordem id --> core_ordem
 
     if maquina_param:
         maquina = get_object_or_404(Maquina, pk=maquina_param)
@@ -607,7 +617,8 @@ def ordens_interrompidas(request):
 
     filtros_ordem = {
         'grupo_maquina': 'montagem',
-        'status_atual': 'interrompida'
+        'status_atual': 'interrompida',
+        'excluida': False,
     }
 
     if maquina_param:
@@ -1083,6 +1094,56 @@ def retornar_processo(request):
             {'status': 'error', 'message': 'Ordem não encontrada'}, 
             status=404
         )
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': str(e)}, 
+            status=500
+        )
+
+def apontamento_qrcode(request):
+    return render(request, 'apontamento_montagem/apontamento_qrcode.html')
+
+def api_apontamento_qrcode(request):
+    if request.method != 'GET':
+        return JsonResponse(
+            {'status': 'error', 'message': 'Método não permitido'}, 
+            status=405
+        )
+
+    try:
+        ordem_id = request.GET.get('ordem_id')
+
+        ordem = Ordem.objects.get(pk=ordem_id)
+        ordem_pecas = ordem.ordem_pecas_montagem.all() # Pega todas as ordem peças relacionadas à ordem
+        total_feito = ordem_pecas.aggregate(
+            total_feito=Coalesce(Sum('qtd_boa', output_field=IntegerField()), Value(0, output_field=IntegerField()))
+        )['total_feito'] or 0 # Soma a quantidade boa feita, ou 0 se não houver
+
+        ordem_peca = ordem_pecas.first()  # Pega a primeira peça da ordem
+        
+
+        dados = {
+            'ordem': ordem.ordem if ordem else None,
+            'maquina': ordem.maquina.nome if ordem and ordem.maquina else None,
+            'status': ordem.status_atual if ordem else None,
+            'peca': ordem_peca.peca if ordem else None,
+            'qtd_planejada': ordem_peca.qtd_planejada if ordem else 0,
+            'qtd_boa': total_feito if ordem else 0,
+            'data_carga': ordem.data_carga.strftime('%d/%m/%Y') if ordem and ordem.data_carga else None,
+        }
+        
+
+        return JsonResponse({
+            'status': 'success', 
+            'message': 'Dados recebidos com sucesso',
+            'dados': dados,
+        })
+    except Ordem.DoesNotExist:
+        return JsonResponse(
+            {'status': 'error', 'message': 'Ordem não encontrada'}, 
+            status=404
+        )
+    
     except Exception as e:
         return JsonResponse(
             {'status': 'error', 'message': str(e)}, 

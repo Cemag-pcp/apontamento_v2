@@ -269,10 +269,13 @@
                 <div class="mb-2 d-flex gap-2">
                     <select class="form-select" name="filtro-processo" id="filtro-processo">
                         <option class="text-muted" value="">Qual seu processo?</option>
-                        <option value="52">Furar</option>
+                        <!-- <option value="52">Furar</option>
                         <option value="51">Chanfrar</option>
                         <option value="50">Tornear</option>
-                        <option value="56">Centro de usinagem</option>
+                        <option value="56">Centro de usinagem</option> -->
+                        {% for processo in processos %}
+                            <option value="{{processo.id}}">{{processo.nome}}</option>
+                        {% endfor %}
                     </select>
                     <button class="btn btn-primary" id="btn-filtrar-processo">Filtrar</button>
                 </div>
@@ -613,6 +616,26 @@
                     </div>
                 </form>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalRetornarProcessoIniciado" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalExcluirLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalExcluirRetorno"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formRetornarProcessoIniciado">
+                <div class="modal-body">
+                    <p id="text-confirm"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger" id="retornar-aguardando-iniciar">Retornar</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

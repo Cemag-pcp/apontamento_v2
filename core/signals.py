@@ -18,6 +18,7 @@ def save_user_profile(sender, instance, **kwargs):
     if hasattr(instance, "profile"):
         instance.profile.save()
 
+
 @receiver(post_save, sender=Notificacao)
 def enviar_notificacao_em_tempo_real(sender, instance, created, **kwargs):
     """

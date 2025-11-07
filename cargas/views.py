@@ -2,14 +2,15 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Now
 from django.db import models
-from django.db.models import Sum,Q,Prefetch,Count,OuterRef, Subquery, F, Value, Avg
+from django.db.models import Sum,Q,CharField,Count,OuterRef, Subquery, F, Value, Avg, Max
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
+from django.db.models import Func, FloatField, ExpressionWrapper
 
 from apontamento_pintura.models import PecasOrdem as POPintura
 from apontamento_montagem.models import PecasOrdem as POMontagem
@@ -18,7 +19,11 @@ from apontamento_solda.models import PecasOrdem as POSolda
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
-from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura, imprimir_ordens_pcp_qualidade
+from apontamento_pintura.models import CambaoPecas, Retrabalho
+from apontamento_pintura.views import ordens_criadas as ordens_criadas_pintura
+from apontamento_montagem.views import ordens_criadas as ordens_criadas_montagem
+from inspecao.models import DadosExecucaoInspecao, CausasNaoConformidade, Inspecao
 
 import pandas as pd
 import os
@@ -29,6 +34,7 @@ import requests
 import json
 from datetime import timedelta
 import django
+from collections import defaultdict
 
 django.setup()
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
@@ -96,7 +102,7 @@ def gerar_arquivos_sequenciamento(request):
 def gerar_dados_sequenciamento(request):
 
     """
-    Chama a API 'criar_ordem'.
+        Chama a API 'criar_ordem'.
     """
 
     data_inicio = request.GET.get('data_inicio')
@@ -143,7 +149,7 @@ def gerar_dados_sequenciamento(request):
         })
 
     if setor.lower() == 'montagem':
-        resultado = processar_ordens_montagem(ordens, grupo_maquina=setor.lower())
+        resultado = processar_ordens_montagem(request, ordens, grupo_maquina=setor.lower())
     elif setor.lower() == 'pintura':
         resultado = processar_ordens_pintura(ordens, grupo_maquina=setor.lower())
     else:
@@ -296,7 +302,7 @@ def atualizar_ordem_existente(request):
 
     # Processar novas ordens
     if setor == 'montagem':
-        resultado = processar_ordens_montagem(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
+        resultado = processar_ordens_montagem(request, ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
     elif setor == 'pintura':
         resultado = processar_ordens_pintura(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
     else:
@@ -878,3 +884,495 @@ def excluir_ordens_dia_setor(request):
         "message": f"{total_excluidas} ordens excluídas com sucesso.",
         "ordens_bloqueadas": list(ordens_com_apontamentos.values("id", "data_carga", "grupo_maquina")),
     })    
+
+@require_GET
+def enviar_etiqueta_impressora(request):
+    data_carga = request.GET.get('data_carga')
+
+    payload_status = imprimir_ordens_montagem(data_carga)
+    # aceita tanto (dict, status) quanto apenas dict
+    if isinstance(payload_status, tuple):
+        payload, status = payload_status
+    else:
+        payload, status = payload_status, 200
+
+    return JsonResponse(payload, status=status)
+
+@csrf_exempt
+@require_POST
+def enviar_etiqueta_impressora_pintura(request):
+    data = json.loads(request.body)
+
+    data_carga = data.get('data_inicio')
+    carga = data.get('carga')
+    celulas = data.get('celulas', [])
+
+    itens = gerar_sequenciamento(data_carga,data_carga,'pintura',carga)
+
+    colunas_grupo = [
+        "Código", "Peca", "Célula", "Datas", 
+        "Recurso_cor", "cor", "Carga", "Etapa5", "Etapa6"
+    ]
+
+    itens_agrupado = (
+        itens.groupby(colunas_grupo, as_index=False)["Qtde_total"]
+        .sum()
+    )
+
+    # filtrando celulas caso esteja marcada
+    if celulas:
+        itens_agrupado = itens_agrupado[itens_agrupado['Célula'].isin(celulas)]
+
+    # reitrando celulas
+    itens_agrupado = itens_agrupado[
+        ~itens_agrupado['Célula'].isin(['CONJ INTERMED'])
+    ]
+    
+    substituicoes = {
+        'PLAT.': 'PL.',
+        'TANQUE.': 'TA.',
+        'CAÇAM.': 'CA.',
+        'IÇAMENTO': 'ICAMENTO'
+    }
+
+    # filtrando apenas células específicas
+    # itens_agrupado = itens_agrupado[
+    #     itens_agrupado['Célula'].isin(['CHASSI'])
+    # ]
+
+    # filtrando apenas células específicas
+    # itens_agrupado = itens_agrupado[
+    #     (itens_agrupado['Código'].isin(['460382'])) &
+    #     (itens_agrupado['cor'] == 'Amarelo')
+    # ]
+
+    # Aplica as substituições
+    itens_agrupado['Célula'] = itens_agrupado['Célula'].replace(substituicoes, regex=True)
+
+    # payload_status = imprimir_ordens_pintura(data_carga, carga, itens_agrupado)
+    # print(itens_agrupado)
+    print(itens_agrupado)
+    payload = imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupado)
+
+    return JsonResponse({"payload": "payload"})
+    # return JsonResponse({"payload": payload})
+    
+@require_GET
+def enviar_etiqueta_unitaria_impressora(request):
+    ordem_id = request.GET.get('ordem_id')
+
+    payload_status = imprimir_ordens_montagem_unitaria(ordem_id)
+    # aceita tanto (dict, status) quanto apenas dict
+    if isinstance(payload_status, tuple):
+        payload, status = payload_status
+    else:
+        payload, status = payload_status, 200
+
+    return JsonResponse(payload, status=status)
+
+# API para consulta no google sheets
+class AtTimeZone(Func):
+    function = ''
+    template = "%(expressions)s AT TIME ZONE '%(timezone)s'"
+    output_field = CharField()
+
+    def __init__(self, expression, timezone, **extra):
+        super().__init__(expression, timezone=timezone, **extra)
+
+class ToChar(Func):
+    function = 'to_char'
+    output_field = CharField()
+
+def ordens_em_andamento_finalizada_pintura(request):
+    """"
+        traz as ordens aguardando inicio, em andamento e finalizadas na pintura
+    """
+    resultado = ordens_criadas_pintura(request)
+
+    resultado_json_ordens_criadas = json.loads(resultado.content)
+
+    ordens_aguardando_iniciar = []
+
+    mes_atual = datetime.now().date().month
+    ano_atual = datetime.now().date().year
+
+    mes_prev = mes_atual -1 if mes_atual > 1 else 12
+    mes_prox = mes_atual +1 if mes_atual <12 else 1
+
+    meses = [mes_prev, mes_atual, mes_prox]
+
+    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+    for ordem in resultado_json_ordens_criadas['ordens']:
+        data_carga_datetime = datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
+        if data_carga_datetime.month not in meses:
+            continue
+
+        #adicionar que a ordem aguardando_iniciar criando do mês atual
+        ordens_aguardando_iniciar.append({
+            'status': ordem['status_atual'],
+            'quantidade_pendurada': 0,
+            'id_ordem': ordem['id'],
+            'ordem': ordem['ordem'],
+            'peca': ordem['peca_codigo'],
+            'qtd_planejada': ordem['peca_qt_planejada'],
+            'cor': ordem['cor'],
+            'data_criacao_fmt': formatar_data_str(ordem['data_criacao']) if ordem['data_criacao'] else '',
+            'data_carga_fmt': formatar_data_str(ordem['data_carga']) if ordem['data_carga'] else '',
+            'data_pendura_fmt': '',
+            'data_derruba_fmt': '',
+            'tipo': '',
+            'cambao_nome': '',
+            'data_ultima_atualizacao': data_hora_atual,
+        })
+
+
+    qs = (
+        CambaoPecas.objects
+        .filter(
+            peca_ordem__ordem__grupo_maquina='pintura',
+            status__isnull=False,
+        )
+        .select_related('peca_ordem', 'peca_ordem__ordem', 'cambao')
+        .annotate(
+            id_ordem=F('peca_ordem__ordem__id'),
+            ordem=F('peca_ordem__ordem__ordem'),
+            peca=F('peca_ordem__peca'),
+            qtd_planejada=F('peca_ordem__qtd_planejada'),
+            cor=F('peca_ordem__ordem__cor'),
+
+            # use nomes sem colidir com fields reais
+            data_criacao_fmt=ToChar(F('peca_ordem__ordem__data_criacao'), Value('DD/MM/YYYY')),
+            data_carga_fmt=ToChar(F('peca_ordem__ordem__data_carga'), Value('DD/MM/YYYY')),
+            data_pendura_fmt=ToChar(
+                AtTimeZone(F('data_pendura'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+            data_derruba_fmt=ToChar(
+                AtTimeZone(F('data_fim'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+
+            tipo=F('cambao__tipo'),
+            cambao_nome=F('cambao__nome'),
+            data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()) # já vem string
+        )
+        .filter(peca_ordem__ordem__data_carga__month__in=meses,
+                peca_ordem__ordem__data_carga__year=ano_atual)
+        .values(
+            'id_ordem',
+            'ordem',
+            'peca',
+            'qtd_planejada',
+            'cor',
+            'status',
+            'quantidade_pendurada',
+
+            # valores formatados
+            'data_criacao_fmt',
+            'data_carga_fmt',
+            'data_pendura_fmt',
+            'data_derruba_fmt',
+            
+            'tipo',
+            'cambao_nome',
+            'data_ultima_atualizacao',
+        )
+        .order_by('-data_fim')
+    )
+
+    data = list(qs)[::-1]
+
+    resultado_final_concat = ordens_aguardando_iniciar + data
+
+    resultado_final_concat = sorted(
+        resultado_final_concat,
+        key=lambda x: parse_data_fmt(x.get('data_derruba_fmt', ''))
+    )
+
+    return JsonResponse(resultado_final_concat, safe=False)
+
+def verificar_cargas_geradas(request):
+
+    qs = (
+        Ordem.objects
+        .filter(grupo_maquina__in=['pintura', 'montagem', 'solda'])
+        .order_by('data_carga', 'grupo_maquina', 'data_criacao')  # precisa começar pelos do distinct
+        .distinct('data_carga', 'grupo_maquina')                  # DISTINCT ON (data_carga, grupo_maquina)
+        .annotate(
+            data_criacao_fmt=ToChar(F('data_criacao'), Value('DD/MM/YYYY')),
+            data_carga_fmt=ToChar(F('data_carga'), Value('DD/MM/YYYY'))
+
+        )
+        .values('data_criacao_fmt', 'data_carga_fmt', 'grupo_maquina')
+    )
+    return JsonResponse(list(qs), safe=False)
+
+def formatar_data_str(data_str):
+    """
+    Recebe uma string de data (ex: '2025-10-07' ou '2025-10-07T00:00:00')
+    e retorna no formato 'DD/MM/YYYY'.
+    Se não conseguir converter, retorna a string original ou vazio.
+    """
+    if not data_str:
+        return ''
+    try:
+        # Trata ISO completo ou só data
+        if 'T' in data_str:
+            data_obj = datetime.strptime(data_str[:10], "%Y-%m-%d")
+        else:
+            data_obj = datetime.strptime(data_str, "%Y-%m-%d")
+        return data_obj.strftime('%d/%m/%Y')
+    except Exception:
+        return data_str
+
+def parse_data_fmt(data_str):
+    try:
+        return datetime.strptime(data_str, "%d/%m/%Y")
+    except Exception:
+        return datetime.min  # Garante que datas inválidas fiquem no início
+
+def ordens_status_montagem(request):
+    """"
+        traz as ordens aguardando inicio, em andamento e finalizadas na montagem
+    """
+
+    # Monta os filtros para a model Ordem
+    filtros_ordem = {
+        'grupo_maquina': 'montagem'
+    }
+
+    # Máquinas a excluir da contagem / retorno
+    maquinas_excluidas = [
+        'PLAT. TANQUE. CAÇAM. 2',
+        'QUALIDADE',
+        'FORJARIA',
+        'ESTAMPARIA',
+        'Carpintaria',
+        'FEIXE DE MOLAS',
+        'ROÇADEIRA'
+    ]
+
+    # Recupera os IDs das ordens que atendem aos filtros (ainda sem excluir máquinas, pois o filtro de máquina pode vir por parâmetro)
+    ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
+
+    # Consulta em PecasOrdem filtrando pelas ordens e EXCLUINDO as máquinas definidas em maquinas_excluidas
+    pecas_ordem_queryset = POMontagem.objects.filter(ordem_id__in=ordem_ids).exclude(
+        ordem__maquina__nome__in=maquinas_excluidas
+    )
+
+    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+    pecas_ordem_agg = pecas_ordem_queryset.values(
+        'ordem',                            # id da ordem (chave para o agrupamento)
+        'peca',                              # nome da peça
+        'ordem__maquina__nome',              # nome da máquina   
+        'ordem__status_atual',               # status atual da ordem
+    ).annotate(
+        total_boa=Coalesce(
+            Sum('qtd_boa'), Value(0.0, output_field=FloatField())
+        ),
+        total_planejada=Coalesce(
+            Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
+        ),
+        data_ultima_atualizacao_ordem=ToChar(AtTimeZone(Max('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),Value('DD/MM/YYYY HH24:MI:SS')),
+        data_carga_fmt=ToChar(Max('ordem__data_carga'), Value('DD/MM/YYYY')),                                       
+        data_ultima_chamada=Value(data_hora_atual, output_field=CharField()),
+
+    ).annotate(
+        restante=ExpressionWrapper(
+            F('total_planejada') - F('total_boa'), output_field=FloatField()
+        )
+    ).order_by('-ordem__ultima_atualizacao')[:1000]
+
+    resultado_final = list(pecas_ordem_agg)
+
+
+    return JsonResponse(resultado_final, safe=False)
+
+def ordens_status_solda(request):
+    """"
+        traz as ordens aguardando inicio, em andamento e finalizadas na solda
+    """
+     
+    # Monta os filtros para a model Ordem
+    filtros_ordem = {
+        'grupo_maquina': 'solda',
+        'ordem_pai__isnull': True
+    }
+
+    # Recupera os IDs das ordens que atendem aos filtros
+    ordem_ids = Ordem.objects.filter(**filtros_ordem).values_list('id', flat=True)
+
+    # Consulta na PecasOrdem filtrando pelas ordens identificadas,
+    # trazendo alguns campos da Ordem (usando a notação "ordem__<campo>"),
+    # e agrupando para calcular as somas e o saldo.
+
+    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    
+    pecas_ordem_queryset = POSolda.objects.filter(ordem_id__in=ordem_ids)
+
+    pecas_ordem_agg = pecas_ordem_queryset.values(
+        'ordem',                            # id da ordem (chave para o agrupamento)
+        'peca',                              # nome da peça
+        'ordem__maquina__nome',              # nome da máquina   
+        'ordem__status_atual',               # status atual da ordem
+    ).annotate(
+        total_boa=Coalesce(
+            Sum('qtd_boa'), Value(0.0, output_field=FloatField())
+        ),
+        total_planejada=Coalesce(
+            Avg('qtd_planejada'), Value(0.0, output_field=FloatField())
+        ),
+        data_ultima_atualizacao_ordem=ToChar(AtTimeZone(Max('ordem__ultima_atualizacao'), 'America/Sao_Paulo'),Value('DD/MM/YYYY HH24:MI:SS')),
+        data_carga_fmt=ToChar(Max('ordem__data_carga'), Value('DD/MM/YYYY')),                                      
+        data_ultima_chamada=Value(data_hora_atual, output_field=CharField()),
+
+    ).annotate(
+        restante=ExpressionWrapper(
+            F('total_planejada') - F('total_boa'), output_field=FloatField()
+        )
+    ).order_by('-ordem__ultima_atualizacao')[:1000]
+
+    resultado_final = list(pecas_ordem_agg)
+
+
+    return JsonResponse(resultado_final, safe=False)
+
+def pecas_status_retrabalho_pintura(request):
+    """
+        Puxar as ordens que estão em retrabalho na pintura, aguardando retrabalho, aguardando inspeção e retrabalhados
+    """
+    # Puxar as ordens que estão em retrabalho ou aguardando retrabalho na pintura
+
+    mes_atual = datetime.now().date().month
+    ano_atual = datetime.now().date().year
+
+    mes_prev = mes_atual -1 if mes_atual > 1 else 12
+    mes_prox = mes_atual +1 if mes_atual <12 else 1
+
+    meses = [mes_prev, mes_atual, mes_prox]
+
+    meses = [mes_prev, mes_atual, mes_prox]
+
+    retrabalho_qs = (
+        Retrabalho.objects
+        .annotate(
+            dados_execucao_inspecao=Subquery(
+                DadosExecucaoInspecao.objects
+                .filter(inspecao=OuterRef('reinspecao__inspecao__id'))
+                .order_by('-id')  # ou '-num_execucao' conforme seu modelo
+                .values_list('id', flat=True)[:1]
+            ),
+            data_carga_fmt=ToChar(F('reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga'), Value('DD/MM/YYYY')),
+            data_inicio_fmt=ToChar(
+                AtTimeZone(F('data_inicio'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+            data_fim_fmt=ToChar(
+                AtTimeZone(F('data_fim'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+        )
+        .filter(reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga__month__in=meses,
+                reinspecao__inspecao__pecas_ordem_pintura__ordem__data_carga__year=ano_atual
+        )
+        .values(
+            'id',
+            'status',
+            'data_inicio_fmt',
+            'data_fim_fmt',
+
+            'reinspecao__inspecao__pecas_ordem_pintura__ordem__id',
+            'reinspecao__inspecao__pecas_ordem_pintura__ordem__ordem',
+            'data_carga_fmt',
+            'reinspecao__inspecao__pecas_ordem_pintura__peca',
+        
+            'reinspecao__inspecao__id',
+            'reinspecao__id',
+            'dados_execucao_inspecao',
+
+        )
+    )
+
+    retr_list = list(retrabalho_qs)
+
+    # 2) buscar causas para os dados_execucao_ids coletados (uma query)
+    dados_ids = {r['dados_execucao_inspecao'] for r in retr_list if r.get('dados_execucao_inspecao')}
+    causas_map = defaultdict(list)
+    if dados_ids:
+        causas_qs = CausasNaoConformidade.objects.filter(dados_execucao__id__in=dados_ids).prefetch_related('causa').values(
+            'id',
+            'dados_execucao__id',
+            'causa__id',
+            'causa__nome'  # ajuste conforme campo de descrição'
+        )
+        for c in causas_qs:
+            causas_map[c['dados_execucao__id']].append({
+                'causa_nao_conformidade_id': c['id'],
+                'causa_id': c['causa__id'],
+                'causa_nome': c.get('causa__nome'),
+            })
+
+    # 3) produzir lista PLANA: cada item de retr_list ganha a chave 'causas_nao_conformidade'
+    flat = []
+    for r in retr_list:
+        causas = causas_map.get(r.get('dados_execucao_inspecao')) or []
+        flat.append({
+            'ordem_id': r.get('reinspecao__inspecao__pecas_ordem_pintura__ordem__id'),
+            'ordem': r.get('reinspecao__inspecao__pecas_ordem_pintura__ordem__ordem'),
+            'data_carga': r.get('data_carga_fmt'),
+            'peca': r.get('reinspecao__inspecao__pecas_ordem_pintura__peca'),
+            'retrabalho_id': r.get('id'),
+            'retrabalho_status': r.get('status'),
+            'retrabalho_data_inicio': r.get('data_inicio_fmt'),
+            'retrabalho_data_fim': r.get('data_fim_fmt'),
+            'causa_nao_conformidade': causas[0].get('causa_nome') if causas else None,
+            'inspecao_id': r.get('reinspecao__inspecao__id'),
+            'reinspecao_id': r.get('reinspecao__id'),
+            'dados_execucao_inspecao': r.get('dados_execucao_inspecao'),
+        })
+
+    
+    # 4) buscar inspeções que ainda aguardam inspeção
+    inspecoes_ids = set(
+        DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
+    )
+
+    # Filtra os dados
+    datas = Inspecao.objects.filter(pecas_ordem_pintura__isnull=False).exclude(
+        id__in=inspecoes_ids
+    )
+
+    datas = datas.select_related(
+        "pecas_ordem_pintura",
+        "pecas_ordem_pintura__ordem",
+        "pecas_ordem_pintura__operador_fim",
+    ).order_by("-id")
+
+
+    for inspecao in datas:
+        flat.append({
+            'ordem_id': inspecao.pecas_ordem_pintura.ordem.id,
+            'ordem': inspecao.pecas_ordem_pintura.ordem.ordem,
+            'data_carga': inspecao.pecas_ordem_pintura.ordem.data_carga.strftime('%d/%m/%Y') if inspecao.pecas_ordem_pintura.ordem.data_carga else '',
+            'peca': inspecao.pecas_ordem_pintura.peca,
+            'retrabalho_id': '',
+            'retrabalho_status': 'aguardando_inspecao',
+            'retrabalho_data_inicio': '',
+            'retrabalho_data_fim': '',
+            'causa_nao_conformidade': '',
+            'inspecao_id': inspecao.id,
+            'reinspecao_id': '',
+            'dados_execucao_inspecao': '',
+        })
+
+    # ordenando por data da carga
+    flat = sorted(
+        flat,
+        key=lambda x: parse_data_fmt(x.get('data_carga', ''))
+    )
+
+    
+    return JsonResponse(flat, safe=False, json_dumps_params={'default': str})

@@ -92,10 +92,18 @@
         </form>
     
         <!-- Results Table -->
+        <div class="d-flex justify-content-end mb-2">
+            <button type="button" id="btn-excluir-selecionadas" class="btn btn-danger btn-sm" disabled>
+                <i class="bi bi-trash"></i> Excluir Selecionadas
+            </button>
+        </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle">
                 <thead class="table-light">
                     <tr>
+                        <th class="text-center" style="width: 40px;">
+                            <input type="checkbox" id="select-all">
+                        </th>
                         <th class="text-center">Ordem</th>
                         <th class="text-center">Data de Criação</th>
                         <th class="text-center">Máquina</th>
@@ -106,7 +114,7 @@
                 </thead>
                 <tbody id="tabela-corpo">
                     <tr>
-                        <td colspan="6" class="text-center py-4">
+                        <td colspan="7" class="text-center py-4">
                             <div class="d-flex align-items-center justify-content-center">
                                 <div class="spinner-border text-primary me-2" role="status" style="width: 1rem; height: 1rem;"></div>
                                 <span>Carregando dados...</span>
