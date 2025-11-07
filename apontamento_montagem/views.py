@@ -1,4 +1,4 @@
-from django.http import JsonResponse, Http404
+from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
 from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q, IntegerField
@@ -13,8 +13,7 @@ from datetime import datetime, date, timedelta
 import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados
-from core.utils import carregar_planilha_base_geral
-from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile, PecasFaltantes
+from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos
 from inspecao.models import Inspecao
 
@@ -354,44 +353,23 @@ def atualizar_status_ordem(request):
                 novo_processo.save()
                 ordem.status_prioridade = 2
 
-                if 'pecas_faltantes' in body and isinstance(body['pecas_faltantes'], list):
-    
-                    # 1. Encontrar o último número de interrupção para esta Ordem
-                    ultimo_numero = PecasFaltantes.objects.filter(ordem=ordem).aggregate(
-                        Max('numero_interrupcao')
-                    )['numero_interrupcao__max']
-                    
-                    # 2. Definir o próximo número. Se for a primeira vez, será 1 (0+1);
-                    #    caso contrário, será o máximo + 1.
-                    proximo_numero_interrupcao = (ultimo_numero or 0) + 1
-                    
-                    pecas_a_criar = []
-                    for peca_faltante in body['pecas_faltantes']:
-                        nome = peca_faltante.get('nome')
-                        quantidade = peca_faltante.get('quantidade')
-                        
-                        if nome and isinstance(quantidade, (int, float)) and quantidade > 0:
-                            pecas_a_criar.append(
-                                PecasFaltantes(
-                                    ordem=ordem,
-                                    # 3. Atribuir o número de interrupção calculado a todos
-                                    #    os registros deste lote (interrupção)
-                                    numero_interrupcao=proximo_numero_interrupcao,
-                                    nome_peca=nome,
-                                    quantidade=quantidade
-                                )
-                            )
-                            
-                    if pecas_a_criar:
-                        PecasFaltantes.objects.bulk_create(pecas_a_criar)
+                peca_falta = body.get('peca_falta')
+                maquina_id = body.get('maquina_id')
+                data_carga = body.get('data_carga')
+
+                if peca_falta:
+                    solicitacao_peca=SolicitacaoPeca.objects.create(
+                        peca=get_object_or_404(Pecas, pk=peca_falta),
+                        localizacao_solicitante=get_object_or_404(Maquina, pk=maquina_id),
+                        data_carga=datetime.strptime(data_carga, "%Y-%m-%d").date()
+                    )
 
                 # Atualiza o status da ordem
                 ordem.status_atual = status
 
-            # Associa o processo à última PecasOrdem (mantido da sua lógica original)
-            ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
-            if ultimo_peca_ordem: # Adicionada verificação para evitar erro se não houver PecasOrdem
+                ultimo_peca_ordem = PecasOrdem.objects.filter(ordem=ordem).last()
                 ultimo_peca_ordem.processo_ordem=novo_processo
+                
                 ultimo_peca_ordem.save()
 
             ordem.save()
@@ -642,30 +620,6 @@ def ordens_interrompidas(request):
             total_boa=Sum('qtd_boa', default=0.0)
         )
 
-        ultima_interrupcao_data = ordem.pecas_faltantes.aggregate(
-            Max('numero_interrupcao')
-        )
-        ultima_interrupcao_num = ultima_interrupcao_data['numero_interrupcao__max']
-        
-        pecas_faltantes_list = []
-        
-        if ultima_interrupcao_num is not None:
-            
-            ultima_interrupcao_pecas = ordem.pecas_faltantes.filter(
-                numero_interrupcao=ultima_interrupcao_num
-            )
-            
-            pecas_faltantes_list = [
-                {
-                    "id": peca_faltante.id,
-                    "nome_peca": peca_faltante.nome_peca,
-                    "quantidade": peca_faltante.quantidade,
-                    "data_registro": peca_faltante.data_registro,
-                    "numero_interrupcao": peca_faltante.numero_interrupcao 
-                }
-                for peca_faltante in ultima_interrupcao_pecas
-            ]
-
         resultado.append({
             "ordem_id": ordem.id,
             "ordem_numero": ordem.ordem,
@@ -677,7 +631,6 @@ def ordens_interrompidas(request):
             "ultima_atualizacao": ordem.ultima_atualizacao,
             "pecas": pecas_unicas,  # Lista apenas os nomes das peças (sem repetições)
             "qtd_restante": agregacoes['total_planejada'] - agregacoes['total_boa'],  # Soma total de qtd_planejada
-            "pecas_faltantes": pecas_faltantes_list,  # Lista de peças faltantes
             "processos": [
                 {
                     "processo_id": processo.id,
@@ -846,39 +799,14 @@ def listar_conjuntos(request):
     return JsonResponse({"conjuntos": list(conjuntos)})
 
 def listar_pecas_disponiveis(request):
-    """
-    Retorna uma lista de peças disponíveis (Pecas) para um Conjunto específico, 
-    usando a coluna de código puro.
-    """
+
+    conjunto = request.GET.get('conjunto')
     
-    conjunto_input = request.GET.get('conjunto')
-    if not conjunto_input:
-        return JsonResponse({'erro': 'Parâmetro "conjunto" é obrigatório.'}, status=400)
+    conjunto_object = get_object_or_404(Conjuntos, codigo=conjunto)
 
-    try:
-        codigo_conjunto_param = conjunto_input.split(' - ')[0].strip()
-    except IndexError:
-        return JsonResponse({'erro': 'Formato de "conjunto" inválido. Esperado: "CODIGO - NOME".'}, status=400)
-    
-    df_base = carregar_planilha_base_geral() 
-    if df_base is None:
-        return JsonResponse({'erro': 'Dados da planilha base não disponíveis.'}, status=503)
+    pecas_disponiveis = Pecas.objects.filter(conjunto=conjunto_object)
 
-    df_conjunto = df_base[df_base['CONJUNTO_CODIGO_PURO'] == codigo_conjunto_param]
-    
-    if df_conjunto.empty:
-         return JsonResponse({'erro': f'Nenhuma peça encontrada para o conjunto: {codigo_conjunto_param}.'}, status=404)
-
-    df_processo_nao_nulo = df_conjunto[df_conjunto['2 PROCESSO'].str.strip() != '']
-
-    df_processo_nao_nulo['DESCRIÇÃO'] = df_processo_nao_nulo['DESCRIÇÃO'].str.upper()
-
-    colunas_para_duplicatas = ['DESCRIÇÃO']
-    df_final = df_processo_nao_nulo.drop_duplicates(subset=colunas_para_duplicatas, keep='first')
-
-    pecas_disponiveis = df_final[['CODIGO', 'DESCRIÇÃO']].to_dict('records')
-
-    return JsonResponse({'pecas': pecas_disponiveis, 'conjunto_filtrado': codigo_conjunto_param}, status=200)
+    return JsonResponse({'pecas':list(pecas_disponiveis.values())})
 
 @csrf_exempt
 def criar_ordem_fora_sequenciamento(request):
