@@ -36,6 +36,9 @@ from apontamento_exped.utils import chamar_impressora_pecas_montagem, chamar_imp
 import warnings
 warnings.filterwarnings("ignore")
 
+REDIS_URL = "redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"
+QUEUE_NAME = "print-zebra"
+
 # Carregar variáveis do arquivo .env
 load_dotenv()
 
@@ -2387,6 +2390,47 @@ def imprimir_ordens_pintura(data_carga, carga, itens_agrupados, pausa_s: float =
 #     finally:
 #         win32print.ClosePrinter(h)
 
+def enviar_para_impressao(zpl, str_celula, max_tentativas=3):
+    """Envia uma etiqueta para impressão e aguarda confirmação do worker."""
+
+    REDIS_URL = "redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"
+    QUEUE_NAME = "print-zebra"
+    r = redis.from_url(REDIS_URL)
+
+    for tentativa in range(1, max_tentativas + 1):
+        job_id = str(uuid.uuid4())
+        resposta_queue = f"print-zebra:resposta:{job_id}"
+
+        payload = {
+            "job_id": job_id,
+            "resposta_queue": resposta_queue,
+            "zpl": zpl,
+        }
+
+        print(f"[{tentativa}/{max_tentativas}] Enviando job para impressão...")
+        r.rpush(QUEUE_NAME, json.dumps(payload))
+
+        # Espera até 10 segundos pela resposta do worker
+        res = r.blpop(resposta_queue, timeout=0.2)
+
+        if res:
+            resposta = json.loads(res[1])
+            status = resposta.get("status")
+            print(f"[RESPOSTA] {status}")
+
+            if status == "OK":
+                print(f"✅ Impressão confirmada para célula {str_celula}")
+                return True
+            else:
+                print(f"❌ Erro na impressão: {status}. Tentando novamente...")
+        else:
+            print("⚠️ Sem resposta do worker (timeout). Tentando reenviar...")
+
+        time.sleep(0.2)  # espera antes de tentar novamente
+
+    print(f"❌ Falha após {max_tentativas} tentativas. Impressora pode estar offline.")
+    return False
+
 def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: float = 1):
     """
     data_carga: str | datetime | date  -> data que vai na etiqueta
@@ -2429,11 +2473,17 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
     out["seq_total"] = reps.loc[itens_agrupados.index.repeat(reps)].groupby(level=0).transform("size")
     out = out.reset_index(drop=True)
 
+    print(out)
+
+    printer = "ZDesigner ZD220-203dpi ZPL"
+
+    timeout=60
+    r = redis.from_url(REDIS_URL)
+
     # out.to_csv("out1.csv")  
     # Itera por cada linha agrupada
     for _, row in out.iterrows():
         codigo = str(row["Código"])
-        print(codigo)
         peca = str(row["Peca"])[:80]  # limita a 80 chars
         qtde_total = int(row.get("Qtde_total", 0) or 0)
         cor = str(row["cor"])
@@ -2442,22 +2492,29 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
         # if qtde_total <= 0:
         #     continue
 
-        # --- imprime etiqueta da célula apenas quando muda ---
         if str_celula != ultima_str_celula:
-            print(f"CELULA DIFERENTE: {str_celula}")
-            zpl_celula = f"""
+            print(f"CELULA DIFERENTE: {str_celula[:11]}")
+            zpl = f"""
                 ^XA
                 ^CI28
                 ^PW800
                 ^LL320
                 ^LT0
                 ^LH0,0
-                ^FO100,100^A0N,100,100^FB600,1,0,C,0^FD{str_celula}^FS
+                ^FO100,100^A0N,60,60^FB600,1,0,C,0^FD{str_celula}^FS
                 ^XZ
                 """.lstrip()
-            chamar_impressora_pecas_montagem(zpl_celula)
-            total_impressoes += 1
-            time.sleep(2)
+
+            sucesso = enviar_para_impressao(zpl, str_celula)
+
+            if sucesso:
+                total_impressoes += 1
+                ultima_str_celula = str_celula
+                time.sleep(2)  # pausa antes do próximo job
+            else:
+                print(f"❌ Impressão da célula {str_celula} não confirmada.")
+            # send_raw_windows(zpl_celula, printer)
+
             ultima_str_celula = str_celula
 
         # --- etiqueta normal da peça ---
@@ -2496,43 +2553,17 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
 ^XZ
 """.lstrip()
 
+        sucesso = enviar_para_impressao(zpl, str_celula)
 
-        # chamar_impressora_pecas_montagem(zpl)
-
-        import redis, uuid, json
-
-        # verificar a fila
-        REDIS_URL = "redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"
-        QUEUE_NAME = "print-zebra"
-        timeout=60
-        
-        r = redis.from_url(REDIS_URL)
-
-        job_id = str(uuid.uuid4())
-        resposta_queue = f"print-zebra:resposta:{job_id}"
-
-        payload = {
-            "job_id": job_id,
-            "resposta_queue": resposta_queue,
-            "zpl": zpl,
-        }
-
-        # Envia pra fila de impressão
-        r.rpush(QUEUE_NAME, json.dumps(payload))
-
-        # Espera o worker responder
-        res = r.blpop(resposta_queue, timeout=timeout)
-        if not res:
-            raise TimeoutError(f"Sem resposta do worker para job {job_id} em {timeout}s")
-
-        _, raw = res
-        resposta = json.loads(raw)
-
-        # Limpa a fila de resposta (opcional)
-        r.delete(resposta_queue)
+        if sucesso:
+            total_impressoes += 1
+            ultima_str_celula = str_celula
+            time.sleep(2)  # pausa antes do próximo job
+        else:
+            print(f"❌ Impressão da célula {str_celula} não confirmada.")
 
         total_impressoes += 1
-        printer = "ZDesigner ZD220-203dpi ZPL"
+        # time.sleep(2)
         # send_raw_windows(zpl, printer)
 
 
