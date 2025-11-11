@@ -636,7 +636,7 @@ function carregarPecasDisponiveis(codigoConjunto) {
 
         if (data.pecas.length !== 0) {
             data.pecas.forEach((peca, index)=> {
-                pecasDisponiveisSelect.append(new Option(`${peca['CODIGO']} - ${peca['DESCRIÇÃO']}`, peca['CODIGO'], false, false));
+                pecasDisponiveisSelect.append(new Option(`${peca['descricao_peca']}`, false, false));
             });
         }
 
