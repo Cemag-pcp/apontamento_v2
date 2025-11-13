@@ -12,7 +12,8 @@ MQTT_CLIENT_ID_LABWORKS = "cemag"  # client_id definido por vocês
 def on_connect(client, userdata, flags, reason_code, properties=None):
     print("Conectado ao broker, código:", reason_code)
     # Assina todos os tópicos de data de todos os centros da cemag
-    topic = f"labworks/vc/cemag/centro1/status"
+    # topic = f"labworks/vc/cemag/centro5/data"
+    topic = "labworks/vc/cemag/+/data"
     client.subscribe(topic)
     print("Assinado tópico:", topic)
 
@@ -31,6 +32,7 @@ def on_message(client, userdata, msg):
     # Pela documentação, o JSON tem sempre 'data' e 'timestamp'
     # Exemplo de data para contagem: {"data": {"3": 37}, "timestamp": 1742922122}
     dados = data.get("data", {})
+    print(dados)
     timestamp = data.get("timestamp")
 
     # Porta 3 = contagem atual do centro de produção
