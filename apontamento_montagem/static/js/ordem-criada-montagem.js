@@ -377,6 +377,10 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                     </div>
                 `).join("");
             }
+            
+            const headerClass = (ordem.processos && ordem.processos.some(p => p.motivo_interrupcao === 'Aguardando Próximo Processo'))
+            ? 'bg-prox-processo'
+            : 'bg-danger';
 
             // Formata as peças faltantes
             let pecasFaltantesInfo = "";
@@ -412,6 +416,8 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                 `;
             }
 
+
+
             card.innerHTML = `
             <div class="card shadow-lg border-0 rounded-3 mb-3 position-relative">
                 <span class="badge bg-warning text-dark fw-bold px-3 py-2 position-absolute" 
@@ -419,8 +425,7 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                     style="top: -10px; right: 0px; font-size: 0.75rem; z-index: 10;">
                     Carregando...
                 </span>
-
-                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center p-3">
+                <div class="card-header ${headerClass} text-white d-flex justify-content-between align-items-center p-3">
                     <h6 class="card-title mb-0">#${ordem.ordem_id} - ${ordem.maquina}</h6>
                 </div>
                 <div class="card-body bg-light">

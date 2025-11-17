@@ -2479,6 +2479,7 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
 
     timeout=60
     r = redis.from_url(REDIS_URL)
+    ultima_cor = ""
 
     # out.to_csv("out1.csv")  
     # Itera por cada linha agrupada
@@ -2492,7 +2493,7 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
         # if qtde_total <= 0:
         #     continue
 
-        if str_celula != ultima_str_celula:
+        if str_celula != ultima_str_celula or cor != ultima_cor:
             print(f"CELULA DIFERENTE: {str_celula[:11]}")
             zpl = f"""
                 ^XA
@@ -2501,9 +2502,18 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
                 ^LL320
                 ^LT0
                 ^LH0,0
-                ^FO100,100^A0N,60,60^FB600,1,0,C,0^FD{str_celula}^FS
+
+                ^FX CÉLULA
+                ^FO100,60^A0N,30,30^FB600,1,0,C,0^FDCélula: {str_celula}^FS
+
+                ^FX COR
+                ^FO100,160^A0N,30,30^FB600,1,0,C,0^FDCor: {cor}^FS
+
+                ^FX DATA DA CARGA
+                ^FO100,260^A0N,30,30^FB600,1,0,C,0^FDDATA CARGA: {data_carga}^FS
+
                 ^XZ
-                """.lstrip()
+            """.lstrip()
 
             sucesso = enviar_para_impressao(zpl, str_celula)
 
@@ -2565,7 +2575,6 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
         total_impressoes += 1
         # time.sleep(2)
         # send_raw_windows(zpl, printer)
-
 
     print(f"✅ Total de etiquetas impressas: {total_impressoes}")
     return total_impressoes

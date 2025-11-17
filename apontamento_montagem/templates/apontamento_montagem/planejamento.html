@@ -10,45 +10,50 @@
     <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
     <link rel="stylesheet" href="{% static 'css/table-fixed-header.css' %}">
 <style>
-@media (max-width: 768px) {
-  .responsive-table thead {
-    display: none;
-  }
-  .truncate-mobile {
-    display: inline-block;
-    max-width: 150px; /* ajuste conforme necessário */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .responsive-table tbody, .responsive-table tr, .responsive-table td {
-    display: block;
-    width: 100%;
-  }
-  .responsive-table tr {
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-    padding: 10px;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  }
-  .responsive-table td {
-    text-align: right;
-    position: relative;
-    padding-left: 50%;
-  }
-  .responsive-table td::before {
-    content: attr(data-label);
-    position: absolute;
-    left: 10px;
-    width: 45%;
-    padding-right: 10px;
-    white-space: nowrap;
-    text-align: left;
-    font-weight: bold;
-  }
+    @media (max-width: 768px) {
+    .responsive-table thead {
+        display: none;
+    }
+    .truncate-mobile {
+        display: inline-block;
+        max-width: 150px; /* ajuste conforme necessário */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .responsive-table tbody, .responsive-table tr, .responsive-table td {
+        display: block;
+        width: 100%;
+    }
+    .responsive-table tr {
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .responsive-table td {
+        text-align: right;
+        position: relative;
+        padding-left: 50%;
+    }
+    .responsive-table td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 10px;
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+        text-align: left;
+        font-weight: bold;
+    }
+
 }
 
+.bg-prox-processo {
+    background-color: #b54ef0;
+    color: #000;
+}
 </style>
 {% endblock %}
 
