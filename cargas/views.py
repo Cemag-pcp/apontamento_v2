@@ -1376,3 +1376,79 @@ def pecas_status_retrabalho_pintura(request):
 
     
     return JsonResponse(flat, safe=False, json_dumps_params={'default': str})
+
+
+def ordens_finalizadas_pintura_inicio_ano(request):
+    """"
+        traz as ordens finalizadas da pintura desde o início
+    """
+
+    ano_atual = datetime.now().date().year
+
+    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+    qs = (
+        CambaoPecas.objects
+        .filter(
+            peca_ordem__ordem__grupo_maquina='pintura',
+            status__isnull=False,
+            status='finalizada'
+        )
+        .select_related('peca_ordem', 'peca_ordem__ordem', 'cambao')
+        .annotate(
+            id_ordem=F('peca_ordem__ordem__id'),
+            ordem=F('peca_ordem__ordem__ordem'),
+            peca=F('peca_ordem__peca'),
+            qtd_planejada=F('peca_ordem__qtd_planejada'),
+            cor=F('peca_ordem__ordem__cor'),
+
+            # use nomes sem colidir com fields reais
+            data_criacao_fmt=ToChar(F('peca_ordem__ordem__data_criacao'), Value('DD/MM/YYYY')),
+            data_carga_fmt=ToChar(F('peca_ordem__ordem__data_carga'), Value('DD/MM/YYYY')),
+            data_pendura_fmt=ToChar(
+                AtTimeZone(F('data_pendura'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+            data_derruba_fmt=ToChar(
+                AtTimeZone(F('data_fim'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+
+            tipo=F('cambao__tipo'),
+            cambao_nome=F('cambao__nome'),
+            data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()) # já vem string
+        )
+        .filter(peca_ordem__ordem__data_carga__year=ano_atual)
+        .values(
+            'id_ordem',
+            'ordem',
+            'peca',
+            'qtd_planejada',
+            'cor',
+            'status',
+            'quantidade_pendurada',
+
+            # valores formatados
+            'data_criacao_fmt',
+            'data_carga_fmt',
+            'data_pendura_fmt',
+            'data_derruba_fmt',
+            
+            'tipo',
+            'cambao_nome',
+            'data_ultima_atualizacao',
+        )
+        .order_by('-data_fim')
+    )
+
+    data = list(qs)[::-1]
+
+    resultado_final_concat = data
+
+    resultado_final_concat = sorted(
+        resultado_final_concat,
+        key=lambda x: parse_data_fmt(x.get('data_derruba_fmt', ''))
+    )
+
+    return JsonResponse(resultado_final_concat, safe=False)
