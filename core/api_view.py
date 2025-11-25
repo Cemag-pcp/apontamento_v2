@@ -1,12 +1,14 @@
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-import json
-from datetime import timedelta as dt_timedelta
+from django.conf import settings
+
 from .models import Notificacao
 from .utils import notificar_erro_requisicoes_se_acima_limite, notificar_erro_transferencias_se_acima_limite
 from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
-from django.conf import settings
+
+import json
+from datetime import timedelta as dt_timedelta
 
 @csrf_exempt
 @require_POST
@@ -41,7 +43,6 @@ def rpa_update_status(request):
         return JsonResponse({"error": "Requisição não encontrada."}, status=404)
     except Exception as e:
         return JsonResponse({"error": f"Erro interno: {str(e)}"}, status=500)
-
 
 @csrf_exempt
 @require_POST
