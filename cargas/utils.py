@@ -2440,15 +2440,18 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
     """
 
     # Normaliza a data para datetime
-    if isinstance(data_carga, str):
-        try:
-            data_carga_dt = datetime.fromisoformat(data_carga)
-        except ValueError:
-            data_carga_dt = datetime.strptime(data_carga, "%Y-%m-%d")
-    elif isinstance(data_carga, date) and not isinstance(data_carga, datetime):
-        data_carga_dt = datetime.combine(data_carga, datetime.min.time())
-    else:
-        data_carga_dt = data_carga
+    # if isinstance(data_carga, str):
+    #     try:
+    #         data_carga_dt = datetime.fromisoformat(data_carga)
+    #     except ValueError:
+    #         data_carga_dt = datetime.strptime(data_carga, "%Y-%m-%d")
+    # elif isinstance(data_carga, date) and not isinstance(data_carga, datetime):
+    #     data_carga_dt = datetime.combine(data_carga, datetime.min.time())
+    # else:
+    #     data_carga_dt = data_carga
+
+    data_carga_dt = datetime.strptime(data_carga, "%Y-%m-%d")
+    data_carga_str = datetime.strftime(data_carga_dt, "%d/%m/%Y")
 
     total_impressoes = 0
     ultima_str_celula = ''  # controla mudança de célula
@@ -2494,7 +2497,7 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
         #     continue
 
         if str_celula != ultima_str_celula or cor != ultima_cor:
-            print(f"CELULA DIFERENTE: {str_celula[:11]}")
+            print(f"CELULA DIFERENTE: {str_celula[:11]} - {cor}")
             zpl = f"""
                 ^XA
                 ^CI28
@@ -2510,16 +2513,16 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
                 ^FO100,160^A0N,30,30^FB600,1,0,C,0^FDCor: {cor}^FS
 
                 ^FX DATA DA CARGA
-                ^FO100,260^A0N,30,30^FB600,1,0,C,0^FDDATA CARGA: {data_carga}^FS
+                ^FO100,260^A0N,30,30^FB600,1,0,C,0^FDDATA CARGA: {data_carga_str}^FS
 
                 ^XZ
             """.lstrip()
 
             sucesso = enviar_para_impressao(zpl, str_celula)
-
             if sucesso:
                 total_impressoes += 1
                 ultima_str_celula = str_celula
+                ultima_cor = cor
                 time.sleep(2)  # pausa antes do próximo job
             else:
                 print(f"❌ Impressão da célula {str_celula} não confirmada.")
@@ -2564,10 +2567,11 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
 """.lstrip()
 
         sucesso = enviar_para_impressao(zpl, str_celula)
-
+        print(codigo, peca)
         if sucesso:
             total_impressoes += 1
             ultima_str_celula = str_celula
+            ultima_cor = cor
             time.sleep(2)  # pausa antes do próximo job
         else:
             print(f"❌ Impressão da célula {str_celula} não confirmada.")
