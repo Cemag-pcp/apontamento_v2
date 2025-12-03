@@ -11,10 +11,9 @@ from django.conf import settings
 @csrf_exempt
 @require_POST
 def rpa_update_status(request):
-    # Segurança via X-API-KEY
-    api_key = (request.headers.get("X-API-KEY") or "").strip()
-    if not api_key or api_key != (settings.RPA_API_KEY or "").strip():
-        return HttpResponseForbidden("Chave de API inválida.")
+    # # Segurança via X-API-KEY
+    # if not api_key or api_key != (settings.RPA_API_KEY or "").strip():
+    #     return HttpResponseForbidden("Chave de API inválida.")
 
     # Dados
     try:
@@ -47,9 +46,9 @@ def rpa_update_status(request):
 @require_POST
 def rpa_update_transfer(request):
     # Segurança via X-API-KEY
-    api_key = (request.headers.get("X-API-KEY") or "").strip()
-    if not api_key or api_key != (settings.RPA_API_KEY or "").strip():
-        return HttpResponseForbidden("Chave de API inválida.")
+    # api_key = (request.headers.get("X-API-KEY") or "").strip()
+    # if not api_key or api_key != (settings.RPA_API_KEY or "").strip():
+    #     return HttpResponseForbidden("Chave de API inválida.")
 
     # Dados
     try:
