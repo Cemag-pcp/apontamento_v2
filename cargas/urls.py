@@ -29,5 +29,6 @@ urlpatterns = [
     path('api/ordens_em_andamento_finalizada_montagem/', views.ordens_status_montagem, name="ordens_status_montagem"),
     path('api/ordens_em_andamento_finalizada_solda/', views.ordens_status_solda, name="ordens_status_solda"),
     path('api/pecas_status_retrabalho_pintura/', views.pecas_status_retrabalho_pintura, name="pecas_status_retrabalho_pintura"),
+    path('api/ordens_finalizadas_pintura_inicio_ano/', views.ordens_finalizadas_pintura_inicio_ano, name="ordens_finalizadas_pintura_inicio_ano"),
 
 ]

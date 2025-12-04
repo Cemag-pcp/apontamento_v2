@@ -658,6 +658,30 @@ def excluir_op_padrao(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+def excluir_op_lote(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        ordem_ids = data.get('ordem_ids', [])
+
+        if not isinstance(ordem_ids, list) or not ordem_ids:
+            return JsonResponse({'error': 'ordem_ids deve ser uma lista não vazia'}, status=400)
+
+        # Garante inteiros
+        try:
+            ordem_ids = [int(i) for i in ordem_ids]
+        except Exception:
+            return JsonResponse({'error': 'ordem_ids contém valores inválidos'}, status=400)
+
+        updated = Ordem.objects.filter(pk__in=ordem_ids).update(excluida=True)
+        return JsonResponse({'success': True, 'atualizadas': updated})
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 def gerar_op_duplicada(request, pk_ordem):
 
     """

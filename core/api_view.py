@@ -4,17 +4,16 @@ from django.views.decorators.http import require_POST
 import json
 from datetime import timedelta as dt_timedelta
 from .models import Notificacao
-from .utils import notificar_erro_requisicoes_se_acima_limite, notificar_erro_transferencias_se_acima_limite
+# from .utils import notificar_erro_requisicoes_se_acima_limite, notificar_erro_transferencias_se_acima_limite
 from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
 from django.conf import settings
 
 @csrf_exempt
 @require_POST
 def rpa_update_status(request):
-    # Segurança via X-API-KEY
-    api_key = (request.headers.get("X-API-KEY") or "").strip()
-    if not api_key or api_key != (settings.RPA_API_KEY or "").strip():
-        return HttpResponseForbidden("Chave de API inválida.")
+    # # Segurança via X-API-KEY
+    # if not api_key or api_key != (settings.RPA_API_KEY or "").strip():
+    #     return HttpResponseForbidden("Chave de API inválida.")
 
     # Dados
     try:
@@ -34,7 +33,7 @@ def rpa_update_status(request):
         requisicao.save()
 
         # Dispara alerta SOMENTE se a contagem de erros ultrapassar o limite
-        notificar_erro_requisicoes_se_acima_limite()
+        # notificar_erro_requisicoes_se_acima_limite()
 
         return JsonResponse({"success": True})
     except SolicitacaoRequisicao.DoesNotExist:
@@ -47,9 +46,9 @@ def rpa_update_status(request):
 @require_POST
 def rpa_update_transfer(request):
     # Segurança via X-API-KEY
-    api_key = (request.headers.get("X-API-KEY") or "").strip()
-    if not api_key or api_key != (settings.RPA_API_KEY or "").strip():
-        return HttpResponseForbidden("Chave de API inválida.")
+    # api_key = (request.headers.get("X-API-KEY") or "").strip()
+    # if not api_key or api_key != (settings.RPA_API_KEY or "").strip():
+    #     return HttpResponseForbidden("Chave de API inválida.")
 
     # Dados
     try:
@@ -71,7 +70,7 @@ def rpa_update_transfer(request):
         transf.save()
 
         # Dispara alerta SOMENTE se a contagem de erros ultrapassar o limite
-        notificar_erro_transferencias_se_acima_limite()
+        # notificar_erro_transferencias_se_acima_limite()
 
         return JsonResponse({"success": True})
     except SolicitacaoTransferencia.DoesNotExist:

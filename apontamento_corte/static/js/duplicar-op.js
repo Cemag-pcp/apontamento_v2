@@ -105,7 +105,7 @@ function atualizarTabela(ordens) {
     tabelaCorpo.innerHTML = "";
 
     if (ordens.length === 0) {
-        tabelaCorpo.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhum dado encontrado.</td></tr>`;
+        tabelaCorpo.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhum dado encontrado.</td></tr>`;
         return;
     }
 
@@ -113,6 +113,9 @@ function atualizarTabela(ordens) {
         const linha = document.createElement("tr");
 
         linha.innerHTML = `
+            <td class="text-center">
+                <input type="checkbox" class="row-select" data-id="${ordem.id}">
+            </td>
             <td>${ordem.ordem}</td>
             <td>${ordem.data_criacao}</td>
             <td>${ordem.grupo_maquina}</td>
@@ -126,6 +129,11 @@ function atualizarTabela(ordens) {
 
         tabelaCorpo.appendChild(linha);
     });
+
+    // reset select-all and bulk actions after render
+    const selectAll = document.getElementById('select-all');
+    if (selectAll) selectAll.checked = false;
+    updateBulkActionsState();
 }
 
 //  Atualiza a paginação
@@ -211,6 +219,69 @@ function mostrarLoading(mostrar) {
     if (spinner) {
         spinner.style.display = mostrar ? "block" : "none";
     }
+}
+
+// Bulk selection helpers
+function getSelectedIds() {
+  return Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.getAttribute('data-id'));
+}
+
+function updateBulkActionsState() {
+  const btn = document.getElementById('btn-excluir-selecionadas');
+  if (btn) btn.disabled = getSelectedIds().length === 0;
+}
+
+function setupBulkSelectionHandlers() {
+  const btn = document.getElementById('btn-excluir-selecionadas');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      const ids = getSelectedIds();
+      if (!ids.length) return;
+
+      const confirm = await Swal.fire({
+        title: 'Confirmar exclusão',
+        text: `Excluir ${ids.length} OP(s) selecionada(s)?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Excluir',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!confirm.isConfirmed) return;
+
+      btn.disabled = true;
+      try {
+        const resp = await fetch('/corte/api/excluir-op-lote/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+          body: JSON.stringify({ ordem_ids: ids })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data?.error || 'Falha ao excluir.');
+        carregarTabela(1);
+        Swal.fire({ icon: 'success', title: 'Excluídas', text: 'Ordens excluídas com sucesso.' });
+      } catch (err) {
+        console.error('Erro ao excluir em lote:', err);
+        Swal.fire({ icon: 'error', title: 'Erro', text: String(err) });
+      } finally {
+        btn.disabled = false;
+        updateBulkActionsState();
+      }
+    });
+  }
+
+  const selectAll = document.getElementById('select-all');
+  if (selectAll) {
+    selectAll.addEventListener('change', () => {
+      document.querySelectorAll('.row-select').forEach(cb => { cb.checked = selectAll.checked; });
+      updateBulkActionsState();
+    });
+  }
+
+  document.addEventListener('change', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('row-select')) {
+      updateBulkActionsState();
+    }
+  });
 }
 
 //  Configuração do Select2 para o filtro de peças
@@ -607,6 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     configurarBotaoVerPecas();
     duplicarOrdem();
+    setupBulkSelectionHandlers();
 
     // Ação do botão de filtro
     document.getElementById("filtro-form").addEventListener("submit", async (event) => {

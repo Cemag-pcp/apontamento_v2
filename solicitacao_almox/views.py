@@ -33,11 +33,11 @@ from .models import (
     SolicitacaoNovaMatricula,
 )
 from cadastro_almox.models import Cc
-from core.utils import (
-    notificacao_almoxarifado,
-    verificar_e_notificar_requisicoes_pendentes,
-    verificar_e_notificar_transferencias_pendentes,
-)
+# from core.utils import (
+#     notificacao_almoxarifado,
+#     verificar_e_notificar_requisicoes_pendentes,
+#     verificar_e_notificar_transferencias_pendentes,
+# )
 
 from datetime import datetime, timedelta
 import json
@@ -75,7 +75,7 @@ def criar_solicitacoes(request):
                     return JsonResponse({"status": "sucesso", "operador": True})
                 except Http404:
                     print(f"Operador com matrícula: {matricula} não encontrado!")
-                    verificar_e_notificar_requisicoes_pendentes()
+                    # verificar_e_notificar_requisicoes_pendentes()
                     return JsonResponse({"status": "sucesso", "operador": False})
             else:
                 return JsonResponse({"status": "erro"})
@@ -102,7 +102,7 @@ def criar_solicitacoes(request):
                     return JsonResponse({"status": "sucesso", "operador": True})
                 except Http404:
                     print(f"Operador com matrícula: {matricula} não encontrado!")
-                    verificar_e_notificar_transferencias_pendentes()
+                    # verificar_e_notificar_transferencias_pendentes()
                     return JsonResponse({"status": "sucesso", "operador": False})
             else:
                 return JsonResponse({"status": "erro"})
@@ -362,11 +362,11 @@ def cadastro_novo_item(request):
                 deposito_destino=deposito_destino_object,
             )
 
-            notificacao_almoxarifado(
-                titulo="Nova Solicitação para criação de itens para Transferência",
-                rota_acesso="/almox/gerir-solicitacao-cadastro/",
-                mensagem=f"O colaborador {funcionario.matricula} - {funcionario.nome} solicitou um novo item para cadastro: {codigo} - {descricao}.",
-            )
+            # notificacao_almoxarifado(
+            #     titulo="Nova Solicitação para criação de itens para Transferência",
+            #     rota_acesso="/almox/gerir-solicitacao-cadastro/",
+            #     mensagem=f"O colaborador {funcionario.matricula} - {funcionario.nome} solicitou um novo item para cadastro: {codigo} - {descricao}.",
+            # )
 
         else:
 
@@ -381,11 +381,11 @@ def cadastro_novo_item(request):
                 cc=cc_object,
             )
 
-            notificacao_almoxarifado(
-                titulo="Nova Solicitação para criação de itens para Requição",
-                rota_acesso="/almox/gerir-solicitacao-cadastro/",
-                mensagem=f"O colaborador {funcionario.matricula} - {funcionario.nome} solicitou um novo item para cadastro: {codigo} - {descricao}.",
-            )
+            # notificacao_almoxarifado(
+            #     titulo="Nova Solicitação para criação de itens para Requição",
+            #     rota_acesso="/almox/gerir-solicitacao-cadastro/",
+            #     mensagem=f"O colaborador {funcionario.matricula} - {funcionario.nome} solicitou um novo item para cadastro: {codigo} - {descricao}.",
+            # )
 
     return redirect("criar_solicitacoes")
 
@@ -404,11 +404,11 @@ def cadastro_nova_matricula(request):
             matricula=matricula, nome=nome, cc=cc_object
         )
 
-        notificacao_almoxarifado(
-            titulo="Nova Solicitação de Matrícula",
-            rota_acesso="/almox/gerir-solicitacao-cadastro/",
-            mensagem=f"Nova Solicitação de Matrícula: {matricula} - {nome} para o CC {cc_object.codigo} - {cc_object.nome}.",
-        )
+        # notificacao_almoxarifado(
+        #     titulo="Nova Solicitação de Matrícula",
+        #     rota_acesso="/almox/gerir-solicitacao-cadastro/",
+        #     mensagem=f"Nova Solicitação de Matrícula: {matricula} - {nome} para o CC {cc_object.codigo} - {cc_object.nome}.",
+        # )
 
     return redirect("criar_solicitacoes")
 

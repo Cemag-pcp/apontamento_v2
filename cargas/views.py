@@ -19,7 +19,7 @@ from apontamento_solda.models import PecasOrdem as POSolda
 from core.models import Ordem
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
-from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura
+from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura, imprimir_ordens_pcp_qualidade
 from apontamento_pintura.models import CambaoPecas, Retrabalho
 from apontamento_pintura.views import ordens_criadas as ordens_criadas_pintura
 from apontamento_montagem.views import ordens_criadas as ordens_criadas_montagem
@@ -905,6 +905,7 @@ def enviar_etiqueta_impressora_pintura(request):
 
     data_carga = data.get('data_inicio')
     carga = data.get('carga')
+    celulas = data.get('celulas', [])
 
     itens = gerar_sequenciamento(data_carga,data_carga,'pintura',carga)
 
@@ -914,25 +915,48 @@ def enviar_etiqueta_impressora_pintura(request):
     ]
 
     itens_agrupado = (
-        itens.groupby(colunas_grupo, as_index=False)
-        ["Qtde_total"]
+        itens.groupby(colunas_grupo, as_index=False)["Qtde_total"]
         .sum()
     )
 
-    # filtrando apenas células específicas
+    # filtrando celulas caso esteja marcada
+    if celulas:
+        itens_agrupado = itens_agrupado[itens_agrupado['Célula'].isin(celulas)]
+
+    # reitrando celulas
     itens_agrupado = itens_agrupado[
-        itens_agrupado['Célula'].isin(['CHASSI', 'CILINDRO', 'EIXO SIMPLES', 'EIXO COMPLETO'])
+        ~itens_agrupado['Célula'].isin(['CONJ INTERMED'])
     ]
     
-    payload_status = imprimir_ordens_pintura(data_carga, carga, itens_agrupado)
-    # aceita tanto (dict, status) quanto apenas dict
-    if isinstance(payload_status, tuple):
-        payload, status = payload_status
-    else:
-        payload, status = payload_status, 200
+    substituicoes = {
+        'PLAT.': 'PL.',
+        'TANQUE.': 'TA.',
+        'CAÇAM.': 'CA.',
+        'IÇAMENTO': 'ICAMENTO'
+    }
 
-    return JsonResponse(payload, status=status)
+    # filtrando apenas células específicas
+    # itens_agrupado = itens_agrupado[
+    #     itens_agrupado['Célula'].isin(['CHASSI'])
+    # ]
 
+    # filtrando apenas células específicas
+    # itens_agrupado = itens_agrupado[
+    #     (itens_agrupado['Código'].isin(['460382'])) &
+    #     (itens_agrupado['cor'] == 'Amarelo')
+    # ]
+
+    # Aplica as substituições
+    itens_agrupado['Célula'] = itens_agrupado['Célula'].replace(substituicoes, regex=True)
+
+    # payload_status = imprimir_ordens_pintura(data_carga, carga, itens_agrupado)
+    # print(itens_agrupado)
+    print(itens_agrupado)
+    payload = imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupado)
+
+    return JsonResponse({"payload": "payload"})
+    # return JsonResponse({"payload": payload})
+    
 @require_GET
 def enviar_etiqueta_unitaria_impressora(request):
     ordem_id = request.GET.get('ordem_id')
@@ -1357,3 +1381,79 @@ def pecas_status_retrabalho_pintura(request):
 
     
     return JsonResponse(flat, safe=False, json_dumps_params={'default': str})
+
+
+def ordens_finalizadas_pintura_inicio_ano(request):
+    """"
+        traz as ordens finalizadas da pintura desde o início
+    """
+
+    ano_atual = datetime.now().date().year
+
+    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+    qs = (
+        CambaoPecas.objects
+        .filter(
+            peca_ordem__ordem__grupo_maquina='pintura',
+            status__isnull=False,
+            status='finalizada'
+        )
+        .select_related('peca_ordem', 'peca_ordem__ordem', 'cambao')
+        .annotate(
+            id_ordem=F('peca_ordem__ordem__id'),
+            ordem=F('peca_ordem__ordem__ordem'),
+            peca=F('peca_ordem__peca'),
+            qtd_planejada=F('peca_ordem__qtd_planejada'),
+            cor=F('peca_ordem__ordem__cor'),
+
+            # use nomes sem colidir com fields reais
+            data_criacao_fmt=ToChar(F('peca_ordem__ordem__data_criacao'), Value('DD/MM/YYYY')),
+            data_carga_fmt=ToChar(F('peca_ordem__ordem__data_carga'), Value('DD/MM/YYYY')),
+            data_pendura_fmt=ToChar(
+                AtTimeZone(F('data_pendura'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+            data_derruba_fmt=ToChar(
+                AtTimeZone(F('data_fim'), 'America/Sao_Paulo'),
+                Value('DD/MM/YYYY HH24:MI:SS')
+            ),
+
+            tipo=F('cambao__tipo'),
+            cambao_nome=F('cambao__nome'),
+            data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()) # já vem string
+        )
+        .filter(peca_ordem__ordem__data_carga__year=ano_atual)
+        .values(
+            'id_ordem',
+            'ordem',
+            'peca',
+            'qtd_planejada',
+            'cor',
+            'status',
+            'quantidade_pendurada',
+
+            # valores formatados
+            'data_criacao_fmt',
+            'data_carga_fmt',
+            'data_pendura_fmt',
+            'data_derruba_fmt',
+            
+            'tipo',
+            'cambao_nome',
+            'data_ultima_atualizacao',
+        )
+        .order_by('-data_fim')
+    )
+
+    data = list(qs)[::-1]
+
+    resultado_final_concat = data
+
+    resultado_final_concat = sorted(
+        resultado_final_concat,
+        key=lambda x: parse_data_fmt(x.get('data_derruba_fmt', ''))
+    )
+
+    return JsonResponse(resultado_final_concat, safe=False)

@@ -14,6 +14,8 @@ from io import BytesIO
 from pathlib import Path
 import environ
 from typing import Optional
+import redis, json, uuid
+# import win32print
 
 from django.core.files import File
 from django.urls import reverse
@@ -29,10 +31,13 @@ from apontamento_pintura.models import PecasOrdem as POP
 from apontamento_solda.models import PecasOrdem as POS
 from core.models import Ordem
 from cadastro.models import Maquina
-from apontamento_exped.utils import chamar_impressora_pecas_montagem
+from apontamento_exped.utils import chamar_impressora_pecas_montagem, chamar_impressora_pecas_montagem_2
 
 import warnings
 warnings.filterwarnings("ignore")
+
+REDIS_URL = "redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"
+QUEUE_NAME = "print-zebra"
 
 # Carregar variáveis do arquivo .env
 load_dotenv()
@@ -89,6 +94,28 @@ def get_data_from_sheets():
     base_carga = pd.DataFrame(list2)
 
     return base_carretas, base_carga
+
+def get_base_carreta(carretas: Optional[list] = None):
+
+    """Carrega os dados das planilhas e retorna como DataFrames."""
+    wks1 = sh.worksheet(worksheet1)
+
+    list1 = wks1.get_all_records()
+
+    # Transformando em dataframes
+    base_carretas = pd.DataFrame(list1)
+
+    if carretas:
+        base_carretas = base_carretas[base_carretas['Recurso'].isin(carretas)]
+
+    return base_carretas
+
+def buscar_celulas(carretas):
+
+    base_carretas = get_base_carreta(carretas)
+    base_carretas[base_carretas['Etapa2'] == 'Pintura']
+
+    return base_carretas['Célula'].unique()
 
 def tratando_dados(base_carretas, base_carga, data_carga, cliente=None, carga=None):
 
@@ -179,8 +206,6 @@ def consultar_carretas(data_inicial, data_final):
 
     dados_carga_data_filtrada['PED_QUANTIDADE'] = dados_carga_data_filtrada['PED_QUANTIDADE'].astype(float)
 
-    print(dados_carga_data_filtrada)
-
     # Agrupa os dados por data e código do recurso
     carretas_unica = dados_carga_data_filtrada[['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO', 'PED_QUANTIDADE', 'Carga']]
     agrupado = carretas_unica.groupby(['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO', 'Carga'])['PED_QUANTIDADE'].sum().reset_index()
@@ -192,7 +217,10 @@ def consultar_carretas(data_inicial, data_final):
         lambda x: '✅' if x in dados_carreta['Recurso'].astype(str).values else '❌'
     )
 
-    # Converte para formato JSON estruturado
+    buscar_cel = buscar_celulas(
+        agrupado['PED_RECURSO.CODIGO'].unique().tolist()
+    )
+
     resultado = [
         {
             "data_carga": str(row['PED_PREVISAOEMISSAODOC'].date()),  # Convertendo para string
@@ -204,7 +232,12 @@ def consultar_carretas(data_inicial, data_final):
         for _, row in agrupado.iterrows()
     ]
 
-    return {"cargas": resultado}
+    celulas = [{"celula": cel} for cel in buscar_cel]
+
+    return {
+        "cargas": resultado,
+        "celulas": celulas,
+    }
 
 def criar_array_datas(data_inicial, data_final):
     # Converte as strings de data para objetos datetime
@@ -1053,7 +1086,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
     
     return filenames
 
-def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] = None):
+def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] = None, celula: Optional[str]= None):
     filenames = []
 
     resultado = criar_array_datas(data_inicial, data_final)
@@ -1091,6 +1124,10 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
         base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE', 'Carga']]
     else:
         base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
+
+    # Apenas para pintura
+    if celula and setor == 'pintura':
+        base_carretas_original = base_carretas_original[(base_carretas_original['Célula'] == celula) & (base_carretas_original['Etapa2'] == 'Pintura')]
 
     # Converte para datetime
     base_carga_original['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
@@ -1739,8 +1776,6 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
         tab_resultado = pd.concat([tab_completa, tab_resultado], ignore_index=True)
     
-    print(tab_resultado)
-
     return tab_resultado
 
 def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
@@ -2339,6 +2374,212 @@ def imprimir_ordens_pintura(data_carga, carga, itens_agrupados, pausa_s: float =
             total_impressoes += 1
             time.sleep(pausa_s)  # controla o ritmo entre etiquetas
 
+    return total_impressoes
+
+# def send_raw_windows(zpl: str, printer_name: str) -> int:
+#     data = zpl.encode("cp437", errors="replace")
+#     h = win32print.OpenPrinter(printer_name)
+#     try:
+#         win32print.StartDocPrinter(h, 1, ("RAW ZPL", None, "RAW"))
+#         win32print.StartPagePrinter(h)
+#         written = win32print.WritePrinter(h, data)
+#         win32print.EndPagePrinter(h)
+#         win32print.EndDocPrinter(h)
+#         return written or 0
+#     finally:
+#         win32print.ClosePrinter(h)
+
+def enviar_para_impressao(zpl, str_celula, max_tentativas=3):
+    """Envia uma etiqueta para impressão e aguarda confirmação do worker."""
+
+    REDIS_URL = "redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"
+    QUEUE_NAME = "print-zebra"
+    r = redis.from_url(REDIS_URL)
+
+    for tentativa in range(1, max_tentativas + 1):
+        job_id = str(uuid.uuid4())
+        resposta_queue = f"print-zebra:resposta:{job_id}"
+
+        payload = {
+            "job_id": job_id,
+            "resposta_queue": resposta_queue,
+            "zpl": zpl,
+        }
+
+        print(f"[{tentativa}/{max_tentativas}] Enviando job para impressão...")
+        r.rpush(QUEUE_NAME, json.dumps(payload))
+
+        # Espera até 10 segundos pela resposta do worker
+        res = r.blpop(resposta_queue, timeout=0.2)
+
+        if res:
+            resposta = json.loads(res[1])
+            status = resposta.get("status")
+            print(f"[RESPOSTA] {status}")
+
+            if status == "OK":
+                print(f"✅ Impressão confirmada para célula {str_celula}")
+                return True
+            else:
+                print(f"❌ Erro na impressão: {status}. Tentando novamente...")
+        else:
+            print("⚠️ Sem resposta do worker (timeout). Tentando reenviar...")
+
+        time.sleep(0.2)  # espera antes de tentar novamente
+
+    print(f"❌ Falha após {max_tentativas} tentativas. Impressora pode estar offline.")
+    return False
+
+def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: float = 1):
+    """
+    data_carga: str | datetime | date  -> data que vai na etiqueta
+    carga: str                          -> ex.: "Carga 01"
+    itens_agrupados: pandas.DataFrame   -> precisa ter colunas: ["Código","Peca","Qtde_total","Célula","cor"]
+    pausa_s: float                      -> pausa entre etiquetas (segundos)
+    """
+
+    # Normaliza a data para datetime
+    # if isinstance(data_carga, str):
+    #     try:
+    #         data_carga_dt = datetime.fromisoformat(data_carga)
+    #     except ValueError:
+    #         data_carga_dt = datetime.strptime(data_carga, "%Y-%m-%d")
+    # elif isinstance(data_carga, date) and not isinstance(data_carga, datetime):
+    #     data_carga_dt = datetime.combine(data_carga, datetime.min.time())
+    # else:
+    #     data_carga_dt = data_carga
+
+    data_carga_dt = datetime.strptime(data_carga, "%Y-%m-%d")
+    data_carga_str = datetime.strftime(data_carga_dt, "%d/%m/%Y")
+
+    total_impressoes = 0
+    ultima_str_celula = ''  # controla mudança de célula
+
+    # Lê o logo e remove a âncora ^FO0,0 para reposicionar
+    logo_gfa = open('logo.zpl').read().strip()
+    logo_gfa_block = logo_gfa.replace("^FO0,0", "", 1)
+
+    # Ordena as peças por célula (importante para o agrupamento)
+    itens_agrupados = itens_agrupados.sort_values(by='Célula')
+
+    reps = itens_agrupados['Qtde_total'].fillna(0).astype(int).clip(lower=0)
+
+    # repete as linhas conforme a quantidade
+    out = itens_agrupados.loc[itens_agrupados.index.repeat(reps)].copy()
+
+    # cada linha passa a representar 1 unidade
+    out['Qtde_total'] = 1
+
+    # (opcional) numeração 1..N por linha original
+    out["seq"] = out.groupby(level=0).cumcount() + 1
+    out["seq_total"] = reps.loc[itens_agrupados.index.repeat(reps)].groupby(level=0).transform("size")
+    out = out.reset_index(drop=True)
+
+    print(out)
+
+    printer = "ZDesigner ZD220-203dpi ZPL"
+
+    timeout=60
+    r = redis.from_url(REDIS_URL)
+    ultima_cor = ""
+
+    # out.to_csv("out1.csv")  
+    # Itera por cada linha agrupada
+    for _, row in out.iterrows():
+        codigo = str(row["Código"])
+        peca = str(row["Peca"])[:80]  # limita a 80 chars
+        qtde_total = int(row.get("Qtde_total", 0) or 0)
+        cor = str(row["cor"])
+        str_celula = str(row["Célula"])
+
+        # if qtde_total <= 0:
+        #     continue
+
+        if str_celula != ultima_str_celula or cor != ultima_cor:
+            print(f"CELULA DIFERENTE: {str_celula[:11]} - {cor}")
+            zpl = f"""
+                ^XA
+                ^CI28
+                ^PW800
+                ^LL320
+                ^LT0
+                ^LH0,0
+
+                ^FX CÉLULA
+                ^FO100,60^A0N,30,30^FB600,1,0,C,0^FDCélula: {str_celula}^FS
+
+                ^FX COR
+                ^FO100,160^A0N,30,30^FB600,1,0,C,0^FDCor: {cor}^FS
+
+                ^FX DATA DA CARGA
+                ^FO100,260^A0N,30,30^FB600,1,0,C,0^FDDATA CARGA: {data_carga_str}^FS
+
+                ^XZ
+            """.lstrip()
+
+            sucesso = enviar_para_impressao(zpl, str_celula)
+            if sucesso:
+                total_impressoes += 1
+                ultima_str_celula = str_celula
+                ultima_cor = cor
+                time.sleep(2)  # pausa antes do próximo job
+            else:
+                print(f"❌ Impressão da célula {str_celula} não confirmada.")
+            # send_raw_windows(zpl_celula, printer)
+
+            ultima_str_celula = str_celula
+
+        # --- etiqueta normal da peça ---
+        zpl = f"""
+^XA
+^CI28
+^PW800
+^LL320
+^LT0
+^LH0,0
+
+^FX Logo centralizado
+^FO220,1{logo_gfa_block}
+
+^FX Código da peça e descrição
+^FO50,110^A0N,28,28^FDCódigo: {codigo} - {peca}^FS
+
+^FX Linha divisória vertical
+^FO400,140^GB2,200,2^FS
+
+^FX Coluna PCP (esquerda)
+^FO50,160^A0N,36,36^FB350,1,0,C,0^FDPCP^FS
+^FO60,210^A0N,30,30^FDCélula: {str_celula[:80]}^FS
+^FO60,240^A0N,30,30^FDCor: {cor}^FS
+
+^FX Coluna Qualidade (direita)
+^FO420,160^A0N,36,36^FB330,1,0,C,0^FDQualidade^FS
+^FO430,205^A0N,30,30^FDAprovado:^FS
+^FO560,205^A0N,30,30^FDSim^FS
+^FO610,205^GB20,20,20^FS
+^FO650,205^A0N,30,30^FDNão^FS
+^FO700,205^GB20,20,2^FS
+^FO430,235^A0N,30,30^FDData: ___/___/___^FS
+^FO430,270^A0N,30,30^FDInspetor: _____________^FS
+
+^XZ
+""".lstrip()
+
+        sucesso = enviar_para_impressao(zpl, str_celula)
+        print(codigo, peca)
+        if sucesso:
+            total_impressoes += 1
+            ultima_str_celula = str_celula
+            ultima_cor = cor
+            time.sleep(2)  # pausa antes do próximo job
+        else:
+            print(f"❌ Impressão da célula {str_celula} não confirmada.")
+
+        total_impressoes += 1
+        # time.sleep(2)
+        # send_raw_windows(zpl, printer)
+
+    print(f"✅ Total de etiquetas impressas: {total_impressoes}")
     return total_impressoes
 
 def gerar_e_salvar_qrcode(request, ordem):
