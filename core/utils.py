@@ -5,17 +5,17 @@ from datetime import datetime, timedelta
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from datetime import timedelta as dt_timedelta
-from django.db import transaction
-from django.utils import timezone as dj_timezone
-from .models import Profile, Notificacao, RegistroNotificacao
-from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
+# from django.db import transaction
+# from django.utils import timezone as dj_timezone
+# from .models import Profile, Notificacao, RegistroNotificacao
+# from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
 
 # Constantes de alerta
-LIMITE_ERROS = 20
-FREQUENCIA_ALERTA_ERROS = dt_timedelta(days=2)  # ajuste conforme desejado
-CACHE_DF = None 
-CACHE_EXPIRATION_TIME = datetime.min 
-CACHE_DURATION = timedelta(hours=24) 
+# LIMITE_ERROS = 20
+# FREQUENCIA_ALERTA_ERROS = dt_timedelta(days=2)  # ajuste conforme desejado
+# CACHE_DF = None 
+# CACHE_EXPIRATION_TIME = datetime.min 
+# CACHE_DURATION = timedelta(hours=24) 
 
 def notificar_ordem(ordem):
     channel_layer = get_channel_layer()
