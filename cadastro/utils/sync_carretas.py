@@ -47,7 +47,7 @@ def tratamento_carretas():
     
     df = pd.read_csv("cadastro/BASE_GERAL.csv")
 
-    df = df[['CODIGO', 'DESCRIÇÃO', 'MATÉRIA PRIMA', 'TOTAL', 'PRIMEIRO PROCESSO', '2 PROCESSO', 'PRODUTO', 'CARRETA','CELULA 3']] 
+    df = df[['CODIGO', 'DESCRIÇÃO', 'MATÉRIA PRIMA', 'TOTAL', 'PRIMEIRO PROCESSO', '2 PROCESSO', 'CONJUNTO', 'CARRETA','CELULA 3']] 
     columns=['codigo_peca','descricao_peca','mp_peca','total_peca','primeiro_processo','segundo_processo','conjunto_peca','carreta','grupo']
 
     # codigos que deverã ser tratados manualmente (criar um processo apenas para eles) - COMPONENTE EXTRA

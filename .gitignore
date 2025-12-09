@@ -5,3 +5,8 @@ __pycache__/
 antigo
 .vscode
 venv
+BASE_GERAL.CSV
+/BASE_GERAL.CSV
+.BASE_GERAL.CSV
+cadastro\BASE_GERAL.csv
+cadastro/BASE_GERAL.csv
