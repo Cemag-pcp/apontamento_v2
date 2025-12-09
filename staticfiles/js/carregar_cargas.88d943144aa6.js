@@ -81,6 +81,10 @@ export async function popularPacotesDaCarga(cargaId) {
             ${carretasChips}
           </div>
         </div>
+        <div class="ms-3 flex-grow-1">
+          <label class="form-label mb-1 small">Filtrar por c\u00f3digo ou descri\u00e7\u00e3o</label>
+          <input type="text" id="filtroItensPacote" class="form-control form-control-sm" placeholder="Digite c\u00f3digo ou parte da descri\u00e7\u00e3o">
+        </div>
     `;
 
     if (data.status_carga !== 'despachado') {
@@ -182,10 +186,43 @@ export async function popularPacotesDaCarga(cargaId) {
       return;
     }
     
+    // filtro de itens dentro dos pacotes
+    const aplicarFiltro = (termo) => {
+      const texto = (termo || '').toLowerCase().trim();
+      const colunas = cardsContainer.querySelectorAll('.col-pacote');
+      let algumVisivel = false;
+
+      colunas.forEach((col) => {
+        const itens = col.querySelectorAll('li.list-group-item');
+        let visiveisCard = 0;
+        itens.forEach((li) => {
+          const cod = (li.dataset.codigo || '').toLowerCase();
+          const desc = (li.dataset.descricao || '').toLowerCase();
+          const match = !texto || cod.includes(texto) || desc.includes(texto);
+          li.classList.toggle('d-none', !match);
+          if (match) visiveisCard += 1;
+        });
+        col.classList.toggle('d-none', visiveisCard === 0);
+        if (visiveisCard > 0) algumVisivel = true;
+      });
+
+      // feedback quando nada encontrado
+      let aviso = modalBody.querySelector('#avisoFiltroPacote');
+      if (!aviso) {
+        aviso = document.createElement('div');
+        aviso.id = 'avisoFiltroPacote';
+        aviso.className = 'alert alert-warning mt-3 d-none';
+        aviso.textContent = 'Nenhum item encontrado com esse filtro.';
+        modalBody.appendChild(aviso);
+      }
+      aviso.classList.toggle('d-none', algumVisivel);
+    };
+
     data.pacotes.forEach(pacote => {
 
       const col = document.createElement('div');
-      col.className = 'col-md-4 col-sm-6';  // 3 colunas em md+, 2 em sm
+      col.className = 'col-md-4 col-sm-6 col-pacote';  // 3 colunas em md+, 2 em sm
+      col.dataset.pacoteId = pacote.id;  // facilita filtros
 
       const card = document.createElement('div');
       card.className = 'card mb-3 shadow-sm';
@@ -195,7 +232,78 @@ export async function popularPacotesDaCarga(cargaId) {
 
       const header = document.createElement('div');
       header.className = 'card-header d-flex justify-content-between align-items-center py-2 px-3';
-      header.innerHTML = `<strong class="text-truncate w-100">${pacote.nome}</strong>`;
+      const headerTitle = document.createElement('strong');
+      headerTitle.className = 'text-truncate w-100';
+      headerTitle.textContent = pacote.nome;
+
+      const headerActions = document.createElement('div');
+      headerActions.className = 'd-flex align-items-center gap-2 flex-shrink-0';
+
+      if (data.status_carga !== 'despachado') {
+        const btnDuplicar = document.createElement('button');
+        btnDuplicar.className = 'btn btn-outline-secondary btn-sm';
+        btnDuplicar.innerHTML = '<i class="fas fa-copy"></i>';
+        btnDuplicar.title = 'Duplicar pacote';
+        btnDuplicar.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const previous = btnDuplicar.innerHTML;
+          btnDuplicar.disabled = true;
+          btnDuplicar.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+          try {
+            const resp = await fetch(`api/pacotes/duplicar/${pacote.id}/`, {
+              method: 'POST',
+              headers: { 'X-CSRFToken': getCookie('csrftoken') }
+            });
+            const dataResp = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+              throw new Error(dataResp?.erro || 'Erro ao duplicar o pacote.');
+            }
+            Toast.fire({ icon: "success", title: dataResp?.mensagem || 'Pacote duplicado.' });
+            await popularPacotesDaCarga(cargaId);
+          } catch (error) {
+            alert(error.message || 'Erro ao duplicar o pacote.');
+          } finally {
+            btnDuplicar.disabled = false;
+            btnDuplicar.innerHTML = previous;
+          }
+        });
+
+        headerActions.appendChild(btnDuplicar);
+
+        const btnDeletar = document.createElement('button');
+        btnDeletar.className = 'btn btn-outline-danger btn-sm';
+        btnDeletar.innerHTML = '<i class="fas fa-trash"></i>';
+        btnDeletar.title = 'Excluir pacote';
+        btnDeletar.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const confirmou = confirm('Deseja excluir este pacote? Os itens voltarão para as pendências.');
+          if (!confirmou) return;
+          const previous = btnDeletar.innerHTML;
+          btnDeletar.disabled = true;
+          btnDeletar.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+          try {
+            const resp = await fetch(`api/pacotes/deletar/${pacote.id}/`, {
+              method: 'DELETE',
+              headers: { 'X-CSRFToken': getCookie('csrftoken') }
+            });
+            const dataResp = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+              throw new Error(dataResp?.erro || 'Erro ao excluir o pacote.');
+            }
+            Toast.fire({ icon: "success", title: dataResp?.mensagem || 'Pacote excluído.' });
+            await popularPacotesDaCarga(cargaId);
+          } catch (error) {
+            alert(error.message || 'Erro ao excluir o pacote.');
+          } finally {
+            btnDeletar.disabled = false;
+            btnDeletar.innerHTML = previous;
+          }
+        });
+
+        headerActions.appendChild(btnDeletar);
+      }
+      header.appendChild(headerTitle);
+      header.appendChild(headerActions);
 
       // Flag de foto ao lado do nome do pacote
       // Ao clicar na flag deverá chamar uma função que trará as fotos em um modal
@@ -277,7 +385,7 @@ export async function popularPacotesDaCarga(cargaId) {
             }
           })();
         });
-        header.appendChild(fotoIcon);
+        headerActions.appendChild(fotoIcon);
       }
 
       const body = document.createElement('div');
@@ -314,14 +422,17 @@ export async function popularPacotesDaCarga(cargaId) {
           info.className = 'me-2';
           info.innerHTML = `
             <div><strong>${item.codigo_peca}</strong> - ${item.descricao || ''}</div>
-            <small class="text-muted">Qtde: ${item.quantidade}</small>
+            <small class="text-muted quantidade-label">Qtde: <span class="quantidade-valor">${item.quantidade}</span></small>
           `;
+          li.dataset.codigo = item.codigo_peca || '';
+          li.dataset.descricao = item.descricao || '';
 
           // Botão "Alterar pacote"
           const btnAlterar = document.createElement('button');
           btnAlterar.type = 'button';
           btnAlterar.className = 'btn btn-outline-primary btn-sm flex-shrink-0';
-          btnAlterar.textContent = 'Alterar pacote';
+          // btnAlterar.textContent = 'Alterar pacote';
+          btnAlterar.innerHTML = '<i class="fas fa-exchange-alt"></i>'; // Ícone de troca
           btnAlterar.setAttribute('data-bs-toggle', 'modal');
           btnAlterar.setAttribute('data-bs-target', '#modalAlterarPacote');
 
@@ -369,7 +480,98 @@ export async function popularPacotesDaCarga(cargaId) {
 
           li.appendChild(info);
           
-          // mesma regra de visibilidade do botão Confirmar (apenas em "apontamento" e pacote != ok)
+          const podeEditarQtd = (data.status_carga === 'planejamento' || data.status_carga === 'verificacao');
+          if (podeEditarQtd) {
+            const quantidadeWrapper = document.createElement('div');
+            quantidadeWrapper.className = 'd-flex align-items-center gap-1 mt-1';
+
+            const inputQtd = document.createElement('input');
+            inputQtd.type = 'number';
+            inputQtd.min = '1';
+            inputQtd.value = item.quantidade;
+            inputQtd.className = 'form-control form-control-sm w-auto';
+
+            const btnSalvarQtd = document.createElement('button');
+            btnSalvarQtd.type = 'button';
+            btnSalvarQtd.className = 'btn btn-outline-secondary btn-sm';
+            btnSalvarQtd.innerHTML = '<i class=\"fas fa-save\"></i>';
+            btnSalvarQtd.title = 'Atualizar quantidade do item';
+
+            btnSalvarQtd.addEventListener('click', async () => {
+              const novaQt = parseInt(inputQtd.value, 10);
+              if (!novaQt || novaQt <= 0) {
+                alert('Quantidade inválida.');
+                return;
+              }
+
+              const prevText = btnSalvarQtd.innerHTML;
+              btnSalvarQtd.disabled = true;
+              btnSalvarQtd.innerHTML = '<span class=\"spinner-border spinner-border-sm\" role=\"status\" aria-hidden=\"true\"></span>';
+              try {
+                const resp = await fetch(`api/pacotes/itens/${item.id}/atualizar-quantidade/`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                  },
+                  body: JSON.stringify({ quantidade: novaQt })
+                });
+                const dataResp = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                  throw new Error(dataResp?.erro || 'Erro ao atualizar quantidade.');
+                }
+                const qVal = li.querySelector('.quantidade-valor');
+                if (qVal) qVal.textContent = dataResp.nova_quantidade;
+                inputQtd.value = dataResp.nova_quantidade;
+              } catch (error) {
+                alert(error.message || 'Erro ao atualizar quantidade.');
+              } finally {
+                btnSalvarQtd.disabled = false;
+                btnSalvarQtd.innerHTML = prevText;
+              }
+            });
+
+            quantidadeWrapper.appendChild(inputQtd);
+            quantidadeWrapper.appendChild(btnSalvarQtd);
+            info.appendChild(quantidadeWrapper);
+
+            const btnExcluirItem = document.createElement('button');
+            btnExcluirItem.type = 'button';
+            btnExcluirItem.className = 'btn btn-outline-danger btn-sm';
+            btnExcluirItem.innerHTML = '<i class="fas fa-trash"></i>';
+            btnExcluirItem.addEventListener('click', async () => {
+              const confirma = confirm('Remover esta peça do pacote? A quantidade voltará para a pendência.');
+              if (!confirma) return;
+              const prev = btnExcluirItem.innerHTML;
+              btnExcluirItem.disabled = true;
+              btnExcluirItem.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+              try {
+                const resp = await fetch(`api/pacotes/itens/${item.id}/deletar/`, {
+                  method: 'DELETE',
+                  headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                });
+                const dataResp = await resp.json().catch(() => ({}));
+                if (!resp.ok) {
+                  throw new Error(dataResp?.erro || 'Erro ao remover peça.');
+                }
+                li.remove();
+                // se lista ficar vazia, mostra aviso
+                if (!lista.querySelector('li')) {
+                  const vazio = document.createElement('li');
+                  vazio.className = 'list-group-item text-muted';
+                  vazio.innerText = 'Nenhum item no pacote.';
+                  lista.appendChild(vazio);
+                }
+              } catch (error) {
+                alert(error.message || 'Erro ao remover peça.');
+              } finally {
+                btnExcluirItem.disabled = false;
+                btnExcluirItem.innerHTML = prev;
+              }
+            });
+            quantidadeWrapper.appendChild(btnExcluirItem);
+          }
+
           if (data.status_carga === 'planejamento' && pacote.status_expedicao !== 'ok') {
             li.appendChild(btnAlterar);
           } else if (data.status_carga === 'verificacao' && pacote.status_qualidade !== 'ok') {
@@ -569,6 +771,13 @@ export async function popularPacotesDaCarga(cargaId) {
 
     modalBody.appendChild(document.createElement('hr'));
     modalBody.appendChild(cardsContainer);
+
+    const campoFiltro = modalBody.querySelector('#filtroItensPacote');
+    if (campoFiltro) {
+      campoFiltro.addEventListener('input', (e) => aplicarFiltro(e.target.value));
+    }
+    // aplica filtro vazio para resetar estado
+    aplicarFiltro('');
 
   } catch (error) {
     console.error('Erro ao buscar pacotes:', error);

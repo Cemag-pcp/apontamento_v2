@@ -286,23 +286,25 @@ export function createKanbanCard(carga) {
   header.appendChild(title);
   header.appendChild(actions);
 
-  // Corpo do card com um "slot" onde o botao/alerta sera colocado
+  // Corpo do card com layout compacto e slot para avan?ar
   const body = document.createElement('div');
-
-  body.className = 'card-body py-2';
+  body.className = 'card-body';
   body.innerHTML = `
-    <div class="small text-muted mb-1">
-      Dt. Carga: ${formatarData(carga.data_carga)}
-      <span class="status-carretas align-middle ms-2"></span>
-      <span class="status-por-carreta align-middle ms-2"></span>
+    <div class="meta-row">
+      <span class="meta"><i class="far fa-calendar"></i>${formatarData(carga.data_carga)}</span>
+      <span class="meta"><i class="fas fa-layer-group"></i>${(carga.stage || '').toUpperCase()}</span>
     </div>
-    <div class="small text-muted">${carga.cliente}</div>
-    <div class="mt-2 d-flex gap-2 align-items-start">
+    <div class="cliente text-truncate" title="${carga.cliente || ''}">${carga.cliente || ''}</div>
+    <div class="meta-row">
+      <span class="meta status-carretas"></span>
+      <span class="meta status-por-carreta"></span>
+    </div>
+    <div class="actions-row">
       <button class="btn btn-sm btn-outline-primary ver-pacotes" title="Ver pacotes"
               data-bs-toggle="modal" data-bs-target="#visualizarPacote" data-id-carga="${carga.id}">
-        <i class="fas fa-box"></i>
+        <i class="fas fa-box"></i> Pacotes
       </button>
-      <span class="slot-avancar d-inline-flex"></span>
+      <span class="slot-avancar"></span>
     </div>
   `;
 

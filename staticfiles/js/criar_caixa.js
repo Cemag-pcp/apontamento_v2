@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const cliente = this.value;
         const data = dataCarga.value;
         const carga = selectCarga.value;
+        etapa4.style.display = 'none';
 
         if (data && carga) {
             // Chama API para buscar carretas
@@ -183,7 +184,10 @@ async function buscarCargas(data) {
     console.log('Buscando cargas para data:', data);
 
     // resetar select
-    selectCarga.innerHTML = '<option value="">Carregando...</option>';
+    selectCarga.disabled = true;
+    selectCarga.innerHTML = '<option value="">aguarde...</option>';
+    etapa4.style.display = 'none';
+    etapa3.style.display = 'none';
 
     try {
         const response = await fetch(`api/cargas_disponiveis/?data_carga=${encodeURIComponent(data)}`);
@@ -195,7 +199,8 @@ async function buscarCargas(data) {
         const cargas = await response.json();
 
         // Popula o select de cargas
-        selectCliente.innerHTML = '<option value="">Selecione um cliente</option>';
+        selectCarga.innerHTML = '<option value="">Escolha</option>';
+
         cargas.forEach((carga, idx) => {
             const option = document.createElement('option');
             option.value = carga;  // valor = código vindo do backend
@@ -204,6 +209,7 @@ async function buscarCargas(data) {
         });
 
         selectCarga.disabled = false;
+
     } catch (err) {
         console.error('Erro ao buscar cargas:', err);
         alert('Erro ao carregar cargas. Tente novamente.');
@@ -213,6 +219,9 @@ async function buscarCargas(data) {
 // Função para buscar clientes via API
 async function buscarClientes(data, carga) {
     console.log('Buscando clientes para data e carga:', data,carga);
+    
+    selectCliente.disabled = true;
+    selectCliente.innerHTML = '<option value="">aguarde...</option>';
 
     try {
         const response = await fetch(`api/clientes_disponiveis/?data_carga=${encodeURIComponent(data)}&carga=${encodeURIComponent(carga)}`);
@@ -224,7 +233,8 @@ async function buscarClientes(data, carga) {
         const clientes = await response.json();
 
         // Popula o select de clientes
-        selectCliente.innerHTML = '<option value="">Selecione um cliente</option>';
+        selectCliente.innerHTML = '<option value="">Escolha</option>';
+
         clientes.forEach((cliente, idx) => {
             const option = document.createElement('option');
             option.value = cliente;  // valor = código vindo do backend
@@ -252,6 +262,7 @@ const COLOR_HEX = {
 
 // Função para buscar carretas via API
 async function buscarCarretas(data, clienteId) {
+    etapa4.style.display = 'none';
     console.log('Buscando carretas para data:', data, 'e cliente:', clienteId);
 
     // estado de loading (opcional)
