@@ -296,6 +296,23 @@ def buscar_cargas(request):
     return JsonResponse(list(cargas), safe=False)
 
 @csrf_exempt
+@require_http_methods(["DELETE", "POST"])
+def excluir_carga(request, id):
+    """
+    Remove o carregamento e todas as relaÇõÇœes em cascata (carretas, pacotes, itens, imagens).
+    Aceita DELETE ou POST para compatibilidade com clientes que não enviam DELETE.
+    """
+
+    # Permite apenas usuario PCP ou ADMIN
+    if not request.user.is_authenticated or not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso != 'pcp' or request.user.profile.tipo_acesso == 'admin':
+        return JsonResponse({'erro': 'Acesso negado: apenas PCP pode excluir carregamentos.'}, status=403)
+
+    carga = get_object_or_404(Carga, id=id)
+    carga.delete()
+    return JsonResponse({'mensagem': 'Carregamento excluÍdo com sucesso.'}, status=200)
+
+
+@csrf_exempt
 @require_http_methods(["POST"])
 def guardar_pacotes(request):
     try:

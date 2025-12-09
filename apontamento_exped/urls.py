@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/clientes_disponiveis/', views.clientes, name='clientes'),
     path('api/criar-caixa/', views.criar_caixa, name='criar_caixa'),
     path('api/buscar-cargas/', views.buscar_cargas, name='buscar_cargas'),
+    path('api/excluir-carga/<int:id>/', views.excluir_carga, name='excluir_carga'),
     path('api/guardar-pacote/', views.guardar_pacotes, name='guardar_pacotes'),
     path('api/buscar-pacote/<int:id>/', views.buscar_pacotes_carga, name='buscar_pacotes_carga'),
     path('api/alterar-stage/<int:id>/', views.alterar_stage, name='alterar_stage'),
