@@ -16,6 +16,27 @@ function mapStage(carga) {
   return 'planejamento';
 }
 
+async function excluirCarregamento(cargaId, cardEl) {
+  try {
+    const resp = await fetch(`api/excluir-carga/${encodeURIComponent(cargaId)}/`, {
+      method: 'DELETE',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+    });
+
+    if (!resp.ok) {
+      const msg = await resp.text();
+      throw new Error(msg || 'Erro ao excluir carregamento');
+    }
+
+    cardEl?.remove();
+  } catch (error) {
+    console.error('Falha ao excluir carregamento:', error);
+    alert(error);
+  }
+}
+
 /**
  * Consulta a API e retorna o número total de itens pendentes (int).
  * Se houver erro, retorna null (para não travar a UI).
@@ -235,12 +256,39 @@ export function createKanbanCard(carga) {
 
   const header = document.createElement('div');
   header.className = 'card-header py-1 d-flex justify-content-between align-items-center';
-  header.innerHTML = `
-    <span class="fw-semibold text-truncate">#${carga.id} • ${carga.carga}</span>
-  `;
+  const title = document.createElement('span');
+  title.className = 'fw-semibold text-truncate';
+  title.textContent = `#${carga.id} - ${carga.carga}`;
 
-  // Corpo do card com um "slot" onde o botão/alerta será colocado
+  const actions = document.createElement('div');
+  actions.className = 'd-flex align-items-center gap-2';
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'btn btn-sm btn-outline-danger';
+  deleteBtn.title = 'Excluir carregamento';
+  deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+  deleteBtn.addEventListener('click', async () => {
+    const confirmou = confirm('Deseja excluir este carregamento e todos os seus pacotes?');
+    if (!confirmou) return;
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+    try {
+      await excluirCarregamento(carga.id, card);
+    } finally {
+      if (document.body.contains(deleteBtn)) {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+      }
+    }
+  });
+
+  actions.appendChild(deleteBtn);
+  header.appendChild(title);
+  header.appendChild(actions);
+
+  // Corpo do card com um "slot" onde o botao/alerta sera colocado
   const body = document.createElement('div');
+
   body.className = 'card-body py-2';
   body.innerHTML = `
     <div class="small text-muted mb-1">
