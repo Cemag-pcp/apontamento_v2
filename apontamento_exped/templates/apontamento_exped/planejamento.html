@@ -61,6 +61,62 @@
           cursor: grabbing;
       }
 
+      /* Layout fixo e mais limpo para os cards do kanban */
+      .card-kanban {
+          min-height: 190px;
+          max-height: 190px;
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+      }
+      .card-kanban .card-header {
+          background: linear-gradient(135deg, #f8fafc, #eef2ff);
+          border-bottom: 1px solid #e5e7eb;
+          padding: 0.4rem 0.75rem;
+      }
+      .card-kanban .card-body {
+          display: flex;
+          flex-direction: column;
+          gap: .35rem;
+          padding: 0.6rem 0.75rem;
+          font-size: 0.92rem;
+      }
+      .card-kanban .meta-row {
+          display: flex;
+          justify-content: space-between;
+          gap: .5rem;
+          align-items: center;
+          flex-wrap: wrap;
+      }
+      .card-kanban .meta {
+          display: inline-flex;
+          align-items: center;
+          gap: .35rem;
+          color: #475569;
+          font-size: 0.85rem;
+          white-space: nowrap;
+      }
+      .card-kanban .meta i {
+          color: #6366f1;
+      }
+      .card-kanban .cliente {
+          font-weight: 600;
+          color: #0f172a;
+          font-size: 0.95rem;
+      }
+      .card-kanban .actions-row {
+          margin-top: auto;
+          display: flex;
+          gap: .4rem;
+          align-items: center;
+      }
+      .card-kanban .slot-avancar {
+          display: inline-flex;
+          flex: 1 1 auto;
+      }
+
   </style>
 
 {% endblock %}

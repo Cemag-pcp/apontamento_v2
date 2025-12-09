@@ -140,18 +140,27 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const row = criarRowItem();
-        itensContainer.appendChild(row);
-
+        
         const selectEl = row.querySelector('.campo-item');
+        
+        btnAdicionar.innerHTML = 'aguarde...';
+        btnAdicionar.disabled = true;
 
         try {
             const itens = await carregarPendencias(idCarga);
             initSelect2Local(selectEl, itens);
+            itensContainer.appendChild(row);
+            btnAdicionar.innerHTML = 'Adicionar Item';
+            btnAdicionar.disabled = false;
+
         } catch (err) {
             console.error(err);
             alert('Não foi possível carregar as pendências. Tente novamente.');
             if ($(selectEl).data('select2')) $(selectEl).select2('destroy');
             row.remove();
+            btnAdicionar.innerHTML = 'Adicionar Item';
+            btnAdicionar.disabled = false;
+
         }
     });
 
