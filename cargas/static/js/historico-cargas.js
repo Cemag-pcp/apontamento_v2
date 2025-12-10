@@ -123,7 +123,7 @@ function atualizarTabela(ordens, setor) {
                     disabled>
             </td>
             <td>
-                <input type="number" class="form-control" 
+                <input type="number" class="form-control qtd-prod-input" 
                     data-id="${ordem.ordem}" value="${ordem.total_produzido}" 
                     disabled>
             </td>
@@ -223,12 +223,14 @@ async function imprimirEtiqueta(ordemId, btn) {
 // Ativa os inputs para edição e exibe o botão de confirmar
 function ativarEdicao(ordemId) {
     const qtBoaInput = document.querySelector(`.qtd-plan-input[data-id="${ordemId}"]`);
+    const qtProdInput = document.querySelector(`.qtd-prod-input[data-id="${ordemId}"]`);
     const dataCargaInput = document.querySelector(`.data-carga-input[data-id="${ordemId}"]`);
     const botaoEditar = document.querySelector(`.btn-editar[data-id="${ordemId}"]`);
     const botaoConfirmar = document.querySelector(`.btn-confirmar[data-id="${ordemId}"]`);
 
     if (qtBoaInput && dataCargaInput) {
         qtBoaInput.removeAttribute("disabled");
+        qtProdInput?.removeAttribute("disabled");
         dataCargaInput.removeAttribute("disabled");
 
         botaoEditar.classList.add("d-none");
@@ -239,14 +241,16 @@ function ativarEdicao(ordemId) {
 // Captura os valores editados e confirma a alteração
 function confirmarAlteracao(ordemId, setor) {
     const qtPlanInput = document.querySelector(`.qtd-plan-input[data-id="${ordemId}"]`);
+    const qtProdInput = document.querySelector(`.qtd-prod-input[data-id="${ordemId}"]`);
     const dataCargaInput = document.querySelector(`.data-carga-input[data-id="${ordemId}"]`);
     const botaoEditar = document.querySelector(`.btn-editar[data-id="${ordemId}"]`);
     const botaoConfirmar = document.querySelector(`.btn-confirmar[data-id="${ordemId}"]`);
 
     const novaQtdPlan = qtPlanInput.value;
+    const novaQtdProd = qtProdInput ? qtProdInput.value : null;
     const novaDataCarga = dataCargaInput.value;
 
-    if (novaQtdPlan === '') {
+    if (novaQtdPlan === '' || novaQtdProd === '') {
         Swal.fire({ icon: 'error', title: 'Erro!', text: 'Preencha todos os campos.' });
         return;
     }
@@ -259,6 +263,7 @@ function confirmarAlteracao(ordemId, setor) {
     // Desativar os campos novamente
     qtPlanInput.setAttribute("disabled", "true");
     dataCargaInput.setAttribute("disabled", "true");
+    if (qtProdInput) qtProdInput.setAttribute("disabled", "true");
 
     // Alternar visibilidade dos botões
     botaoEditar.classList.remove("d-none");
@@ -272,6 +277,7 @@ function confirmarAlteracao(ordemId, setor) {
             ordemId: ordemId,
             novaQtdPlan: novaQtdPlan,
             novaDataCarga: novaDataCarga,
+            qtd_produzida: novaQtdProd,
             setor: setor
         })
     })

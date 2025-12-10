@@ -761,6 +761,7 @@ def editar_planejamento(request):
         qt_planejada = data.get('novaQtdPlan')
         ordem_id = data.get('ordemId')
         setor = data.get('setor')
+        qtd_produzida = data.get('qtd_produzida')
 
         # Validação de campos obrigatórios
         if not ordem_id or not setor:
@@ -813,6 +814,68 @@ def editar_planejamento(request):
         # Atualiza a quantidade planejada, se necessário
         if qt_planejada:
             atualizar_ordens.update(qtd_planejada=qt_planejada)
+
+        # Atualiza a quantidade produzida, se enviada
+        if qtd_produzida is not None:
+            try:
+                qtd_produzida = float(qtd_produzida)
+            except (TypeError, ValueError):
+                return JsonResponse({"erro": "Quantidade produzida inválida."}, status=400)
+            if qtd_produzida < 0:
+                return JsonResponse({"erro": "Quantidade produzida não pode ser negativa."}, status=400)
+
+            if setor == 'montagem':
+                soma_atual = atualizar_ordens.aggregate(total=Coalesce(Sum('qtd_boa'), Value(0.0)))['total'] or 0.0
+                delta = qtd_produzida - float(soma_atual)
+                ultima_execucao = atualizar_ordens.order_by('-data', '-id').first()
+                if not ultima_execucao:
+                    return JsonResponse({"erro": "Nenhuma execução encontrada para ajustar a produção."}, status=400)
+
+                if delta < 0:
+                    reduzir = abs(delta)
+                    if reduzir > (ultima_execucao.qtd_boa or 0):
+                        return JsonResponse({"erro": f"Redução maior que a última execução ({ultima_execucao.qtd_boa})."}, status=400)
+                    ultima_execucao.qtd_boa = (ultima_execucao.qtd_boa or 0) - reduzir
+                elif delta > 0:
+                    ultima_execucao.qtd_boa = (ultima_execucao.qtd_boa or 0) + delta
+                # se delta == 0 não altera
+                if delta != 0:
+                    ultima_execucao.save(update_fields=['qtd_boa'])
+            elif setor == 'pintura':
+                soma_atual = atualizar_ordens.aggregate(total=Coalesce(Sum('qtd_boa'), Value(0.0)))['total'] or 0.0
+                delta = qtd_produzida - float(soma_atual)
+                ultima_execucao = atualizar_ordens.order_by('-data', '-id').first()
+                if not ultima_execucao:
+                    return JsonResponse({"erro": "Nenhuma execução encontrada para ajustar a produção."}, status=400)
+
+                if delta < 0:
+                    reduzir = abs(delta)
+                    if reduzir > (ultima_execucao.qtd_boa or 0):
+                        return JsonResponse({"erro": f"Redução maior que a última execução ({ultima_execucao.qtd_boa})."}, status=400)
+                    ultima_execucao.qtd_boa = (ultima_execucao.qtd_boa or 0) - reduzir
+                elif delta > 0:
+                    ultima_execucao.qtd_boa = (ultima_execucao.qtd_boa or 0) + delta
+
+                if delta != 0:
+                    ultima_execucao.save(update_fields=['qtd_boa'])
+                    # Ajusta o último cambão vinculado à mesma peça/ordem
+                    try:
+                        from apontamento_pintura.models import CambaoPecas
+                        cambao = (CambaoPecas.objects
+                                  .filter(peca_ordem=ultima_execucao)
+                                  .order_by('-data_pendura', '-id')
+                                  .first())
+                        if not cambao:
+                            return JsonResponse({"erro": "Nenhum registro de cambão encontrado para esta peça/ordem."}, status=400)
+                        if cambao:
+                            if delta < 0 and cambao.quantidade_pendurada < abs(delta):
+                                return JsonResponse({"erro": "Quantidade a reduzir maior que a última pendurada."}, status=400)
+                            cambao.quantidade_pendurada = (cambao.quantidade_pendurada or 0) + delta
+                            cambao.save(update_fields=['quantidade_pendurada'])
+                    except Exception as e:
+                        return JsonResponse({"erro": f"Falha ao ajustar cambão: {e}"}, status=400)
+            else:
+                atualizar_ordens.update(qtd_boa=qtd_produzida)
 
         return JsonResponse({"mensagem": "Planejamento atualizado com sucesso!"}, status=200)
 

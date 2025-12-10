@@ -160,7 +160,7 @@ def get_itens_inspecao_montagem(request):
     itens_por_pagina = 12  # Itens por página
 
     # Filtra os dados
-    datas = Inspecao.objects.filter(pecas_ordem_montagem__isnull=False).exclude(
+    datas = Inspecao.objects.filter(pecas_ordem_montagem__isnull=False, pecas_ordem_montagem__qtd_boa__gt=0).exclude(
         id__in=inspecoes_ids
     )
 
