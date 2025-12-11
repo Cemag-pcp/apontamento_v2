@@ -11,6 +11,7 @@ urlpatterns = [
     path('', views.home, name='home'),
 
     path('api/excluir-ordem/', views.excluir_ordem, name='excluir_ordem'),
+    path('propriedades-ordem/', views.propriedades_ordem, name='propriedades_ordem'),
     
     path('login/', CustomLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),  # Para logout, se necessário
@@ -33,6 +34,7 @@ urlpatterns = [
     path('notificacoes/', views.notificacoes_pagina, name='notificacoes'),
     path('api/notificacoes/', views.notificacoes_api, name='api_notificacoes'),
     path('api/notificacoes/marcar-como-lidas/', views.marcar_notificacoes_como_lidas, name='api_marcar_como_lidas'),
+    path('api/propriedades-ordem/', views.propriedades_ordem_api, name='propriedades_ordem_api'),
 
     path('api/rpa/update-transfer/', api_view.rpa_update_transfer, name='rpa_update_transfer'),
     path('api/rpa/update-status/', api_view.rpa_update_status, name='rpa_update_status'),

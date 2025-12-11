@@ -18,7 +18,7 @@ from django.core.paginator import Paginator
 
 from .models import Ordem, Versao
 from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina,CarretasExplodidas
-from core.models import Ordem,MaquinaParada,OrdemProcesso,Profile,RotaAcesso, Notificacao
+from core.models import Ordem,MaquinaParada,OrdemProcesso,Profile,PropriedadesOrdem,RotaAcesso, Notificacao
 
 import json
 import time
@@ -105,6 +105,16 @@ def versao(request):
     versoes = Versao.objects.order_by('data_lancamento')
 
     return render(request, 'home/versao.html', {'versoes': versoes})
+
+@login_required
+def propriedades_ordem(request):
+    return render(
+        request,
+        'core/propriedades_ordem.html',
+        {
+            'tipos_chapa': PropriedadesOrdem.TIPO_CHAPA_CHOICES
+        }
+    )
 
 @csrf_exempt
 @require_http_methods(["PATCH"])  # So PATCH é permitido
@@ -684,3 +694,122 @@ def marcar_notificacoes_como_lidas(request):
 
     except json.JSONDecodeError:
         return HttpResponseBadRequest("JSON inválido.")
+
+@csrf_exempt
+@login_required
+def propriedades_ordem_api(request):
+    """
+    GET: lista PropriedadesOrdem paginadas.
+    PATCH: atualiza campos editáveis (descricao_mp, tamanho, espessura, quantidade).
+    """
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parâmetros de paginação inválidos.'}, status=400)
+
+        queryset = (
+            PropriedadesOrdem.objects
+            .select_related('ordem', 'mp_codigo', 'nova_mp')
+            .order_by('id')
+        )
+
+        # Filtros
+        ordem_param = request.GET.get('ordem')
+        if ordem_param:
+            try:
+                queryset = queryset.filter(ordem__ordem=int(ordem_param))
+            except ValueError:
+                return JsonResponse({'error': 'Parâmetro ordem inválido.'}, status=400)
+
+        mp_codigo_param = request.GET.get('mp_codigo')
+        if mp_codigo_param:
+            queryset = queryset.filter(mp_codigo_id=mp_codigo_param)
+
+        descricao_param = request.GET.get('descricao_mp')
+        if descricao_param:
+            queryset = queryset.filter(descricao_mp__icontains=descricao_param)
+
+        tipo_chapa_param = request.GET.get('tipo_chapa')
+        if tipo_chapa_param:
+            queryset = queryset.filter(tipo_chapa=tipo_chapa_param)
+
+        retalho_param = request.GET.get('retalho')
+        if retalho_param in ['true', 'false']:
+            queryset = queryset.filter(retalho=(retalho_param == 'true'))
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        propriedades = []
+        for prop in page_obj.object_list:
+            propriedades.append({
+                'id': prop.id,
+                'ordem_id': prop.ordem_id,
+                'ordem_numero': prop.ordem.ordem if prop.ordem else None,
+                'grupo_maquina': prop.ordem.grupo_maquina if prop.ordem else None,
+                'grupo_maquina_display': prop.ordem.get_grupo_maquina_display() if prop.ordem else None,
+                'mp_codigo_id': prop.mp_codigo_id,
+                'descricao_mp': prop.descricao_mp,
+                'tamanho': prop.tamanho,
+                'espessura': prop.espessura,
+                'quantidade': prop.quantidade,
+                'aproveitamento': prop.aproveitamento,
+                'tipo_chapa': prop.tipo_chapa,
+                'retalho': prop.retalho,
+                'nova_mp_id': prop.nova_mp_id,
+            })
+
+        return JsonResponse({
+            'results': propriedades,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        })
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        prop_id = data.get('id')
+        if not prop_id:
+            return JsonResponse({'error': 'ID da propriedade não informado.'}, status=400)
+
+        propriedade = get_object_or_404(PropriedadesOrdem, id=prop_id)
+
+        campos_editaveis = ['descricao_mp', 'tamanho', 'espessura', 'quantidade']
+        campos_para_atualizar = {}
+
+        for campo in campos_editaveis:
+            if campo in data:
+                campos_para_atualizar[campo] = data[campo]
+
+        if not campos_para_atualizar:
+            return JsonResponse({'error': 'Nenhum campo válido para atualizar.'}, status=400)
+
+        for campo, valor in campos_para_atualizar.items():
+            setattr(propriedade, campo, valor)
+
+        propriedade.save(update_fields=list(campos_para_atualizar.keys()))
+
+        return JsonResponse({
+            'success': 'Propriedade atualizada com sucesso.',
+            'propriedade': {
+                'id': propriedade.id,
+                'descricao_mp': propriedade.descricao_mp,
+                'tamanho': propriedade.tamanho,
+                'espessura': propriedade.espessura,
+                'quantidade': propriedade.quantidade,
+            }
+        })
+
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)
