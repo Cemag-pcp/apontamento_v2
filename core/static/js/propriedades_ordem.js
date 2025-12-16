@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextBtn = document.getElementById('next-page');
     const refreshBtn = document.getElementById('refresh-btn');
     const ordemInput = document.getElementById('f-ordem');
-    const mpCodigoInput = document.getElementById('f-mp-codigo');
+    // const mpCodigoInput = document.getElementById('f-mp-codigo');
     const descricaoInput = document.getElementById('f-descricao');
     const tipoChapaSelect = document.getElementById('f-tipo-chapa');
     const retalhoSelect = document.getElementById('f-retalho');
@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.page = 1;
         state.filters = {
             ordem: ordemInput.value,
-            mp_codigo: mpCodigoInput.value,
+            // mp_codigo: mpCodigoInput.value,
             descricao_mp: descricaoInput.value,
             tipo_chapa: tipoChapaSelect.value,
             retalho: retalhoSelect.value,
@@ -257,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearFiltersBtn.addEventListener('click', () => {
         ordemInput.value = '';
-        mpCodigoInput.value = '';
+        // mpCodigoInput.value = '';
         descricaoInput.value = '';
         tipoChapaSelect.value = '';
         retalhoSelect.value = '';
