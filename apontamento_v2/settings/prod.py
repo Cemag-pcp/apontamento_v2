@@ -4,7 +4,7 @@ import os
 
 # Configurações específicas de produção
 DEBUG = False
-ALLOWED_HOSTS = ['apontamentousinagem.onrender.com', 'apontamento-v2-testes.onrender.com', 'cmgprod.com.br']
+ALLOWED_HOSTS = ['apontamentousinagem.onrender.com', 'apontamento-v2-testes.onrender.com', 'www.cmgprod.com.br']
 CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
     'http://127.0.0.1',
