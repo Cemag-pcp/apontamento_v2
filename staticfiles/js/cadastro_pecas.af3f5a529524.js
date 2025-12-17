@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!app) return;
 
     const API_URL = app.dataset.apiUrl;
+    const defaultSetorId = app.dataset.defaultSetorId;
     const csrftoken = (() => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; csrftoken=`);
@@ -17,10 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
         hasPrevious: false,
         filters: {
             search: '',
+            setor: defaultSetorId || '',
         },
         meta: {
             conjuntos: [],
             maquinas: [],
+            setores: [],
         },
     };
 
@@ -32,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextBtn = document.getElementById('next-page-cadastro');
     const refreshBtn = document.getElementById('refresh-pecas-cadastro-btn');
     const searchInput = document.getElementById('f-search');
+    const setorFilter = document.getElementById('f-setor');
     const applyFiltersBtn = document.getElementById('apply-filters-cadastro');
     const clearFiltersBtn = document.getElementById('clear-filters-cadastro');
 
@@ -44,6 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const cApelido = document.getElementById('c-apelido');
     const cConjunto = document.getElementById('c-conjunto');
     const cProcesso = document.getElementById('c-processo-1');
+    const cSetores = document.getElementById('c-setores');
+    const modalEl = document.getElementById('cadastro-peca-modal');
+    const modal = window.bootstrap && modalEl ? new bootstrap.Modal(modalEl) : null;
+
+    enableClickToggle(cSetores);
 
     function setLoading(isLoading) {
         refreshBtn.disabled = isLoading;
@@ -52,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isLoading) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9">
+                    <td colspan="10">
                         <div class="loading-ghost w-100"></div>
                     </td>
                 </tr>
@@ -88,6 +97,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function setMultiSelectOptions(selectEl, options) {
+        selectEl.innerHTML = '';
+        options.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option.id;
+            opt.textContent = option.label;
+            selectEl.appendChild(opt);
+        });
+    }
+
     function buildSelect(name, options, selectedId, placeholder) {
         const select = document.createElement('select');
         select.className = 'form-select form-select-sm';
@@ -108,11 +127,42 @@ document.addEventListener('DOMContentLoaded', () => {
         return select;
     }
 
+    function buildMultiSelect(name, options, selectedIds) {
+        const select = document.createElement('select');
+        select.className = 'form-select form-select-sm';
+        select.name = name;
+        select.multiple = true;
+        enableClickToggle(select);
+        const selectedSet = new Set((selectedIds || []).map(String));
+        options.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option.id;
+            opt.textContent = option.label;
+            if (selectedSet.has(String(option.id))) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+        return select;
+    }
+
+    function enableClickToggle(selectEl) {
+        if (!selectEl || selectEl.dataset.clickToggle === 'true') return;
+        selectEl.dataset.clickToggle = 'true';
+        selectEl.addEventListener('mousedown', event => {
+            if (event.target.tagName !== 'OPTION') return;
+            event.preventDefault();
+            const option = event.target;
+            option.selected = !option.selected;
+            selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+
     function renderRows(items) {
         if (!items.length) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center text-muted py-4">
+                    <td colspan="10" class="text-center text-muted py-4">
                         Nenhum registro encontrado.
                     </td>
                 </tr>
@@ -135,6 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.appendChild(editCell('comprimento', item.comprimento, 'number', true));
         tr.appendChild(editCell('apelido', item.apelido));
 
+        const setorTd = document.createElement('td');
+        setorTd.appendChild(buildMultiSelect('setor_ids', state.meta.setores, item.setor_ids));
+        tr.appendChild(setorTd);
+
         const conjuntoTd = document.createElement('td');
         conjuntoTd.appendChild(buildSelect('conjunto_id', state.meta.conjuntos, item.conjunto_id, 'Sem conjunto'));
         tr.appendChild(conjuntoTd);
@@ -151,13 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.innerHTML = '<i class="bi bi-save me-1"></i>Salvar';
         saveBtn.addEventListener('click', () => handleSave(tr, saveBtn));
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'btn btn-outline-danger btn-sm';
-        deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-        deleteBtn.addEventListener('click', () => handleDelete(tr));
-
         actionTd.appendChild(saveBtn);
-        actionTd.appendChild(deleteBtn);
         tr.appendChild(actionTd);
 
         return tr;
@@ -193,8 +241,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const conjuntoSelect = row.querySelector('[name="conjunto_id"]');
         const processoSelect = row.querySelector('[name="processo_1_id"]');
+        const setorSelect = row.querySelector('[name="setor_ids"]');
         payload.conjunto_id = conjuntoSelect ? conjuntoSelect.value : '';
         payload.processo_1_id = processoSelect ? processoSelect.value : '';
+        payload.setor_ids = setorSelect ? Array.from(setorSelect.selectedOptions).map(option => Number(option.value)) : [];
 
         if (payload.comprimento !== '') {
             payload.comprimento = parseFloat(payload.comprimento);
@@ -233,43 +283,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function handleDelete(row) {
-        const id = row.dataset.id;
-        const confirmed = window.Swal
-            ? await Swal.fire({
-                icon: 'warning',
-                title: 'Remover peca?',
-                text: 'Esta acao nao pode ser desfeita.',
-                showCancelButton: true,
-                confirmButtonText: 'Remover',
-                cancelButtonText: 'Cancelar',
-            })
-            : { isConfirmed: window.confirm('Remover peca?') };
-
-        if (!confirmed.isConfirmed) return;
-
-        try {
-            const response = await fetch(API_URL, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken,
-                },
-                body: JSON.stringify({ id: Number(id) }),
-            });
-
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error(err.error || 'Nao foi possivel remover.');
-            }
-
-            showAlert('success', 'Peca removida com sucesso.');
-            loadPage();
-        } catch (error) {
-            showAlert('error', error.message);
-        }
-    }
-
     async function handleCreate() {
         const payload = {
             codigo: cCodigo.value.trim(),
@@ -279,10 +292,16 @@ document.addEventListener('DOMContentLoaded', () => {
             apelido: cApelido.value.trim(),
             conjunto_id: cConjunto.value,
             processo_1_id: cProcesso.value,
+            setor_ids: Array.from(cSetores.selectedOptions).map(option => Number(option.value)),
         };
 
         if (!payload.codigo) {
             showAlert('error', 'Codigo e obrigatorio.');
+            return;
+        }
+
+        if (!payload.setor_ids.length) {
+            showAlert('error', 'Selecione ao menos um setor.');
             return;
         }
 
@@ -310,6 +329,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             showAlert('success', 'Peca criada com sucesso.');
             clearForm();
+            if (modal) {
+                modal.hide();
+            }
             loadPage();
         } catch (error) {
             showAlert('error', error.message);
@@ -327,6 +349,9 @@ document.addEventListener('DOMContentLoaded', () => {
         cApelido.value = '';
         cConjunto.value = '';
         cProcesso.value = '';
+        Array.from(cSetores.options).forEach(option => {
+            option.selected = false;
+        });
     }
 
     async function loadPage() {
@@ -339,6 +364,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (state.filters.search) {
                 params.append('search', state.filters.search);
+            }
+            if (state.filters.setor) {
+                params.append('setor', state.filters.setor);
             }
 
             const response = await fetch(`${API_URL}?${params.toString()}`);
@@ -355,6 +383,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.meta = data.meta;
                 setSelectOptions(cConjunto, state.meta.conjuntos, 'Sem conjunto');
                 setSelectOptions(cProcesso, state.meta.maquinas, 'Sem processo');
+                setMultiSelectOptions(cSetores, state.meta.setores);
+                enableClickToggle(cSetores);
+                const selectedSetor = state.filters.setor || setorFilter.value;
+                setSelectOptions(setorFilter, state.meta.setores, 'Todos');
+                setorFilter.value = selectedSetor;
             }
 
             renderRows(data.results || []);
@@ -362,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-danger text-center py-4">
+                    <td colspan="10" class="text-danger text-center py-4">
                         ${error.message}
                     </td>
                 </tr>
@@ -401,18 +434,24 @@ document.addEventListener('DOMContentLoaded', () => {
     applyFiltersBtn.addEventListener('click', () => {
         state.page = 1;
         state.filters.search = searchInput.value.trim();
+        state.filters.setor = setorFilter.value;
         loadPage();
     });
 
     clearFiltersBtn.addEventListener('click', () => {
         searchInput.value = '';
+        setorFilter.value = '';
         state.page = 1;
         state.filters.search = '';
+        state.filters.setor = '';
         loadPage();
     });
 
     createBtn.addEventListener('click', handleCreate);
     clearFormBtn.addEventListener('click', clearForm);
+    if (modalEl) {
+        modalEl.addEventListener('hidden.bs.modal', clearForm);
+    }
 
     loadPage();
 });
