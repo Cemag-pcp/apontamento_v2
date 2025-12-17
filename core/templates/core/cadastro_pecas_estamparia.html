@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+<title>Cadastro de Pecas - Estamparia</title>
+{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/propriedades_ordem.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="cadastro-pecas-estamparia-app" data-api-url="{% url 'core:cadastro_pecas_estamparia_api' %}">
+    <div class="d-flex align-items-center justify-content-between mb-3 page-hero">
+        <div>
+            <div class="title h4 mb-0">Cadastro de Pecas - Estamparia</div>
+            <p class="subtitle small text-muted mb-0">Crie, edite e remova pecas do setor de estamparia.</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <button id="refresh-pecas-cadastro-btn" class="btn btn-light btn-sm text-dark">
+                <i class="bi bi-arrow-repeat me-1"></i>Atualizar
+            </button>
+        </div>
+    </div>
+
+    <div class="card card-surface mb-3">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-2 col-6">
+                    <label class="form-label small text-secondary">Codigo</label>
+                    <input id="c-codigo" type="text" class="form-control form-control-sm" placeholder="Obrigatorio">
+                </div>
+                <div class="col-md-3 col-6">
+                    <label class="form-label small text-secondary">Descricao</label>
+                    <input id="c-descricao" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2 col-6">
+                    <label class="form-label small text-secondary">Materia prima</label>
+                    <input id="c-mp" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2 col-6">
+                    <label class="form-label small text-secondary">Comprimento</label>
+                    <input id="c-comprimento" type="number" step="0.01" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-3 col-12">
+                    <label class="form-label small text-secondary">Apelido</label>
+                    <input id="c-apelido" type="text" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-4 col-12">
+                    <label class="form-label small text-secondary">Conjunto</label>
+                    <select id="c-conjunto" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-4 col-12">
+                    <label class="form-label small text-secondary">Processo 1</label>
+                    <select id="c-processo-1" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-md-4 col-12 d-flex gap-2">
+                    <button id="create-peca-btn" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-plus-lg me-1"></i>Criar peca
+                    </button>
+                    <button id="clear-form-btn" class="btn btn-outline-secondary btn-sm">
+                        Limpar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-surface mb-3">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-6 col-12">
+                    <label class="form-label small text-secondary">Busca</label>
+                    <input id="f-search" type="text" class="form-control form-control-sm" placeholder="Codigo, descricao ou apelido">
+                </div>
+                <div class="col-sm-6 col-12 d-flex gap-2">
+                    <button id="apply-filters-cadastro" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-funnel me-1"></i>Aplicar filtros
+                    </button>
+                    <button id="clear-filters-cadastro" class="btn btn-outline-secondary btn-sm">
+                        Limpar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-surface">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="fw-semibold small text-secondary mb-0">Itens por pagina</label>
+                    <select id="page-size-cadastro" class="form-select form-select-sm" style="width: auto;">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div id="pagination-summary-cadastro" class="small text-muted ms-auto"></div>
+            </div>
+
+            <div class="table-responsive" style="max-height: 65vh; overflow: auto;">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Codigo</th>
+                            <th>Descricao</th>
+                            <th>Materia prima</th>
+                            <th class="text-end">Comprimento</th>
+                            <th>Apelido</th>
+                            <th>Conjunto</th>
+                            <th>Processo 1</th>
+                            <th class="text-center" style="width: 160px;">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pecas-cadastro-body">
+                        <tr id="loading-row-cadastro">
+                            <td colspan="9">
+                                <div class="loading-ghost w-100"></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between mt-3">
+                <div class="small text-muted" id="total-indicator-cadastro"></div>
+                <div class="btn-group">
+                    <button id="prev-page-cadastro" class="btn btn-outline-secondary btn-sm">Anterior</button>
+                    <button id="next-page-cadastro" class="btn btn-outline-secondary btn-sm">Proxima</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/cadastro_pecas_estamparia.js' %}" defer></script>
+{% endblock %}

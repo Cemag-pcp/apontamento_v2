@@ -16,6 +16,7 @@ urlpatterns = [
     path('pecas-serra/', views.pecas_serra, name='pecas_serra'),
     path('pecas-usinagem/', views.pecas_usinagem, name='pecas_usinagem'),
     path('pecas-estamparia/', views.pecas_estamparia, name='pecas_estamparia'),
+    path('cadastro-pecas-estamparia/', views.cadastro_pecas_estamparia, name='cadastro_pecas_estamparia'),
     
     path('login/', CustomLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),  # Para logout, se necessário
@@ -43,6 +44,7 @@ urlpatterns = [
     path('api/pecas-serra/', views.pecas_serra_api, name='pecas_serra_api'),
     path('api/pecas-usinagem/', views.pecas_usinagem_api, name='pecas_usinagem_api'),
     path('api/pecas-estamparia/', views.pecas_estamparia_api, name='pecas_estamparia_api'),
+    path('api/cadastro-pecas-estamparia/', views.cadastro_pecas_estamparia_api, name='cadastro_pecas_estamparia_api'),
 
     path('api/rpa/update-transfer/', api_view.rpa_update_transfer, name='rpa_update_transfer'),
     path('api/rpa/update-status/', api_view.rpa_update_status, name='rpa_update_status'),

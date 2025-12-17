@@ -9,7 +9,7 @@ from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
 from django.utils.timesince import timesince
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import Prefetch, Count, Q
 from django.contrib.auth.models import User
 from django.contrib import messages
@@ -17,7 +17,7 @@ from django.views.decorators.http import require_GET, require_POST
 from django.core.paginator import Paginator
 
 from .models import Ordem, Versao
-from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina,CarretasExplodidas
+from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina,CarretasExplodidas,Setor,Conjuntos
 from core.models import Ordem,MaquinaParada,OrdemProcesso,Profile,PropriedadesOrdem,RotaAcesso, Notificacao
 from apontamento_corte.models import PecasOrdem as PecasOrdemCorte
 from apontamento_serra.models import PecasOrdem as PecasOrdemSerra
@@ -75,6 +75,203 @@ def excluir_ordem(request):
             return JsonResponse({'error': 'Erro interno no servidor.'}, status=500)
 
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+
+@login_required
+def cadastro_pecas_estamparia(request):
+    return render(request, 'core/cadastro_pecas_estamparia.html')
+
+
+@csrf_exempt
+@login_required
+def cadastro_pecas_estamparia_api(request):
+    """
+    GET: lista peças de estamparia paginadas.
+    POST: cria nova peça de estamparia.
+    PATCH: atualiza peça de estamparia.
+    DELETE: remove peça de estamparia.
+    """
+    setor = Setor.objects.filter(nome__iexact='estamparia').first()
+    if not setor:
+        return JsonResponse({'error': 'Setor estamparia nao encontrado.'}, status=400)
+
+    def parse_float(value, field):
+        if value in (None, ''):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            raise ValueError(f'{field} invalido.')
+
+    def parse_fk(model, value, field):
+        if value in (None, ''):
+            return None
+        try:
+            return model.objects.get(pk=int(value))
+        except (TypeError, ValueError, model.DoesNotExist):
+            raise ValueError(f'{field} invalido.')
+
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parametros de paginacao invalidos.'}, status=400)
+
+        queryset = Pecas.objects.filter(setor=setor).distinct().order_by('codigo')
+
+        search_param = request.GET.get('search')
+        if search_param:
+            queryset = queryset.filter(
+                Q(codigo__icontains=search_param) |
+                Q(descricao__icontains=search_param) |
+                Q(apelido__icontains=search_param)
+            )
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        pecas = []
+        for peca in page_obj.object_list:
+            conjunto_display = None
+            if peca.conjunto:
+                conjunto_display = f"{peca.conjunto.codigo} - {peca.conjunto.descricao}" if peca.conjunto.descricao else peca.conjunto.codigo
+
+            pecas.append({
+                'id': peca.id,
+                'codigo': peca.codigo,
+                'descricao': peca.descricao,
+                'materia_prima': peca.materia_prima,
+                'comprimento': peca.comprimento,
+                'apelido': peca.apelido,
+                'conjunto_id': peca.conjunto_id,
+                'conjunto_display': conjunto_display,
+                'processo_1_id': peca.processo_1_id,
+                'processo_1_nome': peca.processo_1.nome if peca.processo_1 else None,
+            })
+
+        conjuntos = [
+            {
+                'id': conjunto.id,
+                'label': f"{conjunto.codigo} - {conjunto.descricao}" if conjunto.descricao else conjunto.codigo
+            }
+            for conjunto in Conjuntos.objects.all().order_by('codigo')
+        ]
+        maquinas = [
+            {'id': maquina.id, 'label': maquina.nome}
+            for maquina in Maquina.objects.filter(setor=setor).order_by('nome')
+        ]
+
+        return JsonResponse({
+            'results': pecas,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+            'meta': {
+                'conjuntos': conjuntos,
+                'maquinas': maquinas,
+            }
+        })
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        codigo = (data.get('codigo') or '').strip()
+        if not codigo:
+            return JsonResponse({'error': 'Codigo e obrigatorio.'}, status=400)
+
+        try:
+            conjunto = parse_fk(Conjuntos, data.get('conjunto_id'), 'conjunto')
+            processo_1 = parse_fk(Maquina, data.get('processo_1_id'), 'processo_1')
+            comprimento = parse_float(data.get('comprimento'), 'comprimento')
+        except ValueError as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+
+        try:
+            peca = Pecas.objects.create(
+                codigo=codigo,
+                descricao=(data.get('descricao') or '').strip() or None,
+                materia_prima=(data.get('materia_prima') or '').strip() or None,
+                comprimento=comprimento,
+                apelido=(data.get('apelido') or '').strip() or None,
+                conjunto=conjunto,
+                processo_1=processo_1,
+            )
+            peca.setor.add(setor)
+        except IntegrityError:
+            return JsonResponse({'error': 'Codigo ja cadastrado.'}, status=400)
+
+        return JsonResponse({'success': 'Peca criada com sucesso.', 'id': peca.id}, status=201)
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        peca_id = data.get('id')
+        if not peca_id:
+            return JsonResponse({'error': 'ID da peca nao informado.'}, status=400)
+
+        peca = get_object_or_404(Pecas, id=peca_id, setor=setor)
+
+        try:
+            conjunto = parse_fk(Conjuntos, data.get('conjunto_id'), 'conjunto')
+            processo_1 = parse_fk(Maquina, data.get('processo_1_id'), 'processo_1')
+            comprimento = parse_float(data.get('comprimento'), 'comprimento')
+        except ValueError as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+
+        fields = {
+            'codigo': (data.get('codigo') or '').strip(),
+            'descricao': (data.get('descricao') or '').strip() or None,
+            'materia_prima': (data.get('materia_prima') or '').strip() or None,
+            'comprimento': comprimento,
+            'apelido': (data.get('apelido') or '').strip() or None,
+            'conjunto': conjunto,
+            'processo_1': processo_1,
+        }
+
+        if not fields['codigo']:
+            return JsonResponse({'error': 'Codigo e obrigatorio.'}, status=400)
+
+        for campo, valor in fields.items():
+            setattr(peca, campo, valor)
+
+        try:
+            peca.save()
+            if not peca.setor.filter(id=setor.id).exists():
+                peca.setor.add(setor)
+        except IntegrityError:
+            return JsonResponse({'error': 'Codigo ja cadastrado.'}, status=400)
+
+        return JsonResponse({'success': 'Peca atualizada com sucesso.'})
+
+    if request.method == 'DELETE':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        peca_id = data.get('id')
+        if not peca_id:
+            return JsonResponse({'error': 'ID da peca nao informado.'}, status=400)
+
+        peca = get_object_or_404(Pecas, id=peca_id, setor=setor)
+        peca.delete()
+
+        return JsonResponse({'success': 'Peca removida com sucesso.'})
+
+    return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
 
 
 @login_required
@@ -1208,14 +1405,19 @@ def propriedades_ordem_api(request):
             .select_related('ordem', 'mp_codigo', 'nova_mp')
             .order_by('id')
         )
-
+        
         # Filtros
         ordem_param = request.GET.get('ordem')
         if ordem_param:
+            ordem_param = ordem_param.strip()
             try:
-                queryset = queryset.filter(ordem__ordem=int(ordem_param))
+                ordem_num = int(ordem_param)
+                queryset = queryset.filter(
+                    Q(ordem__ordem=ordem_num) |
+                    Q(ordem__ordem_duplicada__iexact=ordem_param)
+                )
             except ValueError:
-                return JsonResponse({'error': 'Parâmetro ordem inválido.'}, status=400)
+                queryset = queryset.filter(ordem__ordem_duplicada__icontains=ordem_param)
 
         mp_codigo_param = request.GET.get('mp_codigo')
         if mp_codigo_param:
@@ -1241,7 +1443,7 @@ def propriedades_ordem_api(request):
             propriedades.append({
                 'id': prop.id,
                 'ordem_id': prop.ordem_id,
-                'ordem_numero': prop.ordem.ordem if prop.ordem else None,
+                'ordem_numero': prop.ordem.ordem if prop.ordem.ordem else prop.ordem.ordem_duplicada,
                 'grupo_maquina': prop.ordem.grupo_maquina if prop.ordem else None,
                 'grupo_maquina_display': prop.ordem.get_grupo_maquina_display() if prop.ordem else None,
                 'mp_codigo_id': prop.mp_codigo_id,
@@ -1254,6 +1456,8 @@ def propriedades_ordem_api(request):
                 'retalho': prop.retalho,
                 'nova_mp_id': prop.nova_mp_id,
             })
+
+        print(propriedades)
 
         return JsonResponse({
             'results': propriedades,
