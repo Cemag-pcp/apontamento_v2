@@ -10,7 +10,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1',
     'https://apontamento-v2-testes.onrender.com'
     'https://cmgprod.com.br'
-    ]
+]
 
 # Banco de dados para produção
 DATABASES = {
