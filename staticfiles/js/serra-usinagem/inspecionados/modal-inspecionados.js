@@ -31,6 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 data.history.forEach((element, index) => {
                     const isFirstItem = index === 0;
                     
+                    const tituloInspecao = index === 0 ? 'Reinspeção' : 'Inspeção';
+
                     // HTML para informações adicionais
                     let infoAdicionaisHTML = '';
                     if (element.info_adicionais) {
@@ -86,7 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     medidasPorProcessoHTML += `
                                         <tr class="${detalhe.conforme ? '' : 'table-danger'}">
                                             <td>${detalhe.cabecalho}</td>
-                                            <td>${detalhe.valor}</td>
+                                            <td>${detalhe.valor}mm</td>
                                             <td>${detalhe.conforme ? 'Sim' : 'Não'}</td>
                                         </tr>`;
                                 });
@@ -110,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             </span>
                             <div class="timeline-content">
                                 <div class="d-flex justify-content-between">
-                                    <h5>Execução #${element.num_execucao}</h5>
+                                    <h5>${tituloInspecao} #${element.num_execucao}</h5>
                                     ${isFirstItem ? `
                                         <i class="bi bi-trash trash-history-last-execution" 
                                             data-id="${element.id}" 

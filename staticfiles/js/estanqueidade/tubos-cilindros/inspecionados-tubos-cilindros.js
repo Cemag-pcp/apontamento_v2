@@ -117,9 +117,19 @@ function buscarItensInspecionadosEstanqueidade(pagina) {
             let iconeNaoConformidade;
 
             if (item.possui_nao_conformidade) {
-                iconeNaoConformidade = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
+            iconeNaoConformidade = `
+                <span class="badge rounded-pill bg-danger">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                Não conformidade
+                </span>
+            `;
             } else {
-                iconeNaoConformidade = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
+            iconeNaoConformidade = `
+                <span class="badge rounded-pill bg-success">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                Conforme
+                </span>
+            `;
             }
 
             let color = borderColors[item.cor];
@@ -137,7 +147,6 @@ function buscarItensInspecionadosEstanqueidade(pagina) {
                     <div class="d-flex justify-content-between">
                         <div class="d-flex align-items-baseline gap-2">
                             ${iconeNaoConformidade}
-                            <h4 style="font-size: 0.875rem; color:#71717a;">Possui não conformidade?</h4>
                         </div>
                         <button 
                             data-id="${item.id}"

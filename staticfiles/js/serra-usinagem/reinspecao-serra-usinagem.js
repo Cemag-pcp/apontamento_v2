@@ -28,7 +28,8 @@ function buscarItensReinspecao(pagina) {
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-reinspecao");
     let itensInspecionar = document.getElementById("itens-reinspecao");
     let itensFiltradosCor = document.getElementById("itens-filtrados-reinspecao-maquina");
-    let itensFiltradosData = document.getElementById("itens-filtrados-reinspecao-data");
+    let itensFiltradosDataInicio = document.getElementById("itens-filtrados-reinspecao-data-inicio");
+    let itensFiltradosDataFim = document.getElementById("itens-filtrados-reinspecao-data-fim");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-reinspecao-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-reinspecao-pesquisa");
     let paginacao = document.getElementById("paginacao-reinspecao-serra-usinagem");
@@ -52,7 +53,9 @@ function buscarItensReinspecao(pagina) {
         inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-reinspecao').value;
+    let dataSelecionadaInicio = document.getElementById('data-filtro-reinspecao-inicio').value;
+    let dataSelecionadaFim = document.getElementById('data-filtro-reinspecao-fim').value;
+    
     let pesquisarInspecao = document.getElementById('pesquisar-peca-reinspecao').value;
 
     // Monta os parâmetros de busca
@@ -65,12 +68,20 @@ function buscarItensReinspecao(pagina) {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
-        itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+    if (dataSelecionadaInicio) {
+        params.append("data_inicio", dataSelecionadaInicio);
+        itensFiltradosDataInicio.style.display = "block";
+        itensFiltradosDataInicio.textContent = "De: " + dataSelecionadaInicio;
     } else {
-        itensFiltradosData.style.display = "none";
+        itensFiltradosDataInicio.style.display = "none";
+    }
+
+    if (dataSelecionadaFim) {
+        params.append("data_fim", dataSelecionadaFim);
+        itensFiltradosDataFim.style.display = "block";
+        itensFiltradosDataFim.textContent = "Até: " + dataSelecionadaFim;
+    } else {
+        itensFiltradosDataFim.style.display = "none";
     }
 
     if (pesquisarInspecao) {
