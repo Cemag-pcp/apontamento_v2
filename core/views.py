@@ -171,9 +171,9 @@ def pecas_estamparia_api(request):
             ordem__grupo_maquina='estamparia'
         )
 
-        qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
-        if not qtd_total == peca_ordem.qtd_planejada:
-            return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
+        # qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
+        # if not qtd_total == peca_ordem.qtd_planejada:
+        #     return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
 
         campos_para_atualizar = {}
         for campo in ['qtd_boa', 'qtd_morta']:
@@ -294,9 +294,9 @@ def pecas_usinagem_api(request):
             ordem__grupo_maquina='usinagem'
         )
 
-        qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
-        if not qtd_total == peca_ordem.qtd_planejada:
-            return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
+        # qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
+        # if not qtd_total == peca_ordem.qtd_planejada:
+        #     return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
 
         campos_para_atualizar = {}
         for campo in ['qtd_boa', 'qtd_morta']:
@@ -417,9 +417,9 @@ def pecas_serra_api(request):
             ordem__grupo_maquina='serra'
         )
 
-        qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
-        if not qtd_total == peca_ordem.qtd_planejada:
-            return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
+        # qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
+        # if not qtd_total == peca_ordem.qtd_planejada:
+        #     return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
 
         campos_para_atualizar = {}
         for campo in ['qtd_boa', 'qtd_morta']:
@@ -535,9 +535,9 @@ def pecas_corte_api(request):
             ordem__grupo_maquina__in=corte_grupos
         )
             
-        qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
-        if not qtd_total == peca_ordem.qtd_planejada:
-            return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
+        # qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
+        # if not qtd_total == peca_ordem.qtd_planejada:
+        #     return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
 
         campos_para_atualizar = {}
         for campo in ['qtd_boa', 'qtd_morta']:
