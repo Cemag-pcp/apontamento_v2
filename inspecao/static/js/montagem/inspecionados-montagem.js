@@ -28,7 +28,8 @@ function buscarItensInspecionados(pagina) {
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecionados");
     let itensInspecionar = document.getElementById("itens-inspecionados");
     let itensFiltradosCor = document.getElementById("itens-filtrados-inspecionados-cor");
-    let itensFiltradosData = document.getElementById("itens-filtrados-inspecionados-data");
+    let itensFiltradosDataInicio = document.getElementById("itens-filtrados-inspecionados-data-inicio");
+    let itensFiltradosDataFim = document.getElementById("itens-filtrados-inspecionados-data-fim");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
     let itensFiltradosStatusConformidade = document.getElementById("itens-filtrados-inspecionados-status");
@@ -63,7 +64,8 @@ function buscarItensInspecionados(pagina) {
         statusConformidade.push('nao_conforme');
     }
 
-    let dataSelecionada = document.getElementById('data-filtro-inspecionados').value;
+    let dataSelecionadaInicio = document.getElementById('data-inicio-inspecionados').value;
+    let dataSelecionadaFim = document.getElementById('data-fim-inspecionados').value;
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecionados').value;
 
     // Monta os parâmetros de busca
@@ -76,13 +78,22 @@ function buscarItensInspecionados(pagina) {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
-        itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+    if (dataSelecionadaInicio) {
+        params.append("data_inicio", dataSelecionadaInicio);
+        itensFiltradosDataInicio.style.display = "block";
+        itensFiltradosDataInicio.textContent = "De: " + dataSelecionadaInicio;
     } else {
-        itensFiltradosData.style.display = "none";
+        itensFiltradosDataInicio.style.display = "none";
     }
+
+    if (dataSelecionadaFim) {
+        params.append("data_fim", dataSelecionadaFim);
+        itensFiltradosDataFim.style.display = "block";
+        itensFiltradosDataFim.textContent = "Até: " + dataSelecionadaFim;
+    } else {
+        itensFiltradosDataFim.style.display = "none";
+    }
+
 
     if (pesquisarInspecao) {
         params.append("pesquisar", pesquisarInspecao);
@@ -150,9 +161,19 @@ function buscarItensInspecionados(pagina) {
             let iconeNaoConformidade;
 
             if (item.possui_nao_conformidade) {
-                iconeNaoConformidade = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
+            iconeNaoConformidade = `
+                <span class="badge rounded-pill bg-danger">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                Não conformidade
+                </span>
+            `;
             } else {
-                iconeNaoConformidade = '<i class="bi bi-x-circle-fill" style="color:red"></i>';
+            iconeNaoConformidade = `
+                <span class="badge rounded-pill bg-success">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                Conforme
+                </span>
+            `;
             }
 
             let color = borderColors[item.cor];
@@ -173,7 +194,6 @@ function buscarItensInspecionados(pagina) {
                     <div class="d-flex justify-content-between">
                         <div class="d-flex align-items-baseline gap-2">
                             ${iconeNaoConformidade}
-                            <h4 style="font-size: 0.875rem; color:#71717a;">Possui não conformidade?</h4>
                         </div>
                         <button 
                             data-id="${item.id}"

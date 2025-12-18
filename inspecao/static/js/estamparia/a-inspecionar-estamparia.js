@@ -78,7 +78,8 @@ function buscarItensInspecao(pagina) {
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecao");
     let itensInspecionar = document.getElementById("itens-inspecionar");
     let itensFiltradosMaquina = document.getElementById("itens-filtrados-inspecao-maquina");
-    let itensFiltradosData = document.getElementById("itens-filtrados-inspecao-data");
+    let itensFiltradosDataInicio = document.getElementById("itens-filtrados-inspecao-data-inicio");
+    let itensFiltradosDataFim = document.getElementById("itens-filtrados-inspecao-data-fim");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecao-pesquisa");
     let paginacao = document.getElementById("paginacao-inspecao-estamparia");
 
@@ -96,7 +97,9 @@ function buscarItensInspecao(pagina) {
         maquinasSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-inspecao').value;
+    let dataInicio = document.getElementById('data-inicio-inspecao').value;
+    let dataFim = document.getElementById('data-fim-inspecao').value;
+
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
     // Monta os parâmetros de busca
@@ -109,12 +112,20 @@ function buscarItensInspecao(pagina) {
         itensFiltradosMaquina.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
-        itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+    if (dataInicio) {
+        params.append("data_inicio", dataInicio);
+        itensFiltradosDataInicio.style.display = "block";
+        itensFiltradosDataInicio.textContent = "De: " + dataInicio;
     } else {
-        itensFiltradosData.style.display = "none";
+        itensFiltradosDataInicio.style.display = "none";
+    }
+
+    if (dataFim) {
+        params.append("data_fim", dataFim);
+        itensFiltradosDataFim.style.display = "block";
+        itensFiltradosDataFim.textContent = "Até: " + dataFim;
+    } else {
+        itensFiltradosDataFim.style.display = "none";
     }
 
     if (pesquisarInspecao) {

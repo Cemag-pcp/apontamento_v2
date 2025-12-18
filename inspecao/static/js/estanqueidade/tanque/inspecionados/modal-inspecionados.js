@@ -53,10 +53,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Para cada execução, criar um carrossel
                 execucaoKeys.forEach(num_execucao => {
                     const elementos = execucoes[num_execucao];
-            
+                    
+                    const tituloInspecao = num_execucao === 0 ? 'Reinspeção' : 'Inspeção';
+
                     const carrosselId = `carouselExecucao${num_execucao}`;
                     let carrosselInnerHTML = `
-                        <h5 class="text-center mb-3">Execução #${num_execucao}</h5>
+                        <h5 class="text-center mb-3">${tituloInspecao} #${num_execucao}</h5>
                         <div id="${carrosselId}" class="carousel slide" data-bs-ride="carousel">
                             <div class="carousel-inner">
                     `;

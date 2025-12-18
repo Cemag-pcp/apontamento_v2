@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Max
 from django.db import transaction
 from django.utils import timezone
 from django.db import connection
@@ -96,7 +96,10 @@ def get_itens_inspecao_pintura(request):
     cores_filtradas = (
         request.GET.get("cores", "").split(",") if request.GET.get("cores") else []
     )
-    data_filtrada = request.GET.get("data", None)
+    
+    data_inicio = request.GET.get("data_inicio", None)
+    data_fim = request.GET.get("data_fim", None)
+    
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
@@ -111,8 +114,18 @@ def get_itens_inspecao_pintura(request):
     if cores_filtradas:
         datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas)
 
-    if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada)
+    if not data_fim:
+        data_fim = data_inicio
+
+    # Filtra por dia inteiro usando lookup __date para não perder registros do dia
+    if data_inicio and data_fim:
+        datas = datas.filter(
+            data_inspecao__date__gte=data_inicio, data_inspecao__date__lte=data_fim
+        )
+    elif data_inicio:
+        datas = datas.filter(data_inspecao__date__gte=data_inicio)
+    elif data_fim:
+        datas = datas.filter(data_inspecao__date__lte=data_fim)
 
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
@@ -179,7 +192,8 @@ def get_itens_reinspecao_pintura(request):
             if request.GET.get("inspetores")
             else []
         ),
-        "data": request.GET.get("data"),
+        "data_inicio": request.GET.get("data_inicio"),
+        "data_fim": request.GET.get("data_fim"),
         "pesquisa": request.GET.get("pesquisar"),
         "pagina": int(request.GET.get("pagina", 1)),
         "itens_por_pagina": 12,
@@ -203,8 +217,30 @@ def get_itens_reinspecao_pintura(request):
             pecas_ordem_pintura__ordem__cor__in=params["cores"]
         ).distinct()
 
-    if params["data"]:
-        queryset = queryset.filter(data_inspecao__date=params["data"]).distinct()
+    # if params["data"]:
+    #     queryset = queryset.filter(data_inspecao__date=params["data"]).distinct()
+
+    data_inicio = params.get("data_inicio")
+    data_fim = params.get("data_fim")
+
+    print(data_inicio)
+
+    if data_inicio and not data_fim:
+        data_fim = data_inicio
+
+    if data_inicio and data_fim:
+        queryset = queryset.filter(
+            dadosexecucaoinspecao__data_execucao__date__gte=data_inicio,
+            dadosexecucaoinspecao__data_execucao__date__lte=data_fim,
+        ).distinct()
+    elif data_inicio:
+        queryset = queryset.filter(
+            dadosexecucaoinspecao__data_execucao__date__gte=data_inicio
+        ).distinct()
+    elif data_fim:
+        queryset = queryset.filter(
+            dadosexecucaoinspecao__data_execucao__date__lte=data_fim
+        ).distinct()
 
     if params["pesquisa"]:
         pesquisa = params["pesquisa"].lower()
@@ -301,7 +337,10 @@ def get_itens_inspecionados_pintura(request):
         if request.GET.get("status-conformidade")
         else []
     )
-    data_filtrada = request.GET.get("data", None)
+
+    data_inicio = request.GET.get("data_inicio", None)
+    data_fim = request.GET.get("data_fim", None)
+
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 6  # Itens por página
@@ -318,10 +357,28 @@ def get_itens_inspecionados_pintura(request):
             pecas_ordem_pintura__ordem__cor__in=cores_filtradas
         ).distinct()
 
-    if data_filtrada:
+    # if data_filtrada:
+    #     datas = datas.filter(
+    #         dadosexecucaoinspecao__data_execucao__date=data_filtrada
+    #     ).distinct()
+    
+    datas = datas.annotate(
+        ultima_data_execucao=Max("dadosexecucaoinspecao__data_execucao")
+    )
+
+    if data_inicio and data_fim:
         datas = datas.filter(
-            dadosexecucaoinspecao__data_execucao__date=data_filtrada
-        ).distinct()
+            ultima_data_execucao__date__gte=data_inicio,
+            ultima_data_execucao__date__lte=data_fim,
+        ).order_by("-ultima_data_execucao")
+    elif data_inicio:
+        datas = datas.filter(
+            ultima_data_execucao__date__gte=data_inicio
+        ).order_by("-ultima_data_execucao")
+    elif data_fim:
+        datas = datas.filter(
+            ultima_data_execucao__date__lte=data_fim
+        ).order_by("-ultima_data_execucao")
 
     if pesquisa_filtrada:
         datas = datas.filter(
