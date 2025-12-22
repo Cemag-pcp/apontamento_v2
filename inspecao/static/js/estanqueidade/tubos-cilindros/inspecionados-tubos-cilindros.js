@@ -27,7 +27,8 @@ function buscarItensInspecionadosEstanqueidade(pagina) {
     let qtdPendenteInspecao = document.getElementById("qtd-inspecionados");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecionados");
     let itensInspecionar = document.getElementById("itens-inspecionados");
-    let itensFiltradosData = document.getElementById("itens-filtrados-inspecionados-data");
+    let itensFiltradosDataInicio = document.getElementById("itens-filtrados-inspecionados-data-inicio");
+    let itensFiltradosDataFim = document.getElementById("itens-filtrados-inspecionados-data-fim");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
     let paginacao = document.getElementById("paginacao-inspecionados-tubos-cilindros");
@@ -46,18 +47,27 @@ function buscarItensInspecionadosEstanqueidade(pagina) {
         inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-inspecionados').value;
+    let dataInicio = document.getElementById('data-inicio-inspecionados').value;
+    let dataFim = document.getElementById('data-fim-inspecionados').value;
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecionados').value;
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
-        itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+    if (dataInicio) {
+        params.append("data_inicio", dataInicio);
+        itensFiltradosDataInicio.style.display = "block";
+        itensFiltradosDataInicio.textContent = "De: " + dataInicio;
     } else {
-        itensFiltradosData.style.display = "none";
+        itensFiltradosDataInicio.style.display = "none";
+    }
+
+    if (dataFim) {
+        params.append("data_fim", dataFim);
+        itensFiltradosDataFim.style.display = "block";
+        itensFiltradosDataFim.textContent = "Para: " + dataFim;
+    } else {
+        itensFiltradosDataFim.style.display = "none";
     }
 
     if (pesquisarInspecao) {
@@ -137,7 +147,7 @@ function buscarItensInspecionadosEstanqueidade(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                    <h5><a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                     <p>Inspeção #${item.id}</p>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>

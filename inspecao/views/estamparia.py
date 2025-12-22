@@ -168,7 +168,7 @@ def inspecionar_estamparia(request):
 
             new_info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.create(
                 dados_exec_inspecao=dados_exec_inspecao,
-                inspecao_completa=True if inspecao_completa == "sim" else False,
+                inspecao_completa=True if inspecao_completa == "Sim" else False,
                 autoinspecao_noturna=True if auto_inspecao_noturna == "true" else False,
                 qtd_mortas=numPecaDefeituosa if numPecaDefeituosa > 0 else 0,
             )

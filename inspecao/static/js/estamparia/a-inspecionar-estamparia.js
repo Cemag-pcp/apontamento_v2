@@ -46,31 +46,33 @@ document.getElementById("btn-limpar-inspecao-estamparia").addEventListener("clic
     buscarItensInspecao(1);
 });
 
-document.getElementById("numPecaDefeituosa").addEventListener("change", (event) => {
+// document.getElementById("numPecaDefeituosa").addEventListener("change", (event) => {
 
-    // Verifica se o valor máximo é menor que o valor atual
-    const max = parseInt(event.target.max);
-    const value = parseInt(event.target.value);
-    if (value > max) {
-        Toast.fire({
-            icon: "warning",
-            title: "A quantidade de peça morta não pode exceder o total de peças produzidas."
-        });
-        event.target.value = '';  
-        return;
-    }
+//     // Verifica se o valor máximo é menor que o valor atual
+//     const max = parseInt(event.target.max);
+//     const value = parseInt(event.target.value);
+//     if (value > max) {
+//         Toast.fire({
+//             icon: "warning",
+//             title: "A quantidade de peça morta não pode exceder o total de peças produzidas."
+//         });
+//         event.target.value = '';  
+//         return;
+//     }
 
-    controlarLinhasTabela();
+//     controlarLinhasTabela();
 
-    if ((value - max) === 0){
-        document.getElementById("medicoesTecnicas").style.display = 'none';
-        document.getElementById("inspecao_total").value = 'Sim';
-    } else {
-        document.getElementById("medicoesTecnicas").style.display = 'block';
-        document.getElementById("inspecao_total").value = '';
-    }
+//     if ((value - max) === 0){
+//         document.getElementById("medicoesTecnicas").style.display = 'none';
+//         document.getElementById("inspecao_total").value = 'Sim';
+//     } else {
+//         document.getElementById("medicoesTecnicas").style.display = 'block';
+//         document.getElementById("inspecao_total").value = '';
+//     }
 
-});
+// });
+
+
 
 function buscarItensInspecao(pagina) {
     let cardsInspecao = document.getElementById("cards-inspecao");
@@ -170,7 +172,7 @@ function buscarItensInspecao(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data:</strong> ${item.data}<br>

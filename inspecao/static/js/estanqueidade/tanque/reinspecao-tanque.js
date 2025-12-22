@@ -28,7 +28,8 @@ function buscarItensReinspecaoEstanqueidadeTanque(pagina) {
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-reinspecao");
     let itensInspecionar = document.getElementById("itens-reinspecao");
     let itensFiltradosCor = document.getElementById("itens-filtrados-reinspecao-cor");
-    let itensFiltradosData = document.getElementById("itens-filtrados-reinspecao-data");
+    let itensFiltradosDataInicio = document.getElementById("itens-filtrados-reinspecao-data-inicio");
+    let itensFiltradosDataFim = document.getElementById("itens-filtrados-reinspecao-data-fim");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-reinspecao-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-reinspecao-pesquisa");
     let paginacao = document.getElementById("paginacao-reinspecao-tanque");
@@ -52,7 +53,8 @@ function buscarItensReinspecaoEstanqueidadeTanque(pagina) {
         inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-reinspecao').value;
+    let dataSelecionadaInicio = document.getElementById('data-inicio-reinspecao').value;
+    let dataSelecionadaFim = document.getElementById('data-fim-reinspecao').value;
     let pesquisarInspecao = document.getElementById('pesquisar-peca-reinspecao').value;
 
     // Monta os parâmetros de busca
@@ -65,12 +67,20 @@ function buscarItensReinspecaoEstanqueidadeTanque(pagina) {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
-        itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+    if (dataSelecionadaInicio) {
+        params.append("data_inicio", dataSelecionadaInicio);
+        itensFiltradosDataInicio.style.display = "block";
+        itensFiltradosDataInicio.textContent = "De: " + dataSelecionadaInicio;
     } else {
-        itensFiltradosData.style.display = "none";
+        itensFiltradosDataInicio.style.display = "none";
+    }
+
+    if (dataSelecionadaFim) {
+        params.append("data_fim", dataSelecionadaFim);
+        itensFiltradosDataFim.style.display = "block";
+        itensFiltradosDataFim.textContent = "Até: " + dataSelecionadaFim;
+    } else {
+        itensFiltradosDataFim.style.display = "none";
     }
 
     if (pesquisarInspecao) {
@@ -127,7 +137,7 @@ function buscarItensReinspecaoEstanqueidadeTanque(pagina) {
                 <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 400px; display: flex; flex-direction: column; justify-content: space-between">
                     <div>
-                        <h5 class="card-title">${item.peca}</h5>
+                        <h5 class="card-title"><a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                         <h6 class="card-subtitle mb-2 text-muted">Inspeção #${item.id}</h6>
                         <p class="card-text">
                             <strong>📅 Data da última inspeção:</strong> ${item.data}<br>

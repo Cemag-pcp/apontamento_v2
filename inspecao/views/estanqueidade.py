@@ -153,7 +153,10 @@ def get_itens_reinspecao_tubos_cilindros(request):
         if request.GET.get("inspetores")
         else []
     )
-    data_filtrada = request.GET.get("data", None)
+    
+    data_inicio = request.GET.get("data_inicio", None)
+    data_fim = request.GET.get("data_fim", None)
+    
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
@@ -169,8 +172,18 @@ def get_itens_reinspecao_tubos_cilindros(request):
     quantidade_total = datas.count()  # Total de itens sem filtro
 
     # Aplicar filtros
-    if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada)
+    # Filtro de data por intervalo; usa lookup __date para cobrir o dia inteiro
+    if data_inicio and not data_fim:
+        data_fim = data_inicio
+
+    if data_inicio and data_fim:
+        datas = datas.filter(
+            data_inspecao__date__gte=data_inicio, data_inspecao__date__lte=data_fim
+        )
+    elif data_inicio:
+        datas = datas.filter(data_inspecao__date__gte=data_inicio)
+    elif data_fim:
+        datas = datas.filter(data_inspecao__date__lte=data_fim)
     if pesquisa_filtrada:
         datas = datas.filter(
             Q(peca__codigo__icontains=pesquisa_filtrada)
@@ -254,17 +267,29 @@ def get_itens_inspecionados_tubos_cilindros(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # 1. Construir a base da consulta a partir do modelo mais detalhado
+    # Construir a base da consulta a partir do modelo mais detalhado
     # Começamos com DadosExecucaoInspecaoEstanqueidade, que contém a maioria dos dados que precisamos.
     base_query = DadosExecucaoInspecaoEstanqueidade.objects.filter(
         inspecao_estanqueidade__peca__tipo__in=["tubo", "cilindro"]
     )
 
-    # 2. Aplicar filtros da requisição (data, pesquisa, inspetores)
+    # Aplicar filtros da requisição (data, pesquisa, inspetores)
     # Filtros são aplicados no início para reduzir o conjunto de dados o mais cedo possível.
-    data_filtrada = request.GET.get("data")
-    if data_filtrada:
-        base_query = base_query.filter(data_exec__date=data_filtrada)
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+
+    # Filtro de data por intervalo; usa lookup __date para cobrir o dia inteiro
+    if data_inicio and not data_fim:
+        data_fim = data_inicio
+
+    if data_inicio and data_fim:
+        base_query = base_query.filter(
+            data_exec__date__gte=data_inicio, data_exec__date__lte=data_fim
+        )
+    elif data_inicio:
+        base_query = base_query.filter(data_exec__date__gte=data_inicio)
+    elif data_fim:
+        base_query = base_query.filter(data_exec__date__lte=data_fim)
 
     inspetores_filtrados = request.GET.get("inspetores")
     if inspetores_filtrados:
@@ -286,7 +311,7 @@ def get_itens_inspecionados_tubos_cilindros(request):
                 Q(inspecao_estanqueidade__peca__descricao__icontains=pesquisa_filtrada)
             )
 
-    # 3. Usar Window Function para encontrar a última execução de cada inspeção
+    # Usar Window Function para encontrar a última execução de cada inspeção
     # Esta é a parte principal da otimização. Criamos uma "janela" para cada inspeção,
     # ordenamos as execuções pela mais recente (maior num_execucao) e numeramos.
     window = Window(
@@ -298,10 +323,10 @@ def get_itens_inspecionados_tubos_cilindros(request):
     # Anotamos cada linha com seu número de execução e depois filtramos apenas a número 1 (a mais recente).
     query_com_ultimas_execucoes = base_query.annotate(row_number=window).filter(row_number=1)
 
-    # 4. Ordenar o resultado final
+    # Ordenar o resultado final
     query_ordenada = query_com_ultimas_execucoes.order_by('-inspecao_estanqueidade__data_inspecao')
 
-    # 5. Otimizar a busca de dados relacionados para a página
+    # Otimizar a busca de dados relacionados para a página
     # Adicionamos select_related e prefetch_related ANTES da paginação.
     # Isso garante que, ao iterar sobre a página, os dados já estarão carregados em poucas queries.
     query_final = query_ordenada.select_related(
@@ -317,7 +342,7 @@ def get_itens_inspecionados_tubos_cilindros(request):
     paginador = Paginator(query_final, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
-    # 7. Serialização dos dados
+    # Serialização dos dados
     # Agora iteramos APENAS sobre os itens da página atual. Não há mais dicionários em memória.
     dados = []
     for de in pagina_obj:
@@ -327,9 +352,6 @@ def get_itens_inspecionados_tubos_cilindros(request):
         if info_adicionais:
             possui_nao_conformidade = (info_adicionais.nao_conformidade + info_adicionais.nao_conformidade_refugo > 0)
         
-        # O Django 5+ tem um bug com `de.num_execucao > 0` aqui em alguns cenários.
-        # A lógica original pode precisar ser ajustada se `de.num_execucao` não estiver disponível.
-        # Mas vamos manter a lógica original por enquanto:
         possui_nao_conformidade = possui_nao_conformidade or de.num_execucao > 0
 
         dados.append({
@@ -953,7 +975,8 @@ def get_itens_reinspecao_tanque(request):
         if request.GET.get("inspetores")
         else []
     )
-    data_filtrada = request.GET.get("data", None)
+    data_inicio = request.GET.get("data_inicio", None)
+    data_fim = request.GET.get("data_fim", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
@@ -964,8 +987,17 @@ def get_itens_reinspecao_tanque(request):
 
     quantidade_total = datas.count()
 
-    if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada)
+    if not data_fim:
+        data_fim = data_inicio
+
+    if data_inicio and data_fim:
+        datas = datas.filter(
+            data_inspecao__date__gte=data_inicio, data_inspecao__date__lte=data_fim
+        )
+    elif data_inicio:
+        datas = datas.filter(data_inspecao__date__gte=data_inicio)
+    elif data_fim:
+        datas = datas.filter(data_inspecao__date__lte=data_fim)
 
     if pesquisa_filtrada:
         datas = datas.filter(
@@ -1106,7 +1138,8 @@ def get_itens_inspecionados_tanque(request):
         if request.GET.get("inspetores")
         else []
     )
-    data_filtrada = request.GET.get("data", None)
+    data_inicio = request.GET.get("data_inicio", None)
+    data_fim = request.GET.get("data_fim", None)
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     
     # Novos filtros
@@ -1132,10 +1165,29 @@ def get_itens_inspecionados_tanque(request):
 
     quantidade_total = datas.count()
 
-    if data_filtrada:
+    # if data_filtrada:
+    #     datas = datas.filter(
+    #         dadosexecucaoinspecaoestanqueidade__data_exec__date=data_filtrada
+    #     ).distinct()
+
+    datas = datas.annotate(
+        ultima_data_execucao=Max("dadosexecucaoinspecaoestanqueidade__data_exec__date")
+    )
+
+    if data_inicio and data_fim:
         datas = datas.filter(
-            dadosexecucaoinspecaoestanqueidade__data_exec__date=data_filtrada
-        ).distinct()
+            ultima_data_execucao__gte=data_inicio,
+            ultima_data_execucao__lte=data_fim,
+        ).order_by("-ultima_data_execucao")
+    elif data_inicio:
+        datas = datas.filter(
+            ultima_data_execucao__gte=data_inicio
+        ).order_by("-ultima_data_execucao")
+    elif data_fim:
+        datas = datas.filter(
+            ultima_data_execucao__lte=data_fim
+        ).order_by("-ultima_data_execucao")
+
 
     if pesquisa_filtrada:
         datas = datas.filter(
