@@ -28,11 +28,9 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             .then(data => {
                 
-                console.log(data)
-
                 data.history.forEach((element, index) => {
                     const isFirstItem = index === 0; 
-
+                    
                     const tituloInspecao = index === 0 ? 'Reinspeção' : 'Inspeção';
 
                     listaTimeline.innerHTML += `

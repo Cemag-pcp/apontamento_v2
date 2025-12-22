@@ -47,7 +47,9 @@ function buscarItensInspecao(pagina) {
         coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-inspecao').value;
+    let dataInicio = document.getElementById('data-filtro-inspecao-inicio').value;
+    let dataFim = document.getElementById('data-filtro-inspecao-fim').value;
+
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
     // Monta os parâmetros de busca
@@ -60,10 +62,18 @@ function buscarItensInspecao(pagina) {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
+    if (dataInicio) {
+        params.append("data_inicio", dataInicio);
         itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+        itensFiltradosData.textContent = "De: " + dataInicio;
+    } else {
+        itensFiltradosData.style.display = "none";
+    }
+
+    if (dataFim) {
+        params.append("data_fim", dataFim);
+        itensFiltradosData.style.display = "block";
+        itensFiltradosData.textContent = "Até: " + dataFim;
     } else {
         itensFiltradosData.style.display = "none";
     }
