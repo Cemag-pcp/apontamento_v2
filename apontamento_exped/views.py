@@ -311,6 +311,185 @@ def excluir_carga(request, id):
     carga.delete()
     return JsonResponse({'mensagem': 'Carregamento excluÍdo com sucesso.'}, status=200)
 
+@csrf_exempt
+@require_http_methods(["DELETE", "POST"])
+def deletar_pacote(request, id):
+    """
+    Deleta o pacote e devolve as quantidades dos itens para as pendências.
+    Permitido apenas se a carga não estiver despachada.
+    """
+    pacote = get_object_or_404(Pacote.objects.select_related('carga'), id=id)
+    if pacote.carga.stage == 'despachado':
+        return JsonResponse({'erro': 'Não é permitido excluir pacotes despachados.'}, status=400)
+
+    itens = list(ItemPacote.objects.filter(pacote=pacote).select_related('codigo'))
+
+    with transaction.atomic():
+        for item in itens:
+            pend = item.codigo
+            if pend:
+                pend.qt_necessaria = (pend.qt_necessaria or 0) + (item.quantidade or 0)
+                pend.save(update_fields=['qt_necessaria'])
+        pacote.delete()
+
+    return JsonResponse({
+        'mensagem': 'Pacote excluído com sucesso.',
+        'carga_id': pacote.carga_id,
+        'stage': pacote.carga.stage,
+    }, status=200)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def atualizar_quantidade_item(request, item_id):
+    """
+    Atualiza a quantidade de um item dentro do pacote.
+    - Somente permitido nos estÃ¡gios planejamento e verificacao.
+    - Se aumentar, verifica se hÃ¡ saldo pendente disponÃ­vel.
+    - Se diminuir, devolve a diferenÃ§a para a pendÃªncia.
+    """
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({'erro': 'JSON invÃ¡lido'}, status=400)
+
+    nova_qt = data.get('quantidade')
+    try:
+        nova_qt = int(nova_qt)
+    except (TypeError, ValueError):
+        return JsonResponse({'erro': 'Quantidade invÃ¡lida.'}, status=400)
+
+    if nova_qt <= 0:
+        return JsonResponse({'erro': 'Quantidade deve ser maior que zero.'}, status=400)
+
+    item = get_object_or_404(
+        ItemPacote.objects.select_related('codigo', 'pacote__carga'),
+        id=item_id
+    )
+    carga = item.pacote.carga
+    if carga.stage not in ('planejamento', 'verificacao'):
+        return JsonResponse({'erro': 'AlteraÃ§Ã£o permitida apenas em planejamento ou verificaÃ§Ã£o.'}, status=400)
+
+    pend = item.codigo
+    atual = int(item.quantidade or 0)
+    delta = nova_qt - atual
+
+    with transaction.atomic():
+        if delta > 0:
+            disponivel = int(pend.qt_necessaria or 0)
+            if disponivel < delta:
+                return JsonResponse({'erro': f'Quantidade indisponÃ­vel. Restam {disponivel}.'}, status=400)
+            pend.qt_necessaria = disponivel - delta
+            pend.save(update_fields=['qt_necessaria'])
+        elif delta < 0:
+            pend.qt_necessaria = int(pend.qt_necessaria or 0) + abs(delta)
+            pend.save(update_fields=['qt_necessaria'])
+
+        item.quantidade = nova_qt
+        item.save(update_fields=['quantidade'])
+
+    return JsonResponse({
+        'mensagem': 'Quantidade atualizada com sucesso.',
+        'item_id': item.id,
+        'nova_quantidade': nova_qt,
+        'pendente': int(pend.qt_necessaria or 0),
+        'carga_id': carga.id,
+        'stage': carga.stage,
+    }, status=200)
+
+@csrf_exempt
+@require_http_methods(["DELETE", "POST"])
+def deletar_item_pacote(request, item_id):
+    """
+    Remove um item do pacote e devolve a quantidade para a pendência.
+    Permitido apenas nos estágios planejamento ou verificacao.
+    """
+    item = get_object_or_404(
+        ItemPacote.objects.select_related('codigo', 'pacote__carga'),
+        id=item_id
+    )
+    carga = item.pacote.carga
+    if carga.stage not in ('planejamento', 'verificacao'):
+        return JsonResponse({'erro': 'Exclusão permitida apenas em planejamento ou verificacao.'}, status=400)
+
+    pend = item.codigo
+    qtd_item = int(item.quantidade or 0)
+
+    with transaction.atomic():
+        if pend:
+            pend.qt_necessaria = int(pend.qt_necessaria or 0) + qtd_item
+            pend.save(update_fields=['qt_necessaria'])
+        item.delete()
+
+    return JsonResponse({
+        'mensagem': 'Item removido do pacote.',
+        'carga_id': carga.id,
+        'stage': carga.stage,
+        'pendente': int(pend.qt_necessaria or 0) if pend else 0,
+    }, status=200)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def duplicar_pacote(request, id):
+    """
+    Duplica um pacote reaproveitando os itens, respeitando a quantidade restante pendente.
+    O novo nome recebe sufixo incremental (.1, .2, ...).
+    """
+    pacote = get_object_or_404(Pacote.objects.select_related('carga'), id=id)
+    itens_origem = list(ItemPacote.objects.filter(pacote=pacote).select_related('codigo'))
+
+    if not itens_origem:
+        return JsonResponse({'erro': 'Pacote sem itens para duplicar.'}, status=400)
+
+    with transaction.atomic():
+        base_nome = pacote.nome
+        partes = base_nome.rsplit('.', 1)
+        if len(partes) == 2 and partes[1].isdigit():
+            base_nome = partes[0]
+
+        sufixos = []
+        for nome in Pacote.objects.filter(carga=pacote.carga, nome__startswith=base_nome).values_list('nome', flat=True):
+            resto = nome[len(base_nome):]
+            if resto.startswith('.') and resto[1:].isdigit():
+                try:
+                    sufixos.append(int(resto[1:]))
+                except ValueError:
+                    continue
+        proximo_sufixo = (max(sufixos) if sufixos else 0) + 1
+        novo_nome = f"{base_nome}.{proximo_sufixo}"
+
+        itens_para_criar = []
+        for item in itens_origem:
+            pend = item.codigo
+            disponivel = max(int(pend.qt_necessaria or 0), 0)
+            original = int(item.quantidade or 0)
+            usar = min(disponivel, original) if original > 0 else 0
+            if usar > 0:
+                itens_para_criar.append((pend, usar))
+
+        if not itens_para_criar:
+            return JsonResponse({'erro': 'Sem quantidade restante para duplicar itens deste pacote.'}, status=400)
+
+        novo_pacote = Pacote.objects.create(
+            nome=novo_nome,
+            carga=pacote.carga,
+            criado_por=pacote.criado_por,
+        )
+
+        for pend, qtd in itens_para_criar:
+            ItemPacote.objects.create(
+                pacote=novo_pacote,
+                codigo=pend,
+                quantidade=qtd
+            )
+            pend.qt_necessaria = max(pend.qt_necessaria - qtd, 0)
+            pend.save(update_fields=['qt_necessaria'])
+
+    return JsonResponse({
+        'mensagem': 'Pacote duplicado com sucesso.',
+        'pacote_id': novo_pacote.id,
+        'nome': novo_pacote.nome,
+    }, status=201)
+
 
 @csrf_exempt
 @require_http_methods(["POST"])

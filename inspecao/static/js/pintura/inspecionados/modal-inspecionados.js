@@ -28,10 +28,10 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             .then(data => {
                 
-                console.log(data)
-
                 data.history.forEach((element, index) => {
+
                     const isFirstItem = index === 0; 
+
                     listaTimeline.innerHTML += `
                     <li class="timeline-item" style="cursor:pointer;" 
                             data-id="${element.id}" 
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         </span>
                         <div class="timeline-content">
                             <div class="d-flex justify-content-between">
-                                <h5>Execução #${element.num_execucao}</h5>
+                                <h5>${element.num_execucao === 0? `Inspeção`: `Reinspeção`} #${element.num_execucao}</h5>
                                 ${isFirstItem ? `
                                     <i class="bi bi-trash trash-history-last-execution" 
                                         data-id="${element.id}" 

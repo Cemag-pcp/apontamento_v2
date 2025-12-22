@@ -112,9 +112,16 @@ document.getElementById('saveReinspection').addEventListener('click', function (
     formData.append('qtdNaoConformidadeReinspecao', document.getElementById('qtdNaoConformidadeReinspecao').value);
 
     const imagem = document.getElementById('fichaReinspection').files[0];
-    if (imagem) {
-        formData.append('ficha_reinspecao', imagem);
+    if (!imagem) {
+        Toast.fire({
+            icon: "error",
+            title: "É obrigatório anexar a ficha de reinspeção."
+        });
+        this.disabled = false; // Reabilitar o botão
+        this.innerHTML = 'Salvar';
+        return;
     }
+    formData.append('ficha_reinspecao', imagem);
 
     // Enviar com Fetch
     fetch('/inspecao/api/envio-reinspecao-estamparia/', {

@@ -47,7 +47,9 @@ function buscarItensInspecao(pagina) {
         coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-inspecao').value;
+    let dataInicio = document.getElementById('data-filtro-inspecao-inicio').value;
+    let dataFim = document.getElementById('data-filtro-inspecao-fim').value;
+
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
     // Monta os parâmetros de busca
@@ -60,10 +62,18 @@ function buscarItensInspecao(pagina) {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
+    if (dataInicio) {
+        params.append("data_inicio", dataInicio);
         itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+        itensFiltradosData.textContent = "De: " + dataInicio;
+    } else {
+        itensFiltradosData.style.display = "none";
+    }
+
+    if (dataFim) {
+        params.append("data_fim", dataFim);
+        itensFiltradosData.style.display = "block";
+        itensFiltradosData.textContent = "Até: " + dataFim;
     } else {
         itensFiltradosData.style.display = "none";
     }
@@ -117,7 +127,7 @@ function buscarItensInspecao(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Dt. Produzida:</strong> ${item.data}<br>

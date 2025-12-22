@@ -1,0 +1,38 @@
+1. tela de itens inspecionados, trocar o texto
+ da flag de "possui não conformidade" para mostrar um "x" em
+  vez de "c". - OK
+
+2. tela de itens inspecionados ao clicar para
+ ver detalhes informar se é inspeção ou reinspeção
+  nas execuções. - OK
+
+3. tela de itens inspecionados ao clicar
+ para ver detalhes na tabela de medições,
+  mostrar a unidade em "mm" de forma automática. - OK
+
+4. filtro de intervalo de datas (em todas as telas de inspeção) - ok
+
+5. padronizar fonte das letras - ok
+
+6. Trocar na tabela de medição Cabeçalho por Nominal
+
+7. Adicionar link do drive em todas as telas de inspeção - ok
+
+9. Ao informar a quantidade de peças mortas no processo anterior,
+ não retirar da quantidade de peças total a ser inspecionada. - ok
+
+------------------- APOS AUDITORIA, POIS VAI MEXER NAS REGRAS DE NEGÓCIO DO SISTEMA ---------------------
+
+8.  Trocar -> Morreu alguma peça durante o processo? 
+    Por -> Alguma não conformidade identificada no 
+            processo anterior (corte)?
+
+10. Ao escolher "sim" como inspeção 100% deverá surgir
+ um campo para anexar foto da lista de inspeção 100%.
+
+10. Deixar como "em andamento" caso necessite
+ da inspeção 100% e o usuário não ponha no momento
+
+
+-----------------------------------------
+

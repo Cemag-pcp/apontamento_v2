@@ -9,16 +9,20 @@ from django.views.decorators.http import require_http_methods
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
 from django.utils.timesince import timesince
-from django.db import transaction
-from django.db.models import Prefetch, Count
+from django.db import transaction, IntegrityError
+from django.db.models import Prefetch, Count, Q
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.views.decorators.http import require_GET, require_POST
 from django.core.paginator import Paginator
 
 from .models import Ordem, Versao
-from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina,CarretasExplodidas
-from core.models import Ordem,MaquinaParada,OrdemProcesso,Profile,RotaAcesso, Notificacao
+from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina,CarretasExplodidas,Setor,Conjuntos
+from core.models import Ordem,MaquinaParada,OrdemProcesso,Profile,PropriedadesOrdem,RotaAcesso, Notificacao
+from apontamento_corte.models import PecasOrdem as PecasOrdemCorte
+from apontamento_serra.models import PecasOrdem as PecasOrdemSerra
+from apontamento_usinagem.models import PecasOrdem as PecasOrdemUsinagem
+from apontamento_estamparia.models import PecasOrdem as PecasOrdemEstamparia
 
 import json
 import time
@@ -72,6 +76,496 @@ def excluir_ordem(request):
 
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
 
+
+
+
+
+@login_required
+def pecas_estamparia(request):
+    return render(request, 'core/pecas_estamparia.html')
+
+
+@csrf_exempt
+@login_required
+def pecas_estamparia_api(request):
+    """
+    GET: lista peças de estamparia paginadas.
+    PATCH: atualiza qtd_boa e qtd_morta de uma peça de estamparia.
+    """
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parâmetros de paginação inválidos.'}, status=400)
+
+        queryset = (
+            PecasOrdemEstamparia.objects
+            .select_related('ordem', 'peca')
+            .filter(ordem__grupo_maquina='estamparia')
+            .order_by('-data', '-id')
+        )
+
+        ordem_param = request.GET.get('ordem')
+        if ordem_param:
+            try:
+                queryset = queryset.filter(ordem__ordem=int(ordem_param))
+            except ValueError:
+                queryset = queryset.filter(ordem__ordem_duplicada__icontains=ordem_param)
+
+        peca_param = request.GET.get('peca')
+        if peca_param:
+            queryset = queryset.filter(
+                Q(peca__codigo__icontains=peca_param) |
+                Q(peca__descricao__icontains=peca_param)
+            )
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        pecas = []
+        for po in page_obj.object_list:
+            ordem_display = po.ordem.ordem if po.ordem and po.ordem.ordem is not None else (po.ordem.ordem_duplicada if po.ordem else None)
+            peca_display = f"{po.peca.codigo} - {po.peca.descricao}" if po.peca else None
+            pecas.append({
+                'id': po.id,
+                'ordem_id': po.ordem_id,
+                'ordem_numero': ordem_display,
+                'grupo_maquina': po.ordem.get_grupo_maquina_display() if po.ordem else None,
+                'peca_id': po.peca_id,
+                'peca_codigo': po.peca.codigo if po.peca else None,
+                'peca_descricao': po.peca.descricao if po.peca else None,
+                'peca_display': peca_display,
+                'qtd_planejada': po.qtd_planejada,
+                'qtd_boa': po.qtd_boa,
+                'qtd_morta': po.qtd_morta,
+                'data': po.data.strftime('%d/%m/%Y %H:%M') if po.data else None,
+            })
+
+        return JsonResponse({
+            'results': pecas,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        })
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        pecas_id = data.get('id')
+        if not pecas_id:
+            return JsonResponse({'error': 'ID da peça não informado.'}, status=400)
+
+        peca_ordem = get_object_or_404(
+            PecasOrdemEstamparia.objects.select_related('ordem'),
+            id=pecas_id,
+            ordem__grupo_maquina='estamparia'
+        )
+
+        # qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
+        # if not qtd_total == peca_ordem.qtd_planejada:
+        #     return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
+
+        campos_para_atualizar = {}
+        for campo in ['qtd_boa', 'qtd_morta']:
+            if campo in data:
+                try:
+                    campos_para_atualizar[campo] = float(data[campo])
+                except (TypeError, ValueError):
+                    return JsonResponse({'error': f'{campo} inválido.'}, status=400)
+
+        if not campos_para_atualizar:
+            return JsonResponse({'error': 'Nenhum campo válido para atualizar.'}, status=400)
+
+        for campo, valor in campos_para_atualizar.items():
+            setattr(peca_ordem, campo, valor)
+
+        peca_ordem.save(update_fields=list(campos_para_atualizar.keys()))
+
+        return JsonResponse({
+            'success': 'Peça atualizada com sucesso.',
+            'peca': {
+                'id': peca_ordem.id,
+                'qtd_boa': peca_ordem.qtd_boa,
+                'qtd_morta': peca_ordem.qtd_morta,
+            }
+        })
+
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+
+@login_required
+def pecas_usinagem(request):
+    return render(request, 'core/pecas_usinagem.html')
+
+
+@csrf_exempt
+@login_required
+def pecas_usinagem_api(request):
+    """
+    GET: lista peças de usinagem paginadas.
+    PATCH: atualiza qtd_boa e qtd_morta de uma peça de usinagem.
+    """
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parâmetros de paginação inválidos.'}, status=400)
+
+        queryset = (
+            PecasOrdemUsinagem.objects
+            .select_related('ordem', 'peca')
+            .filter(ordem__grupo_maquina='usinagem')
+            .order_by('-data', '-id')
+        )
+
+        ordem_param = request.GET.get('ordem')
+        if ordem_param:
+            try:
+                queryset = queryset.filter(ordem__ordem=int(ordem_param))
+            except ValueError:
+                queryset = queryset.filter(ordem__ordem_duplicada__icontains=ordem_param)
+
+        peca_param = request.GET.get('peca')
+        if peca_param:
+            queryset = queryset.filter(
+                Q(peca__codigo__icontains=peca_param) |
+                Q(peca__descricao__icontains=peca_param)
+            )
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        pecas = []
+        for po in page_obj.object_list:
+            ordem_display = po.ordem.ordem if po.ordem and po.ordem.ordem is not None else (po.ordem.ordem_duplicada if po.ordem else None)
+            peca_display = f"{po.peca.codigo} - {po.peca.descricao}" if po.peca else None
+            pecas.append({
+                'id': po.id,
+                'ordem_id': po.ordem_id,
+                'ordem_numero': ordem_display,
+                'grupo_maquina': po.ordem.get_grupo_maquina_display() if po.ordem else None,
+                'peca_id': po.peca_id,
+                'peca_codigo': po.peca.codigo if po.peca else None,
+                'peca_descricao': po.peca.descricao if po.peca else None,
+                'peca_display': peca_display,
+                'qtd_planejada': po.qtd_planejada,
+                'qtd_boa': po.qtd_boa,
+                'qtd_morta': po.qtd_morta,
+                'data': po.data.strftime('%d/%m/%Y %H:%M') if po.data else None,
+            })
+
+        return JsonResponse({
+            'results': pecas,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        })
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        pecas_id = data.get('id')
+        if not pecas_id:
+            return JsonResponse({'error': 'ID da peça não informado.'}, status=400)
+
+        peca_ordem = get_object_or_404(
+            PecasOrdemUsinagem.objects.select_related('ordem'),
+            id=pecas_id,
+            ordem__grupo_maquina='usinagem'
+        )
+
+        # qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
+        # if not qtd_total == peca_ordem.qtd_planejada:
+        #     return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
+
+        campos_para_atualizar = {}
+        for campo in ['qtd_boa', 'qtd_morta']:
+            if campo in data:
+                try:
+                    campos_para_atualizar[campo] = float(data[campo])
+                except (TypeError, ValueError):
+                    return JsonResponse({'error': f'{campo} inválido.'}, status=400)
+
+        if not campos_para_atualizar:
+            return JsonResponse({'error': 'Nenhum campo válido para atualizar.'}, status=400)
+
+        for campo, valor in campos_para_atualizar.items():
+            setattr(peca_ordem, campo, valor)
+
+        peca_ordem.save(update_fields=list(campos_para_atualizar.keys()))
+
+        return JsonResponse({
+            'success': 'Peça atualizada com sucesso.',
+            'peca': {
+                'id': peca_ordem.id,
+                'qtd_boa': peca_ordem.qtd_boa,
+                'qtd_morta': peca_ordem.qtd_morta,
+            }
+        })
+
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+
+@login_required
+def pecas_serra(request):
+    return render(request, 'core/pecas_serra.html')
+
+
+@csrf_exempt
+@login_required
+def pecas_serra_api(request):
+    """
+    GET: lista peças de serra paginadas.
+    PATCH: atualiza qtd_boa e qtd_morta de uma peça de serra.
+    """
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parâmetros de paginação inválidos.'}, status=400)
+
+        queryset = (
+            PecasOrdemSerra.objects
+            .select_related('ordem', 'peca')
+            .filter(ordem__grupo_maquina='serra')
+            .order_by('-data', '-id')
+        )
+
+        ordem_param = request.GET.get('ordem')
+        if ordem_param:
+            try:
+                queryset = queryset.filter(ordem__ordem=int(ordem_param))
+            except ValueError:
+                queryset = queryset.filter(ordem__ordem_duplicada__icontains=ordem_param)
+
+        peca_param = request.GET.get('peca')
+        if peca_param:
+            queryset = queryset.filter(
+                Q(peca__codigo__icontains=peca_param) |
+                Q(peca__descricao__icontains=peca_param)
+            )
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        pecas = []
+        for po in page_obj.object_list:
+            ordem_display = po.ordem.ordem if po.ordem and po.ordem.ordem is not None else (po.ordem.ordem_duplicada if po.ordem else None)
+            peca_display = f"{po.peca.codigo} - {po.peca.descricao}" if po.peca else None
+            pecas.append({
+                'id': po.id,
+                'ordem_id': po.ordem_id,
+                'ordem_numero': ordem_display,
+                'grupo_maquina': po.ordem.get_grupo_maquina_display() if po.ordem else None,
+                'peca_id': po.peca_id,
+                'peca_codigo': po.peca.codigo if po.peca else None,
+                'peca_descricao': po.peca.descricao if po.peca else None,
+                'peca_display': peca_display,
+                'qtd_planejada': po.qtd_planejada,
+                'qtd_boa': po.qtd_boa,
+                'qtd_morta': po.qtd_morta,
+                'data': po.data.strftime('%d/%m/%Y %H:%M') if po.data else None,
+            })
+
+        return JsonResponse({
+            'results': pecas,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        })
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        pecas_id = data.get('id')
+        if not pecas_id:
+            return JsonResponse({'error': 'ID da peça não informado.'}, status=400)
+
+        peca_ordem = get_object_or_404(
+            PecasOrdemSerra.objects.select_related('ordem'),
+            id=pecas_id,
+            ordem__grupo_maquina='serra'
+        )
+
+        # qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
+        # if not qtd_total == peca_ordem.qtd_planejada:
+        #     return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
+
+        campos_para_atualizar = {}
+        for campo in ['qtd_boa', 'qtd_morta']:
+            if campo in data:
+                try:
+                    campos_para_atualizar[campo] = float(data[campo])
+                except (TypeError, ValueError):
+                    return JsonResponse({'error': f'{campo} inválido.'}, status=400)
+
+        if not campos_para_atualizar:
+            return JsonResponse({'error': 'Nenhum campo válido para atualizar.'}, status=400)
+
+        for campo, valor in campos_para_atualizar.items():
+            setattr(peca_ordem, campo, valor)
+
+        peca_ordem.save(update_fields=list(campos_para_atualizar.keys()))
+
+        return JsonResponse({
+            'success': 'Peça atualizada com sucesso.',
+            'peca': {
+                'id': peca_ordem.id,
+                'qtd_boa': peca_ordem.qtd_boa,
+                'qtd_morta': peca_ordem.qtd_morta,
+            }
+        })
+
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+
+@login_required
+def pecas_corte(request):
+    return render(request, 'core/pecas_corte.html')
+
+
+@csrf_exempt
+@login_required
+def pecas_corte_api(request):
+    """
+    GET: lista peças de corte paginadas.
+    PATCH: atualiza qtd_boa e qtd_morta de uma peça de corte.
+    """
+    corte_grupos = ['laser_1', 'laser_2', 'laser_3', 'plasma']
+
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parâmetros de paginação inválidos.'}, status=400)
+
+        queryset = (
+            PecasOrdemCorte.objects
+            .select_related('ordem')
+            .filter(ordem__grupo_maquina__in=corte_grupos)
+            .order_by('-data', '-id')
+        )
+
+        ordem_param = request.GET.get('ordem')
+        if ordem_param:
+            try:
+                queryset = queryset.filter(ordem__ordem=int(ordem_param))
+            except ValueError:
+                queryset = queryset.filter(ordem__ordem_duplicada__icontains=ordem_param)
+
+        peca_param = request.GET.get('peca')
+        if peca_param:
+            queryset = queryset.filter(peca__icontains=peca_param)
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        pecas = []
+        for po in page_obj.object_list:
+            ordem_display = po.ordem.ordem if po.ordem and po.ordem.ordem is not None else (po.ordem.ordem_duplicada if po.ordem else None)
+            pecas.append({
+                'id': po.id,
+                'ordem_id': po.ordem_id,
+                'ordem_numero': ordem_display,
+                'grupo_maquina': po.ordem.get_grupo_maquina_display() if po.ordem else None,
+                'peca': po.peca,
+                'qtd_planejada': po.qtd_planejada,
+                'qtd_boa': po.qtd_boa,
+                'qtd_morta': po.qtd_morta,
+                'data': po.data.strftime('%d/%m/%Y %H:%M') if po.data else None,
+            })
+
+        return JsonResponse({
+            'results': pecas,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        })
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        pecas_id = data.get('id')
+        if not pecas_id:
+            return JsonResponse({'error': 'ID da peça não informado.'}, status=400)
+
+        peca_ordem = get_object_or_404(
+            PecasOrdemCorte.objects.select_related('ordem'),
+            id=pecas_id,
+            ordem__grupo_maquina__in=corte_grupos
+        )
+            
+        # qtd_total = float(data.get('qtd_boa')) + float(data.get('qtd_morta'))
+        # if not qtd_total == peca_ordem.qtd_planejada:
+        #     return JsonResponse({'error': 'Quantidade total precisa ser igual a quantidade planejada.'}, status=400)
+
+        campos_para_atualizar = {}
+        for campo in ['qtd_boa', 'qtd_morta']:
+            if campo in data:
+                try:
+                    campos_para_atualizar[campo] = float(data[campo])
+                except (TypeError, ValueError):
+                    return JsonResponse({'error': f'{campo} inválido.'}, status=400)
+
+        if not campos_para_atualizar:
+            return JsonResponse({'error': 'Nenhum campo válido para atualizar.'}, status=400)
+
+        for campo, valor in campos_para_atualizar.items():
+            setattr(peca_ordem, campo, valor)
+
+        peca_ordem.save(update_fields=list(campos_para_atualizar.keys()))
+
+        return JsonResponse({
+            'success': 'Peça atualizada com sucesso.',
+            'peca': {
+                'id': peca_ordem.id,
+                'qtd_boa': peca_ordem.qtd_boa,
+                'qtd_morta': peca_ordem.qtd_morta,
+            }
+        })
+
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
 class CustomLoginView(LoginView):
     template_name = 'login/login.html'
 
@@ -105,6 +599,16 @@ def versao(request):
     versoes = Versao.objects.order_by('data_lancamento')
 
     return render(request, 'home/versao.html', {'versoes': versoes})
+
+@login_required
+def propriedades_ordem(request):
+    return render(
+        request,
+        'core/propriedades_ordem.html',
+        {
+            'tipos_chapa': PropriedadesOrdem.TIPO_CHAPA_CHOICES
+        }
+    )
 
 @csrf_exempt
 @require_http_methods(["PATCH"])  # So PATCH é permitido
@@ -684,3 +1188,129 @@ def marcar_notificacoes_como_lidas(request):
 
     except json.JSONDecodeError:
         return HttpResponseBadRequest("JSON inválido.")
+
+@csrf_exempt
+@login_required
+def propriedades_ordem_api(request):
+    """
+    GET: lista PropriedadesOrdem paginadas.
+    PATCH: atualiza campos editáveis (descricao_mp, tamanho, espessura, quantidade).
+    """
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parâmetros de paginação inválidos.'}, status=400)
+
+        queryset = (
+            PropriedadesOrdem.objects
+            .select_related('ordem', 'mp_codigo', 'nova_mp')
+            .order_by('id')
+        )
+        
+        # Filtros
+        ordem_param = request.GET.get('ordem')
+        if ordem_param:
+            ordem_param = ordem_param.strip()
+            try:
+                ordem_num = int(ordem_param)
+                queryset = queryset.filter(
+                    Q(ordem__ordem=ordem_num) |
+                    Q(ordem__ordem_duplicada__iexact=ordem_param)
+                )
+            except ValueError:
+                queryset = queryset.filter(ordem__ordem_duplicada__icontains=ordem_param)
+
+        mp_codigo_param = request.GET.get('mp_codigo')
+        if mp_codigo_param:
+            queryset = queryset.filter(mp_codigo_id=mp_codigo_param)
+
+        descricao_param = request.GET.get('descricao_mp')
+        if descricao_param:
+            queryset = queryset.filter(descricao_mp__icontains=descricao_param)
+
+        tipo_chapa_param = request.GET.get('tipo_chapa')
+        if tipo_chapa_param:
+            queryset = queryset.filter(tipo_chapa=tipo_chapa_param)
+
+        retalho_param = request.GET.get('retalho')
+        if retalho_param in ['true', 'false']:
+            queryset = queryset.filter(retalho=(retalho_param == 'true'))
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        propriedades = []
+        for prop in page_obj.object_list:
+            propriedades.append({
+                'id': prop.id,
+                'ordem_id': prop.ordem_id,
+                'ordem_numero': prop.ordem.ordem if prop.ordem.ordem else prop.ordem.ordem_duplicada,
+                'grupo_maquina': prop.ordem.grupo_maquina if prop.ordem else None,
+                'grupo_maquina_display': prop.ordem.get_grupo_maquina_display() if prop.ordem else None,
+                'mp_codigo_id': prop.mp_codigo_id,
+                'descricao_mp': prop.descricao_mp,
+                'tamanho': prop.tamanho,
+                'espessura': prop.espessura,
+                'quantidade': prop.quantidade,
+                'aproveitamento': prop.aproveitamento,
+                'tipo_chapa': prop.tipo_chapa,
+                'retalho': prop.retalho,
+                'nova_mp_id': prop.nova_mp_id,
+            })
+
+        print(propriedades)
+
+        return JsonResponse({
+            'results': propriedades,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        })
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON inválido.'}, status=400)
+
+        prop_id = data.get('id')
+        if not prop_id:
+            return JsonResponse({'error': 'ID da propriedade não informado.'}, status=400)
+
+        propriedade = get_object_or_404(PropriedadesOrdem, id=prop_id)
+
+        campos_editaveis = ['descricao_mp', 'tamanho', 'espessura', 'quantidade']
+        campos_para_atualizar = {}
+
+        for campo in campos_editaveis:
+            if campo in data:
+                campos_para_atualizar[campo] = data[campo]
+
+        if not campos_para_atualizar:
+            return JsonResponse({'error': 'Nenhum campo válido para atualizar.'}, status=400)
+
+        for campo, valor in campos_para_atualizar.items():
+            setattr(propriedade, campo, valor)
+
+        propriedade.save(update_fields=list(campos_para_atualizar.keys()))
+
+        return JsonResponse({
+            'success': 'Propriedade atualizada com sucesso.',
+            'propriedade': {
+                'id': propriedade.id,
+                'descricao_mp': propriedade.descricao_mp,
+                'tamanho': propriedade.tamanho,
+                'espessura': propriedade.espessura,
+                'quantidade': propriedade.quantidade,
+            }
+        })
+
+    return JsonResponse({'error': 'Método não permitido.'}, status=405)

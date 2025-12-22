@@ -168,7 +168,7 @@ def inspecionar_estamparia(request):
 
             new_info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.create(
                 dados_exec_inspecao=dados_exec_inspecao,
-                inspecao_completa=True if inspecao_completa == "sim" else False,
+                inspecao_completa=True if inspecao_completa == "Sim" else False,
                 autoinspecao_noturna=True if auto_inspecao_noturna == "true" else False,
                 qtd_mortas=numPecaDefeituosa if numPecaDefeituosa > 0 else 0,
             )
@@ -307,7 +307,10 @@ def get_itens_inspecao_estamparia(request):
         if request.GET.get("maquinas")
         else []
     )
-    data_filtrada = request.GET.get("data", None)
+    
+    data_inicio = request.GET.get("data_inicio", None)
+    data_fim = request.GET.get("data_fim", None)
+
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
@@ -324,9 +327,18 @@ def get_itens_inspecao_estamparia(request):
             pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas
         )
 
-    if data_filtrada:
-        datas = datas.filter(data_inspecao__date=data_filtrada)
+    if not data_fim:
+        data_fim = data_inicio
 
+    if data_inicio and data_fim:
+        datas = datas.filter(
+            data_inspecao__date__gte=data_inicio, data_inspecao__date__lte=data_fim
+        )
+    elif data_inicio:
+        datas = datas.filter(data_inspecao__date__gte=data_inicio)
+    elif data_fim:
+        datas = datas.filter(data_inspecao__date__lte=data_fim)
+    
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
         datas = datas.filter(
@@ -411,7 +423,10 @@ def get_itens_reinspecao_estamparia(request):
         if request.GET.get("inspetores")
         else []
     )
-    data_filtrada = request.GET.get("data", None)
+
+    data_inicio = request.GET.get("data_inicio", None)
+    data_fim = request.GET.get("data_fim", None)
+    
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))
     itens_por_pagina = 6
@@ -422,12 +437,26 @@ def get_itens_reinspecao_estamparia(request):
     if maquinas_filtradas:
         query &= Q(pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas)
 
-    if data_filtrada:
-        try:
-            data_filtrada_date = datetime.strptime(data_filtrada, "%Y-%m-%d").date()
-            query &= Q(dadosexecucaoinspecao__data_execucao__date=data_filtrada_date)
-        except ValueError:
-            pass  # Data inválida, ignora o filtro ou trate como preferir
+    if data_inicio and not data_fim:
+        data_fim = data_inicio
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        data_inicio = None
+        data_fim = None
+
+    if data_inicio and data_fim:
+        query &= Q(dadosexecucaoinspecao__data_execucao__date__gte=data_inicio) & Q(
+            dadosexecucaoinspecao__data_execucao__date__lte=data_fim
+        )
+    elif data_inicio:
+        query &= Q(dadosexecucaoinspecao__data_execucao__date__gte=data_inicio)
+    elif data_fim:
+        query &= Q(dadosexecucaoinspecao__data_execucao__date__lte=data_fim)
 
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
@@ -572,7 +601,10 @@ def get_itens_inspecionados_estamparia(request):
         if request.GET.get("status-conformidade")
         else []
     )
-    data_filtrada = request.GET.get("data", None)
+
+    data_inicio = request.GET.get("data_inicio", None)
+    data_fim = request.GET.get("data_fim", None)
+
     pesquisa_filtrada = request.GET.get("pesquisar", None)
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 6  # Itens por página
@@ -589,14 +621,26 @@ def get_itens_inspecionados_estamparia(request):
             pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas
         )
 
-    if data_filtrada:
-        datas = (
-            datas.annotate(
-                ultima_data_execucao=Max("dadosexecucaoinspecao__data_execucao")
-            )
-            .filter(ultima_data_execucao__date=data_filtrada)
-            .order_by("-ultima_data_execucao")
-        )
+    if data_inicio and not data_fim:
+        data_fim = data_inicio
+
+    datas = datas.annotate(
+        ultima_data_execucao=Max("dadosexecucaoinspecao__data_execucao")
+    )
+
+    if data_inicio and data_fim:
+        datas = datas.filter(
+            ultima_data_execucao__date__gte=data_inicio,
+            ultima_data_execucao__date__lte=data_fim,
+        ).order_by("-ultima_data_execucao")
+    elif data_inicio:
+        datas = datas.filter(
+            ultima_data_execucao__date__gte=data_inicio
+        ).order_by("-ultima_data_execucao")
+    elif data_fim:
+        datas = datas.filter(
+            ultima_data_execucao__date__lte=data_fim
+        ).order_by("-ultima_data_execucao")
 
     if pesquisa_filtrada:
         datas = datas.annotate(

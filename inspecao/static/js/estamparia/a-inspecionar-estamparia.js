@@ -46,31 +46,33 @@ document.getElementById("btn-limpar-inspecao-estamparia").addEventListener("clic
     buscarItensInspecao(1);
 });
 
-document.getElementById("numPecaDefeituosa").addEventListener("change", (event) => {
+// document.getElementById("numPecaDefeituosa").addEventListener("change", (event) => {
 
-    // Verifica se o valor máximo é menor que o valor atual
-    const max = parseInt(event.target.max);
-    const value = parseInt(event.target.value);
-    if (value > max) {
-        Toast.fire({
-            icon: "warning",
-            title: "A quantidade de peça morta não pode exceder o total de peças produzidas."
-        });
-        event.target.value = '';  
-        return;
-    }
+//     // Verifica se o valor máximo é menor que o valor atual
+//     const max = parseInt(event.target.max);
+//     const value = parseInt(event.target.value);
+//     if (value > max) {
+//         Toast.fire({
+//             icon: "warning",
+//             title: "A quantidade de peça morta não pode exceder o total de peças produzidas."
+//         });
+//         event.target.value = '';  
+//         return;
+//     }
 
-    controlarLinhasTabela();
+//     controlarLinhasTabela();
 
-    if ((value - max) === 0){
-        document.getElementById("medicoesTecnicas").style.display = 'none';
-        document.getElementById("inspecao_total").value = 'Sim';
-    } else {
-        document.getElementById("medicoesTecnicas").style.display = 'block';
-        document.getElementById("inspecao_total").value = '';
-    }
+//     if ((value - max) === 0){
+//         document.getElementById("medicoesTecnicas").style.display = 'none';
+//         document.getElementById("inspecao_total").value = 'Sim';
+//     } else {
+//         document.getElementById("medicoesTecnicas").style.display = 'block';
+//         document.getElementById("inspecao_total").value = '';
+//     }
 
-});
+// });
+
+
 
 function buscarItensInspecao(pagina) {
     let cardsInspecao = document.getElementById("cards-inspecao");
@@ -78,7 +80,8 @@ function buscarItensInspecao(pagina) {
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecao");
     let itensInspecionar = document.getElementById("itens-inspecionar");
     let itensFiltradosMaquina = document.getElementById("itens-filtrados-inspecao-maquina");
-    let itensFiltradosData = document.getElementById("itens-filtrados-inspecao-data");
+    let itensFiltradosDataInicio = document.getElementById("itens-filtrados-inspecao-data-inicio");
+    let itensFiltradosDataFim = document.getElementById("itens-filtrados-inspecao-data-fim");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecao-pesquisa");
     let paginacao = document.getElementById("paginacao-inspecao-estamparia");
 
@@ -96,7 +99,9 @@ function buscarItensInspecao(pagina) {
         maquinasSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-inspecao').value;
+    let dataInicio = document.getElementById('data-inicio-inspecao').value;
+    let dataFim = document.getElementById('data-fim-inspecao').value;
+
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
     // Monta os parâmetros de busca
@@ -109,12 +114,20 @@ function buscarItensInspecao(pagina) {
         itensFiltradosMaquina.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
-        itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+    if (dataInicio) {
+        params.append("data_inicio", dataInicio);
+        itensFiltradosDataInicio.style.display = "block";
+        itensFiltradosDataInicio.textContent = "De: " + dataInicio;
     } else {
-        itensFiltradosData.style.display = "none";
+        itensFiltradosDataInicio.style.display = "none";
+    }
+
+    if (dataFim) {
+        params.append("data_fim", dataFim);
+        itensFiltradosDataFim.style.display = "block";
+        itensFiltradosDataFim.textContent = "Até: " + dataFim;
+    } else {
+        itensFiltradosDataFim.style.display = "none";
     }
 
     if (pesquisarInspecao) {
@@ -159,7 +172,7 @@ function buscarItensInspecao(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data:</strong> ${item.data}<br>

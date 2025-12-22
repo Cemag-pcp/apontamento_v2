@@ -97,7 +97,8 @@ def get_itens_inspecao_serra_usinagem(request):
 
         # Filtros
         maquinas_param = request.GET.get("maquinas", "")
-        data_param = request.GET.get("data", "")
+        data_inicio = request.GET.get("data_inicio", "")
+        data_fim = request.GET.get("data_fim", "")
         pesquisar_param = request.GET.get("pesquisar", "").strip()
         status_param = request.GET.get("status", "")  # Novo filtro por status
 
@@ -145,12 +146,18 @@ def get_itens_inspecao_serra_usinagem(request):
                     )
                 query &= query_maquinas
 
-        if data_param:
-            try:
-                data_filtro = datetime.strptime(data_param, "%Y-%m-%d").date()
-                query &= Q(data_inspecao__date=data_filtro)
-            except ValueError:
-                pass
+        if not data_fim:
+            data_fim = data_inicio
+
+        # Aplica filtro de intervalo na query (usar __date para considerar o dia inteiro)
+        if data_inicio and data_fim:
+            query &= Q(
+                data_inspecao__date__gte=data_inicio, data_inspecao__date__lte=data_fim
+            )
+        elif data_inicio:
+            query &= Q(data_inspecao__date__gte=data_inicio)
+        elif data_fim:
+            query &= Q(data_inspecao__date__lte=data_fim)
 
         if pesquisar_param:
             query_pesquisa = Q()
@@ -353,7 +360,8 @@ def get_execucao_inspecao_serra_usinagem(request):
 
 def get_itens_reinspecao_serra_usinagem(request):
     maquinas = request.GET.get("maquinas")  # Ex: "Serra1,Usinagem2"
-    data = request.GET.get("data")  # Ex: "2025-07-30"
+    data_inicio = request.GET.get("data_inicio")  # Ex: "2025-07-30"
+    data_fim = request.GET.get("data_fim")  # Ex: "2025-07-30"
     pesquisar = request.GET.get("pesquisar")  # Ex: "peça 123"
     pagina = request.GET.get("pagina", 1)
 
@@ -376,9 +384,18 @@ def get_itens_reinspecao_serra_usinagem(request):
             | Q(inspecao__pecas_ordem_usinagem__ordem__maquina__nome__in=maquinas_lista)
         )
 
-    # Filtro por data
-    if data:
-        reinspecoes = reinspecoes.filter(data_reinspecao__date=data)
+    # Filtro por data (usa intervalo quando fornecido; considera o dia inteiro com lookup __date)
+    if data_inicio and not data_fim:
+        data_fim = data_inicio
+
+    if data_inicio and data_fim:
+        reinspecoes = reinspecoes.filter(
+            data_reinspecao__date__gte=data_inicio, data_reinspecao__date__lte=data_fim
+        )
+    elif data_inicio:
+        reinspecoes = reinspecoes.filter(data_reinspecao__date__gte=data_inicio)
+    elif data_fim:
+        reinspecoes = reinspecoes.filter(data_reinspecao__date__lte=data_fim)
 
     # Filtro por pesquisa (nome ou código da peça)
     if pesquisar:
@@ -495,7 +512,8 @@ def get_itens_reinspecao_serra_usinagem(request):
 
 def get_itens_inspecionados_serra_usinagem(request):
     maquinas = request.GET.get("maquinas")  # Ex: "Serra1,Usinagem2"
-    data = request.GET.get("data")  # Ex: "2025-07-30"
+    data_inicio = request.GET.get("data_inicio")  # Ex: "2025-07-30"
+    data_fim = request.GET.get("data_fim")  # Ex: "2025-07-30"
     pesquisar = request.GET.get("pesquisar")  # Ex: "peça 123"
     pagina = request.GET.get("pagina", 1)
 
@@ -537,9 +555,27 @@ def get_itens_inspecionados_serra_usinagem(request):
                 dadosexecucaoinspecao__num_execucao=0,
             )
 
-    # Filtro por data
-    if data:
-        inspecoes = inspecoes.filter(data_inspecao__date=data)
+    if data_inicio and not data_fim:
+        data_fim = data_inicio
+
+    # Usa o queryset correto e filtra pelo dia inteiro com __date
+    inspecoes = inspecoes.annotate(
+        ultima_data_execucao=Max("dadosexecucaoinspecao__data_execucao")
+    )
+
+    if data_inicio and data_fim:
+        inspecoes = inspecoes.filter(
+            ultima_data_execucao__date__gte=data_inicio,
+            ultima_data_execucao__date__lte=data_fim,
+        ).order_by("-ultima_data_execucao")
+    elif data_inicio:
+        inspecoes = inspecoes.filter(
+            ultima_data_execucao__date__gte=data_inicio
+        ).order_by("-ultima_data_execucao")
+    elif data_fim:
+        inspecoes = inspecoes.filter(
+            ultima_data_execucao__date__lte=data_fim
+        ).order_by("-ultima_data_execucao")
 
     # Filtro por pesquisa (nome ou código da peça)
     if pesquisar:

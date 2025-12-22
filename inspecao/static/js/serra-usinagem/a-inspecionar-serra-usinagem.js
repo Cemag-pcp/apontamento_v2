@@ -51,7 +51,8 @@ function buscarItensInspecao(pagina) {
     let itensInspecionar = document.getElementById("itens-inspecionar");
     let itensFiltradosMaquina = document.getElementById("itens-filtrados-inspecao-maquina");
     let itensFiltradosStatus = document.getElementById("itens-filtrados-inspecao-status");
-    let itensFiltradosData = document.getElementById("itens-filtrados-inspecao-data");
+    let itensFiltradosDataInicio = document.getElementById("itens-filtrados-inspecao-data-inicio");
+    let itensFiltradosDataFim = document.getElementById("itens-filtrados-inspecao-data-fim");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecao-pesquisa");
     let paginacao = document.getElementById("paginacao-inspecao-serra-usinagem");
 
@@ -74,7 +75,9 @@ function buscarItensInspecao(pagina) {
         statusSelecionados.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataSelecionada = document.getElementById('data-filtro-inspecao').value;
+    let dataSelecionadaInicio = document.getElementById('data-filtro-inspecao-inicio').value;
+    let dataSelecionadaFim = document.getElementById('data-filtro-inspecao-fim').value;
+
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
     // Monta os parâmetros de busca
@@ -96,12 +99,20 @@ function buscarItensInspecao(pagina) {
         itensFiltradosStatus.style.display = "none";
     }
 
-    if (dataSelecionada) {
-        params.append("data", dataSelecionada);
-        itensFiltradosData.style.display = "block";
-        itensFiltradosData.textContent = "Data: " + dataSelecionada;
+    if (dataSelecionadaInicio) {
+        params.append("data_inicio", dataSelecionadaInicio);
+        itensFiltradosDataInicio.style.display = "block";
+        itensFiltradosDataInicio.textContent = "Data: " + dataSelecionadaInicio;
     } else {
-        itensFiltradosData.style.display = "none";
+        itensFiltradosDataInicio.style.display = "none";
+    }
+
+    if (dataSelecionadaFim) {
+        params.append("data_fim", dataSelecionadaFim);
+        itensFiltradosDataFim.style.display = "block";
+        itensFiltradosDataFim.textContent = "Data: " + dataSelecionadaFim;
+    } else {
+        itensFiltradosDataFim.style.display = "none";
     }
 
     if (pesquisarInspecao) {
@@ -151,7 +162,7 @@ function buscarItensInspecao(pagina) {
             <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <div class="d-flex justify-content-between">
-                        <h5 style="width:70%;"> ${item.peca}</h5>
+                        <h5 style="width:70%;"> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                         <div class="text-center">
                             <p class="status-badge status-${status[item.status]}" style="font-size:13px">${item.status}</p>
                         </div>

@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+<title>Propriedades da Ordem</title>
+{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/propriedades_ordem.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="propriedades-app" data-api-url="{% url 'core:propriedades_ordem_api' %}">
+    <div class="d-flex align-items-center justify-content-between mb-3 page-hero">
+        <div>
+            <div class="title h4 mb-0">Propriedades da Ordem</div>
+            <!-- <p class="subtitle">Edite descrição, tamanho, espessura e quantidade de forma inline e salve por linha.</p> -->
+        </div>
+        <div class="d-flex gap-4 align-items-center">
+            <button id="refresh-btn" class="btn btn-light btn-sm text-dark">
+                <i class="bi bi-arrow-repeat me-1"></i>Atualizar
+            </button>
+        </div>
+    </div>
+
+    <div class="card card-surface mb-3">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-2 col-6">
+                    <label class="form-label small text-secondary">Ordem</label>
+                    <input id="f-ordem" class="form-control form-control-sm" placeholder="Nº da ordem">
+                </div>
+                <div class="col-sm-3 col-12">
+                    <label class="form-label small text-secondary">Descrição MP</label>
+                    <input id="f-descricao" type="text" class="form-control form-control-sm" placeholder="Buscar descrição">
+                </div>
+                <div class="col-sm-2 col-6">
+                    <label class="form-label small text-secondary">Tipo de chapa</label>
+                    <select id="f-tipo-chapa" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        {% for key, label in tipos_chapa %}
+                            <option value="{{ key }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-2 col-6">
+                    <label class="form-label small text-secondary">Retalho</label>
+                    <select id="f-retalho" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        <option value="true">Sim</option>
+                        <option value="false">Não</option>
+                    </select>
+                </div>
+                <div class="col-sm-3 col-12 d-flex gap-2">
+                    <button id="apply-filters" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-funnel me-1"></i>Aplicar filtros
+                    </button>
+                    <button id="clear-filters" class="btn btn-outline-secondary btn-sm">
+                        Limpar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-surface">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="fw-semibold small text-secondary mb-0">Itens por página</label>
+                    <select id="page-size" class="form-select form-select-sm" style="width: auto;">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div id="pagination-summary" class="small text-muted ms-auto"></div>
+            </div>
+
+            <div class="table-responsive" style="max-height: 65vh; overflow: auto;">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Ordem</th>
+                            <th>Grupo</th>
+                            <th>Descrição MP</th>
+                            <th>Tamanho</th>
+                            <th>Espessura</th>
+                            <th>Qtd.</th>
+                            <th>Aproveitamento</th>
+                            <th>Tipo chapa</th>
+                            <th>Retalho</th>
+                            <th>Nova MP</th>
+                            <th class="text-center" style="width: 120px;">Salvar</th>
+                        </tr>
+                    </thead>
+                    <tbody id="propriedades-body">
+                        <tr id="loading-row">
+                            <td colspan="13">
+                                <div class="loading-ghost w-100"></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between mt-3">
+                <div class="small text-muted" id="total-indicator"></div>
+                <div class="btn-group">
+                    <button id="prev-page" class="btn btn-outline-secondary btn-sm">Anterior</button>
+                    <button id="next-page" class="btn btn-outline-secondary btn-sm">Próxima</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/propriedades_ordem.js' %}" defer></script>
+{% endblock %}

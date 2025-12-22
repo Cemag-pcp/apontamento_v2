@@ -614,7 +614,7 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
 
         # Peças relacionadas à ordem
         pecas = [
-            {'peca': peca.peca, 'quantidade': peca.qtd_planejada if peca.qtd_boa == 0 else peca.qtd_boa}
+            {'peca': peca.peca, 'quantidade': peca.qtd_planejada}
             for peca in ordem.ordem_pecas_corte.all()
             if peca.qtd_planejada > 0
         ]

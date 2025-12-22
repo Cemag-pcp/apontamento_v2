@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 data.history.forEach((element, index) => {
                     const isFirstItem = index === 0;
-                    
+                                        
                     // HTML para informações adicionais
                     let infoAdicionaisHTML = '';
                     if (element.info_adicionais) {
@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 medidasHTML += `
                                     <tr>
                                         <td>${medida.cabecalhoMedidaA || 'Medida A'}</td>
-                                        <td>${medida.medidaA}</td>
+                                        <td>${medida.medidaA}mm</td>
                                     </tr>`;
                             }
                             
@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 medidasHTML += `
                                     <tr>
                                         <td>${medida.cabecalhoMedidaB || 'Medida B'}</td>
-                                        <td>${medida.medidaB}</td>
+                                        <td>${medida.medidaB}mm</td>
                                     </tr>`;
                             }
                             
@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 medidasHTML += `
                                     <tr>
                                         <td>${medida.cabecalhoMedidaC || 'Medida C'}</td>
-                                        <td>${medida.medidaC}</td>
+                                        <td>${medida.medidaC}mm</td>
                                     </tr>`;
                             }
                             
@@ -104,7 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 medidasHTML += `
                                     <tr>
                                         <td>${medida.cabecalhoMedidaD || 'Medida D'}</td>
-                                        <td>${medida.medidaD}</td>
+                                        <td>${medida.medidaD}mm</td>
                                     </tr>`;
                             }
                         });
@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             </span>
                             <div class="timeline-content">
                                 <div class="d-flex justify-content-between">
-                                    <h5>Execução #${element.num_execucao}</h5>
+                                    <h5>${element.num_execucao === 0? `Inspeção`: `Reinspeção`} #${element.num_execucao}</h5>
                                     ${isFirstItem ? `
                                         <i class="bi bi-trash trash-history-last-execution" 
                                             data-id="${element.id}" 

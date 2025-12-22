@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     medidasPorProcessoHTML += `
                                         <tr class="${detalhe.conforme ? '' : 'table-danger'}">
                                             <td>${detalhe.cabecalho}</td>
-                                            <td>${detalhe.valor}</td>
+                                            <td>${detalhe.valor}mm</td>
                                             <td>${detalhe.conforme ? 'Sim' : 'Não'}</td>
                                         </tr>`;
                                 });
@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             </span>
                             <div class="timeline-content">
                                 <div class="d-flex justify-content-between">
-                                    <h5>Execução #${element.num_execucao}</h5>
+                                    <h5>${element.num_execucao === 0? `Inspeção`: `Reinspeção`} #${element.num_execucao}</h5>
                                     ${isFirstItem ? `
                                         <i class="bi bi-trash trash-history-last-execution" 
                                             data-id="${element.id}" 

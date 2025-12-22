@@ -146,6 +146,11 @@
                                     <a class="nav-link" href="{% url 'cadastro:operadores' %}">Operadores</a>
                                 </nav>
                             </div>
+                            <div class="collapse" id="collapseCadastro" aria-labelledby="headingCadastro" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'cadastro:cadastro_pecas' %}">Peças</a>
+                                </nav>
+                            </div>
 
                             <div class="sb-sidenav-menu-heading">Cargas</div>
                             <a class="nav-link" href="{% url 'sucata:sucata' %}"><div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div> Sucata</a>
@@ -167,6 +172,37 @@
 
                             <div class="sb-sidenav-menu-heading">Apontamentos</div>
                             
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseBases" aria-expanded="false" aria-controls="collapseBases">
+                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
+                                Bases
+                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            </a>
+                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'core:propriedades_ordem' %}">Propriedades da ordem</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'core:pecas_corte' %}">Histórico Corte</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'core:pecas_serra' %}">Histórico Serra</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'core:pecas_usinagem' %}">Histórico Usinagem</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'core:pecas_estamparia' %}">Histórico Estamparia</a>
+                                </nav>
+                            </div>
+
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseUsinagem" aria-expanded="false" aria-controls="collapseUsinagem">
                                 <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
                                 Usinagem
