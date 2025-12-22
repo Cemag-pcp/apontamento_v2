@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         </span>
                         <div class="timeline-content">
                             <div class="d-flex justify-content-between">
-                                <h5>${tituloInspecao} #${element.num_execucao}</h5>
+                                <h5>${element.num_execucao === 0? `Inspeção`: `Reinspeção`} #${element.num_execucao}</h5>
                                 ${isFirstItem ? `
                                     <i class="bi bi-trash trash-history-last-execution" 
                                         data-id="${element.id}" 
