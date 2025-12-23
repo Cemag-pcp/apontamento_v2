@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         const textoNc = element.nao_conformidade === true ? "Não" : "Sim";
                         return `
                         <tr>
-                            <td class="text-center">${element.num_execucao}</td>
+                            <td class="text-center">${element.num_execucao === 0 ? `Inspeção`:`Reinspeção`}</td>
                             <td>${element.data_execucao}</td>
                             <td>${element.inspetor || "N/A"}</td>
                             <td>${element.pressao_inicial || "N/A"}</td>

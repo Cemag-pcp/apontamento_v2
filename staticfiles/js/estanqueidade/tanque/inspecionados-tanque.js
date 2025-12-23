@@ -67,7 +67,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
     let params = new URLSearchParams();
 
     if (dataSelecionadaInicio) {
-        params.append("data", dataSelecionadaInicio);
+        params.append("data_inicio", dataSelecionadaInicio);
         itensFiltradosDataInicio.style.display = "block";
         itensFiltradosDataInicio.textContent = "De: " + dataSelecionadaInicio;
     } else {
@@ -75,7 +75,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
     }
 
     if (dataSelecionadaFim) {
-        params.append("data", dataSelecionadaFim);
+        params.append("data_fim", dataSelecionadaFim);
         itensFiltradosDataFim.style.display = "block";
         itensFiltradosDataFim.textContent = "Até: " + dataSelecionadaFim;
     } else {
