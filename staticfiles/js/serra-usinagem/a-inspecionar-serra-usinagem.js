@@ -162,7 +162,7 @@ function buscarItensInspecao(pagina) {
             <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
                     <div class="d-flex justify-content-between">
-                        <h5 style="width:70%;"> ${item.peca}</h5>
+                        <h5 style="width:70%;"> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                         <div class="text-center">
                             <p class="status-badge status-${status[item.status]}" style="font-size:13px">${item.status}</p>
                         </div>
