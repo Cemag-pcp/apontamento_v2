@@ -1,6 +1,14 @@
 from django.urls import path
 from . import views_general
-from .views import estamparia, estanqueidade, montagem, pintura, serra_usinagem, verificacao_funcional
+from .views import (
+    corte,
+    estamparia,
+    estanqueidade,
+    montagem,
+    pintura,
+    serra_usinagem,
+    verificacao_funcional,
+)
 
 app_name = "inspecao"
 
@@ -38,6 +46,9 @@ urlpatterns = [
     path('api/itens-inspecionados-serra-usinagem/', serra_usinagem.get_itens_inspecionados_serra_usinagem, name='itens-inspecionados-serra-usinagem'),
     path('api/itens-reinspecao-serra-usinagem/', serra_usinagem.get_itens_reinspecao_serra_usinagem, name='itens-reinspecao-estamserra-usinagemparia'),
     path('api/get-execucao-inspecao-serra-usinagem/', serra_usinagem.get_execucao_inspecao_serra_usinagem, name='execucao-inspecao-serra-usinagem'),
+    path('api/itens-inspecao-corte/', corte.get_itens_inspecao_corte, name='itens-inspecao-corte'),
+    path('api/itens-inspecionados-corte/', corte.get_itens_inspecionados_corte, name='itens-inspecionados-corte'),
+    path('api/ordem-corte/<int:ordem_id>/', corte.get_ordem_corte, name='ordem-corte'),
 
     path('api/envio-inspecao-serra-usinagem/', serra_usinagem.envio_inspecao_serra_usinagem, name='inspecionar-serra-usinagem'),
     path('api/envio-reinspecao-serra-usinagem/', serra_usinagem.envio_reinspecao_serra_usinagem, name='envio-reinspecao-serra-usinagem'),
@@ -86,6 +97,7 @@ urlpatterns += [
     path('montagem/', montagem.inspecao_montagem, name='inspecao-montagem'),
     path('conjuntos-inspecionados/', montagem.conjuntos_inspecionados_montagem, name='conjuntos-inspecionados-montagem'),
     path('serra-usinagem/', serra_usinagem.inspecao_serra_usinagem, name='inspecao-serra-usinagem'),
+    path('corte/', corte.inspecao_corte, name='inspecao-corte'),
     path('estamparia/', estamparia.inspecao_estamparia, name='inspecao-estamparia'),
     path('pintura/', pintura.inspecao_pintura, name='inspecao-pintura'),
     path('verificacao-funcional-pintura/', verificacao_funcional.verificacao_funcional_pintura, name='verificacao-funcional-pintura'),

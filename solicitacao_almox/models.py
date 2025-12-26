@@ -36,6 +36,7 @@ class SolicitacaoRequisicao(models.Model):
     )
     data_entrega = models.DateTimeField(null=True, blank=True)
     rpa = models.TextField(null=True, blank=True)
+    chave_innovaro = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         return f"{self.funcionario} - {self.item} - {self.classe_requisicao}"
@@ -66,6 +67,7 @@ class SolicitacaoTransferencia(models.Model):
     )
     data_entrega = models.DateTimeField(null=True, blank=True)
     rpa = models.TextField(null=True, blank=True)
+    chave_innovaro = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
 

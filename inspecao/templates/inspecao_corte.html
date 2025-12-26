@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}<title>Inspecao Corte</title>{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/modal-inspecao-estamparia.css' %}">
+<link rel="stylesheet" href="{% static 'css/inspecao.css' %}">
+<link rel="stylesheet" href="{% static 'css/select2.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<h2 class="fw-bold my-4">Inspecao Corte</h2>
+
+<ul class="nav nav-tabs mt-3" style="background-color: #f4f4f5;">
+    <li class="nav-item" style="width: 50%;">
+        <a id="tab-pendencias-corte" class="nav-link tab-active active text-center" style="font-size: 0.875rem;" onclick="activeRow('pendencias-corte','inspecionados-corte', this)">
+            Pendencias
+            <span class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true"></span>
+        </a>
+    </li>
+    <li class="nav-item" style="width: 50%;">
+        <a id="tab-inspecionados-corte" class="nav-link tab-active text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-corte','pendencias-corte', this)">
+            Inspecionados
+            <span class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true"></span>
+        </a>
+    </li>
+</ul>
+
+<div id="pendencias-corte" class="row mt-3">
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Pendencias</h4>
+        <div>
+            <div class="btn-group">
+                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownFiltroPendencias" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <form id="form-filtrar-pendencias-corte">
+                    <div class="dropdown-menu p-3" style="width: 250px;">
+                        <p class="fw-bold mx-2 my-1">Filtrar pendencias</p>
+                        <hr>
+                        <input type="text" class="form-control mb-3" id="pesquisar-ordem-pendencias" placeholder="Pesquisar ordens...">
+                        <h6 class="mt-3">Periodo</h6>
+                        <div class="mb-2">
+                            <label for="data-inicio-pendencias" class="form-label small text-muted">Data inicial</label>
+                            <input type="date" class="form-control" id="data-inicio-pendencias">
+                        </div>
+                        <div>
+                            <label for="data-fim-pendencias" class="form-label small text-muted">Data final</label>
+                            <input type="date" class="form-control" id="data-fim-pendencias">
+                        </div>
+                        <div class="d-flex justify-content-between mt-3">
+                            <button type="button" id="btn-limpar-pendencias" class="btn btn-outline-secondary">Limpar</button>
+                            <button type="button" id="btn-filtrar-pendencias" class="btn btn-dark">Filtrar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-pendente-corte" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </span>
+        <span id="qtd-filtrada-pendencias" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="filtro-pendencias-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="filtro-pendencias-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+    </div>
+
+    <div class="row" style="padding-right: 0;" id="cards-pendencias-corte"></div>
+    <div id="paginacao-pendencias-corte"></div>
+</div>
+
+<div id="inspecionados-corte" class="row mt-3" style="display: none;">
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Inspecionados</h4>
+        <div>
+            <div class="btn-group">
+                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownFiltroInspecionados" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <form id="form-filtrar-inspecionados-corte">
+                    <div class="dropdown-menu p-3" style="width: 250px;">
+                        <p class="fw-bold mx-2 my-1">Filtrar inspecionados</p>
+                        <hr>
+                        <input type="text" class="form-control mb-3" id="pesquisar-ordem-inspecionados" placeholder="Pesquisar ordens...">
+                        <h6 class="mt-3">Periodo</h6>
+                        <div class="mb-2">
+                            <label for="data-inicio-inspecionados" class="form-label small text-muted">Data inicial</label>
+                            <input type="date" class="form-control" id="data-inicio-inspecionados">
+                        </div>
+                        <div>
+                            <label for="data-fim-inspecionados" class="form-label small text-muted">Data final</label>
+                            <input type="date" class="form-control" id="data-fim-inspecionados">
+                        </div>
+                        <div class="d-flex justify-content-between mt-3">
+                            <button type="button" id="btn-limpar-inspecionados" class="btn btn-outline-secondary">Limpar</button>
+                            <button type="button" id="btn-filtrar-inspecionados" class="btn btn-dark">Filtrar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-inspecionados-corte" class="rounded-pill py-1 px-2" style="background-color: #00940c; color: #fafafa; font-weight: 600; font-size: 0.75rem;">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </span>
+        <span id="qtd-filtrada-inspecionados" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+
+    <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
+        <span id="filtro-inspecionados-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="filtro-inspecionados-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
+    </div>
+
+    <div class="row" style="padding-right: 0;" id="cards-inspecionados-corte"></div>
+    <div id="paginacao-inspecionados-corte"></div>
+</div>
+
+<template id="template-card-pendencia-corte">
+    <div class="col-sm-6 col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <h6 class="card-title">Ordem <span class="ordem-numero"></span></h6>
+                    <span class="badge text-bg-light">Corte</span>
+                </div>
+                <p class="card-text text-muted small mb-2">Conjunto: <span class="ordem-conjunto"></span></p>
+                <p class="card-text text-muted small mb-3">Pecas cortadas: <span class="ordem-qtd"></span></p>
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-dark btn-sm btn-ver-ordem" data-bs-toggle="modal" data-bs-target="#modal-ordem-corte">Ver</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="template-card-inspecionado-corte">
+    <div class="col-sm-6 col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <h6 class="card-title">Ordem <span class="ordem-numero"></span></h6>
+                    <span class="badge text-bg-success">Inspecionado</span>
+                </div>
+                <p class="card-text text-muted small mb-2">Conjunto: <span class="ordem-conjunto"></span></p>
+                <p class="card-text text-muted small mb-3">Data: <span class="ordem-data"></span></p>
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-outline-secondary btn-sm btn-ver-ordem">Ver</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<div class="modal fade" id="modal-ordem-corte" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalOrdemCorteLabel">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalOrdemCorteLabel">Inspecao corte</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Ordem</label>
+                        <input type="text" class="form-control" id="modal-ordem-corte-numero" readonly>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Conjunto</label>
+                        <input type="text" class="form-control" id="modal-ordem-corte-conjunto" readonly>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Quantidade cortada</label>
+                        <input type="number" class="form-control" id="modal-ordem-corte-qtd" readonly>
+                    </div>
+                </div>
+
+                <div class="accordion" id="lista-pecas-corte"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<template id="template-peca-corte">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse">
+                <span class="peca-nome">Peca</span>
+                <span class="ms-2 badge text-bg-light">Qtd: <span class="peca-qtd"></span></span>
+            </button>
+        </h2>
+        <div class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <form class="form-inspecao-peca-corte">
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Informacoes basicas</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Inspetor</label>
+                                    <input type="text" class="form-control" value="{% if user.get_full_name %}{{ user.get_full_name }}{% else %}{{ user.username }}{% endif %}" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Data da inspecao</label>
+                                    <input type="date" class="form-control data-inspecao-corte" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Peca</label>
+                                    <input type="text" class="form-control peca-nome-input" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Medicoes</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th><input type="text" class="form-control form-control-sm" placeholder="Medida 1"></th>
+                                            <th><input type="text" class="form-control form-control-sm" placeholder="Medida 2"></th>
+                                            <th><input type="text" class="form-control form-control-sm" placeholder="Medida 3"></th>
+                                            <th class="text-center">Conforme</th>
+                                            <th class="text-center">Nao conforme</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3"></td>
+                                            <td class="text-center">
+                                                <input class="form-check-input" type="radio" name="conformidade-1" value="conforme">
+                                            </td>
+                                            <td class="text-center">
+                                                <input class="form-check-input" type="radio" name="conformidade-1" value="nao-conforme">
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3"></td>
+                                            <td class="text-center">
+                                                <input class="form-check-input" type="radio" name="conformidade-2" value="conforme">
+                                            </td>
+                                            <td class="text-center">
+                                                <input class="form-check-input" type="radio" name="conformidade-2" value="nao-conforme">
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3"></td>
+                                            <td class="text-center">
+                                                <input class="form-check-input" type="radio" name="conformidade-3" value="conforme">
+                                            </td>
+                                            <td class="text-center">
+                                                <input class="form-check-input" type="radio" name="conformidade-3" value="nao-conforme">
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Nao conformidades encontradas</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="nao-conformidades-list">
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control" name="nao_conformidades[]" placeholder="Descreva a nao conformidade">
+                                    <button class="btn btn-outline-danger btn-remover-nao-conformidade" type="button">Remover</button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-add-nao-conformidade">Adicionar outra</button>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Foto da nao conformidade (opcional)</h6>
+                        </div>
+                        <div class="card-body">
+                            <input type="file" class="form-control foto-nao-conformidade" accept="image/*">
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Inspecao 100%</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label">Necessita inspecao 100%?</label>
+                                    <select class="form-select inspecao-100-select">
+                                        <option value="" selected disabled></option>
+                                        <option value="nao">Nao</option>
+                                        <option value="sim">Sim</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label">Anexar ficha 100%</label>
+                                    <input type="file" class="form-control ficha-100-file" accept="image/*,application/pdf" disabled>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-success btn-salvar-inspecao-corte">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</template>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/corte/a-inspecionar-corte.js' %}"></script>
+<script src="{% static 'js/corte/inspecionados-corte.js' %}"></script>
+<script>
+    function activeRow(rowVisible, rowInvisible, clickedElement) {
+        document.getElementById(rowVisible).style.display = "flex";
+        document.getElementById(rowInvisible).style.display = "none";
+
+        const tabs = document.querySelectorAll(".nav-tabs .nav-link");
+        tabs.forEach((tab) => tab.classList.remove("active"));
+        clickedElement.classList.add("active");
+    }
+
+    document.addEventListener("click", (event) => {
+        if (event.target.classList.contains("btn-add-nao-conformidade")) {
+            const list = event.target.closest(".card-body").querySelector(".nao-conformidades-list");
+            const item = document.createElement("div");
+            item.className = "input-group mb-2";
+            item.innerHTML = '<input type="text" class="form-control" name="nao_conformidades[]" placeholder="Descreva a nao conformidade"><button class="btn btn-outline-danger btn-remover-nao-conformidade" type="button">Remover</button>';
+            list.appendChild(item);
+        }
+
+        if (event.target.classList.contains("btn-remover-nao-conformidade")) {
+            const group = event.target.closest(".input-group");
+            if (group) {
+                group.remove();
+            }
+        }
+    });
+
+    document.addEventListener("change", (event) => {
+        if (event.target.classList.contains("inspecao-100-select")) {
+            const container = event.target.closest(".card-body");
+            const fileInput = container.querySelector(".ficha-100-file");
+            const isRequired = event.target.value === "sim";
+            fileInput.disabled = !isRequired;
+            fileInput.required = isRequired;
+        }
+    });
+
+    document.addEventListener("show.bs.collapse", (event) => {
+        const collapse = event.target;
+        const dateInput = collapse.querySelector(".data-inspecao-corte");
+        if (dateInput && !dateInput.value) {
+            const today = new Date();
+            dateInput.value = today.toISOString().slice(0, 10);
+        }
+    });
+</script>
+{% endblock %}
