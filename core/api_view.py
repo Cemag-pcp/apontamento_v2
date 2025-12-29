@@ -21,6 +21,7 @@ def rpa_update_status(request):
         requisicao_id = data["id"]
         status = data["status"]
         tipo_requisicao = data.get("tipo_requisicao")
+        chave=data.get("chave")
     except Exception:
         return JsonResponse({"error": "Dados inválidos."}, status=400)
 
@@ -28,6 +29,7 @@ def rpa_update_status(request):
     try:
         requisicao = SolicitacaoRequisicao.objects.get(id=requisicao_id)
         requisicao.rpa = status
+        requisicao.chave_innovaro = chave
         if status and ("Regra Contábil" in status):
             requisicao.classe_requisicao_id = 3 if tipo_requisicao == "Req p Consumo" else 4
         requisicao.save()
