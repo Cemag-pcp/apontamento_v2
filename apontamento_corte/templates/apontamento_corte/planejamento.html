@@ -795,6 +795,27 @@
     </div>
 </div>
 
+<!-- Modal confirmar finalizacao -->
+<div class="modal fade" id="modalConfirmFinalizarCorte" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalConfirmFinalizarCorteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalConfirmFinalizarCorteLabel">Confirmar finalizacao</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">A ordem foi planejada com os seguintes dados:</p>
+                <div id="resumoFinalizacaoCorte" class="border rounded p-3 bg-light"></div>
+                <small class="text-muted d-block mt-2">Escolha como deseja finalizar a ordem.</small>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-warning" id="btnFinalizarParcialCorte">Finalizar parcial</button>
+                <button type="button" class="btn btn-primary" id="btnFinalizarCompletoCorte">Finalizar completamente</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal retornar ordem -->
 <div class="modal fade" id="modalRetornar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalRetornarLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">

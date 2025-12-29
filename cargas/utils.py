@@ -2293,7 +2293,6 @@ def imprimir_ordens_montagem_unitaria(ordem_id):
 
 ^FT500,330^BQN,2,7
 ^FDLA,{env('URI_QR_CODE')}{getattr(peca.ordem, 'caminho_relativo_qr_code', '')}^FS
-^PQ{qtd},0,1,Y
 
 ^XZ
 """.strip()

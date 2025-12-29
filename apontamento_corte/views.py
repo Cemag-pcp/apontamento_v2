@@ -7,7 +7,7 @@ from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
-from django.db.models import Q, Count, Sum, F
+from django.db.models import Q, Count, Sum, F, Max
 from django.forms.models import model_to_dict
 from django.contrib.auth.decorators import login_required
 
@@ -177,6 +177,7 @@ def atualizar_status_ordem(request):
                 qtd_chapas = body.get('qtdChapas', None)
                 maquina_request = body.get('maquina')
                 tipo_chapa = body.get('tipoChapa')
+                finalizar_parcial = bool(body.get('finalizar_parcial', False))
 
                 if maquina_request:
                     maquina_nome = get_object_or_404(Maquina, pk=int(maquina_request))
@@ -223,6 +224,9 @@ def atualizar_status_ordem(request):
                     ordem.maquina = maquina_nome
                     ordem.status_prioridade = 1
                 elif status == 'finalizada':
+                    propriedade_atual = ordem.propriedade
+                    quantidade_chapas_original = propriedade_atual.quantidade if propriedade_atual else 0
+                    tipo_chapa_original = propriedade_atual.tipo_chapa if propriedade_atual else None
 
                     # Verifica se a quantidade de chapas mudaram
                     if int(qtd_chapas) != ordem.propriedade.quantidade:
@@ -232,20 +236,69 @@ def atualizar_status_ordem(request):
                         ordem.propriedade.tipo_chapa = tipo_chapa
                         ordem.propriedade.save()
 
+                    pecas_restantes = []
                     for peca in pecas_geral:
                         peca_id = peca.get('peca')
                         planejada = peca.get('planejadas')
                         mortas = peca.get('mortas', 0)
 
                         peca = PecasOrdem.objects.get(ordem=ordem, peca=peca_id)
+                        qtd_planejada_original = peca.qtd_planejada
                         peca.qtd_boa = planejada - mortas
                         peca.qtd_morta = mortas
 
                         peca.save()
 
+                        if finalizar_parcial:
+                            restante = max(qtd_planejada_original - planejada, 0)
+                            if restante > 0:
+                                pecas_restantes.append({"peca": peca.peca, "quantidade": restante})
+
                     ordem.status_prioridade = 3
                     ordem.operador_final = get_object_or_404(Operador, pk=body.get('operadorFinal'))
                     ordem.obs_operador = body.get('obsFinal')
+
+                    nova_ordem = None
+                    if finalizar_parcial and pecas_restantes:
+                        quantidade_chapas_usada = float(qtd_chapas) if qtd_chapas is not None else 0
+                        quantidade_chapas_restante = max(quantidade_chapas_original - quantidade_chapas_usada, 0)
+
+                        ordem_base = ordem.ordem or ordem.ordem_duplicada
+                        if ordem_base:
+                            ordem_base = re.sub(r'^continuacao#', '', str(ordem_base))
+                            ordem_base = re.sub(r'\.\d+$', '', ordem_base)
+                        continuacao_prefixo = f"continuacao#{ordem_base}"
+                        continuacoes_existentes = Ordem.objects.filter(
+                            ordem_duplicada__startswith=f"{continuacao_prefixo}."
+                        ).count()
+                        nova_ordem = Ordem.objects.create(
+                            ordem=None,
+                            ordem_duplicada=f"{continuacao_prefixo}.{continuacoes_existentes + 1}",
+                            obs=f"Saldo da ordem #{ordem_base}",
+                            grupo_maquina=ordem.grupo_maquina,
+                            data_programacao=now().date(),
+                            status_atual='aguardando_iniciar',
+                            maquina=ordem.maquina,
+                            tempo_estimado=ordem.tempo_estimado,
+                        )
+
+                        PropriedadesOrdem.objects.create(
+                            ordem=nova_ordem,
+                            descricao_mp=propriedade_atual.descricao_mp if propriedade_atual else None,
+                            tamanho=propriedade_atual.tamanho if propriedade_atual else None,
+                            espessura=propriedade_atual.espessura if propriedade_atual else None,
+                            quantidade=quantidade_chapas_restante,
+                            aproveitamento=propriedade_atual.aproveitamento if propriedade_atual else None,
+                            tipo_chapa=tipo_chapa if tipo_chapa is not None else tipo_chapa_original,
+                            retalho=propriedade_atual.retalho if propriedade_atual else False,
+                        )
+
+                        for peca_restante in pecas_restantes:
+                            PecasOrdem.objects.create(
+                                ordem=nova_ordem,
+                                peca=peca_restante["peca"],
+                                qtd_planejada=peca_restante["quantidade"],
+                            )
                 elif status == 'interrompida':
                     novo_processo.motivo_interrupcao = MotivoInterrupcao.objects.get(nome=body['motivo'])
                     novo_processo.comentario_extra = comentario_extra
@@ -255,12 +308,18 @@ def atualizar_status_ordem(request):
                 ordem.save()
                 notificar_ordem(ordem)
 
-                return JsonResponse({
+                response_payload = {
                     'message': 'Status atualizado com sucesso.',
                     'ordem_id': ordem.id,
                     'status': novo_processo.status,
                     'data_inicio': novo_processo.data_inicio,
-                })
+                    'maquina_id': ordem.maquina.id if ordem.maquina else None,
+                }
+                if status == 'finalizada' and 'nova_ordem' in locals() and nova_ordem:
+                    response_payload['nova_ordem_id'] = nova_ordem.id
+                    response_payload['nova_ordem_numero'] = nova_ordem.ordem or nova_ordem.ordem_duplicada
+
+                return JsonResponse(response_payload)
 
         except Ordem.DoesNotExist:
             return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)

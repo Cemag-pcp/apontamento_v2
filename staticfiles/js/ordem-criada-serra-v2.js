@@ -1378,7 +1378,7 @@ function mostrarModalDuplicar(ordemId){
 }
 
 // Modal para "Iniciar"
-function mostrarModalIniciar(ordemId, grupoMaquina) {
+function mostrarModalIniciar(ordemId, grupoMaquina, maquinaPreferidaId = null) {
 
     const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
@@ -1415,6 +1415,9 @@ function mostrarModalIniciar(ordemId, grupoMaquina) {
                 option.textContent = maquina.nome;
                 escolhaMaquina.appendChild(option);
             })
+            if (maquinaPreferidaId) {
+                escolhaMaquina.value = String(maquinaPreferidaId);
+            }
             modal.show();
         }
     )
@@ -1638,6 +1641,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                                             id="qtdRealizada_${peca.peca_id}"
                                             data-peca-index="${index}"
                                             data-peca-id="${peca.peca_id}"
+                                            data-qtd-original="${peca.quantidade}"
                                             class="form-control form-control-sm peca-quantidade" 
                                             value="${peca.quantidade}" 
                                             style="width: 100px; text-align: center;" required>
@@ -1664,6 +1668,31 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
 
             modal.show();
 
+            const inputQtdMp = document.getElementById('propQtd');
+            const qtdMpOriginal = parseFloat(inputQtdMp?.dataset.qtdVara) || 0;
+            const pecasInputs = document.querySelectorAll('.peca-quantidade');
+
+            const atualizarQuantidadesPecas = () => {
+                const qtdMpAtual = parseFloat(inputQtdMp.value) || 0;
+                if (!qtdMpOriginal || !qtdMpAtual) {
+                    return;
+                }
+
+                const fator = qtdMpAtual / qtdMpOriginal;
+                pecasInputs.forEach((input) => {
+                    const qtdOriginal = parseFloat(input.dataset.qtdOriginal) || 0;
+                    const novaQuantidade = qtdOriginal * fator;
+                    input.value = Number.isInteger(novaQuantidade)
+                        ? novaQuantidade
+                        : parseFloat(novaQuantidade.toFixed(2));
+                });
+            };
+
+            if (inputQtdMp) {
+                inputQtdMp.addEventListener('input', atualizarQuantidadesPecas);
+                inputQtdMp.addEventListener('change', atualizarQuantidadesPecas);
+            }
+
             if (!formFinalizar.checkValidity()) {
                 formFinalizar.reportValidity(); // Exibe as mensagens de erro nativas do navegador
                 return; // Interrompe a submissão se o formulário for inválido
@@ -1679,9 +1708,45 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
             });
         });
 
-    // Listener para submissão do formulário
-    clonedForm.addEventListener('submit', (event) => {
-        event.preventDefault();
+    const modalConfirmFinalizarEl = document.getElementById('modalConfirmFinalizar');
+    const modalConfirmFinalizar = modalConfirmFinalizarEl ? new bootstrap.Modal(modalConfirmFinalizarEl) : null;
+    let confirmModalHandlersBound = false;
+
+    const montarResumoFinalizacao = () => {
+        const resumoEl = document.getElementById('resumoFinalizacao');
+        if (!resumoEl) {
+            return;
+        }
+
+        const qtdVaras = document.getElementById('propQtd')?.value || '-';
+        const tamanhoVara = document.getElementById('tamanhoVaraInput')?.value || '-';
+        const mpSelect = document.getElementById('selectMpSerraAlterar');
+        const mpTexto = mpSelect ? mpSelect.options[mpSelect.selectedIndex]?.textContent || '-' : '-';
+
+        const pecas = Array.from(document.querySelectorAll('.peca-quantidade')).map((input) => {
+            const row = input.closest('tr');
+            const nome = row?.querySelector('td')?.textContent?.trim() || '-';
+            return { nome, quantidade: input.value || 0 };
+        });
+
+        const pecasHtml = pecas.length
+            ? `<ul class="mb-0">${pecas
+                  .map((peca) => `<li>${peca.nome}: ${peca.quantidade}</li>`)
+                  .join('')}</ul>`
+            : '<p class="mb-0 text-muted">Nenhuma peça informada.</p>';
+
+        resumoEl.innerHTML = `
+            <div class="mb-2"><strong>Materia-prima:</strong> ${mpTexto}</div>
+            <div class="mb-2"><strong>Tamanho:</strong> ${tamanhoVara}</div>
+            <div class="mb-2"><strong>Quantidade de varas:</strong> ${qtdVaras}</div>
+            <div><strong>Peças:</strong>${pecasHtml}</div>
+        `;
+    };
+
+    const enviarFinalizacao = (payload) => {
+        if (modalConfirmFinalizar) {
+            modalConfirmFinalizar.hide();
+        }
 
         Swal.fire({
             title: 'Finalizando...',
@@ -1691,6 +1756,81 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
                 Swal.showLoading();
             }
         });
+
+        fetch(`api/ordens/atualizar-status/`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            }
+        })
+        .then(async (response) => {
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Erro ao finalizar a ordem.');
+            }
+            return data;
+        })
+        .then((data) => {
+            const numeroNovaOrdem = data.nova_ordem_numero || data.nova_ordem_id;
+            const mensagemParcial = data.nova_ordem_id
+                ? `Ordem finalizada parcialmente. Nova ordem #${numeroNovaOrdem} criada.`
+                : 'Ordem finalizada com sucesso.';
+
+            const mostrarPromptIniciarRestante = () => {
+                if (!data.nova_ordem_id) {
+                    return;
+                }
+
+                Swal.fire({
+                    icon: 'question',
+                    title: 'Deseja iniciar o restante?',
+                    text: `Nova ordem #${numeroNovaOrdem} pronta para iniciar.`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Iniciar restante agora',
+                    cancelButtonText: 'Depois',
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        mostrarModalIniciar(data.nova_ordem_id, grupoMaquina, data.maquina_id);
+                    }
+                });
+            };
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso',
+                text: mensagemParcial,
+            }).then(() => {
+                mostrarPromptIniciarRestante();
+            });
+            
+            const containerIniciado = document.querySelector('.containerProcesso');
+            carregarOrdensIniciadas(containerIniciado);
+            
+            document.getElementById('ordens-container').innerHTML = '';
+            resetarCardsInicial();
+
+            fetchStatusMaquinas();
+            fetchUltimasPecasProduzidas();
+            fetchContagemStatusOrdens();
+
+            modal.hide();
+
+            formFinalizar.reset();
+        })
+        .catch((error) => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: error.message,
+            });
+        });
+    };
+
+    // Listener para submissão do formulário
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
 
         const inputsMortas = document.querySelectorAll('.input-mortas');
         const pecasMortas = Array.from(inputsMortas).map(input => {
@@ -1714,64 +1854,62 @@ function mostrarModalFinalizar(ordemId, grupoMaquina) {
         const operadorFinal = document.getElementById('operadorFinalizar').value;
         const obsFinalizar = document.getElementById('obsFinalizar').value;
         const mp_final = document.getElementById('selectMpSerraAlterar').value;
-        
-        // Faz o fetch para finalizar a ordem
-        fetch(`api/ordens/atualizar-status/`, {
-            method: 'PATCH',
-            body: JSON.stringify({
-                ordem_id: ordemId,
-                grupo_maquina: grupoMaquina,
-                status: 'finalizada',
-                pecas_mortas: pecasMortas,
-                qtd_vara: qtdVaras,
-                tamanho_vara: tamanhoVara,
-                operador_final: operadorFinal,
-                obs_finalizar: obsFinalizar,
-                mp_final: mp_final
-            }),
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken()
-            }
-        })
-        .then(async (response) => {
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || 'Erro ao finalizar a ordem.');
-            }
-            return data;
-        })
-        .then(() => {
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso',
-                text: 'Ordem finalizada com sucesso.',
+
+        const payloadBase = {
+            ordem_id: ordemId,
+            grupo_maquina: grupoMaquina,
+            status: 'finalizada',
+            pecas_mortas: pecasMortas,
+            qtd_vara: qtdVaras,
+            tamanho_vara: tamanhoVara,
+            operador_final: operadorFinal,
+            obs_finalizar: obsFinalizar,
+            mp_final: mp_final,
+        };
+
+        montarResumoFinalizacao();
+
+        if (!modalConfirmFinalizar) {
+            enviarFinalizacao({ ...payloadBase, finalizar_parcial: false });
+            return;
+        }
+
+        let btnCompleto = document.getElementById('btnFinalizarCompleto');
+        let btnParcial = document.getElementById('btnFinalizarParcial');
+
+        if (btnCompleto && btnParcial) {
+            const btnCompletoClone = btnCompleto.cloneNode(true);
+            btnCompleto.parentNode.replaceChild(btnCompletoClone, btnCompleto);
+            btnCompleto = btnCompletoClone;
+
+            const btnParcialClone = btnParcial.cloneNode(true);
+            btnParcial.parentNode.replaceChild(btnParcialClone, btnParcial);
+            btnParcial = btnParcialClone;
+
+            btnCompleto.addEventListener('click', () => {
+                enviarFinalizacao({ ...payloadBase, finalizar_parcial: false });
             });
-            
-            // Atualiza a interface
-            const containerIniciado = document.querySelector('.containerProcesso');
-            carregarOrdensIniciadas(containerIniciado);
-            
-            // Recarrega os dados chamando a função de carregamento
-            document.getElementById('ordens-container').innerHTML = '';
-            resetarCardsInicial();
 
-            fetchStatusMaquinas();
-            fetchUltimasPecasProduzidas();
-            fetchContagemStatusOrdens();
-
-            modal.hide();
-
-            formFinalizar.reset()
-
-        })
-        .catch((error) => {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro',
-                text: error.message,
+            btnParcial.addEventListener('click', () => {
+                enviarFinalizacao({ ...payloadBase, finalizar_parcial: true });
             });
-        });
+        }
+
+        if (modalConfirmFinalizar && !confirmModalHandlersBound) {
+            confirmModalHandlersBound = true;
+
+            modalConfirmFinalizarEl.addEventListener('shown.bs.modal', () => {
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                const ultimoBackdrop = backdrops[backdrops.length - 1];
+                if (ultimoBackdrop) {
+                    ultimoBackdrop.classList.add('modal-backdrop-confirm-finalizar');
+                    ultimoBackdrop.style.zIndex = '1055';
+                }
+                modalConfirmFinalizarEl.style.zIndex = '1056';
+            });
+        }
+
+        modalConfirmFinalizar.show();
     });
 }
 
