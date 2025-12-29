@@ -60,6 +60,7 @@ def rpa_update_transfer(request):
         rec = data.get("rec")
         qtd = data.get("qtd")
         observacao = data.get("observacao")
+        chave = data.get("chave")
     except Exception:
         return JsonResponse({"error": "Dados inválidos."}, status=400)
 
@@ -67,6 +68,7 @@ def rpa_update_transfer(request):
     try:
         transf = SolicitacaoTransferencia.objects.get(id=transferencia_id)
         transf.rpa = status
+        transf.chave_innovaro = chave
         transf.save()
 
         # Dispara alerta SOMENTE se a contagem de erros ultrapassar o limite
