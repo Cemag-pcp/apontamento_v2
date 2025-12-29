@@ -151,7 +151,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Finalizar", se existir
                         if (buttonFinalizar) {
                             buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.id);
+                                mostrarModalFinalizar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
                             });
                         }
 
@@ -323,7 +323,7 @@ export function carregarOrdensIniciadas(container) {
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        mostrarModalFinalizar(ordem.id);
+                        mostrarModalFinalizar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
                     });
                 }
 
@@ -592,59 +592,71 @@ function mostrarModalInterromper(ordemId) {
 }
 
 // Modal para "Iniciar"
-export function mostrarModalIniciar(ordemId, grupoMaquina) {
+export function mostrarModalIniciar(ordemId, grupoMaquina, maquinaPreferidaId = null) {
     const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
-    const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
 
     modalTitle.innerHTML = `Iniciar Ordem ${ordemId}`;
-    modal.show();
-
-    grupoMaquina = grupoMaquina.toLowerCase().replace(" ","_").replace(" (jfy)","");
-    console.log(grupoMaquina);
-
-    // Limpa opções antigas no select
-    escolhaMaquina.innerHTML = ``;
-
-    // Define as máquinas para cada grupo
-    const maquinasPorGrupo = {
-        laser_1: [
-            { value: '16', label: 'Laser 1' },
-            { value: '17', label: 'Laser 2 (JFY)' },
-            { value: '58', label: 'Laser 3 Trumpf' },
-        ],
-        laser_2: [
-            { value: '17', label: 'Laser 2 (JFY)' },
-            { value: '16', label: 'Laser 1' },
-            { value: '58', label: 'Laser 3 Trumpf' },
-        ],
-        laser_3: [
-            { value: '58', label: 'Laser 3 Trumpf' },
-            { value: '16', label: 'Laser 1' },
-            { value: '17', label: 'Laser 2 (JFY)' },
-        ],
-        plasma: [
-            { value: '19', label: 'Plasma 1' },
-            { value: '54', label: 'Plasma 2' },
-        ],
-    };
-
-    // Preenche o select com base no grupo de máquinas
-    if (maquinasPorGrupo[grupoMaquina.toLowerCase()]) {
-        maquinasPorGrupo[grupoMaquina.toLowerCase()].forEach((maquina) => {
-            const option = document.createElement('option');
-            option.value = maquina.value;
-            option.textContent = maquina.label;
-            escolhaMaquina.appendChild(option);
-        });
-    } else {
-        console.warn(`Grupo de máquina "${grupoMaquina}" não encontrado.`);
-    }
+    grupoMaquina = grupoMaquina.toLowerCase().replace(" ", "_").replace(" (jfy)", "");
 
     // Remove listeners antigos e adiciona novo no formulário
     const formIniciar = document.getElementById('formIniciarOrdemCorte');
     const clonedForm = formIniciar.cloneNode(true);
     formIniciar.parentNode.replaceChild(clonedForm, formIniciar);
+
+    const escolhaMaquina = document.getElementById('escolhaMaquinaIniciarOrdem');
+
+    // Limpa opções antigas no select
+    escolhaMaquina.innerHTML = '<option value="">------</option>';
+
+    fetch('/cadastro/api/buscar-maquinas/?setor=corte', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao buscar máquinas');
+            }
+            return response.json();
+        })
+        .then(data => {
+            const maquinas = data.maquinas || [];
+
+            const grupoMaquinaLower = grupoMaquina.toLowerCase();
+            const filtraLaser = grupoMaquinaLower.includes('laser');
+            const filtraPlasma = grupoMaquinaLower.includes('plasma');
+
+            maquinas.forEach((maquina) => {
+                const nome = maquina.nome || '';
+                const nomeLower = nome.toLowerCase();
+                const option = document.createElement('option');
+                option.value = maquina.id;
+                option.textContent = nome;
+
+                if (filtraLaser && !nomeLower.includes('laser')) {
+                    return;
+                }
+                if (filtraPlasma && !nomeLower.includes('plasma')) {
+                    return;
+                }
+                if (filtraLaser || filtraPlasma) {
+                    escolhaMaquina.appendChild(option);
+                    return;
+                }
+
+                escolhaMaquina.appendChild(option);
+            });
+
+            if (maquinaPreferidaId) {
+                escolhaMaquina.value = String(maquinaPreferidaId);
+            }
+
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Erro ao carregar máquinas:', error);
+            modal.show();
+        });
 
     clonedForm.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -770,10 +782,13 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
 }
 
 // Modal para "Finalizar"
-function mostrarModalFinalizar(ordemId) {
+function mostrarModalFinalizar(ordemId, grupoMaquina, maquinaPreferidaId = null) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     const modalTitle = document.getElementById('modalFinalizarLabel');
     const formFinalizar = document.getElementById('formFinalizarOrdemCorte');
+    const modalConfirmFinalizarEl = document.getElementById('modalConfirmFinalizarCorte');
+    const modalConfirmFinalizar = modalConfirmFinalizarEl ? new bootstrap.Modal(modalConfirmFinalizarEl) : null;
+    let confirmModalHandlersBound = false;
 
     // Configura título do modal
     modalTitle.innerHTML = `Finalizar Ordem`;
@@ -927,9 +942,48 @@ function mostrarModalFinalizar(ordemId) {
             });
         });
 
-    // Listener para submissão do formulário
-    clonedForm.addEventListener('submit', (event) => {
-        event.preventDefault();
+    const montarResumoFinalizacao = () => {
+        const resumoEl = document.getElementById('resumoFinalizacaoCorte');
+        if (!resumoEl) {
+            return;
+        }
+
+        const qtdChapas = document.getElementById('propQtd')?.value || '-';
+        const tipoChapaSelect = document.querySelector('[name="tipo_chapa"]');
+        const tipoChapaTexto = tipoChapaSelect
+            ? tipoChapaSelect.options[tipoChapaSelect.selectedIndex]?.textContent || '-'
+            : '-';
+
+        const descricaoChapa = document.querySelector('#bodyPecasFinalizar table tbody td')?.textContent?.trim() || '-';
+        const espessura = document.querySelector('#bodyPecasFinalizar table tbody td:nth-child(2)')?.textContent?.trim() || '-';
+        const aproveitamento = document.querySelector('#bodyPecasFinalizar table tbody td:nth-child(5)')?.textContent?.trim() || '-';
+
+        const pecas = Array.from(document.querySelectorAll('.peca-quantidade')).map((cell) => {
+            const row = cell.closest('tr');
+            const nome = row?.querySelector('td')?.textContent?.trim() || '-';
+            return { nome, quantidade: cell.textContent?.trim() || '0' };
+        });
+
+        const pecasHtml = pecas.length
+            ? `<ul class="mb-0">${pecas
+                  .map((peca) => `<li>${peca.nome}: ${peca.quantidade}</li>`)
+                  .join('')}</ul>`
+            : '<p class="mb-0 text-muted">Nenhuma peça informada.</p>';
+
+        resumoEl.innerHTML = `
+            <div class="mb-2"><strong>Descricao:</strong> ${descricaoChapa}</div>
+            <div class="mb-2"><strong>Espessura:</strong> ${espessura}</div>
+            <div class="mb-2"><strong>Quantidade de chapas:</strong> ${qtdChapas}</div>
+            <div class="mb-2"><strong>Tipo chapa:</strong> ${tipoChapaTexto}</div>
+            <div class="mb-2"><strong>Aproveitamento:</strong> ${aproveitamento}</div>
+            <div><strong>Peças:</strong>${pecasHtml}</div>
+        `;
+    };
+
+    const enviarFinalizacao = (payload) => {
+        if (modalConfirmFinalizar) {
+            modalConfirmFinalizar.hide();
+        }
 
         Swal.fire({
             title: 'Finalizando...',
@@ -940,42 +994,9 @@ function mostrarModalFinalizar(ordemId) {
             }
         });
 
-        const tipoChapa = document.querySelector('[name="tipo_chapa"]').value;
-        const obsFinal = document.getElementById('obsFinalizarCorte').value;
-        const operadorFinal=document.getElementById('operadorFinal').value;
-        const inputsMortas = document.querySelectorAll('.input-mortas');
-        const pecasMortas = Array.from(inputsMortas).map(input => {
-            const pecaId = input.dataset.pecaId;
-            const mortas = parseInt(input.value) || 0;
-        
-            // Captura a quantidade planejada usando um atributo ou elemento relacionado
-            const quantidadePlanejada = parseInt(
-                document.querySelector(`[data-peca-id="${pecaId}"]`).closest('tr')
-                    .querySelector('.peca-quantidade').textContent
-            ) || 0;
-        
-            return {
-                peca: pecaId,
-                mortas: mortas,
-                planejadas: quantidadePlanejada // Adiciona a quantidade planejada
-            };
-        });
-
-        const qtdChapas = document.getElementById('propQtd').value;
-
-        // Faz o fetch para finalizar a ordem
         fetch(`api/ordens/atualizar-status/`, {
             method: 'PATCH',
-            body: JSON.stringify({
-                ordem_id: ordemId,
-                // grupo_maquina: grupoMaquina,
-                status: 'finalizada',
-                pecas_mortas: pecasMortas,
-                qtdChapas: qtdChapas,
-                operadorFinal: operadorFinal,
-                obsFinal: obsFinal,
-                tipoChapa: tipoChapa,
-            }),
+            body: JSON.stringify(payload),
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCSRFToken()
@@ -988,14 +1009,34 @@ function mostrarModalFinalizar(ordemId) {
             }
             return data;
         })
-        .then(() => {
+        .then((data) => {
+            const numeroNovaOrdem = data.nova_ordem_numero || data.nova_ordem_id;
+            const mensagemParcial = data.nova_ordem_id
+                ? `Ordem finalizada parcialmente. Nova ordem #${numeroNovaOrdem} criada.`
+                : 'Ordem finalizada com sucesso.';
+
             Swal.fire({
                 icon: 'success',
                 title: 'Sucesso',
-                text: 'Ordem finalizada com sucesso.',
+                text: mensagemParcial,
+            }).then(() => {
+                if (data.nova_ordem_id) {
+                    Swal.fire({
+                        icon: 'question',
+                        title: 'Deseja iniciar a ordem?',
+                        text: `Nova ordem #${numeroNovaOrdem} pronta para iniciar.`,
+                        showCancelButton: true,
+                        confirmButtonText: 'Iniciar agora',
+                        cancelButtonText: 'Depois',
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            const maquinaId = data.maquina_id || maquinaPreferidaId;
+                            mostrarModalIniciar(data.nova_ordem_id, grupoMaquina, maquinaId);
+                        }
+                    });
+                }
             });
             
-            // Atualiza a interface
             const containerIniciado = document.querySelector('.containerProcesso');
             carregarOrdensIniciadas(containerIniciado);
             
@@ -1015,6 +1056,85 @@ function mostrarModalFinalizar(ordemId) {
                 text: error.message,
             });
         });
+    };
+
+    // Listener para submissão do formulário
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const tipoChapa = document.querySelector('[name="tipo_chapa"]').value;
+        const obsFinal = document.getElementById('obsFinalizarCorte').value;
+        const operadorFinal = document.getElementById('operadorFinal').value;
+        const inputsMortas = document.querySelectorAll('.input-mortas');
+        const pecasMortas = Array.from(inputsMortas).map(input => {
+            const pecaId = input.dataset.pecaId;
+            const mortas = parseInt(input.value) || 0;
+        
+            const quantidadePlanejada = parseInt(
+                document.querySelector(`[data-peca-id="${pecaId}"]`).closest('tr')
+                    .querySelector('.peca-quantidade').textContent
+            ) || 0;
+        
+            return {
+                peca: pecaId,
+                mortas: mortas,
+                planejadas: quantidadePlanejada
+            };
+        });
+
+        const qtdChapas = document.getElementById('propQtd').value;
+
+        const payloadBase = {
+            ordem_id: ordemId,
+            status: 'finalizada',
+            pecas_mortas: pecasMortas,
+            qtdChapas: qtdChapas,
+            operadorFinal: operadorFinal,
+            obsFinal: obsFinal,
+            tipoChapa: tipoChapa,
+        };
+
+        montarResumoFinalizacao();
+
+        if (!modalConfirmFinalizar) {
+            enviarFinalizacao({ ...payloadBase, finalizar_parcial: false });
+            return;
+        }
+
+        let btnCompleto = document.getElementById('btnFinalizarCompletoCorte');
+        let btnParcial = document.getElementById('btnFinalizarParcialCorte');
+
+        if (btnCompleto && btnParcial) {
+            const btnCompletoClone = btnCompleto.cloneNode(true);
+            btnCompleto.parentNode.replaceChild(btnCompletoClone, btnCompleto);
+            btnCompleto = btnCompletoClone;
+
+            const btnParcialClone = btnParcial.cloneNode(true);
+            btnParcial.parentNode.replaceChild(btnParcialClone, btnParcial);
+            btnParcial = btnParcialClone;
+
+            btnCompleto.addEventListener('click', () => {
+                enviarFinalizacao({ ...payloadBase, finalizar_parcial: false });
+            });
+
+            btnParcial.addEventListener('click', () => {
+                enviarFinalizacao({ ...payloadBase, finalizar_parcial: true });
+            });
+        }
+
+        if (modalConfirmFinalizar && !confirmModalHandlersBound) {
+            confirmModalHandlersBound = true;
+            modalConfirmFinalizarEl.addEventListener('shown.bs.modal', () => {
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                const ultimoBackdrop = backdrops[backdrops.length - 1];
+                if (ultimoBackdrop) {
+                    ultimoBackdrop.style.zIndex = '1055';
+                }
+                modalConfirmFinalizarEl.style.zIndex = '1056';
+            });
+        }
+
+        modalConfirmFinalizar.show();
     });
 }
 

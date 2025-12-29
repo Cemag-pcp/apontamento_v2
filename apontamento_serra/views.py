@@ -157,11 +157,16 @@ def atualizar_status_ordem(request):
                     qtd_varas = body.get('qtd_vara')
                     operador_final = int(body.get('operador_final'))
                     obs_final = body.get('obs_finalizar')
+                    finalizar_parcial = bool(body.get('finalizar_parcial', False))
 
                     ordem.operador_final = get_object_or_404(Operador, pk=operador_final)
                     ordem.obs_operador = obs_final
 
                     mp_final = body.get('mp_final')
+                    propriedade_atual = ordem.propriedade
+                    quantidade_varas_original = propriedade_atual.quantidade if propriedade_atual else 0
+                    tamanho_vara_original = propriedade_atual.tamanho if propriedade_atual else None
+                    retalho_original = propriedade_atual.retalho if propriedade_atual else False
 
                     if ordem.propriedade.mp_codigo.codigo != mp_final:
                         ordem.propriedade.nova_mp = get_object_or_404(Mp, codigo=mp_final)
@@ -175,15 +180,22 @@ def atualizar_status_ordem(request):
                         ordem.propriedade.quantidade = int(qtd_varas)
                         ordem.propriedade.save()
 
+                    pecas_restantes = []
                     for peca in pecas_geral:
                         peca_id = peca.get('peca')
                         planejada = peca.get('planejadas')
                         mortas = peca.get('mortas', 0)
 
                         peca_obj = PecasOrdem.objects.get(ordem=ordem, peca=peca_id)
+                        qtd_planejada_original = peca_obj.qtd_planejada
                         peca_obj.qtd_boa = planejada
                         peca_obj.qtd_morta = mortas
                         peca_obj.save()
+
+                        if finalizar_parcial:
+                            restante = max(qtd_planejada_original - planejada - mortas, 0)
+                            if restante > 0:
+                                pecas_restantes.append({"peca": peca_obj.peca, "quantidade": restante})
 
                         # verifica se a peça tem passagem para usinagem
                         peca_object = Pecas.objects.get(pk=peca_id)
@@ -214,6 +226,40 @@ def atualizar_status_ordem(request):
                             pecas_ordem_serra=peca_obj
                         )                   
 
+                    nova_ordem = None
+                    if finalizar_parcial and pecas_restantes:
+                        quantidade_varas_usada = float(qtd_varas) if qtd_varas is not None else 0
+                        quantidade_varas_restante = max(quantidade_varas_original - quantidade_varas_usada, 0)
+
+                        mp_nova_ordem = (
+                            get_object_or_404(Mp, codigo=mp_final)
+                            if mp_final
+                            else propriedade_atual.mp_codigo
+                        )
+
+                        nova_ordem = Ordem.objects.create(
+                            obs=f"Finalizada parcialmente da ordem #{ordem.ordem}",
+                            grupo_maquina=ordem.grupo_maquina,
+                            data_programacao=now().date(),
+                            status_atual="aguardando_iniciar",
+                            maquina=ordem.maquina,
+                        )
+
+                        PropriedadesOrdem.objects.create(
+                            ordem=nova_ordem,
+                            mp_codigo=mp_nova_ordem,
+                            tamanho=tamanho_vara or tamanho_vara_original,
+                            quantidade=quantidade_varas_restante,
+                            retalho=retalho_original,
+                        )
+
+                        for peca_restante in pecas_restantes:
+                            PecasOrdem.objects.create(
+                                ordem=nova_ordem,
+                                peca=peca_restante["peca"],
+                                qtd_planejada=peca_restante["quantidade"],
+                            )
+
                     ordem.status_prioridade = 3
 
                 elif status == 'interrompida':
@@ -224,12 +270,20 @@ def atualizar_status_ordem(request):
                 ordem.save()
                 notificar_ordem(ordem)
 
-                return JsonResponse({
+                response_payload = {
                     'message': 'Status atualizado com sucesso.',
                     'ordem_id': ordem.id,
                     'status': novo_processo.status,
                     'data_inicio': novo_processo.data_inicio,
-                })
+                    'maquina_id': ordem.maquina.id if ordem.maquina else None,
+                }
+
+
+                if status == 'finalizada' and 'nova_ordem' in locals() and nova_ordem:
+                    response_payload['nova_ordem_id'] = nova_ordem.id
+                    response_payload['nova_ordem_numero'] = nova_ordem.ordem
+
+                return JsonResponse(response_payload)
 
         except Ordem.DoesNotExist:
             return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)

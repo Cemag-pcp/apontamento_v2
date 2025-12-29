@@ -117,7 +117,21 @@ function buscarItensRetrabalho(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h5 class="mb-0">${item.peca}</h5>
+                        <input
+                            type="checkbox"
+                            class="form-check-input selecionar-retrabalho-lote"
+                            data-id="${item.id}"
+                            data-dados-execucao="${item.id_dados_execucao}"
+                            data-data="${item.data}"
+                            data-qtd="${item.nao_conformidade}"
+                            data-tipo="${item.tipo}"
+                            data-cor="${item.cor}"
+                            data-peca="${item.peca}"
+                            aria-label="Selecionar retrabalho"
+                        >
+                    </div>
                     <p>Dados Execucao #${item.id}</p>
                     <p>
                         <strong>📅 Dt. Produzida:</strong> ${item.data}<br>
@@ -148,6 +162,7 @@ function buscarItensRetrabalho(pagina) {
 
             cardsretrabalho.innerHTML += cards;
         });
+        atualizarBotaoRetrabalhoLote();
 
         itensInspecionar.textContent = "Pendente";
         document.getElementById('badge-inspecionar').innerText = quantidadeInspecoes;
@@ -198,6 +213,74 @@ function buscarItensRetrabalho(pagina) {
         }
     }).catch((error) => {
         console.error(error);
+    });
+}
+
+function atualizarBotaoRetrabalhoLote() {
+    const botaoLote = document.getElementById("btn-iniciar-retrabalho-lote");
+    if (!botaoLote) {
+        return;
+    }
+    const selecionados = document.querySelectorAll(".selecionar-retrabalho-lote:checked");
+    botaoLote.disabled = selecionados.length === 0;
+    botaoLote.textContent = selecionados.length > 0
+        ? `Iniciar selecionados (${selecionados.length})`
+        : "Iniciar selecionados";
+}
+
+document.addEventListener("change", function(event) {
+    if (event.target.classList.contains("selecionar-retrabalho-lote")) {
+        atualizarBotaoRetrabalhoLote();
+    }
+});
+
+const botaoLote = document.getElementById("btn-iniciar-retrabalho-lote");
+if (botaoLote) {
+    botaoLote.addEventListener("click", async () => {
+        const selecionados = Array.from(document.querySelectorAll(".selecionar-retrabalho-lote:checked"));
+        if (!selecionados.length) {
+            return;
+        }
+        if (!window.confirm(`Deseja iniciar o retrabalho de ${selecionados.length} item(ns)?`)) {
+            return;
+        }
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const textoOriginal = botaoLote.textContent;
+        botaoLote.disabled = true;
+        botaoLote.textContent = "Iniciando...";
+
+        const requisicoes = selecionados.map((checkbox) => {
+            const formData = new FormData();
+            formData.append("id", checkbox.dataset.id);
+            return fetch(`/pintura/api/confirmar-retrabalho-pintura/`, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                },
+                body: formData,
+            }).then((response) => {
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                return response.json();
+            });
+        });
+
+        const resultados = await Promise.allSettled(requisicoes);
+        const quantidadeSucesso = resultados.filter((resultado) => resultado.status === "fulfilled").length;
+        const quantidadeErro = resultados.length - quantidadeSucesso;
+
+        if (quantidadeErro > 0) {
+            console.error(`Falha ao iniciar ${quantidadeErro} item(ns) de retrabalho.`);
+        }
+
+        buscarItensRetrabalho(1);
+        buscarItensEmProcesso(1);
+        buscarItensInspecionadosRetrabalho(1);
+
+        botaoLote.disabled = false;
+        botaoLote.textContent = textoOriginal;
     });
 }
 

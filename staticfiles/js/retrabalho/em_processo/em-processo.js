@@ -131,7 +131,15 @@ function buscarItensEmProcesso(pagina) {
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3 border-${color}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> ${item.peca}</h5>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h5 class="mb-0">${item.peca}</h5>
+                        <input
+                            type="checkbox"
+                            class="form-check-input selecionar-finalizar-lote"
+                            data-id="${item.id}"
+                            aria-label="Selecionar retrabalho para finalizar"
+                        >
+                    </div>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
@@ -157,6 +165,7 @@ function buscarItensEmProcesso(pagina) {
 
             cardsInspecao.innerHTML += cards;
         });
+        atualizarBotaoFinalizarLote();
 
         itensInspecionar.textContent = "Em processo de retrabalho";
         document.getElementById('badge-em-processo').innerText = quantidadeInspecoes;
@@ -206,5 +215,72 @@ function buscarItensEmProcesso(pagina) {
         }
     }).catch((error) => {
         console.error(error);
+    });
+}
+
+function atualizarBotaoFinalizarLote() {
+    const botaoLote = document.getElementById("btn-finalizar-retrabalho-lote");
+    if (!botaoLote) {
+        return;
+    }
+    const selecionados = document.querySelectorAll(".selecionar-finalizar-lote:checked");
+    botaoLote.disabled = selecionados.length === 0;
+    botaoLote.textContent = selecionados.length > 0
+        ? `Finalizar selecionados (${selecionados.length})`
+        : "Finalizar selecionados";
+}
+
+document.addEventListener("change", function(event) {
+    if (event.target.classList.contains("selecionar-finalizar-lote")) {
+        atualizarBotaoFinalizarLote();
+    }
+});
+
+const botaoFinalizarLote = document.getElementById("btn-finalizar-retrabalho-lote");
+if (botaoFinalizarLote) {
+    botaoFinalizarLote.addEventListener("click", async () => {
+        const selecionados = Array.from(document.querySelectorAll(".selecionar-finalizar-lote:checked"));
+        if (!selecionados.length) {
+            return;
+        }
+        if (!window.confirm(`Deseja finalizar o retrabalho de ${selecionados.length} item(ns)?`)) {
+            return;
+        }
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const textoOriginal = botaoFinalizarLote.textContent;
+        botaoFinalizarLote.disabled = true;
+        botaoFinalizarLote.textContent = "Finalizando...";
+
+        const requisicoes = selecionados.map((checkbox) => {
+            const formData = new FormData();
+            formData.append("id", checkbox.dataset.id);
+            return fetch(`/pintura/api/finalizar-retrabalho-pintura/`, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                },
+                body: formData,
+            }).then((response) => {
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                return response.json();
+            });
+        });
+
+        const resultados = await Promise.allSettled(requisicoes);
+        const quantidadeSucesso = resultados.filter((resultado) => resultado.status === "fulfilled").length;
+        const quantidadeErro = resultados.length - quantidadeSucesso;
+
+        if (quantidadeErro > 0) {
+            console.error(`Falha ao finalizar ${quantidadeErro} item(ns) de retrabalho.`);
+        }
+
+        buscarItensEmProcesso(1);
+        buscarItensInspecionadosRetrabalho(1);
+
+        botaoFinalizarLote.disabled = false;
+        botaoFinalizarLote.textContent = textoOriginal;
     });
 }
