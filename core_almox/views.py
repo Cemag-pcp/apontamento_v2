@@ -8,7 +8,7 @@ from solicitacao_almox.forms import SolicitacaoRequisicaoForm, SolicitacaoTransf
 from cadastro_almox.models import OperadorAlmox, Funcionario, ItensSolicitacao, ItensTransferencia
 
 from datetime import datetime
-from conexao_plan import busca_saldo_recurso_central
+from automacoes.conexao_plan import busca_saldo_recurso_central
 from time import time
 import environ
 from zoneinfo import ZoneInfo
