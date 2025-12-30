@@ -1,42 +1,22 @@
+"""
+Automacao para sincronizar pecas/setores entre a planilha Google e o banco.
+
+Fluxo resumido:
+- Le a planilha "Lista Mestra" do arquivo "RQ EP-017-000 (Diretorio de Desenhos)".
+- Normaliza codigo/descricao/setor e compara com a base local (cadastro_pecas_setor).
+- Identifica combinacoes codigo+setor inexistentes e cria setor/peca/relacao faltante.
+- Retorna a quantidade de registros adicionados quando ha diferenca.
+"""
+
 import pandas as pd
-import numpy as np
 import os
-import datetime
 import gspread
-from openpyxl import Workbook, load_workbook
-from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from dotenv import load_dotenv
-from datetime import datetime, date
-import time
-import qrcode
-from io import BytesIO
 from pathlib import Path
 import environ
-from typing import Optional
-import redis, json, uuid
 import psycopg2
 # import win32print
-import django
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
-django.setup()
-
-from django.core.files import File
-from django.urls import reverse
-from django.db.models import Max
-from django.utils.timezone import now
-from django.db import transaction
-from django.conf import settings
-from django.contrib.staticfiles import finders
-from django.db.models import Max, F, Q
-
-from apontamento_montagem.models import PecasOrdem as POM
-from apontamento_pintura.models import PecasOrdem as POP
-from apontamento_solda.models import PecasOrdem as POS
-from core.models import Ordem
-from cadastro.models import Maquina
-from apontamento_exped.utils import chamar_impressora_pecas_montagem, chamar_impressora_pecas_montagem_2
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -50,6 +30,7 @@ env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 def _load_pecas_setor_from_db() -> pd.DataFrame:
+    # Busca o cadastro atual de pecas/setor diretamente no banco.
     query = """
         select
             cp.codigo,
@@ -72,7 +53,7 @@ def _load_pecas_setor_from_db() -> pd.DataFrame:
         conn.close()
 
 def get_data_from_sheets():
-    """Carrega os dados das planilhas e retorna como DataFrames."""
+    """Carrega os dados da planilha e devolve codigo/descricao/setor."""
 
     google_credentials_json={
                 "type":os.environ.get('type'),
@@ -126,6 +107,7 @@ def get_data_from_sheets():
     return base_pecas
 
 def comparar_planilha_x_base():
+    # Compara a planilha com a base e retorna apenas o que nao existe no banco.
 
     base_pecas = get_data_from_sheets()
     base_pecas = base_pecas[["codigo", "descricao", "setor"]].copy()
@@ -149,6 +131,7 @@ def comparar_planilha_x_base():
     return diff[diff["_merge"] == "left_only"][["codigo", "descricao", "setor"]]
 
 def criar_registros_faltantes():
+    # Cria setores, pecas e vinculos ausentes com base na diferenca encontrada.
     faltantes = comparar_planilha_x_base()
     if faltantes.empty:
         return 0
