@@ -203,7 +203,7 @@
                 <form class="form-inspecao-peca-corte">
                     <div class="card mb-4">
                         <div class="card-header bg-light">
-                            <h6 class="mb-0">Informacoes basicas</h6>
+                            <h6 class="mb-0">Informacoes Basicas</h6>
                         </div>
                         <div class="card-body">
                             <div class="row mb-3">
@@ -223,27 +223,28 @@
                         </div>
                     </div>
 
-                    <div class="card mb-4">
+                    <div class="card mb-4" id="medicoesTecnicasCorte">
                         <div class="card-header bg-light">
-                            <h6 class="mb-0">Medicoes</h6>
+                            <h6 class="mb-0">Medicoes Tecnicas</h6>
                         </div>
                         <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-bordered align-middle">
+                            <div id="sectionMedicaoTecCorte">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered inspection-table">
                                     <thead class="table-light">
-                                        <tr>
-                                            <th><input type="text" class="form-control form-control-sm" placeholder="Medida 1"></th>
-                                            <th><input type="text" class="form-control form-control-sm" placeholder="Medida 2"></th>
-                                            <th><input type="text" class="form-control form-control-sm" placeholder="Medida 3"></th>
-                                            <th class="text-center">Conforme</th>
-                                            <th class="text-center">Nao conforme</th>
+                                        <tr class="linha-medicao-corte" data-linha="1">
+                                            <th><input type="text" class="form-control" placeholder="Medida 1" style="padding: 5px;"></th>
+                                            <th><input type="text" class="form-control" placeholder="Medida 2" style="padding: 5px;"></th>
+                                            <th><input type="text" class="form-control" placeholder="Medida 3" style="padding: 5px;"></th>
+                                            <th style="font-size: 11px;" class="text-center">Conforme</th>
+                                            <th style="font-size: 11px;" class="text-center">Nao conforme</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
-                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1"></td>
-                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2"></td>
-                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3"></td>
+                                        <tr class="linha-medicao-corte" data-linha="2">
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1" style="padding: 5px;"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2" style="padding: 5px;"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3" style="padding: 5px;"></td>
                                             <td class="text-center">
                                                 <input class="form-check-input" type="radio" name="conformidade-1" value="conforme">
                                             </td>
@@ -251,10 +252,10 @@
                                                 <input class="form-check-input" type="radio" name="conformidade-1" value="nao-conforme">
                                             </td>
                                         </tr>
-                                        <tr>
-                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1"></td>
-                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2"></td>
-                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3"></td>
+                                        <tr class="linha-medicao-corte" data-linha="3">
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1" style="padding: 5px;"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2" style="padding: 5px;"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3" style="padding: 5px;"></td>
                                             <td class="text-center">
                                                 <input class="form-check-input" type="radio" name="conformidade-2" value="conforme">
                                             </td>
@@ -263,9 +264,9 @@
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1"></td>
-                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2"></td>
-                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1" style="padding: 5px;"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2" style="padding: 5px;"></td>
+                                            <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3" style="padding: 5px;"></td>
                                             <td class="text-center">
                                                 <input class="form-check-input" type="radio" name="conformidade-3" value="conforme">
                                             </td>
@@ -274,32 +275,24 @@
                                             </td>
                                         </tr>
                                     </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card mb-4">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">Nao conformidades encontradas</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="nao-conformidades-list">
-                                <div class="input-group mb-2">
-                                    <input type="text" class="form-control" name="nao_conformidades[]" placeholder="Descreva a nao conformidade">
-                                    <button class="btn btn-outline-danger btn-remover-nao-conformidade" type="button">Remover</button>
+                                    </table>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-outline-primary btn-add-nao-conformidade">Adicionar outra</button>
                         </div>
                     </div>
 
-                    <div class="card mb-4">
-                        <div class="card-header bg-light">
-                            <h6 class="mb-0">Foto da nao conformidade (opcional)</h6>
+                    <div class="card mb-4 card-nao-conformidade-corte" style="display: none;">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0">Detalhes das Nao Conformidades</h6>
                         </div>
                         <div class="card-body">
-                            <input type="file" class="form-control foto-nao-conformidade" accept="image/*">
+                            <p class="text-muted mb-3">Adicione informacoes sobre cada nao conformidade encontrada.</p>
+                            <div class="container-nonconformity-items"></div>
+                            <div class="text-center mt-3">
+                                <button type="button" class="btn btn-outline-primary btn-add-nonconformity">
+                                    <i class="bi bi-plus-circle me-2"></i>Adicionar outra nao conformidade
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -349,19 +342,207 @@
         clickedElement.classList.add("active");
     }
 
-    document.addEventListener("click", (event) => {
-        if (event.target.classList.contains("btn-add-nao-conformidade")) {
-            const list = event.target.closest(".card-body").querySelector(".nao-conformidades-list");
-            const item = document.createElement("div");
-            item.className = "input-group mb-2";
-            item.innerHTML = '<input type="text" class="form-control" name="nao_conformidades[]" placeholder="Descreva a nao conformidade"><button class="btn btn-outline-danger btn-remover-nao-conformidade" type="button">Remover</button>';
-            list.appendChild(item);
+    let cacheCausasCorte = null;
+
+    async function buscarCausasCorte() {
+        if (cacheCausasCorte) {
+            return cacheCausasCorte;
+        }
+        const response = await fetch("/inspecao/api/motivos-causas/corte/", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+        if (!response.ok) {
+            throw new Error(`Erro HTTP! Status: ${response.status}`);
+        }
+        const dados = await response.json();
+        cacheCausasCorte = dados.motivos || [];
+        return cacheCausasCorte;
+    }
+
+    function criarItemNaoConformidade(index, causas) {
+        const item = document.createElement("div");
+        item.className = "non-conformity-item border rounded p-3 mb-3";
+        item.dataset.index = index;
+
+        const causasHtml = causas.map((causa, idx) => {
+            const causaNome = causa.nome || causa.descricao || causa;
+            const causaId = causa.id || `${index}_${idx + 1}`;
+            return `
+                <div class="form-check">
+                    <input class="form-check-input causa-checkbox" type="checkbox" id="causa${index}_${idx + 1}" name="causas${index}" value="${causaId}">
+                    <label class="form-check-label" for="causa${index}_${idx + 1}">${causaNome}</label>
+                </div>
+            `;
+        }).join("");
+
+        item.innerHTML = `
+            <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-remove-nonconformity">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Causas da nao conformidade (selecione todas aplicaveis)</label>
+                    <div class="causes-container">${causasHtml}</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Quantidade afetada</label>
+                    <input type="number" class="form-control quantidade-afetada" min="1">
+                    <label class="form-label mt-2">Destino</label>
+                    <select class="form-select">
+                        <option value="">Selecione</option>
+                        <option value="sucata">Sucata</option>
+                        <option value="retrabalho">Retrabalho</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12">
+                    <label class="form-label">Foto da nao conformidade</label>
+                    <label for="fotoNaoConformidade${index}" class="custom-file-upload">
+                        <i class="bi bi-camera me-2"></i>Clique para adicionar uma foto
+                    </label>
+                    <input type="file" id="fotoNaoConformidade${index}" accept="image/*" style="display: none;" multiple>
+                    <div class="image-preview d-flex mt-2 gap-2"></div>
+                </div>
+            </div>
+        `;
+
+        const fileInput = item.querySelector(`#fotoNaoConformidade${index}`);
+        const preview = item.querySelector(".image-preview");
+        if (fileInput && preview) {
+            fileInput.addEventListener("change", () => {
+                preview.innerHTML = "";
+                Array.from(fileInput.files || []).forEach((file) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = document.createElement("img");
+                        img.src = event.target.result;
+                        img.style.maxWidth = "80px";
+                        img.style.maxHeight = "80px";
+                        img.className = "rounded";
+                        preview.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
         }
 
-        if (event.target.classList.contains("btn-remover-nao-conformidade")) {
-            const group = event.target.closest(".input-group");
-            if (group) {
-                group.remove();
+        return item;
+    }
+
+    async function adicionarItemNaoConformidade(form) {
+        const container = form.querySelector(".container-nonconformity-items");
+        if (!container) {
+            return;
+        }
+        const causas = await buscarCausasCorte();
+        const novoIndex = container.children.length + 1;
+        const item = criarItemNaoConformidade(novoIndex, causas);
+        container.appendChild(item);
+        atualizarLimiteQuantidade(form);
+    }
+
+    document.addEventListener("click", (event) => {
+        if (event.target.closest(".btn-add-nonconformity")) {
+            const form = event.target.closest(".form-inspecao-peca-corte");
+            if (form) {
+                adicionarItemNaoConformidade(form);
+            }
+        }
+
+        if (event.target.closest(".btn-remove-nonconformity")) {
+            const item = event.target.closest(".non-conformity-item");
+            if (item) {
+                item.remove();
+                const form = event.target.closest(".form-inspecao-peca-corte");
+                if (form) {
+                    atualizarLimiteQuantidade(form);
+                }
+            }
+        }
+    });
+
+    function atualizarLimiteQuantidade(form) {
+        const maxPermitido = form.querySelectorAll('input[type="radio"][value="nao-conforme"]:checked').length;
+        const inputs = form.querySelectorAll(".quantidade-afetada");
+        let soma = 0;
+        inputs.forEach((input) => {
+            const valor = parseInt(input.value, 10);
+            if (!Number.isNaN(valor)) {
+                soma += valor;
+            }
+            input.max = maxPermitido || "";
+            input.setCustomValidity("");
+        });
+
+        if (soma <= maxPermitido) {
+            return;
+        }
+
+        const excesso = soma - maxPermitido;
+        const alvo = form.querySelector(".quantidade-afetada:focus");
+        if (alvo) {
+            const valorAtual = parseInt(alvo.value, 10) || 0;
+            const novoValor = Math.max(0, valorAtual - excesso);
+            alvo.value = novoValor ? String(novoValor) : "";
+            alvo.setCustomValidity("Quantidade excede o limite de nao conformes.");
+            alvo.reportValidity();
+        } else {
+            inputs.forEach((input) => {
+                if (parseInt(input.value, 10) > 0) {
+                    input.setCustomValidity("Quantidade excede o limite de nao conformes.");
+                    input.reportValidity();
+                }
+            });
+        }
+    }
+
+    function atualizarVisibilidadeNaoConformidade(form) {
+        const bloco = form.querySelector(".card-nao-conformidade-corte");
+        if (!bloco) {
+            return;
+        }
+        const existeNaoConforme = form.querySelector('input[type="radio"][value="nao-conforme"]:checked');
+        bloco.style.display = existeNaoConforme ? "" : "none";
+        if (existeNaoConforme) {
+            carregarCausasNaoConformidade(form);
+        }
+    }
+
+    async function carregarCausasNaoConformidade(form) {
+        const container = form.querySelector(".container-nonconformity-items");
+        if (!container) {
+            return;
+        }
+        if (!container.children.length) {
+            try {
+                await adicionarItemNaoConformidade(form);
+            } catch (error) {
+                container.innerHTML = '<p class="text-danger mb-0">Erro ao carregar causas.</p>';
+            }
+        }
+    }
+
+    document.addEventListener("change", (event) => {
+        if (event.target.matches('input[type="radio"][value="nao-conforme"], input[type="radio"][value="conforme"]')) {
+            const form = event.target.closest(".form-inspecao-peca-corte");
+            if (form) {
+                atualizarVisibilidadeNaoConformidade(form);
+                atualizarLimiteQuantidade(form);
+            }
+        }
+    });
+
+    document.addEventListener("input", (event) => {
+        if (event.target.classList.contains("quantidade-afetada")) {
+            const form = event.target.closest(".form-inspecao-peca-corte");
+            if (form) {
+                atualizarLimiteQuantidade(form);
             }
         }
     });
@@ -382,6 +563,200 @@
         if (dateInput && !dateInput.value) {
             const today = new Date();
             dateInput.value = today.toISOString().slice(0, 10);
+        }
+        const form = collapse.querySelector(".form-inspecao-peca-corte");
+        if (form) {
+            const qtd = parseInt(form.dataset.qtdPeca || "0", 10);
+            form.style.display = qtd > 0 ? "" : "none";
+            if (qtd > 0) {
+                const linhasVisiveis = qtd >= 3 ? 3 : qtd;
+                const linhas = form.querySelectorAll(".linha-medicao-corte");
+                linhas.forEach((linha, index) => {
+                    linha.style.display = index < linhasVisiveis ? "" : "none";
+                });
+            }
+        }
+    });
+
+    function validarFormularioCorte(form) {
+        const headerInputs = Array.from(form.querySelectorAll("table thead input[type=\"text\"]"));
+        const colunasAtivas = headerInputs
+            .map((input, index) => (input.value.trim() ? index : -1))
+            .filter((index) => index >= 0);
+        if (!colunasAtivas.length) {
+            alert("Preencha ao menos uma coluna de Medicoes Tecnicas.");
+            headerInputs[0]?.focus();
+            return false;
+        }
+
+        const linhas = Array.from(form.querySelectorAll(".linha-medicao-corte")).filter(
+            (linha) => linha.style.display !== "none"
+        );
+        for (const linha of linhas) {
+            const valores = Array.from(linha.querySelectorAll("input[type=\"number\"]"));
+            for (const index of colunasAtivas) {
+                const input = valores[index];
+                if (!input) {
+                    continue;
+                }
+                if (input.value === "" || Number.isNaN(input.valueAsNumber)) {
+                    alert("Todos os valores das colunas preenchidas sao obrigatorios.");
+                    input.focus();
+                    return false;
+                }
+            }
+            const radioSelecionado = linha.querySelector('input[type="radio"]:checked');
+            if (!radioSelecionado) {
+                alert("Selecione Conforme ou Nao conforme em todas as linhas.");
+                linha.querySelector('input[type="radio"]')?.focus();
+                return false;
+            }
+        }
+
+        const selectInspecaoTotal = form.querySelector(".inspecao-100-select");
+        if (!selectInspecaoTotal || !selectInspecaoTotal.value) {
+            alert("Informe se a inspecao 100% e necessaria.");
+            selectInspecaoTotal?.focus();
+            return false;
+        }
+        if (selectInspecaoTotal.value === "sim") {
+            const fichaInput = form.querySelector(".ficha-100-file");
+            if (!fichaInput || !fichaInput.files || !fichaInput.files.length) {
+                alert("Anexe a ficha 100%.");
+                fichaInput?.focus();
+                return false;
+            }
+        }
+
+        const existeNaoConforme = form.querySelector('input[type="radio"][value="nao-conforme"]:checked');
+        if (existeNaoConforme) {
+            const itens = form.querySelectorAll(".non-conformity-item");
+            if (!itens.length) {
+                alert("Adicione os detalhes das nao conformidades.");
+                return false;
+            }
+            for (const item of itens) {
+                const causasSelecionadas = item.querySelectorAll(".causa-checkbox:checked");
+                const quantidadeInput = item.querySelector(".quantidade-afetada");
+                const destinoSelect = item.querySelector("select.form-select");
+                if (!causasSelecionadas.length) {
+                    alert("Selecione ao menos uma causa da nao conformidade.");
+                    item.querySelector(".causa-checkbox")?.focus();
+                    return false;
+                }
+                if (!quantidadeInput || !quantidadeInput.value) {
+                    alert("Informe a quantidade afetada.");
+                    quantidadeInput?.focus();
+                    return false;
+                }
+                if (!destinoSelect || !destinoSelect.value) {
+                    alert("Selecione o destino.");
+                    destinoSelect?.focus();
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    document.addEventListener("click", async (event) => {
+        if (!event.target.classList.contains("btn-salvar-inspecao-corte")) {
+            return;
+        }
+        const form = event.target.closest(".form-inspecao-peca-corte");
+        if (!form) {
+            return;
+        }
+        if (!validarFormularioCorte(form)) {
+            return;
+        }
+
+        const botao = event.target;
+        botao.disabled = true;
+        const textoOriginal = botao.textContent;
+        botao.textContent = "Salvando...";
+
+        const formData = new FormData();
+        formData.append("peca_id", form.dataset.pecaId || "");
+
+        const selectInspecaoTotal = form.querySelector(".inspecao-100-select");
+        if (selectInspecaoTotal) {
+            formData.append("inspecao_total", selectInspecaoTotal.value || "");
+        }
+        const fichaInput = form.querySelector(".ficha-100-file");
+        if (fichaInput && fichaInput.files && fichaInput.files.length) {
+            formData.append("ficha", fichaInput.files[0]);
+        }
+
+        const headerInputs = form.querySelectorAll("table thead input[type=\"text\"]");
+        const headerNomes = Array.from(headerInputs).map((input) => input.value || "");
+        const medidas = [];
+        const linhas = form.querySelectorAll(".linha-medicao-corte");
+        linhas.forEach((linha) => {
+            if (linha.style.display === "none") {
+                return;
+            }
+            const valores = Array.from(linha.querySelectorAll("input[type=\"number\"]"))
+                .map((input) => input.value || "");
+            const radioConforme = linha.querySelector("input[type=\"radio\"][value=\"conforme\"]");
+            const radioNaoConforme = linha.querySelector("input[type=\"radio\"][value=\"nao-conforme\"]");
+            const conforme = radioConforme ? radioConforme.checked : !radioNaoConforme?.checked;
+            medidas.push({
+                medida1: { nome: headerNomes[0] || "", valor: valores[0] || "" },
+                medida2: { nome: headerNomes[1] || "", valor: valores[1] || "" },
+                medida3: { nome: headerNomes[2] || "", valor: valores[2] || "" },
+                conforme,
+            });
+        });
+        formData.append("medicoes", JSON.stringify(medidas));
+
+        const naoConformidades = [];
+        const itens = form.querySelectorAll(".non-conformity-item");
+        itens.forEach((item, index) => {
+            const causas = Array.from(item.querySelectorAll(".causa-checkbox:checked")).map((checkbox) => checkbox.value);
+            const quantidadeInput = item.querySelector(".quantidade-afetada");
+            const destinoSelect = item.querySelector("select.form-select");
+            const quantidade = quantidadeInput ? quantidadeInput.value : "";
+            const destino = destinoSelect ? destinoSelect.value : "";
+            naoConformidades.push({
+                causas,
+                quantidadeAfetada: quantidade,
+                destino,
+                id: index + 1,
+            });
+
+            const fileInput = item.querySelector(`input[type="file"]`);
+            if (fileInput && fileInput.files && fileInput.files.length) {
+                Array.from(fileInput.files).forEach((file) => {
+                    formData.append(`nc_files_${index + 1}`, file);
+                });
+            }
+        });
+        formData.append("naoConformidades", JSON.stringify(naoConformidades));
+
+        try {
+            const csrfInput = document.querySelector("[name=csrfmiddlewaretoken]");
+            const headers = csrfInput ? { "X-CSRFToken": csrfInput.value } : {};
+            const response = await fetch("/inspecao/api/envio-inspecao-corte/", {
+                method: "POST",
+                headers,
+                body: formData,
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Erro ao enviar inspecao.");
+            }
+            botao.textContent = "Salvo";
+            setTimeout(() => {
+                botao.textContent = textoOriginal;
+            }, 1000);
+        } catch (error) {
+            console.error(error);
+            alert(error.message);
+            botao.textContent = textoOriginal;
+        } finally {
+            botao.disabled = false;
         }
     });
 </script>

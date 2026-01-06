@@ -153,6 +153,7 @@ function renderizarPeca(peca, ordemId, index) {
     if (form) {
         form.dataset.ordemId = ordemId;
         form.dataset.pecaId = peca.id;
+        form.dataset.qtdPeca = peca.qtd_boa ?? 0;
     }
 
     const radios = clone.querySelectorAll('input[type="radio"][name^="conformidade-"]');
