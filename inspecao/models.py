@@ -26,6 +26,12 @@ class Inspecao(models.Model):
         null=True,
         blank=True,
     )
+    pecas_ordem_corte = models.ForeignKey(
+        "apontamento_corte.PecasOrdem",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
 
     pecas_ordem_serra = models.ForeignKey(
         "apontamento_serra.PecasOrdem",
@@ -57,6 +63,8 @@ class Inspecao(models.Model):
             setor_inspecao = f"Serra - {self.pecas_ordem_serra.id}"
         elif self.pecas_ordem_usinagem:
             setor_inspecao = f"Usinagem - {self.pecas_ordem_usinagem.id}"
+        elif self.pecas_ordem_corte:
+            setor_inspecao = f"Corte - {self.pecas_ordem_corte.id}"
         elif self.estanqueidade:
             setor_inspecao = f"Tanque - {self.estanqueidade.id}"
         else:
@@ -117,6 +125,7 @@ class Causas(models.Model):
         ("estamparia", "Estamparia"),
         ("serra-usinagem", "Serra e Usinagem"),
         ("tubos cilindros", "Tubos e Cilindros"),
+        ("corte", "Corte"),
         ("tanque", "Tanque"),
     )
 

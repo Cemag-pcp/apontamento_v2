@@ -314,6 +314,13 @@ def atualizar_status_ordem(request):
                         pecas_ordem_montagem=ultimo_peca_ordem,
                     )
 
+                # verifica se a peça é da célula "serralheria", se sim cria inspeção
+                maquina_nome = ordem.maquina.nome.strip().lower() if ordem.maquina and ordem.maquina.nome else ""
+                if maquina_nome == "serralheria":
+                    Inspecao.objects.create(
+                        pecas_ordem_montagem=ultimo_peca_ordem,
+                    )
+
                 # Verificar novamente a quantidade finalizada após o novo registro
                 sum_pecas_finalizadas = PecasOrdem.objects.filter(ordem=ordem).aggregate(Sum('qtd_boa'))['qtd_boa__sum']
 
