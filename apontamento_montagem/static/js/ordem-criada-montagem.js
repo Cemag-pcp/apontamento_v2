@@ -262,10 +262,7 @@ export function carregarOrdensIniciadas(filtros = {}) {
     </div>`;
 
     authFetch(`api/ordens-iniciadas/?setor=${filtros.setor || ''}`)
-        .then(response => {
-                response.json()
-            }
-        )
+        .then(response => response.json())
 
         .then(data => {
             container.innerHTML = ''; // Limpa o container
