@@ -198,6 +198,7 @@ def limpar_cor(nome_carreta: str) -> str:
         'preto': 'PR',
         'branco': 'BC',
         'vermelho': 'VM',
+        'cinza escuro': 'CE',
         # adicione outras se precisar...
     }
 
@@ -348,6 +349,7 @@ def limpar_cor(nome_carreta: str) -> str:
         'preto': 'PR',
         'branco': 'BC',
         'vermelho': 'VM',
+        'cinza escuro': 'CE',
         # adicione outras se precisar...
     }
 

@@ -171,6 +171,7 @@ def consultar_carretas(data_inicial, data_final):
     dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('AN', '')
     dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('VJ', '')
     dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('LC', '')
+    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('CE', '') # cinza escuro
     dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('VM', '')
     dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('AV', '')
     dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('CO', '')
@@ -183,6 +184,7 @@ def consultar_carretas(data_inicial, data_final):
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('AN', '')
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('VJ', '')
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('LC', '')
+    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('CE', '')
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('VM', '')
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('AV', '')
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('CO', '')
@@ -362,12 +364,12 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             base_carga = base_carga.reset_index(drop=True)
 
-            df_cores = pd.DataFrame({'Recurso_cor': ['AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'sem_cor', 'CO'],
-                                    'cor': ['Azul', 'Verde', 'Laranja Jacto', 'Laranja', 'Vermelho', 'Amarelo', 'Laranja', 'Cinza']})
+            df_cores = pd.DataFrame({'Recurso_cor': ['AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'sem_cor', 'CO', 'CE'],
+                                    'cor': ['Azul', 'Verde', 'Laranja Jacto', 'Laranja', 'Vermelho', 'Amarelo', 'Laranja', 'Cinza', 'Cinza escuro']})
 
             nome_cor_para_sigla = dict(zip(df_cores['cor'], df_cores['Recurso_cor']))
 
-            cores = ['AM', 'AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'CO']
+            cores = ['AM', 'AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'CO', 'CE']
 
             base_carga = base_carga.astype(str)
 
@@ -399,6 +401,8 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 'CO', '')  # Cinza
             base_carga['Recurso'] = base_carga['Recurso'].str.replace(
                 'SA', '')  # SEM ADESIVO
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace(
+                'CE', '')  # Cinza escuro
 
             base_carga['Recurso'] = base_carga['Recurso'].str.strip()
 
@@ -630,6 +634,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
@@ -862,6 +867,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
@@ -1200,12 +1206,12 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             base_carga = base_carga.reset_index(drop=True)
 
-            df_cores = pd.DataFrame({'Recurso_cor': ['AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'sem_cor', 'CO'],
-                                    'cor': ['Azul', 'Verde', 'Laranja Jacto', 'Laranja', 'Vermelho', 'Amarelo', 'Laranja', 'Cinza']})
+            df_cores = pd.DataFrame({'Recurso_cor': ['AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'sem_cor', 'CO', 'CE'],
+                                    'cor': ['Azul', 'Verde', 'Laranja Jacto', 'Laranja', 'Vermelho', 'Amarelo', 'Laranja', 'Cinza', 'Cinza escuro']})
 
             nome_cor_para_sigla = dict(zip(df_cores['cor'], df_cores['Recurso_cor']))
 
-            cores = ['AM', 'AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'CO']
+            cores = ['AM', 'AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'CO', 'CE']
 
             base_carga = base_carga.astype(str)
 
@@ -1227,6 +1233,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
@@ -1365,6 +1372,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
@@ -1576,6 +1584,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
+            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
             base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
