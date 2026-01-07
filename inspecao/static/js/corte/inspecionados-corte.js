@@ -165,7 +165,7 @@ async function buscarInspecionados(pagina) {
                         <p class="mb-2">Ordem #${item.ordem_numero || "-"}</p>
 
                         <p class="mb-0">
-                            <strong>📅 Data da última inspeção:</strong> ${item.data_inspecao || "-"}<br>
+                            <strong>📅 Data da inspeção:</strong> ${item.data_inspecao || "-"}<br>
                             <strong>📍 Máquina:</strong> ${item.conjunto || "-"}
                         </p>
                     </div>
@@ -336,16 +336,26 @@ async function abrirModalPeca(pecaId) {
                 ${
                     data.nao_conformidades?.length > 0
                         ? `<div class="mt-3">
-                               <h6 class="mb-2">Não Conformidades:</h6>
+                               <h6 class="mb-2">Informações sobre a não conformidade:</h6>
                                <ul class="list-unstyled mb-0">
                                    ${data.nao_conformidades.map(nc => `
                                        <li class="mb-2">
                                            <strong>Causas:</strong> ${(nc.causas || []).join(", ")}<br>
                                            <strong>Quantidade:</strong> ${nc.quantidade ?? 0}<br>
                                            <strong>Destino:</strong> ${nc.destino ?? "-"}
+                                           ${nc.imagens?.length > 0 ? `<br><strong>Imagens:</strong><br>${nc.imagens.map(url => `<a href="${url}" target="_blank"><img src="${url}" style="max-width: 100px; margin: 5px;" /></a>`).join('')}` : ''}
                                        </li>
                                    `).join("")}
                                </ul>
+                           </div>`
+                        : ""
+                }
+
+                ${
+                    data.ficha_100_url
+                        ? `<div class="mt-3">
+                               <h6 class="mb-2">Ficha Inspeção 100%:</h6>
+                               <a href="${data.ficha_100_url}" target="_blank" class="btn btn-primary">Visualizar Ficha</a>
                            </div>`
                         : ""
                 }

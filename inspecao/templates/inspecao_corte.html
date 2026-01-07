@@ -18,13 +18,11 @@
     <li class="nav-item" style="width: 50%;">
         <a id="tab-pendencias-corte" class="nav-link tab-active active text-center" style="font-size: 0.875rem;" onclick="activeRow('pendencias-corte','inspecionados-corte', this)">
             Pendencias
-            <span class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true"></span>
         </a>
     </li>
     <li class="nav-item" style="width: 50%;">
         <a id="tab-inspecionados-corte" class="nav-link tab-active text-center" style="font-size: 0.875rem;" onclick="activeRow('inspecionados-corte','pendencias-corte', this)">
             Inspecionados
-            <span class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true"></span>
         </a>
     </li>
 </ul>
@@ -127,36 +125,30 @@
 
 <template id="template-card-pendencia-corte">
     <div class="col-sm-6 col-lg-4 mb-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <h6 class="card-title">Ordem <span class="ordem-numero"></span></h6>
-                    <span class="badge text-bg-light">Corte</span>
-                </div>
-                <p class="card-text text-muted small mb-2">Conjunto: <span class="ordem-conjunto"></span></p>
-                <p class="card-text text-muted small mb-3">Pecas cortadas: <span class="ordem-qtd"></span></p>
-                <div class="d-flex justify-content-end">
-                    <button type="button" class="btn btn-dark btn-sm btn-ver-ordem" data-bs-toggle="modal" data-bs-target="#modal-ordem-corte">Ver</button>
-                </div>
-            </div>
+        <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
+            <h5><span class='ordem-numero'></span></h5>
+            <p>
+                <strong>📅 Data do corte:</strong> <span class="ordem-data"></span><br>
+                <strong>⚙️ Máquina:</strong> <span class="ordem-conjunto"></span><br>
+                <strong>🔢 Peças cortadas:</strong> <span class="ordem-qtd"></span><br>
+            </p>
+            <hr>
+            <button type="button" class="btn btn-dark w-100 btn-ver-ordem" data-bs-toggle="modal" data-bs-target="#modal-ordem-corte">Ver</button>
         </div>
     </div>
 </template>
 
 <template id="template-card-inspecionado-corte">
     <div class="col-sm-6 col-lg-4 mb-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <h6 class="card-title">Peça <span class="peca"></span></h6>
-                    <span class="badge text-bg-success">Inspecionado</span>
-                </div>
-                <p class="card-text text-muted small mb-2">Ordem: <span class="ordem-numero"></span></p>
-                <p class="card-text text-muted small mb-3">Data: <span class="data-inspecao"></span></p>
-                <div class="d-flex justify-content-end">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-ver-peca" data-peca-id="">Ver</button>
-                </div>
-            </div>
+        <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
+            <h5>Peça <span class="peca"></span></h5>
+            <p>Inspecao #<span class="inspecao-id"></span></p>
+            <p>
+                <strong>📅 Data:</strong> <span class="data-inspecao"></span><br>
+                <strong>🔢 Ordem:</strong> <span class="ordem-numero"></span><br>
+            </p>
+            <hr>
+            <button type="button" class="btn btn-outline-secondary w-100 btn-ver-peca" data-peca-id="">Ver</button>
         </div>
     </div>
 </template>
@@ -755,6 +747,10 @@
             setTimeout(() => {
                 botao.textContent = textoOriginal;
             }, 1000);
+            // Mostrar toast de sucesso
+            const toastElement = document.getElementById('toast-sucesso');
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
             // Remover o item inspecionado para impedir re-inspeção
             const accordionItem = form.closest('.accordion-item');
             if (accordionItem) {
@@ -769,4 +765,17 @@
         }
     });
 </script>
+
+<div class="toast-container position-fixed top-0 end-0 p-3">
+    <div id="toast-sucesso" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto">Sucesso</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            Inspeção salva com sucesso!
+        </div>
+    </div>
+</div>
+
 {% endblock %}

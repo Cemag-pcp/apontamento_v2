@@ -60,7 +60,7 @@ def get_itens_inspecao_corte(request):
         queryset = queryset.filter(data__date__lte=data_fim)
 
     agrupado = (
-        queryset.values("ordem_id", "ordem__ordem", "ordem__maquina__nome")
+        queryset.values("ordem_id", "ordem__ordem", "ordem__maquina__nome", "ordem__ordem_duplicada")
         .annotate(total_qtd_boa=Sum("qtd_boa"), data_ultima=Max("data"))
         .order_by("-data_ultima")
     )
@@ -74,12 +74,14 @@ def get_itens_inspecao_corte(request):
         dados.append(
             {
                 "ordem_id": item["ordem_id"],
-                "ordem_numero": item["ordem__ordem"],
+                "ordem_numero": item["ordem__ordem"] if item["ordem__ordem"] else item["ordem__ordem_duplicada"],
                 "conjunto": item["ordem__maquina__nome"] or "-",
                 "qtd_boa": item["total_qtd_boa"] or 0,
                 "data": data_ultima,
             }
         )
+
+    print(dados)
 
     return JsonResponse(
         {
@@ -160,7 +162,7 @@ def get_itens_inspecionados_corte(request):
         dados.append({
             "peca_id": peca.id,
             "peca": peca.peca,
-            "ordem_numero": peca.ordem.ordem,
+            "ordem_numero": peca.ordem.ordem if peca.ordem.ordem else peca.ordem.ordem_duplicada,
             "conjunto": peca.ordem.maquina.nome if peca.ordem.maquina else "-",
             "qtd_boa": peca.qtd_boa,
             "data_inspecao": data_inspecao,
@@ -184,6 +186,7 @@ def get_ordem_corte(request, ordem_id):
 
     pecas = (
         PecasOrdem.objects.filter(ordem_id=ordem_id)
+        .exclude(inspecao__isnull=False)
         .values("id", "peca", "qtd_boa", "qtd_planejada", "qtd_morta")
         .order_by("id")
     )
@@ -206,12 +209,18 @@ def get_detalhes_inspecao_corte(request, peca_id):
 
     nao_conformidades = []
     for nc in CausasNaoConformidade.objects.filter(dados_execucao=dados_execucao):
-        causas = [causa.descricao for causa in nc.causa.all()]
+        causas = [causa.nome for causa in nc.causa.all()]
+        imagens = [arquivo.arquivo.url for arquivo in ArquivoCausa.objects.filter(causa_nao_conformidade=nc)]
         nao_conformidades.append({
             "causas": causas,
             "quantidade": nc.quantidade,
             "destino": nc.destino,
+            "imagens": imagens,
         })
+
+    ficha_100_url = None
+    if ArquivoConformidade.objects.filter(dados_execucao=dados_execucao).exists():
+        ficha_100_url = ArquivoConformidade.objects.filter(dados_execucao=dados_execucao).first().arquivo.url
 
     
 
@@ -229,6 +238,7 @@ def get_detalhes_inspecao_corte(request, peca_id):
         "nao_conformidade": dados_execucao.nao_conformidade,
         "observacao": dados_execucao.observacao,
         "nao_conformidades": nao_conformidades,
+        "ficha_100_url": ficha_100_url,
     }
 
     return JsonResponse(data)
