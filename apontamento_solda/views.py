@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models.functions import Coalesce
 from django.shortcuts import render
 from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.auth.decorators import login_required
 
 import json
 from datetime import datetime, date, timedelta
@@ -159,7 +160,13 @@ def criar_ordem(request):
     
 @csrf_exempt
 def atualizar_status_ordem(request):
-
+    
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"detail": "Usuário não autenticado"},
+            status=401
+        )
+    
     """
     Para iniciar uma ordem:
 
@@ -699,6 +706,9 @@ def ordens_interrompidas(request):
     Retorna todas as ordens que estão com status "interrompida" e que ainda não foram finalizadas,
     trazendo informações da ordem, peças relacionadas (sem repetição), soma das quantidades planejadas/boas e processos em andamento.
     """
+
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Unauthorized"}, status=401)
 
     usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
 
