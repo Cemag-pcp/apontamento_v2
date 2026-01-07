@@ -32,6 +32,7 @@ def inspecao_pintura(request):
     causas = Causas.objects.filter(setor="pintura")
 
     cores = ["Amarelo", "Azul", "Cinza", "Laranja", "Verde", "Vermelho"]
+    tipos_tinta = ["PÓ", "PU"]
 
     list_causas = [{"id": causa.id, "nome": causa.nome} for causa in causas]
 
@@ -57,6 +58,7 @@ def inspecao_pintura(request):
             "inspetores": lista_inspetores,
             "causas": list_causas,
             "cores": cores,
+            "tipos_tinta": tipos_tinta,
         },
     )
 
@@ -96,6 +98,9 @@ def get_itens_inspecao_pintura(request):
     cores_filtradas = (
         request.GET.get("cores", "").split(",") if request.GET.get("cores") else []
     )
+    tipos_tinta_filtradas = (
+        request.GET.get("tipos_tinta", "").split(",") if request.GET.get("tipos_tinta") else []
+    )
     
     data_inicio = request.GET.get("data_inicio", None)
     data_fim = request.GET.get("data_fim", None)
@@ -113,6 +118,9 @@ def get_itens_inspecao_pintura(request):
 
     if cores_filtradas:
         datas = datas.filter(pecas_ordem_pintura__ordem__cor__in=cores_filtradas)
+
+    if tipos_tinta_filtradas:
+        datas = datas.filter(pecas_ordem_pintura__tipo__in=tipos_tinta_filtradas)
 
     if not data_fim:
         data_fim = data_inicio
@@ -187,6 +195,9 @@ def get_itens_reinspecao_pintura(request):
         "cores": (
             request.GET.get("cores", "").split(",") if request.GET.get("cores") else []
         ),
+        "tipos_tinta": (
+            request.GET.get("tipos_tinta", "").split(",") if request.GET.get("tipos_tinta") else []
+        ),
         "inspetores": (
             request.GET.get("inspetores", "").split(",")
             if request.GET.get("inspetores")
@@ -215,6 +226,11 @@ def get_itens_reinspecao_pintura(request):
     if params["cores"]:
         queryset = queryset.filter(
             pecas_ordem_pintura__ordem__cor__in=params["cores"]
+        ).distinct()
+
+    if params["tipos_tinta"]:
+        queryset = queryset.filter(
+            pecas_ordem_pintura__tipo__in=params["tipos_tinta"]
         ).distinct()
 
     # if params["data"]:
@@ -326,6 +342,9 @@ def get_itens_inspecionados_pintura(request):
     cores_filtradas = (
         request.GET.get("cores", "").split(",") if request.GET.get("cores") else []
     )
+    tipos_tinta_filtradas = (
+        request.GET.get("tipos_tinta", "").split(",") if request.GET.get("tipos_tinta") else []
+    )
     inspetores_filtrados = (
         request.GET.get("inspetores", "").split(",")
         if request.GET.get("inspetores")
@@ -355,6 +374,11 @@ def get_itens_inspecionados_pintura(request):
     if cores_filtradas:
         datas = datas.filter(
             pecas_ordem_pintura__ordem__cor__in=cores_filtradas
+        ).distinct()
+
+    if tipos_tinta_filtradas:
+        datas = datas.filter(
+            pecas_ordem_pintura__tipo__in=tipos_tinta_filtradas
         ).distinct()
 
     # if data_filtrada:

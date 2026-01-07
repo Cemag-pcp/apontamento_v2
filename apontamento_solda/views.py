@@ -569,6 +569,9 @@ def ordens_iniciadas(request):
     trazendo informações da ordem, peças relacionadas (sem repetição), soma das quantidades planejadas/boas e processos em andamento.
     """
 
+    # if not request.user.is_authenticated:
+    #     return JsonResponse({"detail": "Unauthorized"}, status=401)
+
     usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
 
     maquina_param = request.GET.get('setor', '')

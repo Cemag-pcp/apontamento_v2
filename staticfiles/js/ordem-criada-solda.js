@@ -1,3 +1,14 @@
+function authFetch(input, init) {
+    return fetch(input, init).then(response => {
+        if (response.status === 401) {
+            const nextUrl = window.location.pathname + window.location.search;
+            window.location.href = `/core/login/?next=${encodeURIComponent(nextUrl)}`;
+            throw new Error('Unauthorized');
+        }
+        return response;
+    });
+}
+
 export const loadOrdens = (container, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -5,7 +16,7 @@ export const loadOrdens = (container, filtros = {}) => {
         if (isLoading) return resolve({ ordens: [] });
         isLoading = true;
 
-        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&setor=${filtros.setor || ''}`)
+        authFetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&setor=${filtros.setor || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -177,7 +188,7 @@ function iniciarOrdem(ordemId, operadorId) {
         },
     });
 
-    fetch("api/ordens/atualizar-status/", {
+    authFetch("api/ordens/atualizar-status/", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -231,11 +242,21 @@ export function carregarOrdensIniciadas(filtros = {}) {
     //     <span class="sr-only">Loading...</span>
     // </div>`;
 
-    fetch(`api/ordens-iniciadas/?setor=${filtros.setor || ''}`)
-        .then(response => response.json())
+    authFetch(`api/ordens-iniciadas/?setor=${filtros.setor || ''}`)
+        .then(response => {
+                console.log("response:", response);
+                if (response.status === 401) {
+                    window.location.href = `/core/login/?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+                    return;
+                }
+
+                return response.json();
+            }
+        )
         .then(data => {
             
             container.innerHTML = ''; // Limpa o container
+            console.log(data.ordens);
             data.ordens.forEach(ordem => {
 
                 const card = document.createElement('div');
@@ -336,7 +357,7 @@ export function carregarOrdensInterrompidas(filtros = {}) {
     // Fetch para buscar ordens interrompidas
 
 
-    fetch(`api/ordens-interrompidas/?setor=${filtros.setor || ''}`)
+    authFetch(`api/ordens-interrompidas/?setor=${filtros.setor || ''}`)
     .then(response => response.json())
     .then(data => {
         container.innerHTML = ''; // Limpa o container
@@ -453,7 +474,7 @@ function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) 
     selectPecasContainer.hide(); // Esconde o select de peças por padrão
 
     // Buscar motivos de interrupção
-    fetch("api/listar-motivos-interrupcao/")
+    authFetch("api/listar-motivos-interrupcao/")
         .then(response => response.json())
         .then(data => {
             motivoInterrupcaoSelect.html(`<option value="" disabled selected>Selecione um motivo...</option>`);
@@ -513,7 +534,7 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
             submitButton.disabled = true;
             submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
             
-            const response = await fetch('api/retornar-processo/', {
+            const response = await authFetch('api/retornar-processo/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -551,7 +572,7 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
 function carregarPecasDisponiveis(codigoConjunto) {
     const pecasDisponiveisSelect = $('#pecasDisponiveis');
 
-    fetch(`api/listar-pecas-disponiveis/?conjunto=${codigoConjunto}`)
+    authFetch(`api/listar-pecas-disponiveis/?conjunto=${codigoConjunto}`)
     .then(response => response.json())
     .then(data => {
         pecasDisponiveisSelect.empty(); // Limpa o select
@@ -633,7 +654,7 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
         payload.data_carga = dataCarga;
     }
 
-    fetch("api/ordens/atualizar-status/", {
+    authFetch("api/ordens/atualizar-status/", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -684,7 +705,7 @@ function mostrarModalFinalizar(ordemId, maquina, max_itens) {
     operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
     todosOperadorFinal.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
 
-    fetch(`api/listar-operadores/?maquina=${maquina}&ordem=${ordemId}`)
+    authFetch(`api/listar-operadores/?maquina=${maquina}&ordem=${ordemId}`)
     .then(response => {
         if (!response.ok) {
             throw new Error("Erro ao buscar operadores");
@@ -746,7 +767,7 @@ function mostrarModalIniciar(ordemId, maquina) {
     operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
     todosOperadorInicial.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
 
-    fetch(`api/listar-operadores/?maquina=${maquina}`)
+    authFetch(`api/listar-operadores/?maquina=${maquina}`)
     .then(response => {
         if (!response.ok) {
             throw new Error("Erro ao buscar operadores");
@@ -908,7 +929,7 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         qt_realizada: parseInt(qtRealizada.value)
     };
 
-    fetch("api/ordens/atualizar-status/", {
+    authFetch("api/ordens/atualizar-status/", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -1030,7 +1051,7 @@ document.getElementById('confirmStartButton').addEventListener('click', function
     const currentOrdemId = document.getElementById('ordemIdIniciar').value;
 
     // Primeiro, verificar se a ordem tem quantidade pendente
-    fetch(`api/verificar-qt-restante/?ordem_id=${currentOrdemId}`)
+    authFetch(`api/verificar-qt-restante/?ordem_id=${currentOrdemId}`)
     .then(response => {
         if (!response.ok) {
             return response.json().then(err => { throw err; });
@@ -1103,7 +1124,7 @@ function confirmarRetorno(ordemId, modal) {
         }
     });
 
-    fetch(`api/ordens/atualizar-status/`, {
+    authFetch(`api/ordens/atualizar-status/`, {
         method: 'POST',
         body: JSON.stringify({
             ordem_id: ordemId,
@@ -1237,7 +1258,7 @@ function atualizarAndamentoCarga(dataCarga) {
         <span class="sr-only">Loading...</span>
     </div>`;
 
-    fetch(`api/andamento-carga/?data_carga=${encodeURIComponent(dataCarga)}`)
+    authFetch(`api/andamento-carga/?data_carga=${encodeURIComponent(dataCarga)}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error("Erro ao buscar andamento da carga.");
@@ -1275,7 +1296,7 @@ function atualizarUltimasCargas() {
             <span class="sr-only">Loading...</span>
         </div>`;
 
-    fetch("api/andamento-ultimas-cargas/")
+    authFetch("api/andamento-ultimas-cargas/")
         .then(response => {
             if (!response.ok) {
                 throw new Error("Erro ao buscar andamento das últimas cargas.");
@@ -1360,7 +1381,7 @@ export function fetchStatusMaquinas() {
         </div>`;
 
     // Faz a requisição para a API
-    fetch('/core/api/status_maquinas/?setor=solda')
+    authFetch('/core/api/status_maquinas/?setor=solda')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -1440,7 +1461,7 @@ export function fetchStatusMaquinas() {
 
 async function fetchMaquinasDisponiveis() {
     try {
-        const response = await fetch('/core/api/buscar-maquinas-disponiveis/?setor=solda');
+        const response = await authFetch('/core/api/buscar-maquinas-disponiveis/?setor=solda');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -1477,7 +1498,7 @@ function retornarMaquina(maquina) {
         cancelButtonText: 'Cancelar',
         showLoaderOnConfirm: true,
         preConfirm: () => {
-            return fetch(`/core/api/retornar-maquina/`, {
+            return authFetch(`/core/api/retornar-maquina/`, {
                 method: 'PATCH',
                 body: JSON.stringify({ maquina }),  // Envia no corpo como JSON
                 headers: {
@@ -1534,7 +1555,7 @@ async function handleFormSubmit(event) {
     });
 
     try {
-        const response = await fetch(`/core/api/parar-maquina/?setor=solda`, {
+        const response = await authFetch(`/core/api/parar-maquina/?setor=solda`, {
             method: 'PATCH',
             body: JSON.stringify({
                 maquina: document.getElementById('escolhaMaquinaParada').value,
@@ -1728,7 +1749,7 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         continua: continua
     };
 
-    fetch("api/ordens/atualizar-status/", {
+    authFetch("api/ordens/atualizar-status/", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -1818,3 +1839,4 @@ document.addEventListener('DOMContentLoaded', () => {
         mostrarModalPararMaquina();
     });
 });
+
