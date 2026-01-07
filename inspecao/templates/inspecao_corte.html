@@ -148,13 +148,13 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
-                    <h6 class="card-title">Ordem <span class="ordem-numero"></span></h6>
+                    <h6 class="card-title">Peça <span class="peca"></span></h6>
                     <span class="badge text-bg-success">Inspecionado</span>
                 </div>
-                <p class="card-text text-muted small mb-2">Conjunto: <span class="ordem-conjunto"></span></p>
-                <p class="card-text text-muted small mb-3">Data: <span class="ordem-data"></span></p>
+                <p class="card-text text-muted small mb-2">Ordem: <span class="ordem-numero"></span></p>
+                <p class="card-text text-muted small mb-3">Data: <span class="data-inspecao"></span></p>
                 <div class="d-flex justify-content-end">
-                    <button type="button" class="btn btn-outline-secondary btn-sm btn-ver-ordem">Ver</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm btn-ver-peca" data-peca-id="">Ver</button>
                 </div>
             </div>
         </div>
@@ -162,33 +162,35 @@
 </template>
 
 <div class="modal fade" id="modal-ordem-corte" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalOrdemCorteLabel">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalOrdemCorteLabel">Inspecao corte</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <label class="form-label">Ordem</label>
-                        <input type="text" class="form-control" id="modal-ordem-corte-numero" readonly>
-                    </div>
-                    <div class="col-md-5">
-                        <label class="form-label">Conjunto</label>
-                        <input type="text" class="form-control" id="modal-ordem-corte-conjunto" readonly>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Quantidade cortada</label>
-                        <input type="number" class="form-control" id="modal-ordem-corte-qtd" readonly>
-                    </div>
-                </div>
 
                 <div class="accordion" id="lista-pecas-corte"></div>
             </div>
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modal-historico-ordem-corte" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalHistoricoOrdemCorteLabel">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalHistoricoOrdemCorteLabel">Histórico</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+
+                <div class="accordion" id="lista-historico-pecas-corte"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <template id="template-peca-corte">
     <div class="accordion-item">
@@ -589,10 +591,12 @@
             return false;
         }
 
-        const linhas = Array.from(form.querySelectorAll(".linha-medicao-corte")).filter(
+        const linhas = Array.from(form.querySelectorAll("tbody .linha-medicao-corte")).filter(
             (linha) => linha.style.display !== "none"
         );
+        let linhaIndex = 0;
         for (const linha of linhas) {
+            linhaIndex++;
             const valores = Array.from(linha.querySelectorAll("input[type=\"number\"]"));
             for (const index of colunasAtivas) {
                 const input = valores[index];
@@ -607,7 +611,7 @@
             }
             const radioSelecionado = linha.querySelector('input[type="radio"]:checked');
             if (!radioSelecionado) {
-                alert("Selecione Conforme ou Nao conforme em todas as linhas.");
+                alert(`Selecione Conforme ou Nao conforme na linha ${linhaIndex}.`);
                 linha.querySelector('input[type="radio"]')?.focus();
                 return false;
             }
@@ -751,6 +755,11 @@
             setTimeout(() => {
                 botao.textContent = textoOriginal;
             }, 1000);
+            // Remover o item inspecionado para impedir re-inspeção
+            const accordionItem = form.closest('.accordion-item');
+            if (accordionItem) {
+                accordionItem.remove();
+            }
         } catch (error) {
             console.error(error);
             alert(error.message);
