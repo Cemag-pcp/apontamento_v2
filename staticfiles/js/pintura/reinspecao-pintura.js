@@ -28,6 +28,7 @@ function buscarItensReinspecao(pagina) {
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-reinspecao");
     let itensInspecionar = document.getElementById("itens-reinspecao");
     let itensFiltradosCor = document.getElementById("itens-filtrados-reinspecao-cor");
+    let itensFiltradosTipos = document.getElementById("itens-filtrados-reinspecao-tipos");
     let itensFiltradosDataInicio = document.getElementById("itens-filtrados-reinspecao-data-inicio");
     let itensFiltradosDataFim = document.getElementById("itens-filtrados-reinspecao-data-fim");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-reinspecao-inspetor");
@@ -44,8 +45,14 @@ function buscarItensReinspecao(pagina) {
 
     // Coletar os filtros aplicados
     let coresSelecionadas = [];
+    let tiposSelecionadas = [];
     document.querySelectorAll('.form-check-input-reinspecao:checked').forEach(checkbox => {
-        coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
+        let label = checkbox.nextElementSibling.textContent.trim();
+        if (label === "PÓ" || label === "PU") {
+            tiposSelecionadas.push(label);
+        } else {
+            coresSelecionadas.push(label);
+        }
     });
 
     let inspetorSelecionado = [];
@@ -65,6 +72,14 @@ function buscarItensReinspecao(pagina) {
         itensFiltradosCor.textContent = "Cores: " + coresSelecionadas.join(", ");
     } else {
         itensFiltradosCor.style.display = "none";
+    }
+
+    if (tiposSelecionadas.length > 0) {
+        params.append("tipos_tinta", tiposSelecionadas.join(","));
+        itensFiltradosTipos.style.display = "block";
+        itensFiltradosTipos.textContent = "Tipo de Tinta: " + tiposSelecionadas.join(", ");
+    } else {
+        itensFiltradosTipos.style.display = "none";
     }
 
     if (dataSelecionadaInicio) {
