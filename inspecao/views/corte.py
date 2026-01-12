@@ -34,7 +34,7 @@ def get_itens_inspecao_corte(request):
     pagina = int(request.GET.get("pagina", 1))
     itens_por_pagina = 12
 
-    queryset = PecasOrdem.objects.select_related("ordem", "ordem__maquina").all()
+    queryset = PecasOrdem.objects.select_related("ordem", "ordem__maquina").filter(ordem__grupo_maquina='plasma', ordem__maquina__isnull=False)
 
     total_ordens = queryset.values("ordem_id").distinct().count()
 
@@ -60,7 +60,7 @@ def get_itens_inspecao_corte(request):
         queryset = queryset.filter(data__date__lte=data_fim)
 
     agrupado = (
-        queryset.values("ordem_id", "ordem__ordem", "ordem__maquina__nome")
+        queryset.values("ordem_id", "ordem__ordem", "ordem__maquina__nome", "ordem__ordem_duplicada")
         .annotate(total_qtd_boa=Sum("qtd_boa"), data_ultima=Max("data"))
         .order_by("-data_ultima")
     )
@@ -74,12 +74,14 @@ def get_itens_inspecao_corte(request):
         dados.append(
             {
                 "ordem_id": item["ordem_id"],
-                "ordem_numero": item["ordem__ordem"],
+                "ordem_numero": item["ordem__ordem"] if item["ordem__ordem"] else item["ordem__ordem_duplicada"],
                 "conjunto": item["ordem__maquina__nome"] or "-",
                 "qtd_boa": item["total_qtd_boa"] or 0,
                 "data": data_ultima,
             }
         )
+
+    print(dados)
 
     return JsonResponse(
         {
@@ -96,15 +98,86 @@ def get_itens_inspecionados_corte(request):
     if request.method != "GET":
         return JsonResponse({"error": "Metodo nao permitido"}, status=405)
 
-    return JsonResponse(
-        {
-            "dados": [],
-            "total": 0,
-            "total_filtrado": 0,
-            "pagina_atual": 1,
-            "total_paginas": 1,
-        }
+    pesquisa = request.GET.get("pesquisar", "").strip()
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+    pagina = int(request.GET.get("pagina", 1))
+    itens_por_pagina = 12
+
+    queryset = (
+        PecasOrdem.objects
+        .select_related("ordem", "ordem__maquina")
+        .prefetch_related("inspecao_set")
+        .filter(inspecao__isnull=False)
     )
+
+    total_pecas = queryset.count()
+
+    if pesquisa:
+        queryset = queryset.filter(
+            Q(peca__icontains=pesquisa) |
+            Q(ordem__ordem__icontains=pesquisa)
+        )
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
+    except ValueError:
+        data_inicio = None
+        data_fim = None
+
+    if data_inicio and data_fim:
+        queryset = queryset.filter(
+            inspecao__data_inspecao__date__gte=data_inicio,
+            inspecao__data_inspecao__date__lte=data_fim
+        )
+    elif data_inicio:
+        queryset = queryset.filter(
+            inspecao__data_inspecao__date__gte=data_inicio
+        )
+    elif data_fim:
+        queryset = queryset.filter(
+            inspecao__data_inspecao__date__lte=data_fim
+        )
+
+    queryset = queryset.order_by("-inspecao__data_inspecao")
+
+    paginador = Paginator(queryset, itens_por_pagina)
+    pagina_obj = paginador.get_page(pagina)
+
+    dados = []
+    for peca in pagina_obj:
+        inspecao = peca.inspecao_set.order_by("-data_inspecao").first()
+        data_inspecao = (
+            inspecao.data_inspecao.strftime("%d/%m/%Y")
+            if inspecao and inspecao.data_inspecao
+            else ""
+        )
+
+        # Get the latest execution data
+        dados_execucao = DadosExecucaoInspecao.objects.filter(inspecao=inspecao).order_by("-id").first() if inspecao else None
+
+        dados.append({
+            "peca_id": peca.id,
+            "peca": peca.peca,
+            "ordem_numero": peca.ordem.ordem if peca.ordem.ordem else peca.ordem.ordem_duplicada,
+            "conjunto": peca.ordem.maquina.nome if peca.ordem.maquina else "-",
+            "qtd_boa": peca.qtd_boa,
+            "data_inspecao": data_inspecao,
+            "conformidade": dados_execucao.conformidade if dados_execucao else 0,
+            "nao_conformidade": dados_execucao.nao_conformidade if dados_execucao else 0,
+        })
+
+
+    return JsonResponse({
+        "dados": dados,
+        "total": total_pecas,
+        "total_filtrado": paginador.count,
+        "pagina_atual": pagina_obj.number,
+        "total_paginas": paginador.num_pages,
+    })
 
 
 def get_ordem_corte(request, ordem_id):
@@ -113,11 +186,62 @@ def get_ordem_corte(request, ordem_id):
 
     pecas = (
         PecasOrdem.objects.filter(ordem_id=ordem_id)
+        .exclude(inspecao__isnull=False)
         .values("id", "peca", "qtd_boa", "qtd_planejada", "qtd_morta")
         .order_by("id")
     )
 
     return JsonResponse({"pecas": list(pecas)})
+
+
+def get_detalhes_inspecao_corte(request, peca_id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Metodo nao permitido"}, status=405)
+
+    peca = get_object_or_404(PecasOrdem, pk=peca_id)
+    inspecao = Inspecao.objects.filter(pecas_ordem_corte=peca).order_by("-id").first()
+    if not inspecao:
+        return JsonResponse({"error": "Inspecao nao encontrada"}, status=404)
+
+    dados_execucao = DadosExecucaoInspecao.objects.filter(inspecao=inspecao).order_by("-id").first()
+    if not dados_execucao:
+        return JsonResponse({"error": "Dados de execucao nao encontrados"}, status=404)
+
+    nao_conformidades = []
+    for nc in CausasNaoConformidade.objects.filter(dados_execucao=dados_execucao):
+        causas = [causa.nome for causa in nc.causa.all()]
+        imagens = [arquivo.arquivo.url for arquivo in ArquivoCausa.objects.filter(causa_nao_conformidade=nc)]
+        nao_conformidades.append({
+            "causas": causas,
+            "quantidade": nc.quantidade,
+            "destino": nc.destino,
+            "imagens": imagens,
+        })
+
+    ficha_100_url = None
+    if ArquivoConformidade.objects.filter(dados_execucao=dados_execucao).exists():
+        ficha_100_url = ArquivoConformidade.objects.filter(dados_execucao=dados_execucao).first().arquivo.url
+
+    
+
+    data = {
+        "inspecao_id": inspecao.id,
+        "peca": peca.peca,
+        "ordem": peca.ordem.ordem if peca.ordem.ordem else peca.ordem.ordem_duplicada,
+        "conjunto": peca.ordem.maquina.nome or "-",
+        "qtd_planejada": peca.qtd_planejada,
+        "qtd_boa": peca.qtd_boa,
+        "qtd_morta": peca.qtd_morta,
+        "data_inspecao": inspecao.data_inspecao.strftime("%d/%m/%Y %H:%M") if inspecao.data_inspecao else "",
+        "inspetor": dados_execucao.inspetor.user.username if dados_execucao.inspetor else "",
+        "conformidade": dados_execucao.conformidade,
+        "nao_conformidade": dados_execucao.nao_conformidade,
+        "observacao": dados_execucao.observacao,
+        "nao_conformidades": nao_conformidades,
+        "ficha_100_url": ficha_100_url,
+    }
+
+    return JsonResponse(data)
 
 
 @require_POST

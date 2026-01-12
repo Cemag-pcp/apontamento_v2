@@ -50,6 +50,7 @@ urlpatterns = [
     path('api/itens-inspecao-corte/', corte.get_itens_inspecao_corte, name='itens-inspecao-corte'),
     path('api/itens-inspecionados-corte/', corte.get_itens_inspecionados_corte, name='itens-inspecionados-corte'),
     path('api/ordem-corte/<int:ordem_id>/', corte.get_ordem_corte, name='ordem-corte'),
+    path('api/detalhes-inspecao-corte/<int:peca_id>/', corte.get_detalhes_inspecao_corte, name='detalhes-inspecao-corte'),
     path('api/envio-inspecao-corte/', corte.envio_inspecao_corte, name='envio-inspecao-corte'),
 
     path('api/envio-inspecao-serra-usinagem/', serra_usinagem.envio_inspecao_serra_usinagem, name='inspecionar-serra-usinagem'),
