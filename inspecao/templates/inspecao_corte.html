@@ -12,7 +12,7 @@
 
 {% block content %}
 
-<h2 class="fw-bold my-4">Inspecao Corte</h2>
+<h2 class="fw-bold my-4">Inspecao Corte (Apenas para plasma)</h2>
 
 <ul class="nav nav-tabs mt-3" style="background-color: #f4f4f5;">
     <li class="nav-item" style="width: 50%;">
@@ -226,7 +226,7 @@
                                 <div class="table-responsive">
                                     <table class="table table-bordered inspection-table">
                                     <thead class="table-light">
-                                        <tr class="linha-medicao-corte" data-linha="1">
+                                        <tr>
                                             <th><input type="text" class="form-control" placeholder="Medida 1" style="padding: 5px;"></th>
                                             <th><input type="text" class="form-control" placeholder="Medida 2" style="padding: 5px;"></th>
                                             <th><input type="text" class="form-control" placeholder="Medida 3" style="padding: 5px;"></th>
@@ -257,7 +257,7 @@
                                                 <input class="form-check-input" type="radio" name="conformidade-2" value="nao-conforme">
                                             </td>
                                         </tr>
-                                        <tr>
+                                        <tr class="linha-medicao-corte" data-linha="4">
                                             <td><input type="number" step="0.01" class="form-control" placeholder="Valor 1" style="padding: 5px;"></td>
                                             <td><input type="number" step="0.01" class="form-control" placeholder="Valor 2" style="padding: 5px;"></td>
                                             <td><input type="number" step="0.01" class="form-control" placeholder="Valor 3" style="padding: 5px;"></td>
@@ -564,7 +564,7 @@
             form.style.display = qtd > 0 ? "" : "none";
             if (qtd > 0) {
                 const linhasVisiveis = qtd >= 3 ? 3 : qtd;
-                const linhas = form.querySelectorAll(".linha-medicao-corte");
+                const linhas = form.querySelectorAll("tbody .linha-medicao-corte");
                 linhas.forEach((linha, index) => {
                     linha.style.display = index < linhasVisiveis ? "" : "none";
                 });
@@ -574,33 +574,62 @@
 
     function validarFormularioCorte(form) {
         const headerInputs = Array.from(form.querySelectorAll("table thead input[type=\"text\"]"));
+
+        // Cabeçalhos ativos: somente os preenchidos tornam a coluna obrigatória
         const colunasAtivas = headerInputs
             .map((input, index) => (input.value.trim() ? index : -1))
             .filter((index) => index >= 0);
+
+        // Pelo menos um cabeçalho precisa estar preenchido
         if (!colunasAtivas.length) {
-            alert("Preencha ao menos uma coluna de Medicoes Tecnicas.");
+            alert("Preencha ao menos um cabeçalho de Medicoes Tecnicas.");
             headerInputs[0]?.focus();
             return false;
         }
 
+        // Linhas visíveis (linhas de valores, não o cabeçalho)
         const linhas = Array.from(form.querySelectorAll("tbody .linha-medicao-corte")).filter(
             (linha) => linha.style.display !== "none"
         );
+
         let linhaIndex = 0;
         for (const linha of linhas) {
             linhaIndex++;
             const valores = Array.from(linha.querySelectorAll("input[type=\"number\"]"));
+
+            // 1) Para colunas com cabeçalho preenchido, valor é obrigatório
             for (const index of colunasAtivas) {
                 const input = valores[index];
                 if (!input) {
                     continue;
                 }
                 if (input.value === "" || Number.isNaN(input.valueAsNumber)) {
-                    alert("Todos os valores das colunas preenchidas sao obrigatorios.");
+                    alert("Preencha todas as medidas nas colunas com cabeçalho preenchido.");
                     input.focus();
                     return false;
                 }
             }
+
+            // 2) Se alguma coluna sem cabeçalho tiver valor, exigir o cabeçalho
+            try {
+                headerInputs.forEach((header, idx) => {
+                    if (colunasAtivas.includes(idx)) {
+                        return;
+                    }
+                    const inputValor = valores[idx];
+                    if (inputValor && inputValor.value.trim()) {
+                        alert("Preencha o cabeçalho correspondente antes de informar medidas.");
+                        header.focus();
+                        throw new Error("cabecalho_faltando");
+                    }
+                });
+            } catch (e) {
+                if (e.message === "cabecalho_faltando") {
+                    return false;
+                }
+                throw e;
+            }
+
             const radioSelecionado = linha.querySelector('input[type="radio"]:checked');
             if (!radioSelecionado) {
                 alert(`Selecione Conforme ou Nao conforme na linha ${linhaIndex}.`);
@@ -688,7 +717,7 @@
         const headerInputs = form.querySelectorAll("table thead input[type=\"text\"]");
         const headerNomes = Array.from(headerInputs).map((input) => input.value || "");
         const medidas = [];
-        const linhas = form.querySelectorAll(".linha-medicao-corte");
+        const linhas = form.querySelectorAll("tbody .linha-medicao-corte");
         linhas.forEach((linha) => {
             if (linha.style.display === "none") {
                 return;
@@ -756,6 +785,10 @@
             if (accordionItem) {
                 accordionItem.remove();
             }
+            // Recarregar cards de pendências após 1.5 segundos
+            setTimeout(() => {
+                buscarPendencias(1);
+            }, 1500);
         } catch (error) {
             console.error(error);
             alert(error.message);
