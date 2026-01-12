@@ -271,20 +271,25 @@ async function buscarPendencias(pagina) {
             cardsContainer.innerHTML = '<p class="text-muted">Sem pendencias para exibir.</p>';
         } else {
             data.dados.forEach((item) => {
+                
                 const clone = template.content.cloneNode(true);
-                const numero = clone.querySelector(".ordem-numero");
                 const conjunto = clone.querySelector(".ordem-conjunto");
                 const qtd = clone.querySelector(".ordem-qtd");
+                const dataSpan = clone.querySelector(".ordem-data");
+                const numero = clone.querySelector(".ordem-numero");
                 const botao = clone.querySelector(".btn-ver-ordem");
 
-                if (numero) {
-                    numero.textContent = item.ordem_numero ?? "-";
-                }
                 if (conjunto) {
                     conjunto.textContent = item.conjunto || "-";
                 }
                 if (qtd) {
                     qtd.textContent = item.qtd_boa ?? 0;
+                }
+                if (dataSpan) {
+                    dataSpan.textContent = item.data ?? "-";
+                }
+                if (numero) {
+                    numero.textContent = item.ordem_numero;
                 }
                 if (botao) {
                     botao.addEventListener("click", () => abrirModalOrdem(item));

@@ -34,7 +34,7 @@ def get_itens_inspecao_corte(request):
     pagina = int(request.GET.get("pagina", 1))
     itens_por_pagina = 12
 
-    queryset = PecasOrdem.objects.select_related("ordem", "ordem__maquina").all()
+    queryset = PecasOrdem.objects.select_related("ordem", "ordem__maquina").filter(ordem__grupo_maquina='plasma', ordem__maquina__isnull=False)
 
     total_ordens = queryset.values("ordem_id").distinct().count()
 
