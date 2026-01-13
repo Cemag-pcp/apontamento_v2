@@ -385,3 +385,13 @@ class PecasFaltantes(models.Model):
     def __str__(self):
         # Atualiza a representação para incluir o número da interrupção
         return f"Ordem {self.ordem.ordem}, Int. {self.numero_interrupcao} - Peça: {self.nome_peca} ({self.quantidade} faltante)"
+
+class ConsultaSaldoInnovaro(models.Model):
+
+    agrupamento = models.TextField()
+    codigo = models.TextField()
+    descricao = models.TextField()
+    saldo = models.TextField()
+    custo_total = models.TextField()
+    custo_medio = models.TextField()
+    data_ultimo_saldo = models.TextField()

@@ -1,68 +1,13 @@
-import gspread
-from google.oauth2 import service_account
-import os
 from cachetools import LRUCache
 from datetime import datetime, timedelta
+from core.models import ConsultaSaldoInnovaro
 
 # Cache aumentado para 5000 entradas
 cache = LRUCache(maxsize=5000)
 
-# Cliente autenticado reutilizável
-_gsheets_client = None
-_client_created_at = None
-
-def format_private_key(key: str) -> str:
-    """Formata a chave privada do Google"""
-    if '\\n' in key:
-        return key.replace('\\n', '\n')
-    return key
-
-def get_gsheets_client():
-    """
-    Retorna cliente autenticado reutilizável.
-    Recria cliente a cada 1 hora para manter conexão fresca.
-    """
-    global _gsheets_client, _client_created_at
-    
-    # Verifica se cliente existe e ainda é válido (menos de 1 hora)
-    if _gsheets_client is not None and _client_created_at is not None:
-        idade_cliente = (datetime.now() - _client_created_at).seconds
-        if idade_cliente < 3600:  # 1 hora em segundos
-            return _gsheets_client
-    
-    print("Criando nova conexão com Google Sheets...")
-    
-    # Construir credenciais do ambiente
-    credentials_google = {
-        "type": os.environ.get('type'),
-        "project_id": os.environ.get('project_id'),
-        "private_key": format_private_key(os.environ.get('private_key')),
-        "client_email": os.environ.get('client_email'),
-        "client_id": os.environ.get('client_id'),
-        "auth_uri": os.environ.get('auth_uri'),
-        "token_uri": os.environ.get('token_uri'),
-        "auth_provider_x509_cert_url": os.environ.get('auth_provider_x509_cert_url'),
-        "client_x509_cert_url": os.environ.get('client_x509_cert_url'),
-        "universe_domain": os.environ.get('universe_domain')
-    }
-    
-    scope = [
-        'https://www.googleapis.com/auth/spreadsheets',
-        "https://www.googleapis.com/auth/drive"
-    ]
-    
-    credentials = service_account.Credentials.from_service_account_info(
-        credentials_google, 
-        scopes=scope
-    )
-    _gsheets_client = gspread.authorize(credentials)
-    _client_created_at = datetime.now()
-    
-    return _gsheets_client
-
 def busca_saldo_recurso_central(codigos):
     """
-    Busca saldo de recursos do almoxarifado central.
+    Busca saldo de recursos do almoxarifado central da tabela ConsultaSaldoInnovaro.
     
     Args:
         codigos: List ou Set de códigos dos itens
@@ -71,10 +16,9 @@ def busca_saldo_recurso_central(codigos):
         Tuple: (dict com saldos, data do último saldo)
         
     Otimizações:
-    - Cache de 5000 entradas (antes era 100)
-    - Cliente autenticado reutilizável
-    - Query específica de colunas (A:C)
-    - Dict direto em vez de DataFrame (90% mais rápido)
+    - Cache de 5000 entradas
+    - Busca direta no banco de dados (sem API externa)
+    - Dict direto em vez de DataFrame
     """
     
     # Converter para tupla para usar como chave de cache
@@ -85,81 +29,50 @@ def busca_saldo_recurso_central(codigos):
         print(f'✓ Cache hit: {len(codigos)} códigos')
         return cache[codigos_tupla]
     
-    print(f'⚠ Cache miss: buscando {len(codigos)} códigos do Google Sheets')
+    print(f'⚠ Cache miss: buscando {len(codigos)} códigos do banco de dados')
     
     try:
-        # ✅ Usar cliente reutilizável
-        client = get_gsheets_client()
+        # Normalizar códigos para busca (remover espaços)
+        codigos_set = set(str(cod).strip() for cod in codigos)
         
-        sheet_id = '1u2Iza-ocp6ROUBXG9GpfHvEJwLHuW7F2uiO583qqLIE'
-        sh = client.open_by_key(sheet_id)
-        wks = sh.worksheet('saldo central')
+        # Buscar dados da tabela ConsultaSaldoInnovaro
+        registros = ConsultaSaldoInnovaro.objects.filter(
+            codigo__in=codigos_set
+        ).values('codigo', 'saldo', 'data_ultimo_saldo')
         
-        # ✅ Otimização: Carregar apenas colunas B e D (código e saldo)
-        # B=código, D=saldo
-        list_temp = wks.get('B:D')
-        
-        # Remover a coluna C (descrição) - manter apenas B e D
-        # Cria novo array com apenas as colunas que queremos
-        list1 = [[row[0], row[2] if len(row) > 2 else ''] for row in list_temp]
-        
-        # Validação
-        if not list1 or len(list1) < 2:
-            print("Planilha vazia ou sem dados")
-            return {}, "N/A"
-        
-        print(f"\n{'='*80}")
-        print(f"📋 DADOS CARREGADOS DA PLANILHA (apenas B e D):")
-        print(f"   Header: {list1[0]}")
-        for i in range(1, min(6, len(list1))):
-            print(f"   Row {i}: {list1[i]}")
-        
-        print(f"\n🔍 CÓDIGOS A PROCURAR:")
-        codigos_list = sorted(set(codigos))
-        for idx, cod in enumerate(codigos_list[:10], 1):
-            print(f"   {idx}. '{cod}' (type: {type(cod).__name__})")
-        if len(codigos_list) > 10:
-            print(f"   ... e mais {len(codigos_list) - 10} códigos")
-        print(f"{'='*80}\n")
-        
-        # ✅ Extrair header - agora temos apenas [codigo, saldo]
+        # Construir dicionário de saldos
+        saldo_dict = {}
+        codigos_encontrados = []
         data_ultimo_saldo = "N/A"
         
-        # ✅ Construir dicionário direto com tratamento de espaços/case
-        # Pula a primeira linha (header)
-        # Agora temos apenas 2 colunas: Índice 0 = código, Índice 1 = saldo
-        saldo_dict = {}
-        codigos_set = set(str(cod).strip() for cod in codigos)  # Remove espaços
+        print(f"\n{'='*80}")
+        print(f"📋 BUSCANDO NA TABELA ConsultaSaldoInnovaro:")
+        print(f"   Total de códigos a buscar: {len(codigos_set)}")
         
-        codigos_encontrados = []
-        codigos_nao_encontrados = list(codigos_set)
+        for registro in registros:
+            codigo = str(registro['codigo']).strip()
+            saldo = registro['saldo']
+            
+            if registro['data_ultimo_saldo']:
+                data_ultimo_saldo = registro['data_ultimo_saldo']
+            
+            saldo_dict[codigo] = saldo
+            codigos_encontrados.append(codigo)
+            
+            # Debug: mostrar primeiros 10 resultados
+            if len(codigos_encontrados) <= 10:
+                print(f"   ✓ {codigo}: {saldo}")
         
-        print(f"🔎 PROCURANDO NA PLANILHA ({len(list1)-1} linhas)...\n")
-        
-        for idx, row in enumerate(list1[1:], 1):
-            if len(row) >= 1:  # Precisa ter pelo menos a coluna B
-                codigo_planilha = str(row[0]).strip()  # Coluna B (índice 0)
-                saldo = row[1] if len(row) > 1 else ""  # Coluna D (índice 1)
-                
-                # Debug: mostrar primeiros 10 códigos da planilha
-                if idx <= 10:
-                    encontrou = "✓ ENCONTRADO" if codigo_planilha in codigos_set else ""
-                    print(f"   Linha {idx}: código='{codigo_planilha}', saldo='{saldo}' {encontrou}")
-                
-                # Busca exata com espaços removidos
-                if codigo_planilha in codigos_set:
-                    saldo_dict[codigo_planilha] = saldo
-                    codigos_encontrados.append(codigo_planilha)
-                    if codigo_planilha in codigos_nao_encontrados:
-                        codigos_nao_encontrados.remove(codigo_planilha)
-        
-        # Armazenar no cache e retornar
-        resultado = (saldo_dict, data_ultimo_saldo)
-        cache[codigos_tupla] = resultado
+        codigos_nao_encontrados = [cod for cod in codigos_set if cod not in codigos_encontrados]
+        print(f"{'='*80}\n")
         
         print(f"✓ Saldo recuperado para {len(saldo_dict)} itens, {len(codigos_nao_encontrados)} não encontrados")
         if codigos_nao_encontrados and len(codigos_nao_encontrados) <= 5:
             print(f"   Códigos não encontrados: {codigos_nao_encontrados}")
+        
+        # Armazenar no cache e retornar
+        resultado = (saldo_dict, data_ultimo_saldo)
+        cache[codigos_tupla] = resultado
         
         return resultado
         
