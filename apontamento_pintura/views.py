@@ -17,7 +17,7 @@ from collections import defaultdict
 from core.models import Profile
 from apontamento_pintura.models import Retrabalho
 from inspecao.models import Reinspecao, DadosExecucaoInspecao, Inspecao
-from .models import PecasOrdem, CambaoPecas, Cambao, TesteFuncional
+from .models import PecasOrdem, CambaoPecas, Cambao, TesteFuncional, Programa, Programacao
 from core.models import Ordem
 from cadastro.models import Operador, Conjuntos
 from inspecao.models import Inspecao
@@ -25,6 +25,114 @@ from core.utils import notificar_ordem
 
 def planejamento(request):
     return render(request, "apontamento_pintura/planejamento.html")
+
+def listar_programas(request):
+    """
+    API para listar programas de pintura com suas programações
+    """
+    data_inicial = request.GET.get('data_inicial', None)
+    data_final = request.GET.get('data_final', None)
+    tipo_tinta = request.GET.get('tipo_tinta', '')
+    cor = request.GET.get('cor', '')
+    
+    # Filtros base
+    filtros = Q()
+    
+    if tipo_tinta:
+        filtros &= Q(tipo_tinta=tipo_tinta)
+    
+    if cor:
+        filtros &= Q(cor__icontains=cor)
+    
+    # Buscar programas com prefetch de programações
+    programas = Programa.objects.filter(filtros, status='programada').prefetch_related(
+        Prefetch('programacao_pintura', queryset=Programacao.objects.select_related('peca_ordem'))
+    ).order_by('-data_planejada', '-num_programa')
+    
+    # Montar resposta
+    dados = []
+    for programa in programas:
+        programacoes = programa.programacao_pintura.all()
+        
+        pecas = []
+        total_programado = 0
+        total_em_processo = 0
+        total_finalizado = 0
+        
+        for prog in programacoes:
+            pecas.append({
+                'id': prog.id,
+                'peca_codigo': prog.peca_ordem.peca if prog.peca_ordem else 'N/A',
+                'quantidade': prog.qtd_programacao,
+                'peca_ordem_id': prog.peca_ordem.id if prog.peca_ordem else None,
+                'ordem_id': prog.peca_ordem.ordem.id if prog.peca_ordem else None,
+                'ordem': prog.peca_ordem.ordem.ordem if (prog.peca_ordem and prog.peca_ordem.ordem) else '',
+            })
+            
+            total_programado += prog.qtd_programacao
+        
+        dados.append({
+            'id': programa.id,
+            'num_programa': programa.num_programa,
+            'tipo_tinta': programa.tipo_tinta,
+            'cor': programa.cor,
+            'prioridade': programa.prioridade or 'médio',
+            'data_planejada': programa.data_planejada.strftime('%d/%m/%Y') if programa.data_planejada else 'N/A',
+            'data_criacao': programa.data_created.strftime('%d/%m/%Y %H:%M'),
+            'pecas': pecas,
+            'total_programado': total_programado,
+            'total_em_processo': total_em_processo,
+            'total_finalizado': total_finalizado,
+            'percentual_concluido': round((total_finalizado / total_programado * 100), 2) if total_programado > 0 else 0
+        })
+    
+    return JsonResponse({
+        'sucesso': True,
+        'programas': dados,
+        'total': len(dados)
+    })
+
+def programar_producao(request):
+    """
+    Tela para programar produção do setor de pintura
+    """
+    # Buscar conjuntos para a seleção
+    conjuntos = Conjuntos.objects.all()
+    operadores = Operador.objects.all()
+    
+    context = {
+        'conjuntos': conjuntos,
+        'operadores': operadores
+    }
+    return render(request, "apontamento_pintura/programar_producao.html", context)
+
+@csrf_exempt
+def iniciar_programa(request):
+    """
+    API para iniciar um programa - atualiza o status para 'finalizada'
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            programa_id = data.get('programa_id')
+            
+            if not programa_id:
+                return JsonResponse({'error': 'ID do programa é obrigatório'}, status=400)
+            
+            programa = get_object_or_404(Programa, id=programa_id)
+            programa.status = 'finalizada'
+            programa.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Programa iniciado com sucesso',
+                'programa_id': programa.id
+            })
+        
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Método não permitido'}, status=405)
 
 def ordens_criadas(request):
     
@@ -351,6 +459,112 @@ def adicionar_pecas_cambao(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+@csrf_exempt
+def adicionar_pecas_programacao(request):
+    """
+    Cria uma programação de peças para pintura.
+    {
+        "peca_ordens": [12, 15],
+        "quantidade": [1, 1],
+        "cor": "Azul"  # cor do cambão
+        "tipo":"PU"
+    }
+    """
+
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            peca_ordens = data.get("peca_ordens", [])  # Lista de IDs de PecasOrdem
+            quantidades = data.get(
+                "quantidade", []
+            )  # Lista de quantidades correspondentes
+            cor = data.get("cor")
+            tipo_tinta = data.get("tipo")
+            data_planejamento = data.get("data_planejamento")
+
+            if len(peca_ordens) != len(quantidades):
+                return JsonResponse(
+                    {"error": "A quantidade de peças e de IDs deve ser a mesma!"},
+                    status=400,
+                )
+
+            # cria o programa
+            maior_valor_programa = Programa.objects.aggregate(
+                max_num=models.Max('num_programa')
+            )['max_num'] or 0
+
+            with transaction.atomic():
+                programa = Programa.objects.create(
+                    num_programa=maior_valor_programa + 1,  # deve ser o maior valor do num_programa +1
+                    cor=cor,
+                    tipo_tinta=tipo_tinta,
+                    data_planejada=data_planejamento
+                )
+
+                # cria programacao atrelada ao programa
+                pecas_selecionadas = []
+
+                for idx, peca_ordem_id in enumerate(peca_ordens):
+                    quantidade = quantidades[idx]
+
+                    try:
+                        peca_ordem = PecasOrdem.objects.get(id=peca_ordem_id)
+                    except PecasOrdem.DoesNotExist:
+                        return JsonResponse(
+                            {
+                                "error": f"A peça com ID {peca_ordem_id} não foi encontrada!"
+                            },
+                            status=400,
+                        )
+
+                    if peca_ordem.ordem.cor != cor:
+                        return JsonResponse(
+                            {
+                                "error": f"A peça {peca_ordem.peca} não pertence à cor {cor}!"
+                            },
+                            status=400,
+                        )
+
+                    # Verificar quantidade disponível para programar
+                    qtd_programacao = (
+                        CambaoPecas.objects.filter(peca_ordem=peca_ordem).aggregate(
+                            Sum("quantidade_pendurada")
+                        )["quantidade_pendurada__sum"]
+                        or 0
+                    )
+
+                    qtd_disponivel = peca_ordem.qtd_planejada - qtd_programacao
+                    if quantidade > qtd_disponivel:
+                        return JsonResponse(
+                            {
+                                "error": f"A peça {peca_ordem.peca} só pode ter mais {qtd_disponivel} unidades penduradas!"
+                            },
+                            status=400,
+                        )
+
+                    pecas_selecionadas.append((peca_ordem, quantidade))
+
+                for peca_ordem, quantidade in pecas_selecionadas:
+                    Programacao.objects.create(
+                        programa=programa,
+                        peca_ordem=peca_ordem,
+                        qtd_programacao=quantidade,
+                    )
+
+                # Notifica o websocket
+                notificar_ordem(peca_ordem.ordem)
+
+                return JsonResponse(
+                    {"success": True, "message": "Peças programadas com sucesso!"}
+                )
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Método não permitido!"}, status=405)
+
 
 @csrf_exempt
 def criar_ordem_fora_sequenciamento(request):
