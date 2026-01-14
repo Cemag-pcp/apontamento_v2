@@ -141,8 +141,15 @@
 <template id="template-card-inspecionado-corte">
     <div class="col-sm-6 col-lg-4 mb-3">
         <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-            <h5>Peça <span class="peca"></span></h5>
-            <p>Inspecao #<span class="inspecao-id"></span></p>
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h5>Peça <span class="peca"></span></h5>
+                    <p>Inspecao #<span class="inspecao-id"></span></p>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-desfazer-inspecao" data-peca-id="" title="Desfazer inspeção">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
             <p>
                 <strong>📅 Data:</strong> <span class="data-inspecao"></span><br>
                 <strong>🔢 Ordem:</strong> <span class="ordem-numero"></span><br>
@@ -324,6 +331,10 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    // Definir permissão do usuário para desfazer inspeção
+    var podeDesfazerInspecao = {% if pode_desfazer %}true{% else %}false{% endif %};
+</script>
 <script src="{% static 'js/corte/a-inspecionar-corte.js' %}"></script>
 <script src="{% static 'js/corte/inspecionados-corte.js' %}"></script>
 <script>

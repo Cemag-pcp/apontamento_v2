@@ -154,20 +154,25 @@ async function buscarInspecionados(pagina) {
                 const googleSearch = encodeURIComponent(item.peca || "");
 
                 card.innerHTML = `
-                    <div>
-                        <h5 class="mb-2">
-                            <a href="https://drive.google.com/drive/u/0/search?q=${googleSearch}"
-                               target="_blank" rel="noopener noreferrer">
-                               ${item.peca || "-"}
-                            </a>
-                        </h5>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-2">
+                                <a href="https://drive.google.com/drive/u/0/search?q=${googleSearch}"
+                                   target="_blank" rel="noopener noreferrer">
+                                   ${item.peca || "-"}
+                                </a>
+                            </h5>
 
-                        <p class="mb-2">Ordem #${item.ordem_numero || "-"}</p>
+                            <p class="mb-2">Ordem #${item.ordem_numero || "-"}</p>
 
-                        <p class="mb-0">
-                            <strong>📅 Data da inspeção:</strong> ${item.data_inspecao || "-"}<br>
-                            <strong>📍 Máquina:</strong> ${item.conjunto || "-"}
-                        </p>
+                            <p class="mb-0">
+                                <strong>📅 Data da inspeção:</strong> ${item.data_inspecao || "-"}<br>
+                                <strong>📍 Máquina:</strong> ${item.conjunto || "-"}
+                            </p>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger btn-desfazer-inspecao" data-peca-id="${item.peca_id}" title="Desfazer inspeção" style="display: none;">
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </div>
 
                     <hr class="my-3">
@@ -214,7 +219,15 @@ async function buscarInspecionados(pagina) {
                         allBtns.forEach(btn => btn.disabled = false);
                     }
                 });
-
+                // Adicionar evento para o botão de desfazer inspeção
+                const btnDesfazer = card.querySelector(".btn-desfazer-inspecao");
+                if (btnDesfazer && podeDesfazerInspecao) {
+                    btnDesfazer.style.display = 'block';
+                    btnDesfazer.addEventListener("click", async (e) => {
+                        e.stopPropagation();
+                        await desfazerInspecaoCorte(item.peca_id, item.peca);
+                    });
+                }
                 col.appendChild(card);
                 cardsContainer.appendChild(col);
             });
@@ -378,6 +391,78 @@ async function abrirModalPeca(pecaId) {
             icon: "error",
             title: "Erro",
             text: "Erro ao carregar detalhes da inspeção."
+        });
+    }
+}
+
+async function desfazerInspecaoCorte(pecaId, pecaNome) {
+    try {
+        const result = await Swal.fire({
+            icon: "warning",
+            title: "Confirmar Exclusão",
+            html: `Tem certeza que deseja desfazer a inspeção da peça <strong>${pecaNome || pecaId}</strong>?<br><br>Esta ação não pode ser desfeita.`,
+            showCancelButton: true,
+            confirmButtonColor: "#dc3545",
+            cancelButtonColor: "#6c757d",
+            confirmButtonText: "Sim, desfazer",
+            cancelButtonText: "Cancelar"
+        });
+
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        // Mostrar loading
+        Swal.fire({
+            title: "Processando...",
+            text: "Desfazendo inspeção",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value;
+        const response = await fetch("/inspecao/api/desfazer-inspecao-corte/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken
+            },
+            credentials: "same-origin",
+            body: JSON.stringify({ peca_id: pecaId })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Erro ao desfazer inspeção");
+        }
+
+        // Sucesso
+        await Swal.fire({
+            icon: "success",
+            title: "Sucesso!",
+            text: "Inspeção desfeita com sucesso",
+            timer: 2000,
+            showConfirmButton: false
+        });
+
+        // Recarregar a lista de inspecionados e pendências
+        await buscarInspecionados(1);
+        
+        // Verificar se a função buscarPendencias existe (do arquivo a-inspecionar-corte.js)
+        if (typeof buscarPendencias === 'function') {
+            await buscarPendencias(1);
+        }
+
+    } catch (error) {
+        console.error("Erro ao desfazer inspeção:", error);
+        Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: error.message || "Erro ao desfazer inspeção"
         });
     }
 }

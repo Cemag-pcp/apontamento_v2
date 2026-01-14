@@ -22,7 +22,19 @@ from inspecao.models import (
 
 
 def inspecao_corte(request):
-    return render(request, "inspecao_corte.html")
+    # Obter tipo de acesso do usuário
+    tipo_acesso = None
+    try:
+        profile = request.user.profile
+        tipo_acesso = profile.tipo_acesso
+    except (AttributeError, Profile.DoesNotExist):
+        pass
+    
+    context = {
+        'tipo_acesso': tipo_acesso,
+        'pode_desfazer': tipo_acesso in ['admin', 'supervisor', 'pcp'] if tipo_acesso else False
+    }
+    return render(request, "inspecao_corte.html", context)
 
 
 def get_itens_inspecao_corte(request):
@@ -348,5 +360,70 @@ def envio_inspecao_corte(request):
                 )
 
         return JsonResponse({"success": True, "execucao_id": dados_execucao.id})
+    except Exception as exc:
+        return JsonResponse({"error": str(exc)}, status=500)
+
+
+@require_POST
+@transaction.atomic
+def desfazer_inspecao_corte(request):
+    """
+    Endpoint para desfazer o processo de inspeção de uma peça no corte.
+    Remove a inspeção e todos os dados relacionados (execução, causas, arquivos).
+    Apenas usuários com tipo_acesso 'admin', 'supervisor' ou 'pcp' podem executar esta ação.
+    """
+    try:
+        # Verificar permissão do usuário
+        try:
+            profile = request.user.profile
+            if profile.tipo_acesso not in ['admin', 'supervisor', 'pcp']:
+                return JsonResponse({
+                    "error": "Você não tem permissão para desfazer inspeções. Apenas administradores, supervisores e PCP podem realizar esta ação."
+                }, status=403)
+        except Profile.DoesNotExist:
+            return JsonResponse({"error": "Perfil de usuário não encontrado"}, status=403)
+        
+        if request.content_type and "application/json" in request.content_type:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        else:
+            payload = request.POST.dict()
+
+        peca_id = payload.get("peca_id") or payload.get("pecaId")
+        if not peca_id:
+            return JsonResponse({"error": "peca_id obrigatorio"}, status=400)
+
+        peca = get_object_or_404(PecasOrdem, pk=peca_id)
+        
+        # Buscar a inspeção relacionada à peça
+        inspecao = Inspecao.objects.filter(pecas_ordem_corte=peca).order_by("-id").first()
+        if not inspecao:
+            return JsonResponse({"error": "Nenhuma inspecao encontrada para esta peca"}, status=404)
+
+        # Buscar dados de execução relacionados
+        dados_execucoes = DadosExecucaoInspecao.objects.filter(inspecao=inspecao)
+        
+        # Deletar arquivos e causas relacionados
+        for dados_exec in dados_execucoes:
+            # Deletar arquivos de não conformidade
+            causas_nc = CausasNaoConformidade.objects.filter(dados_execucao=dados_exec)
+            for causa_nc in causas_nc:
+                ArquivoCausa.objects.filter(causa_nao_conformidade=causa_nc).delete()
+            causas_nc.delete()
+            
+            # Deletar arquivos de conformidade
+            ArquivoConformidade.objects.filter(dados_execucao=dados_exec).delete()
+        
+        # Deletar dados de execução
+        dados_execucoes.delete()
+        
+        # Deletar a inspeção
+        inspecao.delete()
+
+        return JsonResponse({
+            "success": True, 
+            "message": "Inspecao desfeita com sucesso",
+            "peca_id": peca_id
+        })
+    
     except Exception as exc:
         return JsonResponse({"error": str(exc)}, status=500)
