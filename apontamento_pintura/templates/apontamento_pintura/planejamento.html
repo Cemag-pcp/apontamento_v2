@@ -13,6 +13,7 @@
 
 {% block content %}
 <div>
+    <input id="type_template" type="hidden" value="apontamento">
 
     <!-- Título Principal -->
     <div class="text-center mb-5">
@@ -116,11 +117,43 @@
             </button>
         </div>
     
-        <!-- Tabela de Ordens Criadas -->
-        <div id="ordens-container" class="table-responsive">
-            <div class="border rounded p-4 bg-white shadow-sm">
-                <div class="table-container">
-                    <!-- Tabela será gerada aqui -->
+        <!-- Tabs de Visualização -->
+        <ul class="nav nav-tabs mb-3" id="visualizacaoTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tabela-tab" data-bs-toggle="tab" data-bs-target="#tabela-view" type="button" role="tab" aria-controls="tabela-view" aria-selected="true">
+                    <i class="fas fa-table me-2"></i>Iniciar sem programar
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="cards-tab" data-bs-toggle="tab" data-bs-target="#cards-view" type="button" role="tab" aria-controls="cards-view" aria-selected="false">
+                    <i class="fas fa-th-large me-2"></i>Iniciar planejadas
+                </button>
+            </li>
+        </ul>
+
+        <!-- Conteúdo das Tabs -->
+        <div class="tab-content" id="visualizacaoTabsContent">
+            <!-- Tab 1: Tabela de Ordens -->
+            <div class="tab-pane fade show active" id="tabela-view" role="tabpanel" aria-labelledby="tabela-tab">
+                <div id="ordens-container" class="table-responsive">
+                    <div class="border rounded p-4 bg-white shadow-sm">
+                        <div class="table-container">
+                            <!-- Tabela será gerada aqui -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Quadro de Cards -->
+            <div class="tab-pane fade" id="cards-view" role="tabpanel" aria-labelledby="cards-tab">
+                <div class="border rounded p-4 bg-white shadow-sm">
+                    <div id="cards-container" class="row g-3">
+                        <!-- Cards serão gerados aqui -->
+                        <div class="col-12 text-center text-muted py-5">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p>Os cards serão exibidos aqui</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -307,11 +340,68 @@
     </div>
 </div>
 
+<!-- Modal para interromper Cambão -->
+<div class="modal fade" id="modalInterromperCambao" tabindex="-1" aria-labelledby="modalInterromperCambaoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalInterromperCambaoLabel">Interromper Cambão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Informe o motivo da interrupção:</p>
+                <textarea id="motivoInterrupcao" class="form-control" rows="3" placeholder="Descreva o motivo da interrupção..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="confirmarInterrupcaoCambao">Interromper Cambão</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script type="module" src="{% static 'js/ordem-criada-pintura.js' %}"></script>
 <script type="module" src="{% static 'js/ordem-fora-sequenciamento-pintura.js' %}"></script>
 <script type="module" src="{% static 'js/websocket-pintura.js' %}"></script>
+<script type="module">
+    import { carregarProgramasCards } from "{% static 'js/programas-cards.js' %}";
+
+    // Quando a tab de cards for ativada, carregar os programas
+    document.getElementById('cards-tab').addEventListener('shown.bs.tab', function (e) {
+        // Obter filtros atuais do formulário
+        const dataInicio = document.getElementById('filtro-data-carga').value;
+        const cor = document.getElementById('filtro-cor').value;
+        const dataProgramada = document.getElementById('filtro-data-programada').value;
+        
+        const filtros = {
+            data_inicial: dataInicio || '',
+            data_final: dataProgramada || '',
+            cor: cor || ''
+        };
+        
+        carregarProgramasCards(filtros);
+    });
+
+    // Recarregar cards ao submeter filtro se a tab de cards estiver ativa
+    document.getElementById('filtro-form').addEventListener('submit', function(e) {
+        const cardsTab = document.getElementById('cards-tab');
+        if (cardsTab.classList.contains('active')) {
+            const dataInicio = document.getElementById('filtro-data-carga').value;
+            const cor = document.getElementById('filtro-cor').value;
+            const dataProgramada = document.getElementById('filtro-data-programada').value;
+            
+            const filtros = {
+                data_inicial: dataInicio || '',
+                data_final: dataProgramada || '',
+                cor: cor || ''
+            };
+            
+            carregarProgramasCards(filtros);
+        }
+    });
+</script>
 {% endblock %}
 

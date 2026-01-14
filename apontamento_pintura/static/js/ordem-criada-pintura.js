@@ -1,12 +1,17 @@
+
+const typeTemplate = document.getElementById("type_template").value;
+
 export const loadOrdens = (container, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
+    console.log(typeTemplate);
+    
     return new Promise((resolve, reject) => {
         if (isLoading) return resolve({ ordens: [] });
         isLoading = true;
         document.getElementById('data-entrega-info').textContent = '[carregando...]';
 
-        fetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&cor=${filtros.cor || ''}&conjunto=${filtros.conjunto || ''}&data-programada=${filtros.data_programada || ''}`)
+        fetch(`/pintura/api/ordens-criadas/?type_template=${typeTemplate}&data_carga=${filtros.data_carga}&cor=${filtros.cor || ''}&conjunto=${filtros.conjunto || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -152,10 +157,15 @@ export const loadOrdens = (container, filtros = {}) => {
                                 qtdPendurarMax.value = ''; // Limpa o campo de quantidade
                             }
 
+                            // Habilita o botão apenas se houver seleções válidas
+                            if (typeTemplate === 'apontamento') {
+                                document.getElementById("btn-criar-cambao").disabled = selecionados.length === 0 || !isValid;
+                            }
+
+                            if (typeTemplate === 'programacao') {
+                                document.getElementById("btn-criar-programacao").disabled = selecionados.length === 0 || !isValid;
+                            }
                             
-                    
-                            // ✅ Habilita o botão apenas se houver seleções válidas
-                            document.getElementById("btn-criar-cambao").disabled = selecionados.length === 0 || !isValid;
                         });
                     });
 
@@ -1623,10 +1633,13 @@ async function atualizarCamboesDisponiveis(){
     }
 }
 
-let modalCriarCambao = document.getElementById("modalCriarCambao");
+if (typeTemplate === 'apontamento') {
 
-selectTipo.addEventListener("change", async () => atualizarCamboesDisponiveis()); // Atualiza os cambões disponíveis quando o tipo de pintura muda
-modalCriarCambao.addEventListener("show.bs.modal", async() => atualizarCamboesDisponiveis());
+    let modalCriarCambao = document.getElementById("modalCriarCambao");
+    
+    selectTipo.addEventListener("change", async () => atualizarCamboesDisponiveis()); // Atualiza os cambões disponíveis quando o tipo de pintura muda
+    modalCriarCambao.addEventListener("show.bs.modal", async() => atualizarCamboesDisponiveis());
+}
 
 async function abrirModalCambao() {
     const checkboxes = document.querySelectorAll(".ordem-checkbox:checked");
@@ -1749,6 +1762,74 @@ async function abrirModalCambao() {
     modal.show();
 }
 
+async function abrirModalProgramacao() {
+    const checkboxes = document.querySelectorAll(".ordem-checkbox:checked");
+    const tabelaCambao = document.getElementById("tabelaCambao");
+    const corCambao = document.getElementById("corCambao");
+
+    if (checkboxes.length === 0) {
+        Swal.fire({
+            icon: "warning",
+            title: "Nenhuma ordem selecionada",
+            text: "Selecione pelo menos uma ordem para criar um cambão.",
+            confirmButtonText: "OK"
+        });
+        return;
+    }
+
+    let corSelecionada = checkboxes[0].dataset.cor;
+    let pecaOrdens = [];
+    let quantidades = [];
+    let erros = [];
+
+    tabelaCambao.innerHTML = ""; // Limpa a tabela antes de preencher
+
+    checkboxes.forEach(cb => {
+        const linha = cb.closest("tr");
+        const pecaOrdem = linha.dataset.pecaOrdem;
+        const codigoPeca = linha.querySelector("a").textContent;
+        const quantidadeInput = linha.querySelector(".qt-produzida");
+        const quantidade = parseInt(quantidadeInput.value, 10);
+
+        if (!quantidade || quantidade <= 0) {
+            erros.push(`Ordem #${pecaOrdem}: Defina uma quantidade válida.`);
+            return;
+        }
+
+        pecaOrdens.push(pecaOrdem);
+        quantidades.push(quantidade);
+
+        tabelaCambao.innerHTML += `
+            <tr>
+                <td>#${pecaOrdem}</td>
+                <td>${codigoPeca}</td>
+                <td>${quantidade}</td>
+            </tr>
+        `;
+    });
+
+    if (erros.length > 0) {
+        Swal.fire({
+            icon: "warning",
+            title: "Erro ao criar Cambão",
+            html: erros.join("<br>"),
+            confirmButtonText: "OK"
+        });
+        return;
+    }
+
+    corCambao.textContent = corSelecionada;
+
+    document.getElementById("confirmarCriacaoProgramacao").dataset.cambaoData = JSON.stringify({
+        peca_ordens: pecaOrdens,
+        quantidade: quantidades,
+        cor: corSelecionada
+    });
+
+    let modal = new bootstrap.Modal(document.getElementById("modalPlanejarPrograma"));
+    modal.show();
+}
+
 // Função de contador para mostrar tempo decorrido
 function iniciarContador(cambaoId, dataCriacao) {
     const contador = document.getElementById(`contador-${cambaoId}`);
@@ -1772,114 +1853,202 @@ function iniciarContador(cambaoId, dataCriacao) {
 }
 
 // Evento para confirmar a criação do cambão
-document.getElementById("confirmarCriacaoCambao").addEventListener("click", () => {
+if (typeTemplate === 'apontamento'){
+    document.getElementById("confirmarCriacaoCambao").addEventListener("click", () => {
 
-    const botaoConfirmar = document.getElementById("confirmarCriacaoCambao");
-    
-    const selectCambao = document.getElementById("cambaoSelecionado");
-    const selectTipo = document.getElementById("tipoPintura");
-    const selectOperador = document.getElementById("operadorInicial");
-    const cambaoId = selectCambao.value;
-    const tipoId = selectTipo.value;
-    const operadorId = selectOperador.value;
-    
-    const dadosCambao = JSON.parse(botaoConfirmar.dataset.cambaoData);
-    let modal = document.getElementById("modalCriarCambao");
-    
-    if (!cambaoId) {
+        const botaoConfirmar = document.getElementById("confirmarCriacaoCambao");
+        
+        const selectCambao = document.getElementById("cambaoSelecionado");
+        const selectTipo = document.getElementById("tipoPintura");
+        const selectOperador = document.getElementById("operadorInicial");
+        const cambaoId = selectCambao.value;
+        const tipoId = selectTipo.value;
+        const operadorId = selectOperador.value;
+        
+        const dadosCambao = JSON.parse(botaoConfirmar.dataset.cambaoData);
+        let modal = document.getElementById("modalCriarCambao");
+        
+        if (!cambaoId) {
 
-        console.log("Alerta: Cambão não selecionado!");
-        Swal.fire({
-            icon: "warning",
-            title: "Seleção obrigatória",
-            text: "Por favor, selecione um cambão antes de continuar.",
-            confirmButtonText: "OK",
-            allowOutsideClick: false
-        });
-        return;
-    } else if (!tipoId) {
-        console.log("Alerta: Tipo não selecionado!");
-        Swal.fire({
-            icon: "warning",
-            title: "Seleção obrigatória",
-            text: "Por favor, selecione um tipo antes de continuar.",
-            confirmButtonText: "OK",
-            allowOutsideClick: false
-        });
-        return;
-    } else if (!operadorId) {
-        console.log("Alerta: Operador não selecionado!");
-        Swal.fire({
-            icon: "warning",
-            title: "Seleção obrigatória",
-            text: "Por favor, selecione um operador antes de continuar.",
-            confirmButtonText: "OK",
-            allowOutsideClick: false
-        });
-        return;
-    }
-
-
-    // Adiciona o cambão selecionado ao payload
-    dadosCambao.cambao_id = parseInt(cambaoId);
-    dadosCambao.tipo = tipoId;
-    dadosCambao.operador = operadorId;
-
-    Swal.fire({
-        title: 'Carregando...',
-        text: 'Aguarde...',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
-    fetch("api/add-pecas-cambao/", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            // "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
-        },
-        body: JSON.stringify(dadosCambao)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
+            console.log("Alerta: Cambão não selecionado!");
             Swal.fire({
-                icon: "success",
-                title: "Cambão Criado",
-                text: "O cambão foi gerado com sucesso.",
-                confirmButtonText: "OK"
-            }).then(() => {
-                Swal.close();
-
-                let modalInstance = bootstrap.Modal.getInstance(modal);
-                if (modalInstance) {
-                    modalInstance.hide();
-                };
-                
-                resetarCardsInicial();
-                cambaoProcesso();
+                icon: "warning",
+                title: "Seleção obrigatória",
+                text: "Por favor, selecione um cambão antes de continuar.",
+                confirmButtonText: "OK",
+                allowOutsideClick: false
             });
-        } else {
+            return;
+        } else if (!tipoId) {
+            console.log("Alerta: Tipo não selecionado!");
+            Swal.fire({
+                icon: "warning",
+                title: "Seleção obrigatória",
+                text: "Por favor, selecione um tipo antes de continuar.",
+                confirmButtonText: "OK",
+                allowOutsideClick: false
+            });
+            return;
+        } else if (!operadorId) {
+            console.log("Alerta: Operador não selecionado!");
+            Swal.fire({
+                icon: "warning",
+                title: "Seleção obrigatória",
+                text: "Por favor, selecione um operador antes de continuar.",
+                confirmButtonText: "OK",
+                allowOutsideClick: false
+            });
+            return;
+        }
+
+        // Adiciona o cambão selecionado ao payload
+        dadosCambao.cambao_id = parseInt(cambaoId);
+        dadosCambao.tipo = tipoId;
+        dadosCambao.operador = operadorId;
+
+        Swal.fire({
+            title: 'Carregando...',
+            text: 'Aguarde...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch("api/add-pecas-cambao/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                // "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+            },
+            body: JSON.stringify(dadosCambao)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    icon: "success",
+                    title: "Cambão Criado",
+                    text: "O cambão foi gerado com sucesso.",
+                    confirmButtonText: "OK"
+                }).then(() => {
+                    Swal.close();
+
+                    let modalInstance = bootstrap.Modal.getInstance(modal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    };
+                    
+                    resetarCardsInicial();
+                    cambaoProcesso();
+                });
+            } else {
+                Swal.fire({
+                    icon: "error",
+                    title: "Erro ao Criar Cambão",
+                    text: data.error || "Ocorreu um erro ao gerar o cambão.",
+                    confirmButtonText: "OK"
+                });
+            }
+        })
+        .catch(error => {
+            console.error("Erro ao criar cambão:", error);
             Swal.fire({
                 icon: "error",
-                title: "Erro ao Criar Cambão",
-                text: data.error || "Ocorreu um erro ao gerar o cambão.",
+                title: "Erro",
+                text: "Ocorreu um erro ao tentar criar o cambão.",
                 confirmButtonText: "OK"
             });
-        }
-    })
-    .catch(error => {
-        console.error("Erro ao criar cambão:", error);
-        Swal.fire({
-            icon: "error",
-            title: "Erro",
-            text: "Ocorreu um erro ao tentar criar o cambão.",
-            confirmButtonText: "OK"
         });
     });
-});
+}
+
+// Evento para confirmar o planejamento da programação
+if (typeTemplate === 'programacao'){
+    document.getElementById("confirmarCriacaoProgramacao").addEventListener("click", () => {
+
+        const botaoConfirmar = document.getElementById("confirmarCriacaoProgramacao");
+        
+        const selectTipo = document.getElementById("tipoPintura");
+        const tipoId = selectTipo.value;
+        
+        const dataPlanejamento = document.getElementById("dataPlanejamento").value;
+
+        const dadosCambao = JSON.parse(botaoConfirmar.dataset.cambaoData);
+        let modal = document.getElementById("modalPlanejarPrograma");
+        
+        if (!tipoId) {
+            console.log("Alerta: Tipo não selecionado!");
+            Swal.fire({
+                icon: "warning",
+                title: "Seleção obrigatória",
+                text: "Por favor, selecione um tipo antes de continuar.",
+                confirmButtonText: "OK",
+                allowOutsideClick: false
+            });
+            return;
+        }
+
+        // Adiciona o tipo selecionado ao payload
+        dadosCambao.tipo = tipoId;
+        dadosCambao.data_planejamento = dataPlanejamento;
+
+        Swal.fire({
+            title: 'Carregando...',
+            text: 'Aguarde...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch("/pintura/api/add-pecas-programacao/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                // "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+            },
+            body: JSON.stringify(dadosCambao)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    icon: "success",
+                    title: "Programação criada",
+                    text: "A programação foi gerada com sucesso.",
+                    confirmButtonText: "OK"
+                }).then(() => {
+                    Swal.close();
+
+                    let modalInstance = bootstrap.Modal.getInstance(modal);
+                    if (modalInstance) {
+                        modalInstance.hide();
+                    };
+
+                    resetarCardsInicial();
+                    
+                });
+            } else {
+                Swal.fire({
+                    icon: "error",
+                    title: "Erro ao Criar Programação",
+                    text: data.error || "Ocorreu um erro ao gerar a programação.",
+                    confirmButtonText: "OK"
+                });
+            }
+        })
+        .catch(error => {
+            console.error("Erro ao criar programação:", error);
+            Swal.fire({
+                icon: "error",
+                title: "Erro",
+                text: "Ocorreu um erro ao tentar criar a programação.",
+                confirmButtonText: "OK"
+            });
+        });
+    });
+}
 
 export async function cambaoProcesso() {
     const cambaoContainer = document.getElementById("cambao-container");
@@ -1936,9 +2105,12 @@ export async function cambaoProcesso() {
                     </div>
                     <div class="card-body p-2">
                         ${camboes.map(cambao => `
-                            <div class="border rounded p-2 mb-2 cambao-card">
-                                <div class="d-flex justify-content-between">
-                                    <strong>Cambão #${cambao.nome}</strong> 
+                            <div class="border rounded p-2 mb-2 cambao-card ${cambao.cambao_status === 'interrompido' ? 'border-warning' : ''}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>Cambão #${cambao.nome}</strong>
+                                        ${cambao.cambao_status === 'interrompido' ? '<span class="badge bg-warning text-dark ms-2"><i class="fas fa-pause-circle"></i> INTERROMPIDO</span>' : ''}
+                                    </div>
                                     <span class="badge ${cambao.tipo === 'PÓ' ? 'bg-primary' : 'bg-secondary'}">${cambao.tipo}</span>
                                 </div>
                                 <span class="badge bg-dark text-light px-2 py-1 my-2" 
@@ -1966,12 +2138,24 @@ export async function cambaoProcesso() {
                                         </li>
                                     `).join('')}
                                 </ul>
-                                <div class="d-flex justify-content-between mt-2">
+                                <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
                                     <small class="text-muted">Início: ${new Date(cambao.data_pendura).toLocaleString()}</small>
-                                    <button id="visualizarConjuntosButton-${cambao.id}" class="btn btn-sm btn-success" >Visualizar conjuntos completos</button>
-                                    <button class="btn btn-sm btn-danger btn-finalizar" data-cambao-id="${cambao.id}">
-                                        Encerrar
-                                    </button>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button id="visualizarConjuntosButton-${cambao.id}" class="btn btn-outline-secondary" title="Visualizar conjuntos completos">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        ${cambao.cambao_status === 'interrompido' 
+                                            ? `<button class="btn btn-outline-info btn-retornar" data-cambao-id="${cambao.id}" title="Retornar cambão ao processo">
+                                                <i class="fas fa-play"></i>
+                                            </button>`
+                                            : `<button class="btn btn-outline-warning btn-interromper" data-cambao-id="${cambao.id}" title="Interromper cambão">
+                                                <i class="fas fa-pause"></i>
+                                            </button>`
+                                        }
+                                        <button class="btn btn-outline-danger btn-finalizar" data-cambao-id="${cambao.id}" title="Finalizar cambão">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         `).join('')}
@@ -1997,15 +2181,6 @@ export async function cambaoProcesso() {
 
                 // faz o mesmo para .cambaoInformacoes
                 $botao.closest('.cambao-card').find('.cambaoInformacoes').toggleClass('d-none');
-
-                if ($botao.closest('.cambao-card').find('.cambaoInformacoes').hasClass('d-none')){
-                    $botao.text('Visualizar Tudo');
-                }else{
-                    $botao.text('Visualizar conjuntos completos')
-                }
-                
-
-                
             });
         });
 
@@ -2047,6 +2222,39 @@ export async function cambaoProcesso() {
                 // Exibe o modal
                 let modal = new bootstrap.Modal(document.getElementById("modalFinalizarCambao"));
                 modal.show();
+            });
+        });
+
+        // Evento de clique para abrir o modal de interrupção
+        document.querySelectorAll(".btn-interromper").forEach(botao => {
+            botao.addEventListener("click", function () {
+                const cambaoId = this.dataset.cambaoId;
+                document.getElementById("confirmarInterrupcaoCambao").dataset.cambaoId = cambaoId;
+
+                // Exibe o modal de interrupção
+                let modal = new bootstrap.Modal(document.getElementById("modalInterromperCambao"));
+                modal.show();
+            });
+        });
+
+        // Evento de clique para retornar cambão interrompido
+        document.querySelectorAll(".btn-retornar").forEach(botao => {
+            botao.addEventListener("click", function () {
+                const cambaoId = this.dataset.cambaoId;
+                
+                Swal.fire({
+                    title: 'Confirmar retorno?',
+                    text: 'Deseja retornar este cambão ao processo?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sim, retornar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#17a2b8'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        retornarCambao(cambaoId);
+                    }
+                });
             });
         });
 
@@ -2123,6 +2331,131 @@ function finalizarCambao() {
             icon: "error",
             title: "Erro",
             text: "Ocorreu um erro ao tentar finalizar o cambão.",
+            confirmButtonText: "OK"
+        });
+    });
+}
+
+// Evento de clique para confirmar a interrupção
+document.getElementById("confirmarInterrupcaoCambao").removeEventListener("click", interromperCambao);
+document.getElementById("confirmarInterrupcaoCambao").addEventListener("click", interromperCambao);
+
+function interromperCambao() {
+    let modal = document.getElementById("modalInterromperCambao");
+    let modalInstance = bootstrap.Modal.getInstance(modal);
+
+    const cambaoId = this.dataset.cambaoId;
+    const motivoInterrupcao = document.getElementById("motivoInterrupcao").value;
+
+    if (!motivoInterrupcao || motivoInterrupcao.trim() === "") {
+        Swal.fire({
+            icon: "warning",
+            title: "Motivo não informado",
+            text: "Por favor, informe o motivo da interrupção.",
+            confirmButtonText: "OK"
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Interrompendo cambão...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    fetch("api/interromper-cambao/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+            cambao_id: cambaoId, 
+            motivo: motivoInterrupcao 
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: "success",
+                title: "Cambão Interrompido",
+                text: "O cambão foi interrompido com sucesso.",
+                confirmButtonText: "OK"
+            }).then(() => {
+                modalInstance.hide();
+                document.getElementById("motivoInterrupcao").value = ""; // Limpa o campo
+                cambaoProcesso(); // Recarrega os cambões
+                resetarCardsInicial(); // Atualiza os cards
+            });
+        } else {
+            Swal.fire({
+                icon: "error",
+                title: "Erro ao Interromper",
+                text: data.error || "Ocorreu um erro ao interromper o cambão.",
+                confirmButtonText: "OK"
+            });
+        }
+    })
+    .catch(error => {
+        console.error("Erro ao interromper cambão:", error);
+        Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: "Ocorreu um erro ao tentar interromper o cambão.",
+            confirmButtonText: "OK"
+        });
+    });
+}
+
+function retornarCambao(cambaoId) {
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Retornando cambão ao processo...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    fetch("api/retornar-cambao/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+            cambao_id: cambaoId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: "success",
+                title: "Cambão Retornado",
+                text: "O cambão retornou ao processo com sucesso.",
+                confirmButtonText: "OK"
+            }).then(() => {
+                cambaoProcesso(); // Recarrega os cambões
+                resetarCardsInicial(); // Atualiza os cards
+            });
+        } else {
+            Swal.fire({
+                icon: "error",
+                title: "Erro ao Retornar",
+                text: data.error || "Ocorreu um erro ao retornar o cambão.",
+                confirmButtonText: "OK"
+            });
+        }
+    })
+    .catch(error => {
+        console.error("Erro ao retornar cambão:", error);
+        Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: "Ocorreu um erro ao tentar retornar o cambão.",
             confirmButtonText: "OK"
         });
     });
@@ -2207,12 +2540,18 @@ document.getElementById("filtro-data-carga").addEventListener("change", function
 });
 
 // Evento no botão 🔄 para atualização manual
-document.getElementById("refresh-status-carga").addEventListener("click", function () {
-    const dataCarga = document.getElementById("filtro-data-carga").value;
+const btnRefresh = document.getElementById("refresh-status-carga");
+
+if (btnRefresh) {
+  btnRefresh.addEventListener("click", function () {
+    const dataInput = document.getElementById("filtro-data-carga");
+    const dataCarga = dataInput ? dataInput.value : "";
+
     if (dataCarga) {
-        atualizarAndamentoCarga(dataCarga);
+      atualizarAndamentoCarga(dataCarga);
     }
-})
+  });
+}
 
 function atualizarUltimasCargas() {
     const listaCargas = document.getElementById("ultimas-pecas-list");
@@ -2222,7 +2561,7 @@ function atualizarUltimasCargas() {
         <span class="sr-only">Loading...</span>
     </div>`;
 
-    fetch("api/andamento-ultimas-cargas/")
+    fetch("/pintura/api/andamento-ultimas-cargas/")
         .then(response => {
             if (!response.ok) {
                 throw new Error("Erro ao buscar andamento das últimas cargas.");
@@ -2268,21 +2607,35 @@ function atualizarUltimasCargas() {
 }
 
 // Evento no botão 🔄 para atualização manual
-document.getElementById("refresh-pecas").addEventListener("click", atualizarUltimasCargas);
+const btnRefreshPecas = document.getElementById("refresh-pecas");
+
+if (btnRefreshPecas) {
+  btnRefreshPecas.addEventListener("click", atualizarUltimasCargas);
+}
 
 // Chama a função ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
+
     resetarCardsInicial();
-    cambaoProcesso();
-    filtro();
-    coresCarga();
-    atualizarUltimasCargas();
     
-    const botaoCriarCambao = document.getElementById("btn-criar-cambao");
-    
-    if (botaoCriarCambao) {
+    if (typeTemplate === 'apontamento') {
+
+        cambaoProcesso();
+        filtro();
+        coresCarga();
+        atualizarUltimasCargas();
+
+        const botaoCriarCambao = document.getElementById("btn-criar-cambao");
         botaoCriarCambao.addEventListener("click", () => abrirModalCambao());
     }
+    
+    if (typeTemplate === 'programacao') {
+        filtro();
+        const botaoCriarPrograma = document.getElementById("btn-criar-programacao");
+        botaoCriarPrograma.addEventListener("click", () => abrirModalProgramacao());
+    }
+
+    
 });
 
 function pegarCodigoPeca(peca){

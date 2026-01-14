@@ -252,6 +252,26 @@
     </div>
 </div>
 
+<!-- Modal para interromper Cambão -->
+<div class="modal fade" id="modalInterromperCambao" tabindex="-1" aria-labelledby="modalInterromperCambaoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalInterromperCambaoLabel">Interromper Cambão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Informe o motivo da interrupção:</p>
+                <textarea id="motivoInterrupcao" class="form-control" rows="3" placeholder="Descreva o motivo da interrupção..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="confirmarInterrupcaoCambao">Interromper Cambão</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}

@@ -1,3 +1,5 @@
+import { resetarCardsInicial } from './ordem-criada-pintura.js';
+
 /**
  * Módulo para gerenciar a visualização em cards dos programas de pintura
  * Mostra programas com suas respectivas peças, cores e status
@@ -111,14 +113,19 @@ const criarCardPrograma = (programa) => {
     // Lista mínima: peça + quantidade
     const listaPecas = programa.pecas.map(peca => `
         <li class="list-group-item d-flex justify-content-between align-items-center peca-item">
-            <span class="peca-codigo">${peca.peca_codigo}</span>
+            <div style="flex-grow: 1;">
+                <div class="peca-codigo">${peca.peca_codigo}</div>
+                <small class="text-muted" style="font-size: 0.75rem;"><i class="far fa-calendar me-1"></i>${peca.data_carga || ''}</small>
+            </div>
             <span class="badge bg-dark rounded-pill">${peca.quantidade}</span>
         </li>
     `).join('');
 
     col.innerHTML = `
         <div class="card minimal-card shadow-sm" style="border-left: 8px solid ${corBadge}; position: relative;">
-            <span class="color-flag" style="background-color: ${corBadge};"></span>
+            <button class="btn btn-link btn-sm position-absolute top-0 end-0 mt-2 me-2 p-0 text-danger" onclick="deletarPrograma(${programa.id}, event)" style="background: none; border: none; z-index: 10;" title="Deletar programa">
+                <i class="fas fa-trash-alt"></i>
+            </button>
             <div class="card-body py-2">
                 <div class="mb-2">
                     <h6 class="mb-1 text-dark">#${numProgramaFormatado}</h6>
@@ -128,7 +135,10 @@ const criarCardPrograma = (programa) => {
                     <span class="badge ${programa.tipo_tinta === 'PÓ' ? 'bg-info' : 'bg-success'}">${programa.tipo_tinta}</span>
                 </div>
                 <div class="mb-2">
-                    <small class="text-muted"><i class="far fa-calendar me-1"></i>${programa.data_planejada}</small>
+                    <small class="text-muted"><i class="far fa-calendar me-1"></i>Planejado: ${programa.data_planejada}</small>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted"><i class="far fa-clock me-1"></i>Criado: ${programa.data_criacao}</small>
                 </div>
                 <div class="pecas-list" style="max-height: 260px; overflow-y: auto;">
                     <ul class="list-group list-group-flush">
@@ -175,28 +185,34 @@ window.iniciarPrograma = async (programaId, tipoPintura, cor, pecas, btn) => {
 
     const button = btn instanceof HTMLElement ? btn : null;
     const originalBtnText = button ? button.innerHTML : '';
+    
+    // Desabilitar todos os botões "Iniciar"
+    const allIniciarButtons = document.querySelectorAll('.btn.btn-success.btn-sm');
+    allIniciarButtons.forEach(btn => {
+        btn.disabled = true;
+    });
+    
     if (button) {
-        button.disabled = true;
         button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Carregando...';
     }
 
     try {
         // Atualizar status do programa para 'finalizada'
-        try {
-            const response = await fetch('/pintura/api/iniciar-programa/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ programa_id: programaId })
-            });
+        // try {
+        //     const response = await fetch('/pintura/api/iniciar-programa/', {
+        //         method: 'POST',
+        //         headers: {
+        //             'Content-Type': 'application/json',
+        //         },
+        //         body: JSON.stringify({ programa_id: programaId })
+        //     });
             
-            if (!response.ok) {
-                console.error('Erro ao iniciar programa');
-            }
-        } catch (error) {
-            console.error('Erro ao atualizar status do programa:', error);
-        }
+        //     if (!response.ok) {
+        //         console.error('Erro ao iniciar programa');
+        //     }
+        // } catch (error) {
+        //     console.error('Erro ao atualizar status do programa:', error);
+        // }
         
         // Preencher o campo de tipo de pintura
         const selectTipoPintura = document.getElementById('tipoPintura');
@@ -270,8 +286,12 @@ window.iniciarPrograma = async (programaId, tipoPintura, cor, pecas, btn) => {
     } catch (error) {
         console.error('Erro ao iniciar programa (geral):', error);
     } finally {
+        // Reabilitar todos os botões "Iniciar"
+        allIniciarButtons.forEach(btn => {
+            btn.disabled = false;
+        });
+        
         if (button) {
-            button.disabled = false;
             button.innerHTML = originalBtnText || '<i class="fas fa-play me-2"></i>Iniciar';
         }
     }
@@ -281,6 +301,57 @@ window.editarPrograma = (programaId) => {
     console.log('Editar programa:', programaId);
     // Implementar lógica de edição
     alert(`Editar programa #${programaId}`);
+};
+
+window.deletarPrograma = async (programaId, event) => {
+    if (!confirm('Tem certeza que deseja deletar este programa?')) {
+        return;
+    }
+    
+    // Encontrar o card do programa
+    const button = event ? event.target.closest('button') : null;
+    const cardElement = button ? button.closest('.col-lg-4, .col-md-6') : null;
+    
+    try {
+        const response = await fetch('/pintura/api/deletar-programa/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ programa_id: programaId })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Remover o card da tela com animação
+            if (cardElement) {
+                cardElement.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+                cardElement.style.opacity = '0';
+                cardElement.style.transform = 'scale(0.9)';
+                
+                setTimeout(() => {
+                    cardElement.remove();
+                    
+                    // Verificar se ainda há cards
+                    const container = document.getElementById('cards-container');
+                    if (container && container.children.length === 0) {
+                        container.innerHTML = `
+                            <div class="col-12 text-center text-muted py-5">
+                                <i class="fas fa-inbox fa-3x mb-3"></i>
+                                <p>Nenhum programa encontrado</p>
+                            </div>
+                        `;
+                    }
+                }, 300);
+            }
+        } else {
+            alert('Erro ao deletar programa');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar programa:', error);
+        alert('Erro ao deletar programa');
+    }
 };
 
 // CSS adicional (pode ser movido para arquivo CSS separado)

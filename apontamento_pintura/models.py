@@ -5,6 +5,8 @@ from core.models import Ordem, Profile
 from cadastro.models import Operador
 from inspecao.models import Reinspecao
 
+import uuid
+
 class PecasOrdem(models.Model):
     ordem = models.ForeignKey(Ordem, on_delete=models.CASCADE, related_name='ordem_pecas_pintura')
     peca = models.CharField(max_length=255)
@@ -36,16 +38,36 @@ class Cambao(models.Model):
         return f"Cambão {self.id} - {self.cor} ({self.status})"
 
 class CambaoPecas(models.Model):
+    
+    identificador_lote = models.CharField(max_length=36, null=True, blank=True, default=None)
     cambao = models.ForeignKey(Cambao, on_delete=models.CASCADE, related_name='pecas_no_cambao')
     peca_ordem = models.ForeignKey(PecasOrdem, on_delete=models.CASCADE, related_name='cambao_peca_ordem_pintura', null=True)
     quantidade_pendurada = models.FloatField(default=0)
     data_pendura = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=20, default='pendurada')  # 'pendurada', 'finalizada'
+    status = models.CharField(max_length=20, default='pendurada')  # 'pendurada', 'finalizada', 'programada'
     data_fim = models.DateTimeField(null=True, blank=True)
     operador_inicio=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_produzido_pintura', blank=True, null=True)
 
     def __str__(self):
         return f"{self.peca_ordem.peca} - {self.quantidade_pendurada}"
+
+class CambaoInterrupcao(models.Model):
+    """
+    Model para registrar interrupções de cambões.
+    Guarda o histórico de todas as interrupções ocorridas.
+    """
+    cambao = models.ForeignKey(Cambao, on_delete=models.CASCADE, related_name='interrupcoes')
+    motivo = models.TextField()
+    data_inicio = models.DateTimeField(auto_now_add=True)
+    data_fim = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Interrupção Cambão #{self.cambao.nome} - {self.data_inicio.strftime('%d/%m/%Y %H:%M')}"
+    
+    class Meta:
+        verbose_name = "Interrupção de Cambão"
+        verbose_name_plural = "Interrupções de Cambões"
+        ordering = ['-data_inicio']
 
 class Retrabalho(models.Model):
     TIPO_CHOICES = (
@@ -80,4 +102,24 @@ class TesteFuncional(models.Model):
     data_inicial = models.DateTimeField(auto_now_add=True,null=True, blank=True)
     data_atualizacao = models.DateTimeField(auto_now=True,null=True, blank=True)
     inspetor = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True)
+
+class Programa(models.Model):
+
+    num_programa = models.IntegerField()
+    prioridade = models.CharField(max_length=10, null=True, blank=True) # deve ser "alto", "médio", "baixo"
+    tipo_tinta = models.CharField(max_length=20)  # PÓ ou PU
+    cor = models.CharField(max_length=20)
+    data_planejada = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, default='programada')  # 'programada', 'finalizada'
+
+    data_created = models.DateTimeField(auto_now_add=True)
+
+class Programacao(models.Model):
+    programa = models.ForeignKey(Programa, on_delete=models.CASCADE, related_name='programacao_pintura')
+    peca_ordem = models.ForeignKey(PecasOrdem, on_delete=models.CASCADE, related_name='programacao_peca_ordem_pintura', null=True)
+    qtd_programacao = models.FloatField(default=0)
+    data_created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.peca_ordem.peca} - {self.qtd_programacao}"
 
