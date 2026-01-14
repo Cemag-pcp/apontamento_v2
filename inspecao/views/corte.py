@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 
+from django.utils import timezone
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Max, Q, Sum
@@ -39,7 +40,8 @@ def get_itens_inspecao_corte(request):
     queryset = PecasOrdem.objects.select_related("ordem", "ordem__maquina").filter(
         ordem__grupo_maquina='plasma',
         ordem__maquina__isnull=False,
-        inspecao__isnull=True  # Exclui peças que já foram inspecionadas
+        inspecao__isnull=True,  # Exclui peças que já foram inspecionadas
+        data__gte=timezone.make_aware(datetime(2026, 1, 5, 0, 0, 0)),
     )
 
     total_ordens = queryset.values("ordem_id").distinct().count()
@@ -114,7 +116,10 @@ def get_itens_inspecionados_corte(request):
         PecasOrdem.objects
         .select_related("ordem", "ordem__maquina")
         .prefetch_related("inspecao_set")
-        .filter(inspecao__isnull=False)
+        .filter(
+            inspecao__isnull=False,
+            
+        )
     )
 
     total_pecas = queryset.count()
