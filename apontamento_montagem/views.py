@@ -458,7 +458,6 @@ def ordens_criadas(request):
         'ESTAMPARIA',
         'Carpintaria',
         'FEIXE DE MOLAS',
-        'ROÇADEIRA'
     ]
 
     # Recupera os IDs das ordens que atendem aos filtros (ainda sem excluir máquinas, pois o filtro de máquina pode vir por parâmetro)
@@ -732,7 +731,6 @@ def percentual_concluido_carga(request):
         'Carpintaria',
         'FEIXE DE MOLAS',
         'SERRALHERIA',
-        'ROÇADEIRA'
     ]
 
     maquinas_excluidas_ids = Maquina.objects.filter(nome__in=maquinas_excluidas).values_list('id', flat=True)
@@ -774,7 +772,6 @@ def andamento_ultimas_cargas(request):
         'Carpintaria',
         'FEIXE DE MOLAS',
         'SERRALHERIA',
-        'ROÇADEIRA'
     ]
 
     maquinas_excluidas_ids = Maquina.objects.filter(nome__in=maquinas_excluidas).values_list('id', flat=True)
