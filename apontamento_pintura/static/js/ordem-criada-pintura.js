@@ -4,12 +4,14 @@ const typeTemplate = document.getElementById("type_template").value;
 export const loadOrdens = (container, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
+    console.log(typeTemplate);
+    
     return new Promise((resolve, reject) => {
         if (isLoading) return resolve({ ordens: [] });
         isLoading = true;
         document.getElementById('data-entrega-info').textContent = '[carregando...]';
 
-        fetch(`/pintura/api/ordens-criadas/?data_carga=${filtros.data_carga}&cor=${filtros.cor || ''}&conjunto=${filtros.conjunto || ''}&data-programada=${filtros.data_programada || ''}`)
+        fetch(`/pintura/api/ordens-criadas/?type_template=${typeTemplate}&data_carga=${filtros.data_carga}&cor=${filtros.cor || ''}&conjunto=${filtros.conjunto || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
