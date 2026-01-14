@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Gerenciamento de Processo</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+    <link rel="stylesheet" href="{% static 'css/table-fixed-header.css' %}">
+{% endblock %}
+
+{% block content %}
+<div>
+    <input id="type_template" type="hidden" value="programacao">
+
+    <!-- Título Principal -->
+    <div class="text-center mb-5">
+        <h1 class="display-5">Apontamento de Pintura</h1>
+        <p class="text-muted">Gerencie e acompanhe os processos de pintura.</p>
+    </div>
+
+    <div id="containerPlanejar">
+        <!-- Painel de Ordens Criadas -->
+        <h3 class="mb-4 text-center text-secondary">Painel de Ordens Criadas</h3>
+    
+        <!-- Formulário de Filtro -->
+        <form id="filtro-form" class="mb-4 p-4 border rounded bg-light">
+            <div class="d-flex justify-content-end gap-3 mb-4">
+                <small><button type="button" class="btn btn-success" id="btnForaSequenciamento" data-bs-toggle="modal" data-bs-target="#modalForaSequenciamento">
+                    Produção fora do sequenciamento
+                </button></small>
+            </div>
+            <div class="row g-3">
+                <!-- Filtro por Data -->
+                <div class="col-md-3">
+                    <label for="filtro-data-carga" class="form-label fw-bold">Data da Carga</label>
+                    <input type="date" id="filtro-data-carga" class="form-control">
+                </div>
+    
+                <!-- Filtro por Cor -->
+                <div class="col-md-2">
+                    <label for="filtro-cor" class="form-label fw-bold">Cor</label>
+                    <select class="form-select" name="filtro-cor" id="filtro-cor" disabled>
+                        <option value="" selected>Escolha uma cor...</option>
+                    </select>
+                </div>
+
+                <!-- Filtro por conjunto -->
+                <div class="col-md-2">
+                    <label for="filtro-conjunto" class="form-label fw-bold">Conjunto</label>
+                    <input type="text" id="filtro-conjunto" class="form-control">
+                </div>
+
+                <!-- Filtro por data programada -->
+                <div class="col-md-3">
+                    <label for="filtro-data-programada" class="form-label fw-bold">Data programada</label>
+                    <input type="date" id="filtro-data-programada" class="form-control">
+                </div>
+
+                <!-- Botão de Filtrar -->
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </div>
+        </form>
+    
+        <!-- Linha com alerta e botão alinhados -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+
+            <!-- Alerta informativo -->
+            <div class="alert alert-info d-flex align-items-center m-0" role="alert">
+                <i class="fas fa-info-circle me-2"></i>
+                <div>
+                    <strong>Você está visualizando:</strong>
+                    Conjuntos programados para entrega em
+                    <span id="data-entrega-info" class="fw-semibold text-primary">[carregando...]</span>
+                </div>
+            </div>
+
+            <!-- Botão de ação -->
+            <button id="btn-criar-programacao" class="btn btn-success" disabled>
+                <i class="fas fa-plus me-1"></i> Planejar
+            </button>
+        </div>
+    
+        <!-- Tabela de Ordens Criadas -->
+        <div id="ordens-container" class="table-responsive">
+            <div class="border rounded p-4 bg-white shadow-sm">
+                <div class="table-container">
+                    <!-- Tabela será gerada aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal para gerar fora sequenciamento -->
+<div class="modal fade" id="modalForaSequenciamento" tabindex="-1" aria-labelledby="formModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="formModalLabel">Formulário de Peças</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="pecasForm">
+                    <input type="hidden" id="conjuntoId" name="conjuntoId">
+
+                    <!-- Seção principal - Peça e Quantidade -->
+                    <div class="row mb-3">
+                        
+                        <!-- Campo de Peça com autocomplete -->
+                        <div class="col-md-10 position-relative">
+                            <label for="pecaSelect" class="form-label fw-bold">Peça</label>
+                            <div class="input-group mb-0">
+                                <input type="text" class="form-control" id="pecaSelect" placeholder="Digite para buscar peças" autocomplete="off" aria-describedby="basic-addon2">
+                                <div class="input-group-append">
+                                    <button class="btn btn-outline-secondary" type="button" id="btnLimparInput" title="Limpar campo">
+                                        <i class="fas fa-times-circle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        
+                            <!-- Lista de sugestões posicionada abaixo -->
+                            <div id="pecasSugeridas" class="list-group position-absolute mt-1"
+                                 style="z-index: 1000; width: 100%; max-height: 200px; overflow-y: auto;"></div>
+                        </div>
+
+                        <!-- Campo de Quantidade -->
+                        <div class="col-md-2">
+                            <label for="quantidade" class="form-label fw-bold">Quantidade</label>
+                            <input type="number" class="form-control" id="quantidade" min="1" required>
+                        </div>
+                    </div>
+
+                    <!-- Seção secundária - Data e Setor -->
+                    <div class="row mb-3">
+                        <!-- Campo de Data de Carga -->
+                        <div class="col-md-6">
+                            <label for="dataCarga" class="form-label fw-bold">Data de Carga</label>
+                            <input type="date" class="form-control" id="dataCarga" required>
+                        </div>
+                        
+                        <!-- Campo de Setor -->
+                        <div class="col-md-6">
+                            <label for="cor" class="form-label fw-bold">Cor</label>
+                            <select class="form-select" id="cor" required>
+                                <option value="" selected disabled>Selecione uma cor</option>
+                                <option value="Laranja">Laranja</option>
+                                <option value="Vermelho">Vermelho</option>
+                                <option value="Azul">Azul</option>
+                                <option value="Cinza">Cinza</option>
+                                <option value="Amarelo">Amarelo</option>
+                                <option value="Verde">Verde</option>
+                                <option value="Preto">Preto</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Seção de Observações -->
+                    <div class="row">
+                        <div class="col-12">
+                            <label for="observacao" class="form-label fw-bold">Observação</label>
+                            <textarea class="form-control" id="observacao" rows="4" placeholder="Adicione informações adicionais aqui..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-primary" id="btnSalvar">
+                    <i class="bi bi-check-circle me-1"></i>Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal planejar Cambão -->
+<div class="modal fade" id="modalPlanejarPrograma" tabindex="-1" aria-labelledby="modalPlanejarProgramaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalPlanejarProgramaLabel">Planejar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <p><strong>Cor Selecionada:</strong> <span id="corCambao" class="badge bg-primary text-white"></span></p>
+                </div>
+            
+                <!-- Linha com os dois selects lado a lado -->
+                <div class="row mb-3">
+                    <div class="col-sm-4">
+                        <label for="tipoPintura" class="form-label">Tipo:</label>
+                        <select id="tipoPintura" class="form-select">
+                            <option value="" disabled selected>Escolha</option>
+                            <option value="PÓ">PÓ</option>
+                            <option value="PU">PU</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-4">
+                        <label for="dataPlanejamento" class="form-label">Data Planejamento:</label>
+                        <input type="date" id="dataPlanejamento" class="form-control">
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 20%;">Ordem</th>
+                                <th style="width: 50%;">Código Peça</th>
+                                <th style="width: 30%;">Quantidade</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaCambao">
+                            <!-- As peças selecionadas serão inseridas aqui dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmarCriacaoProgramacao">Planejar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para finalizar Cambão -->
+<div class="modal fade" id="modalFinalizarCambao" tabindex="-1" aria-labelledby="modalFinalizarCambaoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalFinalizarCambaoLabel">Finalizar Cambão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Informe o operador responsável pelo encerramento:</p>
+                <select id="operadorSelect" class="form-select">
+                    <option value="" disabled selected>Selecione um operador...</option>
+                    <!-- Operadores serão carregados via JavaScript -->
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmarEncerramentoCambao">Encerrar Cambão</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/ordem-criada-pintura.js' %}"></script>
+{% endblock %}
+

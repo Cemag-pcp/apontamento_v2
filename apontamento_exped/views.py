@@ -32,6 +32,7 @@ SIGLA_POR_COR = {
     'verde': 'VJ',
     'preto': 'PR',
     'vermelho': 'VM',
+    'cinza escuro': 'CE',
     # adicione outras se precisar...
 }
 SIGLAS_VALIDAS = {v.upper() for v in SIGLA_POR_COR.values()}

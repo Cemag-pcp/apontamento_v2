@@ -263,16 +263,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 title: 'Iniciando...',
                 text: 'Por favor, aguarde enquanto a ordem está sendo iniciada.',
                 allowOutsideClick: false,
-                didOpen: () => Swal.showLoading(),
+                didOpen: () => {
+                    Swal.showLoading();
+                },
             });
 
             const response = await fetch("/solda/api/ordens/atualizar-status/", {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': (typeof csrftoken !== 'undefined' ? csrftoken : (document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''))
+                    'Content-Type': 'application/json'
                 },
-                credentials: 'same-origin',
                 body: JSON.stringify({
                     status: "iniciada",
                     ordem_id: ordemId,
@@ -280,28 +280,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
 
-            if (response.status === 401) {
-                window.location.href = `/core/login/?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-                return false;
-            }
-
-            if (response.redirected) {
-                window.location.href = response.url;
-                return false;
-            }
-
             if (!response.ok) {
-                let err = {};
-                try { err = await response.json(); } catch {}
+                const err = await response.json();
                 throw err;
             }
-
-            try { await response.json(); } catch {}
+            await response.json();
             Swal.close();
 
+            // Fecha o modal de confirmação
             const modalElement = document.getElementById('confirmModal');
             const confirmModal = bootstrap.Modal.getInstance(modalElement);
-            if (confirmModal) confirmModal.hide();
+            confirmModal.hide();
 
             Swal.fire({
                 icon: 'success',
@@ -316,13 +305,11 @@ document.addEventListener('DOMContentLoaded', function() {
             Swal.fire({
                 icon: 'error',
                 title: 'Erro',
-                text: error?.error || error?.detail || 'Ocorreu um erro ao tentar iniciar a ordem. Tente novamente.',
+                text: error.error || 'Ocorreu um erro ao tentar iniciar a ordem. Tente novamente.',
             });
-
             return false;
         }
     }
-
 
     document.getElementById('botaoVoltarOperadoresMaquinaOperadorInicial').addEventListener('click', function () {
         const operadorInicial = document.getElementById('operadorInicial');

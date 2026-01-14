@@ -1356,6 +1356,7 @@ def api_ordens_finalizadas(request):
         'Cinza': 'CO',
         'Azul': 'AN',
         'Vermelho': 'VM',
+        'cinza escuro': 'CE',
     }
 
     dados = PecasOrdem.objects.select_related(
