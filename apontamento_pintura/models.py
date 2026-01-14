@@ -5,6 +5,8 @@ from core.models import Ordem, Profile
 from cadastro.models import Operador
 from inspecao.models import Reinspecao
 
+import uuid
+
 class PecasOrdem(models.Model):
     ordem = models.ForeignKey(Ordem, on_delete=models.CASCADE, related_name='ordem_pecas_pintura')
     peca = models.CharField(max_length=255)
@@ -36,6 +38,8 @@ class Cambao(models.Model):
         return f"Cambão {self.id} - {self.cor} ({self.status})"
 
 class CambaoPecas(models.Model):
+    
+    identificador_lote = models.CharField(max_length=36, null=True, blank=True, default=None)
     cambao = models.ForeignKey(Cambao, on_delete=models.CASCADE, related_name='pecas_no_cambao')
     peca_ordem = models.ForeignKey(PecasOrdem, on_delete=models.CASCADE, related_name='cambao_peca_ordem_pintura', null=True)
     quantidade_pendurada = models.FloatField(default=0)
@@ -46,6 +50,24 @@ class CambaoPecas(models.Model):
 
     def __str__(self):
         return f"{self.peca_ordem.peca} - {self.quantidade_pendurada}"
+
+class CambaoInterrupcao(models.Model):
+    """
+    Model para registrar interrupções de cambões.
+    Guarda o histórico de todas as interrupções ocorridas.
+    """
+    cambao = models.ForeignKey(Cambao, on_delete=models.CASCADE, related_name='interrupcoes')
+    motivo = models.TextField()
+    data_inicio = models.DateTimeField(auto_now_add=True)
+    data_fim = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Interrupção Cambão #{self.cambao.nome} - {self.data_inicio.strftime('%d/%m/%Y %H:%M')}"
+    
+    class Meta:
+        verbose_name = "Interrupção de Cambão"
+        verbose_name_plural = "Interrupções de Cambões"
+        ordering = ['-data_inicio']
 
 class Retrabalho(models.Model):
     TIPO_CHOICES = (

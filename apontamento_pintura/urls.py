@@ -10,6 +10,8 @@ urlpatterns = [
     path('api/add-pecas-cambao/', views.adicionar_pecas_cambao, name='adicionar_pecas_cambao'),
     path('api/add-pecas-programacao/', views.adicionar_pecas_programacao, name='adicionar_pecas_programacao'),
     path('api/finalizar-cambao/', views.finalizar_cambao, name='finalizar_cambao'),
+    path('api/interromper-cambao/', views.interromper_cambao, name='interromper_cambao'),
+    path('api/retornar-cambao/', views.retornar_cambao, name='retornar_cambao'),
     path('api/ordens-criadas/', views.ordens_criadas, name='ordens_criadas'),
     path('api/cambao-livre/', views.cambao_livre, name='cambao_livre'),
     path('api/cambao-processo/', views.cambao_em_processo, name='cambao_em_processo'),
@@ -21,6 +23,7 @@ urlpatterns = [
     path('api/listar-conjuntos/', views.listar_conjuntos, name='listar_conjuntos'),
     path('api/listar-programas/', views.listar_programas, name='listar_programas'),
     path('api/iniciar-programa/', views.iniciar_programa, name='iniciar_programa'),
+    path('api/deletar-programa/', views.deletar_programa, name='deletar_programa'),
 
     path('api/itens-retrabalho-pintura/', views.get_itens_retrabalho_pintura, name='itens_retrabalho_pintura'),
     path('api/itens-em-processo-pintura/', views.get_itens_em_processo_pintura, name='itens_em_processo_pintura'),

@@ -121,12 +121,12 @@
         <ul class="nav nav-tabs mb-3" id="visualizacaoTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="tabela-tab" data-bs-toggle="tab" data-bs-target="#tabela-view" type="button" role="tab" aria-controls="tabela-view" aria-selected="true">
-                    <i class="fas fa-table me-2"></i>Visualização em Tabela
+                    <i class="fas fa-table me-2"></i>Iniciar sem programar
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="cards-tab" data-bs-toggle="tab" data-bs-target="#cards-view" type="button" role="tab" aria-controls="cards-view" aria-selected="false">
-                    <i class="fas fa-th-large me-2"></i>Visualização em Cards
+                    <i class="fas fa-th-large me-2"></i>Iniciar planejadas
                 </button>
             </li>
         </ul>
@@ -335,6 +335,26 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-danger" id="confirmarEncerramentoCambao">Encerrar Cambão</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para interromper Cambão -->
+<div class="modal fade" id="modalInterromperCambao" tabindex="-1" aria-labelledby="modalInterromperCambaoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalInterromperCambaoLabel">Interromper Cambão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Informe o motivo da interrupção:</p>
+                <textarea id="motivoInterrupcao" class="form-control" rows="3" placeholder="Descreva o motivo da interrupção..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="confirmarInterrupcaoCambao">Interromper Cambão</button>
             </div>
         </div>
     </div>

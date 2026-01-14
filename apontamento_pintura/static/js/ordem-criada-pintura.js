@@ -2025,6 +2025,8 @@ if (typeTemplate === 'programacao'){
                     if (modalInstance) {
                         modalInstance.hide();
                     };
+
+                    resetarCardsInicial();
                     
                 });
             } else {
@@ -2103,9 +2105,12 @@ export async function cambaoProcesso() {
                     </div>
                     <div class="card-body p-2">
                         ${camboes.map(cambao => `
-                            <div class="border rounded p-2 mb-2 cambao-card">
-                                <div class="d-flex justify-content-between">
-                                    <strong>Cambão #${cambao.nome}</strong> 
+                            <div class="border rounded p-2 mb-2 cambao-card ${cambao.cambao_status === 'interrompido' ? 'border-warning' : ''}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>Cambão #${cambao.nome}</strong>
+                                        ${cambao.cambao_status === 'interrompido' ? '<span class="badge bg-warning text-dark ms-2"><i class="fas fa-pause-circle"></i> INTERROMPIDO</span>' : ''}
+                                    </div>
                                     <span class="badge ${cambao.tipo === 'PÓ' ? 'bg-primary' : 'bg-secondary'}">${cambao.tipo}</span>
                                 </div>
                                 <span class="badge bg-dark text-light px-2 py-1 my-2" 
@@ -2133,12 +2138,24 @@ export async function cambaoProcesso() {
                                         </li>
                                     `).join('')}
                                 </ul>
-                                <div class="d-flex justify-content-between mt-2">
+                                <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
                                     <small class="text-muted">Início: ${new Date(cambao.data_pendura).toLocaleString()}</small>
-                                    <button id="visualizarConjuntosButton-${cambao.id}" class="btn btn-sm btn-success" >Visualizar conjuntos completos</button>
-                                    <button class="btn btn-sm btn-danger btn-finalizar" data-cambao-id="${cambao.id}">
-                                        Encerrar
-                                    </button>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button id="visualizarConjuntosButton-${cambao.id}" class="btn btn-outline-secondary" title="Visualizar conjuntos completos">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        ${cambao.cambao_status === 'interrompido' 
+                                            ? `<button class="btn btn-outline-info btn-retornar" data-cambao-id="${cambao.id}" title="Retornar cambão ao processo">
+                                                <i class="fas fa-play"></i>
+                                            </button>`
+                                            : `<button class="btn btn-outline-warning btn-interromper" data-cambao-id="${cambao.id}" title="Interromper cambão">
+                                                <i class="fas fa-pause"></i>
+                                            </button>`
+                                        }
+                                        <button class="btn btn-outline-danger btn-finalizar" data-cambao-id="${cambao.id}" title="Finalizar cambão">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         `).join('')}
@@ -2164,15 +2181,6 @@ export async function cambaoProcesso() {
 
                 // faz o mesmo para .cambaoInformacoes
                 $botao.closest('.cambao-card').find('.cambaoInformacoes').toggleClass('d-none');
-
-                if ($botao.closest('.cambao-card').find('.cambaoInformacoes').hasClass('d-none')){
-                    $botao.text('Visualizar Tudo');
-                }else{
-                    $botao.text('Visualizar conjuntos completos')
-                }
-                
-
-                
             });
         });
 
@@ -2214,6 +2222,39 @@ export async function cambaoProcesso() {
                 // Exibe o modal
                 let modal = new bootstrap.Modal(document.getElementById("modalFinalizarCambao"));
                 modal.show();
+            });
+        });
+
+        // Evento de clique para abrir o modal de interrupção
+        document.querySelectorAll(".btn-interromper").forEach(botao => {
+            botao.addEventListener("click", function () {
+                const cambaoId = this.dataset.cambaoId;
+                document.getElementById("confirmarInterrupcaoCambao").dataset.cambaoId = cambaoId;
+
+                // Exibe o modal de interrupção
+                let modal = new bootstrap.Modal(document.getElementById("modalInterromperCambao"));
+                modal.show();
+            });
+        });
+
+        // Evento de clique para retornar cambão interrompido
+        document.querySelectorAll(".btn-retornar").forEach(botao => {
+            botao.addEventListener("click", function () {
+                const cambaoId = this.dataset.cambaoId;
+                
+                Swal.fire({
+                    title: 'Confirmar retorno?',
+                    text: 'Deseja retornar este cambão ao processo?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sim, retornar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#17a2b8'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        retornarCambao(cambaoId);
+                    }
+                });
             });
         });
 
@@ -2290,6 +2331,131 @@ function finalizarCambao() {
             icon: "error",
             title: "Erro",
             text: "Ocorreu um erro ao tentar finalizar o cambão.",
+            confirmButtonText: "OK"
+        });
+    });
+}
+
+// Evento de clique para confirmar a interrupção
+document.getElementById("confirmarInterrupcaoCambao").removeEventListener("click", interromperCambao);
+document.getElementById("confirmarInterrupcaoCambao").addEventListener("click", interromperCambao);
+
+function interromperCambao() {
+    let modal = document.getElementById("modalInterromperCambao");
+    let modalInstance = bootstrap.Modal.getInstance(modal);
+
+    const cambaoId = this.dataset.cambaoId;
+    const motivoInterrupcao = document.getElementById("motivoInterrupcao").value;
+
+    if (!motivoInterrupcao || motivoInterrupcao.trim() === "") {
+        Swal.fire({
+            icon: "warning",
+            title: "Motivo não informado",
+            text: "Por favor, informe o motivo da interrupção.",
+            confirmButtonText: "OK"
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Interrompendo cambão...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    fetch("api/interromper-cambao/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+            cambao_id: cambaoId, 
+            motivo: motivoInterrupcao 
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: "success",
+                title: "Cambão Interrompido",
+                text: "O cambão foi interrompido com sucesso.",
+                confirmButtonText: "OK"
+            }).then(() => {
+                modalInstance.hide();
+                document.getElementById("motivoInterrupcao").value = ""; // Limpa o campo
+                cambaoProcesso(); // Recarrega os cambões
+                resetarCardsInicial(); // Atualiza os cards
+            });
+        } else {
+            Swal.fire({
+                icon: "error",
+                title: "Erro ao Interromper",
+                text: data.error || "Ocorreu um erro ao interromper o cambão.",
+                confirmButtonText: "OK"
+            });
+        }
+    })
+    .catch(error => {
+        console.error("Erro ao interromper cambão:", error);
+        Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: "Ocorreu um erro ao tentar interromper o cambão.",
+            confirmButtonText: "OK"
+        });
+    });
+}
+
+function retornarCambao(cambaoId) {
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Retornando cambão ao processo...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    fetch("api/retornar-cambao/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+            cambao_id: cambaoId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: "success",
+                title: "Cambão Retornado",
+                text: "O cambão retornou ao processo com sucesso.",
+                confirmButtonText: "OK"
+            }).then(() => {
+                cambaoProcesso(); // Recarrega os cambões
+                resetarCardsInicial(); // Atualiza os cards
+            });
+        } else {
+            Swal.fire({
+                icon: "error",
+                title: "Erro ao Retornar",
+                text: data.error || "Ocorreu um erro ao retornar o cambão.",
+                confirmButtonText: "OK"
+            });
+        }
+    })
+    .catch(error => {
+        console.error("Erro ao retornar cambão:", error);
+        Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: "Ocorreu um erro ao tentar retornar o cambão.",
             confirmButtonText: "OK"
         });
     });
@@ -2450,7 +2616,6 @@ if (btnRefreshPecas) {
 // Chama a função ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
 
-
     resetarCardsInicial();
     
     if (typeTemplate === 'apontamento') {
@@ -2465,6 +2630,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     if (typeTemplate === 'programacao') {
+        filtro();
         const botaoCriarPrograma = document.getElementById("btn-criar-programacao");
         botaoCriarPrograma.addEventListener("click", () => abrirModalProgramacao());
     }

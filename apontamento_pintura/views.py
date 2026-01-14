@@ -13,11 +13,12 @@ from datetime import date, datetime, timedelta
 from pytz import timezone
 import random
 from collections import defaultdict
+from uuid import uuid4
 
 from core.models import Profile
 from apontamento_pintura.models import Retrabalho
 from inspecao.models import Reinspecao, DadosExecucaoInspecao, Inspecao
-from .models import PecasOrdem, CambaoPecas, Cambao, TesteFuncional, Programa, Programacao
+from .models import PecasOrdem, CambaoPecas, Cambao, CambaoInterrupcao, TesteFuncional, Programa, Programacao
 from core.models import Ordem
 from cadastro.models import Operador, Conjuntos
 from inspecao.models import Inspecao
@@ -67,6 +68,7 @@ def listar_programas(request):
                 'peca_ordem_id': prog.peca_ordem.id if prog.peca_ordem else None,
                 'ordem_id': prog.peca_ordem.ordem.id if prog.peca_ordem else None,
                 'ordem': prog.peca_ordem.ordem.ordem if (prog.peca_ordem and prog.peca_ordem.ordem) else '',
+                'data_carga': prog.peca_ordem.ordem.data_carga.strftime('%d/%m/%Y') if (prog.peca_ordem and prog.peca_ordem.ordem and prog.peca_ordem.ordem.data_carga) else '',
             })
             
             total_programado += prog.qtd_programacao
@@ -78,7 +80,7 @@ def listar_programas(request):
             'cor': programa.cor,
             'prioridade': programa.prioridade or 'médio',
             'data_planejada': programa.data_planejada.strftime('%d/%m/%Y') if programa.data_planejada else 'N/A',
-            'data_criacao': programa.data_created.strftime('%d/%m/%Y %H:%M'),
+            'data_criacao': (programa.data_created - timedelta(hours=3)).strftime('%d/%m/%Y %H:%M'),
             'pecas': pecas,
             'total_programado': total_programado,
             'total_em_processo': total_em_processo,
@@ -91,6 +93,38 @@ def listar_programas(request):
         'programas': dados,
         'total': len(dados)
     })
+
+@csrf_exempt
+def deletar_programa(request):
+    """
+    API para deletar um programa
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            programa_id = data.get('programa_id')
+            
+            if not programa_id:
+                return JsonResponse({'error': 'ID do programa é obrigatório'}, status=400)
+            
+            programa = get_object_or_404(Programa, id=programa_id)
+            
+            # Deletar as programações associadas
+            Programacao.objects.filter(programa=programa).delete()
+            
+            # Deletar o programa
+            programa.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Programa deletado com sucesso',
+                'programa_id': programa_id
+            })
+        
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Método não permitido'}, status=405)
 
 def programar_producao(request):
     """
@@ -134,7 +168,130 @@ def iniciar_programa(request):
     
     return JsonResponse({'error': 'Método não permitido'}, status=405)
 
-r
+def ordens_criadas(request):
+    filtros = {}
+    filtros_peca = {}
+
+    data_carga = request.GET.get("data_carga", None)
+    type_template = request.GET.get("type_template")
+
+    if data_carga:
+        try:
+            if data_carga and data_carga.strip():
+                data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
+                filtros["data_carga"] = data_carga
+            else:
+                data_carga = now().date()
+                filtros["data_carga"] = data_carga
+        except ValueError:
+            data_carga = now().date()
+            filtros["data_carga"] = data_carga
+
+    cor = request.GET.get("cor", "")
+    conjunto = request.GET.get("conjunto", "")
+    data_programacao = request.GET.get("data-programada", "")
+
+    if cor:
+        filtros["cor"] = cor
+    if data_programacao:
+        filtros["data_programacao"] = data_programacao
+    if conjunto:
+        filtros_peca["peca__contains"] = conjunto
+
+    primeira_peca = PecasOrdem.objects.filter(
+        ordem=OuterRef("pk"), **filtros_peca
+    ).order_by("id")
+
+    soma_qtd_pendurada = (
+        CambaoPecas.objects.filter(peca_ordem__ordem=OuterRef("pk"))
+        .values("peca_ordem__ordem")
+        .annotate(
+            total_quantidade_pendurada=Sum(
+                "quantidade_pendurada", output_field=models.FloatField()
+            )
+        )
+        .values("total_quantidade_pendurada")
+    )
+
+    # 🔹 soma do que já foi programado (Programacao)
+    soma_qtd_programada = (
+        Programacao.objects.filter(peca_ordem__ordem=OuterRef("pk"))
+        .values("peca_ordem__ordem")
+        .annotate(
+            total_qtd_programada=Sum(
+                "qtd_programacao", output_field=models.FloatField()
+            )
+        )
+        .values("total_qtd_programada")
+    )
+
+    qt_planejada = primeira_peca.values("qtd_planejada")[:1]
+
+    ordens_queryset = (
+        Ordem.objects.filter(grupo_maquina="pintura", excluida=False, **filtros)
+        .annotate(
+            peca_ordem_id=Subquery(primeira_peca.values("id")[:1]),
+            peca_codigo=Subquery(primeira_peca.values("peca")[:1]),
+            peca_qt_planejada=Subquery(
+                qt_planejada, output_field=models.FloatField()
+            ),
+            soma_qtd_pendurada=Coalesce(
+                Subquery(soma_qtd_pendurada, output_field=models.FloatField()),
+                Value(0.0),
+                output_field=models.FloatField(),
+            ),
+            soma_qtd_programada=Coalesce(
+                Subquery(soma_qtd_programada, output_field=models.FloatField()),
+                Value(0.0),
+                output_field=models.FloatField(),
+            ),
+        )
+    )
+
+    # 🔧 diferença de lógica apenas para programação
+    if type_template == "programacao":
+        ordens_queryset = ordens_queryset.annotate(
+            qt_restante=F("peca_qt_planejada")
+            - F("soma_qtd_pendurada")
+            - F("soma_qtd_programada")
+        )
+    else:
+        ordens_queryset = ordens_queryset.annotate(
+            qt_restante=F("peca_qt_planejada") - F("soma_qtd_pendurada")
+        )
+
+    ordens_queryset = (
+        ordens_queryset.filter(qt_restante__gt=0)
+        .order_by("-status_prioridade", "data_programacao")
+    )
+
+    primeira_data = (
+        ordens_queryset.first().data_programacao
+        if ordens_queryset.exists()
+        else None
+    )
+    data_programacao_formatada = (
+        primeira_data.strftime("%d/%m/%Y") if primeira_data else None
+    )
+
+    primeira_data_carga = (
+        ordens_queryset.first().data_carga
+        if ordens_queryset.exists()
+        else None
+    )
+    data_programacao_formatada_carga = (
+        primeira_data_carga if primeira_data_carga else None
+    )
+
+    return JsonResponse(
+        {
+            "ordens": list(ordens_queryset.values()),
+            "data_programacao": data_programacao_formatada,
+            "data_carga": data_programacao_formatada_carga,
+        }
+    )
+
+
 
 @csrf_exempt
 def criar_ordem(request):
@@ -341,10 +498,23 @@ def adicionar_pecas_cambao(request):
                         )
 
                     pecas_selecionadas.append((peca_ordem, quantidade))
+                
+                lote_em_andamento = (
+                    CambaoPecas.objects
+                    .filter(
+                        cambao=cambao,
+                        status__in=["pendurada", "programada"],
+                        data_fim__isnull=True,
+                    )
+                    .values_list("identificador_lote", flat=True)
+                    .first()
+                )
 
                 # Criar as associações no cambão
+                identificador_lote = lote_em_andamento or uuid4()
                 for peca_ordem, quantidade in pecas_selecionadas:
                     CambaoPecas.objects.create(
+                        identificador_lote=identificador_lote,
                         cambao=cambao,
                         peca_ordem=peca_ordem,
                         quantidade_pendurada=quantidade,
@@ -675,6 +845,108 @@ def finalizar_cambao(request):
 
     return JsonResponse({"error": "Método não permitido!"}, status=405)
 
+@csrf_exempt
+def interromper_cambao(request):
+    """
+    Interrompe um cambão em uso, registrando o motivo e alterando o status.
+    """
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            
+            cambao_id = data.get("cambao_id")
+            motivo = data.get("motivo")
+
+            if not cambao_id:
+                return JsonResponse(
+                    {"error": "ID do cambão é obrigatório!"}, status=400
+                )
+
+            if not motivo or not motivo.strip():
+                return JsonResponse(
+                    {"error": "O motivo da interrupção é obrigatório!"}, status=400
+                )
+
+            cambao = get_object_or_404(Cambao, id=cambao_id)
+
+            if cambao.status != "em uso":
+                return JsonResponse(
+                    {"error": "Apenas cambões em uso podem ser interrompidos!"}, status=400
+                )
+
+            # Altera o status do cambão para interrompido
+            cambao.status = "interrompido"
+            cambao.save()
+
+            # Cria o registro da interrupção
+            interrupcao = CambaoInterrupcao.objects.create(
+                cambao=cambao,
+                motivo=motivo
+            )
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": f"Cambão {cambao.nome} interrompido com sucesso!",
+                    "interrupcao_id": interrupcao.id
+                }
+            )
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+@csrf_exempt
+def retornar_cambao(request):
+    """
+    Retorna um cambão interrompido para o status 'em uso'.
+    """
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            
+            cambao_id = data.get("cambao_id")
+
+            if not cambao_id:
+                return JsonResponse(
+                    {"error": "ID do cambão é obrigatório!"}, status=400
+                )
+
+            cambao = get_object_or_404(Cambao, id=cambao_id)
+
+            if cambao.status != "interrompido":
+                return JsonResponse(
+                    {"error": "Apenas cambões interrompidos podem retornar!"}, status=400
+                )
+
+            # Busca a última interrupção ativa (sem data_fim)
+            interrupcao_ativa = CambaoInterrupcao.objects.filter(
+                cambao=cambao,
+                data_fim__isnull=True
+            ).order_by('-data_inicio').first()
+
+            if interrupcao_ativa:
+                # Finaliza a interrupção
+                interrupcao_ativa.data_fim = now()
+                interrupcao_ativa.save()
+
+            # Altera o status do cambão de volta para em uso
+            cambao.status = "em uso"
+            cambao.save()
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": f"Cambão {cambao.nome} retornou ao processo com sucesso!",
+                }
+            )
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    return JsonResponse({"error": "Método não permitido!"}, status=405)
+
 def cambao_livre(request):
     tipo = request.GET.get('tipo')
     cambao_livres = Cambao.objects.filter(tipo=tipo, ativo=True)
@@ -692,7 +964,7 @@ def cambao_livre(request):
 
 def cambao_em_processo(request):
     """
-    Retorna os cambões que estão em processo, agrupando suas peças corretamente.
+    Retorna os cambões que estão em processo ou interrompidos, agrupando suas peças corretamente.
 
     Resposta esperada:
     {
@@ -705,6 +977,7 @@ def cambao_em_processo(request):
                 ],
                 "data_pendura": "2025-02-20T20:08:42.030Z",
                 "status": "pendurada",
+                "cambao_status": "em uso",
                 "data_fim": null
             }
         ]
@@ -742,6 +1015,7 @@ def cambao_em_processo(request):
             "pecas": pecas,
             "data_pendura": cambao.pecas_no_cambao.first().data_pendura if pecas else None,
             "status": "pendurada",
+            "cambao_status": cambao.status,  # Adiciona o status do cambão (em uso, interrompido, etc)
             "tipo": cambao.tipo,
             "nome": cambao.nome,
             # "data_fim": cambao.data_fim
