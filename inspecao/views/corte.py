@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 from django.utils import timezone
@@ -90,7 +90,7 @@ def get_itens_inspecao_corte(request):
 
     dados = []
     for item in pagina_obj:
-        data_ultima = item["data_ultima"].strftime("%d/%m/%Y") if item["data_ultima"] else ""
+        data_ultima = (item["data_ultima"] - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S") if item["data_ultima"] else ""
         dados.append(
             {
                 "ordem_id": item["ordem_id"],

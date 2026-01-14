@@ -271,6 +271,7 @@ async function buscarPendencias(pagina) {
             cardsContainer.innerHTML = '<p class="text-muted">Sem pendencias para exibir.</p>';
         } else {
             data.dados.forEach((item) => {
+                console.log(item);
                 
                 const clone = template.content.cloneNode(true);
                 const conjunto = clone.querySelector(".ordem-conjunto");
