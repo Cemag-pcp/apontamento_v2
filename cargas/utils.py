@@ -2170,8 +2170,7 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
             ]
         }
 
-def imprimir_ordens_montagem(data_carga_str):
-    # 1) validar/parse da data
+def imprimir_ordens_montagem(data_carga_str, celulas, carga):
     try:
         if isinstance(data_carga_str, (datetime, date)):
             data_carga = data_carga_str.date() if isinstance(data_carga_str, datetime) else data_carga_str
@@ -2179,7 +2178,7 @@ def imprimir_ordens_montagem(data_carga_str):
             data_carga = datetime.strptime(str(data_carga_str), "%Y-%m-%d").date()
     except Exception:
         return ({"error": "Formato de data inválido. Use YYYY-MM-DD."}, 400)
-    
+
     CODIGOS_EXCLUIR = [
         '023590', '030679', '031517', '032470', '032546', '032531', '032681', '032731', '032871',
         '411528', '032637', '411267', '030499', '033053', '034015', '033884', '025118', '034316',
@@ -2192,16 +2191,17 @@ def imprimir_ordens_montagem(data_carga_str):
         excluir_codigos_q |= Q(peca__startswith=f"{codigo} ")
 
     pecas_pos = POS.objects.values_list('peca', flat=True)
+
     qs = (
         POM.objects
         .filter(
             ordem__data_carga=data_carga,
             qtd_boa=0,
-            ordem__maquina__nome__in=['CHASSI', 'PLAT. TANQUE. CAÇAM.'],
+            ordem__maquina__nome__in=celulas,
             peca__in=pecas_pos,
         )
         .exclude(excluir_codigos_q)
-        .select_related('ordem')
+        .select_related('ordem', 'ordem__maquina')
         .order_by('ordem__maquina__nome')
     )
 
@@ -2209,27 +2209,55 @@ def imprimir_ordens_montagem(data_carga_str):
         return ({"error": "Nenhuma ordem encontrada para esse dia."}, 404)
 
     impressas = 0
+    ultima_celula = None
+
     for peca in qs:
+        celula_atual = peca.ordem.maquina.nome
         qtd = int(peca.qtd_planejada or 0)
         if qtd <= 0:
             continue
 
+        # 🔹 IMPRIME ETIQUETA DE TROCA DE CÉLULA
+        if celula_atual != ultima_celula:
+            zpl_celula = f"""
+^XA
+^CI28
+^PW800
+^LL320
+^LT0
+^LH0,0
+
+^FX CÉLULA
+^FO100,60^A0N,30,30^FB600,1,0,C,0^FDCélula: {celula_atual}^FS
+
+^FX DATA DA CARGA
+^FO100,260^A0N,30,30^FB600,1,0,C,0^FDDATA CARGA: {data_carga.strftime('%d/%m/%Y')}^FS
+
+^XZ
+""".lstrip()
+
+            chamar_impressora_pecas_montagem(zpl_celula)
+            time.sleep(2)
+            ultima_celula = celula_atual
+
         if not getattr(peca.ordem, 'caminho_relativo_qr_code', None):
-            caminho_relativo = reverse("montagem:apontamento_qrcode") + f"?ordem_id={peca.ordem.pk}&selecao_setor=pendente"
+            caminho_relativo = (
+                reverse("montagem:apontamento_qrcode")
+                + f"?ordem_id={peca.ordem.pk}&selecao_setor=pendente"
+            )
             peca.ordem.caminho_relativo_qr_code = caminho_relativo
             peca.ordem.save(update_fields=['caminho_relativo_qr_code'])
 
-        # Uma etiqueta por vez, devagar e sem duplicação (^PQ1,0,0)
         for _ in range(qtd):
             zpl = f"""
 ^XA
-
 ^MMT
 ^PW799
 ^LL0400
 ^LS0
 ^PR1,1,1
 ~SD14
+
 ^FO10,10
 ^A0N,40,40
 ^FB400,10,10,L,0
@@ -2239,15 +2267,17 @@ def imprimir_ordens_montagem(data_carga_str):
 ^A0N,40,40
 ^FB400,10,10,L,0
 ^FDCarga: {data_carga.strftime("%d/%m/%Y")}^FS
+
 ^FT500,330^BQN,2,7
-^FDLA,{env('URI_QR_CODE')}{getattr(peca.ordem, 'caminho_relativo_qr_code', '')}^FS
+^FDLA,{env('URI_QR_CODE')}{peca.ordem.caminho_relativo_qr_code}^FS
+
 ^PQ1,0,0
 ^XZ
 """.strip()
 
             chamar_impressora_pecas_montagem(zpl)
             impressas += 1
-            time.sleep(2)  # controla o ritmo entre etiquetas
+            time.sleep(2)
 
     if impressas == 0:
         return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)
@@ -2483,8 +2513,6 @@ def imprimir_ordens_pcp_qualidade(data_carga, carga, itens_agrupados, pausa_s: f
     out["seq"] = out.groupby(level=0).cumcount() + 1
     out["seq_total"] = reps.loc[itens_agrupados.index.repeat(reps)].groupby(level=0).transform("size")
     out = out.reset_index(drop=True)
-
-    print(out)
 
     printer = "ZDesigner ZD220-203dpi ZPL"
 

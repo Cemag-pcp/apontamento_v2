@@ -122,36 +122,186 @@ async function gerarEtiquetaQrCode() {
 
     if (setor === 'montagem') {
         btnGerarEtiquetas.disabled = true;
-        btnGerarEtiquetas.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
 
-        const url = `api/imprimir-etiquetas/?data_carga=${dataInicio}`;
+        const dataFim = dataInicio;
 
-        fetch(url, {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
-        })
-        .then(response => {
-            return response.json().then(data => {
-                if (!response.ok) {
-                    throw data; // Lança o erro para ser tratado no catch
-                }
-                return data;
-            });
-        })
-        .then(data => {
-            alert("Etiquetas geradas com sucesso!");
-        })
-        .catch(error => {
-            console.error("Erro ao gerar etiquetas:", error);
-            if (error && error.error) {
-                alert("Erro ao gerar etiquetas: " + error.error);
-            } else {
-                alert("Erro inesperado ao processar a solicitação.");
+        const ensureModal = () => {
+            let modal = document.getElementById("modalMontagem");
+            if (!modal) {
+                modal = document.createElement("div");
+                modal.id = "modalMontagem";
+                Object.assign(modal.style, {
+                    position: "fixed",
+                    inset: "0",
+                    background: "rgba(0,0,0,.45)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: "9999",
+                });
+
+                const box = document.createElement("div");
+                Object.assign(box.style, {
+                    background: "#fff",
+                    width: "min(720px, 92vw)",
+                    maxHeight: "80vh",
+                    borderRadius: "12px",
+                    boxShadow: "0 10px 30px rgba(0,0,0,.2)",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                });
+
+                box.innerHTML = `
+                    <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+                        <h3 style="margin:0;font:600 18px/1.2 system-ui">Selecionar carga para Montagem</h3>
+                        <button id="fecharModalMontagem" style="border:0;background:#f5f5f5;padding:8px 12px;border-radius:8px;cursor:pointer">Fechar</button>
+                    </div>
+                    <div id="modalMontagemBody" style="padding:12px 20px;overflow:auto"></div>
+                    <div style="padding:14px 20px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end">
+                        <button id="confirmarCargaMontagem" style="background:#2563eb;color:#fff;border:0;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer">Confirmar</button>
+                    </div>
+                `;
+
+                modal.appendChild(box);
+                document.body.appendChild(modal);
+
+                document.getElementById("fecharModalMontagem").onclick = () => modal.remove();
             }
-        })
-        .finally(() => {
-            btnGerarEtiquetas.innerHTML = '<i class="fas fa-qrcode"></i> Gerar Etiquetas';
-        });
+            return modal;
+        };
+
+        try {
+            const resp = await fetch(`api/buscar-carretas-base/?data_inicio=${encodeURIComponent(dataInicio)}&data_fim=${encodeURIComponent(dataFim)}`);
+            if (!resp.ok) throw new Error("Erro ao buscar cargas");
+            const payload = await resp.json();
+
+            const lista = Array.isArray(payload?.cargas?.cargas) ? payload.cargas.cargas : [];
+            const celulas = Array.isArray(payload?.cargas?.celulas) ? payload.cargas.celulas : [];
+
+            const grupos = lista
+                .filter(item => item?.presente_no_carreta === '✅')
+                .reduce((acc, item) => {
+                    const key = item.carga || "Sem carga";
+                    (acc[key] ||= []).push(item);
+                    return acc;
+                }, {});
+
+            const modal = ensureModal();
+            const body = document.getElementById("modalMontagemBody");
+            body.innerHTML = "";
+
+            const wrap = document.createElement("div");
+            wrap.style.display = "grid";
+            wrap.style.gap = "14px";
+
+            Object.entries(grupos).forEach(([cargaNome, itens]) => {
+                const card = document.createElement("div");
+                card.classList.add("card-carga-montagem");
+                Object.assign(card.style, {
+                    border: "1px solid #eee",
+                    borderRadius: "10px",
+                    padding: "12px",
+                });
+
+                const header = document.createElement("label");
+                header.style.display = "flex";
+                header.style.alignItems = "center";
+                header.style.gap = "10px";
+                header.style.marginBottom = "8px";
+
+                const chk = document.createElement("input");
+                chk.type = "checkbox";
+                chk.name = "cargaMontagem";
+                chk.value = cargaNome;
+                chk.onchange = e => {
+                    if (e.target.checked) {
+                        document.querySelectorAll('input[name="cargaMontagem"]').forEach(el => {
+                            if (el !== e.target) el.checked = false;
+                        });
+                    }
+                };
+
+                header.appendChild(chk);
+                header.appendChild(document.createTextNode(cargaNome));
+                card.appendChild(header);
+
+                const ul = document.createElement("ul");
+                ul.style.margin = "0 0 0 28px";
+                itens.forEach(it => {
+                    const li = document.createElement("li");
+                    li.textContent = `${it.codigo_recurso} — ${it.quantidade} un.`;
+                    ul.appendChild(li);
+                });
+                card.appendChild(ul);
+
+                if (celulas.length) {
+                    const celWrap = document.createElement("div");
+                    celWrap.style.margin = "8px 0 0 28px";
+
+                    celulas.forEach(obj => {
+                        const nome = obj?.celula ?? obj;
+                        const lbl = document.createElement("label");
+                        lbl.style.marginRight = "12px";
+
+                        const ck = document.createElement("input");
+                        ck.type = "checkbox";
+                        ck.name = "celulaMontagem";
+                        ck.value = nome;
+
+                        lbl.appendChild(ck);
+                        lbl.appendChild(document.createTextNode(" " + nome));
+                        celWrap.appendChild(lbl);
+                    });
+
+                    card.appendChild(celWrap);
+                }
+
+                wrap.appendChild(card);
+            });
+
+            body.appendChild(wrap);
+
+            document.getElementById("confirmarCargaMontagem").onclick = async () => {
+                const selecionada = document.querySelector('input[name="cargaMontagem"]:checked');
+                if (!selecionada) {
+                    alert("Selecione uma carga.");
+                    return;
+                }
+
+                const card = selecionada.closest(".card-carga-montagem");
+                const celulasSelecionadas = Array.from(
+                    card.querySelectorAll('input[name="celulaMontagem"]:checked')
+                ).map(el => el.value);
+
+                const payloadEnvio = {
+                    data_inicio: dataInicio,
+                    carga: selecionada.value,
+                    celulas: celulasSelecionadas,
+                };
+
+                const r = await fetch("api/imprimir-etiquetas-montagem/", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payloadEnvio),
+                });
+
+                if (!r.ok) {
+                    alert("Erro ao imprimir etiquetas de montagem.");
+                    return;
+                }
+
+                const data = await r.json();
+                alert(`Total de impressões: ${data.payload}`);
+                document.getElementById("modalMontagem").remove();
+            };
+
+        } catch (e) {
+            console.error(e);
+            alert("Erro ao carregar cargas para montagem.");
+        } finally {
+            btnGerarEtiquetas.disabled = false;
+        }
 
     } else if (setor === 'pintura') {
         // abrir um modal mostrando as cargas e as carretas logo abaixo de cada carga

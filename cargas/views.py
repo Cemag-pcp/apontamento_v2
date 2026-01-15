@@ -963,6 +963,20 @@ def enviar_etiqueta_impressora(request):
 
 @csrf_exempt
 @require_POST
+def enviar_etiqueta_impressora_montagem(request):
+    data = json.loads(request.body)
+
+    data_carga = data.get('data_inicio')
+    carga = data.get('carga')
+    celulas = data.get('celulas', [])
+
+    print(data_carga, carga, celulas)
+    imprimir_ordens_montagem(data_carga,celulas,carga)
+
+    return JsonResponse({"payload": "payload"})
+
+@csrf_exempt
+@require_POST
 def enviar_etiqueta_impressora_pintura(request):
     data = json.loads(request.body)
 
