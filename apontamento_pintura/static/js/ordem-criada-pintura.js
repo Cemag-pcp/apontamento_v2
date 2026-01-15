@@ -2465,7 +2465,7 @@ function carregarCores(dataCarga) {
     const filtroCor = document.getElementById('filtro-cor');
     filtroCor.disabled = true; // Desabilita enquanto carrega
 
-    fetch(`api/cores-carga/?data_carga=${encodeURIComponent(dataCarga)}`)
+    fetch(`/pintura/api/cores-carga/?data_carga=${encodeURIComponent(dataCarga)}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error("Erro ao buscar cores da carga.");
@@ -2534,10 +2534,12 @@ function atualizarAndamentoCarga(dataCarga) {
         .catch(error => console.error("Erro no carregamento do andamento da carga:", error));
 }
 
-// Evento de mudança no select para atualizar automaticamente
-document.getElementById("filtro-data-carga").addEventListener("change", function () {
-    atualizarAndamentoCarga(this.value);
-});
+if (typeTemplate === 'apontamento') {
+    // Evento de mudança no select para atualizar automaticamente
+    document.getElementById("filtro-data-carga").addEventListener("change", function () {
+        atualizarAndamentoCarga(this.value);
+    });
+}
 
 // Evento no botão 🔄 para atualização manual
 const btnRefresh = document.getElementById("refresh-status-carga");
@@ -2622,7 +2624,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         cambaoProcesso();
         filtro();
-        coresCarga();
         atualizarUltimasCargas();
 
         const botaoCriarCambao = document.getElementById("btn-criar-cambao");
@@ -2634,7 +2635,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const botaoCriarPrograma = document.getElementById("btn-criar-programacao");
         botaoCriarPrograma.addEventListener("click", () => abrirModalProgramacao());
     }
-
+    
+    coresCarga();
     
 });
 

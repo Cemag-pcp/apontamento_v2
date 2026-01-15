@@ -6,6 +6,10 @@ Fluxo resumido:
 - Normaliza codigo/descricao/setor e compara com a base local (cadastro_pecas_setor).
 - Identifica combinacoes codigo+setor inexistentes e cria setor/peca/relacao faltante.
 - Retorna a quantidade de registros adicionados quando ha diferenca.
+
+Como rodar:
+    python automacoes/atualizar_pecas_projeto.py
+
 """
 
 import pandas as pd
@@ -36,9 +40,9 @@ def _load_pecas_setor_from_db() -> pd.DataFrame:
             cp.codigo,
             cp.descricao,
             cs.nome as setor
-        from apontamento_v2_testes.cadastro_pecas_setor cps
-        left join apontamento_v2_testes.cadastro_pecas cp on cps.pecas_id = cp.id
-        left join apontamento_v2_testes.cadastro_setor cs on cs.id = cps.setor_id
+        from apontamento_v2.cadastro_pecas_setor cps
+        left join apontamento_v2.cadastro_pecas cp on cps.pecas_id = cp.id
+        left join apontamento_v2.cadastro_setor cs on cs.id = cps.setor_id
     """
     conn = psycopg2.connect(
         dbname=env("DB_NAME"),
@@ -152,7 +156,7 @@ def criar_registros_faltantes():
                     setor = str(row["setor"]).strip()
 
                     cur.execute(
-                        "select id from apontamento_v2_testes.cadastro_setor where nome = %s",
+                        "select id from apontamento_v2.cadastro_setor where nome = %s",
                         (setor,),
                     )
                     setor_row = cur.fetchone()
@@ -160,13 +164,13 @@ def criar_registros_faltantes():
                         setor_id = setor_row[0]
                     else:
                         cur.execute(
-                            "insert into apontamento_v2_testes.cadastro_setor (nome) values (%s) returning id",
+                            "insert into apontamento_v2.cadastro_setor (nome) values (%s) returning id",
                             (setor,),
                         )
                         setor_id = cur.fetchone()[0]
 
                     cur.execute(
-                        "select id from apontamento_v2_testes.cadastro_pecas where codigo = %s",
+                        "select id from apontamento_v2.cadastro_pecas where codigo = %s",
                         (codigo,),
                     )
                     peca_row = cur.fetchone()
@@ -174,7 +178,7 @@ def criar_registros_faltantes():
                         peca_id = peca_row[0]
                     else:
                         cur.execute(
-                            "insert into apontamento_v2_testes.cadastro_pecas (codigo, descricao) values (%s, %s) returning id",
+                            "insert into apontamento_v2.cadastro_pecas (codigo, descricao) values (%s, %s) returning id",
                             (codigo, descricao),
                         )
                         peca_id = cur.fetchone()[0]
@@ -182,7 +186,7 @@ def criar_registros_faltantes():
                     cur.execute(
                         """
                         select 1
-                        from apontamento_v2_testes.cadastro_pecas_setor
+                        from apontamento_v2.cadastro_pecas_setor
                         where pecas_id = %s and setor_id = %s
                         """,
                         (peca_id, setor_id),
@@ -190,7 +194,7 @@ def criar_registros_faltantes():
                     if not cur.fetchone():
                         cur.execute(
                             """
-                            insert into apontamento_v2_testes.cadastro_pecas_setor (pecas_id, setor_id)
+                            insert into apontamento_v2.cadastro_pecas_setor (pecas_id, setor_id)
                             values (%s, %s)
                             """,
                             (peca_id, setor_id),
@@ -198,3 +202,13 @@ def criar_registros_faltantes():
         return len(faltantes)
     finally:
         conn.close()
+
+def main():
+    registros_adicionados = criar_registros_faltantes()
+    if registros_adicionados > 0:
+        print(f"{registros_adicionados} registros de peças/setores foram adicionados ao banco.")
+    else:
+        print("Nenhum registro novo foi adicionado. A base já está sincronizada.")
+
+if __name__ == "__main__":
+    main()
