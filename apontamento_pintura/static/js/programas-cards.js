@@ -110,14 +110,17 @@ const criarCardPrograma = (programa) => {
     // Formatar número do programa com zeros à esquerda
     const numProgramaFormatado = String(programa.num_programa).padStart(3, '0');
 
-    // Lista mínima: peça + quantidade
-    const listaPecas = programa.pecas.map(peca => `
-        <li class="list-group-item d-flex justify-content-between align-items-center peca-item">
+    // Lista mínima: peça + quantidade + lixeira
+    const listaPecas = programa.pecas.map((peca, idx) => `
+        <li class="list-group-item d-flex justify-content-between align-items-center peca-item" data-programacao-id="${peca.id}">
             <div style="flex-grow: 1;">
                 <div class="peca-codigo">${peca.peca_codigo}</div>
                 <small class="text-muted" style="font-size: 0.75rem;"><i class="far fa-calendar me-1"></i>${peca.data_carga || ''}</small>
             </div>
             <span class="badge bg-dark rounded-pill">${peca.quantidade}</span>
+            <button class="btn btn-link btn-sm text-danger ms-2 p-0 lixeira-peca-btn" title="Remover peça" data-programa-id="${programa.id}" data-peca-idx="${idx}" data-programacao-id="${peca.id}" style="background: none; border: none;">
+                <i class="fas fa-trash-alt"></i>
+            </button>
         </li>
     `).join('');
 
@@ -154,7 +157,56 @@ const criarCardPrograma = (programa) => {
         </div>
     `;
 
+    // Adicionar event listener para lixeiras das peças após renderização
+    setTimeout(() => {
+        const lixeiraBtns = col.querySelectorAll('.lixeira-peca-btn');
+        lixeiraBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const programaId = btn.getAttribute('data-programa-id');
+                const pecaIdx = btn.getAttribute('data-peca-idx');
+                window.removerPecaDoPrograma(programaId, pecaIdx, btn);
+            });
+        });
+    }, 0);
     return col;
+}
+
+// Função global para remover peça do programa
+window.removerPecaDoPrograma = async (programaId, pecaIdx, btn) => {
+    if (!confirm('Tem certeza que deseja remover esta peça deste programa?')) {
+        return;
+    }
+    // Obter o id da programação (programacao_id) da peça
+    const programacaoId = btn.getAttribute('data-programacao-id');
+    if (!programacaoId) {
+        alert('Não foi possível identificar a peça para remoção.');
+        return;
+    }
+    // Chamar backend para remover
+    try {
+        const response = await fetch('/pintura/api/remover-peca-programa/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ programacao_id: programacaoId })
+        });
+        if (response.ok) {
+            // Remover visualmente do card
+            const li = btn.closest('li');
+            if (li) {
+                li.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+                li.style.opacity = '0';
+                li.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    li.remove();
+                }, 300);
+            }
+        } else {
+            alert('Erro ao remover peça do backend.');
+        }
+    } catch (error) {
+        alert('Erro ao remover peça: ' + error);
+    }
 };
 
 /**

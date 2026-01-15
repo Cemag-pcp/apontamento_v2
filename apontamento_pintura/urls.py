@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/listar-programas/', views.listar_programas, name='listar_programas'),
     path('api/iniciar-programa/', views.iniciar_programa, name='iniciar_programa'),
     path('api/deletar-programa/', views.deletar_programa, name='deletar_programa'),
+    path('api/remover-peca-programa/', views.remover_peca_programa, name='remover_peca_programa'),
 
     path('api/itens-retrabalho-pintura/', views.get_itens_retrabalho_pintura, name='itens_retrabalho_pintura'),
     path('api/itens-em-processo-pintura/', views.get_itens_em_processo_pintura, name='itens_em_processo_pintura'),

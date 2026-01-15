@@ -1,3 +1,4 @@
+
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
@@ -644,6 +645,24 @@ def adicionar_pecas_programacao(request):
 
     return JsonResponse({"error": "Método não permitido!"}, status=405)
 
+@csrf_exempt
+def remover_peca_programa(request):
+    """
+    API para remover uma peça (Programacao) de um programa
+    Espera: {"programacao_id": 123}
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            programacao_id = data.get('programacao_id')
+            if not programacao_id:
+                return JsonResponse({'error': 'ID da programação é obrigatório'}, status=400)
+            programacao = get_object_or_404(Programacao, id=programacao_id)
+            programacao.delete()
+            return JsonResponse({'success': True, 'message': 'Peça removida com sucesso', 'programacao_id': programacao_id})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Método não permitido'}, status=405)
 
 @csrf_exempt
 def criar_ordem_fora_sequenciamento(request):
