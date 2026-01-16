@@ -1463,8 +1463,12 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             tab_completa = tab_completa.drop(
                 columns=['Recurso', 'Qtde_x', 'Qtde_y'])
 
-            tab_completa = tab_completa.groupby(
-                ['Código', 'Peca', 'Célula', 'Datas']).sum()
+            if carga:
+                tab_completa = tab_completa.groupby(
+                    ['Código', 'Peca', 'Célula', 'Datas', 'Carga']).sum()
+            else:
+                tab_completa = tab_completa.groupby(
+                    ['Código', 'Peca', 'Célula', 'Datas']).sum()
 
             # tab_completa1 = tab_completa[['Código','Peca','Célula','Datas','Carga','Qtde_total']]
 
@@ -1503,7 +1507,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             #     ['Código', 'Peca', 'Célula', 'Datas', 'Carga', 'PED_CHCRIACAO', 'Ano', 'codigo']).sum()
         
             tab_completa = tab_completa.reset_index(drop=True)
-            tab_completa[tab_completa['Código'] == '034550'] 
+            # tab_completa[tab_completa['Código'] == '034550'] 
             # carga_unique = tab_completa['Carga'].unique()
 
             # for carga in carga_unique:
@@ -2170,7 +2174,8 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
             ]
         }
 
-def imprimir_ordens_montagem(data_carga_str, celulas, carga):
+def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
+
     try:
         if isinstance(data_carga_str, (datetime, date)):
             data_carga = data_carga_str.date() if isinstance(data_carga_str, datetime) else data_carga_str
@@ -2186,94 +2191,120 @@ def imprimir_ordens_montagem(data_carga_str, celulas, carga):
         '032705', '032992', '033121',
     ]
 
-    excluir_codigos_q = Q()
-    for codigo in CODIGOS_EXCLUIR:
-        excluir_codigos_q |= Q(peca__startswith=f"{codigo} ")
-
-    pecas_pos = POS.objects.values_list('peca', flat=True)
-
-    qs = (
-        POM.objects
-        .filter(
-            ordem__data_carga=data_carga,
-            qtd_boa=0,
-            ordem__maquina__nome__in=celulas,
-            peca__in=pecas_pos,
-        )
-        .exclude(excluir_codigos_q)
-        .select_related('ordem', 'ordem__maquina')
-        .order_by('ordem__maquina__nome')
-    )
-
-    if not qs.exists():
-        return ({"error": "Nenhuma ordem encontrada para esse dia."}, 404)
-
     impressas = 0
     ultima_celula = None
+    ultima_carga = None
 
-    for peca in qs:
-        celula_atual = peca.ordem.maquina.nome
-        qtd = int(peca.qtd_planejada or 0)
+    itens_agrupado_filtrado = itens_agrupado_filtrado.sort_values('Célula')
+
+    for index, row in itens_agrupado_filtrado.iterrows():
+        
+        # retirando codigos_excluir da coluna peca
+        # precisa ser like pois o codigo contem a descrição
+        if any(codigo in str(row['Código']) for codigo in CODIGOS_EXCLUIR):
+            continue
+        
+        celula_atual = row['Célula']
+        carga_atual = row['Carga']  # ou pega do peca.ordem se houver campo específico
+        qtd = int(row.get("Qtde_total", 0))
         if qtd <= 0:
             continue
 
-        # 🔹 IMPRIME ETIQUETA DE TROCA DE CÉLULA
+        # IMPRIME ETIQUETA DE TROCA DE CARGA
+        if carga_atual != ultima_carga:
+            print(f"indo para celula {carga_atual}")
+
+            zpl_carga = f"""
+^XA
+^CI28
+^PW560
+^LL240
+^LT0
+^LH0,0
+
+^FX CARGA
+^FO10,40^A0N,36,36^FB540,1,0,C,0^FD{carga_atual}^FS
+
+^FX DATA DA CARGA
+^FO10,155^A0N,24,24^FB540,1,0,C,0^FDDATA CARGA: {data_carga.strftime('%d/%m/%Y')}^FS
+
+^XZ
+
+""".lstrip()
+
+            chamar_impressora_pecas_montagem(zpl_carga)
+            time.sleep(2)
+            ultima_carga = carga_atual
+
+        # IMPRIME ETIQUETA DE TROCA DE CÉLULA
         if celula_atual != ultima_celula:
+            print(f"indo para celula {celula_atual}")
+
             zpl_celula = f"""
 ^XA
 ^CI28
-^PW800
-^LL320
+^PW560
+^LL240
 ^LT0
 ^LH0,0
 
 ^FX CÉLULA
-^FO100,60^A0N,30,30^FB600,1,0,C,0^FDCélula: {celula_atual}^FS
+^FO10,35^A0N,32,32^FB540,1,0,C,0^FD{celula_atual}^FS
 
 ^FX DATA DA CARGA
-^FO100,260^A0N,30,30^FB600,1,0,C,0^FDDATA CARGA: {data_carga.strftime('%d/%m/%Y')}^FS
+^FO10,150^A0N,24,24^FB540,1,0,C,0^FDDATA CARGA: {data_carga.strftime('%d/%m/%Y')}^FS
 
 ^XZ
+
 """.lstrip()
 
             chamar_impressora_pecas_montagem(zpl_celula)
             time.sleep(2)
             ultima_celula = celula_atual
 
-        if not getattr(peca.ordem, 'caminho_relativo_qr_code', None):
-            caminho_relativo = (
-                reverse("montagem:apontamento_qrcode")
-                + f"?ordem_id={peca.ordem.pk}&selecao_setor=pendente"
-            )
-            peca.ordem.caminho_relativo_qr_code = caminho_relativo
-            peca.ordem.save(update_fields=['caminho_relativo_qr_code'])
+        # caminho_qr = peca.ordem.caminho_relativo_qr_code
+        # if not caminho_qr:
+        #     caminho_qr = (
+        #         reverse("montagem:apontamento_qrcode")
+        #         + f"?ordem_id={peca.ordem.pk}&selecao_setor=pendente"
+        #     )
+        #     peca.ordem.caminho_relativo_qr_code = caminho_qr
+        #     peca.ordem.save(update_fields=['caminho_relativo_qr_code'])
 
         for _ in range(qtd):
             zpl = f"""
 ^XA
 ^MMT
-^PW799
-^LL0400
+^PW560
+^LL240
 ^LS0
 ^PR1,1,1
 ~SD14
 
 ^FO10,10
-^A0N,40,40
-^FB400,10,10,L,0
-^FD{peca.peca[:80]}-{qtd}^FS
+^A0N,28,28
+^FB540,2,0,L,0
+^FD{f'{row["Código"]}-{str(row["Peca"])[:80]}-{qtd}un.'}^FS
 
-^FO10,280
-^A0N,40,40
-^FB400,10,10,L,0
+^FO10,95
+^A0N,24,24
+^FB540,1,0,L,0
+^FDCelula: {celula_atual}^FS
+
+^FO10,150
+^A0N,24,24
+^FB540,1,0,L,0
 ^FDCarga: {data_carga.strftime("%d/%m/%Y")}^FS
-
-^FT500,330^BQN,2,7
-^FDLA,{env('URI_QR_CODE')}{peca.ordem.caminho_relativo_qr_code}^FS
 
 ^PQ1,0,0
 ^XZ
+
 """.strip()
+
+# retirando o bloco que imprime qrcode
+
+# ^FT500,330^BQN,2,7
+# ^FDLA,{env('URI_QR_CODE')}{peca.ordem.caminho_relativo_qr_code}^FS
 
             chamar_impressora_pecas_montagem(zpl)
             impressas += 1

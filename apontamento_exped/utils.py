@@ -375,7 +375,6 @@ def chamar_impressora_pecas_montagem(zpl):
     job_id = str(uuid.uuid4())
     payload = {"job_id": job_id, "zpl": zpl}
     r.rpush("print-zebra", json.dumps(payload))
-
     
     print(job_id)
 
@@ -388,5 +387,4 @@ def chamar_impressora_pecas_montagem_2(zpl, itens_agrupados):
     
     r.rpush("print-zebra", json.dumps(payload))
 
-    
     print(job_id)

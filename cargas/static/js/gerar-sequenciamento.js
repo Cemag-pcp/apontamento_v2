@@ -214,10 +214,18 @@ async function gerarEtiquetaQrCode() {
                 chk.type = "checkbox";
                 chk.name = "cargaMontagem";
                 chk.value = cargaNome;
+                chk.checked = true; // Marca todos os checkboxes
                 chk.onchange = e => {
-                    if (e.target.checked) {
-                        document.querySelectorAll('input[name="cargaMontagem"]').forEach(el => {
-                            if (el !== e.target) el.checked = false;
+                    const card = e.target.closest(".card-carga-montagem");
+                    // Quando desmarcar a carga, desmarcar todas as células dessa carga
+                    if (!e.target.checked) {
+                        card.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
+                            cel.checked = false;
+                        });
+                    } else {
+                        // Quando marcar a carga, marcar todas as células dessa carga
+                        card.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
+                            cel.checked = true;
                         });
                     }
                 };
@@ -248,6 +256,17 @@ async function gerarEtiquetaQrCode() {
                         ck.type = "checkbox";
                         ck.name = "celulaMontagem";
                         ck.value = nome;
+                        ck.checked = true; // Marca todas as células por padrão
+                        ck.onchange = e => {
+                            // Se marcar uma célula e a carga não está marcada, marcar a carga
+                            if (e.target.checked) {
+                                const card = e.target.closest(".card-carga-montagem");
+                                const chkCarga = card.querySelector('input[name="cargaMontagem"]');
+                                if (chkCarga && !chkCarga.checked) {
+                                    chkCarga.checked = true;
+                                }
+                            }
+                        };
 
                         lbl.appendChild(ck);
                         lbl.appendChild(document.createTextNode(" " + nome));
@@ -263,37 +282,56 @@ async function gerarEtiquetaQrCode() {
             body.appendChild(wrap);
 
             document.getElementById("confirmarCargaMontagem").onclick = async () => {
-                const selecionada = document.querySelector('input[name="cargaMontagem"]:checked');
-                if (!selecionada) {
-                    alert("Selecione uma carga.");
+                const selecionadas = document.querySelectorAll('input[name="cargaMontagem"]:checked');
+                if (selecionadas.length === 0) {
+                    alert("Selecione ao menos uma carga.");
                     return;
                 }
 
-                const card = selecionada.closest(".card-carga-montagem");
-                const celulasSelecionadas = Array.from(
-                    card.querySelectorAll('input[name="celulaMontagem"]:checked')
-                ).map(el => el.value);
+                const btnConfirmar = document.getElementById("confirmarCargaMontagem");
+                btnConfirmar.disabled = true;
+                btnConfirmar.innerHTML = 'Confirmando...';
 
-                const payloadEnvio = {
-                    data_inicio: dataInicio,
-                    carga: selecionada.value,
-                    celulas: celulasSelecionadas,
-                };
+                try {
+                    // Coleta cada carga com suas respectivas células
+                    const cargasComCelulas = Array.from(selecionadas).map(chk => {
+                        const card = chk.closest(".card-carga-montagem");
+                        const celulas = Array.from(
+                            card.querySelectorAll('input[name="celulaMontagem"]:checked')
+                        ).map(cel => cel.value);
+                        
+                        return {
+                            nome: chk.value,
+                            celulas: celulas
+                        };
+                    });
 
-                const r = await fetch("api/imprimir-etiquetas-montagem/", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payloadEnvio),
-                });
+                    const payloadEnvio = {
+                        data_inicio: dataInicio,
+                        cargas: cargasComCelulas
+                    };
 
-                if (!r.ok) {
-                    alert("Erro ao imprimir etiquetas de montagem.");
-                    return;
+                    const r = await fetch("api/imprimir-etiquetas-montagem/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payloadEnvio),
+                    });
+
+                    if (!r.ok) {
+                        alert("Erro ao imprimir etiquetas de montagem.");
+                        return;
+                    }
+
+                    const data = await r.json();
+                    alert(`Total de impressões: ${data.payload}`);
+                    // document.getElementById("modalMontagem").remove();
+                } catch (error) {
+                    console.error(error);
+                    alert("Erro ao processar a solicitação.");
+                } finally {
+                    btnConfirmar.disabled = false;
+                    btnConfirmar.innerHTML = 'Confirmar';
                 }
-
-                const data = await r.json();
-                alert(`Total de impressões: ${data.payload}`);
-                document.getElementById("modalMontagem").remove();
             };
 
         } catch (e) {

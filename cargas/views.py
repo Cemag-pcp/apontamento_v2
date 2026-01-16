@@ -966,14 +966,35 @@ def enviar_etiqueta_impressora(request):
 def enviar_etiqueta_impressora_montagem(request):
     data = json.loads(request.body)
 
+    print(data)
+
     data_carga = data.get('data_inicio')
-    carga = data.get('carga')
+    cargas = data.get('cargas', [])  # Array de objetos {nome, celulas}
     celulas = data.get('celulas', [])
 
-    print(data_carga, carga, celulas)
-    imprimir_ordens_montagem(data_carga,celulas,carga)
+    # o argumento 'teste' é apenas para rodar com a coluna de carga
+    itens = gerar_sequenciamento(data_carga,data_carga,'montagem', 'teste') 
+    
 
-    return JsonResponse({"payload": "payload"})
+    colunas_grupo = [
+        "Código", "Peca", "Célula", "Datas","Carga"
+    ]
+
+    itens_agrupado = (
+        itens.groupby(colunas_grupo, as_index=False)["Qtde_total"]
+        .sum()
+    )
+
+    #primeiro filtrar o dataframe por uma das cargas enviadas
+    for carga in cargas:
+        nome_carga = carga.get('nome')
+        celulas_carga = carga.get('celulas', [])
+        itens_agrupado_filtrado = itens_agrupado[itens_agrupado['Carga'] == nome_carga]
+
+        itens_agrupado_filtrado = itens_agrupado_filtrado[itens_agrupado_filtrado['Célula'].isin(celulas_carga)]
+        imprimir_ordens_montagem(data_carga, itens_agrupado_filtrado)
+
+    return JsonResponse({"payload": f"Processadas {len(cargas)} cargas"})
 
 @csrf_exempt
 @require_POST
