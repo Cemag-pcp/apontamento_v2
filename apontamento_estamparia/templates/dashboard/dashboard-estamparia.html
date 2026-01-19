@@ -312,7 +312,7 @@
             
             const productionData = await response.json();
 
-            console.log(productionData);
+            return productionData;
 
         } catch (error) {
             console.error(error);
@@ -671,6 +671,9 @@
 
             // Gráfico 5 - Produção vs Inspeção (linha dupla com eixos Y)
             if (Object.keys(dadosProducaoInspecao).length > 0) {
+                
+                console.log(dadosProducaoInspecao);
+
                 const labels = dadosProducaoInspecao.map(item => item.dia);
 
                 const dadosProdInsp = {
@@ -690,16 +693,7 @@
                             tension: 0.3,
                             yAxisID: 'y'
                         },
-                        {
-                            label: 'Taxa de Não Conformidade',
-                            data: dadosProducaoInspecao.map(item =>
-                                Number((item.taxa_nao_conformidade * 100).toFixed(2))
-                            ),
-                            borderDash: [5, 5],
-                            borderWidth: 2,
-                            tension: 0.3,
-                            yAxisID: 'y1'
-                        }
+                        
                     ]
                 };
 
@@ -733,7 +727,7 @@
                                         if (context.dataset.yAxisID === 'y1') {
                                             label += context.raw + '%';
                                         } else {
-                                            label += context.raw + ' un.';
+                                            label += context.raw + ' op';
                                         }
                                         return label;
                                     }

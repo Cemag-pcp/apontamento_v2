@@ -1048,31 +1048,23 @@ def indicador_estamparia_analise_temporal_diario(request):
         queryset.annotate(
             dia=Cast(TruncDay("data_inspecao"), output_field=CharField()),
             qtd_boa=F("pecas_ordem_estamparia__qtd_boa"),
-            conformidade=F("dadosexecucaoinspecao__conformidade"),
-            nao_conformidade=F("dadosexecucaoinspecao__nao_conformidade"),
         )
         .values("dia")
         .annotate(
             qtd_peca_produzida=Count("id"),
             qtd_peca_inspecionada=Count("dadosexecucaoinspecao__id"),
-            soma_conformidade=Sum("conformidade"),
-            soma_nao_conformidade=Sum("nao_conformidade"),
         )
         .order_by("dia")
     )
 
     resultado = []
     for item in queryset:
-        conformidade = item["soma_conformidade"] or 0
-        nao_conformidade = item["soma_nao_conformidade"] or 0
-        taxa_nc = (nao_conformidade / conformidade) if conformidade else 0
 
         resultado.append(
             {
                 "dia": item["dia"][:10],  # YYYY-MM-DD
                 "qtd_peca_produzida": item["qtd_peca_produzida"] or 0,
                 "qtd_peca_inspecionada": item["qtd_peca_inspecionada"] or 0,
-                "taxa_nao_conformidade": round(taxa_nc, 4),
             }
         )
 
