@@ -41,7 +41,7 @@
                             <div class="col-md-4">
                                 <label for="maquinaSelect" class="form-label">Selecione a máquina:</label>
                                 <select id="maquinaSelect" class="form-select">
-                                    <option value="">Selecione uma máquina</option>
+                                    <option value="">Todas as máquinas</option>
                                     <option value="Viradeira 1" selected>Viradeira 1</option>
                                     <option value="Viradeira 2">Viradeira 2</option>
                                     <option value="Viradeira 3">Viradeira 3</option>
@@ -127,14 +127,6 @@
                     <div class="col-md-3">
                         <div class="card text-center">
                             <div class="card-body">
-                                <h5 class="card-title">Tempo Total Ocioso</h5>
-                                <p id="tempoOcioso" class="card-text">-</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mt-3">
-                        <div class="card text-center">
-                            <div class="card-body">
                                 <h5 class="card-title">Total de Ordens Finalizadas</h5>
                                 <p id="totalOrdens" class="card-text">-</p>
                             </div>
@@ -187,6 +179,21 @@
                         </div>
                     </div>
                 </div>
+                <!-- Gráfico de Produção vs Inspeção -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Produção vs Inspeção</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="grafico5"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -195,7 +202,7 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    let chart1, chart3, chart4;
+    let chart1, chart3, chart4, chart5;
 
     // Função para mostrar/esconder mensagens
     function mostrarMensagem(tipo, texto) {
@@ -290,23 +297,26 @@
         }
     }
 
-    // Função para buscar dados da segunda API (ordens finalizadas)
-    async function buscarDadosProducao(dataInicio, dataFim) {
+    // Função para processar dados de produção vs inspeção
+    async function buscarDadosProducaoInspecao(dataInicio, dataFim) {
+        const queryParams = new URLSearchParams();
+        if (dataInicio) queryParams.append('data_inicio', dataInicio);
+        if (dataFim) queryParams.append('data_fim', dataFim );
+
+        
+        const url = `/inspecao/estamparia/api/indicador-estamparia-analise-temporal-diario/?${queryParams.toString()}`;
+        
         try {
-            const url = `/estamparia/api/dashboard/indicador-pecas-produzidas-maquina?data_inicio=${dataInicio}&data_fim=${dataFim}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar os dados do gráfico.');
             
-            const resposta = await fetch(url);
-            
-            if (!resposta.ok) {
-                throw new Error(`Erro na API: ${resposta.status} - ${resposta.statusText}`);
-            }
-            
-            const dados = await resposta.json();
-            
-            return dados;
-            
+            const productionData = await response.json();
+
+            console.log(productionData);
+
         } catch (error) {
-            throw new Error(`Erro ao carregar dados de ordens: ${error.message}`);
+            console.error(error);
+            alert('Erro ao carregar gráfico de produção.');
         }
     }
 
@@ -427,26 +437,55 @@
         return { labels: todasAsDatas, datasets };
     }
 
+    // Função para atualizar os cards do dashboard
+    async function atualizarCards(dataInicial, dataFinal, maquinaSelecionada) {
+        try {
+            const url = `/estamparia/api/dashboard/kpis-consolidado?data_inicio=${dataInicial}&data_fim=${dataFinal}&maquina=${encodeURIComponent(maquinaSelecionada)}`;
+            
+            const resposta = await fetch(url);
+            
+            if (!resposta.ok) {
+                throw new Error(`Erro na API: ${resposta.status}`);
+            }
+            
+            const kpis = await resposta.json();
+            
+            // Atualizar os cards
+            document.getElementById('totalPecas').textContent = kpis.total_pecas.toLocaleString('pt-BR');
+            document.getElementById('tempoProducao').textContent = kpis.tempo_producao;
+            document.getElementById('tempoParada').textContent = kpis.tempo_parada;
+            document.getElementById('totalOrdens').textContent = kpis.total_ordens.toLocaleString('pt-BR');
+            
+        } catch (error) {
+            console.error('Erro ao atualizar cards:', error);
+            // Manter valores padrão em caso de erro
+            document.getElementById('totalPecas').textContent = '-';
+            document.getElementById('tempoProducao').textContent = '-';
+            document.getElementById('tempoParada').textContent = '-';
+            document.getElementById('totalOrdens').textContent = '-';
+        }
+    }
+
     // Função para criar/atualizar gráficos
     async function atualizarGraficos() {
         const dataInicial = document.getElementById('dataInicial').value;
         const dataFinal = document.getElementById('dataFinal').value;
         const maquinaSelecionada = document.getElementById('maquinaSelect').value;
 
-        if (!maquinaSelecionada) {
-            mostrarMensagem('error', 'Selecione uma máquina.');
-            return;
-        }
+        // Remove a validação que impedia buscar sem máquina selecionada
+        // Agora quando vazio, busca todas as máquinas
 
         try {
             mostrarMensagem('loading');
 
-            // Buscar dados das duas APIs em paralelo
-            const [dados, dadosOrdens, dadosProducao] = await Promise.all([
+            // Buscar dados das APIs em paralelo (incluindo KPIs dos cards)
+            const [dados, dadosOrdens, dadosProducaoInspecao] = await Promise.all([
                 buscarDados(dataInicial, dataFinal, maquinaSelecionada),
                 buscarDadosOrdens(dataInicial, dataFinal),
-                buscarDadosProducao(dataInicial, dataFinal)
+                buscarDadosProducaoInspecao(dataInicial, dataFinal, maquinaSelecionada)
             ]);
+            
+            await atualizarCards(dataInicial, dataFinal, maquinaSelecionada);
 
             document.getElementById('loadingSpinner').style.display = 'none';
 
@@ -461,6 +500,7 @@
             if (chart1) chart1.destroy();
             if (chart3) chart3.destroy();
             if (chart4) chart4.destroy();
+            if (chart5) chart5.destroy();
 
             // Gráfico 1 - Linha (apenas se houver dados da primeira API)
             if (dados.length > 0) {
@@ -477,11 +517,11 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            // title: { 
-                            //     display: true, 
-                            //     text: `Produção, Parada e Ociosidade - ${maquinaSelecionada}`,
-                            //     font: { size: 16 }
-                            // },
+                            title: { 
+                                display: true, 
+                                text: maquinaSelecionada ? `Produção, Parada e Ociosidade - ${maquinaSelecionada}` : 'Produção, Parada e Ociosidade - Todas as Máquinas',
+                                font: { size: 16 }
+                            },
                             legend: { position: 'top' },
                             tooltip: {
                                 callbacks: {
@@ -573,8 +613,8 @@
             }
 
             // Gráfico 3 - Empilhado (sempre mostrar se houver dados)
-            if (Object.keys(dadosProducao).length > 0) {
-                const dadosEmpilhados = processarDadosEmpilhados(dadosProducao);
+            if (Object.keys(dadosOrdens).length > 0) {
+                const dadosEmpilhados = processarDadosEmpilhados(dadosOrdens);
 
                 const ctx4 = document.getElementById('grafico4').getContext('2d');
                 chart4 = new Chart(ctx4, {
@@ -622,6 +662,124 @@
                                 stacked: true,
                                 beginAtZero: true,
                                 title: { display: true, text: 'Quantidade de Ordens' }
+                            }
+                        }
+                    },
+                    plugins: [ChartDataLabels]
+                });
+            }
+
+            // Gráfico 5 - Produção vs Inspeção (linha dupla com eixos Y)
+            if (Object.keys(dadosProducaoInspecao).length > 0) {
+                const labels = dadosProducaoInspecao.map(item => item.dia);
+
+                const dadosProdInsp = {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Produzido',
+                            data: dadosProducaoInspecao.map(item => item.qtd_peca_produzida),
+                            borderWidth: 2,
+                            tension: 0.3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Inspecionado',
+                            data: dadosProducaoInspecao.map(item => item.qtd_peca_inspecionada),
+                            borderWidth: 2,
+                            tension: 0.3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Taxa de Não Conformidade',
+                            data: dadosProducaoInspecao.map(item =>
+                                Number((item.taxa_nao_conformidade * 100).toFixed(2))
+                            ),
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                };
+
+                const ctx5 = document.getElementById('grafico5').getContext('2d');
+                chart5 = new Chart(ctx5, {
+                    type: 'line',
+                    data: dadosProdInsp,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: maquinaSelecionada
+                                    ? `Produção vs Inspeção - ${maquinaSelecionada}`
+                                    : 'Produção vs Inspeção - Todas as Máquinas',
+                                font: { size: 16 }
+                            },
+                            legend: {
+                                position: 'top',
+                                labels: { boxWidth: 12 }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        let label = context.dataset.label + ': ';
+                                        if (context.dataset.yAxisID === 'y1') {
+                                            label += context.raw + '%';
+                                        } else {
+                                            label += context.raw + ' un.';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                display: true,
+                                align: 'top',
+                                anchor: 'end',
+                                font: {
+                                    weight: 'bold',
+                                    size: 9
+                                },
+                                formatter: (value, context) => {
+                                    if (context.dataset.yAxisID === 'y1') {
+                                        return value + '%';
+                                    }
+                                    return value;
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'Unidades'
+                                }
+                            },
+                            y1: {
+                                beginAtZero: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: 'Taxa de Não Conformidade (%)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Data'
+                                }
                             }
                         }
                     },

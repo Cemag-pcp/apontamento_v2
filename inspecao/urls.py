@@ -129,6 +129,7 @@ urlpatterns += [
     path('montagem/api/imagens-nao-conformidade/', montagem.imagens_nao_conformidade_montagem, name='imagens_nao_conformidade_montagem'),
 
     path('estamparia/api/indicador-estamparia-analise-temporal/', estamparia.indicador_estamparia_analise_temporal, name='indicador_estamparia_analise_temporal'),
+    path('estamparia/api/indicador-estamparia-analise-temporal-diario/', estamparia.indicador_estamparia_analise_temporal_diario, name='indicador_estamparia_analise_temporal_diario'),
     path('estamparia/api/indicador-estamparia-resumo-analise-temporal/', estamparia.indicador_estamparia_resumo_analise_temporal, name='indicador_estamparia_resumo_analise_temporal'),
     path('estamparia/api/causas-nao-conformidade/', estamparia.causas_nao_conformidade_mensal_estamparia, name='causas_nao_conformidade_mensal'),
     path('estamparia/api/imagens-nao-conformidade/', estamparia.imagens_nao_conformidade_estamparia, name='imagens_nao_conformidade_estamparia'),

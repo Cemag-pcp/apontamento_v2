@@ -2193,7 +2193,7 @@ def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
 
     impressas = 0
     ultima_celula = None
-    ultima_carga = None
+    # ultima_carga = None
 
     itens_agrupado_filtrado = itens_agrupado_filtrado.sort_values('Célula')
 
@@ -2211,30 +2211,30 @@ def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
             continue
 
         # IMPRIME ETIQUETA DE TROCA DE CARGA
-        if carga_atual != ultima_carga:
-            print(f"indo para celula {carga_atual}")
+#         if carga_atual != ultima_carga:
+#             print(f"indo para celula {carga_atual}")
 
-            zpl_carga = f"""
-^XA
-^CI28
-^PW560
-^LL240
-^LT0
-^LH0,0
+#             zpl_carga = f"""
+# ^XA
+# ^CI28
+# ^PW560
+# ^LL240
+# ^LT0
+# ^LH0,0
 
-^FX CARGA
-^FO10,40^A0N,36,36^FB540,1,0,C,0^FD{carga_atual}^FS
+# ^FX CARGA
+# ^FO10,40^A0N,36,36^FB540,1,0,C,0^FD{carga_atual}^FS
 
-^FX DATA DA CARGA
-^FO10,155^A0N,24,24^FB540,1,0,C,0^FDDATA CARGA: {data_carga.strftime('%d/%m/%Y')}^FS
+# ^FX DATA DA CARGA
+# ^FO10,155^A0N,24,24^FB540,1,0,C,0^FDDATA CARGA: {data_carga.strftime('%d/%m/%Y')}^FS
 
-^XZ
+# ^XZ
 
-""".lstrip()
+# """.lstrip()
 
-            chamar_impressora_pecas_montagem(zpl_carga)
-            time.sleep(2)
-            ultima_carga = carga_atual
+#             chamar_impressora_pecas_montagem(zpl_carga)
+#             time.sleep(2)
+#             ultima_carga = carga_atual
 
         # IMPRIME ETIQUETA DE TROCA DE CÉLULA
         if celula_atual != ultima_celula:
@@ -2259,7 +2259,7 @@ def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
 """.lstrip()
 
             chamar_impressora_pecas_montagem(zpl_celula)
-            time.sleep(2)
+            # time.sleep(2)
             ultima_celula = celula_atual
 
         # caminho_qr = peca.ordem.caminho_relativo_qr_code
@@ -2294,7 +2294,12 @@ def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
 ^FO10,150
 ^A0N,24,24
 ^FB540,1,0,L,0
-^FDCarga: {data_carga.strftime("%d/%m/%Y")}^FS
+^FDCarga: {carga_atual}^FS
+
+^FO10,205
+^A0N,24,24
+^FB540,1,0,L,0
+^FDDt. Carga: {data_carga.strftime("%d/%m/%Y")}^FS
 
 ^PQ1,0,0
 ^XZ
@@ -2308,7 +2313,7 @@ def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
 
             chamar_impressora_pecas_montagem(zpl)
             impressas += 1
-            time.sleep(2)
+            # time.sleep(2)
 
     if impressas == 0:
         return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)

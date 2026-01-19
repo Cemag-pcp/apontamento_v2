@@ -975,7 +975,6 @@ def enviar_etiqueta_impressora_montagem(request):
     # o argumento 'teste' é apenas para rodar com a coluna de carga
     itens = gerar_sequenciamento(data_carga,data_carga,'montagem', 'teste') 
     
-
     colunas_grupo = [
         "Código", "Peca", "Célula", "Datas","Carga"
     ]
@@ -985,14 +984,26 @@ def enviar_etiqueta_impressora_montagem(request):
         .sum()
     )
 
-    #primeiro filtrar o dataframe por uma das cargas enviadas
-    for carga in cargas:
-        nome_carga = carga.get('nome')
-        celulas_carga = carga.get('celulas', [])
-        itens_agrupado_filtrado = itens_agrupado[itens_agrupado['Carga'] == nome_carga]
+    # filtrar todas as cargas da coluna e celulas escolhidas
+    itens_agrupado = itens_agrupado[itens_agrupado['Carga'].isin([carga.get('nome') for carga in cargas])]
 
-        itens_agrupado_filtrado = itens_agrupado_filtrado[itens_agrupado_filtrado['Célula'].isin(celulas_carga)]
-        imprimir_ordens_montagem(data_carga, itens_agrupado_filtrado)
+    celulas_escolhidas = []
+    for carga in cargas:
+        celulas_escolhidas.extend(carga.get('celulas', []))
+
+    itens_agrupado = itens_agrupado[itens_agrupado['Célula'].isin(celulas_escolhidas)].sort_values(by=['Célula', 'Carga', 'Código'])
+
+    imprimir_ordens_montagem(data_carga, itens_agrupado)
+
+    #primeiro filtrar o dataframe por uma das cargas enviadas
+    # for carga in cargas:
+    #     nome_carga = carga.get('nome')
+    #     celulas_carga = carga.get('celulas', [])
+    #     itens_agrupado_filtrado = itens_agrupado[itens_agrupado['Carga'] == nome_carga]
+
+    #     itens_agrupado_filtrado = itens_agrupado_filtrado[itens_agrupado_filtrado['Célula'].isin(celulas_carga)]
+
+    #     print(itens_agrupado_filtrado)
 
     return JsonResponse({"payload": f"Processadas {len(cargas)} cargas"})
 

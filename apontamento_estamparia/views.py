@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.utils.timezone import now,localtime
-from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
+from django.db.models import Q,Prefetch,Count,OuterRef, Subquery, Sum, F
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 
@@ -783,4 +783,216 @@ def indicador_peca_produzida_maquina(request):
 
     resultado = producao_por_maquina(data_inicio, data_fim)
 
-    return JsonResponse(resultado)        
+    return JsonResponse(resultado)
+
+@login_required
+def dashboard_kpis_consolidado(request):
+    """
+    Retorna todos os KPIs consolidados para os cards do dashboard:
+    - Total de peças produzidas
+    - Tempo total de produção
+    - Tempo total de parada
+    - Total de ordens finalizadas
+    """
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+    maquina_param = request.GET.get('maquina')
+
+    if not data_inicio or not data_fim:
+        return JsonResponse({'error': 'data_inicio e data_fim são obrigatórios'}, status=400)
+
+    try:
+        # Busca dados de produção/parada
+        horas_producao = hora_operacao_maquina(maquina_param, data_inicio, data_fim)
+        horas_parada = hora_parada_maquina(maquina_param, data_inicio, data_fim)
+        resultado_horas = merge_metricas(horas_producao, horas_parada)
+
+        # Busca ordens finalizadas
+        ordens_por_maquina = ordem_por_maquina(data_inicio, data_fim)
+        
+        # Busca peças produzidas
+        pecas_por_maquina = producao_por_maquina(data_inicio, data_fim)
+
+        # Calcula totais
+        tempo_producao_total = timedelta()
+        tempo_parada_total = timedelta()
+        total_ordens = 0
+        total_pecas = 0
+
+        # Processa tempo de produção/parada/ocioso
+        for item in resultado_horas:
+            # Se maquina_param estiver vazio, processa todas; senão, apenas a selecionada
+            if maquina_param and maquina_param != '' and item.get('maquina') != maquina_param:
+                continue
+            
+            # Converte strings de tempo para timedelta
+            prod = item.get('producao_total', '00:00:00')
+            parada = item.get('parada_total', '00:00:00')
+            ocioso = item.get('tempo_ocioso', '00:00:00')
+            
+            if prod != '00:00:00':
+                h, m, s = map(int, prod.split(':'))
+                tempo_producao_total += timedelta(hours=h, minutes=m, seconds=s)
+            
+            if parada != '00:00:00':
+                h, m, s = map(int, parada.split(':'))
+                tempo_parada_total += timedelta(hours=h, minutes=m, seconds=s)
+            
+        # Processa ordens finalizadas
+        for dia, maquinas in ordens_por_maquina.items():
+            for maq_data in maquinas:
+                # Se maquina_param estiver vazio, processa todas; senão, apenas a selecionada
+                if maquina_param and maquina_param != '' and maq_data.get('maquina') != maquina_param:
+                    continue
+                total_ordens += maq_data.get('total_ordens_finalizadas', 0)
+
+        # Processa peças produzidas
+        for dia, maquinas in pecas_por_maquina.items():
+            for maq_data in maquinas:
+                # Se maquina_param estiver vazio, processa todas; senão, apenas a selecionada
+                if maquina_param and maquina_param != '' and maq_data.get('maquina') != maquina_param:
+                    continue
+                total_pecas += maq_data.get('total_ordens_finalizadas', 0)
+
+        # Formata timedeltas para string HH:MM:SS
+        def format_timedelta(td):
+            total_seconds = int(td.total_seconds())
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            seconds = total_seconds % 60
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+        return JsonResponse({
+            'total_pecas': total_pecas,
+            'tempo_producao': format_timedelta(tempo_producao_total),
+            'tempo_parada': format_timedelta(tempo_parada_total),
+            'total_ordens': total_ordens
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def dashboard_producao_inspecao(request):
+    """
+    Retorna dados cruzados de produção e inspeção por máquina/período
+    Agrupa por máquina e data, mostrando:
+    - Total de ordens finalizadas
+    - Total de peças produzidas
+    - Total de peças inspecionadas
+    - Total de peças aprovadas
+    - Taxa de aprovação (%)
+    """
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+    maquina_param = request.GET.get('maquina')
+
+    if not data_inicio or not data_fim:
+        return JsonResponse({'error': 'data_inicio e data_fim são obrigatórios'}, status=400)
+
+    try:
+        # Converte strings de data
+        data_inicio_obj = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+        data_fim_obj = datetime.strptime(data_fim, "%Y-%m-%d").date()
+
+        # Query para dados de produção
+        producao_query = (
+            PecasOrdem.objects
+            .filter(
+                ordem__data_carga__range=[data_inicio_obj, data_fim_obj],
+                ordem__grupo_maquina='estamparia'
+            )
+            .select_related('ordem', 'ordem__maquina')
+        )
+
+        # Se maquina_param foi fornecida e não está vazia, filtra
+        if maquina_param and maquina_param != '':
+            producao_query = producao_query.filter(ordem__maquina__nome=maquina_param)
+
+        # Agrupa dados de produção por máquina e data
+        producao_por_data = defaultdict(lambda: defaultdict(lambda: {
+            'ordens': 0,
+            'pecas_produzidas': 0
+        }))
+
+        for peca in producao_query:
+            maq_nome = peca.ordem.maquina.nome if peca.ordem.maquina else 'Sem máquina'
+            data = peca.ordem.data_carga.strftime('%Y-%m-%d')
+            
+            if maq_nome not in producao_por_data[data]:
+                producao_por_data[data][maq_nome] = {'ordens': 0, 'pecas_produzidas': 0}
+            
+            producao_por_data[data][maq_nome]['ordens'] += 1
+            producao_por_data[data][maq_nome]['pecas_produzidas'] += int(peca.qtd_boa or 0)
+
+        # Query para dados de inspeção (apenas estamparia)
+        inspecao_query = (
+            DadosExecucaoInspecao.objects
+            .filter(
+                data_execucao__range=[data_inicio_obj, data_fim_obj],
+                inspecao__pecas_ordem_estamparia__isnull=False
+            )
+            .select_related('inspecao', 'inspecao__pecas_ordem_estamparia')
+        )
+
+        # Se maquina_param foi fornecida e não está vazia, filtra
+        if maquina_param and maquina_param != '':
+            inspecao_query = inspecao_query.filter(
+                inspecao__pecas_ordem_estamparia__ordem__maquina__nome__icontains=maquina_param
+            )
+
+        # Agrupa dados de inspeção por máquina e data
+        inspecao_por_data = defaultdict(lambda: defaultdict(lambda: {
+            'inspecionadas': 0,
+            'aprovadas': 0
+        }))
+
+        for insp in inspecao_query:
+            # Obtém o nome da máquina a partir da PecasOrdem
+            maq_nome = 'Sem máquina'
+            if insp.inspecao.pecas_ordem_estamparia:
+                maq_nome = insp.inspecao.pecas_ordem_estamparia.ordem.maquina.nome
+            
+            data = insp.data_execucao.strftime('%Y-%m-%d')
+            
+            if maq_nome not in inspecao_por_data[data]:
+                inspecao_por_data[data][maq_nome] = {'inspecionadas': 0, 'aprovadas': 0}
+
+            inspecionadas_total = int(insp.conformidade or 0) + int(insp.nao_conformidade or 0)
+            aprovadas_total = int(insp.conformidade or 0)
+
+            inspecao_por_data[data][maq_nome]['inspecionadas'] += inspecionadas_total
+            inspecao_por_data[data][maq_nome]['aprovadas'] += aprovadas_total
+
+        # Mescla dados de produção e inspeção
+        resultado = defaultdict(list)
+        
+        todas_datas = set(list(producao_por_data.keys()) + list(inspecao_por_data.keys()))
+        
+        for data in sorted(todas_datas):
+            prod_data = producao_por_data.get(data, {})
+            insp_data = inspecao_por_data.get(data, {})
+            
+            todas_maquinas = set(list(prod_data.keys()) + list(insp_data.keys()))
+            
+            for maquina in sorted(todas_maquinas):
+                prod = prod_data.get(maquina, {'ordens': 0, 'pecas_produzidas': 0})
+                insp = insp_data.get(maquina, {'inspecionadas': 0, 'aprovadas': 0})
+                
+                taxa_aprovacao = 0
+                if insp['inspecionadas'] > 0:
+                    taxa_aprovacao = round((insp['aprovadas'] / insp['inspecionadas']) * 100, 2)
+                
+                resultado[data].append({
+                    'maquina': maquina,
+                    'ordens_finalizadas': prod['ordens'],
+                    'pecas_produzidas': prod['pecas_produzidas'],
+                    'pecas_inspecionadas': insp['inspecionadas'],
+                    'pecas_aprovadas': insp['aprovadas'],
+                    'taxa_aprovacao': taxa_aprovacao
+                })
+
+        return JsonResponse(dict(resultado))
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
