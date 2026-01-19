@@ -1862,6 +1862,8 @@ def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grup
             #     data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
             # except:
             # data_carga pode ser str, datetime ou date
+            data_carga = o.get("data_carga")
+
             if isinstance(data_carga, str):
                 data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
             elif isinstance(data_carga, datetime):
@@ -2174,15 +2176,7 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
             ]
         }
 
-def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
-
-    try:
-        if isinstance(data_carga_str, (datetime, date)):
-            data_carga = data_carga_str.date() if isinstance(data_carga_str, datetime) else data_carga_str
-        else:
-            data_carga = datetime.strptime(str(data_carga_str), "%Y-%m-%d").date()
-    except Exception:
-        return ({"error": "Formato de data inválido. Use YYYY-MM-DD."}, 400)
+def imprimir_ordens_montagem(itens_agrupado_filtrado):#data_carga_str, ):
 
     CODIGOS_EXCLUIR = [
         '023590', '030679', '031517', '032470', '032546', '032531', '032681', '032731', '032871',
@@ -2195,8 +2189,8 @@ def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
     ultima_celula = None
     # ultima_carga = None
 
-    itens_agrupado_filtrado = itens_agrupado_filtrado.sort_values('Célula')
-
+    itens_agrupado_filtrado = itens_agrupado_filtrado.sort_values(['Célula','Datas'])
+    
     for index, row in itens_agrupado_filtrado.iterrows():
         
         # retirando codigos_excluir da coluna peca
@@ -2206,35 +2200,12 @@ def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
         
         celula_atual = row['Célula']
         carga_atual = row['Carga']  # ou pega do peca.ordem se houver campo específico
+        data_carga = pd.to_datetime(row["Datas"], errors="coerce")
+        data_carga_fmt = data_carga.strftime("%d/%m/%Y") if pd.notna(data_carga) else ""
+
         qtd = int(row.get("Qtde_total", 0))
         if qtd <= 0:
             continue
-
-        # IMPRIME ETIQUETA DE TROCA DE CARGA
-#         if carga_atual != ultima_carga:
-#             print(f"indo para celula {carga_atual}")
-
-#             zpl_carga = f"""
-# ^XA
-# ^CI28
-# ^PW560
-# ^LL240
-# ^LT0
-# ^LH0,0
-
-# ^FX CARGA
-# ^FO10,40^A0N,36,36^FB540,1,0,C,0^FD{carga_atual}^FS
-
-# ^FX DATA DA CARGA
-# ^FO10,155^A0N,24,24^FB540,1,0,C,0^FDDATA CARGA: {data_carga.strftime('%d/%m/%Y')}^FS
-
-# ^XZ
-
-# """.lstrip()
-
-#             chamar_impressora_pecas_montagem(zpl_carga)
-#             time.sleep(2)
-#             ultima_carga = carga_atual
 
         # IMPRIME ETIQUETA DE TROCA DE CÉLULA
         if celula_atual != ultima_celula:
@@ -2251,69 +2222,48 @@ def imprimir_ordens_montagem(data_carga_str, itens_agrupado_filtrado):
 ^FX CÉLULA
 ^FO10,35^A0N,32,32^FB540,1,0,C,0^FD{celula_atual}^FS
 
-^FX DATA DA CARGA
-^FO10,150^A0N,24,24^FB540,1,0,C,0^FDDATA CARGA: {data_carga.strftime('%d/%m/%Y')}^FS
-
 ^XZ
 
 """.lstrip()
-
             chamar_impressora_pecas_montagem(zpl_celula)
-            # time.sleep(2)
             ultima_celula = celula_atual
-
-        # caminho_qr = peca.ordem.caminho_relativo_qr_code
-        # if not caminho_qr:
-        #     caminho_qr = (
-        #         reverse("montagem:apontamento_qrcode")
-        #         + f"?ordem_id={peca.ordem.pk}&selecao_setor=pendente"
-        #     )
-        #     peca.ordem.caminho_relativo_qr_code = caminho_qr
-        #     peca.ordem.save(update_fields=['caminho_relativo_qr_code'])
 
         for _ in range(qtd):
             zpl = f"""
 ^XA
 ^MMT
 ^PW560
-^LL240
+^LL220
 ^LS0
 ^PR1,1,1
 ~SD14
 
-^FO10,10
+^FO25,10
 ^A0N,28,28
-^FB540,2,0,L,0
+^FB525,2,0,L,0
 ^FD{f'{row["Código"]}-{str(row["Peca"])[:80]}-{qtd}un.'}^FS
 
-^FO10,95
+^FO25,80
 ^A0N,24,24
-^FB540,1,0,L,0
+^FB525,1,0,L,0
 ^FDCelula: {celula_atual}^FS
 
-^FO10,150
+^FO25,130
 ^A0N,24,24
-^FB540,1,0,L,0
+^FB525,1,0,L,0
 ^FDCarga: {carga_atual}^FS
 
-^FO10,205
+^FO25,180
 ^A0N,24,24
-^FB540,1,0,L,0
-^FDDt. Carga: {data_carga.strftime("%d/%m/%Y")}^FS
+^FB525,1,0,L,0
+^FDDt. Carga: {data_carga_fmt}^FS
 
 ^PQ1,0,0
 ^XZ
 
 """.strip()
-
-# retirando o bloco que imprime qrcode
-
-# ^FT500,330^BQN,2,7
-# ^FDLA,{env('URI_QR_CODE')}{peca.ordem.caminho_relativo_qr_code}^FS
-
             chamar_impressora_pecas_montagem(zpl)
             impressas += 1
-            # time.sleep(2)
 
     if impressas == 0:
         return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)

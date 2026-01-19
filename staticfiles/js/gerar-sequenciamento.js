@@ -116,14 +116,11 @@ function gerarPlanejamento() {
 async function gerarEtiquetaQrCode() {
     const btnGerarEtiquetas = document.getElementById("gerarEtiquetas");
     const dataInicio = document.getElementById("data-inicio").value;
+    const dataFim = document.getElementById("data-fim").value;
     const setor = document.getElementById("setorSelect").value;
-
-    console.log(setor);
 
     if (setor === 'montagem') {
         btnGerarEtiquetas.disabled = true;
-
-        const dataFim = dataInicio;
 
         const ensureModal = () => {
             let modal = document.getElementById("modalMontagem");
@@ -176,13 +173,18 @@ async function gerarEtiquetaQrCode() {
             if (!resp.ok) throw new Error("Erro ao buscar cargas");
             const payload = await resp.json();
 
+            console.log(payload);
+
             const lista = Array.isArray(payload?.cargas?.cargas) ? payload.cargas.cargas : [];
             const celulas = Array.isArray(payload?.cargas?.celulas) ? payload.cargas.celulas : [];
 
             const grupos = lista
                 .filter(item => item?.presente_no_carreta === '✅')
                 .reduce((acc, item) => {
-                    const key = item.carga || "Sem carga";
+                    const key = JSON.stringify({
+                        carga: item?.carga ?? "Sem carga",
+                        data_carga: item?.data_carga ?? "",
+                    });
                     (acc[key] ||= []).push(item);
                     return acc;
                 }, {});
@@ -195,7 +197,16 @@ async function gerarEtiquetaQrCode() {
             wrap.style.display = "grid";
             wrap.style.gap = "14px";
 
-            Object.entries(grupos).forEach(([cargaNome, itens]) => {
+            Object.entries(grupos).forEach(([keyStr, itens]) => {
+                let meta = { carga: "Sem carga", data_carga: "" };
+                try {
+                    meta = JSON.parse(keyStr);
+                } catch {
+                    // fallback silencioso
+                }
+
+                const cargaNome = meta?.carga ?? "Sem carga";
+                const dataCarga = meta?.data_carga ?? "";
                 const card = document.createElement("div");
                 card.classList.add("card-carga-montagem");
                 Object.assign(card.style, {
@@ -213,7 +224,9 @@ async function gerarEtiquetaQrCode() {
                 const chk = document.createElement("input");
                 chk.type = "checkbox";
                 chk.name = "cargaMontagem";
-                chk.value = cargaNome;
+                chk.value = keyStr;
+                chk.dataset.carga = cargaNome;
+                chk.dataset.dataCarga = dataCarga;
                 chk.checked = true; // Marca todos os checkboxes
                 chk.onchange = e => {
                     const card = e.target.closest(".card-carga-montagem");
@@ -231,7 +244,24 @@ async function gerarEtiquetaQrCode() {
                 };
 
                 header.appendChild(chk);
-                header.appendChild(document.createTextNode(cargaNome));
+
+                const titleWrap = document.createElement("div");
+                titleWrap.style.display = "flex";
+                titleWrap.style.flexDirection = "column";
+
+                const title = document.createElement("strong");
+                title.textContent = cargaNome;
+                titleWrap.appendChild(title);
+
+                if (dataCarga) {
+                    const subtitle = document.createElement("span");
+                    subtitle.style.fontSize = "12px";
+                    subtitle.style.color = "#6b7280";
+                    subtitle.textContent = `Data: ${dataCarga}`;
+                    titleWrap.appendChild(subtitle);
+                }
+
+                header.appendChild(titleWrap);
                 card.appendChild(header);
 
                 const ul = document.createElement("ul");
@@ -301,13 +331,15 @@ async function gerarEtiquetaQrCode() {
                         ).map(cel => cel.value);
                         
                         return {
-                            nome: chk.value,
+                            nome: chk.dataset.carga,
+                            data_carga: chk.dataset.dataCarga,
                             celulas: celulas
                         };
                     });
 
                     const payloadEnvio = {
                         data_inicio: dataInicio,
+                        data_fim: dataFim,
                         cargas: cargasComCelulas
                     };
 

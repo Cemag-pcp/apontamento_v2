@@ -158,7 +158,7 @@ def gerar_dados_sequenciamento(request):
     if "error" in resultado:
         return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
 
-    return JsonResponse({"message": "Sequenciamento gerado com sucesso!", "detalhes": resultado})
+    return JsonResponse({"message": "Sequenciamento gerado com sucesso!", "detalhes": "resultado"})
 
 @csrf_exempt
 def atualizar_ordem_existente(request):
@@ -966,14 +966,13 @@ def enviar_etiqueta_impressora(request):
 def enviar_etiqueta_impressora_montagem(request):
     data = json.loads(request.body)
 
-    print(data)
-
     data_carga = data.get('data_inicio')
-    cargas = data.get('cargas', [])  # Array de objetos {nome, celulas}
+    data_fim = data.get('data_fim')
+    cargas = data.get('cargas', [])  # Array de objetos {nome, data_carga, celulas}
     celulas = data.get('celulas', [])
 
     # o argumento 'teste' é apenas para rodar com a coluna de carga
-    itens = gerar_sequenciamento(data_carga,data_carga,'montagem', 'teste') 
+    itens = gerar_sequenciamento(data_carga, data_fim or data_carga, 'montagem', 'teste') 
     
     colunas_grupo = [
         "Código", "Peca", "Célula", "Datas","Carga"
@@ -984,16 +983,44 @@ def enviar_etiqueta_impressora_montagem(request):
         .sum()
     )
 
-    # filtrar todas as cargas da coluna e celulas escolhidas
-    itens_agrupado = itens_agrupado[itens_agrupado['Carga'].isin([carga.get('nome') for carga in cargas])]
+    # Normaliza tipos/strings
+    itens_agrupado["Datas"] = pd.to_datetime(itens_agrupado["Datas"], errors="coerce").dt.date.astype("string")
+    itens_agrupado["Carga"] = itens_agrupado["Carga"].astype("string").str.strip().str.upper()
+    itens_agrupado["Célula"] = itens_agrupado["Célula"].astype("string").str.strip().str.upper()
 
-    celulas_escolhidas = []
-    for carga in cargas:
-        celulas_escolhidas.extend(carga.get('celulas', []))
+    # Mapeia filtros vindos do frontend
+    filtros = {}
+    for item in cargas:
+        data = pd.to_datetime(item.get("data_carga"), errors="coerce")
+        if pd.isna(data):
+            continue
 
-    itens_agrupado = itens_agrupado[itens_agrupado['Célula'].isin(celulas_escolhidas)].sort_values(by=['Célula', 'Carga', 'Código'])
+        data_str = data.date().isoformat()
+        carga = str(item.get("nome", "")).strip().upper()
+        celulas = [c.strip().upper() for c in (item.get("celulas") or []) if c.strip()]
 
-    imprimir_ordens_montagem(data_carga, itens_agrupado)
+        filtros[(data_str, carga)] = celulas  # mesmo vazio, é restrição explícita
+
+    if not filtros:
+        return itens_agrupado.iloc[0:0].copy()
+
+    def linha_valida(row):
+        chave = (row["Datas"], row["Carga"])
+        if chave not in filtros:
+            return False
+
+        celulas_permitidas = filtros[chave]
+        if celulas_permitidas:
+            return row["Célula"] in celulas_permitidas
+        else:
+            # se veio lista vazia, NÃO permite nenhuma célula
+            return False
+
+    itens_agrupado = itens_agrupado[itens_agrupado.apply(linha_valida, axis=1)].copy()
+
+    itens_agrupado.sort_values(by=["Célula", "Carga", "Código"], kind="stable").reset_index(drop=True)
+
+    imprimir_ordens_montagem(itens_agrupado)
 
     #primeiro filtrar o dataframe por uma das cargas enviadas
     # for carga in cargas:
