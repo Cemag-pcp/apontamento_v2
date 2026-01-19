@@ -676,22 +676,34 @@
 
                 const labels = dadosProducaoInspecao.map(item => item.dia);
 
+                // Calcular percentual de não conformes
+                const percentuaisNaoConforme = dadosProducaoInspecao.map(item => {
+                    if (item.qtd_peca_produzida > 0) {
+                        return ((item.qtd_peca_nao_conforme / item.qtd_peca_produzida) * 100).toFixed(2);
+                    }
+                    return 0;
+                });
+
                 const dadosProdInsp = {
                     labels: labels,
                     datasets: [
                         {
                             label: 'Produzido',
                             data: dadosProducaoInspecao.map(item => item.qtd_peca_produzida),
+                            borderColor: '#28a745',
+                            backgroundColor: '#28a74520',
                             borderWidth: 2,
                             tension: 0.3,
                             yAxisID: 'y'
                         },
                         {
-                            label: 'Inspecionado',
-                            data: dadosProducaoInspecao.map(item => item.qtd_peca_inspecionada),
+                            label: 'Não conforme (%)',
+                            data: percentuaisNaoConforme,
+                            borderColor: '#dc3545',
+                            backgroundColor: '#dc354520',
                             borderWidth: 2,
                             tension: 0.3,
-                            yAxisID: 'y'
+                            yAxisID: 'y1'
                         },
                         
                     ]
@@ -711,9 +723,7 @@
                         plugins: {
                             title: {
                                 display: true,
-                                text: maquinaSelecionada
-                                    ? `Produção vs Inspeção - ${maquinaSelecionada}`
-                                    : 'Produção vs Inspeção - Todas as Máquinas',
+                                text: 'Produção vs Inspeção - Todas as Máquinas',
                                 font: { size: 16 }
                             },
                             legend: {
@@ -727,7 +737,7 @@
                                         if (context.dataset.yAxisID === 'y1') {
                                             label += context.raw + '%';
                                         } else {
-                                            label += context.raw + ' op';
+                                            label += context.raw.toLocaleString('pt-BR') + ' peças';
                                         }
                                         return label;
                                     }
@@ -742,31 +752,32 @@
                                     size: 9
                                 },
                                 formatter: (value, context) => {
+                                    if (value <= 0) return '';
                                     if (context.dataset.yAxisID === 'y1') {
                                         return value + '%';
                                     }
-                                    return value;
+                                    return value.toLocaleString('pt-BR');
                                 }
                             }
                         },
                         scales: {
-                            y: {
-                                beginAtZero: true,
-                                position: 'left',
-                                title: {
-                                    display: true,
-                                    text: 'Unidades'
-                                }
-                            },
                             y1: {
                                 beginAtZero: true,
                                 position: 'right',
                                 title: {
                                     display: true,
-                                    text: 'Taxa de Não Conformidade (%)'
+                                    text: 'Não Conformidade (%)'
                                 },
                                 grid: {
                                     drawOnChartArea: false
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'Quantidade de Peças'
                                 }
                             },
                             x: {
