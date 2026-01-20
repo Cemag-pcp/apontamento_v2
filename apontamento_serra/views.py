@@ -616,9 +616,13 @@ def criar_ordem(request):
                 )
 
                 # Criação das propriedades da ordem
+                mp = Mp.objects.filter(codigo=data.get('mp')).first()
+                if not mp:
+                    return JsonResponse({'status': 'error', 'message': f'MP com código {data.get("mp")} não encontrada.'}, status=404)
+                
                 PropriedadesOrdem.objects.create(
                     ordem=nova_ordem,
-                    mp_codigo=get_object_or_404(Mp, codigo=data.get('mp')),
+                    mp_codigo=mp,
                     tamanho=data.get('tamanhoVara', 0),  # Usa valor padrão caso 'tamanho' não exista
                     quantidade=0 if data.get('quantidade') == '' else data.get('quantidade'),  # Usa valor padrão caso 'qtd' não exista
                     retalho=(data.get('retalho') == 'on')  # Converte "on" para True e ausente para False
