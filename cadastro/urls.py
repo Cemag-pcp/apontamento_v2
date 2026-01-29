@@ -27,4 +27,8 @@ urlpatterns = [
     path('cadastro-pecas/', views.cadastro_pecas, name='cadastro_pecas'),
     path('api/cadastro-pecas/', views.cadastro_pecas_api, name='cadastro_pecas_api'),
 
+    # Conjuntos
+    path('cadastro-conjuntos/', views.cadastro_conjuntos, name='cadastro_conjuntos'),
+    path('api/cadastro-conjuntos/', views.cadastro_conjuntos_api, name='cadastro_conjuntos_api'),
+
 ]

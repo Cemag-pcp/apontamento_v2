@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+<title>Cadastro de Conjuntos</title>
+{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/propriedades_ordem.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="cadastro-conjuntos-app" data-api-url="{% url 'cadastro:cadastro_conjuntos_api' %}">
+    <div class="d-flex align-items-center justify-content-between mb-3 page-hero">
+        <div>
+            <div class="title h4 mb-0">Cadastro de Conjuntos</div>
+            <p class="subtitle small text-muted mb-0">Crie, edite e remova conjuntos.</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#cadastro-conjunto-modal">
+                <i class="bi bi-plus-lg me-1"></i>Novo conjunto
+            </button>
+            <button id="refresh-conjuntos-cadastro-btn" class="btn btn-light btn-sm text-dark">
+                <i class="bi bi-arrow-repeat me-1"></i>Atualizar
+            </button>
+        </div>
+    </div>
+
+    <div class="card card-surface mb-3">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-6 col-12">
+                    <label class="form-label small text-secondary">Busca</label>
+                    <input id="f-search" type="text" class="form-control form-control-sm" placeholder="Codigo ou descricao">
+                </div>
+                <div class="col-sm-6 col-12 d-flex gap-2">
+                    <button id="apply-filters-cadastro" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-funnel me-1"></i>Aplicar
+                    </button>
+                    <button id="clear-filters-cadastro" class="btn btn-outline-secondary btn-sm">
+                        Limpar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-surface">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="fw-semibold small text-secondary mb-0">Itens por pagina</label>
+                    <select id="page-size-cadastro" class="form-select form-select-sm" style="width: auto;">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div id="pagination-summary-cadastro" class="small text-muted ms-auto"></div>
+            </div>
+
+            <div class="table-responsive" style="max-height: 65vh; overflow: auto;">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Codigo</th>
+                            <th>Descricao</th>
+                            <th class="text-end">Quantidade</th>
+                            <th class="text-center" style="width: 140px;">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="conjuntos-cadastro-body">
+                        <tr id="loading-row-cadastro">
+                            <td colspan="5">
+                                <div class="loading-ghost w-100"></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between mt-3">
+                <div class="small text-muted" id="total-indicator-cadastro"></div>
+                <div class="btn-group">
+                    <button id="prev-page-cadastro" class="btn btn-outline-secondary btn-sm">Anterior</button>
+                    <button id="next-page-cadastro" class="btn btn-outline-secondary btn-sm">Proxima</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cadastro-conjunto-modal" tabindex="-1" aria-labelledby="cadastro-conjunto-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cadastro-conjunto-modal-label">Novo conjunto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-4 col-12">
+                        <label class="form-label small text-secondary">Codigo</label>
+                        <input id="c-codigo" type="text" class="form-control form-control-sm" placeholder="Obrigatorio">
+                    </div>
+                    <div class="col-md-8 col-12">
+                        <label class="form-label small text-secondary">Descricao</label>
+                        <input id="c-descricao" type="text" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-md-4 col-12">
+                        <label class="form-label small text-secondary">Quantidade</label>
+                        <input id="c-quantidade" type="number" class="form-control form-control-sm" min="0" step="1">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="clear-form-btn" class="btn btn-outline-secondary btn-sm" type="button">Limpar</button>
+                <button id="create-conjunto-btn" class="btn btn-primary btn-sm" type="button">
+                    <i class="bi bi-plus-lg me-1"></i>Criar conjunto
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/cadastro_conjuntos.js' %}" defer></script>
+{% endblock %}

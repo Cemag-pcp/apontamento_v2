@@ -10,7 +10,7 @@ from django.db.models import Prefetch, Count, Q
 from django.views.decorators.csrf import csrf_exempt
 
 from .forms import UploadCSVForm
-from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos
+from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas
 from . import views
 
 import csv
@@ -397,5 +397,201 @@ def cadastro_pecas_api(request):
         peca.delete()
 
         return JsonResponse({'success': 'Peca removida com sucesso.'})
+
+    return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
+
+@login_required
+def cadastro_conjuntos(request):
+    return render(request, 'cadastro_conjuntos.html')
+
+@csrf_exempt
+@login_required
+def cadastro_conjuntos_api(request):
+    """
+    GET: lista conjuntos paginados (com filtro opcional por carreta).
+    POST: cria novo conjunto.
+    PATCH: atualiza conjunto.
+    DELETE: remove conjunto.
+    """
+
+    def parse_int(value, field):
+        if value in (None, ''):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise ValueError(f'{field} invalido.')
+
+    def parse_carretas(value):
+        if value in (None, ''):
+            return []
+        if isinstance(value, list):
+            ids = value
+        elif isinstance(value, str):
+            ids = [item for item in value.split(',') if item]
+        else:
+            raise ValueError('carretas invalidas.')
+        try:
+            ids = [int(item) for item in ids]
+        except (TypeError, ValueError):
+            raise ValueError('carretas invalidas.')
+        if not ids:
+            return []
+        carretas = list(Carretas.objects.filter(id__in=ids))
+        if len(carretas) != len(set(ids)):
+            raise ValueError('carretas invalidas.')
+        return carretas
+
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parametros de paginacao invalidos.'}, status=400)
+
+        queryset = Conjuntos.objects.prefetch_related('carreta').order_by('codigo')
+
+        search_param = request.GET.get('search')
+        carreta_param = request.GET.get('carreta')
+
+        if search_param:
+            queryset = queryset.filter(
+                Q(codigo__icontains=search_param) |
+                Q(descricao__icontains=search_param)
+            )
+
+        if carreta_param:
+            try:
+                carretas_filtro = parse_carretas(carreta_param)
+            except ValueError as exc:
+                return JsonResponse({'error': str(exc)}, status=400)
+            if carretas_filtro:
+                queryset = queryset.filter(carreta__in=carretas_filtro).distinct()
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        conjuntos = []
+        for conjunto in page_obj.object_list:
+            carretas = list(conjunto.carreta.all().order_by('codigo'))
+            conjuntos.append({
+                'id': conjunto.id,
+                'codigo': conjunto.codigo,
+                'descricao': conjunto.descricao,
+                'quantidade': conjunto.quantidade,
+                'carreta_ids': [carreta.id for carreta in carretas],
+                'carreta_labels': [
+                    f"{carreta.codigo} - {carreta.descricao}" if carreta.descricao else carreta.codigo
+                    for carreta in carretas
+                ],
+            })
+
+        carretas_meta = [
+            {
+                'id': carreta.id,
+                'label': f"{carreta.codigo} - {carreta.descricao}" if carreta.descricao else carreta.codigo
+            }
+            for carreta in Carretas.objects.all().order_by('codigo')
+        ]
+
+        return JsonResponse({
+            'results': conjuntos,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+            'meta': {
+                'carretas': carretas_meta,
+            }
+        })
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        codigo = (data.get('codigo') or '').strip()
+        if not codigo:
+            return JsonResponse({'error': 'Codigo e obrigatorio.'}, status=400)
+
+        try:
+            quantidade = parse_int(data.get('quantidade'), 'quantidade')
+            carretas = parse_carretas(data.get('carreta_ids'))
+        except ValueError as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+
+        if quantidade is None:
+            return JsonResponse({'error': 'Quantidade e obrigatoria.'}, status=400)
+
+        try:
+            conjunto = Conjuntos.objects.create(
+                codigo=codigo,
+                descricao=(data.get('descricao') or '').strip() or None,
+                quantidade=quantidade,
+            )
+            if carretas:
+                conjunto.carreta.set(carretas)
+        except IntegrityError:
+            return JsonResponse({'error': 'Nao foi possivel criar o conjunto.'}, status=400)
+
+        return JsonResponse({'success': 'Conjunto criado com sucesso.', 'id': conjunto.id}, status=201)
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        conjunto_id = data.get('id')
+        if not conjunto_id:
+            return JsonResponse({'error': 'ID do conjunto nao informado.'}, status=400)
+
+        conjunto = get_object_or_404(Conjuntos, id=conjunto_id)
+
+        try:
+            quantidade = parse_int(data.get('quantidade'), 'quantidade')
+            carretas = parse_carretas(data.get('carreta_ids'))
+        except ValueError as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+
+        codigo = (data.get('codigo') or '').strip()
+        if not codigo:
+            return JsonResponse({'error': 'Codigo e obrigatorio.'}, status=400)
+
+        if quantidade is None:
+            return JsonResponse({'error': 'Quantidade e obrigatoria.'}, status=400)
+
+        conjunto.codigo = codigo
+        conjunto.descricao = (data.get('descricao') or '').strip() or None
+        conjunto.quantidade = quantidade
+
+        try:
+            conjunto.save()
+            conjunto.carreta.set(carretas)
+        except IntegrityError:
+            return JsonResponse({'error': 'Nao foi possivel salvar o conjunto.'}, status=400)
+
+        return JsonResponse({'success': 'Conjunto atualizado com sucesso.'})
+
+    if request.method == 'DELETE':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        conjunto_id = data.get('id')
+        if not conjunto_id:
+            return JsonResponse({'error': 'ID do conjunto nao informado.'}, status=400)
+
+        conjunto = get_object_or_404(Conjuntos, id=conjunto_id)
+        conjunto.delete()
+
+        return JsonResponse({'success': 'Conjunto removido com sucesso.'})
 
     return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
