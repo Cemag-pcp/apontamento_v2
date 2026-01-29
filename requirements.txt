@@ -12,7 +12,7 @@ django-environ==0.11.2
 django-storages==1.14.6
 google-auth==2.40.3
 gspread==5.7.2
-openpyxl==3.1.2
+openpyxl>=3.1.5
 paho-mqtt
 pillow==11.3.0
 python-dotenv==1.0.0
