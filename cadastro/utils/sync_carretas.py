@@ -6,7 +6,7 @@ from itertools import islice
 import pandas as pd
 
 # Ajuste aqui se quiser outra chave natural:
-KEY_FIELDS = ('codigo_peca', 'carreta', 'segundo_processo')
+KEY_FIELDS = ('codigo_peca', 'carreta', 'segundo_processo', 'grupo', 'grupo1', 'grupo2')
 
 ALL_FIELDS = (
     'codigo_peca',
@@ -17,7 +17,9 @@ ALL_FIELDS = (
     'primeiro_processo',
     'segundo_processo',
     'carreta',
-    'grupo'
+    'grupo',
+    'grupo1',
+    'grupo2'
 )
 
 def _chunked(iterable, size=1000):
@@ -42,13 +44,12 @@ def tratamento_carretas():
     """
     Precisa baixar a ultima versão da planilha: https://docs.google.com/spreadsheets/d/1A67y-gk0P5qW_jDaxL4B9I-wP9wDM6mjJ91BMrzGWHw/edit?gid=733473611#gid=733473611
     formato CSV e renomear para BASE_GERAL.
-
     """
     
     df = pd.read_csv("cadastro/BASE_GERAL.csv")
 
-    df = df[['CODIGO', 'DESCRIÇÃO', 'MATÉRIA PRIMA', 'TOTAL', 'PRIMEIRO PROCESSO', '2 PROCESSO', 'CONJUNTO', 'CARRETA','CELULA 3']] 
-    columns=['codigo_peca','descricao_peca','mp_peca','total_peca','primeiro_processo','segundo_processo','conjunto_peca','carreta','grupo']
+    df = df[['CODIGO', 'DESCRIÇÃO', 'MATÉRIA PRIMA', 'TOTAL', 'PRIMEIRO PROCESSO', '2 PROCESSO', 'CONJUNTO', 'CARRETA','CELULA 3', 'CELULA 1', 'CELULA 2']] 
+    columns=['codigo_peca','descricao_peca','mp_peca','total_peca','primeiro_processo','segundo_processo','conjunto_peca','carreta','grupo', 'grupo1', 'grupo2']
 
     # codigos que deverã ser tratados manualmente (criar um processo apenas para eles) - COMPONENTE EXTRA
     codigo_processo = [

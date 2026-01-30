@@ -1025,7 +1025,7 @@ def consulta_pecas(request):
 def consulta_carretas(request):
     """
     Retorna sugestões de carretas com base em um caractere digitado.
-    Exemplo de uso: /api/consulta-carretas/?q=car
+    Exemplo de uso: /api/consulta-carreta/?q=car
     """
 
     termo = request.GET.get('q', '').strip()
@@ -1090,6 +1090,109 @@ def mostrar_pecas_completa(request):
 
     return JsonResponse({'pecas': list(pecas)})
 
+@require_GET
+def base_explodida_innovaro(request):
+    
+    """
+    Retorna as peças completas de uma carreta e conjunto específicos.
+    Exemplo de uso: 
+    """
+
+    conjunto = request.GET.get('conjunto', '').strip()
+    carreta = request.GET.get('carreta', '').strip()
+    primeiro_processo = request.GET.get('primeiro_processo', '').strip()
+    segundo_processo = request.GET.get('segundo_processo', '').strip()
+    codigo_peca = request.GET.get('codigo_peca', '').strip()
+    mp_peca = request.GET.get('mp_peca', '').strip()
+    conjunto_peca = request.GET.get('conjunto_peca', '').strip()
+    skip_raw = request.GET.get('skip', '0').strip()
+    limit_raw = request.GET.get('limit', '100').strip()
+
+    def _parse_list(v):
+        if not v:
+            return []
+        return [p.strip() for p in v.split(',') if p.strip()]
+
+    def _like_q(field, pattern):
+        raw = (pattern or '').strip()
+        if not raw:
+            return Q()
+        starts = raw.startswith('%')
+        ends = raw.endswith('%')
+        core = raw.strip('%')
+        if not core:
+            return Q()
+        if starts and ends:
+            return Q(**{f"{field}__icontains": core})
+        if starts:
+            return Q(**{f"{field}__iendswith": core})
+        if ends:
+            return Q(**{f"{field}__istartswith": core})
+        return Q(**{f"{field}__iexact": raw})
+
+    filtros = Q()
+
+    if '%' in carreta:
+        filtros &= _like_q('carreta', carreta)
+    else:
+        carreta_list = _parse_list(carreta)
+        if carreta_list:
+            filtros &= Q(carreta__in=carreta_list)
+
+    conjunto_list_req = _parse_list(conjunto)
+    if conjunto_list_req:
+        filtros &= Q(conjunto_peca__in=conjunto_list_req)
+
+    primeiro_list = _parse_list(primeiro_processo)
+    if primeiro_list:
+        filtros &= Q(primeiro_processo__in=primeiro_list)
+
+    segundo_list = _parse_list(segundo_processo)
+    if segundo_list:
+        filtros &= Q(segundo_processo__in=segundo_list)
+
+    codigo_list = _parse_list(codigo_peca)
+    if codigo_list:
+        filtros &= Q(codigo_peca__in=codigo_list)
+
+    mp_list = _parse_list(mp_peca)
+    if mp_list:
+        filtros &= Q(mp_peca__in=mp_list)
+
+    conjunto_list = _parse_list(conjunto_peca)
+    if conjunto_list:
+        filtros &= Q(conjunto_peca__in=conjunto_list)
+
+    try:
+        skip = max(int(skip_raw), 0)
+    except ValueError:
+        skip = 0
+
+    try:
+        limit = max(int(limit_raw), 1)
+    except ValueError:
+        limit = 100
+
+    pecas = (
+        CarretasExplodidas.objects
+        .filter(filtros)
+        .values(
+            'codigo_peca',
+            'descricao_peca',
+            'mp_peca',
+            'total_peca',
+            'conjunto_peca',
+            'primeiro_processo',
+            'segundo_processo',
+            'carreta',
+            'grupo',
+            'grupo1',
+            'grupo2',
+        )
+        [skip:skip + limit]
+    )
+
+    return JsonResponse({'pecas': list(pecas)})
 
 login_required
 def notificacoes_pagina(request):

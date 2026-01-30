@@ -55,4 +55,5 @@ urlpatterns += [
     path('api/consulta-carreta/', views.consulta_carretas, name='consulta_carretas'),
     path('api/consulta-conjunto/', views.consulta_conjunto, name='consulta_conjunto'),
     path('api/consulta-peca/', views.mostrar_pecas_completa, name='mostrar_pecas_completa'),
+    path('api/base-explodida-innovaro/', views.base_explodida_innovaro, name='base_explodida_innovaro')
 ]

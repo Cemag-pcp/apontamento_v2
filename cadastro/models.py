@@ -152,6 +152,10 @@ class PecasEstanqueidade(models.Model):
 
 class CarretasExplodidas(models.Model):
 
+    # additionals columns 
+    grupo1 = models.CharField(max_length=255, blank=True, null=True) # this column corresponds to column 'celula1' in the excel sheet
+    grupo2 = models.CharField(max_length=255, blank=True, null=True) # this column corresponds to column 'celula2' in the excel sheet
+
     codigo_peca = models.CharField(max_length=250, blank=True, null=True)
     descricao_peca = models.CharField(max_length=255, blank=True, null=True)
     mp_peca = models.CharField(max_length=255, blank=True, null=True)
@@ -160,7 +164,7 @@ class CarretasExplodidas(models.Model):
     primeiro_processo = models.CharField(max_length=255, blank=True, null=True)
     segundo_processo = models.CharField(max_length=255, blank=True, null=True)
     carreta = models.CharField(max_length=255, blank=True, null=True)
-    grupo = models.CharField(max_length=255, blank=True, null=True)
+    grupo = models.CharField(max_length=255, blank=True, null=True) # this column corresponds to column 'celula3' in the excel sheet
 
     def __str__(self):
         return f'{self.descricao_peca}'
