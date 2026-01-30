@@ -127,6 +127,7 @@ def gerar_dados_sequenciamento(request):
 
     # Gerar os arquivos e a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_final, setor)
+
     # tabela_completa['cor'].unique()
 
     if setor == 'pintura':
@@ -134,6 +135,8 @@ def gerar_dados_sequenciamento(request):
         tabela_completa.drop_duplicates(subset=['Código','Datas','cor'], inplace=True)
     else:
         tabela_completa.drop_duplicates(subset=['Código','Datas','Célula'], inplace=True)
+
+    print(tabela_completa)
 
     # Criar a carga para a API de criar ordem
     ordens = []

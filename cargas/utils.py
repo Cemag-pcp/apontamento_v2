@@ -1410,13 +1410,13 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             # filtro_data[filtro_data['Recurso'] == '034550G']
 
             filtro_data = filtro_data.reset_index(drop=True)
-            # filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
+            filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
 
-            # for i in range(len(filtro_data)):
-            #     if filtro_data['Recurso'][i][0] == '0':
-            #         filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
-            #     if len(filtro_data['Recurso'][i]) == 5:
-            #         filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
+            for i in range(len(filtro_data)):
+                if filtro_data['Recurso'][i][0] == '0':
+                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+                if len(filtro_data['Recurso'][i]) == 5:
+                    filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
             
             ##### juntando planilhas de acordo com o recurso#######
 
@@ -1679,8 +1679,12 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             tab_completa = tab_completa.drop(
                 columns=['Recurso', 'Qtde_x', 'Qtde_y'])
 
-            tab_completa = tab_completa.groupby(
-                ['Código', 'Peca', 'Célula', 'Datas']).sum()
+            if carga:
+                tab_completa = tab_completa.groupby(
+                    ['Código', 'Peca', 'Célula', 'Datas', 'Carga']).sum()
+            else:
+                tab_completa = tab_completa.groupby(
+                    ['Código', 'Peca', 'Célula', 'Datas']).sum()
 
             # tab_completa1 = tab_completa[['Código','Peca','Célula','Datas','Carga','Qtde_total']]
 
@@ -2113,6 +2117,8 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
             #     data_carga = datetime.strptime(o["data_carga"], "%Y-%d-%m").date()
             # except:
             # data_carga pode ser str, datetime ou date
+            data_carga = o.get("data_carga")
+
             if isinstance(data_carga, str):
                 data_carga = datetime.strptime(data_carga, "%Y-%m-%d").date()
             elif isinstance(data_carga, datetime):
