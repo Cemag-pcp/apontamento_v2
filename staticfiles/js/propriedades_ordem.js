@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const retalhoSelect = document.getElementById('f-retalho');
     const applyFiltersBtn = document.getElementById('apply-filters');
     const clearFiltersBtn = document.getElementById('clear-filters');
+    const tipoChapaOptions = Array.from(tipoChapaSelect.options)
+        .filter(option => option.value !== '')
+        .map(option => ({ value: option.value, label: option.textContent }));
 
     function setLoading(isLoading) {
         refreshBtn.disabled = isLoading;
@@ -95,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.appendChild(editCell('espessura', item.espessura));
         tr.appendChild(editCell('quantidade', item.quantidade, 'number'));
         tr.appendChild(textCell(item.aproveitamento ?? '-'));
-        tr.appendChild(textCell(item.tipo_chapa ?? '-'));
+        tr.appendChild(selectCell('tipo_chapa', item.tipo_chapa, tipoChapaOptions));
         tr.appendChild(textCell(item.retalho ? 'Sim' : 'Não'));
         tr.appendChild(textCell(item.nova_mp_id ?? '-'));
 
@@ -128,16 +131,51 @@ document.addEventListener('DOMContentLoaded', () => {
         return td;
     }
 
+    function selectCell(name, value, options = []) {
+        const td = document.createElement('td');
+        const select = document.createElement('select');
+        select.className = 'form-select form-select-sm';
+        select.name = name;
+
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '-';
+        select.appendChild(emptyOption);
+
+        options.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option.value;
+            opt.textContent = option.label;
+            select.appendChild(opt);
+        });
+
+        if (value) {
+            const hasOption = options.some(option => option.value === value);
+            if (!hasOption) {
+                const fallbackOption = document.createElement('option');
+                fallbackOption.value = value;
+                fallbackOption.textContent = value;
+                select.appendChild(fallbackOption);
+            }
+            select.value = value;
+        }
+
+        td.appendChild(select);
+        return td;
+    }
+
     async function handleSave(row, button) {
         const id = row.dataset.id;
         const payload = { id: Number(id) };
-        const fields = ['descricao_mp', 'tamanho', 'espessura', 'quantidade'];
+        const fields = ['descricao_mp', 'tamanho', 'espessura', 'quantidade', 'tipo_chapa'];
 
         fields.forEach(field => {
             const input = row.querySelector(`[name="${field}"]`);
             if (!input) return;
             if (field === 'quantidade') {
                 if (input.value !== '') payload[field] = parseFloat(input.value);
+            } else if (field === 'tipo_chapa') {
+                payload[field] = input.value || null;
             } else {
                 payload[field] = input.value;
             }

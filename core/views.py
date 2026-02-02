@@ -1297,7 +1297,7 @@ def marcar_notificacoes_como_lidas(request):
 def propriedades_ordem_api(request):
     """
     GET: lista PropriedadesOrdem paginadas.
-    PATCH: atualiza campos editáveis (descricao_mp, tamanho, espessura, quantidade).
+    PATCH: atualiza campos editáveis (descricao_mp, tamanho, espessura, quantidade, tipo_chapa).
     """
     if request.method == 'GET':
         page_number = request.GET.get('page', 1)
@@ -1390,7 +1390,7 @@ def propriedades_ordem_api(request):
 
         propriedade = get_object_or_404(PropriedadesOrdem, id=prop_id)
 
-        campos_editaveis = ['descricao_mp', 'tamanho', 'espessura', 'quantidade']
+        campos_editaveis = ['descricao_mp', 'tamanho', 'espessura', 'quantidade', 'tipo_chapa']
         campos_para_atualizar = {}
 
         for campo in campos_editaveis:
@@ -1413,6 +1413,7 @@ def propriedades_ordem_api(request):
                 'tamanho': propriedade.tamanho,
                 'espessura': propriedade.espessura,
                 'quantidade': propriedade.quantidade,
+                'tipo_chapa': propriedade.tipo_chapa,
             }
         })
 
