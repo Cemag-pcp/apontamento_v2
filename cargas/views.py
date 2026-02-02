@@ -136,8 +136,6 @@ def gerar_dados_sequenciamento(request):
     else:
         tabela_completa.drop_duplicates(subset=['Código','Datas','Célula'], inplace=True)
 
-    print(tabela_completa)
-
     # Criar a carga para a API de criar ordem
     ordens = []
     for _, row in tabela_completa.iterrows():

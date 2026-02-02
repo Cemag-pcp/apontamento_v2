@@ -1106,7 +1106,7 @@ def base_explodida_innovaro(request):
     mp_peca = request.GET.get('mp_peca', '').strip()
     conjunto_peca = request.GET.get('conjunto_peca', '').strip()
     skip_raw = request.GET.get('skip', '0').strip()
-    limit_raw = request.GET.get('limit', '100').strip()
+    limit_raw = request.GET.get('limit', '200').strip()
 
     def _parse_list(v):
         if not v:
