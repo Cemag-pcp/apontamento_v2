@@ -1805,6 +1805,8 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
 def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
 
+    print(ordens_data)
+
     if not ordens_data:
         return {"error": "Nenhuma ordem nova adicionada, caso tivesse ordem para ser excluída, foi excluída.", "status": 400}
 
@@ -1958,8 +1960,6 @@ def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grup
         }
 
 def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina="pintura"):
-
-    print(ordens_data)
 
     if not ordens_data:
         return {"error": "Nenhuma ordem nova adicionada, caso tivesse ordem para ser excluída, foi excluída.", "status": 400}

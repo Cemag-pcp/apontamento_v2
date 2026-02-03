@@ -102,7 +102,7 @@ def gerar_arquivos_sequenciamento(request):
 def gerar_dados_sequenciamento(request):
 
     """
-        Chama a API 'criar_ordem'.
+    Chama a API 'criar_ordem'.
     """
 
     data_inicio = request.GET.get('data_inicio')
@@ -135,6 +135,8 @@ def gerar_dados_sequenciamento(request):
         tabela_completa.drop_duplicates(subset=['Código','Datas','cor'], inplace=True)
     else:
         tabela_completa.drop_duplicates(subset=['Código','Datas','Célula'], inplace=True)
+
+    print(tabela_completa)
 
     # Criar a carga para a API de criar ordem
     ordens = []
