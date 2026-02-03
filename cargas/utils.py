@@ -655,8 +655,9 @@ def gerar_arquivos(data_inicial, data_final, setor):
             base_carretas = base_carretas.reset_index(drop=True)
             
             for i in range(len(base_carretas)):
-                if len(base_carretas['Recurso'][i]) == 5:
-                    base_carretas['Recurso'][i] = "0" + base_carretas['Recurso'][i]
+                recurso = base_carretas.loc[i, 'Recurso']
+                if len(recurso) == 5:
+                    base_carretas.loc[i, 'Recurso'] = "0" + recurso
 
             #### criando código único#####
 
@@ -693,7 +694,22 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             # st.dataframe(carretas_agrupadas)
 
-            tab_completa['Código'] = tab_completa['Código'].astype(str)
+            tab_completa['Código'] = (
+                tab_completa['Código']
+                    .fillna('')
+                    .astype(str)
+                    .str.strip()
+                    .str.replace(r'\.0$', '', regex=True)
+            )
+
+            def _normaliza_codigo(codigo: str) -> str:
+                if len(codigo) == 5:
+                    return '0' + codigo
+                if len(codigo) == 8:
+                    return codigo[:6]
+                return codigo
+
+            tab_completa['Código'] = tab_completa['Código'].apply(_normaliza_codigo)
 
             tab_completa.reset_index(inplace=True, drop=True)
 
@@ -737,11 +753,6 @@ def gerar_arquivos(data_inicial, data_final, setor):
             tab_completa.reset_index(inplace=True)
 
             # tratando coluna de código e recurso
-
-            for d in range(0, tab_completa.shape[0]):
-
-                if len(tab_completa['Código'][d]) == 5:
-                    tab_completa['Código'][d] = '0' + tab_completa['Código'][d]
 
             # criando coluna de código para arquivar
 
@@ -889,8 +900,9 @@ def gerar_arquivos(data_inicial, data_final, setor):
             base_carretas = base_carretas.reset_index(drop=True)
             
             for i in range(len(base_carretas)):
-                if len(base_carretas['Recurso'][i]) == 5:
-                    base_carretas['Recurso'][i] = "0" + base_carretas['Recurso'][i]
+                recurso = base_carretas.loc[i, 'Recurso']
+                if len(recurso) == 5:
+                    base_carretas.loc[i, 'Recurso'] = "0" + recurso
 
             #### criando código único#####
 
@@ -908,10 +920,12 @@ def gerar_arquivos(data_inicial, data_final, setor):
             filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
 
             for i in range(len(filtro_data)):
-                if filtro_data['Recurso'][i][0] == '0':
-                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
-                if len(filtro_data['Recurso'][i]) == 5:
-                    filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
+                recurso = filtro_data.loc[i, 'Recurso']
+                if recurso and recurso[0] == '0':
+                    recurso = recurso[1:]
+                if len(recurso) == 5:
+                    recurso = "0" + recurso
+                filtro_data.loc[i, 'Recurso'] = recurso
             
             ##### juntando planilhas de acordo com o recurso#######
 
@@ -927,7 +941,22 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             # st.dataframe(carretas_agrupadas)
 
-            tab_completa['Código'] = tab_completa['Código'].astype(str)
+            tab_completa['Código'] = (
+                tab_completa['Código']
+                    .fillna('')
+                    .astype(str)
+                    .str.strip()
+                    .str.replace(r'\.0$', '', regex=True)
+            )
+
+            def _normaliza_codigo(codigo: str) -> str:
+                if len(codigo) == 5:
+                    return '0' + codigo
+                if len(codigo) == 8:
+                    return codigo[:6]
+                return codigo
+
+            tab_completa['Código'] = tab_completa['Código'].apply(_normaliza_codigo)
 
             tab_completa.reset_index(inplace=True, drop=True)
 
@@ -971,11 +1000,6 @@ def gerar_arquivos(data_inicial, data_final, setor):
             tab_completa.reset_index(inplace=True)
 
             # tratando coluna de código e recurso
-
-            for d in range(0, tab_completa.shape[0]):
-
-                if len(tab_completa['Código'][d]) == 5:
-                    tab_completa['Código'][d] = '0' + tab_completa['Código'][d]
 
             # criando coluna de código para arquivar
 
@@ -1130,7 +1154,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
         base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE', 'Carga']]
     else:
         base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
-
+ 
     # Apenas para pintura
     if celula and setor == 'pintura':
         base_carretas_original = base_carretas_original[(base_carretas_original['Célula'] == celula) & (base_carretas_original['Etapa2'] == 'Pintura')]
@@ -1402,8 +1426,9 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             base_carretas = base_carretas.reset_index(drop=True)
             
             for i in range(len(base_carretas)):
-                if len(base_carretas['Recurso'][i]) == 5:
-                    base_carretas['Recurso'][i] = "0" + base_carretas['Recurso'][i]
+                recurso = base_carretas.loc[i, 'Recurso']
+                if len(recurso) == 5:
+                    base_carretas.loc[i, 'Recurso'] = "0" + recurso
 
             #### criando código único#####
 
@@ -1421,10 +1446,12 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
 
             for i in range(len(filtro_data)):
-                if filtro_data['Recurso'][i][0] == '0':
-                    filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
-                if len(filtro_data['Recurso'][i]) == 5:
-                    filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
+                recurso = filtro_data.loc[i, 'Recurso']
+                if recurso and recurso[0] == '0':
+                    recurso = recurso[1:]
+                if len(recurso) == 5:
+                    recurso = "0" + recurso
+                filtro_data.loc[i, 'Recurso'] = recurso
             
             ##### juntando planilhas de acordo com o recurso#######
 
@@ -1440,7 +1467,22 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             # st.dataframe(carretas_agrupadas)
 
-            tab_completa['Código'] = tab_completa['Código'].astype(str)
+            tab_completa['Código'] = (
+                tab_completa['Código']
+                    .fillna('')
+                    .astype(str)
+                    .str.strip()
+                    .str.replace(r'\.0$', '', regex=True)
+            )
+
+            def _normaliza_codigo(codigo: str) -> str:
+                if len(codigo) == 5:
+                    return '0' + codigo
+                if len(codigo) == 8:
+                    return codigo[:6]
+                return codigo
+
+            tab_completa['Código'] = tab_completa['Código'].apply(_normaliza_codigo)
 
             tab_completa.reset_index(inplace=True, drop=True)
 
@@ -1488,11 +1530,6 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             tab_completa.reset_index(inplace=True)
 
             # tratando coluna de código e recurso
-
-            for d in range(0, tab_completa.shape[0]):
-
-                if len(tab_completa['Código'][d]) == 5:
-                    tab_completa['Código'][d] = '0' + tab_completa['Código'][d]
 
             # criando coluna de código para arquivar
 
