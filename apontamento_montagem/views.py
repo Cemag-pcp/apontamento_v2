@@ -18,6 +18,26 @@ from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, Mo
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos, CarretasExplodidas
 from inspecao.models import Inspecao
 
+
+def _normalizar_codigo_inspecao(valor):
+    codigo = str(valor or "").strip().replace(" ", "")
+    if codigo.endswith(".0"):
+        codigo = codigo[:-2]
+    return codigo.upper()
+
+
+def _chave_codigo_inspecao(valor):
+    return _normalizar_codigo_inspecao(valor).lstrip("0")
+
+
+def _extrair_codigo_peca(peca_nome):
+    texto = str(peca_nome or "").strip()
+    if " - " in texto:
+        return texto.split(" - ", maxsplit=1)[0].strip()
+    if "-" in texto:
+        return texto.split("-", maxsplit=1)[0].strip()
+    return texto
+
 @csrf_exempt
 def criar_ordem(request):
     """
@@ -302,21 +322,23 @@ def atualizar_status_ordem(request):
                 ultimo_peca_ordem.operador=operador_final
                 ultimo_peca_ordem.save()
 
-                if "-" in peca.peca:
-                    codigo = peca.peca.split(" - ", maxsplit=1)[0]
+                codigo = _extrair_codigo_peca(peca.peca)
+                codigo_chave = _chave_codigo_inspecao(codigo)
+
+                # verifica se tá na lista de itens a ser inspecionado (com fallback de normalização)
+                conjunto_exato = ConjuntosInspecionados.objects.filter(codigo=codigo).exists()
+                if conjunto_exato:
+                    conjunto_inspecionado = True
                 else:
-                    codigo = peca.peca
-                
-                # verifica se ta na lista de itens a ser inspecionado pelo setor da montagem
-                conjuntos_inspecionados = ConjuntosInspecionados.objects.filter(codigo=codigo)
-                if conjuntos_inspecionados:
-                    Inspecao.objects.create(
-                        pecas_ordem_montagem=ultimo_peca_ordem,
-                    )
+                    codigos_cadastro = ConjuntosInspecionados.objects.values_list("codigo", flat=True)
+                    codigos_chave = {_chave_codigo_inspecao(c) for c in codigos_cadastro}
+                    conjunto_inspecionado = codigo_chave in codigos_chave
 
                 # verifica se a peça é da célula "serralheria", se sim cria inspeção
                 maquina_nome = ordem.maquina.nome.strip().lower() if ordem.maquina and ordem.maquina.nome else ""
-                if maquina_nome == "serralheria":
+                precisa_inspecao = conjunto_inspecionado or maquina_nome == "serralheria"
+
+                if precisa_inspecao and not Inspecao.objects.filter(pecas_ordem_montagem=ultimo_peca_ordem).exists():
                     Inspecao.objects.create(
                         pecas_ordem_montagem=ultimo_peca_ordem,
                     )
