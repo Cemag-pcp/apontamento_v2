@@ -900,7 +900,7 @@ def causas_nao_conformidade_mensal(request):
 
     sql = """
         SELECT
-        TO_CHAR(i.data_inspecao, 'YYYY-MM') AS mes,
+        TO_CHAR(app.data, 'YYYY-MM') AS mes,
         c.nome AS causa,
         SUM(cnc.quantidade) AS total_nao_conformidades,
         app.peca as peca
@@ -908,12 +908,11 @@ def causas_nao_conformidade_mensal(request):
     JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
     JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
     JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c ON cnc.id = cnc_c.causasnaoconformidade_id
-    JOIN apontamento_v2.inspecao_causas c ON c.id = cnc_c.causas_id 
-    join apontamento_v2.apontamento_pintura_pecasordem app on app.id = i.pecas_ordem_pintura_id 
-    WHERE i.data_inspecao IS NOT NULL
-    AND i.pecas_ordem_pintura_id IS NOT NULL
-    AND i.data_inspecao >= %(data_inicio)s
-    AND i.data_inspecao <= %(data_fim)s
+    JOIN apontamento_v2.inspecao_causas c ON c.id = cnc_c.causas_id
+    JOIN apontamento_v2.apontamento_pintura_pecasordem app ON app.id = i.pecas_ordem_pintura_id
+    WHERE i.pecas_ordem_pintura_id IS NOT NULL
+    AND app.data >= %(data_inicio)s
+    AND app.data < %(data_fim)s
     GROUP BY mes, c.nome, app.peca
     ORDER BY mes ASC, c.nome ASC;
     """
@@ -1016,7 +1015,7 @@ def causas_nao_conformidade_por_tipo(request):
 
     sql = """
     SELECT
-        TO_CHAR(i.data_inspecao, 'YYYY-MM') AS data_inspecao,
+        TO_CHAR(pop.data, 'YYYY-MM') AS data_inspecao,
         c.nome AS Causa,
         UPPER(pop.tipo) AS Tipo,
         pop.peca AS Peça,
@@ -1027,11 +1026,10 @@ def causas_nao_conformidade_por_tipo(request):
     JOIN apontamento_v2.apontamento_pintura_pecasordem pop ON i.pecas_ordem_pintura_id = pop.id
     JOIN apontamento_v2.inspecao_causasnaoconformidade_causa link ON cnc.id = link.causasnaoconformidade_id
     JOIN apontamento_v2.inspecao_causas c ON link.causas_id = c.id
-    WHERE i.data_inspecao IS NOT NULL
-      AND i.pecas_ordem_pintura_id IS NOT NULL
-      AND i.data_inspecao >= %(data_inicio)s
-      AND i.data_inspecao <= %(data_fim)s
-    GROUP BY data_inspecao, Causa, Tipo, Peça
+    WHERE i.pecas_ordem_pintura_id IS NOT NULL
+      AND pop.data >= %(data_inicio)s
+      AND pop.data < %(data_fim)s
+    GROUP BY TO_CHAR(pop.data, 'YYYY-MM'), c.nome, UPPER(pop.tipo), pop.peca
     ORDER BY data_inspecao, Causa, Tipo, Peça;
     """
 

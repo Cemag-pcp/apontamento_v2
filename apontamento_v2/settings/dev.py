@@ -9,7 +9,9 @@ ALLOWED_HOSTS = ['127.0.0.1',
                 '192.168.3.18',
                 'mongolia-near-task-mothers.trycloudflare.com',
                 '3c8g63hx-8000.brs.devtunnels.ms',
-                'formatting-sake-south-subscriber.trycloudflare.com'
+                'formatting-sake-south-subscriber.trycloudflare.com',
+                ".trycloudflare.com",
+
             ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -20,7 +22,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://192.168.3.18:8084',
     'https://mongolia-near-task-mothers.trycloudflare.com'
     'https://3c8g63hx-8000.brs.devtunnels.ms',
-    'https://formatting-sake-south-subscriber.trycloudflare.com'
+    'https://formatting-sake-south-subscriber.trycloudflare.com',
+    "https://*.trycloudflare.com",
 ]
 
 DATABASES = {
@@ -32,7 +35,7 @@ DATABASES = {
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
         'OPTIONS': {
-            'options': '-c search_path='+env('BASE_TESTE'),
+            'options': '-c search_path='+env('BASE_PROD'),
         },
     }
 }
