@@ -35,9 +35,11 @@ import json
 from datetime import timedelta
 import django
 from collections import defaultdict
+import logging
 
 django.setup()
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
+logger = logging.getLogger(__name__)
 
 def home(request):
 
@@ -157,6 +159,13 @@ def gerar_dados_sequenciamento(request):
         resultado = processar_ordens_solda(ordens, grupo_maquina=setor.lower())
 
     if "error" in resultado:
+        logger.warning(
+            "gerar_dados_sequenciamento falhou | setor=%s | data_inicio=%s | data_fim=%s | erro=%s",
+            setor,
+            data_inicio,
+            data_final,
+            resultado.get("error"),
+        )
         return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
 
     return JsonResponse({"message": "Sequenciamento gerado com sucesso!", "detalhes": "resultado"})
