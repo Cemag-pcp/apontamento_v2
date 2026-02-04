@@ -1188,6 +1188,7 @@ def base_explodida_innovaro(request):
             'grupo',
             'grupo1',
             'grupo2',
+            'peso'
         )
         [skip:skip + limit]
     )

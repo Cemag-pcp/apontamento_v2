@@ -165,6 +165,7 @@ class CarretasExplodidas(models.Model):
     segundo_processo = models.CharField(max_length=255, blank=True, null=True)
     carreta = models.CharField(max_length=255, blank=True, null=True)
     grupo = models.CharField(max_length=255, blank=True, null=True) # this column corresponds to column 'celula3' in the excel sheet
+    peso = models.CharField(max_length=10, blank=True, null=True)
 
     def __str__(self):
         return f'{self.descricao_peca}'
