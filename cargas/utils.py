@@ -1291,13 +1291,13 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             # tab_completa['Código'] = tab_completa['Código'].astype(str)
 
-            tab_completa['Código'] = (
-                tab_completa['Código']
-                    .fillna('')                 # evita NaN
-                    .astype(str)
-                    .str.strip()
-                    .str.replace(r'\.0$', '', regex=True)  # remove ".0" no final (ex: 12345.0)
-            )
+            # tab_completa['Código'] = (
+            #     tab_completa['Código']
+            #         .fillna('')                 # evita NaN
+            #         .astype(str)
+            #         .str.strip()
+            #         .str.replace(r'\.0$', '', regex=True)  # remove ".0" no final (ex: 12345.0)
+            # )
 
             tab_completa = tab_completa.reset_index(drop=True)
 
@@ -1310,14 +1310,14 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             # tratando coluna de código
 
-            for t in range(tab_completa.shape[0]):
-                codigo = tab_completa['Código'].iloc[t]
+            # for t in range(tab_completa.shape[0]):
+            #     codigo = tab_completa['Código'].iloc[t]
 
-                if len(codigo) == 5:
-                    tab_completa.loc[t, 'Código'] = '0' + codigo[:5]
+            #     if len(codigo) == 5:
+            #         tab_completa.loc[t, 'Código'] = '0' + codigo[:5]
 
-                elif len(codigo) == 8:
-                    tab_completa.loc[t, 'Código'] = codigo[:6]
+            #     elif len(codigo) == 8:
+            #         tab_completa.loc[t, 'Código'] = codigo[:6]
 
             # criando coluna de quantidade total de itens
 
