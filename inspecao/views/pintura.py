@@ -913,7 +913,7 @@ def causas_nao_conformidade_mensal(request):
     WHERE i.data_inspecao IS NOT NULL
     AND i.pecas_ordem_pintura_id IS NOT NULL
     AND i.data_inspecao >= %(data_inicio)s
-    AND i.data_inspecao < %(data_fim)s
+    AND i.data_inspecao <= %(data_fim)s
     GROUP BY mes, c.nome, app.peca
     ORDER BY mes ASC, c.nome ASC;
     """
@@ -970,7 +970,7 @@ def imagens_nao_conformidade_pintura(request):
         WHERE de.data_execucao IS NOT NULL
         AND i.pecas_ordem_pintura_id IS NOT NULL
         AND de.data_execucao >= %(data_inicio)s
-        AND de.data_execucao < %(data_fim)s
+        AND de.data_execucao <= %(data_fim)s
         AND a.arquivo IS NOT NULL
         GROUP BY cnc.id, i.data_inspecao, a.arquivo, cnc.quantidade
         ORDER BY i.data_inspecao DESC;
@@ -1030,7 +1030,7 @@ def causas_nao_conformidade_por_tipo(request):
     WHERE i.data_inspecao IS NOT NULL
       AND i.pecas_ordem_pintura_id IS NOT NULL
       AND i.data_inspecao >= %(data_inicio)s
-      AND i.data_inspecao < %(data_fim)s
+      AND i.data_inspecao <= %(data_fim)s
     GROUP BY data_inspecao, Causa, Tipo, Peça
     ORDER BY data_inspecao, Causa, Tipo, Peça;
     """
