@@ -1209,6 +1209,8 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             base_carretas = base_carretas.reset_index(drop=True)
 
+            print(base_carretas)
+
             base_carretas = base_carretas.astype(str)
             
             for d in range(0, base_carretas.shape[0]):

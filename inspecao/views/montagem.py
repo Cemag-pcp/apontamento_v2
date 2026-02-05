@@ -769,7 +769,7 @@ def indicador_montagem_analise_temporal(request):
             EXTRACT(YEAR FROM data) AS ano,
             EXTRACT(MONTH FROM data) AS mes,
             SUM(qtd_boa) AS total_produzido
-        FROM apontamento_v2.apontamento_montagem_pecasordem
+        FROM apontamento_v2_testes.apontamento_montagem_pecasordem
         WHERE qtd_boa IS NOT NULL
             AND data BETWEEN %(data_inicio)s AND %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
@@ -780,9 +780,9 @@ def indicador_montagem_analise_temporal(request):
             EXTRACT(MONTH FROM amp.data) AS mes,
             SUM(dei.conformidade) AS total_conforme,
             SUM(dei.nao_conformidade) AS total_nao_conforme
-        FROM apontamento_v2.apontamento_montagem_pecasordem amp
-        INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_montagem_id = amp.id
-        INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
+        FROM apontamento_v2_testes.apontamento_montagem_pecasordem amp
+        INNER JOIN apontamento_v2_testes.inspecao_inspecao i ON i.pecas_ordem_montagem_id = amp.id
+        INNER JOIN apontamento_v2_testes.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
         WHERE amp.data BETWEEN %(data_inicio)s AND %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM amp.data), EXTRACT(MONTH FROM amp.data)
     )
@@ -846,7 +846,7 @@ def indicador_montagem_resumo_analise_temporal(request):
         EXTRACT(YEAR FROM data) AS ano,
         EXTRACT(MONTH FROM data) AS mes,
         SUM(qtd_boa) AS total_produzido
-    FROM apontamento_v2.apontamento_montagem_pecasordem
+    FROM apontamento_v2_testes.apontamento_montagem_pecasordem
     WHERE qtd_boa IS NOT NULL
         AND data BETWEEN %(data_inicio)s AND %(data_fim)s
     GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
@@ -857,9 +857,9 @@ def indicador_montagem_resumo_analise_temporal(request):
             EXTRACT(MONTH FROM app.data) AS mes,
             SUM(dei.conformidade) AS total_conforme,
             SUM(dei.nao_conformidade) AS total_nao_conforme
-        FROM apontamento_v2.apontamento_montagem_pecasordem app
-        INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_montagem_id = app.id
-        INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
+        FROM apontamento_v2_testes.apontamento_montagem_pecasordem app
+        INNER JOIN apontamento_v2_testes.inspecao_inspecao i ON i.pecas_ordem_montagem_id = app.id
+        INNER JOIN apontamento_v2_testes.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
         WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
     )

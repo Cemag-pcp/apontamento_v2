@@ -19,7 +19,8 @@ ALL_FIELDS = (
     'carreta',
     'grupo',
     'grupo1',
-    'grupo2'
+    'grupo2',
+    'peso'
 )
 
 def _chunked(iterable, size=1000):
