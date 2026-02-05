@@ -3,14 +3,10 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import (
     Q,
-    Sum,
     Max
 )
 from django.db import transaction
 from django.utils import timezone
-from django.db.models.functions import (
-    TruncMonth,
-)
 from django.db import connection
 
 from apontamento_montagem.models import ConjuntosInspecionados
@@ -930,45 +926,32 @@ def causas_nao_conformidade_mensal_montagem(request):
             "dados_execucao__inspecao__pecas_ordem_montagem",
         )
         .prefetch_related("causa")
+        .distinct()
     )
 
     # Aplica filtros de data se fornecidos
     if data_inicio:
         queryset = queryset.filter(
-            dados_execucao__inspecao__data_inspecao__gte=data_inicio
+            dados_execucao__inspecao__data_inspecao__date__gte=data_inicio.date()
         )
     if data_fim:
         queryset = queryset.filter(
-            dados_execucao__inspecao__data_inspecao__lte=data_fim
+            dados_execucao__inspecao__data_inspecao__date__lte=data_fim.date()
         )
 
-    # Agrupa por mês/ano, peça e causa, somando as quantidades
-    resultados = (
-        queryset.annotate(
-            data_mes=TruncMonth(
-                "dados_execucao__inspecao__data_inspecao"
-            )  # Agrupa por mês/ano
-        )
-        .values(
-            "data_mes",
-            "dados_execucao__inspecao__pecas_ordem_montagem__peca",  # Campo da peça de montagem
-            "causa__nome",
-        )
-        .annotate(quantidade_total=Sum("quantidade"))
-        .order_by("data_mes")
-    )
+    resultados = queryset.order_by("dados_execucao__inspecao__data_inspecao", "id")
 
     # Formata os resultados para JSON
     dados_formatados = []
     for item in resultados:
+        causas = [c.nome for c in item.causa.all()]
         dados_formatados.append(
             {
-                "data": (
-                    item["data_mes"].strftime("%Y-%m") if item["data_mes"] else None
-                ),  # Formata como YYYY-MM
-                "peca": item["dados_execucao__inspecao__pecas_ordem_montagem__peca"],
-                "causa": item["causa__nome"],
-                "quantidade": item["quantidade_total"],
+                "data": item.dados_execucao.inspecao.data_inspecao.strftime("%Y-%m"),
+                "peca": item.dados_execucao.inspecao.pecas_ordem_montagem.peca,
+                "causa": ", ".join(causas),
+                "causas": causas,
+                "quantidade": item.quantidade,
                 "setor": "montagem",
             }
         )
