@@ -1056,3 +1056,70 @@ def causas_nao_conformidade_por_tipo(request):
         )
 
     return JsonResponse(resultado, safe=False)
+
+def causas_nao_conformidade_diaria(request):
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+
+    try:
+        if data_inicio:
+            data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
+        if data_fim:
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+    except ValueError:
+        return JsonResponse(
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
+        )
+
+    sql = """
+        SELECT
+            TO_CHAR(app.data::date, 'YYYY-MM-DD') AS dia,
+            app.peca AS peca,
+
+            -- concatena causas sem duplicar
+            STRING_AGG(DISTINCT c.nome, ', ') AS causas,
+
+            -- soma correta das NC
+            SUM(cnc.quantidade) AS total_nao_conformidades,
+
+            -- produção (uma vez por ordem)
+            SUM(DISTINCT app.qtd_boa) AS total_produzidas
+        FROM apontamento_v2.apontamento_pintura_pecasordem app
+        JOIN apontamento_v2.inspecao_inspecao i
+            ON app.id = i.pecas_ordem_pintura_id
+        JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de
+            ON de.inspecao_id = i.id
+        JOIN apontamento_v2.inspecao_causasnaoconformidade cnc
+            ON cnc.dados_execucao_id = de.id
+        JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c
+            ON cnc.id = cnc_c.causasnaoconformidade_id
+        JOIN apontamento_v2.inspecao_causas c
+            ON c.id = cnc_c.causas_id
+        WHERE app.data >= %(data_inicio)s
+          AND app.data < %(data_fim)s
+        GROUP BY dia, app.peca
+        ORDER BY dia ASC, app.peca ASC;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            sql,
+            {
+                "data_inicio": data_inicio,
+                "data_fim": data_fim,
+            },
+        )
+        rows = cursor.fetchall()
+
+    resultado = [
+        {
+            "data_execucao": row[0],
+            "peca": row[1],
+            "causas": row[2],  # ex: "Escorrimento, Mancha, Falta de tinta"
+            "quantidade_nao_conforme": row[3],
+            "quantidade_produzida": row[4],
+        }
+        for row in rows
+    ]
+
+    return JsonResponse(resultado, safe=False)

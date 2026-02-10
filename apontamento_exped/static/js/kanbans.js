@@ -5,6 +5,126 @@ import { renderStatusCarretas } from './verificar_carretas.js'
 // Cache simples para não bombardear a API ao renderizar vários cards
 const _pendenciasCache = new Map();
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildPrintHtml(data, rows) {
+  const header = `
+    <div class="header">
+      <div><strong>Cliente:</strong> ${escapeHtml(data?.cliente_carga || '')}</div>
+      <div><strong>Dt. Carga:</strong> ${escapeHtml(data?.data_carga || '')}</div>
+      <div><strong>Carga:</strong> ${escapeHtml(data?.carga || '')}</div>
+    </div>
+  `;
+
+  const bodyRows = rows.length
+    ? rows.map(r => `
+        <tr>
+          <td>${escapeHtml(r.pacote)}</td>
+          <td>${escapeHtml(r.item)}</td>
+          <td class="qty">${escapeHtml(r.quantidade)}</td>
+        </tr>
+      `).join('')
+    : `<tr><td colspan="3" class="muted">Nenhum pacote encontrado.</td></tr>`;
+
+  return `
+    <!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <title>Pacotes da Carga</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #111; margin: 24px; }
+          h1 { font-size: 18px; margin: 0 0 8px 0; }
+          .header { display: grid; gap: 4px; margin-bottom: 16px; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; }
+          th { background: #f3f4f6; text-align: left; }
+          .qty { text-align: right; width: 90px; }
+          .muted { color: #6b7280; text-align: center; padding: 12px; }
+          @media print {
+            body { margin: 12px; }
+          }
+        </style>
+      </head>
+      <body onload="window.print()">
+        <h1>Lista de Pacotes</h1>
+        ${header}
+        <table>
+          <thead>
+            <tr>
+              <th>Pacote</th>
+              <th>Item</th>
+              <th class="qty">Quantidade</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `;
+}
+
+async function imprimirPacotesDaCarga(cargaId) {
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('N\u00e3o foi poss\u00edvel abrir a janela de impress\u00e3o. Libere pop-ups e tente novamente.');
+    return;
+  }
+
+  win.document.write('<p style="font-family: Arial, sans-serif; padding: 16px;">Carregando...</p>');
+  win.document.close();
+
+  try {
+    const resp = await fetch(`api/buscar-pacote/${encodeURIComponent(cargaId)}/`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+
+    const rows = [];
+    const pacotes = Array.isArray(data?.pacotes) ? data.pacotes : [];
+
+    pacotes.forEach((pacote) => {
+      const itens = Array.isArray(pacote?.itens) ? pacote.itens : [];
+      if (!itens.length) {
+        rows.push({
+          pacote: pacote?.nome || '',
+          item: '(sem itens)',
+          quantidade: ''
+        });
+        return;
+      }
+      itens.forEach((item) => {
+        const desc = item?.descricao ? ` - ${item.descricao}` : '';
+        rows.push({
+          pacote: pacote?.nome || '',
+          item: `${item?.codigo_peca || ''}${desc}`.trim(),
+          quantidade: item?.quantidade ?? ''
+        });
+      });
+    });
+
+    const html = buildPrintHtml(data, rows);
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  } catch (err) {
+    console.error('Erro ao gerar impress\u00e3o:', err);
+    win.document.open();
+    win.document.write('<p style="font-family: Arial, sans-serif; padding: 16px; color: #b91c1c;">Erro ao carregar os pacotes para impress\u00e3o.</p>');
+    win.document.close();
+  }
+}
+
 function mapStage(carga) {
   // se já vier "estagio" do backend, use direto:
   if (carga.stage) return carga.stage.toLowerCase(); 
@@ -289,6 +409,12 @@ export function createKanbanCard(carga) {
   // Corpo do card com layout compacto e slot para avan?ar
   const body = document.createElement('div');
   body.className = 'card-body';
+  const stageKey = mapStage(carga);
+  const printBtnHtml = stageKey === 'verificacao'
+    ? `<button class="btn btn-sm btn-outline-secondary imprimir-pacotes" title="Imprimir pacotes" data-id-carga="${carga.id}">
+         <i class="fas fa-print"></i>
+       </button>`
+    : '';
   body.innerHTML = `
     <div class="meta-row">
       <span class="meta"><i class="far fa-calendar"></i>${formatarData(carga.data_carga)}</span>
@@ -304,6 +430,7 @@ export function createKanbanCard(carga) {
               data-bs-toggle="modal" data-bs-target="#visualizarPacote" data-id-carga="${carga.id}">
         <i class="fas fa-box"></i> Pacotes
       </button>
+      ${printBtnHtml}
       <span class="slot-avancar"></span>
     </div>
   `;
@@ -320,6 +447,16 @@ export function createKanbanCard(carga) {
     if (modalTitle) modalTitle.textContent = `Pacotes da carga #${cargaId}`;
     popularPacotesDaCarga(cargaId);
   });
+
+  const printBtn = body.querySelector('.imprimir-pacotes');
+  if (printBtn) {
+    printBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const cargaId = printBtn.getAttribute('data-id-carga');
+      imprimirPacotesDaCarga(cargaId);
+    });
+  }
 
   // Preencher o slot do avançar (botão/alerta) de forma assíncrona
   // const slotAvancar = body.querySelector('.slot-avancar');

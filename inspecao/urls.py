@@ -120,6 +120,7 @@ urlpatterns += [
     path('pintura/api/indicador-pintura-analise-temporal/', pintura.indicador_pintura_analise_temporal, name='indicador_pintura_analise_temporal'),
     path('pintura/api/indicador-pintura-resumo-analise-temporal/', pintura.indicador_pintura_resumo_analise_temporal, name='indicador_pintura_resumo_analise_temporal'),
     path('pintura/api/causas-nao-conformidade/', pintura.causas_nao_conformidade_mensal, name='causas_nao_conformidade_mensal'),
+    path('pintura/api/causas-nao-conformidade-diaria/', pintura.causas_nao_conformidade_diaria, name='causas_nao_conformidade_diaria'),
     path('pintura/api/imagens-nao-conformidade/', pintura.imagens_nao_conformidade_pintura, name='imagens_nao_conformidade_pintura'),
     path('pintura/api/causas-nao-conformidade-tipo/', pintura.causas_nao_conformidade_por_tipo, name='causas_nao_conformidade_por_tipo'),
 

@@ -53,9 +53,14 @@ document.addEventListener('DOMContentLoaded', function() {
             // Agrupar por causa
             const causesCount = {};
             causesData.forEach(item => {
-                const causa = item.causa;
-                const total = item.quantidade;
-                causesCount[causa] = (causesCount[causa] || 0) + total;
+                const total = Number(item.quantidade) || 0;
+                const causas = Array.isArray(item.causas)
+                    ? item.causas
+                    : (item.causa || "").split(",").map(v => v.trim()).filter(Boolean);
+
+                causas.forEach(causa => {
+                    causesCount[causa] = (causesCount[causa] || 0) + total;
+                });
             });
 
             // Atualiza o gráfico
@@ -134,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.length === 0) {
                 tabela.innerHTML = `
                     <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
+                        <td colspan="4" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
                     </tr>
                 `;
                 return;

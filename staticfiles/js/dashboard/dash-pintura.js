@@ -237,6 +237,50 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    async function carregarTabelaCausasDiaria(startDate, endDate) {
+
+        let url = '/inspecao/pintura/api/causas-nao-conformidade-diaria/';
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar causas diÃ¡rias.');
+            const data = await response.json();
+
+            const tabela = document.querySelector('#table-causas-diaria tbody');
+            tabela.innerHTML = '';
+
+            if (data.length === 0) {
+                tabela.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Nenhum dado encontrado para o perÃ­odo selecionado.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            data.forEach(item => {
+                const row = `
+                    <tr>
+                        <td>${item.data_execucao}</td>
+                        <td>${item.peca}</td>
+                        <td>${item.causas}</td>
+                        <td>${item.quantidade_nao_conforme}</td>
+                        <td>${item.quantidade_produzida}</td>
+                    </tr>
+                `;
+                tabela.insertAdjacentHTML('beforeend', row);
+            });
+
+        } catch (error) {
+            console.error('Erro ao carregar tabela de causas diÃ¡rias:', error);
+            alert('Erro ao carregar dados de causas diÃ¡rias.');
+        }
+    }
+
     async function carregarTabelaProducao(startDate, endDate) {
 
         let url = '/inspecao/pintura/api/indicador-pintura-resumo-analise-temporal/';
@@ -309,6 +353,7 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarCarrosselImagens(startDateInput.value, endDateInput.value);
         carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
         carregarTabelaCausas(startDateInput.value, endDateInput.value);
+        carregarTabelaCausasDiaria(startDateInput.value, endDateInput.value);
         carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
     });
@@ -323,6 +368,7 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarCarrosselImagens(startDateInput.value, endDateInput.value);
         carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
         carregarTabelaCausas(startDateInput.value, endDateInput.value);
+        carregarTabelaCausasDiaria(startDateInput.value, endDateInput.value);
         carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
     });
@@ -333,6 +379,7 @@ document.addEventListener('DOMContentLoaded', function() {
     carregarCarrosselImagens(startDateInput.value, endDateInput.value);
     carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
     carregarTabelaCausas(startDateInput.value, endDateInput.value);
+    carregarTabelaCausasDiaria(startDateInput.value, endDateInput.value);
     carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
 });
