@@ -1075,6 +1075,7 @@ def causas_nao_conformidade_diaria(request):
         SELECT
             TO_CHAR(app.data::date, 'YYYY-MM-DD') AS dia,
             app.peca AS peca,
+            o.cor AS cor,
 
             -- concatena causas sem duplicar
             STRING_AGG(DISTINCT c.nome, ', ') AS causas,
@@ -1085,6 +1086,8 @@ def causas_nao_conformidade_diaria(request):
             -- produção (uma vez por ordem)
             SUM(DISTINCT app.qtd_boa) AS total_produzidas
         FROM apontamento_v2.apontamento_pintura_pecasordem app
+        JOIN apontamento_v2.core_ordem o
+            ON o.id = app.ordem_id
         JOIN apontamento_v2.inspecao_inspecao i
             ON app.id = i.pecas_ordem_pintura_id
         JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de
@@ -1097,7 +1100,7 @@ def causas_nao_conformidade_diaria(request):
             ON c.id = cnc_c.causas_id
         WHERE app.data >= %(data_inicio)s
           AND app.data < %(data_fim)s
-        GROUP BY dia, app.peca
+        GROUP BY dia, app.peca, o.cor
         ORDER BY dia ASC, app.peca ASC;
     """
 
@@ -1115,9 +1118,10 @@ def causas_nao_conformidade_diaria(request):
         {
             "data_execucao": row[0],
             "peca": row[1],
-            "causas": row[2],  # ex: "Escorrimento, Mancha, Falta de tinta"
-            "quantidade_nao_conforme": row[3],
-            "quantidade_produzida": row[4],
+            "cor": row[2],
+            "causas": row[3],  # ex: "Escorrimento, Mancha, Falta de tinta"
+            "quantidade_nao_conforme": row[4],
+            "quantidade_produzida": row[5],
         }
         for row in rows
     ]

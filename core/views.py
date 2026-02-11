@@ -1176,6 +1176,12 @@ def base_explodida_innovaro(request):
     pecas = (
         CarretasExplodidas.objects
         .filter(filtros)
+        .order_by(
+            'codigo_peca',
+            'conjunto_peca',
+            'primeiro_processo',
+            'descricao_peca'
+        )
         .values(
             'codigo_peca',
             'descricao_peca',
@@ -1189,8 +1195,7 @@ def base_explodida_innovaro(request):
             'grupo1',
             'grupo2',
             'peso'
-        )
-        [skip:skip + limit]
+        )[skip:skip + limit]
     )
 
     return JsonResponse({'pecas': list(pecas)})
