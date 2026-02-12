@@ -7,9 +7,12 @@ urlpatterns = [
     
     #templates
     path('', views.planejamento, name='planejamento'),
+    path('relatorios/', views.relatorios, name='relatorios'),
+    path('relatorios/impressao/', views.relatorios_impressao, name='relatorios_impressao'),
 
     #apis
     path('api/cargas_disponiveis/', views.cargas, name='cargas'),
+    path('api/relatorios-clientes/', views.relatorios_clientes_api, name='relatorios_clientes'),
     path('api/carretas_disponiveis/', views.carretas, name='carretas'),
     path('api/clientes_disponiveis/', views.clientes, name='clientes'),
     path('api/criar-caixa/', views.criar_caixa, name='criar_caixa'),

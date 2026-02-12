@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+<title>Relatórios - Expedição</title>
+{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h2 class="mb-3">Relatórios - Expedição</h2>
+        <form method="get" action="/expedicao/relatorios/impressao/" class="row g-3 align-items-end" target="_blank">
+            <div class="col-auto">
+                <label for="data" class="form-label">Data da carga</label>
+                <input type="date" id="data" name="data" class="form-control" value="{{ data_str }}">
+            </div>
+            <div class="col-auto">
+                <label for="cliente" class="form-label">Cliente</label>
+                <select id="cliente" name="cliente" class="form-select" disabled>
+                    <option value="">Selecione a data</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary" id="btnBuscar" disabled>Buscar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const dataInput = document.getElementById('data');
+    const clienteSelect = document.getElementById('cliente');
+    const btnBuscar = document.getElementById('btnBuscar');
+
+    function resetClientes(label) {
+        clienteSelect.innerHTML = '';
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = label;
+        clienteSelect.appendChild(opt);
+        clienteSelect.disabled = true;
+        btnBuscar.disabled = true;
+    }
+
+    async function carregarClientes(data) {
+        resetClientes('Carregando...');
+        try {
+            const response = await fetch(`/expedicao/api/relatorios-clientes/?data=${encodeURIComponent(data)}`);
+            const payload = await response.json();
+            if (!response.ok) {
+                resetClientes(payload.error || 'Erro ao carregar');
+                return;
+            }
+            const clientes = payload.clientes || [];
+            if (clientes.length === 0) {
+                resetClientes('Nenhum cliente encontrado');
+                return;
+            }
+            clienteSelect.innerHTML = '<option value="">Todos os clientes</option>';
+            for (const cliente of clientes) {
+                const opt = document.createElement('option');
+                opt.value = cliente;
+                opt.textContent = cliente;
+                clienteSelect.appendChild(opt);
+            }
+            clienteSelect.disabled = false;
+            btnBuscar.disabled = true;
+        } catch (err) {
+            resetClientes('Erro ao carregar');
+        }
+    }
+
+    dataInput.addEventListener('change', () => {
+        const data = dataInput.value;
+        if (!data) {
+            resetClientes('Selecione a data');
+            return;
+        }
+        carregarClientes(data);
+    });
+
+    clienteSelect.addEventListener('change', () => {
+        btnBuscar.disabled = !clienteSelect.value;
+    });
+</script>
+{% endblock %}

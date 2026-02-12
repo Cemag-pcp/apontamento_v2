@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from django.views.decorators.http import require_http_methods
-from django.db.models import Sum, Exists, OuterRef, Count, Q
+from django.db.models import Sum, Exists, OuterRef, Count, Q, Prefetch
 from django.db.models.functions import Coalesce
 from django.utils.timezone import localtime
 
@@ -21,6 +21,7 @@ import re
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
+from datetime import datetime
 
 # === Helpers de normalização ===
 
@@ -90,6 +91,82 @@ def parse_total(v):
 def planejamento(request):
 
     return render(request, 'apontamento_exped/planejamento.html')
+
+def relatorios(request):
+    data_str = (request.GET.get('data') or '').strip()
+    return render(request, 'apontamento_exped/relatorios.html', {'data_str': data_str})
+
+
+
+
+def relatorios_clientes_api(request):
+    data_str = (request.GET.get('data') or '').strip()
+    if not data_str:
+        return JsonResponse({'error': 'Data n?o informada.'}, status=400)
+    try:
+        data_consulta = datetime.strptime(data_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({'error': 'Data inv?lida. Use o formato AAAA-MM-DD.'}, status=400)
+
+    clientes = (
+        Carga.objects
+        .filter(data_carga=data_consulta)
+        .values_list('cliente', flat=True)
+        .distinct()
+        .order_by('cliente')
+    )
+    return JsonResponse({'clientes': list(clientes)})
+
+def relatorios_impressao(request):
+    data_str = (request.GET.get('data') or '').strip()
+    cliente = (request.GET.get('cliente') or '').strip()
+    data_consulta = None
+    erro = None
+
+    if data_str:
+        try:
+            data_consulta = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except ValueError:
+            erro = 'Data inválida. Use o formato AAAA-MM-DD.'
+
+    cargas = []
+    if data_consulta:
+        pacotes_qs = (
+            Pacote.objects
+            .prefetch_related(
+                Prefetch(
+                    'itens',
+                    queryset=ItemPacote.objects.select_related('codigo')
+                ),
+                Prefetch(
+                    'pacote_imagem',
+                    queryset=ImagemPacote.objects.all()
+                )
+            )
+            .order_by('nome', 'id')
+        )
+
+        cargas = Carga.objects.filter(data_carga=data_consulta)
+        if cliente:
+            cargas = cargas.filter(cliente=cliente)
+
+        cargas = (
+            cargas
+            .prefetch_related(
+                Prefetch('pacotes', queryset=pacotes_qs)
+            )
+            .order_by('cliente', 'carga', 'id')
+        )
+
+    context = {
+        'data_str': data_str,
+        'data_consulta': data_consulta,
+        'erro': erro,
+        'cargas': cargas,
+        'report_ready': bool(data_str),
+        'cliente': cliente,
+    }
+    return render(request, 'apontamento_exped/relatorios_impressao.html', context)
 
 # =========== utils ==============
 

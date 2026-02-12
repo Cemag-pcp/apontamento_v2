@@ -11,6 +11,15 @@ document.addEventListener('DOMContentLoaded', function() {
     startDateInput.valueAsDate = firstDayOfMonth;
     endDateInput.valueAsDate = today;
 
+    function formatDateBr(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!match) return raw;
+        const [, y, m, d] = match;
+        return `${d}/${m}/${y}`;
+    }
+
     async function carregarGraficoProducao(startDate, endDate) {
         const queryParams = new URLSearchParams();
         if (startDate) queryParams.append('data_inicio', startDate);
@@ -101,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <img src="https://apontamentov2-teste.s3.sa-east-1.amazonaws.com/${item.arquivo_url}" class="d-block w-100" alt="Imagem de não conformidade">
                         <div class="carousel-caption d-none d-md-block">
                             <h5>${causas}</h5>
-                            <p>Data: ${item.data_execucao} | Quantidade: ${item.quantidade}</p>
+                            <p>Data: ${formatDateBr(item.data_execucao)} | Quantidade: ${item.quantidade}</p>
                         </div>
                     </div>
                 `;
@@ -156,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
             data.forEach(item => {
                 const rowHTML = `
                     <tr>
-                        <td>${item.Data}</td>
+                        <td>${formatDateBr(item.Data)}</td>
                         <td>${item.Causa}</td>
                         <td>${item.Peça}</td>
                         <td>${item.Quantidade}</td>
@@ -222,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
             data.forEach(item => {
                 const row = `
                     <tr>
-                        <td>${item.data_execucao}</td>
+                        <td>${formatDateBr(item.data_execucao)}</td>
                         <td>${item.peca}</td>
                         <td>${item.nome_causa}</td>
                         <td>${item.quantidade}</td>
@@ -256,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.length === 0) {
                 tabela.innerHTML = `
                     <tr>
-                        <td colspan="5" class="text-center text-muted">Nenhum dado encontrado para o perÃ­odo selecionado.</td>
+                        <td colspan="6" class="text-center text-muted">Nenhum dado encontrado para o perÃ­odo selecionado.</td>
                     </tr>
                 `;
                 return;
@@ -265,8 +274,9 @@ document.addEventListener('DOMContentLoaded', function() {
             data.forEach(item => {
                 const row = `
                     <tr>
-                        <td>${item.data_execucao}</td>
+                        <td>${formatDateBr(item.data_execucao)}</td>
                         <td>${item.peca}</td>
+                        <td>${item.cor || ""}</td>
                         <td>${item.causas}</td>
                         <td>${item.quantidade_nao_conforme}</td>
                         <td>${item.quantidade_produzida}</td>
@@ -309,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function() {
             data.forEach(item => {
                 const row = `
                     <tr>
-                        <td>${item.Data}</td>
+                        <td>${formatDateBr(item.Data)}</td>
                         <td>${item["N° de peças produzidas"]}</td>
                         <td>${item["N° de inspeções"]}</td>
                         <td>${item["N° de não conformidades"]}</td>
@@ -345,7 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const filterInfo = document.createElement('div');
         filterInfo.className = 'alert alert-info mt-3';
-        filterInfo.innerText = `Filtro aplicado: ${startDate} até ${endDate}`;
+        filterInfo.innerText = `Filtro aplicado: ${formatDateBr(startDate)} até ${formatDateBr(endDate)}`;
         document.querySelector('.card-body').appendChild(filterInfo);
 
         carregarGraficoProducao(startDate, endDate);
