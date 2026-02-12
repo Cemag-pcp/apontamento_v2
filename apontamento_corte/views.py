@@ -254,6 +254,10 @@ def atualizar_status_ordem(request):
                             if restante > 0:
                                 pecas_restantes.append({"peca": peca.peca, "quantidade": restante})
 
+                    # Se existir peça iniciando com 9, marca a ordem como excluída
+                    if PecasOrdem.objects.filter(ordem=ordem, peca__startswith='9').exists():
+                        ordem.excluida = True
+
                     ordem.status_prioridade = 3
                     ordem.operador_final = get_object_or_404(Operador, pk=body.get('operadorFinal'))
                     ordem.obs_operador = body.get('obsFinal')
