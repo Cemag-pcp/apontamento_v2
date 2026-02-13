@@ -585,27 +585,50 @@ export async function carregarCargasKanban() {
     // limpar colunas
     [colPlanej, colVerif, colDesp].forEach(col => col.innerHTML = '');
 
+    const despachados = [];
+    const outros = [];
+
     cargas.forEach((carga) => {
-      
       const stage = mapStage(carga);
-      const card  = createKanbanCard(carga); // cria card com .slot-avancar
-
-      // escolhe coluna
-      let targetCol = colPlanej;
-      if (stage === 'verificacao') targetCol = colVerif;
-      else if (stage === 'despachado')  targetCol = colDesp;
-
-      // insere o card na coluna
-      targetCol.appendChild(card);
-
-      // >>> CHAMAR A VERIFICAÇÃO *APÓS* MONTAR O CARD <<<
-      const slot = card.querySelector('.slot-avancar');
-      if (slot) {
-        // não bloqueia a UI — roda async
-        preencherSlotAvancar(carga, slot);
+      if (stage === 'despachado') {
+        despachados.push(carga);
+      } else {
+        outros.push(carga);
       }
+    });
 
-    }); 
+    // ordenar despachados por data_criacao desc e limitar a 5
+    despachados.sort((a, b) => {
+      const da = new Date(a.data_criacao || 0).getTime();
+      const db = new Date(b.data_criacao || 0).getTime();
+      return db - da;
+    });
+    const despachadosLimitados = despachados.slice(0, 5);
+
+    const renderCargas = (lista) => {
+      lista.forEach((carga) => {
+        const stage = mapStage(carga);
+        const card  = createKanbanCard(carga); // cria card com .slot-avancar
+
+        // escolhe coluna
+        let targetCol = colPlanej;
+        if (stage === 'verificacao') targetCol = colVerif;
+        else if (stage === 'despachado')  targetCol = colDesp;
+
+        // insere o card na coluna
+        targetCol.appendChild(card);
+
+        // >>> CHAMAR A VERIFICAÇÃO *APÓS* MONTAR O CARD <<<
+        const slot = card.querySelector('.slot-avancar');
+        if (slot) {
+          // não bloqueia a UI — roda async
+          preencherSlotAvancar(carga, slot);
+        }
+      });
+    };
+
+    renderCargas(outros);
+    renderCargas(despachadosLimitados);
 
   } catch (err) {
     console.error(err);
