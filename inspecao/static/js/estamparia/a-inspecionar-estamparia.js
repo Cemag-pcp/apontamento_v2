@@ -10,6 +10,243 @@ const Toast = Swal.mixin({
     }
 });
 
+const LINHAS_PADRAO_MEDICAO = 5;
+let linhasMedicaoSolicitadas = LINHAS_PADRAO_MEDICAO;
+
+function getTabelaMedicaoBody() {
+    return document.querySelector("#sectionMedicaoTec table tbody");
+}
+
+function getLinhasMedicao() {
+    return Array.from(document.querySelectorAll('tr[id^="linhaMedicao"]'));
+}
+
+function getLinhasMedicaoVisiveis() {
+    return getLinhasMedicao().filter((linha) => linha.style.display !== "none");
+}
+
+function limparLinhaMedicao(linha) {
+    linha.querySelectorAll("td input[type='number']").forEach((input) => {
+        input.value = "";
+    });
+    const radioConforme = linha.querySelector("input[id^='conforming']");
+    const radioNaoConforme = linha.querySelector("input[id^='nonConforming']");
+    if (radioConforme) radioConforme.checked = false;
+    if (radioNaoConforme) radioNaoConforme.checked = false;
+}
+
+function criarLinhaMedicao(indice) {
+    const tbody = getTabelaMedicaoBody();
+    if (!tbody) return;
+
+    const linha = document.createElement("tr");
+    linha.id = `linhaMedicao${indice}`;
+    linha.innerHTML = `
+        <td>
+            <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor${indice}_1" style="padding: 5px;">
+        </td>
+        <td>
+            <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor${indice}_2" style="padding: 5px;">
+        </td>
+        <td>
+            <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor${indice}_3" style="padding: 5px;">
+        </td>
+        <td>
+            <input type="number" step="0.01" class="form-control" placeholder="Valor" id="valor${indice}_4" style="padding: 5px;">
+        </td>
+        <td>
+            <div class="form-check">
+                <input class="form-check-input conformity-radio" type="radio" name="conformity${indice}" id="conforming${indice}" value="conforming">
+            </div>
+        </td>
+        <td>
+            <div class="form-check">
+                <input class="form-check-input conformity-radio" type="radio" name="conformity${indice}" id="nonConforming${indice}" value="nonConforming">
+            </div>
+        </td>
+    `;
+
+    tbody.appendChild(linha);
+}
+
+function garantirQuantidadeLinhasMedicao(quantidade) {
+    let totalLinhas = getLinhasMedicao().length;
+    while (totalLinhas < quantidade) {
+        totalLinhas += 1;
+        criarLinhaMedicao(totalLinhas);
+    }
+}
+
+function atualizarContadorLinhasMedicao(linhasVisiveis) {
+    const contador = document.getElementById("contadorLinhasMedicao");
+    if (contador) {
+        contador.textContent = `${linhasVisiveis} linha(s)`;
+    }
+}
+
+function adicionarLinhaMedicao() {
+    linhasMedicaoSolicitadas += 1;
+    controlarLinhasTabela();
+}
+
+function removerLinhaMedicao() {
+    if (linhasMedicaoSolicitadas <= 1) {
+        return;
+    }
+
+    linhasMedicaoSolicitadas -= 1;
+    controlarLinhasTabela();
+}
+
+function getChaveRascunhoInspecao(idInspecao) {
+    return `inspecao_estamparia_rascunho_${idInspecao}`;
+}
+
+function atualizarFlagParcialCard(idInspecao, ativo) {
+    const card = document.querySelector(`[data-card-inspecao-id="${idInspecao}"]`);
+    if (!card) return;
+
+    const existente = card.querySelector(".flag-rascunho-parcial");
+    if (!ativo) {
+        if (existente) existente.remove();
+        return;
+    }
+
+    if (existente) return;
+
+    const titulo = card.querySelector(".titulo-card-inspecao");
+    if (!titulo) return;
+
+    titulo.insertAdjacentHTML(
+        "beforeend",
+        ' <span class="badge bg-warning text-dark flag-rascunho-parcial">Parcial</span>'
+    );
+}
+
+function coletarCamposRascunho() {
+    const campos = {};
+    document.querySelectorAll("#inspectionForm input[id], #inspectionForm select[id], #inspectionForm textarea[id]").forEach((el) => {
+        if (el.type === "file") return;
+        campos[el.id] = {
+            tipo: el.type,
+            valor: el.value,
+            checked: el.checked
+        };
+    });
+    return campos;
+}
+
+function aplicarCamposRascunho(campos) {
+    if (!campos) return;
+    Object.entries(campos).forEach(([id, estado]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (estado.tipo === "checkbox" || estado.tipo === "radio") {
+            el.checked = Boolean(estado.checked);
+        } else {
+            el.value = estado.valor ?? "";
+        }
+    });
+}
+
+function aplicarChecksPendentes(ids, tentativa = 0) {
+    if (!Array.isArray(ids) || ids.length === 0) return;
+
+    const faltando = [];
+    ids.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.checked = true;
+        } else {
+            faltando.push(id);
+        }
+    });
+
+    if (faltando.length > 0 && tentativa < 20) {
+        setTimeout(() => aplicarChecksPendentes(faltando, tentativa + 1), 120);
+    }
+}
+
+function ajustarQuantidadeItensNaoConformidade(quantidade) {
+    if (!Number.isInteger(quantidade) || quantidade < 1) return;
+    const container = document.getElementById("containerNonConformityItems");
+    if (!container) return;
+
+    let atual = container.querySelectorAll(".non-conformity-item").length;
+    while (atual < quantidade) {
+        addNonConformityItem();
+        atual++;
+    }
+}
+
+function salvarParcialInspecao() {
+    const idInspecao = document.getElementById("id-inspecao").value;
+    if (!idInspecao) {
+        Toast.fire({ icon: "warning", title: "Nenhuma inspeção selecionada para salvar parcialmente." });
+        return;
+    }
+
+    const idsChecksMarcados = [];
+    document.querySelectorAll("#inspectionForm input[type='checkbox']:checked, #inspectionForm input[type='radio']:checked").forEach((el) => {
+        if (el.id) idsChecksMarcados.push(el.id);
+    });
+
+    const itensNaoConformidade = Array.from(document.querySelectorAll("#containerNonConformityItems .non-conformity-item")).map((item) => item.id);
+
+    const rascunho = {
+        linhasMedicaoSolicitadas,
+        campos: coletarCamposRascunho(),
+        idsChecksMarcados,
+        quantidadeItensNaoConformidade: itensNaoConformidade.length
+    };
+
+    localStorage.setItem(getChaveRascunhoInspecao(idInspecao), JSON.stringify(rascunho));
+    atualizarFlagParcialCard(idInspecao, true);
+    Toast.fire({ icon: "success", title: "Rascunho salvo com sucesso." });
+}
+
+function carregarRascunhoParcialInspecao(idInspecao) {
+    if (!idInspecao) return;
+
+    const bruto = localStorage.getItem(getChaveRascunhoInspecao(idInspecao));
+    if (!bruto) return;
+
+    let rascunho = null;
+    try {
+        rascunho = JSON.parse(bruto);
+    } catch (error) {
+        localStorage.removeItem(getChaveRascunhoInspecao(idInspecao));
+        return;
+    }
+
+    if (!rascunho) return;
+
+    if (Number.isInteger(rascunho.linhasMedicaoSolicitadas) && rascunho.linhasMedicaoSolicitadas > 0) {
+        linhasMedicaoSolicitadas = rascunho.linhasMedicaoSolicitadas;
+    }
+    controlarLinhasTabela();
+
+    ajustarQuantidadeItensNaoConformidade(rascunho.quantidadeItensNaoConformidade);
+
+    aplicarCamposRascunho(rascunho.campos);
+    aplicarChecksPendentes(rascunho.idsChecksMarcados);
+
+    if (document.getElementById("pecaMortaSim")?.checked) {
+        togglePecaMortaSection(true);
+    } else {
+        togglePecaMortaSection(false);
+    }
+
+    updateConformityCounts();
+}
+
+function limparRascunhoParcialInspecao(idInspecao) {
+    const id = idInspecao || document.getElementById("id-inspecao").value;
+    if (!id) return;
+    localStorage.removeItem(getChaveRascunhoInspecao(id));
+    atualizarFlagParcialCard(id, false);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     buscarItensInspecao(1); // Chama a função quando a página carrega, começando na página 1
         
@@ -23,6 +260,15 @@ document.addEventListener("DOMContentLoaded", () => {
     updateConformityCounts();
 
     preencherCausas_1();
+
+    document.getElementById("numPecaDefeituosa").addEventListener("change", () => {
+        controlarLinhasTabela();
+    });
+
+    const btnSalvarParcial = document.getElementById("savePartialInspection");
+    if (btnSalvarParcial) {
+        btnSalvarParcial.addEventListener("click", salvarParcialInspecao);
+    }
 
 });
 
@@ -54,7 +300,7 @@ document.getElementById("btn-limpar-inspecao-estamparia").addEventListener("clic
 //     if (value > max) {
 //         Toast.fire({
 //             icon: "warning",
-//             title: "A quantidade de peça morta não pode exceder o total de peças produzidas."
+//             title: "A quantidade de peca morta nao pode exceder o total de pecas produzidas."
 //         });
 //         event.target.value = '';  
 //         return;
@@ -168,11 +414,15 @@ function buscarItensInspecao(pagina) {
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         items.dados.forEach(item => {
+            const existeRascunhoParcial = Boolean(localStorage.getItem(getChaveRascunhoInspecao(item.id)));
 
             const cards = `
             <div class="col-md-4 mb-4">
-                <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
+                <div class="card p-3" data-card-inspecao-id="${item.id}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
+                    <h5 class="d-flex align-items-center gap-2 titulo-card-inspecao">
+                        <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a>
+                        ${existeRascunhoParcial ? '<span class="badge bg-warning text-dark flag-rascunho-parcial">Parcial</span>' : ''}
+                    </h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data:</strong> ${item.data}<br>
@@ -227,9 +477,10 @@ function buscarItensInspecao(pagina) {
                     modalInspecao.querySelector('#dataInspecao').disabled = true;
                     modalInspecao.querySelector('#conjuntoName').disabled = true;
 
-                    modalInspecao.querySelector('#numPecaDefeituosa').setAttribute("max", itemQtd);                 
+                    modalInspecao.querySelector('#numPecaDefeituosa').removeAttribute("max");                 
                     controlarLinhasTabela();
                     resetInspetorSelect();
+                    carregarRascunhoParcialInspecao(itemId);
 
                     // Mostrar o modal
                     new bootstrap.Modal(modalInspecao).show();
@@ -286,53 +537,30 @@ function buscarItensInspecao(pagina) {
 }
 
 function controlarLinhasTabela() { 
-    const qtdProduzida = parseInt(document.getElementById("pecasProduzidas").value) || 0;
-    const qtdMorta = parseInt(document.getElementById("numPecaDefeituosa").value) || 0;
-    
-    if (qtdProduzida <= 0) {
-        Toast.fire({
-            icon: "warning",
-            title: "Por favor, informe uma quantidade válida de peças produzidas."
-        });
-        return;
-    }
+    const linhasExibidas = Math.max(1, linhasMedicaoSolicitadas);
+    garantirQuantidadeLinhasMedicao(linhasExibidas);
 
-    // A quantidade de peças válidas para análise é a quantidade produzida menos a quantidade de peças mortas.
-    const qtdParaAnalise = qtdProduzida - qtdMorta;
-
-    // if (qtdParaAnalise <= 0) {
-    //     alert("A quantidade de peças mortas é igual ou maior que a quantidade produzida. Não há peças para análise.");
-    //     return;
-    // }
-
-    // Número máximo de linhas exibidas na tabela (limitado a 3)
-    const maxLinhas = 3;
-    const linhasExibidas = Math.min(qtdParaAnalise, maxLinhas);
-    // Mostrar ou ocultar as linhas da tabela
-    for (let i = 1; i <= maxLinhas; i++) {
-        const linha = document.getElementById(`linhaMedicao${i}`);
-        const linhaInput = document.querySelectorAll(`#linhaMedicao${i} td input`)
-        const linhaCheckbox = document.querySelectorAll(`#linhaMedicao${i} .form-check input`)
-        if (i <= linhasExibidas) {
-            linha.style.display = ""; // Mostra a linha
-        } else {
-            linha.style.display = "none"; // Esconde a linha
-            linhaInput.forEach((input) => {
-                input.value = "";
-            })
-            linhaCheckbox.forEach((checkbox) => {
-                checkbox.checked = false;
-            })
+    const linhas = getLinhasMedicao();
+    linhas.forEach((linha, indice) => {
+        if (indice < linhasExibidas) {
+            linha.style.display = "";
+            return;
         }
+
+        linha.style.display = "none";
+        limparLinhaMedicao(linha);
+    });
+
+    document.getElementById("sectionMedicaoTec").style.display = "block";
+    atualizarContadorLinhasMedicao(linhasExibidas);
+
+    const btnRemoverLinha = document.getElementById("btnRemoverLinhaMedicao");
+    if (btnRemoverLinha) {
+        btnRemoverLinha.disabled = linhasExibidas <= 1;
     }
 
-    if(qtdParaAnalise === 0){
-        document.getElementById("sectionMedicaoTec").style.display = "none";
-    } else {
-        document.getElementById("sectionMedicaoTec").style.display = "block";
-    } 
+    updateConformityCounts();
 }
-
 function togglePecaMortaSection(mostrar) {
     const secao = document.getElementById('pecaMortaSection');
     const statusBadge = document.getElementById('statusPecasDefeituosas');
@@ -354,6 +582,7 @@ function togglePecaMortaSection(mostrar) {
 
     document.getElementById('medicoesTecnicas').style.display = 'block';
 }
+
 
 async function buscarMotivosCausas() {
     try {
@@ -432,6 +661,9 @@ function resetModal() {
         statusBadge.textContent = 'Não verificado';
         statusBadge.className = 'badge bg-secondary text-dark';
     }
+
+    linhasMedicaoSolicitadas = LINHAS_PADRAO_MEDICAO;
+    controlarLinhasTabela();
 }
 
 // Verificar se algum checkbox "Outro" está marcado
@@ -676,9 +908,7 @@ function getSelectedCauses(itemId) {
 // Função para validar o formulário antes do envio
 function validarFormulario() {
 
-    const qtdProduzida = parseInt(document.getElementById("pecasProduzidas").value);
-
-    // Validação de inspetor
+    // Validacao de inspetor
     const inspetor = document.getElementById('inspetor').value;
     if (inspetor === '') {
         Toast.fire({
@@ -689,9 +919,7 @@ function validarFormulario() {
     }
 
     // 1. Validação de peças mortas
-    const pecaMortaSim = document.getElementById("pecaMortaSim").checked;
-    let qtdPecaMorta = 0;
-    
+    const pecaMortaSim = document.getElementById("pecaMortaSim").checked;
     if (pecaMortaSim) {
         const quantidade = parseInt(document.getElementById("numPecaDefeituosa").value);
         const causasSelecionadas = document.querySelectorAll("#causasPecaMorta .causa-checkbox:checked").length;
@@ -710,17 +938,17 @@ function validarFormulario() {
                 title: "Por favor, selecione pelo menos uma causa para as peças mortas."
             });
             return false;
-        }
-
-        qtdPecaMorta = quantidade; // Armazena a quantidade de peças mortas
+        }
     }
 
-    // 2. Validação das medições técnicas conforme a quantidade produzida 
-    let linhasObrigatorias = Math.min(qtdProduzida-qtdPecaMorta, 3); // No máximo 3 linhas obrigatórias
+    // 2. Validacao das medicoes tecnicas conforme as linhas exibidas 
+    const linhasVisiveis = getLinhasMedicaoVisiveis();
+    let linhasObrigatorias = linhasVisiveis.length;
     let linhasPreenchidas = 0;
     let somaQuantidadeNaoConforme = 0;
 
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 0; i < linhasVisiveis.length; i++) {
+        const numeroLinha = parseInt(linhasVisiveis[i].id.replace("linhaMedicao", ""), 10);
         let linhaPreenchida = false;
         let algumCampoPreenchido = false;
         let conformeMarcado = false;
@@ -728,17 +956,17 @@ function validarFormulario() {
 
         // Verificar se pelo menos um campo da linha foi preenchido
         for (let j = 1; j <= 4; j++) {
-            const valor = document.getElementById(`valor${i}_${j}`).value.trim();
+            const valor = document.getElementById(`valor${numeroLinha}_${j}`).value.trim();
             if (valor !== "") { // Verifica se o campo possui algum valor
                 algumCampoPreenchido = true;
             }
         }
 
         // Verificar se um dos botões de conformidade foi marcado
-        conformeMarcado = document.getElementById(`conforming${i}`).checked;
-        naoConformeMarcado = document.getElementById(`nonConforming${i}`).checked;
+        conformeMarcado = document.getElementById(`conforming${numeroLinha}`).checked;
+        naoConformeMarcado = document.getElementById(`nonConforming${numeroLinha}`).checked;
 
-        if(naoConformeMarcado){
+        if (naoConformeMarcado) {
             somaQuantidadeNaoConforme += 1;
         }
 
@@ -749,16 +977,15 @@ function validarFormulario() {
         }
 
         // Verificar se a linha obrigatória não está preenchida corretamente
-        if (i <= linhasObrigatorias && !linhaPreenchida) {
+        if ((i + 1) <= linhasObrigatorias && !linhaPreenchida) {
             Toast.fire({
                 icon: "error",
-                title: `Por favor, preencha pelo menos um campo e marque conformidade na linha ${i} da tabela de medições técnicas.`
+                title: `Por favor, preencha pelo menos um campo e marque conformidade na linha ${numeroLinha} da tabela de medições técnicas.`
             });
 
             return false;
         }
     }
-
     // Verifica se o número de linhas preenchidas é suficiente
     if (linhasPreenchidas < linhasObrigatorias) {
         Toast.fire({
@@ -780,9 +1007,8 @@ function validarFormulario() {
 
     // 4. Validação de conformidade (pelo menos um marcado)
     const conformidadeMarcada = document.querySelectorAll('[name^="conformity"]:checked').length;
-    const quantidade = parseInt(document.getElementById("numPecaDefeituosa").value);
 
-    if (!((qtdProduzida - quantidade) === 0) && (conformidadeMarcada === 0)) {
+    if (conformidadeMarcada === 0) {
         Toast.fire({
             icon: "error",
             title: `Por favor, marque pelo menos uma opção de conformidade (Conforme ou Não Conforme).`
@@ -832,21 +1058,8 @@ function validarFormulario() {
         somaQuantidadesAfetadas += quantidade;
     }
 
-    // 6. Verificar se a quantidade de peças mortas + quantidade afetada é maior que a quantidade produzida
-    const totalPecasProblema = qtdPecaMorta + somaQuantidadesAfetadas;
+    // 6. Verificar consistencia das quantidades de nao conformidade
     const totalNaoConformidade = somaQuantidadeNaoConforme;
-    console.log(totalNaoConformidade)
-    console.log(somaQuantidadesAfetadas)
-
-    if (totalPecasProblema > qtdProduzida) {
-        Toast.fire({
-            icon: "error",
-            title: `A soma da quantidade de peças mortas e das quantidades afetadas por não conformidades não pode ultrapassar a quantidade produzida.`
-        });
-
-        return false;
-    }
-    
 
     if (totalNaoConformidade > 0 && totalNaoConformidade !== somaQuantidadesAfetadas) {
         Toast.fire({
@@ -891,6 +1104,9 @@ document.getElementById('inspectionForm').addEventListener('submit', function(e)
 });
 
 document.addEventListener("change", (event) =>{
+    if (event.target.classList.contains("conformity-radio")) {
+        updateConformityCounts();
+    }
     
     if(event.target.id === "autoInspecaoNoturna"){
         const optionAutoInspecaoNoturna = document.getElementById("optionAutoInspecaoNoturna");
@@ -940,3 +1156,16 @@ function resetInspetorSelect(){
     optionAutoInspecaoNoturna.disabled = true;
     optionAutoInspecaoNoturna.selected = false;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

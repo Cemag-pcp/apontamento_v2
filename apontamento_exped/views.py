@@ -122,6 +122,7 @@ def relatorios_impressao(request):
     cliente = (request.GET.get('cliente') or '').strip()
     data_consulta = None
     erro = None
+    carretas_cliente = []
 
     if data_str:
         try:
@@ -158,10 +159,25 @@ def relatorios_impressao(request):
             .order_by('cliente', 'carga', 'id')
         )
 
+        if cliente:
+            carretas_agrupadas = (
+                CarretaCarga.objects
+                .filter(carga__data_carga=data_consulta, carga__cliente=cliente)
+                .values('carreta')
+                .annotate(quantidade=Coalesce(Sum('quantidade'), 0))
+                .order_by('carreta')
+            )
+
+            carretas_cliente = [
+                {'codigo': item['carreta'], 'quantidade': item['quantidade']}
+                for item in carretas_agrupadas
+            ]
+
     context = {
         'data_str': data_str,
         'data_consulta': data_consulta,
         'erro': erro,
+        'carretas_cliente': carretas_cliente,
         'cargas': cargas,
         'report_ready': bool(data_str),
         'cliente': cliente,

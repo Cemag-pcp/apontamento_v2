@@ -230,6 +230,11 @@ def atualizar_status_ordem(request):
                 ordem.maquina = maquina_nome
                 ordem.status_prioridade = 1
 
+                # Cria a inspeção já no início para o inspetor ver o lote
+                peca_inicial = PecasOrdem.objects.filter(ordem=ordem).first()
+                if peca_inicial and not Inspecao.objects.filter(pecas_ordem_estamparia__ordem=ordem).exists():
+                    Inspecao.objects.create(pecas_ordem_estamparia=peca_inicial)
+
             elif status == 'finalizada':
                 operador_final = get_object_or_404(Operador, pk=int(body.get('operador_final')))
                 obs_final = body.get('obs_finalizar')
@@ -248,9 +253,15 @@ def atualizar_status_ordem(request):
                     operador=operador_final
                 )
 
-                Inspecao.objects.create(
-                    pecas_ordem_estamparia=nova_peca_ordem
-                )
+                # Atualiza a inspeção existente (criada no início) para apontar para o lote final
+                inspecao_existente = Inspecao.objects.filter(
+                    pecas_ordem_estamparia__ordem=ordem
+                ).order_by('-id').first()
+                if inspecao_existente and not DadosExecucaoInspecao.objects.filter(inspecao=inspecao_existente).exists():
+                    inspecao_existente.pecas_ordem_estamparia = nova_peca_ordem
+                    inspecao_existente.save(update_fields=['pecas_ordem_estamparia'])
+                elif not inspecao_existente:
+                    Inspecao.objects.create(pecas_ordem_estamparia=nova_peca_ordem)
 
                 ordem.status_prioridade = 3
 

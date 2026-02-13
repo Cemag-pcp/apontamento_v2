@@ -31,6 +31,34 @@
     {% endif %}
 
     {% if data_str and not erro %}
+    {% if cliente %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="mb-3">Carretas solicitadas</h5>
+            {% if carretas_cliente %}
+                <table class="table table-sm table-bordered align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 60%;">Codigo</th>
+                            <th style="width: 40%;">Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for carreta in carretas_cliente %}
+                        <tr>
+                            <td>{{ carreta.codigo }}</td>
+                            <td>{{ carreta.quantidade }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="text-muted">Nenhuma carreta encontrada para este cliente na data selecionada.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <div class="row">
         <div class="col-12">
             <!-- <h4 class="mb-3">Relatório de pacotes - {{ data_consulta|date:"d/m/Y" }}</h4> -->
