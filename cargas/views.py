@@ -160,11 +160,12 @@ def gerar_dados_sequenciamento(request):
 
     if "error" in resultado:
         logger.warning(
-            "gerar_dados_sequenciamento falhou | setor=%s | data_inicio=%s | data_fim=%s | erro=%s",
+            "gerar_dados_sequenciamento falhou | setor=%s | data_inicio=%s | data_fim=%s | erro=%s | ordens=%s",
             setor,
             data_inicio,
             data_final,
             resultado.get("error"),
+            ordens
         )
         return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
 
