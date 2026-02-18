@@ -1367,7 +1367,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             # criando coluna de quantidade total de itens
 
-            tab_completa = tab_completa.dropna()
+            # tab_completa = tab_completa.dropna()
             _dbg_df("pintura_tab_completa_pos_dropna_1", tab_completa, cols=["Recurso", "Qtde_x", "Qtde_y"])
 
             tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(',', '.')
