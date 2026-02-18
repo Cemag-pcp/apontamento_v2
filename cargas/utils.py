@@ -1209,14 +1209,12 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             base_carretas = base_carretas.reset_index(drop=True)
 
-            print(base_carretas)
-
             base_carretas = base_carretas.astype(str)
             
-            for d in range(0, base_carretas.shape[0]):
-
-                if len(base_carretas['Código'][d]) == 5:
-                    base_carretas['Código'][d] = '0' + base_carretas['Código'][d]
+            for i in range(len(base_carretas)):
+                recurso = base_carretas.loc[i, 'Recurso']
+                if len(recurso) == 5:
+                    base_carretas.loc[i, 'Recurso'] = "0" + recurso
 
             # separando string por "-" e adicionando no dataframe antigo
             base_carga["Recurso"] = base_carga["Recurso"].astype(str)
