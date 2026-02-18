@@ -1118,9 +1118,39 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
 def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] = None, celula: Optional[str]= None):
     filenames = []
+    def _dbg(step, **kwargs):
+        try:
+            details = " | ".join([f"{k}={v}" for k, v in kwargs.items()])
+            msg = f"[gerar_sequenciamento] {step}"
+            if details:
+                msg = f"{msg} | {details}"
+            print(msg, flush=True)
+        except Exception as e:
+            print(f"[gerar_sequenciamento] log_error | step={step} | error={repr(e)}", flush=True)
+
+    def _dbg_df(step, df, cols=None):
+        info = {"rows": len(df), "cols": len(df.columns)}
+        if cols:
+            for c in cols:
+                if c in df.columns:
+                    info[f"null_{c}"] = int(df[c].isna().sum())
+                    info[f"uniq_{c}"] = int(df[c].nunique(dropna=True))
+        _dbg(step, **info)
+
+    _dbg(
+        "start",
+        data_inicial=data_inicial,
+        data_final=data_final,
+        setor=setor,
+        carga=carga,
+        celula=celula
+    )
 
     resultado = criar_array_datas(data_inicial, data_final)
     base_carretas_original, base_carga_original = get_data_from_sheets()
+    _dbg("datas_criadas", total_datas=len(resultado), primeira_data=(resultado[0] if len(resultado) > 0 else None), ultima_data=(resultado[-1] if len(resultado) > 0 else None))
+    _dbg_df("base_carretas_original_carregada", base_carretas_original, cols=["Recurso", "Etapa2"])
+    _dbg_df("base_carga_original_carregada", base_carga_original, cols=["PED_RECURSO.CODIGO", "PED_PREVISAOEMISSAODOC", "Carga"])
 
     base_carretas_original['Recurso'] = base_carretas_original['Recurso'].astype(str)
 
@@ -1148,21 +1178,26 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
     )
 
     resultado = pd.to_datetime(resultado, dayfirst=True, errors='coerce')
+    _dbg("datas_convertidas_datetime", total_datas=len(resultado), datas_invalidas=int(pd.Series(resultado).isna().sum()))
 
     # Ajusta colunas
     if carga:
         base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE', 'Carga']]
     else:
         base_carga_original = base_carga_original[['PED_PREVISAOEMISSAODOC','PED_RECURSO.CODIGO', 'PED_QUANTIDADE']]
+    _dbg_df("base_carga_original_colunas_ajustadas", base_carga_original, cols=["PED_PREVISAOEMISSAODOC", "PED_RECURSO.CODIGO", "Carga"])
  
     # Apenas para pintura
     if celula and setor == 'pintura':
+        _dbg_df("base_carretas_antes_filtro_celula", base_carretas_original, cols=["Recurso", "Etapa2", "Célula"])
         base_carretas_original = base_carretas_original[(base_carretas_original['Célula'] == celula) & (base_carretas_original['Etapa2'] == 'Pintura')]
+        _dbg_df("base_carretas_depois_filtro_celula", base_carretas_original, cols=["Recurso", "Etapa2", "Célula"])
 
     # Converte para datetime
     base_carga_original['PED_PREVISAOEMISSAODOC'] = pd.to_datetime(
         base_carga_original['PED_PREVISAOEMISSAODOC'], format='%d/%m/%Y', dayfirst=True, errors='coerce'
     )
+    _dbg("datas_base_carga_convertidas", total=len(base_carga_original), datas_invalidas=int(base_carga_original['PED_PREVISAOEMISSAODOC'].isna().sum()))
 
     # Pega apenas o ano ANTES de formatar para string
     # base_carga_original['Ano'] = base_carga_original['PED_PREVISAOEMISSAODOC'].dt.year.astype(str)
@@ -1179,15 +1214,21 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
     base_carga_original.dropna(inplace=True)
     base_carga_original.reset_index(drop=True)
+    _dbg_df("base_carga_original_pos_dropna", base_carga_original, cols=["Datas", "Recurso", "Qtde", "Carga"])
+    _dbg_df("base_carretas_original_pre_loop", base_carretas_original, cols=["Recurso", "Etapa2"])
 
     tab_resultado = pd.DataFrame() 
 
     for idx, data_escolhida in enumerate(resultado):
+        _dbg("loop_inicio", idx=idx, data_escolhida=data_escolhida, setor=setor)
         # data_nome_planilha = data_escolhida.replace("/","-")[:5]
         base_carretas = base_carretas_original.copy()
         base_carga = base_carga_original.copy()
+        _dbg_df("loop_base_carretas_copy", base_carretas, cols=["Recurso", "Etapa2"])
+        _dbg_df("loop_base_carga_copy", base_carga, cols=["Datas", "Recurso", "Qtde", "Carga"])
 
         if setor == 'pintura':
+            _dbg("pintura_inicio", idx=idx, data=data_escolhida)
 
             base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
             # base_carretas[base_carretas['Recurso'] == '034550G']
@@ -1266,14 +1307,17 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             base_carga['Recurso'] = base_carga['Recurso'].str.strip()
 
             datas_unique = pd.DataFrame(base_carga['Datas'].unique())
+            _dbg("pintura_datas_unique", qtd_datas=len(datas_unique))
 
             escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
             filtro_data = base_carga.loc[escolha_data]
+            _dbg_df("pintura_filtro_data", filtro_data, cols=["Datas", "Recurso", "Qtde", "Carga"])
             # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
 
             if carga:
                 escolha_carga = (base_carga['Carga'] == carga)
                 filtro_data = filtro_data.loc[escolha_carga]
+                _dbg_df("pintura_filtro_carga", filtro_data, cols=["Datas", "Recurso", "Qtde", "Carga"])
 
             # procv e trazendo as colunas que quero ver
 
@@ -1285,9 +1329,11 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             # tab_completa['Recurso'] = tab_completa['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else x)
             filtro_data['Recurso'] = filtro_data['Recurso'].apply(lambda x: "0" + str(x)  if len(str(x)) == 5 else x)
+            _dbg("pintura_chave_merge_recurso", recurso_filtro_unique=int(filtro_data['Recurso'].nunique(dropna=True)), recurso_carretas_unique=int(base_carretas['Recurso'].nunique(dropna=True)))
 
             tab_completa = pd.merge(filtro_data, base_carretas, on=[
                                     'Recurso'], how='left')
+            _dbg_df("pintura_tab_completa_pos_merge", tab_completa, cols=["Recurso", "Qtde_x", "Qtde_y"])
 
             # tab_completa['Código'] = tab_completa['Código'].astype(str)
 
@@ -1322,6 +1368,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             # criando coluna de quantidade total de itens
 
             tab_completa = tab_completa.dropna()
+            _dbg_df("pintura_tab_completa_pos_dropna_1", tab_completa, cols=["Recurso", "Qtde_x", "Qtde_y"])
 
             tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(',', '.')
 
@@ -1329,6 +1376,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
 
             tab_completa = tab_completa.dropna(axis=0)
+            _dbg_df("pintura_tab_completa_pos_dropna_2", tab_completa, cols=["Recurso", "Qtde_x", "Qtde_y"])
 
             tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(float)
             tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)
@@ -1346,6 +1394,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
                     ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor']).sum()
 
             tab_completa.reset_index(inplace=True)
+            _dbg_df("pintura_tab_completa_pos_groupby", tab_completa, cols=["Datas", "Recurso_cor", "cor"])
 
             # linha abaixo exclui eixo simples do sequenciamento da pintura
             # tab_completa.drop(tab_completa.loc[tab_completa['Célula']=='EIXO SIMPLES'].index, inplace=True)
@@ -1378,6 +1427,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             tab_completa['Recurso_cor'] = tab_completa.apply(lambda row: definir_recurso_cor(row, 'PRETO', 'Preto'), axis=1)
             tab_completa['cor'] = tab_completa.apply(lambda row: definir_cor(row, 'PRETO', 'Preto'), axis=1)
+            _dbg_df("pintura_tab_completa_final_bloco", tab_completa, cols=["Datas", "Recurso_cor", "cor", "Qtde_total"])
 
             
 
@@ -1836,8 +1886,11 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             # Chamar a função de inserção
             # insert_montagem(data_formatada, data_insert_sql, check_atualizar_base_carga)
 
+        _dbg_df("loop_tab_completa_antes_concat", tab_completa)
         tab_resultado = pd.concat([tab_completa, tab_resultado], ignore_index=True)
+        _dbg_df("loop_tab_resultado_pos_concat", tab_resultado)
     
+    _dbg_df("fim_tab_resultado", tab_resultado)
     return tab_resultado
 
 def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grupo_maquina='montagem'):
