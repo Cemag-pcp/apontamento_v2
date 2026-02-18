@@ -1193,212 +1193,199 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
         base_carretas = base_carretas_original.copy()
         base_carga = base_carga_original.copy()
 
-        if setor == 'pintura':
+        if setor == "pintura":
 
-            base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
-            # base_carretas[base_carretas['Recurso'] == '034550G']
-            base_carga['Recurso'] = base_carga['Recurso'].astype(str)
-            # base_carga[base_carga['Recurso'] == '034550G']
-            
-            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
-            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
-            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
-            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
-            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
-            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
-            # base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
-
-            base_carretas.drop(['Etapa', 'Etapa3', 'Etapa4'], axis=1, inplace=True)
-
-            base_carretas.drop(
-                base_carretas[(base_carretas['Etapa2'] == '')].index, inplace=True)
-
-            base_carretas = base_carretas.reset_index(drop=True)
-
-            print(base_carretas)
-
-            base_carretas = base_carretas.astype(str)
-            
-            for d in range(0, base_carretas.shape[0]):
-
-                if len(base_carretas['Código'][d]) == 5:
-                    base_carretas['Código'][d] = '0' + base_carretas['Código'][d]
-
-            # separando string por "-" e adicionando no dataframe antigo
+            # =========================================================
+            # 1️⃣ Padronizações iniciais
+            # =========================================================
+            base_carretas["Recurso"] = base_carretas["Recurso"].astype(str)
             base_carga["Recurso"] = base_carga["Recurso"].astype(str)
 
-            tratando_coluna = base_carga["Recurso"].str.split(
-                " - ", n=1, expand=True)
+            # Remove colunas desnecessárias
+            base_carretas = (
+                base_carretas
+                .drop(columns=["Etapa", "Etapa3", "Etapa4"], errors="ignore")
+                .query("Etapa2 != ''")
+                .reset_index(drop=True)
+            )
 
-            base_carga['Recurso'] = tratando_coluna[0]
+            # Código com 6 dígitos
+            base_carretas["Código"] = (
+                base_carretas["Código"]
+                .astype(str)
+                .str.strip()
+                .apply(lambda x: f"0{x}" if len(x) == 5 else x)
+            )
 
-            # tratando cores da string
+            # =========================================================
+            # 2️⃣ Tratamento de Recurso + Cor
+            # =========================================================
 
-            base_carga['Recurso_cor'] = base_carga['Recurso']
+            # Separa "12345 - algo"
+            base_carga["Recurso"] = base_carga["Recurso"].str.split(" - ", n=1).str[0]
 
-            base_carga = base_carga.reset_index(drop=True)
+            # Extrai últimos 2 caracteres como possível sigla de cor
+            base_carga["Recurso_cor"] = (
+                base_carga["Recurso"]
+                .str[-2:]
+                .str.strip()
+            )
 
-            df_cores = pd.DataFrame({'Recurso_cor': ['AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'sem_cor', 'CO', 'CE'],
-                                    'cor': ['Azul', 'Verde', 'Laranja Jacto', 'Laranja', 'Vermelho', 'Amarelo', 'Laranja', 'Cinza', 'Cinza escuro']})
+            mapa_cores = {
+                "AM": "Amarelo",
+                "AN": "Azul",
+                "VJ": "Verde",
+                "LJ": "Laranja Jacto",
+                "LC": "Laranja",
+                "VM": "Vermelho",
+                "AV": "Amarelo",
+                "CO": "Cinza",
+                "CE": "Cinza escuro",
+            }
 
-            nome_cor_para_sigla = dict(zip(df_cores['cor'], df_cores['Recurso_cor']))
+            # Se não estiver no mapa → LC
+            base_carga["Recurso_cor"] = base_carga["Recurso_cor"].where(
+                base_carga["Recurso_cor"].isin(mapa_cores.keys()),
+                "LC"
+            )
 
-            cores = ['AM', 'AN', 'VJ', 'LJ', 'LC', 'VM', 'AV', 'CO', 'CE']
+            base_carga["cor"] = base_carga["Recurso_cor"].map(mapa_cores)
 
-            base_carga = base_carga.astype(str)
+            # Remove siglas da coluna recurso
+            base_carga["Recurso"] = (
+                base_carga["Recurso"]
+                .str.replace("|".join(mapa_cores.keys()), "", regex=True)
+                .str.replace("SA", "", regex=False)
+                .str.strip()
+            )
 
-            for r in range(0, base_carga.shape[0]):
-                base_carga['Recurso_cor'][r] = base_carga['Recurso_cor'][r][len(
-                    base_carga['Recurso_cor'][r])-3:len(base_carga['Recurso_cor'][r])]
-                base_carga['Recurso_cor'] = base_carga['Recurso_cor'].str.strip()
+            # Recurso com 6 dígitos
+            base_carga["Recurso"] = base_carga["Recurso"].apply(
+                lambda x: f"0{x}" if len(str(x)) == 5 else x
+            )
 
-                if len(base_carga['Recurso_cor'][r]) > 2:
-                    base_carga['Recurso_cor'][r] = base_carga['Recurso_cor'][r][1:3]
+            # =========================================================
+            # 3️⃣ Filtro por data e carga
+            # =========================================================
 
-                if base_carga['Recurso_cor'][r] not in cores:
-                    base_carga['Recurso_cor'][r] = "LC"
-
-            base_carga = pd.merge(base_carga, df_cores, on=[
-                                'Recurso_cor'], how='left')
-
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('SA', '')
-
-            base_carga['Recurso'] = base_carga['Recurso'].str.strip()
-
-            datas_unique = pd.DataFrame(base_carga['Datas'].unique())
-
-            escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
-            filtro_data = base_carga.loc[escolha_data]
-            # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
+            filtro_data = base_carga.loc[
+                base_carga["Datas"] == str(data_escolhida.date())
+            ]
 
             if carga:
-                escolha_carga = (base_carga['Carga'] == carga)
-                filtro_data = filtro_data.loc[escolha_carga]
-
-            # procv e trazendo as colunas que quero ver
+                filtro_data = filtro_data.loc[filtro_data["Carga"] == carga]
 
             filtro_data = filtro_data.reset_index(drop=True)
 
-            # for i in range(len(filtro_data)):
-            #     if filtro_data['Recurso'][i][0] == '0':
-            #         filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
+            # =========================================================
+            # 4️⃣ Merge principal
+            # =========================================================
 
-            # tab_completa['Recurso'] = tab_completa['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else x)
-            filtro_data['Recurso'] = filtro_data['Recurso'].apply(lambda x: "0" + str(x)  if len(str(x)) == 5 else x)
+            tab_completa = (
+                pd.merge(filtro_data, base_carretas, on="Recurso", how="left")
+                .dropna()
+                .reset_index(drop=True)
+            )
 
-            tab_completa = pd.merge(filtro_data, base_carretas, on=[
-                                    'Recurso'], how='left')
+            # =========================================================
+            # 5️⃣ Cálculo de quantidade total
+            # =========================================================
 
-            # tab_completa['Código'] = tab_completa['Código'].astype(str)
+            tab_completa["Qtde_x"] = (
+                tab_completa["Qtde_x"]
+                .astype(str)
+                .str.replace(",", ".", regex=False)
+                .astype(float)
+                .astype(int)
+            )
 
-            # tab_completa['Código'] = (
-            #     tab_completa['Código']
-            #         .fillna('')                 # evita NaN
-            #         .astype(str)
-            #         .str.strip()
-            #         .str.replace(r'\.0$', '', regex=True)  # remove ".0" no final (ex: 12345.0)
-            # )
+            tab_completa["Qtde_y"] = (
+                tab_completa["Qtde_y"]
+                .astype(float)
+                .astype(int)
+            )
 
-            tab_completa = tab_completa.reset_index(drop=True)
+            tab_completa["Qtde_total"] = (
+                tab_completa["Qtde_x"] * tab_completa["Qtde_y"]
+            )
 
-            celulas_unique = pd.DataFrame(tab_completa['Célula'].unique())
-            celulas_unique = celulas_unique.dropna(axis=0)
-            celulas_unique.reset_index(drop=True)
-
-            recurso_unique = pd.DataFrame(tab_completa['Recurso'].unique())
-            recurso_unique = recurso_unique.dropna(axis=0)
-
-            # tratando coluna de código
-
-            # for t in range(tab_completa.shape[0]):
-            #     codigo = tab_completa['Código'].iloc[t]
-
-            #     if len(codigo) == 5:
-            #         tab_completa.loc[t, 'Código'] = '0' + codigo[:5]
-
-            #     elif len(codigo) == 8:
-            #         tab_completa.loc[t, 'Código'] = codigo[:6]
-
-            # criando coluna de quantidade total de itens
-
-            tab_completa = tab_completa.dropna()
-
-            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(',', '.')
-
-            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(float)
-            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
-
-            tab_completa = tab_completa.dropna(axis=0)
-
-            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(float)
-            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)
-
-            tab_completa['Qtde_total'] = tab_completa['Qtde_x'] * \
-                tab_completa['Qtde_y']
             tab_completa = tab_completa.drop(
-                columns=['Recurso', 'Qtde_x', 'Qtde_y', 'LEAD TIME', 'flag peça', 'Etapa2'])
+                columns=[
+                    "Recurso",
+                    "Qtde_x",
+                    "Qtde_y",
+                    "LEAD TIME",
+                    "flag peça",
+                    "Etapa2"
+                ],
+                errors="ignore"
+            )
+
+            # =========================================================
+            # 6️⃣ Agrupamento
+            # =========================================================
+
+            group_cols = [
+                "Código",
+                "Peca",
+                "Célula",
+                "Datas",
+                "Recurso_cor",
+                "cor"
+            ]
 
             if carga:
-                tab_completa = tab_completa.groupby(
-                    ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor', 'Carga']).sum()
-            else:
-                tab_completa = tab_completa.groupby(
-                    ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor']).sum()
+                group_cols.append("Carga")
 
-            tab_completa.reset_index(inplace=True)
+            tab_completa = (
+                tab_completa
+                .groupby(group_cols, as_index=False)
+                .sum()
+            )
 
-            # linha abaixo exclui eixo simples do sequenciamento da pintura
-            # tab_completa.drop(tab_completa.loc[tab_completa['Célula']=='EIXO SIMPLES'].index, inplace=True)
-            tab_completa.reset_index(inplace=True, drop=True)
+            # =========================================================
+            # 7️⃣ Normalização Etapa5
+            # =========================================================
 
-            tab_completa['Etapa5'].unique()
+            tab_completa["Etapa5"] = (
+                tab_completa["Etapa5"]
+                .fillna("")
+                .str.upper()
+            )
 
-            # Normaliza os valores da coluna 'Etapa5' para identificar corretamente as cores
-            tab_completa.loc[tab_completa['Etapa5'].str.contains('CINZA', na=False), 'Etapa5'] = 'CINZA'
-            tab_completa.loc[tab_completa['Etapa5'].str.contains('COLORIDO', na=False), 'Etapa5'] = 'COLORIDO'
-            tab_completa.loc[tab_completa['Etapa5'].str.contains('PRETO', na=False), 'Etapa5'] = 'PRETO'
+            tab_completa.loc[
+                tab_completa["Etapa5"].str.contains("CINZA"),
+                "Etapa5"
+            ] = "CINZA"
 
-            # Função para definir a coluna 'Recurso_cor'
-            def definir_recurso_cor(row, corPlanilha, siglaCor):
-                if row['Etapa5'] == corPlanilha:
-                    return row['Código'] + siglaCor
-                else:
-                    return row['Código'] + row['Recurso_cor']
+            tab_completa.loc[
+                tab_completa["Etapa5"].str.contains("COLORIDO"),
+                "Etapa5"
+            ] = "COLORIDO"
 
-            # Função para definir a coluna 'cor'
-            def definir_cor(row, corPlanilha, returnCor):
-                if row['Etapa5'] == corPlanilha:
-                    return returnCor
-                else:
-                    return row['cor']
+            tab_completa.loc[
+                tab_completa["Etapa5"].str.contains("PRETO"),
+                "Etapa5"
+            ] = "PRETO"
 
-            # Aplicando as funções corretamente
-            tab_completa['Recurso_cor'] = tab_completa.apply(lambda row: definir_recurso_cor(row, 'CINZA', 'Cinza'), axis=1)
-            tab_completa['cor'] = tab_completa.apply(lambda row: definir_cor(row, 'CINZA', 'Cinza'), axis=1)
+            # =========================================================
+            # 8️⃣ Ajuste final de cor conforme Etapa5
+            # =========================================================
 
-            tab_completa['Recurso_cor'] = tab_completa.apply(lambda row: definir_recurso_cor(row, 'PRETO', 'Preto'), axis=1)
-            tab_completa['cor'] = tab_completa.apply(lambda row: definir_cor(row, 'PRETO', 'Preto'), axis=1)
+            def ajustar_cor(row):
+                if row["Etapa5"] == "CINZA":
+                    return pd.Series([row["Código"] + "Cinza", "Cinza"])
+                if row["Etapa5"] == "PRETO":
+                    return pd.Series([row["Código"] + "Preto", "Preto"])
+                return pd.Series([row["Código"] + row["Recurso_cor"], row["cor"]])
 
-            
+            tab_completa[["Recurso_cor", "cor"]] = tab_completa.apply(
+                ajustar_cor,
+                axis=1
+            )
 
-            ###########################################################################################
-
-            # if idx == 0:
-            #     st.write("Arquivos para download")
-
-            # if carga_escolhida != 'Selecione':
-            #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
-            
             tab_completa = tab_completa.reset_index(drop=True)
-
+        
         if setor == 'montagem':
 
             base_carretas['Código'] = base_carretas['Código'].astype(str)
@@ -2013,7 +2000,7 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
     try:
         formato_data = "%Y-%d-%m" if grupo_maquina == "montagem" or "solda" else "%Y-%m-%d"
         datas_requisicao = {
-            datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
+            pd.to_datetime(o["data_carga"]).date()
             for o in ordens_data if o.get("data_carga")
         }
     except ValueError:
@@ -2043,7 +2030,7 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
         ordens_metadata = []
 
         for i, o in enumerate(ordens_data):
-            data_carga = datetime.strptime(o["data_carga"], "%Y-%m-%d").date()
+            data_carga = pd.to_datetime(o["data_carga"]).date()
             peca_nome = o["peca_nome"]
             cor = o["cor"]
 
