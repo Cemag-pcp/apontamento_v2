@@ -1367,18 +1367,18 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             # criando coluna de quantidade total de itens
 
-            # tab_completa = tab_completa.dropna()
-            _dbg_df("pintura_tab_completa_pos_dropna_1", tab_completa, cols=["Recurso", "Qtde_x", "Qtde_y"])
+            tab_completa['Qtde_x'] = pd.to_numeric(
+                tab_completa['Qtde_x'].astype(str).str.replace(',', '.'),
+                errors='coerce'
+            )
+            tab_completa['Qtde_y'] = pd.to_numeric(
+                tab_completa['Qtde_y'],
+                errors='coerce'
+            )
+            tab_completa = tab_completa.dropna(subset=['Qtde_x', 'Qtde_y'])
+            _dbg_df("pintura_tab_completa_pos_dropna_qtde", tab_completa, cols=["Recurso", "Qtde_x", "Qtde_y"])
 
-            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(',', '.')
-
-            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(float)
             tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
-
-            tab_completa = tab_completa.dropna(axis=0)
-            _dbg_df("pintura_tab_completa_pos_dropna_2", tab_completa, cols=["Recurso", "Qtde_x", "Qtde_y"])
-
-            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(float)
             tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)
 
             tab_completa['Qtde_total'] = tab_completa['Qtde_x'] * \
