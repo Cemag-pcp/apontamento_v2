@@ -193,6 +193,50 @@ class ArquivoConformidade(models.Model):
         return f"Arquivo para Execução de Inspeção ID {self.dados_execucao.id}"
 
 
+class InspecaoRecebimento(models.Model):
+    RESULTADO_CHOICES = (
+        ("conforme", "Conforme"),
+        ("nao_conforme", "Nao conforme"),
+    )
+
+    data_inspecao = models.DateTimeField(auto_now_add=True)
+    inspetor = models.ForeignKey(
+        Profile, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    item = models.ForeignKey(
+        "InspecaoRecebimentoItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="inspecoes",
+    )
+    planilha_id = models.CharField(max_length=120)
+    aba_nome = models.CharField(max_length=120)
+    linha_planilha = models.IntegerField(null=True, blank=True)
+    sheet_hash = models.CharField(max_length=64, unique=True)
+    dados = models.JSONField()
+    resultado = models.CharField(max_length=20, choices=RESULTADO_CHOICES)
+    observacao = models.CharField(max_length=255, null=True, blank=True)
+
+    def __str__(self):
+        return f"Recebimento {self.id} - {self.resultado}"
+
+
+class InspecaoRecebimentoItem(models.Model):
+    criado_em = models.DateTimeField(auto_now_add=True)
+    planilha_id = models.CharField(max_length=120)
+    aba_nome = models.CharField(max_length=120)
+    linha_planilha = models.IntegerField(null=True, blank=True)
+    sheet_hash = models.CharField(max_length=64, unique=True)
+    dados = models.JSONField()
+    data_referencia = models.DateField()
+    status_h = models.BooleanField(default=False)
+    inspecionado = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Recebimento Item {self.id}"
+
+
 #### Inspecao Estanqueidade ####
 
 

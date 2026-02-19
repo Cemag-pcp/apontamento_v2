@@ -6,6 +6,8 @@ from .models import (
     CausasNaoConformidade,
     Causas,
     ArquivoCausa,
+    InspecaoRecebimento,
+    InspecaoRecebimentoItem,
     InspecaoEstanqueidade,
     ReinspecaoEstanqueidade,
     DadosExecucaoInspecaoEstanqueidade,
@@ -67,6 +69,31 @@ class InfoAdicionaisExecTubosCilindrosAdmin(ProfilePermissionMixin, admin.ModelA
     list_display = ("id","dados_exec_inspecao", "nao_conformidade", "nao_conformidade_refugo", "qtd_inspecionada", "observacao", "ficha")
     list_display_links = ("dados_exec_inspecao",)
 
+class InspecaoRecebimentoAdmin(ProfilePermissionMixin, admin.ModelAdmin):
+    list_display = (
+        "id",
+        "data_inspecao",
+        "inspetor",
+        "item",
+        "resultado",
+        "planilha_id",
+        "aba_nome",
+        "linha_planilha",
+    )
+    list_display_links = ("data_inspecao",)
+
+class InspecaoRecebimentoItemAdmin(ProfilePermissionMixin, admin.ModelAdmin):
+    list_display = (
+        "id",
+        "criado_em",
+        "data_referencia",
+        "status_h",
+        "inspecionado",
+        "planilha_id",
+        "aba_nome",
+        "linha_planilha",
+    )
+    list_display_links = ("criado_em",)
 
 admin.site.register(Inspecao, InspecaoAdmin)
 admin.site.register(DadosExecucaoInspecao, DadosExecucaoInspecaoAdmin)
@@ -80,3 +107,5 @@ admin.site.register(ReinspecaoEstanqueidade, ReinspecaoEstanqueidadeAdmin)
 admin.site.register(DadosExecucaoInspecaoEstanqueidade, DadosExecucaoInspecaoEstanqueidadeAdmin)
 admin.site.register(InfoAdicionaisExecTubosCilindros, InfoAdicionaisExecTubosCilindrosAdmin)
 admin.site.register(DetalhesPressaoTanque, DetalhesPressaoTanqueAdmin)
+admin.site.register(InspecaoRecebimento, InspecaoRecebimentoAdmin)
+admin.site.register(InspecaoRecebimentoItem, InspecaoRecebimentoItemAdmin)

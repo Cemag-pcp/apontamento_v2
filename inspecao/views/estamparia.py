@@ -1,4 +1,4 @@
-﻿from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import (
@@ -84,7 +84,7 @@ def inspecao_estamparia(request):
 def inspecionar_estamparia(request):
 
     if request.method != "POST":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido!"}, status=405)
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
 
     if request.method == "POST":
 
@@ -96,9 +96,9 @@ def inspecionar_estamparia(request):
         )
 
         if itemInspecionado:
-            return JsonResponse({"error": "Item jÃ¡ inspecionado!"}, status=400)
+            return JsonResponse({"error": "Item já inspecionado!"}, status=400)
 
-        # Coletar dados simples do formulÃ¡rio
+        # Coletar dados simples do formulário
         dataInspecao = request.POST.get("dataInspecao")
         pecasProduzidas = int(request.POST.get("pecasProduzidas", 0) or 0)
         inspetor = request.POST.get("inspetor")
@@ -112,21 +112,21 @@ def inspecionar_estamparia(request):
             if request.POST.get("numPecaDefeituosa", None)
             else 0
         )
-        # Definindo a data de inspeÃ§Ã£o manualmente
+        # Definindo a data de inspeção manualmente
         if dataInspecao == datetime.now().date().isoformat():
             dataInspecao = datetime.now()
         else:
             data_ontem = datetime.now() - timedelta(days=1)
             dataInspecao = data_ontem.replace(hour=20, minute=0, second=0, microsecond=0)
 
-        # Coletar causas de peÃ§as mortas (JSON convertido para lista)
+        # Coletar causas de peças mortas (JSON convertido para lista)
         causasPecaMorta_raw = request.POST.get("causasPecaMorta")
         causasPecaMorta = json.loads(causasPecaMorta_raw) if causasPecaMorta_raw else []
 
         inspecao = get_object_or_404(Inspecao, pk=request.POST.get("id-inspecao"))
         inspetor = Profile.objects.get(user__pk=inspetor)
 
-        # Coletar nÃ£o conformidades (JSON convertido para lista de dicionÃ¡rios)
+        # Coletar não conformidades (JSON convertido para lista de dicionários)
         nao_conformidades_raw = request.POST.get("naoConformidades")
         nao_conformidades = (
             json.loads(nao_conformidades_raw) if nao_conformidades_raw else []
@@ -180,7 +180,7 @@ def inspecionar_estamparia(request):
                 InfoAdicionaisInspecaoEstamparia, pk=new_info_adicionais.pk
             )
 
-            # DicionÃ¡rios para armazenar os valores dinamicamente
+            # Dicionários para armazenar os valores dinamicamente
             medidas_raw = request.POST.get("medidas")
             medidas = json.loads(medidas_raw) if medidas_raw else []
 
@@ -191,7 +191,7 @@ def inspecionar_estamparia(request):
 
                 for i in range(1, 5):
                     chave = f"medida{i}"
-                    letra = chr(96 + i)  # 1â†’a, 2â†’b, etc.
+                    letra = chr(96 + i)  # 1->a, 2->b, etc.
 
                     if chave in linha:
                         campos[f"cabecalho_medida_{letra}"] = linha[chave]["nome"]
@@ -259,7 +259,7 @@ def inspecionar_estamparia(request):
                     f"fotoNaoConformidade{index}"
                 )  # Pega as imagens enviadas
 
-                # Criar o objeto principal da nÃ£o conformidade
+                # Criar o objeto principal da não conformidade
                 new_dados_nao_conformidade = DadosNaoConformidade.objects.create(
                     informacoes_adicionais_estamparia=informacoes_adicionais_estamparia,
                     qt_nao_conformidade=qt_nao_conformidade,
@@ -286,18 +286,18 @@ def inspecionar_estamparia(request):
                 reinspecao = Reinspecao(inspecao=inspecao)
                 reinspecao.save()
 
-    return JsonResponse({"success": True, "message": "InspeÃ§Ã£o realizada com sucesso!"})
+    return JsonResponse({"success": True, "message": "Inspeção realizada com sucesso!"})
 
 
 def get_itens_inspecao_estamparia(request):
     if request.method != "GET":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+        return JsonResponse({"error": "Método não permitido"}, status=405)
 
     inspecoes_ids = set(
         DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
     )
 
-    # Captura os parÃ¢metros enviados na URL
+    # Captura os parâmetros enviados na URL
     maquinas_filtradas = (
         request.GET.get("maquinas", "").split(",")
         if request.GET.get("maquinas")
@@ -308,8 +308,8 @@ def get_itens_inspecao_estamparia(request):
     data_fim = request.GET.get("data_fim", None)
 
     pesquisa_filtrada = request.GET.get("pesquisar", None)
-    pagina = int(request.GET.get("pagina", 1))  # PÃ¡gina atual, padrÃ£o Ã© 1
-    itens_por_pagina = 12  # Itens por pÃ¡gina
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 12  # Itens por página
 
     # Filtra os dados
     datas = Inspecao.objects.filter(pecas_ordem_estamparia__isnull=False).exclude(
@@ -347,7 +347,7 @@ def get_itens_inspecao_estamparia(request):
         "pecas_ordem_estamparia__operador",
     ).order_by("-id")
 
-    # PaginaÃ§Ã£o
+    # Paginação
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
@@ -363,12 +363,12 @@ def get_itens_inspecao_estamparia(request):
         if data.pecas_ordem_estamparia.operador:
             matricula_nome_operador = f"{data.pecas_ordem_estamparia.operador.matricula} - {data.pecas_ordem_estamparia.operador.nome}"
 
-        # PeÃ§a
+        # Peça
         peca_info = ""
         if data.pecas_ordem_estamparia.peca:
             peca_info = f"{data.pecas_ordem_estamparia.peca.codigo} - {data.pecas_ordem_estamparia.peca.descricao}"
 
-        # MÃ¡quina
+        # Máquina
         maquina_nome = None
         if (
             data.pecas_ordem_estamparia.ordem
@@ -391,7 +391,7 @@ def get_itens_inspecao_estamparia(request):
         {
             "dados": dados,
             "total": quantidade_total,
-            "total_filtrado": paginador.count,  # Total de itens apÃ³s filtro
+            "total_filtrado": paginador.count,  # Total de itens após filtro
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
         },
@@ -401,9 +401,9 @@ def get_itens_inspecao_estamparia(request):
 
 def get_itens_reinspecao_estamparia(request):
     if request.method != "GET":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+        return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # OtimizaÃ§Ã£o 1: Usar exists() em vez de values_list para verificar reinspeÃ§Ãµes
+    # Otimização 1: Usar exists() em vez de values_list para verificar reinspeções
     reinspecao_ids = Reinspecao.objects.filter(reinspecionado=False).values_list(
         "inspecao_id", flat=True
     )
@@ -427,7 +427,7 @@ def get_itens_reinspecao_estamparia(request):
     pagina = int(request.GET.get("pagina", 1))
     itens_por_pagina = 6
 
-    # OtimizaÃ§Ã£o 2: Construir a query de forma incremental
+    # Otimização 2: Construir a query de forma incremental
     query = Q(id__in=reinspecao_ids) & Q(pecas_ordem_estamparia__isnull=False)
 
     if maquinas_filtradas:
@@ -463,7 +463,7 @@ def get_itens_reinspecao_estamparia(request):
             dadosexecucaoinspecao__inspetor__user__username__in=inspetores_filtrados
         )
 
-    # OtimizaÃ§Ã£o 3: Selecionar apenas os campos necessÃ¡rios e prÃ©-carregar relacionamentos
+    # Otimização 3: Selecionar apenas os campos necessários e pré-carregar relacionamentos
     datas = (
         Inspecao.objects.filter(query)
         .select_related(
@@ -484,7 +484,7 @@ def get_itens_reinspecao_estamparia(request):
         id__in=reinspecao_ids, pecas_ordem_estamparia__isnull=False
     ).count()
 
-    # PaginaÃ§Ã£o
+    # Paginação
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
@@ -497,7 +497,7 @@ def get_itens_reinspecao_estamparia(request):
         .annotate(total_conformidade=Sum("conformidade"))
     }
 
-    # OtimizaÃ§Ã£o 4: Reduzir consultas no loop usando prefetch_related e valores jÃ¡ carregados
+    # Otimização 4: Reduzir consultas no loop usando prefetch_related e valores já carregados
     dados = []
     for data in pagina_obj:
         last_dados_execucao = data.dadosexecucaoinspecao_set.last()
@@ -543,7 +543,7 @@ def get_itens_reinspecao_estamparia(request):
             "maquina": (
                 data.pecas_ordem_estamparia.ordem.maquina.nome
                 if data.pecas_ordem_estamparia.ordem.maquina
-                else "NÃ£o identificada"
+                else "Não identificada"
             ),
             "conformidade": (
                 last_dados_execucao.conformidade if last_dados_execucao else None
@@ -574,7 +574,7 @@ def get_itens_reinspecao_estamparia(request):
 
 def get_itens_inspecionados_estamparia(request):
     if request.method != "GET":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+        return JsonResponse({"error": "Método não permitido"}, status=405)
 
     inspecionados_ids = set(
         DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
@@ -602,8 +602,8 @@ def get_itens_inspecionados_estamparia(request):
     data_fim = request.GET.get("data_fim", None)
 
     pesquisa_filtrada = request.GET.get("pesquisar", None)
-    pagina = int(request.GET.get("pagina", 1))  # PÃ¡gina atual, padrÃ£o Ã© 1
-    itens_por_pagina = 6  # Itens por pÃ¡gina
+    pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
+    itens_por_pagina = 6  # Itens por página
 
     # Filtra os dados
     datas = Inspecao.objects.filter(
@@ -654,7 +654,7 @@ def get_itens_inspecionados_estamparia(request):
 
     # Filtro de status de conformidade
     if status_conformidade_filtrados:
-        # Verifica os casos possÃ­veis de combinaÃ§Ã£o de filtros
+        # Verifica os casos possíveis de combinação de filtros
         if set(status_conformidade_filtrados) == {"conforme", "nao_conforme"}:
             pass
         elif "conforme" in status_conformidade_filtrados:
@@ -664,7 +664,7 @@ def get_itens_inspecionados_estamparia(request):
                 dadosexecucaoinspecao__num_execucao=0,
             )
         elif "nao_conforme" in status_conformidade_filtrados:
-            # Apenas itens nÃ£o conformes (nao_conformidades > 0) E num_execucao=0
+            # Apenas itens não conformes (nao_conformidades > 0) E num_execucao=0
             datas = datas.filter(
                 dadosexecucaoinspecao__nao_conformidade__gt=0,
                 dadosexecucaoinspecao__num_execucao=0,
@@ -676,7 +676,7 @@ def get_itens_inspecionados_estamparia(request):
         "pecas_ordem_estamparia__operador",
     ).order_by("-dadosexecucaoinspecao__data_execucao")
 
-    # PaginaÃ§Ã£o
+    # Paginação
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
@@ -686,7 +686,7 @@ def get_itens_inspecionados_estamparia(request):
         "inspecao", "inspetor__user", "inspecao__pecas_ordem_estamparia__ordem__maquina"
     )
 
-    # Cria um dicionÃ¡rio para mapear inspecao_id para seus dados de execuÃ§Ã£o
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução
     dados_execucao_dict = {de.inspecao_id: de for de in dados_execucao}
 
     dados = []
@@ -708,7 +708,7 @@ def get_itens_inspecionados_estamparia(request):
                 "maquina": (
                     data.pecas_ordem_estamparia.ordem.maquina.nome
                     if data.pecas_ordem_estamparia.ordem.maquina
-                    else "NÃ£o identificada"
+                    else "Não identificada"
                 ),
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
@@ -719,7 +719,7 @@ def get_itens_inspecionados_estamparia(request):
         {
             "dados": dados,
             "total": quantidade_total,
-            "total_filtrado": paginador.count,  # Total de itens apÃ³s filtro
+            "total_filtrado": paginador.count,  # Total de itens após filtro
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
         },
@@ -729,7 +729,7 @@ def get_itens_inspecionados_estamparia(request):
 
 def get_historico_estamparia(request, id):
     if request.method != "GET":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+        return JsonResponse({"error": "Método não permitido"}, status=405)
 
     dados = (
         DadosExecucaoInspecao.objects.filter(inspecao__id=id)
@@ -805,7 +805,7 @@ def get_historico_estamparia(request, id):
 
 def get_historico_causas_estamparia(request, id):
     if request.method != "GET":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+        return JsonResponse({"error": "Método não permitido"}, status=405)
 
     try:
         dados_nao_conformidades = DadosNaoConformidade.objects.filter(
@@ -845,7 +845,7 @@ def get_historico_causas_estamparia(request, id):
 
 def envio_reinspecao_estamparia(request):
     if request.method != "POST":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido!"}, status=405)
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
 
     try:
         with transaction.atomic():
@@ -866,7 +866,7 @@ def envio_reinspecao_estamparia(request):
             inspecao = Inspecao.objects.get(id=id_inspecao)
             inspetor = Profile.objects.get(id=inspetor_id)
 
-            # CriaÃ§Ã£o do registro de execuÃ§Ã£o
+            # Criação do registro de execução
             dados_execucao = DadosExecucaoInspecao.objects.create(
                 inspecao=inspecao,
                 inspetor=inspetor,
@@ -875,7 +875,7 @@ def envio_reinspecao_estamparia(request):
                 nao_conformidade=int(nao_conformidade),
             )
 
-            # CriaÃ§Ã£o das informaÃ§Ãµes adicionais
+            # Criação das informações adicionais
             info_adicionais = InfoAdicionaisInspecaoEstamparia.objects.create(
                 dados_exec_inspecao=dados_execucao,
                 inspecao_completa=True,
@@ -892,11 +892,11 @@ def envio_reinspecao_estamparia(request):
                     quantidade_afetada = request.POST.get(f"quantidade_reinspecao_{i}")
                     imagens = request.FILES.getlist(f"imagens_reinspecao_{i}")
 
-                    # Criar o objeto principal da nÃ£o conformidade
+                    # Criar o objeto principal da não conformidade
                     dados_nao_conformidade = DadosNaoConformidade.objects.create(
                         informacoes_adicionais_estamparia=info_adicionais,
                         qt_nao_conformidade=int(quantidade_afetada),
-                        destino="ReinspeÃ§Ã£o",  # Aqui vocÃª pode ajustar o destino conforme o seu fluxo
+                        destino="Reinspeção",  # Aqui você pode ajustar o destino conforme o seu fluxo
                     )
 
                     # Relacionar as causas
@@ -951,7 +951,7 @@ def indicador_estamparia_analise_temporal(request):
     order by id.data_execucao desc;
     """
 
-    # Recebe os parÃ¢metros de data
+    # Recebe os parâmetros de data
     setor = request.GET.get("setor")
     data_inicio = request.GET.get("data_inicio")
     data_fim = request.GET.get("data_fim")
@@ -963,10 +963,10 @@ def indicador_estamparia_analise_temporal(request):
             data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
     except ValueError:
         return JsonResponse(
-            {"erro": "Formato de data invÃ¡lido. Use YYYY-MM-DD."}, status=400
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
         )
 
-    # Filtra somente as produÃ§Ãµes com peÃ§a ligada (mesmo sem inspeÃ§Ã£o)
+    # Filtra somente as produções com peça ligada (mesmo sem inspeção)
     queryset = Inspecao.objects.filter(pecas_ordem_estamparia__isnull=False)
 
     if data_inicio:
@@ -1010,10 +1010,10 @@ def indicador_estamparia_analise_temporal(request):
 
 def indicador_estamparia_analise_temporal_diario(request):
     """
-    Indicador temporal diÃ¡rio da estamparia
+    Indicador temporal diário da estamparia
     """
 
-    # Recebe os parÃ¢metros de data
+    # Recebe os parâmetros de data
     setor = request.GET.get("setor")
     data_inicio = request.GET.get("data_inicio")
     data_fim = request.GET.get("data_fim")
@@ -1022,14 +1022,14 @@ def indicador_estamparia_analise_temporal_diario(request):
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
         if data_fim:
-            # soma 1 dia para incluir o Ãºltimo dia inteiro
+            # soma 1 dia para incluir o último dia inteiro
             data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
     except ValueError:
         return JsonResponse(
-            {"erro": "Formato de data invÃ¡lido. Use YYYY-MM-DD."}, status=400
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
         )
 
-    # ProduÃ§Ãµes com peÃ§a ligada
+    # Produções com peça ligada
     queryset = Inspecao.objects.filter(
         pecas_ordem_estamparia__isnull=False
     )
@@ -1083,7 +1083,7 @@ def indicador_estamparia_resumo_analise_temporal(request):
             data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
     except ValueError:
         return JsonResponse(
-            {"erro": "Formato de data invÃ¡lido. Use YYYY-MM-DD."}, status=400
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
         )
 
     # Query principal
@@ -1094,7 +1094,7 @@ def indicador_estamparia_resumo_analise_temporal(request):
     if data_fim:
         queryset = queryset.filter(data_inspecao__lte=data_fim)
 
-    # AnotaÃ§Ãµes e agregaÃ§Ãµes
+    # Anotações e agregações
     queryset = (
         queryset.annotate(
             ano=ExtractYear("data_inspecao"),
@@ -1133,10 +1133,10 @@ def indicador_estamparia_resumo_analise_temporal(request):
         resultado.append(
             {
                 "Data": mes_formatado,
-                "NÂ° de peÃ§as produzidas": int(total_prod),
-                "NÂ° de inspeÃ§Ãµes": int(total_insp),
-                "NÂ° de nÃ£o conformidades": int(total_nc),
-                "% de inspeÃ§Ã£o": f"{perc_insp:.2f} %",
+                "N° de peças produzidas": int(total_prod),
+                "N° de inspeções": int(total_insp),
+                "N° de não conformidades": int(total_nc),
+                "% de inspeção": f"{perc_insp:.2f} %",
             }
         )
 
@@ -1154,7 +1154,7 @@ def causas_nao_conformidade_mensal_estamparia(request):
             data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
     except ValueError:
         return JsonResponse(
-            {"erro": "Formato de data invÃ¡lido. Use YYYY-MM-DD."}, status=400
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
         )
 
     queryset = DadosNaoConformidade.objects.filter(
@@ -1199,20 +1199,20 @@ def causas_nao_conformidade_mensal_estamparia(request):
             "mes_formatado",
             "causas__nome",
             "destino",
-            "peca_info",  # Usando a anotaÃ§Ã£o que criamos
+            "peca_info",  # Usando a anotação que criamos
         )
         .annotate(total_nao_conformidades=Sum("qt_nao_conformidade"))
         .order_by("mes_formatado", "causas__nome")
     )
 
-    # FormataÃ§Ã£o final
+    # Formatação final
     resultado = [
         {
             "Data": item["mes_formatado"],
             "Causa": item["causas__nome"],
             "Destino": item["destino"],
-            "PeÃ§a": item["peca_info"],  # Formato "codigo - descricao"
-            "Soma do NÂ° Total de nÃ£o conformidades": item["total_nao_conformidades"],
+            "Peça": item["peca_info"],  # Formato "codigo - descricao"
+            "Soma do N° Total de não conformidades": item["total_nao_conformidades"],
         }
         for item in resultados
     ]
@@ -1231,10 +1231,10 @@ def imagens_nao_conformidade_estamparia(request):
             data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
     except ValueError:
         return JsonResponse(
-            {"erro": "Formato de data invÃ¡lido. Use YYYY-MM-DD."}, status=400
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
         )
 
-    # Query otimizada com select_related e prefetch_related especÃ­ficos
+    # Query otimizada com select_related e prefetch_related específicos
     queryset = (
         DadosNaoConformidade.objects.filter(
             informacoes_adicionais_estamparia__dados_exec_inspecao__data_execucao__isnull=False,
@@ -1263,7 +1263,7 @@ def imagens_nao_conformidade_estamparia(request):
             informacoes_adicionais_estamparia__dados_exec_inspecao__data_execucao__lte=data_fim
         )
 
-    # PrÃ©-carrega todos os dados relacionados de uma vez
+    # Pré-carrega todos os dados relacionados de uma vez
     dados_completos = list(queryset)
 
     resultado = []
@@ -1274,7 +1274,7 @@ def imagens_nao_conformidade_estamparia(request):
         )
         data_execucao = date.strftime("%Y-%m-%d %H:%M:%S")
 
-        # Acessa os dados jÃ¡ prÃ©-carregados
+        # Acessa os dados já pré-carregados
         causas = [c.nome for c in item.causas.all()]
         imagens = [
             imagem.imagem.url
@@ -1308,10 +1308,10 @@ def ficha_inspecao_estamparia(request):
             data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
     except ValueError:
         return JsonResponse(
-            {"erro": "Formato de data invÃ¡lido. Use YYYY-MM-DD."}, status=400
+            {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
         )
 
-    # Query base com joins e prefetch necessÃ¡rios
+    # Query base com joins e prefetch necessários
     queryset = (
         InfoAdicionaisInspecaoEstamparia.objects.select_related("dados_exec_inspecao")
         .prefetch_related("motivo_mortas")
@@ -1333,7 +1333,7 @@ def ficha_inspecao_estamparia(request):
     # Prepara os resultados
     resultados = []
     for item in queryset:
-        if item.ficha:  # Garante que sÃ³ retorne itens com ficha
+        if item.ficha:  # Garante que só retorne itens com ficha
             resultados.append(
                 {
                     "data_execucao": item.data_execucao.strftime("%Y-%m-%d %H:%M:%S"),
@@ -1347,5 +1347,4 @@ def ficha_inspecao_estamparia(request):
             )
 
     return JsonResponse(resultados, safe=False)
-
 

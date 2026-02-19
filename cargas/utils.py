@@ -465,7 +465,6 @@ def gerar_arquivos(data_inicial, data_final, setor):
             tab_completa = tab_completa[
                 np.isfinite(tab_completa['Qtde_x']) & np.isfinite(tab_completa['Qtde_y'])
             ]
-            _dbg_df("pintura_tab_completa_pos_filtro_qtde_finite", tab_completa, cols=["Recurso", "Qtde_x", "Qtde_y"])
 
             tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
             tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)

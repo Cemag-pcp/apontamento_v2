@@ -6,6 +6,7 @@ from .views import (
     estanqueidade,
     montagem,
     pintura,
+    recebimento,
     serra_usinagem,
     verificacao_funcional,
 )
@@ -94,6 +95,11 @@ urlpatterns = [
     path('api/realizar-verificacao-funcional/', verificacao_funcional.realizar_verificacao_funcional, name='realizar-verificacao-funcional'),
     path('api/detalhes-verificacao-funcional/<int:id>/', verificacao_funcional.detalhes_verificacao_funcional, name='detalhes-verificacao-funcional'),
 
+    path('api/recebimento/sincronizar/', recebimento.sincronizar_recebimento, name='recebimento-sincronizar'),
+    path('api/recebimento/pendencias/', recebimento.recebimento_pendencias, name='recebimento-pendencias'),
+    path('api/recebimento/inspecionados/', recebimento.recebimento_inspecionados, name='recebimento-inspecionados'),
+    path('api/recebimento/inspecionar/', recebimento.inspecionar_recebimento, name='recebimento-inspecionar'),
+
 ]
 
 # templates
@@ -105,6 +111,7 @@ urlpatterns += [
     path('estamparia/', estamparia.inspecao_estamparia, name='inspecao-estamparia'),
     path('pintura/', pintura.inspecao_pintura, name='inspecao-pintura'),
     path('verificacao-funcional-pintura/', verificacao_funcional.verificacao_funcional_pintura, name='verificacao-funcional-pintura'),
+    path('recebimento/', recebimento.inspecao_recebimento, name='inspecao-recebimento'),
     path('tubos-cilindros/', estanqueidade.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),
     path('dashboard/pintura/', pintura.dashboard_pintura, name='dasdashboard_pinturahboard'),
     path('dashboard/montagem/', montagem.dashboard_montagem, name='dasdashboard_montagemhboard'),

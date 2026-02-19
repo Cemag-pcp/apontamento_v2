@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}<title>Inspecao Recebimento</title>{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/inspecao.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<h2 class="fw-bold my-4">Inspecao de Recebimento</h2>
+
+<ul class="nav nav-tabs mt-3" style="background-color: #f4f4f5;">
+    <li class="nav-item" style="width: 50%;">
+        <a id="tab-pendencias-recebimento" class="nav-link tab-active active text-center" style="font-size: 0.875rem;" onclick="toggleTab('pendencias-recebimento','inspecionados-recebimento', this)">
+            Pendencias
+        </a>
+    </li>
+    <li class="nav-item" style="width: 50%;">
+        <a id="tab-inspecionados-recebimento" class="nav-link tab-active text-center" style="font-size: 0.875rem;" onclick="toggleTab('inspecionados-recebimento','pendencias-recebimento', this)">
+            Inspecionados
+        </a>
+    </li>
+</ul>
+
+<div id="pendencias-recebimento" class="row mt-3">
+    <div class="d-flex justify-content-between mt-3 flex-wrap gap-2">
+        <h4 style="width: 60%;">Pendencias</h4>
+        <div class="d-flex gap-2 align-items-center">
+            <input type="date" class="form-control" id="data-sincronizar-recebimento" style="max-width: 170px;">
+            <button type="button" class="btn btn-outline-primary" id="btn-sincronizar-recebimento">
+                Sincronizar
+            </button>
+            <div class="input-group" style="max-width: 320px;">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control" id="pesquisa-pendencias-recebimento" placeholder="Pesquisar...">
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-pendencias-recebimento" class="rounded-pill py-1 px-2" style="background-color: #ef4444; color: #fafafa; font-weight: 600; font-size: 0.75rem;">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </span>
+        <span id="qtd-filtrada-pendencias-recebimento" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle" id="tabela-pendencias-recebimento">
+            <thead></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="inspecionados-recebimento" class="row mt-3" style="display: none;">
+    <div class="d-flex justify-content-between mt-3">
+        <h4 style="width: 60%;">Inspecionados</h4>
+        <div class="input-group" style="max-width: 320px;">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="pesquisa-inspecionados-recebimento" placeholder="Pesquisar...">
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 my-2">
+        <span id="qtd-inspecionados-recebimento" class="rounded-pill py-1 px-2" style="background-color: #00940c; color: #fafafa; font-weight: 600; font-size: 0.75rem;">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </span>
+        <span id="qtd-filtrada-inspecionados-recebimento" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle" id="tabela-inspecionados-recebimento">
+            <thead></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-inspecao-recebimento" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInspecaoRecebimentoLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalInspecaoRecebimentoLabel">Inspecao de recebimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-4">
+                    <div class="col-md-7">
+                        <h6 class="fw-bold mb-3">Dados do recebimento</h6>
+                        <dl id="detalhes-recebimento" class="row"></dl>
+                    </div>
+                    <div class="col-md-5">
+                        <form id="form-inspecao-recebimento">
+                            <div class="mb-3">
+                                <label class="form-label">Resultado</label>
+                                <select id="resultado-recebimento" class="form-select" required>
+                                    <option value="" selected disabled></option>
+                                    <option value="conforme">Conforme</option>
+                                    <option value="nao_conforme">Nao conforme</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Observacao</label>
+                                <textarea id="observacao-recebimento" class="form-control" rows="4" maxlength="255"></textarea>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-success" id="btn-salvar-recebimento">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let pendenciasCache = { columns: [], rows: [] };
+    let inspecionadosCache = { columns: [], rows: [] };
+    let pendenciaSelecionada = null;
+
+    function toggleTab(showId, hideId, button) {
+        document.getElementById(showId).style.display = "";
+        document.getElementById(hideId).style.display = "none";
+        document.querySelectorAll(".nav-link.tab-active").forEach((link) => link.classList.remove("active"));
+        if (button) {
+            button.classList.add("active");
+        }
+    }
+
+    function carregarPendencias() {
+        const badgeTotal = document.getElementById("qtd-pendencias-recebimento");
+        badgeTotal.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        fetch("/inspecao/api/recebimento/pendencias/")
+            .then((response) => response.json())
+            .then((data) => {
+                pendenciasCache = data;
+                renderPendencias();
+            })
+            .catch((error) => {
+                console.error(error);
+                badgeTotal.textContent = "Erro";
+            });
+    }
+
+    function carregarInspecionados() {
+        const badgeTotal = document.getElementById("qtd-inspecionados-recebimento");
+        badgeTotal.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        fetch("/inspecao/api/recebimento/inspecionados/")
+            .then((response) => response.json())
+            .then((data) => {
+                inspecionadosCache = data;
+                renderInspecionados();
+            })
+            .catch((error) => {
+                console.error(error);
+                badgeTotal.textContent = "Erro";
+            });
+    }
+
+    function sincronizarRecebimento() {
+        const btn = document.getElementById("btn-sincronizar-recebimento");
+        btn.disabled = true;
+        const textoOriginal = btn.textContent;
+        btn.textContent = "Sincronizando...";
+
+        const csrfInput = document.querySelector("[name=csrfmiddlewaretoken]");
+        const headers = { "Content-Type": "application/json" };
+        if (csrfInput) {
+            headers["X-CSRFToken"] = csrfInput.value;
+        }
+
+        const dataInput = document.getElementById("data-sincronizar-recebimento");
+        const payload = {
+            cutoff_date: dataInput && dataInput.value ? dataInput.value : ""
+        };
+
+        fetch("/inspecao/api/recebimento/sincronizar/", {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+        })
+            .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+            .then((result) => {
+                if (!result.ok) {
+                    throw new Error(result.data.error || "Erro ao sincronizar.");
+                }
+                carregarPendencias();
+            })
+            .catch((error) => {
+                console.error(error);
+                alert(error.message || "Erro ao sincronizar.");
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = textoOriginal;
+            });
+    }
+
+    function renderPendencias() {
+        const columns = pendenciasCache.columns || [];
+        const rows = pendenciasCache.rows || [];
+        const filtro = (document.getElementById("pesquisa-pendencias-recebimento").value || "").toLowerCase();
+        const filtradas = rows.filter((row) => {
+            if (!filtro) return true;
+            const texto = Object.values(row.data || {}).join(" ").toLowerCase();
+            return texto.includes(filtro);
+        });
+
+        const tabela = document.getElementById("tabela-pendencias-recebimento");
+        const thead = tabela.querySelector("thead");
+        const tbody = tabela.querySelector("tbody");
+
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+        const headerRow = document.createElement("tr");
+        columns.forEach((col) => {
+            const th = document.createElement("th");
+            th.textContent = col;
+            headerRow.appendChild(th);
+        });
+        const thAcoes = document.createElement("th");
+        thAcoes.textContent = "Acoes";
+        headerRow.appendChild(thAcoes);
+        thead.appendChild(headerRow);
+
+        if (!filtradas.length) {
+            const tr = document.createElement("tr");
+            const td = document.createElement("td");
+            td.colSpan = columns.length + 1;
+            td.className = "text-center text-muted";
+            td.textContent = "Nenhuma pendencia encontrada.";
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+        } else {
+            filtradas.forEach((row) => {
+                const tr = document.createElement("tr");
+                columns.forEach((col) => {
+                    const td = document.createElement("td");
+                    td.textContent = row.data?.[col] || "";
+                    tr.appendChild(td);
+                });
+                const tdAcao = document.createElement("td");
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "btn btn-sm btn-dark";
+                btn.textContent = "Inspecionar";
+                btn.addEventListener("click", () => abrirModalRecebimento(row));
+                tdAcao.appendChild(btn);
+                tr.appendChild(tdAcao);
+                tbody.appendChild(tr);
+            });
+        }
+
+        atualizarBadges(
+            "qtd-pendencias-recebimento",
+            "qtd-filtrada-pendencias-recebimento",
+            rows.length,
+            filtradas.length
+        );
+    }
+
+    function renderInspecionados() {
+        const columns = inspecionadosCache.columns || [];
+        const rows = inspecionadosCache.rows || [];
+        const filtro = (document.getElementById("pesquisa-inspecionados-recebimento").value || "").toLowerCase();
+        const filtradas = rows.filter((row) => {
+            if (!filtro) return true;
+            const texto = Object.values(row.data || {}).join(" ").toLowerCase();
+            return texto.includes(filtro);
+        });
+
+        const tabela = document.getElementById("tabela-inspecionados-recebimento");
+        const thead = tabela.querySelector("thead");
+        const tbody = tabela.querySelector("tbody");
+
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+        const headerRow = document.createElement("tr");
+        columns.forEach((col) => {
+            const th = document.createElement("th");
+            th.textContent = col;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+
+        if (!filtradas.length) {
+            const tr = document.createElement("tr");
+            const td = document.createElement("td");
+            td.colSpan = columns.length || 1;
+            td.className = "text-center text-muted";
+            td.textContent = "Nenhum item inspecionado.";
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+        } else {
+            filtradas.forEach((row) => {
+                const tr = document.createElement("tr");
+                columns.forEach((col) => {
+                    const td = document.createElement("td");
+                    td.textContent = row.data?.[col] || "";
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        atualizarBadges(
+            "qtd-inspecionados-recebimento",
+            "qtd-filtrada-inspecionados-recebimento",
+            rows.length,
+            filtradas.length
+        );
+    }
+
+    function atualizarBadges(idTotal, idFiltrado, total, filtrado) {
+        const badgeTotal = document.getElementById(idTotal);
+        const badgeFiltrado = document.getElementById(idFiltrado);
+        badgeTotal.textContent = total;
+        if (filtrado !== total) {
+            badgeFiltrado.style.display = "";
+            badgeFiltrado.textContent = filtrado;
+        } else {
+            badgeFiltrado.style.display = "none";
+        }
+    }
+
+    function abrirModalRecebimento(row) {
+        pendenciaSelecionada = row;
+        const container = document.getElementById("detalhes-recebimento");
+        container.innerHTML = "";
+        Object.entries(row.data || {}).forEach(([key, value]) => {
+            const dt = document.createElement("dt");
+            dt.className = "col-5 text-muted";
+            dt.textContent = key;
+            const dd = document.createElement("dd");
+            dd.className = "col-7";
+            dd.textContent = value || "-";
+            container.appendChild(dt);
+            container.appendChild(dd);
+        });
+
+        document.getElementById("resultado-recebimento").value = "";
+        document.getElementById("observacao-recebimento").value = "";
+
+        const modalElement = document.getElementById("modal-inspecao-recebimento");
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    }
+
+    function salvarInspecaoRecebimento(event) {
+        event.preventDefault();
+        if (!pendenciaSelecionada) {
+            return;
+        }
+
+        const resultado = document.getElementById("resultado-recebimento").value;
+        if (!resultado) {
+            alert("Selecione o resultado da inspecao.");
+            return;
+        }
+
+        const observacao = document.getElementById("observacao-recebimento").value || "";
+
+        const payload = {
+            row_index: pendenciaSelecionada.row_index,
+            item_id: pendenciaSelecionada.item_id,
+            data: pendenciaSelecionada.data,
+            resultado: resultado,
+            observacao: observacao
+        };
+
+        const csrfInput = document.querySelector("[name=csrfmiddlewaretoken]");
+        const headers = { "Content-Type": "application/json" };
+        if (csrfInput) {
+            headers["X-CSRFToken"] = csrfInput.value;
+        }
+
+        const btnSalvar = document.getElementById("btn-salvar-recebimento");
+        btnSalvar.disabled = true;
+        btnSalvar.textContent = "Salvando...";
+
+        fetch("/inspecao/api/recebimento/inspecionar/", {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+        })
+            .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+            .then((result) => {
+                if (!result.ok) {
+                    throw new Error(result.data.error || "Erro ao salvar.");
+                }
+
+                const modalElement = document.getElementById("modal-inspecao-recebimento");
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+                pendenciaSelecionada = null;
+                carregarPendencias();
+                carregarInspecionados();
+            })
+            .catch((error) => {
+                console.error(error);
+                alert(error.message || "Erro ao salvar.");
+            })
+            .finally(() => {
+                btnSalvar.disabled = false;
+                btnSalvar.textContent = "Salvar";
+            });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        carregarPendencias();
+        carregarInspecionados();
+
+        document.getElementById("pesquisa-pendencias-recebimento").addEventListener("input", renderPendencias);
+        document.getElementById("pesquisa-inspecionados-recebimento").addEventListener("input", renderInspecionados);
+        document.getElementById("form-inspecao-recebimento").addEventListener("submit", salvarInspecaoRecebimento);
+        document.getElementById("btn-sincronizar-recebimento").addEventListener("click", sincronizarRecebimento);
+    });
+</script>
+{% endblock %}
