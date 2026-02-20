@@ -215,6 +215,7 @@ class InspecaoRecebimento(models.Model):
     linha_planilha = models.IntegerField(null=True, blank=True)
     sheet_hash = models.CharField(max_length=64, unique=True)
     dados = models.JSONField()
+    dados_inspecao = models.JSONField(null=True, blank=True)
     resultado = models.CharField(max_length=20, choices=RESULTADO_CHOICES)
     observacao = models.CharField(max_length=255, null=True, blank=True)
 

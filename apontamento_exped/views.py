@@ -998,9 +998,17 @@ def salvar_foto(request):
 def buscar_fotos(request, pacote_id):
     if request.method == 'GET':
         imagens = ImagemPacote.objects.filter(pacote_id=pacote_id)
-        fotos = [{'url': img.arquivo.url, 'etapa': img.stage} for img in imagens]
+        fotos = [{'id': img.id, 'url': img.arquivo.url, 'etapa': img.stage} for img in imagens]
         return JsonResponse({'fotos': fotos})
     return JsonResponse({'erro': 'Método não permitido'}, status=405)
+
+
+@require_http_methods(["DELETE"])
+def excluir_foto(request, foto_id):
+    imagem = get_object_or_404(ImagemPacote, id=foto_id)
+    imagem.arquivo.delete(save=False)
+    imagem.delete()
+    return JsonResponse({'mensagem': 'Foto excluída com sucesso.'})
 
 @require_http_methods(["GET"])
 def mostrar_pendencias(request, carregamento_id):

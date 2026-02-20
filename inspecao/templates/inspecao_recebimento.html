@@ -80,7 +80,7 @@
 </div>
 
 <div class="modal fade" id="modal-inspecao-recebimento" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInspecaoRecebimentoLabel">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalInspecaoRecebimentoLabel">Inspecao de recebimento</h5>
@@ -88,25 +88,23 @@
             </div>
             <div class="modal-body">
                 <div class="row g-4">
-                    <div class="col-md-7">
-                        <h6 class="fw-bold mb-3">Dados do recebimento</h6>
-                        <dl id="detalhes-recebimento" class="row"></dl>
-                    </div>
                     <div class="col-md-5">
+                        <h6 class="fw-bold mb-3">Dados do recebimento</h6>
+                        <dl id="detalhes-recebimento" class="row small"></dl>
+                    </div>
+                    <div class="col-md-7">
                         <form id="form-inspecao-recebimento">
-                            <div class="mb-3">
-                                <label class="form-label">Resultado</label>
-                                <select id="resultado-recebimento" class="form-select" required>
-                                    <option value="" selected disabled></option>
-                                    <option value="conforme">Conforme</option>
-                                    <option value="nao_conforme">Nao conforme</option>
-                                </select>
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <label class="form-label mb-0 fw-semibold small">Unidades:</label>
+                                <div class="input-group input-group-sm" style="max-width:110px">
+                                    <button type="button" class="btn btn-outline-secondary" id="btn-qtd-menos-recebimento">-</button>
+                                    <input type="number" class="form-control text-center" id="qtd-unidades-recebimento" value="1" min="1" max="30">
+                                    <button type="button" class="btn btn-outline-secondary" id="btn-qtd-mais-recebimento">+</button>
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Observacao</label>
-                                <textarea id="observacao-recebimento" class="form-control" rows="4" maxlength="255"></textarea>
-                            </div>
-                            <div class="d-flex justify-content-end gap-2">
+                            <ul class="nav nav-tabs nav-tabs-sm mb-0" id="tabs-unidades-recebimento"></ul>
+                            <div class="tab-content border border-top-0 rounded-bottom p-2" id="content-unidades-recebimento" style="max-height:55vh;overflow-y:auto;"></div>
+                            <div class="d-flex justify-content-end gap-2 mt-3">
                                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
                                 <button type="submit" class="btn btn-success" id="btn-salvar-recebimento">Salvar</button>
                             </div>
@@ -333,11 +331,170 @@
         }
     }
 
+    // ─── helpers do formulário dinâmico ────────────────────────────────────
+    let classeAtual = "";
+
+    function selectConformidade(prefix, name, label) {
+        const fullName = `${prefix}${name}`;
+        return `<div class="mb-2 row align-items-center">
+            <label class="col-sm-7 col-form-label col-form-label-sm">${label}</label>
+            <div class="col-sm-5">
+                <select name="${fullName}" class="form-select form-select-sm" required>
+                    <option value="" selected disabled></option>
+                    <option value="conforme">Conforme</option>
+                    <option value="nao_conforme">Nao conforme</option>
+                </select>
+            </div>
+        </div>`;
+    }
+
+    function secao(titulo) {
+        return `<h6 class="fw-semibold mt-3 mb-1 border-bottom pb-1">${titulo}</h6>`;
+    }
+
+    const FORMULARIOS = {
+        "Rodas": (prefix) => {
+            let html = "";
+            html += secao("Sessão Visual");
+            html += selectConformidade(prefix, "visual_amassado", "Amassado");
+            html += selectConformidade(prefix, "visual_oxidacao", "Oxidação");
+            html += selectConformidade(prefix, "visual_pintura", "Pintura");
+            html += secao("Sessão Empeno");
+            html += selectConformidade(prefix, "empeno_rodagem", "Teste de rodagem");
+            html += secao("Sessão Dimensional");
+            html += selectConformidade(prefix, "dim_furo_central", "Furo central");
+            html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Furos parafusos</label>`;
+            html += `<div class="row g-1">`;
+            for (let i = 1; i <= 6; i++) {
+                html += `<div class="col-4"><div class="input-group input-group-sm">`
+                      + `<span class="input-group-text">${i}°</span>`
+                      + `<input type="text" name="${prefix}dim_furo_parafuso_${i}" class="form-control form-control-sm">`
+                      + `</div></div>`;
+            }
+            html += `</div></div>`;
+            html += selectConformidade(prefix, "dim_diametro_externo", "Diâmetro externo");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Cubos de Roda": (prefix) => {
+            let html = "";
+            html += secao("Sessão Dimensional");
+            html += selectConformidade(prefix, "dim_diametro_interno", "Diâmetro interno");
+            html += selectConformidade(prefix, "dim_diametro_externo", "Diâmetro externo");
+            html += selectConformidade(prefix, "dim_diametro_centro_furacao", "Diâmetro do centro de furação");
+            html += selectConformidade(prefix, "dim_comprimento_cubo", "Comprimento do cubo");
+            html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Furos parafusos</label>`;
+            html += `<div class="row g-1">`;
+            for (let i = 1; i <= 6; i++) {
+                html += `<div class="col-4"><div class="input-group input-group-sm">`
+                      + `<span class="input-group-text">${i}°</span>`
+                      + `<input type="text" name="${prefix}dim_furo_parafuso_${i}" class="form-control form-control-sm">`
+                      + `</div></div>`;
+            }
+            html += `</div></div>`;
+            html += secao("Sessão Visual");
+            html += selectConformidade(prefix, "visual_trincas_falhas", "Trincas / Falhas");
+            html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Dureza</label>`;
+            html += `<div class="row g-1">`;
+            for (let i = 1; i <= 3; i++) {
+                html += `<div class="col-4"><div class="input-group input-group-sm">`
+                      + `<span class="input-group-text">${i}°</span>`
+                      + `<input type="text" name="${prefix}dureza_${i}" class="form-control form-control-sm">`
+                      + `</div></div>`;
+            }
+            html += `</div></div>`;
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Tintas": (prefix) => {
+            let html = "";
+            html += secao("Sessão Visual");
+            html += selectConformidade(prefix, "visual_cor", "Cor");
+            html += selectConformidade(prefix, "visual_estabilidade", "Estabilidade");
+            html += selectConformidade(prefix, "visual_tonalidade", "Tonalidade");
+            html += secao("Sessão de Aplicação");
+            html += selectConformidade(prefix, "aplic_alastramento", "Alastramento");
+            html += selectConformidade(prefix, "aplic_secagem", "Secagem");
+            html += selectConformidade(prefix, "aplic_polimerizacao", "Polimerização");
+            html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Espessura de camada</label>`;
+            html += `<div class="row g-1">`;
+            for (let i = 1; i <= 3; i++) {
+                html += `<div class="col-4"><div class="input-group input-group-sm">`
+                      + `<span class="input-group-text">${i}°</span>`
+                      + `<input type="text" name="${prefix}espessura_camada_${i}" class="form-control form-control-sm">`
+                      + `</div></div>`;
+            }
+            html += `</div></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Aderência</label>`;
+            html += `<div class="row g-1">`;
+            html += `<div class="col-6"><div class="input-group input-group-sm">`
+                  + `<span class="input-group-text">X</span>`
+                  + `<input type="text" name="${prefix}aderencia_x" class="form-control form-control-sm">`
+                  + `<span class="input-group-text">mm</span>`
+                  + `</div></div>`;
+            html += `<div class="col-6"><div class="input-group input-group-sm">`
+                  + `<span class="input-group-text">Y</span>`
+                  + `<input type="text" name="${prefix}aderencia_y" class="form-control form-control-sm">`
+                  + `<span class="input-group-text">mm</span>`
+                  + `</div></div>`;
+            html += `</div></div>`;
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "_generico": (prefix) => {
+            let html = selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="3" maxlength="255"></textarea></div>`;
+            return html;
+        },
+    };
+
+    function renderUnidades(qtd) {
+        const builder = FORMULARIOS[classeAtual] || FORMULARIOS["_generico"];
+        const tabsEl = document.getElementById("tabs-unidades-recebimento");
+        const contentEl = document.getElementById("content-unidades-recebimento");
+        tabsEl.innerHTML = "";
+        contentEl.innerHTML = "";
+
+        for (let u = 1; u <= qtd; u++) {
+            const prefix = `u${u}_`;
+            const isActive = u === 1;
+
+            const li = document.createElement("li");
+            li.className = "nav-item";
+            li.innerHTML = `<button class="nav-link py-1 px-3${isActive ? " active" : ""}" 
+                data-bs-toggle="tab" data-bs-target="#unit-tab-${u}" type="button">
+                Unid. ${u}
+            </button>`;
+            tabsEl.appendChild(li);
+
+            const pane = document.createElement("div");
+            pane.className = `tab-pane fade${isActive ? " show active" : ""}`;
+            pane.id = `unit-tab-${u}`;
+            pane.innerHTML = builder(prefix);
+            contentEl.appendChild(pane);
+        }
+    }
+
     function abrirModalRecebimento(row) {
         pendenciaSelecionada = row;
+
+        // preenche dados do recebimento
         const container = document.getElementById("detalhes-recebimento");
         container.innerHTML = "";
-        Object.entries(row.data || {}).forEach(([key, value]) => {
+        Object.entries(row.data_completa || row.data || {}).forEach(([key, value]) => {
             const dt = document.createElement("dt");
             dt.className = "col-5 text-muted";
             dt.textContent = key;
@@ -348,8 +505,11 @@
             container.appendChild(dd);
         });
 
-        document.getElementById("resultado-recebimento").value = "";
-        document.getElementById("observacao-recebimento").value = "";
+        // detecta classe e reseta quantidade para 1
+        classeAtual = (row.data?.["Classe de Inspeção"] || row.data_completa?.["Classe de Inspeção"] || "").trim();
+        const qtdInput = document.getElementById("qtd-unidades-recebimento");
+        qtdInput.value = 1;
+        renderUnidades(1);
 
         const modalElement = document.getElementById("modal-inspecao-recebimento");
         const modal = new bootstrap.Modal(modalElement);
@@ -358,31 +518,64 @@
 
     function salvarInspecaoRecebimento(event) {
         event.preventDefault();
-        if (!pendenciaSelecionada) {
-            return;
-        }
+        if (!pendenciaSelecionada) return;
 
-        const resultado = document.getElementById("resultado-recebimento").value;
-        if (!resultado) {
-            alert("Selecione o resultado da inspecao.");
-            return;
-        }
+        const qtd = parseInt(document.getElementById("qtd-unidades-recebimento").value) || 1;
+        const form = document.getElementById("form-inspecao-recebimento");
+        const formData = new FormData(form);
 
-        const observacao = document.getElementById("observacao-recebimento").value || "";
+        // coleta dados por unidade
+        const unidades = [];
+        let resultadoGeral = "conforme";
+
+        for (let u = 1; u <= qtd; u++) {
+            const prefix = `u${u}_`;
+            const unitData = {};
+            let unitResultado = null;
+            let unitObservacao = "";
+
+            for (const [key, value] of formData.entries()) {
+                if (!key.startsWith(prefix)) continue;
+                const field = key.slice(prefix.length);
+                if (field === "resultado") {
+                    unitResultado = value;
+                } else if (field === "observacao") {
+                    unitObservacao = value.trim();
+                } else {
+                    unitData[field] = value;
+                }
+            }
+
+            if (!unitResultado) {
+                alert(`Selecione o resultado da inspeção para a Unidade ${u}.`);
+                // ativa a aba da unidade com problema
+                const tabBtn = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="#unit-tab-${u}"]`);
+                if (tabBtn) tabBtn.click();
+                return;
+            }
+
+            if (unitResultado === "nao_conforme") resultadoGeral = "nao_conforme";
+
+            unidades.push({
+                unidade: u,
+                resultado: unitResultado,
+                observacao: unitObservacao,
+                campos: unitData,
+            });
+        }
 
         const payload = {
             row_index: pendenciaSelecionada.row_index,
             item_id: pendenciaSelecionada.item_id,
-            data: pendenciaSelecionada.data,
-            resultado: resultado,
-            observacao: observacao
+            data: pendenciaSelecionada.data_completa || pendenciaSelecionada.data,
+            resultado: resultadoGeral,
+            observacao: unidades.map(u => u.observacao).filter(Boolean).join(" | "),
+            dados_inspecao: { unidades },
         };
 
         const csrfInput = document.querySelector("[name=csrfmiddlewaretoken]");
         const headers = { "Content-Type": "application/json" };
-        if (csrfInput) {
-            headers["X-CSRFToken"] = csrfInput.value;
-        }
+        if (csrfInput) headers["X-CSRFToken"] = csrfInput.value;
 
         const btnSalvar = document.getElementById("btn-salvar-recebimento");
         btnSalvar.disabled = true;
@@ -395,15 +588,9 @@
         })
             .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
             .then((result) => {
-                if (!result.ok) {
-                    throw new Error(result.data.error || "Erro ao salvar.");
-                }
-
-                const modalElement = document.getElementById("modal-inspecao-recebimento");
-                const modal = bootstrap.Modal.getInstance(modalElement);
-                if (modal) {
-                    modal.hide();
-                }
+                if (!result.ok) throw new Error(result.data.error || "Erro ao salvar.");
+                const modal = bootstrap.Modal.getInstance(document.getElementById("modal-inspecao-recebimento"));
+                if (modal) modal.hide();
                 pendenciaSelecionada = null;
                 carregarPendencias();
                 carregarInspecionados();
@@ -426,6 +613,25 @@
         document.getElementById("pesquisa-inspecionados-recebimento").addEventListener("input", renderInspecionados);
         document.getElementById("form-inspecao-recebimento").addEventListener("submit", salvarInspecaoRecebimento);
         document.getElementById("btn-sincronizar-recebimento").addEventListener("click", sincronizarRecebimento);
+
+        // controles de quantidade de unidades
+        document.getElementById("btn-qtd-menos-recebimento").addEventListener("click", () => {
+            const inp = document.getElementById("qtd-unidades-recebimento");
+            const val = Math.max(1, parseInt(inp.value || 1) - 1);
+            inp.value = val;
+            renderUnidades(val);
+        });
+        document.getElementById("btn-qtd-mais-recebimento").addEventListener("click", () => {
+            const inp = document.getElementById("qtd-unidades-recebimento");
+            const val = Math.min(30, parseInt(inp.value || 1) + 1);
+            inp.value = val;
+            renderUnidades(val);
+        });
+        document.getElementById("qtd-unidades-recebimento").addEventListener("change", (e) => {
+            const val = Math.min(30, Math.max(1, parseInt(e.target.value) || 1));
+            e.target.value = val;
+            renderUnidades(val);
+        });
     });
 </script>
 {% endblock %}

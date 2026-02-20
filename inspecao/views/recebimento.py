@@ -141,7 +141,7 @@ def sincronizar_recebimento(request):
             continue
 
         data_coluna_a = _parse_br_date(row_values[0])
-        if data_coluna_a is None or data_coluna_a <= cutoff:
+        if data_coluna_a is None or data_coluna_a < cutoff:
             continue
 
         status_val = str(row_values[COLUNA_STATUS_IDX] or "").strip().upper()
@@ -180,31 +180,39 @@ def sincronizar_recebimento(request):
     return JsonResponse({"novos": novos, "total": total}, status=200)
 
 
+COLUNAS_PENDENCIAS = [
+    "Data",
+    "CNPJ",
+    "Fornecedor",
+    "Nº Nota fiscal",
+    "Tipo de material",
+    "Classe de Inspeção",
+]
+
+
 def recebimento_pendencias(request):
     if request.method != "GET":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+        return JsonResponse({"error": "Método não permitido"}, status=405)
 
     itens = InspecaoRecebimentoItem.objects.filter(inspecionado=False).order_by("-id")
     rows = []
-    headers = []
 
     for item in itens:
         data = item.dados or {}
-        for key in data.keys():
-            if key not in headers:
-                headers.append(key)
+        data_filtrada = {col: data.get(col, "") for col in COLUNAS_PENDENCIAS}
         rows.append(
             {
                 "row_index": item.linha_planilha,
                 "hash": item.sheet_hash,
-                "data": data,
+                "data": data_filtrada,
                 "item_id": item.id,
+                "data_completa": data,
             }
         )
 
     return JsonResponse(
         {
-            "columns": headers,
+            "columns": COLUNAS_PENDENCIAS,
             "rows": rows,
             "total": len(rows),
         },
@@ -272,22 +280,23 @@ def recebimento_inspecionados(request):
 
 def inspecionar_recebimento(request):
     if request.method != "POST":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+        return JsonResponse({"error": "Método não permitido"}, status=405)
 
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
-        return JsonResponse({"error": "JSON invÃ¡lido"}, status=400)
+        return JsonResponse({"error": "JSON inválido"}, status=400)
 
     row_data = payload.get("data")
     if not isinstance(row_data, dict) or not row_data:
-        return JsonResponse({"error": "Dados da linha nÃ£o informados"}, status=400)
+        return JsonResponse({"error": "Dados da linha não informados"}, status=400)
 
     resultado = payload.get("resultado")
     if resultado not in {"conforme", "nao_conforme"}:
-        return JsonResponse({"error": "Resultado invÃ¡lido"}, status=400)
+        return JsonResponse({"error": "Resultado inválido"}, status=400)
 
     observacao = (payload.get("observacao") or "").strip()
+    dados_inspecao = payload.get("dados_inspecao") or None
     row_index = payload.get("row_index")
     item_id = payload.get("item_id")
     sheet_hash = _row_hash(row_data)
@@ -299,7 +308,7 @@ def inspecionar_recebimento(request):
             sheet_hash = item.sheet_hash
 
     if InspecaoRecebimento.objects.filter(sheet_hash=sheet_hash).exists():
-        return JsonResponse({"error": "Item jÃ¡ inspecionado"}, status=409)
+        return JsonResponse({"error": "Item já inspecionado"}, status=409)
 
     inspetor_profile = Profile.objects.filter(user=request.user).first()
 
@@ -316,6 +325,7 @@ def inspecionar_recebimento(request):
             linha_planilha=row_index if isinstance(row_index, int) else None,
             sheet_hash=sheet_hash,
             dados=row_data,
+            dados_inspecao=dados_inspecao,
             resultado=resultado,
             observacao=observacao,
         )
