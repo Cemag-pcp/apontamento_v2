@@ -327,25 +327,38 @@ export async function popularPacotesDaCarga(cargaId) {
               const response = await fetch(`api/buscar-fotos/${pacote.id}/`);
               const data = await response.json();
 
-              const fotosPorEtapa = {};
-              data.fotos.forEach(foto => {
-                if (!fotosPorEtapa[foto.etapa]) {
-                  fotosPorEtapa[foto.etapa] = [];
-                }
-                fotosPorEtapa[foto.etapa].push(foto.url);
-              });
+              const buildConteudoModal = (fotos) => {
+                const fotosPorEtapa = {};
+                fotos.forEach(foto => {
+                  if (!fotosPorEtapa[foto.etapa]) {
+                    fotosPorEtapa[foto.etapa] = [];
+                  }
+                  fotosPorEtapa[foto.etapa].push(foto);
+                });
 
-              const conteudoModal = Object.entries(fotosPorEtapa).map(([etapa, urls]) => {
-                const imagens = urls.map(url => `
-                  <a href="${url}" target="_blank" class="d-inline-block me-2 mb-2">
-                    <img src="${url}" class="rounded shadow-sm" style="max-width: 200px; height: auto; cursor: zoom-in;" alt="Foto da etapa ${etapa}" />
-                  </a>
-                `).join('');
-                return `
-                  <h6 class="mt-3">Etapa: ${etapa}</h6>
-                  ${imagens}
-                `;
-              }).join('');
+                if (!fotos.length) {
+                  return '<p class="text-muted">Nenhuma foto encontrada.</p>';
+                }
+
+                return Object.entries(fotosPorEtapa).map(([etapa, fotosEtapa]) => {
+                  const imagens = fotosEtapa.map(foto => `
+                    <div class="d-inline-block me-2 mb-2 position-relative">
+                      <div class="position-absolute top-0 start-0 m-1" style="z-index:10;">
+                        <input class="form-check-input foto-checkbox" type="checkbox" data-foto-id="${foto.id}"
+                          style="width:1.3em;height:1.3em;cursor:pointer;background-color:rgba(255,255,255,0.85);" />
+                      </div>
+                      <a href="${foto.url}" target="_blank">
+                        <img src="${foto.url}" class="rounded shadow-sm"
+                          style="max-width:200px;height:auto;cursor:zoom-in;" alt="Foto da etapa ${etapa}" />
+                      </a>
+                    </div>
+                  `).join('');
+                  return `
+                    <h6 class="mt-3">Etapa: ${etapa}</h6>
+                    ${imagens}
+                  `;
+                }).join('');
+              };
 
               const modal = document.createElement('div');
               modal.className = 'modal fade';
@@ -356,8 +369,14 @@ export async function popularPacotesDaCarga(cargaId) {
                       <h5 class="modal-title">Fotos do Pacote ${pacote.nome}</h5>
                       <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                     </div>
-                    <div class="modal-body">
-                      ${data.fotos?.length ? conteudoModal : '<p class="text-muted">Nenhuma foto encontrada.</p>'}
+                    <div class="modal-body" id="modalFotosBody">
+                      ${buildConteudoModal(data.fotos || [])}
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-danger" id="btnExcluirFotosSelecionadas" disabled>
+                        <i class="fas fa-trash"></i> Excluir fotos selecionadas
+                      </button>
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                     </div>
                   </div>
                 </div>
@@ -370,6 +389,66 @@ export async function popularPacotesDaCarga(cargaId) {
               // Remove modal from DOM after hiding
               modal.addEventListener('hidden.bs.modal', () => {
                 document.body.removeChild(modal);
+              });
+
+              // Atualiza estado do botão de exclusão conforme seleção
+              const syncDeleteBtn = () => {
+                const checados = modal.querySelectorAll('.foto-checkbox:checked');
+                modal.querySelector('#btnExcluirFotosSelecionadas').disabled = checados.length === 0;
+              };
+
+              modal.addEventListener('change', (e) => {
+                if (e.target.classList.contains('foto-checkbox')) syncDeleteBtn();
+              });
+
+              // Botão excluir fotos selecionadas
+              modal.querySelector('#btnExcluirFotosSelecionadas').addEventListener('click', async () => {
+                const checados = [...modal.querySelectorAll('.foto-checkbox:checked')];
+                if (!checados.length) return;
+
+                const qtd = checados.length;
+                const confirmado = await Swal.fire({
+                  title: 'Confirmar exclusão',
+                  text: `Deseja excluir ${qtd} foto(s) selecionada(s)? Esta ação não pode ser desfeita.`,
+                  icon: 'warning',
+                  showCancelButton: true,
+                  confirmButtonColor: '#d33',
+                  cancelButtonColor: '#6c757d',
+                  confirmButtonText: 'Sim, excluir',
+                  cancelButtonText: 'Cancelar',
+                }).then(r => r.isConfirmed);
+
+                if (!confirmado) return;
+
+                const btnExcluir = modal.querySelector('#btnExcluirFotosSelecionadas');
+                btnExcluir.disabled = true;
+                btnExcluir.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Excluindo...';
+
+                try {
+                  await Promise.all(checados.map(cb =>
+                    fetch(`api/excluir-foto/${cb.dataset.fotoId}/`, {
+                      method: 'DELETE',
+                      headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                    }).then(r => { if (!r.ok) throw new Error('Erro ao excluir foto'); })
+                  ));
+
+                  // Recarrega fotos no modal
+                  const resp = await fetch(`api/buscar-fotos/${pacote.id}/`);
+                  const novosDados = await resp.json();
+                  modal.querySelector('#modalFotosBody').innerHTML = buildConteudoModal(novosDados.fotos || []);
+
+                  Toast.fire({ icon: 'success', title: `${qtd} foto(s) excluída(s) com sucesso.` });
+
+                  // Atualiza flag do botão "Ver foto" se não houver mais fotos
+                  if (!novosDados.fotos?.length) {
+                    fotoIcon.remove();
+                  }
+                } catch (err) {
+                  alert('Erro ao excluir foto(s): ' + err.message);
+                } finally {
+                  btnExcluir.innerHTML = '<i class="fas fa-trash"></i> Excluir fotos selecionadas';
+                  syncDeleteBtn();
+                }
               });
 
               fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
