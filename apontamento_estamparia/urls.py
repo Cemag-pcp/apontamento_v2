@@ -7,6 +7,7 @@ app_name = 'estamparia'
 urlpatterns = [
     path('', views.planejamento, name='planejamento'),
     path('historico/', views.historico, name='historico'),
+    path('erp/apontamentos/', views.erp_apontamentos_estamparia, name='erp_apontamentos_estamparia'),
 
     path('api/ordens-criadas/', views.get_ordens_criadas, name='get_ordens_criadas'),
     path('api/ordens-criadas/<int:pk_ordem>/<str:name_maquina>/pecas/', views.get_pecas_ordem, name='get_pecas_ordem'),
@@ -21,6 +22,8 @@ urlpatterns = [
     path('atualizar-pecas/', views.atualizar_pecas_ordem, name='atualizar_pecas_ordem'),
 
     path('api/apontamentos-peca/estamparia', views.api_apontamentos_peca, name='api_apontamentos_peca'),
+    path('api/erp/apontamentos/', views.api_erp_apontamentos_estamparia, name='api_erp_apontamentos_estamparia'),
+    path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_estamparia, name='api_erp_apontar_item_estamparia'),
     path('api/retornar-processo/', views.retornar_processo, name='retornar_processo')
 ]
 
