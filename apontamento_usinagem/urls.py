@@ -7,6 +7,7 @@ app_name = 'usinagem'
 urlpatterns = [
     path('', views.planejamento, name='planejamento'),
     path('processos/', views.processos, name='processos'),
+    path('erp/apontamentos/', views.erp_apontamentos_usinagem, name='erp_apontamentos_usinagem'),
 
     path('api/ordens-criadas/', views.get_ordens_criadas, name='get_ordens_criadas'),
     path('api/ordens-criadas/<int:pk_ordem>/pecas/', views.get_pecas_ordem, name='get_pecas_ordem'),
@@ -21,6 +22,8 @@ urlpatterns = [
     path('api/retornar-processo/', views.retornar_processo, name='retornar_processo'),
 
     path('api/apontamentos-peca/usinagem', views.api_apontamentos_peca, name='api_apontamentos_peca'),
+    path('api/erp/apontamentos/', views.api_erp_apontamentos_usinagem, name='api_erp_apontamentos_usinagem'),
+    path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_usinagem, name='api_erp_apontar_item_usinagem'),
 
 ]
 

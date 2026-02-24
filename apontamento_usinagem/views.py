@@ -6,8 +6,11 @@ from django.db import transaction, connection
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_POST
 from django.utils.timezone import now,localtime
-from django.db.models import Q,Prefetch,Count,OuterRef, Subquery
+from django.utils.dateparse import parse_date
+from django.db.models import Q,Prefetch,Count,OuterRef, Subquery, Exists
+from django.contrib.auth.decorators import login_required
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso, MaquinaParada, Profile
@@ -20,6 +23,8 @@ import os
 import tempfile
 import re
 import json
+import requests
+from datetime import date
 
 from core.utils import notificar_ordem
 
@@ -591,6 +596,350 @@ def api_apontamentos_peca(request):
         })
 
     return JsonResponse(resultado, safe=False)
+
+
+@login_required
+def erp_apontamentos_usinagem(request):
+    return render(request, "apontamento_usinagem/erp_apontamentos_usinagem.html")
+
+
+@login_required
+@require_GET
+def api_erp_apontamentos_usinagem(request):
+    page = max(int(request.GET.get('page', 1) or 1), 1)
+    limit = int(request.GET.get('limit', 50) or 50)
+    limit = min(max(limit, 10), 200)
+
+    filtros = {
+        'ordem': request.GET.get('ordem', '').strip(),
+        'peca': request.GET.get('peca', '').strip(),
+        'chave_apontamento': request.GET.get('chave_apontamento', '').strip(),
+        'apontado': request.GET.get('apontado', '').strip().lower(),
+        'resp_apontamento': request.GET.get('resp_apontamento', '').strip(),
+        'data_apontamento_inicio': request.GET.get('data_apontamento_inicio', '').strip(),
+        'data_apontamento_fim': request.GET.get('data_apontamento_fim', '').strip(),
+        'data_producao_inicio': request.GET.get('data_producao_inicio', '').strip(),
+        'data_producao_fim': request.GET.get('data_producao_fim', '').strip(),
+    }
+
+    subquery_ordem_apontada = (
+        PecasOrdem.objects
+        .filter(ordem_id=OuterRef('ordem_id'), apontado=True)
+        .order_by('-data_apontamento', '-id')
+    )
+
+    queryset = (
+        PecasOrdem.objects
+        .filter(
+            qtd_boa__gt=0,
+            ordem__grupo_maquina='usinagem',
+            data__date__gte=date(2026, 2, 23),
+        )
+        .select_related('ordem', 'ordem__maquina', 'peca', 'operador', 'resp_apontamento')
+        .annotate(
+            ordem_ja_apontada=Exists(subquery_ordem_apontada),
+            ordem_item_apontado_id=Subquery(subquery_ordem_apontada.values('id')[:1]),
+            ordem_tipo_apontamento=Subquery(subquery_ordem_apontada.values('tipo_apontamento')[:1]),
+            ordem_data_apontamento_ref=Subquery(subquery_ordem_apontada.values('data_apontamento')[:1]),
+            ordem_chave_apontamento_ref=Subquery(subquery_ordem_apontada.values('chave_apontamento')[:1]),
+            ordem_resp_username_ref=Subquery(subquery_ordem_apontada.values('resp_apontamento__username')[:1]),
+        )
+        .order_by('-data_apontamento', '-id')
+    )
+
+    if filtros['ordem']:
+        queryset = queryset.filter(ordem__ordem__icontains=filtros['ordem'])
+
+    if filtros['peca']:
+        queryset = queryset.filter(
+            Q(peca__codigo__icontains=filtros['peca']) |
+            Q(peca__descricao__icontains=filtros['peca'])
+        )
+
+    if filtros['chave_apontamento']:
+        queryset = queryset.filter(chave_apontamento__icontains=filtros['chave_apontamento'])
+
+    if filtros['resp_apontamento']:
+        queryset = queryset.filter(
+            Q(resp_apontamento__username__icontains=filtros['resp_apontamento']) |
+            Q(resp_apontamento__first_name__icontains=filtros['resp_apontamento']) |
+            Q(resp_apontamento__last_name__icontains=filtros['resp_apontamento'])
+        )
+
+    if filtros['apontado'] == 'true':
+        queryset = queryset.filter(apontado=True)
+    elif filtros['apontado'] == 'false':
+        queryset = queryset.filter(apontado=False)
+
+    data_apontamento_inicio = parse_date(filtros['data_apontamento_inicio']) if filtros['data_apontamento_inicio'] else None
+    data_apontamento_fim = parse_date(filtros['data_apontamento_fim']) if filtros['data_apontamento_fim'] else None
+    data_producao_inicio = parse_date(filtros['data_producao_inicio']) if filtros['data_producao_inicio'] else None
+    data_producao_fim = parse_date(filtros['data_producao_fim']) if filtros['data_producao_fim'] else None
+
+    if data_apontamento_inicio:
+        queryset = queryset.filter(data_apontamento__date__gte=data_apontamento_inicio)
+    if data_apontamento_fim:
+        queryset = queryset.filter(data_apontamento__date__lte=data_apontamento_fim)
+    if data_producao_inicio:
+        queryset = queryset.filter(data__date__gte=data_producao_inicio)
+    if data_producao_fim:
+        queryset = queryset.filter(data__date__lte=data_producao_fim)
+
+    paginator = Paginator(queryset, limit)
+    pagina = paginator.get_page(page)
+
+    itens = []
+    for item in pagina.object_list:
+        resp = item.resp_apontamento
+        nome_resp = ''
+        if resp:
+            nome_resp = (resp.get_full_name() or resp.username).strip()
+
+        itens.append({
+            'id': item.id,
+            'ordem_id': item.ordem_id,
+            'ordem': item.ordem.ordem if item.ordem else '',
+            'peca_codigo': item.peca.codigo if item.peca else '',
+            'peca_descricao': item.peca.descricao if item.peca else '',
+            'qtd_boa': item.qtd_boa,
+            'qtd_morta': item.qtd_morta,
+            'qtd_planejada': item.qtd_planejada,
+            'maquina': item.ordem.maquina.nome if item.ordem and item.ordem.maquina else '',
+            'operador': f"{item.operador.matricula} - {item.operador.nome}" if item.operador else '',
+            'apontado': item.apontado,
+            'tipo_apontamento': item.tipo_apontamento or '',
+            'chave_apontamento': item.chave_apontamento or '',
+            'erro_apontamento': item.erro_apontamento or '',
+            'resp_apontamento': nome_resp,
+            'resp_apontamento_username': resp.username if resp else '',
+            'data_producao': localtime(item.data).strftime('%d/%m/%Y %H:%M') if item.data else '',
+            'data_apontamento': localtime(item.data_apontamento).strftime('%d/%m/%Y %H:%M') if item.data_apontamento else '',
+            'ordem_ja_apontada': bool(getattr(item, 'ordem_ja_apontada', False)),
+            'ordem_item_apontado_id': getattr(item, 'ordem_item_apontado_id', None),
+            'ordem_tipo_apontamento': getattr(item, 'ordem_tipo_apontamento', '') or '',
+            'ordem_chave_apontamento': getattr(item, 'ordem_chave_apontamento_ref', '') or '',
+            'ordem_resp_apontamento_username': getattr(item, 'ordem_resp_username_ref', '') or '',
+            'ordem_data_apontamento': (
+                localtime(item.ordem_data_apontamento_ref).strftime('%d/%m/%Y %H:%M')
+                if getattr(item, 'ordem_data_apontamento_ref', None)
+                else ''
+            ),
+        })
+
+    return JsonResponse({
+        'results': itens,
+        'pagination': {
+            'page': pagina.number,
+            'page_size': limit,
+            'total_items': paginator.count,
+            'total_pages': paginator.num_pages,
+            'has_next': pagina.has_next(),
+            'has_previous': pagina.has_previous(),
+        }
+    })
+
+
+@login_required
+@require_POST
+def api_erp_apontar_item_usinagem(request, pk):
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        body = {}
+
+    tipo_apontamento = (body.get('tipo_apontamento') or 'manual').strip().lower()
+    if tipo_apontamento not in ('manual', 'api'):
+        return JsonResponse({'status': 'error', 'message': 'tipo_apontamento inválido.'}, status=400)
+
+    item = get_object_or_404(
+        PecasOrdem.objects.select_related('ordem', 'peca'),
+        pk=pk,
+        ordem__grupo_maquina='usinagem'
+    )
+
+    item_ja_apontado_ordem = (
+        PecasOrdem.objects
+        .filter(ordem_id=item.ordem_id, apontado=True)
+        .exclude(pk=item.pk)
+        .select_related('resp_apontamento')
+        .order_by('-data_apontamento', '-id')
+        .first()
+    )
+
+    if item.apontado or item_ja_apontado_ordem:
+        item_referencia = item if item.apontado else item_ja_apontado_ordem
+        resp_ref = getattr(item_referencia, 'resp_apontamento', None)
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': 'Esta ordem já foi apontada e não pode ser apontada novamente.',
+                'already_apontado': True,
+                'detalhes': {
+                    'item_id': item_referencia.id,
+                    'ordem_id': item_referencia.ordem_id,
+                    'tipo_apontamento': item_referencia.tipo_apontamento or '',
+                    'data_apontamento': localtime(item_referencia.data_apontamento).strftime('%d/%m/%Y %H:%M') if item_referencia.data_apontamento else '',
+                    'resp_apontamento': (resp_ref.get_full_name() or resp_ref.username) if resp_ref else '',
+                    'chave_apontamento': item_referencia.chave_apontamento or '',
+                }
+            },
+            status=409
+        )
+
+    if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
+        msg_qtd_morta = (
+            'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
+            'A funcionalidade de desvio precisa ser ajustada na API.'
+        )
+        item.erro_apontamento = msg_qtd_morta
+        item.tipo_apontamento = 'api'
+        item.resp_apontamento = request.user
+        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': 'Apontamento via API bloqueado para item com qtd_morta.',
+                'description': msg_qtd_morta,
+            },
+            status=422
+        )
+
+    payload_integracao = None
+    if tipo_apontamento == 'api':
+        payload_integracao = {
+            "id": "Apontamento 1",
+            "data": localtime(now()).strftime('%d/%m/%Y'),
+            "pessoa": "4357",
+            "recurso": str(item.peca.codigo if item.peca else ""),
+            "processo": "S Usinagem",
+            "produzido": item.qtd_boa,
+            "observacao": str(item.ordem_id),
+        }
+
+        try:
+            response_integracao = requests.post(
+                "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                json=payload_integracao,
+                auth=("luan araujo", "luanaraujo7"),
+                timeout=20,
+            )
+        except requests.RequestException as exc:
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': f'Falha de comunicação com API ERP: {exc}',
+                    'payload_enviado': payload_integracao,
+                },
+                status=502
+            )
+
+        resposta_api_json = None
+        try:
+            resposta_api_json = response_integracao.json()
+        except ValueError:
+            resposta_api_json = None
+
+        if not response_integracao.ok:
+            descricao_erro = ''
+            if isinstance(resposta_api_json, dict):
+                descricao_erro = str(resposta_api_json.get('description') or '')
+
+            retorno_texto = ''
+            try:
+                retorno_texto = response_integracao.text[:500]
+            except Exception:
+                retorno_texto = 'Sem detalhes'
+
+            item.erro_apontamento = descricao_erro or retorno_texto
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = request.user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': f'API ERP retornou status {response_integracao.status_code}.',
+                    'payload_enviado': payload_integracao,
+                    'description': descricao_erro,
+                    'retorno_api': retorno_texto,
+                },
+                status=502
+            )
+
+        if isinstance(resposta_api_json, dict):
+            status_erp = str(resposta_api_json.get('status') or '').strip()
+
+            if status_erp.lower() == 'error':
+                descricao_erro = str(resposta_api_json.get('description') or 'Erro retornado pela API ERP.')
+                item.erro_apontamento = descricao_erro
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = request.user
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+
+                return JsonResponse(
+                    {
+                        'status': 'error',
+                        'message': 'API ERP retornou erro de negócio.',
+                        'description': descricao_erro,
+                        'payload_enviado': payload_integracao,
+                        'retorno_api': resposta_api_json,
+                    },
+                    status=422
+                )
+
+            if status_erp.lower() == 'success':
+                item.chave_apontamento = str(resposta_api_json.get('chaveProducao') or '')
+                item.erro_apontamento = None
+            else:
+                item.erro_apontamento = str(resposta_api_json)
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = request.user
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return JsonResponse(
+                    {
+                        'status': 'error',
+                        'message': 'Resposta da API ERP em formato inesperado.',
+                        'payload_enviado': payload_integracao,
+                        'retorno_api': resposta_api_json,
+                    },
+                    status=502
+                )
+        else:
+            item.erro_apontamento = (response_integracao.text or '')[:2000]
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = request.user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': 'API ERP não retornou JSON válido.',
+                    'payload_enviado': payload_integracao,
+                    'retorno_api': (response_integracao.text or '')[:500],
+                },
+                status=502
+            )
+
+    item.apontado = True
+    item.data_apontamento = now()
+    item.tipo_apontamento = tipo_apontamento
+    item.resp_apontamento = request.user
+    update_fields = ['apontado', 'data_apontamento', 'tipo_apontamento', 'resp_apontamento']
+    if tipo_apontamento == 'api':
+        update_fields.extend(['chave_apontamento', 'erro_apontamento'])
+    item.save(update_fields=update_fields)
+
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Apontamento confirmado com sucesso.',
+        'item_id': item.id,
+        'apontado': item.apontado,
+        'tipo_apontamento': item.tipo_apontamento,
+        'data_apontamento': localtime(item.data_apontamento).strftime('%d/%m/%Y %H:%M'),
+        'resp_apontamento': request.user.get_full_name() or request.user.username,
+        'chave_apontamento': item.chave_apontamento or '',
+        'erro_apontamento': item.erro_apontamento or '',
+        'payload_enviado': payload_integracao if tipo_apontamento == 'api' else None,
+    })
 
 def buscar_processos(request):
 

@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+<title>ERP | Apontamentos Usinagem</title>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4 mb-3">
+        <div>
+            <h1 class="h3 mb-1">ERP - Apontamentos (Usinagem)</h1>
+            <p class="text-muted mb-0">Listagem em blocos para manter a navegação rápida.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" id="btnAtualizarTabela" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-rotate-right me-1"></i> Atualizar tabela
+            </button>
+            <span id="erpResumoTabela" class="text-muted small">Carregando...</span>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-filter me-1"></i> Filtros
+        </div>
+        <div class="card-body">
+            <form id="erpFiltrosForm" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroOrdem">Ordem</label>
+                    <input type="text" class="form-control" id="filtroOrdem" name="ordem" placeholder="Ex.: 12345">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="filtroPeca">Peça</label>
+                    <input type="text" class="form-control" id="filtroPeca" name="peca" placeholder="Código ou descrição">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroApontado">Apontado</label>
+                    <select class="form-select" id="filtroApontado" name="apontado">
+                        <option value="">Todos</option>
+                        <option value="true">Sim</option>
+                        <option value="false" selected>Não</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="filtroChaveApontamento">Chave apontamento</label>
+                    <input type="text" class="form-control" id="filtroChaveApontamento" name="chave_apontamento" placeholder="Texto livre">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroRespApontamento">Resp. apontamento</label>
+                    <input type="text" class="form-control" id="filtroRespApontamento" name="resp_apontamento" placeholder="Usuário">
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroDataApontIni">Data apont. de</label>
+                    <input type="date" class="form-control" id="filtroDataApontIni" name="data_apontamento_inicio">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroDataApontFim">Data apont. até</label>
+                    <input type="date" class="form-control" id="filtroDataApontFim" name="data_apontamento_fim">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroDataProdIni">Data produzida de</label>
+                    <input type="date" class="form-control" id="filtroDataProdIni" name="data_producao_inicio">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroDataProdFim">Data produzida até</label>
+                    <input type="date" class="form-control" id="filtroDataProdFim" name="data_producao_fim">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroLimite">Bloco</label>
+                    <select class="form-select" id="filtroLimite" name="limit">
+                        <option value="25">25 linhas</option>
+                        <option value="50" selected>50 linhas</option>
+                        <option value="100">100 linhas</option>
+                        <option value="200">200 linhas</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary w-100">Aplicar</button>
+                    <button type="button" id="btnLimparFiltros" class="btn btn-outline-secondary w-100">Limpar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-table me-1"></i> Apontamentos de Usinagem</span>
+            <span id="erpLoadingState" class="small text-muted d-none">Carregando bloco...</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Ordem</th>
+                            <th>Peça</th>
+                            <th>Descrição</th>
+                            <th>Máquina</th>
+                            <th>Operador</th>
+                            <th class="text-end">Qtd. boa</th>
+                            <th class="text-end">Qtd. morta</th>
+                            <th>Apontado</th>
+                            <th>Chave apont.</th>
+                            <th>Resp. apont.</th>
+                            <th>Data produzida</th>
+                            <th>Data apont.</th>
+                            <th class="text-center">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="erpTabelaApontamentos">
+                        <tr>
+                            <td colspan="13" class="text-center text-muted py-4">Carregando...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
+                <div class="small text-muted" id="erpPaginationInfo">-</div>
+                <div class="d-flex align-items-center gap-2" id="erpPaginationControls"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="erpApontamentosConfig"
+     data-api-url="{% url 'usinagem:api_erp_apontamentos_usinagem' %}"
+     data-apontar-url-template="{% url 'usinagem:api_erp_apontar_item_usinagem' 0 %}"
+     data-csrf-token="{{ csrf_token }}">
+</div>
+
+<div class="modal fade" id="modalConfirmarApontamentoERP" tabindex="-1" aria-labelledby="modalConfirmarApontamentoERPLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalConfirmarApontamentoERPLabel">Confirmar apontamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Deseja apontar este item no ERP?</p>
+                <div class="small text-muted" id="erpApontamentoResumoModal">-</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-outline-primary" id="btnApontarViaApiERP">
+                    Apontar via API
+                </button>
+                <button type="button" class="btn btn-primary" id="btnConfirmarApontamentoERP">
+                    Apontar manualmente
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetalhesApontamentoERP" tabindex="-1" aria-labelledby="modalDetalhesApontamentoERPLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetalhesApontamentoERPLabel">Detalhes do apontamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-muted mb-2" id="erpDetalhesResumoModal">-</div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr><th style="width: 40%;">Status</th><td id="detalheApontadoStatus">-</td></tr>
+                            <tr><th>Tipo</th><td id="detalheTipoApontamento">-</td></tr>
+                            <tr><th>Data apontamento</th><td id="detalheDataApontamento">-</td></tr>
+                            <tr><th>Responsável</th><td id="detalheRespApontamento">-</td></tr>
+                            <tr><th>Chave</th><td id="detalheChaveApontamento">-</td></tr>
+                            <tr><th>Item apontado (ID)</th><td id="detalheItemApontadoId">-</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalErroApontamentoERP" tabindex="-1" aria-labelledby="modalErroApontamentoERPLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalErroApontamentoERPLabel">Erro do apontamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-muted mb-2" id="erpErroResumoModal">-</div>
+                <pre id="erpErroDescricaoModal" class="mb-0 p-3 bg-light border rounded" style="white-space: pre-wrap; word-break: break-word;">-</pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/erp-apontamentos-estamparia.js' %}"></script>
+{% endblock %}
+
