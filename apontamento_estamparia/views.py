@@ -19,7 +19,7 @@ from .utils_dashboard import *
 from apontamento_serra.utils import formatar_timedelta
 from core.utils import notificar_ordem
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import os
 import re
 import json
@@ -823,7 +823,7 @@ def api_erp_apontamentos_estamparia(request):
         .filter(
             qtd_boa__gt=0,
             ordem__grupo_maquina='estamparia',
-            data__date__gte=localdate(),
+            data__date__gte=date(2026, 2, 23),
         )
         .select_related('ordem', 'ordem__maquina', 'peca', 'operador', 'resp_apontamento')
         .annotate(
