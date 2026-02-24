@@ -34,6 +34,107 @@ TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
 # Certifique-se de que a pasta existe
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
+    """
+    Tenta apontar no ERP sem interromper o fluxo do operador.
+    Em caso de falha, registra o erro no item e retorna sem lançar exceção.
+    """
+    try:
+        item = (
+            PecasOrdem.objects
+            .select_related('ordem', 'peca')
+            .filter(pk=item_id, ordem__grupo_maquina='usinagem')
+            .first()
+        )
+        if not item or item.apontado:
+            return
+
+        user_ref = user if getattr(user, 'is_authenticated', False) else None
+
+        if (item.qtd_morta or 0) > 0:
+            item.erro_apontamento = (
+                'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
+                'A funcionalidade de desvio precisa ser ajustada na API.'
+            )
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user_ref
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            return
+
+        payload_integracao = {
+            "id": "Apontamento 1",
+            "data": localtime(now()).strftime('%d/%m/%Y'),
+            "pessoa": "4357",
+            "recurso": str(item.peca.codigo if item.peca else ""),
+            "processo": "S Usinagem",
+            "produzido": item.qtd_boa,
+            "observacao": str(item.ordem_id),
+        }
+
+        try:
+            response_integracao = requests.post(
+                "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                json=payload_integracao,
+                auth=("luan araujo", "luanaraujo7"),
+                timeout=20,
+            )
+        except requests.RequestException as exc:
+            item.erro_apontamento = str(exc)[:2000]
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user_ref
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            return
+
+        try:
+            resposta_api_json = response_integracao.json()
+        except ValueError:
+            resposta_api_json = None
+
+        if not response_integracao.ok:
+            descricao_erro = ''
+            if isinstance(resposta_api_json, dict):
+                descricao_erro = str(resposta_api_json.get('description') or '')
+            item.erro_apontamento = (descricao_erro or (response_integracao.text or ''))[:2000]
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user_ref
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            return
+
+        if not isinstance(resposta_api_json, dict):
+            item.erro_apontamento = (response_integracao.text or '')[:2000]
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user_ref
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            return
+
+        status_erp = str(resposta_api_json.get('status') or '').strip().lower()
+        if status_erp != 'success':
+            item.erro_apontamento = str(
+                resposta_api_json.get('description') or resposta_api_json
+            )[:2000]
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user_ref
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            return
+
+        item.apontado = True
+        item.data_apontamento = now()
+        item.tipo_apontamento = 'api'
+        item.resp_apontamento = user_ref
+        item.chave_apontamento = str(resposta_api_json.get('chaveProducao') or '')
+        item.erro_apontamento = None
+        item.save(update_fields=[
+            'apontado',
+            'data_apontamento',
+            'tipo_apontamento',
+            'resp_apontamento',
+            'chave_apontamento',
+            'erro_apontamento',
+        ])
+    except Exception:
+        # Fluxo silencioso por requisito: nunca interromper a finalização do operador.
+        return
+
 def extrair_numeracao(nome_arquivo):
     match = re.search(r"(?i)OP(\d+)", nome_arquivo)  # (?i) torna a busca case insensitive
     if match:
@@ -244,6 +345,11 @@ def atualizar_status_ordem(request):
                     
                     Inspecao.objects.create(    
                         pecas_ordem_usinagem=peca_obj
+                    )
+
+                    # Envio silencioso ao ERP após confirmar a transação de finalização.
+                    transaction.on_commit(
+                        lambda peca_obj_id=peca_obj.id, user=request.user: _apontar_item_erp_usinagem_silencioso(peca_obj_id, user)
                     )
 
                     ordem.status_prioridade = 3
