@@ -1,4 +1,4 @@
-import { getCookie } from './criar_caixa.js';
+﻿import { getCookie } from './criar_caixa.js';
 import { resetFormCriarPacote } from './criar_pacote.js';
 import { atualizarSlotAvancar } from './kanbans.js';
 
@@ -7,7 +7,7 @@ function classeCorBadge(cor) {
   const c = String(cor || '').toLowerCase();
   switch (c) {
     case 'amarelo':  return 'bg-warning text-dark';
-    case 'laranja':  return 'bg-orange text-dark'; // se não tiver, usa 'bg-warning'
+    case 'laranja':  return 'bg-orange text-dark'; // se nÃ£o tiver, usa 'bg-warning'
     case 'cinza':    return 'bg-secondary';
     case 'azul':     return 'bg-primary';
     case 'verde':    return 'bg-success';
@@ -18,7 +18,7 @@ function classeCorBadge(cor) {
   }
 }
 
-// se quiser garantir classe para laranja no Bootstrap 5 padrão:
+// se quiser garantir classe para laranja no Bootstrap 5 padrÃ£o:
 (function ensureOrange() {
   const css = `.bg-orange{background-color:#fd7e14!important;color:#212529!important}`;
   if (!document.getElementById('css-orange-badge')) {
@@ -46,7 +46,7 @@ export async function popularPacotesDaCarga(cargaId) {
   const modal = document.getElementById('visualizarPacote');
   const modalBody = modal.querySelector('.modal-body');
 
-  // Zera o conteúdo antes de popular
+  // Zera o conteÃºdo antes de popular
   modalBody.innerHTML = '';
 
   const cardsContainer = document.createElement('div');
@@ -61,12 +61,12 @@ export async function popularPacotesDaCarga(cargaId) {
     const carretasChips = carretas.length
       ? carretas.map(({ carreta, quantidade, cor }) => {
           const cls = classeCorBadge(cor);
-          const tip = `${cor ?? '—'} • qtd: ${quantidade ?? 0}`;
+          const tip = `${cor ?? 'â€”'} â€¢ qtd: ${quantidade ?? 0}`;
           return `
             <span class="badge rounded-pill ${cls}" 
                   data-bs-toggle="tooltip" data-bs-placement="top" 
                   data-bs-title="${tip}">
-              ${carreta} × ${quantidade}
+              ${carreta} Ã— ${quantidade}
             </span>`;
         }).join(' ')
       : `<span class="text-muted">Sem carretas</span>`;
@@ -103,7 +103,7 @@ export async function popularPacotesDaCarga(cargaId) {
     modalBody.innerHTML = infoHTML;
 
     if (data.status_carga !== 'despachado') {
-      // Busca o botão dentro do escopo do modal, que é mais eficiente
+      // Busca o botÃ£o dentro do escopo do modal, que Ã© mais eficiente
       const btnAbrirModal = modalBody.querySelector('#btnAbrirModalCriarPacote');
 
       if (btnAbrirModal) {
@@ -147,7 +147,7 @@ export async function popularPacotesDaCarga(cargaId) {
             lista.map(p => `<option value="${p.id_pacote}">${p.nome_pacote}</option>`).join('');
         }
 
-        // No botão que abre o modal:
+        // No botÃ£o que abre o modal:
         const btnAbrirModal = modalBody.querySelector('#btnAbrirModalCriarPacote');
         if (btnAbrirModal) {
           btnAbrirModal.addEventListener('click', async function (e) {
@@ -226,7 +226,7 @@ export async function popularPacotesDaCarga(cargaId) {
 
       const card = document.createElement('div');
       card.className = 'card mb-3 shadow-sm';
-      card.style.height = '300px';  // Altura padrão
+      card.style.height = '300px';  // Altura padrÃ£o
       card.style.display = 'flex';
       card.style.flexDirection = 'column';
 
@@ -276,7 +276,7 @@ export async function popularPacotesDaCarga(cargaId) {
         btnDeletar.title = 'Excluir pacote';
         btnDeletar.addEventListener('click', async (event) => {
           event.stopPropagation();
-          const confirmou = confirm('Deseja excluir este pacote? Os itens voltarão para as pendências.');
+          const confirmou = confirm('Deseja excluir este pacote? Os itens voltarÃ£o para as pendÃªncias.');
           if (!confirmou) return;
           const previous = btnDeletar.innerHTML;
           btnDeletar.disabled = true;
@@ -290,7 +290,7 @@ export async function popularPacotesDaCarga(cargaId) {
             if (!resp.ok) {
               throw new Error(dataResp?.erro || 'Erro ao excluir o pacote.');
             }
-            Toast.fire({ icon: "success", title: dataResp?.mensagem || 'Pacote excluído.' });
+            Toast.fire({ icon: "success", title: dataResp?.mensagem || 'Pacote excluÃ­do.' });
             await popularPacotesDaCarga(cargaId);
           } catch (error) {
             alert(error.message || 'Erro ao excluir o pacote.');
@@ -306,7 +306,7 @@ export async function popularPacotesDaCarga(cargaId) {
       header.appendChild(headerActions);
 
       // Flag de foto ao lado do nome do pacote
-      // Ao clicar na flag deverá chamar uma função que trará as fotos em um modal
+      // Ao clicar na flag deverÃ¡ chamar uma funÃ§Ã£o que trarÃ¡ as fotos em um modal
 
       if (pacote.tem_foto === true || pacote.tem_foto === "true") {
         
@@ -391,7 +391,7 @@ export async function popularPacotesDaCarga(cargaId) {
                 document.body.removeChild(modal);
               });
 
-              // Atualiza estado do botão de exclusão conforme seleção
+              // Atualiza estado do botÃ£o de exclusÃ£o conforme seleÃ§Ã£o
               const syncDeleteBtn = () => {
                 const checados = modal.querySelectorAll('.foto-checkbox:checked');
                 modal.querySelector('#btnExcluirFotosSelecionadas').disabled = checados.length === 0;
@@ -401,15 +401,15 @@ export async function popularPacotesDaCarga(cargaId) {
                 if (e.target.classList.contains('foto-checkbox')) syncDeleteBtn();
               });
 
-              // Botão excluir fotos selecionadas
+              // BotÃ£o excluir fotos selecionadas
               modal.querySelector('#btnExcluirFotosSelecionadas').addEventListener('click', async () => {
                 const checados = [...modal.querySelectorAll('.foto-checkbox:checked')];
                 if (!checados.length) return;
 
                 const qtd = checados.length;
                 const confirmado = await Swal.fire({
-                  title: 'Confirmar exclusão',
-                  text: `Deseja excluir ${qtd} foto(s) selecionada(s)? Esta ação não pode ser desfeita.`,
+                  title: 'Confirmar exclusÃ£o',
+                  text: `Deseja excluir ${qtd} foto(s) selecionada(s)? Esta aÃ§Ã£o nÃ£o pode ser desfeita.`,
                   icon: 'warning',
                   showCancelButton: true,
                   confirmButtonColor: '#d33',
@@ -437,9 +437,9 @@ export async function popularPacotesDaCarga(cargaId) {
                   const novosDados = await resp.json();
                   modal.querySelector('#modalFotosBody').innerHTML = buildConteudoModal(novosDados.fotos || []);
 
-                  Toast.fire({ icon: 'success', title: `${qtd} foto(s) excluída(s) com sucesso.` });
+                  Toast.fire({ icon: 'success', title: `${qtd} foto(s) excluÃ­da(s) com sucesso.` });
 
-                  // Atualiza flag do botão "Ver foto" se não houver mais fotos
+                  // Atualiza flag do botÃ£o "Ver foto" se nÃ£o houver mais fotos
                   if (!novosDados.fotos?.length) {
                     fotoIcon.remove();
                   }
@@ -506,18 +506,18 @@ export async function popularPacotesDaCarga(cargaId) {
           li.dataset.codigo = item.codigo_peca || '';
           li.dataset.descricao = item.descricao || '';
 
-          // Botão "Alterar pacote"
+          // BotÃ£o "Alterar pacote"
           const btnAlterar = document.createElement('button');
           btnAlterar.type = 'button';
           btnAlterar.className = 'btn btn-outline-primary btn-sm flex-shrink-0';
           // btnAlterar.textContent = 'Alterar pacote';
-          btnAlterar.innerHTML = '<i class="fas fa-exchange-alt"></i>'; // Ícone de troca
+          btnAlterar.innerHTML = '<i class="fas fa-exchange-alt"></i>'; // Ãcone de troca
           btnAlterar.setAttribute('data-bs-toggle', 'modal');
           btnAlterar.setAttribute('data-bs-target', '#modalAlterarPacote');
 
-          // Ao clicar, preenche o modal e lista os pacotes disponíveis
+          // Ao clicar, preenche o modal e lista os pacotes disponÃ­veis
           btnAlterar.addEventListener('click', () => {
-            // guarda referência do <li> atual para mover no DOM após sucesso
+            // guarda referÃªncia do <li> atual para mover no DOM apÃ³s sucesso
             window._editingItemLi = li;
 
             // campos escondidos
@@ -535,7 +535,7 @@ export async function popularPacotesDaCarga(cargaId) {
             if (outros.length === 0) {
               const opt = document.createElement('option');
               opt.value = '';
-              opt.textContent = 'Não há outros pacotes';
+              opt.textContent = 'NÃ£o hÃ¡ outros pacotes';
               sel.appendChild(opt);
               sel.disabled = true;
               helper.textContent = 'Crie outro pacote para mover este item.';
@@ -579,7 +579,7 @@ export async function popularPacotesDaCarga(cargaId) {
             btnSalvarQtd.addEventListener('click', async () => {
               const novaQt = parseInt(inputQtd.value, 10);
               if (!novaQt || novaQt <= 0) {
-                alert('Quantidade inválida.');
+                alert('Quantidade invÃ¡lida.');
                 return;
               }
 
@@ -619,7 +619,7 @@ export async function popularPacotesDaCarga(cargaId) {
             btnExcluirItem.className = 'btn btn-outline-danger btn-sm';
             btnExcluirItem.innerHTML = '<i class="fas fa-trash"></i>';
             btnExcluirItem.addEventListener('click', async () => {
-              const confirma = confirm('Remover esta peça do pacote? A quantidade voltará para a pendência.');
+              const confirma = confirm('Remover esta peÃ§a do pacote? A quantidade voltarÃ¡ para a pendÃªncia.');
               if (!confirma) return;
               const prev = btnExcluirItem.innerHTML;
               btnExcluirItem.disabled = true;
@@ -631,7 +631,7 @@ export async function popularPacotesDaCarga(cargaId) {
                 });
                 const dataResp = await resp.json().catch(() => ({}));
                 if (!resp.ok) {
-                  throw new Error(dataResp?.erro || 'Erro ao remover peça.');
+                  throw new Error(dataResp?.erro || 'Erro ao remover peÃ§a.');
                 }
                 li.remove();
                 // se lista ficar vazia, mostra aviso
@@ -642,7 +642,7 @@ export async function popularPacotesDaCarga(cargaId) {
                   lista.appendChild(vazio);
                 }
               } catch (error) {
-                alert(error.message || 'Erro ao remover peça.');
+                alert(error.message || 'Erro ao remover peÃ§a.');
               } finally {
                 btnExcluirItem.disabled = false;
                 btnExcluirItem.innerHTML = prev;
@@ -661,10 +661,10 @@ export async function popularPacotesDaCarga(cargaId) {
         });
       }
 
-      // Botão Confirmar APONTAMENTO
+      // BotÃ£o Confirmar APONTAMENTO
       const btnConfirmarExpedicao = document.createElement('button');
       btnConfirmarExpedicao.className = 'btn btn-outline-success btn-sm mt-2 w-100';
-      btnConfirmarExpedicao.textContent = 'Confirmar (Expedição)';
+      btnConfirmarExpedicao.textContent = 'Confirmar (ExpediÃ§Ã£o)';
       btnConfirmarExpedicao.setAttribute('data-bs-toggle', 'modal');
       btnConfirmarExpedicao.setAttribute('data-bs-target', '#modalConfirmarPacote');
       btnConfirmarExpedicao.setAttribute('data-id-pacote', pacote.id);
@@ -675,7 +675,7 @@ export async function popularPacotesDaCarga(cargaId) {
         document.getElementById('obsConfirmarPacote').value = '';  // limpa campo
       });
 
-      // Botão Confirmar QUALIDADE
+      // BotÃ£o Confirmar QUALIDADE
       const btnConfirmarQualidade = document.createElement('button');
       btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm mt-2 w-100';
       btnConfirmarQualidade.textContent = 'Confirmar (Qualidade)';
@@ -695,27 +695,35 @@ export async function popularPacotesDaCarga(cargaId) {
       const footer = document.createElement('div');
       footer.className = 'card-footer d-flex flex-column gap-2';
 
-      // Botão de adicionar foto
+      // BotÃ£o de adicionar foto
       const btnFoto = document.createElement('button');
       btnFoto.className = 'btn btn-outline-secondary btn-sm';
       btnFoto.innerHTML = '<i class="fas fa-camera"></i>';
-      btnFoto.title = "Adicionar foto";
-      btnFoto.onclick = () => {
-        // Cria input de arquivo invisível
+      btnFoto.title = "Câmera";
+      const abrirSelecaoFoto = (usarCamera = false) => {
+        // Cria input de arquivo invisÃ­vel
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = 'image/*';
-        input.capture = 'environment';  // força uso da câmera no celular
-        input.style.display = 'none';
+        // Em alguns navegadores mobile, `image/*` abre a cÃ¢mera direto.
+        // Usar extensÃµes forÃ§a o seletor de arquivos/galeria.
+        input.accept = '.jpg,.jpeg,.png,.webp,.heic,.heif';
+        if (usarCamera) {
+          input.setAttribute('capture', 'environment');
+        } else {
+          input.removeAttribute('capture');
+        }
 
         // Ao selecionar ou tirar a foto
         input.onchange = () => {
           const file = input.files[0];
-          if (!file) return;
+          if (!file) {
+            input.remove();
+            return;
+          }
 
           const previewURL = URL.createObjectURL(file);
 
-          // Cria modal para confirmação
+          // Cria modal para confirmaÃ§Ã£o
           const modal = document.createElement('div');
           modal.className = 'modal fade';
           modal.id = 'fotoModal';
@@ -728,7 +736,7 @@ export async function popularPacotesDaCarga(cargaId) {
                   <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
                 <div class="modal-body text-center">
-                  <img src="${previewURL}" alt="Prévia" class="img-fluid rounded mb-3" />
+                  <img src="${previewURL}" alt="PrÃ©via" class="img-fluid rounded mb-3" />
                   <button id="confirmarFotoBtn" class="btn btn-success">Confirmar</button>
                 </div>
               </div>
@@ -744,11 +752,11 @@ export async function popularPacotesDaCarga(cargaId) {
           // Ao confirmar
           modal.querySelector('#confirmarFotoBtn').onclick = (e) => {
             
-            const btn = e.currentTarget;   // referência ao próprio botão
+            const btn = e.currentTarget;   // referÃªncia ao prÃ³prio botÃ£o
             btn.innerHTML = 'Confirmando...';
             btn.disabled = true;
 
-            // Aqui você envia para o backend via fetch/axios/FormData
+            // Aqui vocÃª envia para o backend via fetch/axios/FormData
             const formData = new FormData();
             formData.append('foto', file);
             formData.append('pacote', pacote.id)
@@ -785,20 +793,32 @@ export async function popularPacotesDaCarga(cargaId) {
 
             });
           };
+
+          modal.addEventListener('hidden.bs.modal', () => {
+            URL.revokeObjectURL(previewURL);
+            modal.remove();
+          }, { once: true });
         };
 
         // Aciona o input
         document.body.appendChild(input);
         input.click();
       };
+      btnFoto.onclick = () => abrirSelecaoFoto(true);
 
-      // Botão de imprimir
+      const btnArquivo = document.createElement('button');
+      btnArquivo.className = 'btn btn-outline-secondary btn-sm';
+      btnArquivo.innerHTML = '<i class="fas fa-image"></i>';
+      btnArquivo.title = "Selecionar arquivo";
+      btnArquivo.onclick = () => abrirSelecaoFoto(false);
+
+      // BotÃ£o de imprimir
       const btnPrint = document.createElement('button');
       btnPrint.className = 'btn btn-outline-secondary btn-sm';
       btnPrint.innerHTML = '<i class="fas fa-print"></i>';
       btnPrint.title = "Imprimir";
       btnPrint.onclick = () => {
-        // lógica para impressão
+        // lÃ³gica para impressÃ£o
         impressaoZebra(pacote.id, pacote.cliente, pacote.data_carga, pacote.nome);
       };
 
@@ -813,6 +833,7 @@ export async function popularPacotesDaCarga(cargaId) {
 
         btnGroup.appendChild(btnPrint);
         btnGroup.appendChild(btnFoto);
+        btnGroup.appendChild(btnArquivo);
 
         footer.appendChild(btnGroup);
 
@@ -824,6 +845,7 @@ export async function popularPacotesDaCarga(cargaId) {
         btnGroup.appendChild(span);
         btnGroup.appendChild(btnPrint);
         btnGroup.appendChild(btnFoto);
+        btnGroup.appendChild(btnArquivo);
 
         footer.appendChild(btnGroup);
       }
@@ -836,6 +858,7 @@ export async function popularPacotesDaCarga(cargaId) {
 
         // btnGroup.appendChild(btnPrint);
         btnGroup.appendChild(btnFoto);
+        btnGroup.appendChild(btnArquivo);
 
         footer.appendChild(btnGroup);
 
@@ -881,7 +904,7 @@ export function wireModalAlterarPacote(){
       return;
     }
 
-    // botão de submit em loading
+    // botÃ£o de submit em loading
     const submitBtn = form.querySelector('button[type="submit"]');
     const prevText  = submitBtn.textContent;
     submitBtn.disabled = true;

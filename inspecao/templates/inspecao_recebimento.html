@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% load static %}
 
@@ -91,6 +91,20 @@
                     <div class="col-md-5">
                         <h6 class="fw-bold mb-3">Dados do recebimento</h6>
                         <dl id="detalhes-recebimento" class="row small"></dl>
+                        <div class="mt-3 row g-2 align-items-end">
+                            <div class="col-6">
+                                <label for="quantidade-lote-recebimento" class="form-label form-label-sm fw-semibold">quantidade do lote</label>
+                                <input type="number" id="quantidade-lote-recebimento" class="form-control form-control-sm" min="1" step="1">
+                            </div>
+                            <div class="col-6">
+                                <label for="resultado-lote-recebimento" class="form-label form-label-sm fw-semibold">Resultado do lote</label>
+                                <select id="resultado-lote-recebimento" class="form-select form-select-sm" required>
+                                    <option value="" selected disabled></option>
+                                    <option value="conforme">Conforme</option>
+                                    <option value="nao_conforme">Nao conforme</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-md-7">
                         <form id="form-inspecao-recebimento">
@@ -331,7 +345,7 @@
         }
     }
 
-    // ─── helpers do formulário dinâmico ────────────────────────────────────
+    // â”€â”€â”€ helpers do formulÃ¡rio dinÃ¢mico â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let classeAtual = "";
 
     function selectConformidade(prefix, name, label) {
@@ -372,7 +386,8 @@
                       + `</div></div>`;
             }
             html += `</div></div>`;
-            html += selectConformidade(prefix, "dim_diametro_externo", "Diâmetro externo");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">Diâmetro externo</label>`
+                  + `<input type="text" name="${prefix}dim_diametro_externo" class="form-control form-control-sm"></div>`;
             html += secao("Resultado");
             html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
             html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
@@ -385,8 +400,10 @@
             html += secao("Sessão Dimensional");
             html += selectConformidade(prefix, "dim_diametro_interno", "Diâmetro interno");
             html += selectConformidade(prefix, "dim_diametro_externo", "Diâmetro externo");
-            html += selectConformidade(prefix, "dim_diametro_centro_furacao", "Diâmetro do centro de furação");
-            html += selectConformidade(prefix, "dim_comprimento_cubo", "Comprimento do cubo");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">Diâmetro do centro de furação</label>`
+                  + `<input type="text" name="${prefix}dim_diametro_centro_furacao" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">Comprimento do cubo</label>`
+                  + `<input type="text" name="${prefix}dim_comprimento_cubo" class="form-control form-control-sm"></div>`;
             html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Furos parafusos</label>`;
             html += `<div class="row g-1">`;
             for (let i = 1; i <= 6; i++) {
@@ -453,6 +470,72 @@
             return html;
         },
 
+        "Pneus": (prefix) => {
+            let html = "";
+            html += secao("Sessão Visual");
+            html += selectConformidade(prefix, "visual_rachaduras", "Rachaduras");
+            html += selectConformidade(prefix, "visual_falha", "Falha");
+            html += selectConformidade(prefix, "visual_deformacoes", "Deformações");
+            html += selectConformidade(prefix, "visual_cortes", "Cortes");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Chapas e bobinas": (prefix) => {
+            let html = "";
+            html += secao("Sessão Dimensional");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">espessura</label>`
+                  + `<input type="text" name="${prefix}dim_espessura" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">largura</label>`
+                  + `<input type="text" name="${prefix}dim_largura" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento</label>`
+                  + `<input type="text" name="${prefix}dim_comprimento" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. interno</label>`
+                  + `<input type="text" name="${prefix}dim_diam_interno" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">diam externo</label>`
+                  + `<input type="text" name="${prefix}dim_diam_externo" class="form-control form-control-sm"></div>`;
+            html += secao("Sessão Visual");
+            html += selectConformidade(prefix, "visual_corrosao", "Corrosão");
+            html += selectConformidade(prefix, "visual_amassados", "amassados");
+            html += selectConformidade(prefix, "visual_ondulacoes", "ondulações");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Parafuso de Roda": (prefix) => {
+            let html = "";
+            html += secao("Sessão Dimensional");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">diametro das estrias</label>`
+                  + `<input type="text" name="${prefix}dim_diametro_estrias" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento das estrias</label>`
+                  + `<input type="text" name="${prefix}dim_comprimento_estrias" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento util do parafuso</label>`
+                  + `<input type="text" name="${prefix}dim_comprimento_util_parafuso" class="form-control form-control-sm"></div>`;
+            html += selectConformidade(prefix, "teste_montagem", "teste de montagem");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Câmara de Ar": (prefix) => {
+            let html = "";
+            html += secao("Sessão Visual");
+            html += selectConformidade(prefix, "visual_rachados_falhas_deformacoes_cortes", "Rachados / Falhas / Deformações / Cortes");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
         "_generico": (prefix) => {
             let html = selectConformidade(prefix, "resultado", "Resultado da inspeção");
             html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
@@ -506,7 +589,17 @@
         });
 
         // detecta classe e reseta quantidade para 1
-        classeAtual = (row.data?.["Classe de Inspeção"] || row.data_completa?.["Classe de Inspeção"] || "").trim();
+        classeAtual = (
+            row.data?.["Classe de inspeção"]
+            || row.data?.["Classe de Inspeção"]
+            || row.data_completa?.["Classe de inspeção"]
+            || row.data_completa?.["Classe de Inspeção"]
+            || ""
+        ).trim();
+        const resultadoLoteInput = document.getElementById("resultado-lote-recebimento");
+        if (resultadoLoteInput) resultadoLoteInput.value = "";
+        const quantidadeLoteInput = document.getElementById("quantidade-lote-recebimento");
+        if (quantidadeLoteInput) quantidadeLoteInput.value = "";
         const qtdInput = document.getElementById("qtd-unidades-recebimento");
         qtdInput.value = 1;
         renderUnidades(1);
@@ -526,7 +619,12 @@
 
         // coleta dados por unidade
         const unidades = [];
-        let resultadoGeral = "conforme";
+        const resultadoLoteInput = document.getElementById("resultado-lote-recebimento");
+        const resultadoLote = resultadoLoteInput ? resultadoLoteInput.value : "";
+        if (!resultadoLote) {
+            alert("Selecione o resultado do lote.");
+            return;
+        }
 
         for (let u = 1; u <= qtd; u++) {
             const prefix = `u${u}_`;
@@ -554,8 +652,6 @@
                 return;
             }
 
-            if (unitResultado === "nao_conforme") resultadoGeral = "nao_conforme";
-
             unidades.push({
                 unidade: u,
                 resultado: unitResultado,
@@ -568,7 +664,7 @@
             row_index: pendenciaSelecionada.row_index,
             item_id: pendenciaSelecionada.item_id,
             data: pendenciaSelecionada.data_completa || pendenciaSelecionada.data,
-            resultado: resultadoGeral,
+            resultado: resultadoLote,
             observacao: unidades.map(u => u.observacao).filter(Boolean).join(" | "),
             dados_inspecao: { unidades },
         };
