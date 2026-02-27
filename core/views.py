@@ -229,6 +229,7 @@ def pecas_usinagem_api(request):
             PecasOrdemUsinagem.objects
             .select_related('ordem', 'peca')
             .filter(ordem__grupo_maquina='usinagem')
+            .exclude(qtd_boa=0, qtd_morta=0)
             .order_by('-data', '-id')
         )
 
