@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!app) return;
 
     const API_URL = app.dataset.apiUrl;
+    const PECAS_OPTIONS_URL = app.dataset.pecasOptionsUrl;
     const csrftoken = (() => {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; csrftoken=`);
@@ -76,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tbody.innerHTML = '';
         items.forEach(item => tbody.appendChild(buildRow(item)));
+        initPecaSelects();
     }
 
     function buildRow(item) {
@@ -85,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.appendChild(textCell(item.id));
         tr.appendChild(textCell(item.ordem_numero ?? '-'));
         tr.appendChild(textCell(item.grupo_maquina ?? '-'));
-        tr.appendChild(textCell(item.peca_display ?? '-'));
+        tr.appendChild(pecaSelectCell(item));
         tr.appendChild(numberCell(item.qtd_planejada));
         tr.appendChild(editCell('qtd_boa', item.qtd_boa));
         tr.appendChild(editCell('qtd_morta', item.qtd_morta));
@@ -107,6 +109,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const td = document.createElement('td');
         td.textContent = content;
         return td;
+    }
+
+    function pecaSelectCell(item) {
+        const td = document.createElement('td');
+        td.style.minWidth = '220px';
+        const select = document.createElement('select');
+        select.name = 'peca_id';
+        select.className = 'peca-s2 form-select form-select-sm';
+        if (item.peca_id) {
+            const opt = new Option(item.peca_display ?? item.peca_id, item.peca_id, true, true);
+            select.appendChild(opt);
+        }
+        td.appendChild(select);
+        return td;
+    }
+
+    function initPecaSelects() {
+        $('.peca-s2').each(function () {
+            if ($(this).data('select2')) return; // already initialized
+            $(this).select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                placeholder: 'Buscar peça…',
+                allowClear: true,
+                minimumInputLength: 0,
+                dropdownParent: $(document.body),
+                ajax: {
+                    url: PECAS_OPTIONS_URL,
+                    dataType: 'json',
+                    delay: 250,
+                    data: params => ({ q: params.term || '' }),
+                    processResults: data => ({ results: data.results }),
+                    cache: true,
+                },
+            });
+        });
     }
 
     function numberCell(value) {
@@ -139,6 +177,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!input) return;
             if (input.value !== '') payload[field] = parseFloat(input.value);
         });
+
+        const pecaSelect = row.querySelector('[name="peca_id"]');
+        if (pecaSelect && pecaSelect.value) {
+            payload.peca_id = parseInt(pecaSelect.value);
+        }
 
         if (Object.keys(payload).length === 1) {
             showAlert('error', 'Informe ao menos um campo para salvar.');

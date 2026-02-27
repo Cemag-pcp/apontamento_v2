@@ -42,6 +42,7 @@ urlpatterns = [
     path('api/pecas-corte/', views.pecas_corte_api, name='pecas_corte_api'),
     path('api/pecas-serra/', views.pecas_serra_api, name='pecas_serra_api'),
     path('api/pecas-usinagem/', views.pecas_usinagem_api, name='pecas_usinagem_api'),
+    path('api/pecas-options/', views.pecas_search_api, name='pecas_options_api'),
     path('api/pecas-estamparia/', views.pecas_estamparia_api, name='pecas_estamparia_api'),
 
     path('api/rpa/update-transfer/', api_view.rpa_update_transfer, name='rpa_update_transfer'),

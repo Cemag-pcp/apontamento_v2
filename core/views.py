@@ -306,13 +306,37 @@ def pecas_usinagem_api(request):
                 except (TypeError, ValueError):
                     return JsonResponse({'error': f'{campo} inválido.'}, status=400)
 
-        if not campos_para_atualizar:
+        peca_id_novo = data.get('peca_id')
+        if peca_id_novo is not None:
+            try:
+                peca_id_novo = int(peca_id_novo)
+            except (TypeError, ValueError):
+                return JsonResponse({'error': 'peca_id inválido.'}, status=400)
+            if not Pecas.objects.filter(id=peca_id_novo).exists():
+                return JsonResponse({'error': 'Peça não encontrada.'}, status=400)
+
+        if not campos_para_atualizar and peca_id_novo is None:
             return JsonResponse({'error': 'Nenhum campo válido para atualizar.'}, status=400)
 
+        # Atualiza qtd_boa / qtd_morta apenas no registro solicitado
         for campo, valor in campos_para_atualizar.items():
             setattr(peca_ordem, campo, valor)
 
-        peca_ordem.save(update_fields=list(campos_para_atualizar.keys()))
+        update_fields = list(campos_para_atualizar.keys())
+
+        if peca_id_novo is not None:
+            # Atualiza a peça em TODOS os registros da mesma ordem
+            PecasOrdemUsinagem.objects.filter(
+                ordem_id=peca_ordem.ordem_id
+            ).update(peca_id=peca_id_novo)
+            peca_ordem.peca_id = peca_id_novo
+
+        if update_fields:
+            peca_ordem.save(update_fields=update_fields)
+
+        peca_ordem.refresh_from_db()
+
+        peca_display = f"{peca_ordem.peca.codigo} - {peca_ordem.peca.descricao}" if peca_ordem.peca else None
 
         return JsonResponse({
             'success': 'Peça atualizada com sucesso.',
@@ -320,10 +344,23 @@ def pecas_usinagem_api(request):
                 'id': peca_ordem.id,
                 'qtd_boa': peca_ordem.qtd_boa,
                 'qtd_morta': peca_ordem.qtd_morta,
+                'peca_id': peca_ordem.peca_id,
+                'peca_display': peca_display,
             }
         })
 
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+
+@login_required
+def pecas_search_api(request):
+    """Retorna lista de Pecas para o select2 pesquisável."""
+    q = request.GET.get('q', '').strip()
+    queryset = Pecas.objects.filter(
+        Q(codigo__icontains=q) | Q(descricao__icontains=q)
+    ).order_by('codigo')[:50]
+    results = [{'id': p.id, 'text': f'{p.codigo} - {p.descricao}'} for p in queryset]
+    return JsonResponse({'results': results})
 
 
 @login_required
