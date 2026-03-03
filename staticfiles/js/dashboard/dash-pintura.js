@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.length === 0) {
                 tabela.innerHTML = `
                     <tr>
-                        <td colspan="4" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
+                        <td colspan="5" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
                     </tr>
                 `;
                 return;
@@ -232,6 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const row = `
                     <tr>
                         <td>${formatDateBr(item.data_execucao)}</td>
+                        <td>${item.ordem_id}</td>
                         <td>${item.peca}</td>
                         <td>${item.nome_causa}</td>
                         <td>${item.quantidade}</td>

@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
             data.forEach(item => {
                 const row = `
                     <tr>
+                        <td>${item["ID Inspeção"]}</td>
                         <td>${item.Data}</td>
                         <td>${item["Peça"]}</td>
                         <td>${item.Causa}</td>
@@ -234,7 +235,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            let anoAtual = null;
             data.forEach(item => {
+                const ano = item.Data.split('/')[1];
+                if (anoAtual !== null && ano !== anoAtual) {
+                    const separador = `
+                        <tr class="table-dark">
+                            <td colspan="9" class="text-center py-1" style="border-top: 2px solid #6c757d; border-bottom: 2px solid #6c757d; letter-spacing: 2px;">
+                                <small>── fim de ${anoAtual} ──</small>
+                            </td>
+                        </tr>
+                    `;
+                    tabela.insertAdjacentHTML('beforeend', separador);
+                }
+                anoAtual = ano;
                 const row = `
                     <tr>
                         <td>${item.Data}</td>
@@ -242,6 +256,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${item["N° de inspeções"]}</td>
                         <td>${item["N° de não conformidades"]}</td>
                         <td>${item["% de inspeção"]}</td>
+                        <td>${item["Quantidade de pç produzidas"]}</td>
+                        <td>${item["Quantidade pç inspecionada"]}</td>
+                        <td>${item["Quantidade pç não conforme"]}</td>
+                        <td>${item["% de inspeção por total de peça"]}</td>
                     </tr>
                 `;
                 tabela.insertAdjacentHTML('beforeend', row);
