@@ -232,5 +232,6 @@ function pegarCodigoPeca(peca){
         const partes = peca.split("-");
         return partes[0].trim();
     }
+
     return peca;
 }
