@@ -32,6 +32,7 @@ from ..models import (
 )
 from core.models import Profile, Maquina
 from apontamento_estamparia.models import (
+    PecasOrdem,
     InfoAdicionaisInspecaoEstamparia,
     MedidasInspecaoEstamparia,
     DadosNaoConformidade,
@@ -1094,12 +1095,79 @@ def indicador_estamparia_resumo_analise_temporal(request):
     if data_fim:
         queryset = queryset.filter(data_inspecao__lte=data_fim)
 
+    # 1) Extrai ordem_id de cada Inspecao filtrada, com o mês correspondente
+    ordem_mes_rows = (
+        queryset
+        .annotate(
+            ano=ExtractYear("data_inspecao"),
+            mes_num=ExtractMonth("data_inspecao"),
+        )
+        .values("ano", "mes_num", "pecas_ordem_estamparia__ordem_id")
+        .distinct()
+    )
+
+    # 2) Monta mapa: ordem_id -> lista de (ano, mes_num)
+    ordem_mes_map = defaultdict(list)
+    for row in ordem_mes_rows:
+        ordem_id = row["pecas_ordem_estamparia__ordem_id"]
+        if ordem_id:
+            ordem_mes_map[ordem_id].append((row["ano"], row["mes_num"]))
+
+    # 3) Busca qtd_boa em PecasOrdem pelo ordem_id
+    pecas_qtd = (
+        PecasOrdem.objects
+        .filter(ordem_id__in=ordem_mes_map.keys())
+        .values("ordem_id")
+        .annotate(total_qtd_boa=Sum("qtd_boa"))
+    )
+
+    # 4) Distribui por mês
+    qtd_boa_dict = defaultdict(int)
+    for row in pecas_qtd:
+        for mes_key in ordem_mes_map[row["ordem_id"]]:
+            qtd_boa_dict[mes_key] += row["total_qtd_boa"] or 0
+
+    # 0) Conta NC por mês usando DadosNaoConformidade — mesma fonte da tabela de causas
+    nc_qs = DadosNaoConformidade.objects.filter(
+        informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__isnull=False,
+        causas__isnull=False,
+    )
+    if data_inicio:
+        nc_qs = nc_qs.filter(
+            informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao__gte=data_inicio
+        )
+    if data_fim:
+        nc_qs = nc_qs.filter(
+            informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao__lte=data_fim
+        )
+
+    nc_inspecoes_por_mes = defaultdict(set)
+    nc_qtd_por_mes = defaultdict(int)
+    nc_count_por_mes = defaultdict(int)
+    seen_nc_ids = set()
+    for row in nc_qs.values(
+        "id",
+        "informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao",
+        "informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao_id",
+        "qt_nao_conformidade",
+    ):
+        if row["id"] in seen_nc_ids:
+            continue
+        seen_nc_ids.add(row["id"])
+        dt = row["informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__data_inspecao"]
+        chave_mes = (dt.year, dt.month)
+        nc_inspecoes_por_mes[chave_mes].add(
+            row["informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao_id"]
+        )
+        nc_qtd_por_mes[chave_mes] += row["qt_nao_conformidade"] or 0
+        nc_count_por_mes[chave_mes] += 1
+    nc_count_dict = dict(nc_count_por_mes)
+
     # Anotações e agregações
     queryset = (
         queryset.annotate(
             ano=ExtractYear("data_inspecao"),
             mes_num=ExtractMonth("data_inspecao"),
-            qtd_boa=F("pecas_ordem_estamparia__qtd_boa"),
             conformidade=F("dadosexecucaoinspecao__conformidade"),
             nao_conformidade=F("dadosexecucaoinspecao__nao_conformidade"),
             qtd_inspecionada=ExpressionWrapper(
@@ -1112,9 +1180,7 @@ def indicador_estamparia_resumo_analise_temporal(request):
         .annotate(
             total_produzida=Count("id"),
             total_inspecionada=Count("dadosexecucaoinspecao__id"),
-            total_nao_conforme=Count(
-                "dadosexecucaoinspecao__id", filter=Q(nao_conformidade__gt=0)
-            ),
+            total_qtd_inspecionada=Sum("qtd_inspecionada"),
         )
         .order_by("ano", "mes_num")
     )
@@ -1122,21 +1188,29 @@ def indicador_estamparia_resumo_analise_temporal(request):
     # Monta JSON
     resultado = []
     for item in queryset:
-        mes_formatado = f"{item['ano']}-{item['mes_num']}"
+        mes_formatado = f"{item['ano']}-{str(item['mes_num']).zfill(2)}"
 
         total_prod = item["total_produzida"] or 0
+        total_qtd_boa = qtd_boa_dict.get((item["ano"], item["mes_num"]), 0)
         total_insp = item["total_inspecionada"] or 0
-        total_nc = item["total_nao_conforme"] or 0
+        total_qtd_insp = item["total_qtd_inspecionada"] or 0
+        total_nc = nc_qtd_por_mes.get((item["ano"], item["mes_num"]), 0)
+        total_insp_nc = nc_count_dict.get((item["ano"], item["mes_num"]), 0)
 
         perc_insp = (total_insp / total_prod) * 100 if total_prod else 0
+        perc_insp_total = (total_qtd_insp / total_qtd_boa) * 100 if total_qtd_boa else 0
 
         resultado.append(
             {
                 "Data": mes_formatado,
                 "N° de peças produzidas": int(total_prod),
+                "Quantidade de pç produzidas": int(total_qtd_boa),
                 "N° de inspeções": int(total_insp),
-                "N° de não conformidades": int(total_nc),
+                "Quantidade pç inspecionada": int(total_qtd_insp),
+                "Quantidade pç não conforme": int(total_nc),
+                "N° de não conformidades": int(total_insp_nc),
                 "% de inspeção": f"{perc_insp:.2f} %",
+                "% de inspeção por total de peça": f"{perc_insp_total:.2f} %",
             }
         )
 
@@ -1199,7 +1273,8 @@ def causas_nao_conformidade_mensal_estamparia(request):
             "mes_formatado",
             "causas__nome",
             "destino",
-            "peca_info",  # Usando a anotação que criamos
+            "peca_info",
+            "informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__ordem_id",
         )
         .annotate(total_nao_conformidades=Sum("qt_nao_conformidade"))
         .order_by("mes_formatado", "causas__nome")
@@ -1209,9 +1284,10 @@ def causas_nao_conformidade_mensal_estamparia(request):
     resultado = [
         {
             "Data": item["mes_formatado"],
+            "ID Ordem": item["informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__ordem_id"],
             "Causa": item["causas__nome"],
             "Destino": item["destino"],
-            "Peça": item["peca_info"],  # Formato "codigo - descricao"
+            "Peça": item["peca_info"],
             "Soma do N° Total de não conformidades": item["total_nao_conformidades"],
         }
         for item in resultados

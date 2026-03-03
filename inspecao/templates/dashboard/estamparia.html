@@ -67,7 +67,7 @@
 
 <!-- Tabela de Produção -->
 <div class="row mb-4">
-    <div class="col-6">
+    <div class="col-12">
         <div class="card">
             <div class="card-header">
                 Dados de Produção e Inspeção
@@ -77,11 +77,21 @@
                     <table class="table table-striped table-hover" id="table-producao">
                         <thead>
                             <tr>
-                                <th>Data Referência</th>
-                                <th>N° de peças produzidas</th>
-                                <th>N° de inspeções</th>
-                                <th>N° de não conformidades</th>
-                                <th>% de inspeção</th>
+                                <th rowspan="2">Data Referência</th>
+                                <th colspan="4" class="text-center table-primary">Por Tipo (contagem de registros)</th>
+                                <th colspan="4" class="text-center table-success" style="border-left: 3px solid #6c757d;">Total Absoluto (quantidade de peças)</th>
+                            </tr>
+                            <tr>
+                                <!-- valores por tipo -->
+                                <th>Qt. tipos de pç</th>
+                                <th>Qt. inspeção por tipos</th>
+                                <th>Qt. nc por tipo</th>
+                                <th>% de inspeção por tipo</th>
+                                <!-- valores por total absoluto -->
+                                <th style="border-left: 3px solid #6c757d;">Quantidade de pç produzidas</th>
+                                <th>Quantidade pç inspecionada</th>
+                                <th>Quantidade pç não conforme</th>
+                                <th>% de inspeção por total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -92,7 +102,11 @@
             </div>
         </div>
     </div>
-    <div class="col-6">
+</div>
+
+<!-- Contagem de não conformidade -->
+<div class="row mb-4">
+    <div class="col-12">
         <div class="card">
             <div class="card-header">
                 Causas de Não Conformidades
@@ -103,6 +117,7 @@
                         <thead>
                             <tr>
                                 <th>Data Inspeção</th>
+                                <th>ID Ordem</th>
                                 <th>Peça</th>
                                 <th>Causa</th>
                                 <th>Total Ñ conformidades</th>
@@ -184,7 +199,6 @@
         </div>
     </div>
 </div>
-
 
 {% endblock %}
 

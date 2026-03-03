@@ -72,12 +72,17 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
         }
 
         try:
-            response_integracao = requests.post(
-                "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
-                json=payload_integracao,
-                auth=("luan araujo", "luanaraujo7"),
-                timeout=20,
-            )
+            # se for dev não rodar esse bloco
+            # DJANGO_ENV = dev
+            if os.getenv("DJANGO_ENV") == "dev":
+                return
+            else:
+                response_integracao = requests.post(
+                    "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                    json=payload_integracao,
+                    auth=("luan araujo", "luanaraujo7"),
+                    timeout=20,
+                )
         except requests.RequestException as exc:
             item.erro_apontamento = str(exc)[:2000]
             item.tipo_apontamento = 'api'
@@ -923,12 +928,15 @@ def api_erp_apontar_item_usinagem(request, pk):
         }
 
         try:
-            response_integracao = requests.post(
-                "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
-                json=payload_integracao,
-                auth=("luan araujo", "luanaraujo7"),
-                timeout=20,
-            )
+            if os.getenv("DJANGO_ENV") == "dev":
+                return
+            else:
+                response_integracao = requests.post(
+                    "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                    json=payload_integracao,
+                    auth=("luan araujo", "luanaraujo7"),
+                    timeout=20,
+                )
         except requests.RequestException as exc:
             return JsonResponse(
                 {

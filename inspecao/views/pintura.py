@@ -842,15 +842,32 @@ def indicador_pintura_resumo_analise_temporal(request):
         INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
         WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
+    ),
+    nc_ordens AS (
+        SELECT
+            EXTRACT(YEAR FROM app.data) AS ano,
+            EXTRACT(MONTH FROM app.data) AS mes,
+            COUNT(DISTINCT app.ordem_id) AS total_ordens_nc
+        FROM apontamento_v2.inspecao_causasnaoconformidade cnc
+        JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON cnc.dados_execucao_id = dei.id
+        JOIN apontamento_v2.inspecao_inspecao i ON dei.inspecao_id = i.id
+        JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c ON cnc.id = cnc_c.causasnaoconformidade_id
+        JOIN apontamento_v2.apontamento_pintura_pecasordem app ON app.id = i.pecas_ordem_pintura_id
+        WHERE i.pecas_ordem_pintura_id IS NOT NULL
+            AND app.data >= %(data_inicio)s
+            AND app.data < %(data_fim)s + INTERVAL '1 day'
+        GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
     )
     SELECT 
         p.ano,
         p.mes,
         p.total_produzido,
         (COALESCE(i.total_conforme, 0) - COALESCE(i.total_nao_conforme, 0)) AS total_conforme,
-        COALESCE(i.total_nao_conforme, 0) AS total_nao_conforme
+        COALESCE(i.total_nao_conforme, 0) AS total_nao_conforme,
+        COALESCE(n.total_ordens_nc, 0) AS total_ordens_nc
     FROM producao_total p
     LEFT JOIN inspecoes_total i ON p.ano = i.ano AND p.mes = i.mes
+    LEFT JOIN nc_ordens n ON p.ano = n.ano AND p.mes = n.mes
     ORDER BY p.ano, p.mes;
     """
 
@@ -866,7 +883,7 @@ def indicador_pintura_resumo_analise_temporal(request):
 
     resultado = []
     for row in rows:
-        ano, mes_num, total_prod, total_conf, total_nc = row
+        ano, mes_num, total_prod, total_conf, total_nc, total_ordens_nc = row
         total_insp = total_nc + total_conf
         perc_insp = (total_insp / total_prod) * 100 if total_prod else 0
 
@@ -875,7 +892,7 @@ def indicador_pintura_resumo_analise_temporal(request):
                 "Data": f"{int(ano)}-{int(mes_num):02}",
                 "N° de peças produzidas": int(total_prod or 0),
                 "N° de inspeções": int(total_insp or 0),
-                "N° de não conformidades": int(total_nc or 0),
+                "N° de não conformidades": int(total_ordens_nc or 0),
                 "% de inspeção": f"{perc_insp:.2f} %",
             }
         )
@@ -903,7 +920,8 @@ def causas_nao_conformidade_mensal(request):
         TO_CHAR(app.data, 'YYYY-MM') AS mes,
         c.nome AS causa,
         SUM(cnc.quantidade) AS total_nao_conformidades,
-        app.peca as peca
+        app.peca as peca,
+        app.ordem_id as ordem_id
     FROM apontamento_v2.inspecao_causasnaoconformidade cnc
     JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
     JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
@@ -913,7 +931,7 @@ def causas_nao_conformidade_mensal(request):
     WHERE i.pecas_ordem_pintura_id IS NOT NULL
     AND app.data >= %(data_inicio)s
     AND app.data < %(data_fim)s
-    GROUP BY mes, c.nome, app.peca
+    GROUP BY mes, c.nome, app.peca, app.ordem_id
     ORDER BY mes ASC, c.nome ASC;
     """
 
@@ -933,6 +951,7 @@ def causas_nao_conformidade_mensal(request):
             "nome_causa": row[1],
             "quantidade": row[2],
             "peca": row[3],
+            "ordem_id": row[4],
         }
         for row in rows
     ]

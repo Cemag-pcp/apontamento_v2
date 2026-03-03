@@ -10,9 +10,7 @@ ALLOWED_HOSTS = ['127.0.0.1',
                 'mongolia-near-task-mothers.trycloudflare.com',
                 '3c8g63hx-8000.brs.devtunnels.ms',
                 'formatting-sake-south-subscriber.trycloudflare.com',
-                ".trycloudflare.com",
-
-            ]
+                ".trycloudflare.com",]
 
 CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
@@ -35,7 +33,7 @@ DATABASES = {
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
         'OPTIONS': {
-            'options': '-c search_path='+env('BASE_TESTE'),
+            'options': '-c search_path='+env('BASE_PROD'),
         },
     }
 }

@@ -10,6 +10,7 @@ from apontamento_serra.models import (
     DetalheMedidaSerraUsinagem,
     InfoAdicionaisSerraUsinagem,
 )
+from apontamento_usinagem.models import PecasOrdem as PecasOrdemUsinagem
 from django.db.models import (
     Q,
     Prefetch,
@@ -1472,19 +1473,73 @@ def indicador_usinagem_resumo_analise_temporal(request):
     if data_fim:
         queryset = queryset.filter(data_inspecao__lte=data_fim)
 
+    # 0) Conta NC distintas por (ano, mes) usando data_execucao — mesma fonte da tabela de causas
+    nc_qs = CausasNaoConformidade.objects.filter(
+        dados_execucao__inspecao__pecas_ordem_usinagem__isnull=False,
+    )
+    if data_inicio:
+        nc_qs = nc_qs.filter(dados_execucao__data_execucao__gte=data_inicio)
+    if data_fim:
+        nc_qs = nc_qs.filter(dados_execucao__data_execucao__lte=data_fim)
+
+    nc_inspecoes_por_mes = defaultdict(set)
+    nc_qtd_por_mes = defaultdict(int)
+    for row in nc_qs.values("dados_execucao__data_execucao", "dados_execucao__inspecao_id", "quantidade"):
+        exec_dt = row["dados_execucao__data_execucao"]
+        chave_mes = (exec_dt.year, exec_dt.month)
+        nc_inspecoes_por_mes[chave_mes].add(row["dados_execucao__inspecao_id"])
+        nc_qtd_por_mes[chave_mes] += row["quantidade"] or 0
+    nc_count_dict = {k: len(v) for k, v in nc_inspecoes_por_mes.items()}
+
+    # 1) Extrai ordem_id de cada Inspecao filtrada, com o mês correspondente
+    ordem_mes_rows = (
+        queryset
+        .annotate(
+            ano=ExtractYear("data_inspecao"),
+            mes_num=ExtractMonth("data_inspecao"),
+        )
+        .values("ano", "mes_num", "pecas_ordem_usinagem__ordem_id")
+        .distinct()
+    )
+
+    # 2) Monta mapa: ordem_id -> lista de (ano, mes_num)
+    ordem_mes_map = defaultdict(list)
+    for row in ordem_mes_rows:
+        ordem_id = row["pecas_ordem_usinagem__ordem_id"]
+        if ordem_id:
+            ordem_mes_map[ordem_id].append((row["ano"], row["mes_num"]))
+
+    # 3) Busca qtd_boa em PecasOrdemUsinagem pelo ordem_id
+    pecas_qtd = (
+        PecasOrdemUsinagem.objects
+        .filter(ordem_id__in=ordem_mes_map.keys())
+        .values("ordem_id")
+        .annotate(total_qtd_boa=Sum("qtd_boa"))
+    )
+
+    # 4) Distribui por mês
+    qtd_boa_dict = defaultdict(int)
+    for row in pecas_qtd:
+        for mes_key in ordem_mes_map[row["ordem_id"]]:
+            qtd_boa_dict[mes_key] += row["total_qtd_boa"] or 0
+
     queryset = (
         queryset.annotate(
             ano=ExtractYear("data_inspecao"),
             mes_num=ExtractMonth("data_inspecao"),
-            qtd_boa=F("pecas_ordem_usinagem__qtd_boa"),
             conformidade=F("dadosexecucaoinspecao__conformidade"),
             nao_conformidade=F("dadosexecucaoinspecao__nao_conformidade"),
+            qtd_inspecionada=ExpressionWrapper(
+                F("dadosexecucaoinspecao__conformidade")
+                + F("dadosexecucaoinspecao__nao_conformidade"),
+                output_field=FloatField(),
+            ),
         )
         .values("ano", "mes_num")
         .annotate(
             total_produzida=Count("id"),
             total_inspecionada=Count("dadosexecucaoinspecao__id"),
-            total_nao_conforme=Sum("dadosexecucaoinspecao__nao_conformidade"),
+            total_qtd_inspecionada=Sum("qtd_inspecionada"),
         )
         .order_by("ano", "mes_num")
     )
@@ -1494,18 +1549,26 @@ def indicador_usinagem_resumo_analise_temporal(request):
         mes_formatado = f"{item['ano']}-{str(item['mes_num']).zfill(2)}"
 
         total_prod = item["total_produzida"] or 0
+        total_qtd_boa = qtd_boa_dict.get((item["ano"], item["mes_num"]), 0)
         total_insp = item["total_inspecionada"] or 0
-        total_nc = item["total_nao_conforme"] or 0
+        total_qtd_insp = item["total_qtd_inspecionada"] or 0
+        total_nc = nc_qtd_por_mes.get((item["ano"], item["mes_num"]), 0)
+        total_insp_nc = nc_count_dict.get((item["ano"], item["mes_num"]), 0)
 
         perc_insp = (total_insp / total_prod) * 100 if total_prod else 0
+        perc_insp_total = (total_qtd_insp / total_qtd_boa) * 100 if total_qtd_boa else 0
 
         resultado.append({
             "Data": mes_formatado,
             "Setor": "usinagem",
             "N° de peças produzidas": int(total_prod),
+            "Quantidade de pç produzidas": int(total_qtd_boa),
             "N° de inspeções": int(total_insp),
-            "N° de não conformidades": int(total_nc),
+            "Quantidade pç inspecionada": int(total_qtd_insp),
+            "Quantidade pç não conforme": int(total_nc),
+            "N° de não conformidades": int(total_insp_nc),
             "% de inspeção": f"{perc_insp:.2f} %",
+            "% de inspeção por total de peça": f"{perc_insp_total:.2f} %",
         })
 
     return JsonResponse(resultado, safe=False)
@@ -1526,50 +1589,48 @@ def causas_nao_conformidade_mensal_usinagem(request):
 
     queryset = CausasNaoConformidade.objects.filter(
         dados_execucao__inspecao__pecas_ordem_usinagem__isnull=False,
-        causa__isnull=False
-    )
+    ).select_related(
+        "dados_execucao__inspecao__pecas_ordem_usinagem__peca"
+    ).prefetch_related("causa")
 
     if data_inicio:
         queryset = queryset.filter(dados_execucao__data_execucao__gte=data_inicio)
     if data_fim:
         queryset = queryset.filter(dados_execucao__data_execucao__lte=data_fim)
 
-    resultados = (
-        queryset.annotate(
-            mes_formatado=Concat(
-                ExtractYear("dados_execucao__data_execucao"),
-                Value("-"),
-                ExtractMonth("dados_execucao__data_execucao"),
-                output_field=CharField(),
-            ),
-            peca_info=Concat(
-                F("dados_execucao__inspecao__pecas_ordem_usinagem__peca__codigo"),
-                Value(" - "),
-                F("dados_execucao__inspecao__pecas_ordem_usinagem__peca__descricao"),
-                output_field=CharField()
-            )
-        )
-        .values(
-            "mes_formatado",
-            "causa__nome",
-            "destino",
-            "peca_info"
-        )
-        .annotate(total_nao_conformidades=Sum("quantidade"))
-        .order_by("mes_formatado", "causa__nome")
-    )
+    # Agrupa em Python: chave = (mes, inspecao_id, peca_info)
+    # Uma linha por inspeção NC → total de linhas = "N° de não conformidades"
+    grupos = defaultdict(lambda: {"causas": set(), "destinos": set(), "total": 0})
 
-    resultado = [
-        {
-            "Data": item["mes_formatado"],
-            "Setor": "usinagem",
-            "Causa": item["causa__nome"],
-            "Destino": item["destino"],
-            "Peça": item["peca_info"],
-            "Soma do N° Total de não conformidades": item["total_nao_conformidades"],
-        }
-        for item in resultados
-    ]
+    for nc in queryset:
+        exec_dt = nc.dados_execucao.data_execucao
+        mes = f"{exec_dt.year}-{exec_dt.month}"
+        peca = nc.dados_execucao.inspecao.pecas_ordem_usinagem
+        peca_info = f"{peca.peca.codigo} - {peca.peca.descricao}" if peca and peca.peca else ""
+        inspecao_id = nc.dados_execucao.inspecao_id
+        chave = (mes, inspecao_id, peca_info)
+
+        for causa in nc.causa.all():
+            grupos[chave]["causas"].add(causa.nome)
+        if nc.destino:
+            grupos[chave]["destinos"].add(nc.destino)
+        grupos[chave]["total"] += nc.quantidade or 0
+
+    resultado = sorted(
+        [
+            {
+                "Data": chave[0],
+                "Setor": "usinagem",
+                "ID Inspeção": chave[1],
+                "Causa": ", ".join(sorted(dados["causas"])) if dados["causas"] else None,
+                "Destino": ", ".join(sorted(dados["destinos"])) if dados["destinos"] else "",
+                "Peça": chave[2],
+                "Soma do N° Total de não conformidades": dados["total"],
+            }
+            for chave, dados in grupos.items()
+        ],
+        key=lambda x: x["Data"],
+    )
 
     return JsonResponse(resultado, safe=False)
 

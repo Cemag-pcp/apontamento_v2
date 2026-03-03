@@ -79,12 +79,19 @@ def _apontar_item_via_api_erp_estamparia(item, user):
     }
 
     try:
-        response_integracao = requests.post(
-            "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
-            json=payload_integracao,
-            auth=("luan araujo", "luanaraujo7"),
-            timeout=20,
-        )
+        # apenas em producao
+        # verifica se o ambiente é dev
+        # pela var DJANGO_ENV, se for dev, não roda
+
+        if os.getenv("DJANGO_ENV") == "dev":
+            return
+        else:
+            response_integracao = requests.post(
+                "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                json=payload_integracao,
+                auth=("luan araujo", "luanaraujo7"),
+                timeout=20,
+            )
     except requests.RequestException as exc:
         raise IntegracaoERPError(
             f'Falha de comunicação com API ERP: {exc}',
@@ -1009,12 +1016,17 @@ def api_erp_apontar_item_estamparia(request, pk):
             payload_integracao["desviado"] = item.qtd_morta
 
         try:
-            response_integracao = requests.post(
-                "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
-                json=payload_integracao,
-                auth=("luan araujo", "luanaraujo7"),
-                timeout=20,
-            )
+            # se for dev não roda
+            # DJANGO_ENV
+            if os.getenv("DJANGO_ENV") == "dev":
+                return
+            else:
+                response_integracao = requests.post(
+                    "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                    json=payload_integracao,
+                    auth=("luan araujo", "luanaraujo7"),
+                    timeout=20,
+                )
         except requests.RequestException as exc:
             return JsonResponse(
                 {
