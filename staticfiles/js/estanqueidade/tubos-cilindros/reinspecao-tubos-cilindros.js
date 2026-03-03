@@ -215,3 +215,11 @@ function buscarItensReinspecaoEstanqueidade(pagina) {
         console.error(error);
     });
 }
+
+function pegarCodigoPeca(peca){
+    if (peca.includes("-")) {
+        const partes = peca.split("-");
+        return partes[0].trim();
+    }
+    return peca;
+}
