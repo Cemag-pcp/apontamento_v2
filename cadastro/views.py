@@ -10,7 +10,7 @@ from django.db.models import Prefetch, Count, Q
 from django.views.decorators.csrf import csrf_exempt
 
 from .forms import UploadCSVForm
-from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas
+from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas, ItensExplodidos
 from . import views
 
 import csv
@@ -595,3 +595,115 @@ def cadastro_conjuntos_api(request):
         return JsonResponse({'success': 'Conjunto removido com sucesso.'})
 
     return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
+
+
+def _clean_produto(value):
+    if value is None:
+        return None
+    produto = str(value).strip()
+    if not produto:
+        return None
+    return produto
+
+
+@login_required
+def cadastro_itens_explodidos(request):
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'add_single':
+            produto = _clean_produto(request.POST.get('produto'))
+            if not produto:
+                messages.error(request, 'Informe o produto para cadastrar.')
+                return redirect('cadastro:cadastro_itens_explodidos')
+
+            obj, created = ItensExplodidos.objects.get_or_create(produto=produto)
+            if created:
+                messages.success(request, f'Produto "{obj.produto}" cadastrado com sucesso.')
+            else:
+                messages.warning(request, f'Produto "{obj.produto}" ja esta cadastrado.')
+            return redirect('cadastro:cadastro_itens_explodidos')
+
+        if action == 'upload_csv':
+            file = request.FILES.get('file')
+            if not file:
+                messages.error(request, 'Selecione um arquivo CSV para importar.')
+                return redirect('cadastro:cadastro_itens_explodidos')
+
+            if not file.name.lower().endswith('.csv'):
+                messages.error(request, 'Arquivo invalido. Envie um arquivo .csv.')
+                return redirect('cadastro:cadastro_itens_explodidos')
+
+            raw_bytes = file.read()
+
+            try:
+                decoded = raw_bytes.decode('utf-8-sig')
+            except UnicodeDecodeError:
+                try:
+                    decoded = raw_bytes.decode('latin-1')
+                except UnicodeDecodeError:
+                    messages.error(request, 'Nao foi possivel ler o arquivo CSV (encoding invalido).')
+                    return redirect('cadastro:cadastro_itens_explodidos')
+
+            rows = csv.reader(decoded.splitlines())
+            produtos = set()
+
+            for row in rows:
+                if not row:
+                    continue
+                produto = _clean_produto(row[0])
+                if not produto:
+                    continue
+                if produto.lower() == 'produto':
+                    continue
+                produtos.add(produto)
+
+            if not produtos:
+                messages.warning(request, 'Nenhum produto valido encontrado no CSV.')
+                return redirect('cadastro:cadastro_itens_explodidos')
+
+            existentes = set(
+                ItensExplodidos.objects.filter(produto__in=produtos).values_list('produto', flat=True)
+            )
+            novos = [ItensExplodidos(produto=produto) for produto in produtos if produto not in existentes]
+            ItensExplodidos.objects.bulk_create(novos, ignore_conflicts=True)
+
+            messages.success(
+                request,
+                f'Importacao concluida. Novos: {len(novos)} | Ja existentes: {len(existentes)}.'
+            )
+            return redirect('cadastro:cadastro_itens_explodidos')
+
+        if action == 'delete':
+            item_id = request.POST.get('id')
+            if not item_id:
+                messages.error(request, 'ID do item nao informado para exclusao.')
+                return redirect('cadastro:cadastro_itens_explodidos')
+
+            item = get_object_or_404(ItensExplodidos, id=item_id)
+            produto = item.produto
+            item.delete()
+            messages.success(request, f'Produto "{produto}" removido com sucesso.')
+            return redirect('cadastro:cadastro_itens_explodidos')
+
+        messages.error(request, 'Acao invalida.')
+        return redirect('cadastro:cadastro_itens_explodidos')
+
+    search = (request.GET.get('search') or '').strip()
+    queryset = ItensExplodidos.objects.all().order_by('produto')
+    if search:
+        queryset = queryset.filter(produto__icontains=search)
+
+    paginator = Paginator(queryset, 50)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        'cadastro_itens_explodidos.html',
+        {
+            'page_obj': page_obj,
+            'search': search,
+            'total_items': paginator.count,
+        }
+    )

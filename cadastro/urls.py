@@ -30,5 +30,6 @@ urlpatterns = [
     # Conjuntos
     path('cadastro-conjuntos/', views.cadastro_conjuntos, name='cadastro_conjuntos'),
     path('api/cadastro-conjuntos/', views.cadastro_conjuntos_api, name='cadastro_conjuntos_api'),
+    path('cadastro-itens-explodidos/', views.cadastro_itens_explodidos, name='cadastro_itens_explodidos'),
 
 ]

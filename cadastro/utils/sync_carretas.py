@@ -1,9 +1,10 @@
 # utils/sync_carretas.py
-from django.db import transaction
-from cadastro.models import CarretasExplodidas  
-
 from itertools import islice
+
 import pandas as pd
+from django.db import transaction
+
+from cadastro.models import CarretasExplodidas
 
 # Ajuste aqui se quiser outra chave natural:
 KEY_FIELDS = ('codigo_peca', 'carreta', 'segundo_processo', 'grupo', 'grupo1', 'grupo2')
@@ -20,8 +21,51 @@ ALL_FIELDS = (
     'grupo',
     'grupo1',
     'grupo2',
-    'peso'
+    'peso',
 )
+
+SOURCE_FIELDS = (
+    'CODIGO',
+    'DESCRIÇÃO',
+    'MATÉRIA PRIMA',
+    'TOTAL',
+    'PRIMEIRO PROCESSO',
+    '2 PROCESSO',
+    'CONJUNTO',
+    'CARRETA',
+    'CELULA 3',
+    'CELULA 1',
+    'CELULA 2',
+    'PESO',
+)
+
+SOURCE_TO_MODEL = {
+    'CODIGO': 'codigo_peca',
+    'DESCRIÇÃO': 'descricao_peca',
+    'MATÉRIA PRIMA': 'mp_peca',
+    'TOTAL': 'total_peca',
+    'PRIMEIRO PROCESSO': 'primeiro_processo',
+    '2 PROCESSO': 'segundo_processo',
+    'CONJUNTO': 'conjunto_peca',
+    'CARRETA': 'carreta',
+    'CELULA 3': 'grupo',
+    'CELULA 1': 'grupo1',
+    'CELULA 2': 'grupo2',
+    'PESO': 'peso',
+}
+
+MANUAL_COMPONENTE_EXTRA = {
+    '214104',
+    '214105',
+    '214108',
+    '262729',
+    '200391',
+    '240471',
+    '222416',
+    '268150',
+    '218455',
+}
+
 
 def _chunked(iterable, size=1000):
     it = iter(iterable)
@@ -30,6 +74,7 @@ def _chunked(iterable, size=1000):
         if not chunk:
             return
         yield chunk
+
 
 def _clean_cell(v):
     # Converte NaN/None/"" para None; strings são stripadas
@@ -40,71 +85,77 @@ def _clean_cell(v):
         return None
     return s.strip()
 
-def tratamento_carretas():
-    
+
+def _normalize_source_columns(df):
     """
-    Precisa baixar a ultima versão da planilha: https://docs.google.com/spreadsheets/d/1A67y-gk0P5qW_jDaxL4B9I-wP9wDM6mjJ91BMrzGWHw/edit?gid=733473611#gid=733473611
-    formato CSV e renomear para BASE_GERAL.
+    Permite receber colunas com acento normal ou mojibake
+    (ex.: DESCRIÇÃO / MATÉRIA PRIMA).
     """
-    
-    df = pd.read_csv("cadastro/BASE_GERAL.csv")
+    aliases = {
+        'DESCRIÇÃO': 'DESCRIÇÃO',
+        'MATÉRIA PRIMA': 'MATÉRIA PRIMA',
+    }
+    rename_map = {k: v for k, v in aliases.items() if k in df.columns and v not in df.columns}
+    if rename_map:
+        df = df.rename(columns=rename_map)
+    return df
 
-    df = df[['CODIGO', 'DESCRIÇÃO', 'MATÉRIA PRIMA', 'TOTAL', 'PRIMEIRO PROCESSO', '2 PROCESSO', 'CONJUNTO', 'CARRETA','CELULA 3', 'CELULA 1', 'CELULA 2', 'PESO']] 
-    columns=['codigo_peca','descricao_peca','mp_peca','total_peca','primeiro_processo','segundo_processo','conjunto_peca','carreta','grupo', 'grupo1', 'grupo2', 'peso']
 
-    # codigos que deverã ser tratados manualmente (criar um processo apenas para eles) - COMPONENTE EXTRA
-    codigo_processo = [
-        '214104',
-        '214105',
-        '214108',
-        '262729',
-        '200391',
-        '240471',
-        '222416',
-        '268150',
-        '218455'
-    ]
+def tratamento_carretas(source_df=None):
+    """
+    Tratamento padrão para dados de carretas.
+    - Sem source_df: lê cadastro/BASE_GERAL.csv.
+    - Com source_df: usa o DataFrame fornecido.
+    """
+    if source_df is None:
+        df = pd.read_csv('cadastro/BASE_GERAL.csv')
+    else:
+        df = source_df.copy()
 
-    df.columns = columns
-    
+    df = _normalize_source_columns(df)
+
+    if all(col in df.columns for col in SOURCE_FIELDS):
+        df = df.loc[:, list(SOURCE_FIELDS)].rename(columns=SOURCE_TO_MODEL)
+    elif all(col in df.columns for col in ALL_FIELDS):
+        df = df.loc[:, list(ALL_FIELDS)].copy()
+    else:
+        missing_source = [c for c in SOURCE_FIELDS if c not in df.columns]
+        missing_normalized = [c for c in ALL_FIELDS if c not in df.columns]
+        raise ValueError(
+            'DataFrame em formato invalido para sync de carretas. '
+            f'Faltando colunas fonte: {missing_source}. '
+            f'Faltando colunas normalizadas: {missing_normalized}.'
+        )
+
     df['codigo_peca'] = df['codigo_peca'].astype(str).str.strip()
-
-    mascara = df['codigo_peca'].isin(codigo_processo)
+    mascara = df['codigo_peca'].isin(MANUAL_COMPONENTE_EXTRA)
     df.loc[mascara, 'primeiro_processo'] = 'COMPONENTE EXTRA'
 
     return df
 
+
 @transaction.atomic
-def sync_carretas_from_df(update_existing=False, chunk_size=1000):
-    
+def sync_carretas_from_df(source_df=None, update_existing=False, chunk_size=1000):
     """
     Garante que todas as linhas do DataFrame estejam na tabela CarretasExplodidas.
     - Insere as ausentes (comparando pela KEY_FIELDS).
     - Se update_existing=True, atualiza também as já existentes para refletir o DF.
-    Retorna dict com contagens.
     """
-    
-    df = tratamento_carretas()
+    df = tratamento_carretas(source_df=source_df)
 
-    # Garante colunas esperadas
     missing_cols = [c for c in ALL_FIELDS if c not in df.columns]
     if missing_cols:
-        raise ValueError(f"DataFrame faltando colunas: {missing_cols}")
+        raise ValueError(f'DataFrame faltando colunas: {missing_cols}')
 
-    # Normalização básica
     df_norm = df.loc[:, list(ALL_FIELDS)].copy()
     for col in ALL_FIELDS:
         df_norm[col] = df_norm[col].map(_clean_cell)
 
-    # Conjunto de chaves já existentes no banco
-    existing_keys = set(
-        CarretasExplodidas.objects.values_list(*KEY_FIELDS)
-    )
+    existing_keys = set(CarretasExplodidas.objects.values_list(*KEY_FIELDS))
 
     to_create = []
     to_update = []
 
-    # Se vamos atualizar existentes, crie um índice em memória dos objetos atuais por chave
     existing_map = None
     if update_existing:
         existing_map = {
@@ -112,7 +163,6 @@ def sync_carretas_from_df(update_existing=False, chunk_size=1000):
             for *vals, obj_id in CarretasExplodidas.objects.values_list(*KEY_FIELDS, 'id')
         }
 
-    # Monta payloads
     for row in df_norm.to_dict(orient='records'):
         key = tuple(row[k] for k in KEY_FIELDS)
         if key not in existing_keys:
@@ -120,26 +170,19 @@ def sync_carretas_from_df(update_existing=False, chunk_size=1000):
         elif update_existing:
             obj_id = existing_map.get(key)
             if obj_id:
-                obj = CarretasExplodidas(id=obj_id, **row)
-                to_update.append(obj)
+                to_update.append(CarretasExplodidas(id=obj_id, **row))
 
     created = 0
     updated = 0
 
-    # bulk_create em chunks
     for chunk in _chunked(to_create, chunk_size):
         CarretasExplodidas.objects.bulk_create(chunk, batch_size=chunk_size)
         created += len(chunk)
 
-    # bulk_update (se habilitado)
     if update_existing and to_update:
-        # Campos que podem ser atualizados (todos menos a PK)
         update_fields = [f for f in ALL_FIELDS]
         for chunk in _chunked(to_update, chunk_size):
             CarretasExplodidas.objects.bulk_update(chunk, update_fields, batch_size=chunk_size)
             updated += len(chunk)
 
-    return {"created": created, "updated": updated, "existing_kept": len(existing_keys)}
-
-
-
+    return {'created': created, 'updated': updated, 'existing_kept': len(existing_keys)}

@@ -169,3 +169,10 @@ class CarretasExplodidas(models.Model):
 
     def __str__(self):
         return f'{self.descricao_peca}'
+
+class ItensExplodidos(models.Model):
+
+    produto = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.produto
