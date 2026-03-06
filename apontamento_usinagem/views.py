@@ -75,7 +75,12 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
             # se for dev não rodar esse bloco
             # DJANGO_ENV = dev
             if os.getenv("DJANGO_ENV") == "dev":
-                return
+                response_integracao = requests.post(
+                    "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                    json=payload_integracao,
+                    auth=("luan araujo", "luanaraujo7"),
+                    timeout=20,
+                )
             else:
                 response_integracao = requests.post(
                     "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
@@ -929,7 +934,12 @@ def api_erp_apontar_item_usinagem(request, pk):
 
         try:
             if os.getenv("DJANGO_ENV") == "dev":
-                return
+                response_integracao = requests.post(
+                    "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                    json=payload_integracao,
+                    auth=("luan araujo", "luanaraujo7"),
+                    timeout=20,
+                )
             else:
                 response_integracao = requests.post(
                     "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",

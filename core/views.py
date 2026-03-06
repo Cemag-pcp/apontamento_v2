@@ -15,6 +15,8 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from django.views.decorators.http import require_GET, require_POST
 from django.core.paginator import Paginator
+from django.core.cache import cache
+from django.db.utils import OperationalError
 
 from .models import Ordem, Versao
 from cadastro.models import MotivoExclusao,MotivoMaquinaParada,MotivoInterrupcao,Pecas,Maquina,CarretasExplodidas,Setor,Conjuntos
@@ -814,28 +816,43 @@ def get_ultimas_pecas_produzidas(request):
 def get_contagem_status_ordem(request):
 
     setor = request.GET.get('setor', '')  # Captura o setor da URL
+    cache_key = f"status_ordem:{setor or 'all'}"
 
-    if setor == 'corte':
-        contagem_status = Ordem.objects.filter(grupo_maquina__in=('laser_1','laser_2','laser_3','plasma'), excluida=False).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
-    else:
-        contagem_status = Ordem.objects.filter(grupo_maquina=setor, excluida=False).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
+    try:
+        if setor == 'corte':
+            contagem_status_qs = Ordem.objects.filter(
+                grupo_maquina__in=('laser_1', 'laser_2', 'laser_3', 'plasma'),
+                excluida=False
+            ).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
+        else:
+            contagem_status_qs = Ordem.objects.filter(
+                grupo_maquina=setor,
+                excluida=False
+            ).values('status_atual').annotate(total=Count('id')).order_by('status_atual')
 
-    # Consulta os dados agrupados por status
+        contagem_status = list(contagem_status_qs)
+        total_ordens = sum(item['total'] for item in contagem_status)
 
-    # Total de ordens
-    total_ordens = sum(item['total'] for item in contagem_status)
+        status_data = []
+        for item in contagem_status:
+            porcentagem = (item['total'] / total_ordens * 100) if total_ordens > 0 else 0
+            status_data.append({
+                'status': item['status_atual'],
+                'total': item['total'],
+                'porcentagem': round(porcentagem, 2),
+            })
 
-    # Calcula as porcentagens e prepara os dados para o frontend
-    status_data = []
-    for item in contagem_status:
-        porcentagem = (item['total'] / total_ordens * 100) if total_ordens > 0 else 0
-        status_data.append({
-            'status': item['status_atual'],
-            'total': item['total'],
-            'porcentagem': round(porcentagem, 2)  # Trunca a porcentagem para 2 casas decimais
-        })
-
-    return JsonResponse({'status_contagem': status_data})
+        cache.set(cache_key, status_data, 30)
+        return JsonResponse({'status_contagem': status_data})
+    except OperationalError:
+        status_data = cache.get(cache_key, [])
+        return JsonResponse(
+            {
+                'status_contagem': status_data,
+                'warning': 'Banco indisponível temporariamente. Exibindo último valor em cache.',
+            },
+            status=200 if status_data else 503
+        )
 
 def get_status_maquinas(request):
     setor = request.GET.get('setor', '')

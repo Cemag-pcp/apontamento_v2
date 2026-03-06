@@ -69,7 +69,7 @@ def _apontar_item_via_api_erp_estamparia(item, user):
         )
 
     payload_integracao = {
-        "id": "Apontamento 1",
+        "id": f"estamparia-item-{item.id}",
         "data": localtime(now()).strftime('%d/%m/%Y'),
         "pessoa": "4357",
         "recurso": str(item.peca.codigo if item.peca else ""),
@@ -84,7 +84,12 @@ def _apontar_item_via_api_erp_estamparia(item, user):
         # pela var DJANGO_ENV, se for dev, não roda
 
         if os.getenv("DJANGO_ENV") == "dev":
-            return
+            response_integracao = requests.post(
+                "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                json=payload_integracao,
+                auth=("luan araujo", "luanaraujo7"),
+                timeout=20,
+            )
         else:
             response_integracao = requests.post(
                 "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
@@ -347,17 +352,19 @@ def atualizar_status_ordem(request):
         if not ordem_id or not grupo_maquina or not status:
             return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
 
-        # Obtém a ordem ANTES da transação, para evitar falha na atomicidade
-        ordem = get_object_or_404(Ordem, pk=ordem_id)
-
         if maquina_nome:
             maquina_nome = get_object_or_404(Maquina, pk=int(maquina_nome))
 
-        # Validações básicas
-        if ordem.status_atual == status:
-            return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
-
         with transaction.atomic():  # Entra na transação somente após garantir que todos os objetos existem
+            ordem = Ordem.objects.select_for_update().get(pk=ordem_id)
+            item_id_para_apontamento_erp = None
+
+            # Validações com lock para evitar corrida/duplicidade de finalização
+            if ordem.status_atual == status:
+                return JsonResponse({'error': f'Essa ordem já está {status}. Atualize a página.'}, status=400)
+            if ordem.status_atual == 'finalizada':
+                return JsonResponse({'error': 'Essa ordem já foi finalizada e não pode ser alterada.'}, status=409)
+
             ###NÃO VERIFICA MAIS SE A MÁQUINA JA ESTÁ SENDO UTILIZADA, USUARIO PODE INICIAR OUTRA PEÇA NA MESMA MÁQUINA###
             # Verifica se já existe uma ordem iniciada na mesma máquina
             # if status == 'iniciada' and maquina_nome:
@@ -429,12 +436,7 @@ def atualizar_status_ordem(request):
                 elif not inspecao_existente:
                     Inspecao.objects.create(pecas_ordem_estamparia=nova_peca_ordem)
 
-                try:
-                    _apontar_item_via_api_erp_estamparia(nova_peca_ordem, getattr(request, 'user', None))
-                except IntegracaoERPError:
-                    # Não bloquear a operação do operador.
-                    # O erro fica salvo em `erro_apontamento` para tratativa posterior no ERP.
-                    pass
+                item_id_para_apontamento_erp = nova_peca_ordem.id
 
                 ordem.status_prioridade = 3
 
@@ -479,7 +481,32 @@ def atualizar_status_ordem(request):
                 )
 
             ordem.save()
-            notificar_ordem(ordem)
+
+            ordem_id = ordem.id
+            request_user = getattr(request, 'user', None)
+
+            def _executar_pos_commit():
+                try:
+                    ordem_pos_commit = Ordem.objects.get(pk=ordem_id)
+                except Ordem.DoesNotExist:
+                    return
+
+                try:
+                    notificar_ordem(ordem_pos_commit)
+                except Exception:
+                    # Notificação não deve quebrar o fluxo principal.
+                    pass
+
+                if item_id_para_apontamento_erp:
+                    try:
+                        item_erp = PecasOrdem.objects.get(pk=item_id_para_apontamento_erp)
+                        _apontar_item_via_api_erp_estamparia(item_erp, request_user)
+                    except (PecasOrdem.DoesNotExist, IntegracaoERPError):
+                        # Não bloquear a operação do operador.
+                        # O erro fica salvo em `erro_apontamento` para tratativa posterior no ERP.
+                        pass
+
+            transaction.on_commit(_executar_pos_commit)
 
             return JsonResponse({
                 'message': 'Status atualizado com sucesso.',
@@ -1003,7 +1030,7 @@ def api_erp_apontar_item_estamparia(request, pk):
 
     if tipo_apontamento == 'api':
         payload_integracao = {
-            "id": "Apontamento 1",
+            "id": f"estamparia-item-{item.id}",
             "data": localtime(now()).strftime('%d/%m/%Y'),
             "pessoa": "4357",
             "recurso": str(item.peca.codigo if item.peca else ""),
@@ -1019,7 +1046,12 @@ def api_erp_apontar_item_estamparia(request, pk):
             # se for dev não roda
             # DJANGO_ENV
             if os.getenv("DJANGO_ENV") == "dev":
-                return
+                response_integracao = requests.post(
+                    "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                    json=payload_integracao,
+                    auth=("luan araujo", "luanaraujo7"),
+                    timeout=20,
+                )
             else:
                 response_integracao = requests.post(
                     "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
