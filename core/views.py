@@ -1166,7 +1166,7 @@ def base_explodida_innovaro(request):
     def _parse_list(v):
         if not v:
             return []
-        return [p.strip() for p in v.split(',') if p.strip()]
+        return [p.strip() for p in v.split('|') if p.strip()]
 
     def _like_q(field, pattern):
         raw = (pattern or '').strip()

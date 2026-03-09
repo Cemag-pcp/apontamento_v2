@@ -61,12 +61,12 @@ export async function popularPacotesDaCarga(cargaId) {
     const carretasChips = carretas.length
       ? carretas.map(({ carreta, quantidade, cor }) => {
           const cls = classeCorBadge(cor);
-          const tip = `${cor ?? 'â€”'} â€¢ qtd: ${quantidade ?? 0}`;
+          const tip = `${cor ?? '*'} * qtd: ${quantidade ?? 0}`;
           return `
             <span class="badge rounded-pill ${cls}" 
                   data-bs-toggle="tooltip" data-bs-placement="top" 
                   data-bs-title="${tip}">
-              ${carreta} Ã— ${quantidade}
+              ${carreta} — ${quantidade}
             </span>`;
         }).join(' ')
       : `<span class="text-muted">Sem carretas</span>`;
