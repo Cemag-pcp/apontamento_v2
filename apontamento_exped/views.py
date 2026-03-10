@@ -286,6 +286,8 @@ def criar_caixa(request):
     qs = (CarretasExplodidas.objects
         .filter(carreta__in=lista_carretas,
                 primeiro_processo__in=['PINTAR', 'COMPONENTE EXTRA'])
+        .order_by('carreta', 'codigo_peca')
+        .distinct('carreta', 'codigo_peca')
         .values('carreta', 'codigo_peca', 'descricao_peca', 'total_peca'))
     
     # --- Preparar base agrupada por carreta, com tratamento de código/descrição ---
