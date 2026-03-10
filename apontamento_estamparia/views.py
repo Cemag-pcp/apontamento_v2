@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.conf import settings
 from django.db import transaction, connection
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
@@ -1010,24 +1011,6 @@ def api_erp_apontar_item_estamparia(request, pk):
             status=409
         )
 
-    if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
-        msg_qtd_morta = (
-            'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
-            'A funcionalidade de desvio precisa ser ajustada na API.'
-        )
-        item.erro_apontamento = msg_qtd_morta
-        item.tipo_apontamento = 'api'
-        item.resp_apontamento = request.user
-        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-        return JsonResponse(
-            {
-                'status': 'error',
-                'message': 'Apontamento via API bloqueado para item com qtd_morta.',
-                'description': msg_qtd_morta,
-            },
-            status=422
-        )
-
     if tipo_apontamento == 'api':
         payload_integracao = {
             "id": f"estamparia-item-{item.id}",
@@ -1041,6 +1024,30 @@ def api_erp_apontar_item_estamparia(request, pk):
         if (item.qtd_morta or 0) > 0:
             payload_integracao["depositodesv"] = 61912804
             payload_integracao["desviado"] = item.qtd_morta
+
+        if settings.DEBUG:
+            print(
+                "[ESTAMPARIA][INNOVARO][PAYLOAD]",
+                json.dumps(payload_integracao, ensure_ascii=False, indent=2)
+            )
+
+        if (item.qtd_morta or 0) > 0:
+            msg_qtd_morta = (
+                'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
+                'A funcionalidade de desvio precisa ser ajustada na API.'
+            )
+            item.erro_apontamento = msg_qtd_morta
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = request.user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': 'Apontamento via API bloqueado para item com qtd_morta.',
+                    'description': msg_qtd_morta,
+                },
+                status=422
+            )
 
         try:
             # se for dev não roda

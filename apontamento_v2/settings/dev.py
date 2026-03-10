@@ -35,7 +35,7 @@ DATABASES = {
         'CONN_MAX_AGE': 60,
         'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
-            'options': '-c search_path='+env('BASE_PROD'),
+            'options': '-c search_path='+env('BASE_TESTE'),
             'connect_timeout': 5,
         },
     }
