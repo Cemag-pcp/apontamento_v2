@@ -283,6 +283,7 @@ def criar_caixa(request):
         return JsonResponse({'erro': 'Nenhuma carreta válida nos itens'}, status=400)
 
     # --- Buscar componentes em CarretasExplodidas (apenas PINTAR) ---
+    # Mudança aqui
     qs = (CarretasExplodidas.objects
         .filter(carreta__in=lista_carretas,
                 primeiro_processo__in=['PINTAR', 'COMPONENTE EXTRA'])
