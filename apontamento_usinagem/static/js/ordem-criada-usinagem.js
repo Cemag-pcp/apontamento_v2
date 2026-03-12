@@ -1,5 +1,94 @@
 import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina-usinagem.js';
 
+function formatarStatus(status) {
+    const labels = {
+        aguardando_iniciar: 'Aguardando iniciar',
+        iniciada: 'Iniciada',
+        interrompida: 'Interrompida',
+        finalizada: 'Finalizada',
+        agua_prox_proc: 'Próximo processo',
+    };
+
+    return labels[status] || status;
+}
+
+function carregarPainelPrioridades() {
+    const container = document.getElementById('prioridades-ordens-list');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only"></span>
+        </div>
+    `;
+
+    fetch('/usinagem/api/painel-prioridades/')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao carregar painel de prioridades.');
+            }
+            return response.json();
+        })
+        .then(data => {
+            container.innerHTML = '';
+            const usuarioPodeRetirar = data.usuario_tipo_acesso === 'pcp';
+
+            if (!data.ordens || data.ordens.length === 0) {
+                container.innerHTML = '<p class="text-muted mb-0">Nenhuma ordem com prioridade definida.</p>';
+                return;
+            }
+
+            data.ordens.forEach(ordem => {
+                const item = document.createElement('div');
+                item.className = 'priority-item d-flex justify-content-between align-items-start gap-3';
+                item.innerHTML = `
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="priority-number">${ordem.prioridade}</span>
+                        <div>
+                            <div class="fw-semibold">#${ordem.ordem} - ${ordem.peca_codigo || 'Sem peça'}</div>
+                            <div class="text-muted small">${ordem.peca_descricao || 'Sem descrição'}</div>
+                            <div class="text-muted small">Programada: ${ordem.data_programacao || '-'} | Qt.: ${ordem.qtd_planejada || 0}</div>
+                        </div>
+                    </div>
+                    <div class="text-end small">
+                        <div class="fw-semibold">${ordem.maquina || 'Sem máquina'}</div>
+                        <div class="text-muted">${formatarStatus(ordem.status_atual)}</div>
+                        <div class="priority-actions">
+                            <button type="button" class="btn btn-sm btn-warning btn-prioridade-iniciar" title="Iniciar">
+                                <i class="fa fa-play"></i>
+                            </button>
+                            ${usuarioPodeRetirar ? `
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-prioridade-retirar" title="Retirar da prioridade">
+                                    <i class="fa fa-times"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+
+                const botaoIniciar = item.querySelector('.btn-prioridade-iniciar');
+                if (botaoIniciar) {
+                    botaoIniciar.addEventListener('click', () => {
+                        mostrarModalIniciar(ordem.id, ordem.maquina_id);
+                    });
+                }
+
+                const botaoRetirar = item.querySelector('.btn-prioridade-retirar');
+                if (botaoRetirar) {
+                    botaoRetirar.addEventListener('click', () => {
+                        retirarPrioridadeOrdem(ordem.id);
+                    });
+                }
+
+                container.appendChild(item);
+            });
+        })
+        .catch(error => {
+            console.error(error);
+            container.innerHTML = '<p class="text-danger mb-0">Erro ao carregar prioridades.</p>';
+        });
+}
+
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -98,9 +187,12 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         <div class="card shadow-sm bg-light text-dark">
                             <div class="card-body">
                                 <h5 class="card-title d-flex justify-content-between align-items-center">
-                                    <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca.codigo}" target="_blank" rel="noopener noreferrer">
-                                        ${ordem.peca.codigo} - ${ordem.peca.descricao}
-                                    </a>
+                                    <div class="d-flex flex-column gap-1">
+                                        <a href="https://drive.google.com/drive/u/0/search?q=${ordem.peca.codigo}" target="_blank" rel="noopener noreferrer">
+                                            ${ordem.peca.codigo} - ${ordem.peca.descricao}
+                                        </a>
+                                        <div class="small text-primary fw-semibold">Prioridade: ${ordem.ordem_prioridade ?? '-'}</div>
+                                    </div>
                                     ${statusBadge}
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">#${ordem.ordem} Criado em: ${ordem.data_criacao}</p>
@@ -778,6 +870,46 @@ function getCSRFToken() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
 
+function retirarPrioridadeOrdem(ordemId) {
+    Swal.fire({
+        icon: 'warning',
+        title: 'Retirar da prioridade?',
+        text: 'A ordem deixara de aparecer no painel de prioridades.',
+        showCancelButton: true,
+        confirmButtonText: 'Sim',
+        cancelButtonText: 'Cancelar',
+    }).then(result => {
+        if (!result.isConfirmed) return;
+
+        fetch('/usinagem/api/painel-prioridades/retirar/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken(),
+            },
+            body: JSON.stringify({ ordem_id: ordemId }),
+        })
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao retirar prioridade.');
+                }
+                return data;
+            })
+            .then(() => {
+                carregarPainelPrioridades();
+                resetarCardsInicial();
+            })
+            .catch(error => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message,
+                });
+            });
+    });
+}
+
 // function atualizarStatusOrdem(ordemId, grupoMaquina, status) {
 //     switch (status) {
 //         case 'iniciada':
@@ -1119,6 +1251,7 @@ function mostrarModalFinalizarParcial(ordemId, ordem_numero) {
                         document.getElementById('ordens-container').innerHTML = '';
                     }
                     resetarCardsInicial();
+                    carregarPainelPrioridades();
 
                     modal.hide();
 
@@ -1787,6 +1920,7 @@ function resetarCardsInicial(filtros = {}) {
 
     // Carrega a primeira página automaticamente
     container.innerHTML = ''; // Limpa o container antes de carregar novos resultados
+    carregarPainelPrioridades();
     fetchOrdens();
 
     // Configurar o botão "Carregar Mais"
@@ -1871,6 +2005,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     resetarCardsInicial();
     configurarFormulario();
+    carregarPainelPrioridades();
     
     $('#pecaSelect').select2({
         placeholder: 'Selecione a peça',
@@ -1910,6 +2045,11 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarOrdensIniciadas(containerIniciado);
     carregarOrdensInterrompidas(containerInterrompido);
     carregarOrdensAgProProcesso(containerProxProcesso);
+
+    const refreshPrioridades = document.getElementById('refresh-prioridades');
+    if (refreshPrioridades) {
+        refreshPrioridades.addEventListener('click', carregarPainelPrioridades);
+    }
 
     filtro();
 

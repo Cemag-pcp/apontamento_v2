@@ -94,9 +94,109 @@ def _parse_br_date(value):
     return None
 
 
+def _get_classe_inspecao(data):
+    if not isinstance(data, dict):
+        return ""
+    return str(
+        data.get("Classe de inspeção")
+        or data.get("Classe de Inspeção")
+        or ""
+    ).strip()
+
+
 def _row_hash_from_list(row_values):
     payload = json.dumps(row_values, ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _is_filled(value):
+    return str(value or "").strip() != ""
+
+
+def _merge_sheet_data(existing_data, incoming_data):
+    merged = dict(existing_data or {})
+    for key, value in (incoming_data or {}).items():
+        if _is_filled(value) or key not in merged:
+            merged[key] = value
+    return merged
+
+
+IDENTITY_IGNORE_FIELDS = {"CNPJ", "Fornecedor"}
+
+
+def _identity_payload(dados):
+    payload = {}
+    for key, value in (dados or {}).items():
+        if key in IDENTITY_IGNORE_FIELDS:
+            continue
+        payload[key] = str(value or "").strip()
+    return payload
+
+
+def _find_recebimento_item_by_identity(dados, data_coluna_a):
+    identity_payload = _identity_payload(dados)
+    candidates = InspecaoRecebimentoItem.objects.filter(
+        planilha_id=SHEET_ID,
+        aba_nome=SHEET_TAB,
+        data_referencia=data_coluna_a,
+    ).order_by("id")
+
+    for candidate in candidates:
+        if _identity_payload(candidate.dados) == identity_payload:
+            return candidate
+    return None
+
+
+def _reconcile_recebimento_items(items, incoming_dados, row_index, sheet_hash, data_coluna_a):
+    unique_items = []
+    seen_ids = set()
+    for item in items:
+        if item and item.id not in seen_ids:
+            unique_items.append(item)
+            seen_ids.add(item.id)
+
+    primary_item = next((item for item in unique_items if item.inspecionado), None)
+    if primary_item is None:
+        primary_item = unique_items[0]
+
+    merged_dados = {}
+    any_inspecionado = False
+    for item in unique_items:
+        merged_dados = _merge_sheet_data(merged_dados, item.dados)
+        any_inspecionado = any_inspecionado or item.inspecionado
+    merged_dados = _merge_sheet_data(merged_dados, incoming_dados)
+
+    for duplicate_item in unique_items:
+        if duplicate_item.id == primary_item.id:
+            continue
+        InspecaoRecebimento.objects.filter(item=duplicate_item).update(item=primary_item)
+        duplicate_item.delete()
+
+    primary_item.dados = merged_dados
+    primary_item.data_referencia = data_coluna_a
+    primary_item.status_h = True
+    primary_item.sheet_hash = sheet_hash
+    primary_item.linha_planilha = row_index
+    primary_item.inspecionado = any_inspecionado
+    primary_item.save(
+        update_fields=[
+            "dados",
+            "data_referencia",
+            "status_h",
+            "sheet_hash",
+            "linha_planilha",
+            "inspecionado",
+        ]
+    )
+
+    if primary_item.inspecionado:
+        InspecaoRecebimento.objects.filter(item=primary_item).update(
+            dados=primary_item.dados,
+            linha_planilha=row_index,
+            sheet_hash=sheet_hash,
+        )
+
+    return primary_item
 
 
 def sincronizar_recebimento(request):
@@ -158,12 +258,23 @@ def sincronizar_recebimento(request):
             for idx, col_idx in enumerate(COLUNAS_EXIBIR)
         }
 
-        existing_item = InspecaoRecebimentoItem.objects.filter(sheet_hash=sheet_hash).first()
+        existing_by_line = InspecaoRecebimentoItem.objects.filter(
+            planilha_id=SHEET_ID,
+            aba_nome=SHEET_TAB,
+            linha_planilha=row_index,
+        ).first()
+        existing_by_hash = InspecaoRecebimentoItem.objects.filter(sheet_hash=sheet_hash).first()
+        existing_by_identity = _find_recebimento_item_by_identity(dados, data_coluna_a)
+
+        existing_item = existing_by_line or existing_by_hash or existing_by_identity
         if existing_item:
-            existing_item.dados = dados
-            existing_item.data_referencia = data_coluna_a
-            existing_item.status_h = True
-            existing_item.save(update_fields=["dados", "data_referencia", "status_h"])
+            _reconcile_recebimento_items(
+                items=[existing_by_line, existing_by_hash, existing_by_identity],
+                incoming_dados=dados,
+                row_index=row_index,
+                sheet_hash=sheet_hash,
+                data_coluna_a=data_coluna_a,
+            )
             continue
 
         InspecaoRecebimentoItem.objects.create(
@@ -300,6 +411,26 @@ def inspecionar_recebimento(request):
     row_index = payload.get("row_index")
     item_id = payload.get("item_id")
     sheet_hash = _row_hash(row_data)
+    classe_inspecao = _get_classe_inspecao(row_data)
+
+    if classe_inspecao == "Adaptadores e terminais":
+        unidades = dados_inspecao.get("unidades") if isinstance(dados_inspecao, dict) else None
+        if not isinstance(unidades, list) or not unidades:
+            return JsonResponse(
+                {"error": "Informe o teste de rosqueamento para as unidades inspecionadas."},
+                status=400,
+            )
+
+        for unidade in unidades:
+            campos = unidade.get("campos") if isinstance(unidade, dict) else None
+            teste_rosqueamento = ""
+            if isinstance(campos, dict):
+                teste_rosqueamento = str(campos.get("teste_rosqueamento") or "").strip()
+            if teste_rosqueamento not in {"conforme", "nao_conforme"}:
+                return JsonResponse(
+                    {"error": "Informe o teste de rosqueamento como conforme ou nao conforme."},
+                    status=400,
+                )
 
     item = None
     if item_id:

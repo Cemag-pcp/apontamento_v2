@@ -86,6 +86,29 @@
             background-color: #a03ddd; /* um tom um pouco mais escuro */
             color: #fff; /* opcional para mais contraste */
         }
+        .priority-item {
+            border: 1px solid #e9ecef;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            background: #fff;
+        }
+        .priority-number {
+            min-width: 2.5rem;
+            height: 2.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            font-weight: 700;
+            background: #0d6efd;
+            color: #fff;
+        }
+        .priority-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            margin-top: 0.5rem;
+        }
     </style>
 {% endblock %}
 
@@ -152,6 +175,22 @@
                 </h4>
                 <div class="border rounded p-3 bg-light" style="height: auto; max-height: 400px; overflow-y: auto;">
                     <ul id="status-ordens-list" class="list-unstyled"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <h4 class="text-center text-secondary d-flex justify-content-between align-items-center">
+            Painel de Prioridades
+            <button class="btn btn-sm" id="refresh-prioridades">
+                ðŸ”„
+            </button>
+        </h4>
+        <div class="border rounded p-3 bg-light" style="height: auto; max-height: 320px; overflow-y: auto;">
+            <div id="prioridades-ordens-list" class="d-grid gap-2">
+                <div class="spinner-border text-dark" role="status">
+                    <span class="sr-only"></span>
                 </div>
             </div>
         </div>
@@ -328,6 +367,14 @@
                         <div class="col-md-6">
                             <label for="observacoes" class="form-label">Observações:</label>
                             <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3 align-items-center">
+                        <div class="col-md-6">
+                            <label for="ordemPrioridade" class="form-label">Prioridade numÃ©rica:</label>
+                            <input type="number" class="form-control" id="ordemPrioridade" name="ordemPrioridade" min="1" step="1" placeholder="Ex.: 1, 2, 3..." required>
+                            <small class="text-muted">Quanto menor o nÃºmero, maior a prioridade.</small>
                         </div>
                     </div>
 

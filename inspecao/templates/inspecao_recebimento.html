@@ -369,13 +369,13 @@
     const FORMULARIOS = {
         "Rodas": (prefix) => {
             let html = "";
-            html += secao("Sessão Visual");
+            html += secao("Visual");
             html += selectConformidade(prefix, "visual_amassado", "Amassado");
             html += selectConformidade(prefix, "visual_oxidacao", "Oxidação");
             html += selectConformidade(prefix, "visual_pintura", "Pintura");
-            html += secao("Sessão Empeno");
+            html += secao("Empeno");
             html += selectConformidade(prefix, "empeno_rodagem", "Teste de rodagem");
-            html += secao("Sessão Dimensional");
+            html += secao("Dimensional");
             html += selectConformidade(prefix, "dim_furo_central", "Furo central");
             html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Furos parafusos</label>`;
             html += `<div class="row g-1">`;
@@ -397,7 +397,7 @@
 
         "Cubos de Roda": (prefix) => {
             let html = "";
-            html += secao("Sessão Dimensional");
+            html += secao("Dimensional");
             html += selectConformidade(prefix, "dim_diametro_interno", "Diâmetro interno");
             html += selectConformidade(prefix, "dim_diametro_externo", "Diâmetro externo");
             html += `<div class="mb-2"><label class="form-label form-label-sm">Diâmetro do centro de furação</label>`
@@ -413,7 +413,7 @@
                       + `</div></div>`;
             }
             html += `</div></div>`;
-            html += secao("Sessão Visual");
+            html += secao("Visual");
             html += selectConformidade(prefix, "visual_trincas_falhas", "Trincas / Falhas");
             html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Dureza</label>`;
             html += `<div class="row g-1">`;
@@ -433,11 +433,11 @@
 
         "Tintas": (prefix) => {
             let html = "";
-            html += secao("Sessão Visual");
+            html += secao("Visual");
             html += selectConformidade(prefix, "visual_cor", "Cor");
             html += selectConformidade(prefix, "visual_estabilidade", "Estabilidade");
             html += selectConformidade(prefix, "visual_tonalidade", "Tonalidade");
-            html += secao("Sessão de Aplicação");
+            html += secao("Aplicação");
             html += selectConformidade(prefix, "aplic_alastramento", "Alastramento");
             html += selectConformidade(prefix, "aplic_secagem", "Secagem");
             html += selectConformidade(prefix, "aplic_polimerizacao", "Polimerização");
@@ -472,7 +472,7 @@
 
         "Pneus": (prefix) => {
             let html = "";
-            html += secao("Sessão Visual");
+            html += secao("Visual");
             html += selectConformidade(prefix, "visual_rachaduras", "Rachaduras");
             html += selectConformidade(prefix, "visual_falha", "Falha");
             html += selectConformidade(prefix, "visual_deformacoes", "Deformações");
@@ -486,7 +486,7 @@
 
         "Chapas e bobinas": (prefix) => {
             let html = "";
-            html += secao("Sessão Dimensional");
+            html += secao("Dimensional");
             html += `<div class="mb-2"><label class="form-label form-label-sm">espessura</label>`
                   + `<input type="text" name="${prefix}dim_espessura" class="form-control form-control-sm"></div>`;
             html += `<div class="mb-2"><label class="form-label form-label-sm">largura</label>`
@@ -497,7 +497,7 @@
                   + `<input type="text" name="${prefix}dim_diam_interno" class="form-control form-control-sm"></div>`;
             html += `<div class="mb-2"><label class="form-label form-label-sm">diam externo</label>`
                   + `<input type="text" name="${prefix}dim_diam_externo" class="form-control form-control-sm"></div>`;
-            html += secao("Sessão Visual");
+            html += secao("Visual");
             html += selectConformidade(prefix, "visual_corrosao", "Corrosão");
             html += selectConformidade(prefix, "visual_amassados", "amassados");
             html += selectConformidade(prefix, "visual_ondulacoes", "ondulações");
@@ -510,12 +510,12 @@
 
         "Parafuso de Roda": (prefix) => {
             let html = "";
-            html += secao("Sessão Dimensional");
-            html += `<div class="mb-2"><label class="form-label form-label-sm">diametro das estrias</label>`
+            html += secao("Dimensional");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. das estrias</label>`
                   + `<input type="text" name="${prefix}dim_diametro_estrias" class="form-control form-control-sm"></div>`;
-            html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento das estrias</label>`
+            html += `<div class="mb-2"><label class="form-label form-label-sm">comp. das estrias</label>`
                   + `<input type="text" name="${prefix}dim_comprimento_estrias" class="form-control form-control-sm"></div>`;
-            html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento util do parafuso</label>`
+            html += `<div class="mb-2"><label class="form-label form-label-sm">comp. útil do parafuso</label>`
                   + `<input type="text" name="${prefix}dim_comprimento_util_parafuso" class="form-control form-control-sm"></div>`;
             html += selectConformidade(prefix, "teste_montagem", "teste de montagem");
             html += secao("Resultado");
@@ -525,9 +525,103 @@
             return html;
         },
 
+        "Parafusos de Roda": (prefix) => {
+            return FORMULARIOS["Parafuso de Roda"](prefix);
+        },
+
+        "Adaptadores e terminais": (prefix) => {
+            let html = "";
+            html += secao("Funcional");
+            html += selectConformidade(prefix, "teste_rosqueamento", "teste de rosqueamento");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Galvanizados": (prefix) => {
+            let html = "";
+            html += secao("Dimensional");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">espessura 1</label>`
+                  + `<input type="text" name="${prefix}dim_espessura_1" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">espessura 2</label>`
+                  + `<input type="text" name="${prefix}dim_espessura_2" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">espessura 3</label>`
+                  + `<input type="text" name="${prefix}dim_espessura_3" class="form-control form-control-sm"></div>`;
+            html += secao("Visual");
+            html += selectConformidade(prefix, "visual_trincas_falhas", "Trincas/Falhas");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Rolamentos": (prefix) => {
+            let html = "";
+            html += secao("Dimensional");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. interno</label>`
+                  + `<input type="text" name="${prefix}dim_diametro_interno" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
+                  + `<input type="text" name="${prefix}dim_diametro_externo" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">altura</label>`
+                  + `<input type="text" name="${prefix}dim_altura" class="form-control form-control-sm"></div>`;
+            html += selectConformidade(prefix, "rodado", "rodado");
+            html += secao("Visual");
+            html += selectConformidade(prefix, "visual_trincas_falhas", "trincas / falhas");
+            html += secao("Dureza");
+            html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Dureza</label>`;
+            html += `<div class="row g-1">`;
+            for (let i = 1; i <= 3; i++) {
+                html += `<div class="col-4"><div class="input-group input-group-sm">`
+                      + `<span class="input-group-text">${i}°</span>`
+                      + `<input type="text" name="${prefix}dureza_${i}" class="form-control form-control-sm">`
+                      + `</div></div>`;
+            }
+            html += `</div></div>`;
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Componentes de Cilindros": (prefix) => {
+            let html = "";
+            html += secao("Camisa");
+            html += `<div class="fw-semibold small mt-2 mb-2">Dimensional</div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">Comprimento</label>`
+                  + `<input type="text" name="${prefix}camisa_dim_comprimento" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. interno</label>`
+                  + `<input type="text" name="${prefix}camisa_dim_diametro_interno" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
+                  + `<input type="text" name="${prefix}camisa_dim_diametro_externo" class="form-control form-control-sm"></div>`;
+            html += selectConformidade(prefix, "camisa_dim_reiture_tubo", "reitude do tubo");
+            html += selectConformidade(prefix, "camisa_dim_circularidade_tubo", "circularidade do tubo");
+            html += `<div class="fw-semibold small mt-2 mb-2">Visual</div>`;
+            html += selectConformidade(prefix, "camisa_visual_oxidacao", "Oxidação");
+
+            html += secao("Haste");
+            html += `<div class="fw-semibold small mt-2 mb-2">Dimensional</div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento</label>`
+                  + `<input type="text" name="${prefix}haste_dim_comprimento" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
+                  + `<input type="text" name="${prefix}haste_dim_diametro_externo" class="form-control form-control-sm"></div>`;
+            html += `<div class="fw-semibold small mt-2 mb-2">Visual</div>`;
+            html += selectConformidade(prefix, "haste_visual_oxidacao", "oxidação");
+            html += selectConformidade(prefix, "haste_visual_marcacoes", "marcações");
+
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
         "Câmara de Ar": (prefix) => {
             let html = "";
-            html += secao("Sessão Visual");
+            html += secao("Visual");
             html += selectConformidade(prefix, "visual_rachados_falhas_deformacoes_cortes", "Rachados / Falhas / Deformações / Cortes");
             html += secao("Resultado");
             html += selectConformidade(prefix, "resultado", "Resultado da inspeção");

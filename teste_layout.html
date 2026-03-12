@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Produção - Tempo Real</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --primary: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 24px;
+        }
+
+        .header { margin-bottom: 24px; }
+        .header h1 { margin: 0; font-size: 24px; color: #0f172a; }
+
+        /* Grid Superior (Estratégico) */
+        .top-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Lista Simples */
+        .simple-list { list-style: none; padding: 0; margin: 0; }
+        .simple-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+        .simple-list li:last-child { border-bottom: none; padding-bottom: 0; }
+        
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: white; }
+        .bg-danger { background-color: var(--danger); }
+        .bg-warning { background-color: var(--warning); }
+        .bg-success { background-color: var(--success); }
+
+        /* Grid Inferior (Operacional com Cronômetros) */
+        .process-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .process-column {
+            background-color: #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 400px;
+        }
+
+        .process-column h3 {
+            margin-top: 0;
+            font-size: 15px;
+            color: #334155;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .process-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-left: 4px solid #cbd5e1;
+        }
+
+        .process-card.ongoing { border-left-color: var(--success); }
+        .process-card.interrupted { border-left-color: var(--danger); }
+        .process-card.next { border-left-color: var(--primary); }
+
+        .process-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .process-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        /* Estilo do Cronômetro */
+        .timer-display {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background-color: #f8fafc;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 16px;
+            font-weight: 700;
+            border: 1px solid var(--border);
+        }
+
+        .ongoing .timer-display { color: var(--success); border-color: #a7f3d0; background-color: #ecfdf5; }
+        .interrupted .timer-display { color: var(--danger); border-color: #fecaca; background-color: #fef2f2; }
+        .next .timer-display { color: var(--primary); border-color: #bfdbfe; background-color: #eff6ff; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Painel de Produção</h1>
+    </div>
+
+    <div class="top-grid">
+        <div class="card" style="text-align: center; display: flex; flex-direction: column; justify-content: center;">
+            <div class="card-title" style="justify-content: center;"><i class="fas fa-cogs"></i> Status da Máquina Principal</div>
+            <div style="font-size: 32px; font-weight: 700; color: var(--success); margin: 10px 0;">OPERANDO</div>
+            <div style="font-size: 14px; color: var(--text-muted);">Eficiência OEE: 87%</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><i class="fas fa-exclamation-circle"></i> Painel de Prioridades</div>
+            <ul class="simple-list">
+                <li><span>Ajuste de Temperatura (Forno 2)</span> <span class="badge bg-danger">Alta</span></li>
+                <li><span>Inspeção Lote #402</span> <span class="badge bg-warning">Média</span></li>
+                <li><span>Troca de Ferramenta CNC</span> <span class="badge bg-warning">Média</span></li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><i class="fas fa-chart-pie"></i> Status de Ordens (Hoje)</div>
+            <div style="height: 120px; display: flex; justify-content: center;">
+                <canvas id="ordensChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><i class="fas fa-box-open"></i> Últimas Peças</div>
+            <ul class="simple-list">
+                <li><span>Eixo de Transmissão X</span> <span class="badge bg-success">10:45</span></li>
+                <li><span>Flange Metálica B2</span> <span class="badge bg-success">10:12</span></li>
+                <li><span>Engrenagem Z (Lote 10)</span> <span class="badge bg-success">09:30</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="process-board">
+        
+        <div class="process-column">
+            <h3><i class="fas fa-play-circle" style="color: var(--success);"></i> Processos em Andamento</h3>
+            
+            <div class="process-card ongoing">
+                <div class="process-header"><span>Ordem #1050</span> <span>Torno CNC</span></div>
+                <div class="process-desc">Usinagem de peças de alumínio</div>
+                <div class="timer-display" data-seconds="3420" data-type="up">
+                    <i class="fas fa-clock"></i> <span class="time-text">00:00:00</span>
+                </div>
+            </div>
+
+            <div class="process-card ongoing">
+                <div class="process-header"><span>Ordem #1051</span> <span>Fresa 2</span></div>
+                <div class="process-desc">Acabamento de superfície</div>
+                <div class="timer-display" data-seconds="1245" data-type="up">
+                    <i class="fas fa-clock"></i> <span class="time-text">00:00:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="process-column">
+            <h3><i class="fas fa-pause-circle" style="color: var(--danger);"></i> Processos Interrompidos</h3>
+            
+            <div class="process-card interrupted">
+                <div class="process-header"><span>Ordem #1048</span> <span>Injetora A</span></div>
+                <div class="process-desc">Falta de matéria-prima (Polímero)</div>
+                <div style="font-size: 11px; margin-bottom: 4px; color: var(--danger); font-weight: bold;">TEMPO PARADO:</div>
+                <div class="timer-display" data-seconds="5430" data-type="up">
+                    <i class="fas fa-stopwatch"></i> <span class="time-text">00:00:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="process-column">
+            <h3><i class="fas fa-step-forward" style="color: var(--primary);"></i> Próximos Processos</h3>
+            
+            <div class="process-card next">
+                <div class="process-header"><span>Ordem #1052</span> <span>Solda</span></div>
+                <div class="process-desc">Montagem do chassi principal</div>
+                <div style="font-size: 11px; margin-bottom: 4px; color: var(--primary); font-weight: bold;">INICIA EM:</div>
+                <div class="timer-display" data-seconds="900" data-type="down">
+                    <i class="fas fa-hourglass-half"></i> <span class="time-text">00:00:00</span>
+                </div>
+            </div>
+
+            <div class="process-card next">
+                <div class="process-header"><span>Ordem #1053</span> <span>Pintura</span></div>
+                <div class="process-desc">Revestimento anticorrosivo</div>
+                <div style="font-size: 11px; margin-bottom: 4px; color: var(--primary); font-weight: bold;">INICIA EM:</div>
+                <div class="timer-display" data-seconds="3600" data-type="down">
+                    <i class="fas fa-hourglass-half"></i> <span class="time-text">00:00:00</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 1. Configuração do Gráfico de Rosca
+        const ctx = document.getElementById('ordensChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Concluídas', 'Em Andamento', 'Interrompidas'],
+                datasets: [{
+                    data: [12, 5, 2],
+                    backgroundColor: ['#10b981', '#3b82f6', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: {size: 11} } } },
+                cutout: '75%'
+            }
+        });
+
+        // 2. Lógica dos Cronômetros em Tempo Real
+        function formatTime(totalSeconds) {
+            const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+            const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+            const s = String(totalSeconds % 60).padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        function updateTimers() {
+            const timers = document.querySelectorAll('.timer-display');
+            
+            timers.forEach(timer => {
+                let seconds = parseInt(timer.getAttribute('data-seconds'));
+                const type = timer.getAttribute('data-type');
+                
+                // Se for cronômetro progressivo (Andamento / Interrompido)
+                if (type === 'up') {
+                    seconds++;
+                } 
+                // Se for cronômetro regressivo (Próximos)
+                else if (type === 'down') {
+                    if (seconds > 0) seconds--;
+                }
+
+                // Atualiza o valor no HTML
+                timer.querySelector('.time-text').innerText = formatTime(seconds);
+                // Salva o novo valor para o próximo segundo
+                timer.setAttribute('data-seconds', seconds);
+            });
+        }
+
+        // Roda a função updateTimers a cada 1000 milissegundos (1 segundo)
+        setInterval(updateTimers, 1000);
+        // Roda uma vez imediatamente para não esperar 1 segundo para mostrar os tempos
+        updateTimers();
+    </script>
+</body>
+</html>

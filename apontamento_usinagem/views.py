@@ -9,7 +9,8 @@ from django.views.decorators.http import require_GET
 from django.views.decorators.http import require_POST
 from django.utils.timezone import now,localtime
 from django.utils.dateparse import parse_date
-from django.db.models import Q,Prefetch,Count,OuterRef, Subquery, Exists
+from django.db.models import Q,Prefetch,Count,OuterRef, Subquery, Exists, Value, IntegerField
+from django.db.models.functions import Coalesce
 from django.contrib.auth.decorators import login_required
 
 from .models import Ordem,PecasOrdem
@@ -223,8 +224,9 @@ def get_ordens_criadas(request):
         peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
         peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
         peca_quantidade=Subquery(primeira_peca.values('qtd_planejada')),
-        peca_quantidade_boa=Subquery(primeira_peca.values('qtd_boa'))
-    ).order_by('-data_criacao')#.exclude(status_atual='finalizada')
+        peca_quantidade_boa=Subquery(primeira_peca.values('qtd_boa')),
+        prioridade_ordenacao=Coalesce('ordem_prioridade', Value(999999), output_field=IntegerField()),
+    ).order_by('status_prioridade', 'prioridade_ordenacao', '-data_criacao')#.exclude(status_atual='finalizada')
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
@@ -252,6 +254,7 @@ def get_ordens_criadas(request):
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
             'obs': ordem.obs,
+            'ordem_prioridade': ordem.ordem_prioridade,
             'status_atual': ordem.status_atual,
             'maquina_id': ordem.maquina.id if ordem.maquina else None,
             'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M'),
@@ -268,6 +271,64 @@ def get_ordens_criadas(request):
         'ordens': data,
         'has_next': ordens_page.has_next(),
     })
+
+
+@require_GET
+def get_painel_prioridades(request):
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    ordens = (
+        Ordem.objects.filter(
+            grupo_maquina='usinagem',
+            excluida=False,
+            ordem_prioridade__isnull=False,
+        )
+        .exclude(status_atual__in=['iniciada', 'finalizada'])
+        .annotate(
+            prioridade_ordenacao=Coalesce('ordem_prioridade', Value(999999), output_field=IntegerField())
+        )
+        .prefetch_related('ordem_pecas_usinagem')
+        .order_by('prioridade_ordenacao', 'status_prioridade', '-ultima_atualizacao')[:50]
+    )
+
+    data = []
+    for ordem in ordens:
+        primeira_peca = ordem.ordem_pecas_usinagem.first()
+        data.append({
+            'id': ordem.id,
+            'ordem': ordem.ordem,
+            'prioridade': ordem.ordem_prioridade,
+            'status_atual': ordem.status_atual,
+            'maquina_id': ordem.maquina.id if ordem.maquina else None,
+            'maquina': ordem.maquina.nome if ordem.maquina else 'Sem maquina planejada',
+            'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y') if ordem.data_programacao else '',
+            'peca_codigo': primeira_peca.peca.codigo if primeira_peca and primeira_peca.peca else '',
+            'peca_descricao': primeira_peca.peca.descricao if primeira_peca and primeira_peca.peca else '',
+            'qtd_planejada': primeira_peca.qtd_planejada if primeira_peca else 0,
+        })
+
+    return JsonResponse({'ordens': data, 'usuario_tipo_acesso': usuario_tipo})
+
+
+@require_POST
+def retirar_ordem_prioridade(request):
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    if usuario_tipo != 'pcp':
+        return JsonResponse({'error': 'Apenas usuarios PCP podem retirar prioridade.'}, status=403)
+
+    try:
+        body = json.loads(request.body)
+        ordem_id = body.get('ordem_id')
+        if not ordem_id:
+            return JsonResponse({'error': 'Ordem nao informada.'}, status=400)
+
+        ordem = Ordem.objects.get(pk=ordem_id, grupo_maquina='usinagem', excluida=False)
+        ordem.ordem_prioridade = None
+        ordem.save(update_fields=['ordem_prioridade'])
+        return JsonResponse({'message': 'Prioridade removida com sucesso.'})
+    except Ordem.DoesNotExist:
+        return JsonResponse({'error': 'Ordem nao encontrada.'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON invalido.'}, status=400)
 
 def atualizar_status_ordem(request):
     if request.method == 'PATCH':
@@ -684,6 +745,16 @@ def get_pecas(request):
 def planejar_ordem_usinagem(request):
 
     if request.method == 'POST':
+        prioridade_ordem_raw = request.POST.get('ordemPrioridade')
+
+        try:
+            prioridade_ordem = int(prioridade_ordem_raw)
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'Informe uma prioridade numerica valida.'}, status=400)
+
+        if prioridade_ordem < 1:
+            return JsonResponse({'error': 'A prioridade deve ser maior ou igual a 1.'}, status=400)
+
         criar_ordem_usinagem(request.POST)
         return JsonResponse({'message': 'Status atualizado com sucesso.'})
 

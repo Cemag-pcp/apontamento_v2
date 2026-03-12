@@ -10,6 +10,8 @@ urlpatterns = [
     path('erp/apontamentos/', views.erp_apontamentos_usinagem, name='erp_apontamentos_usinagem'),
 
     path('api/ordens-criadas/', views.get_ordens_criadas, name='get_ordens_criadas'),
+    path('api/painel-prioridades/', views.get_painel_prioridades, name='get_painel_prioridades'),
+    path('api/painel-prioridades/retirar/', views.retirar_ordem_prioridade, name='retirar_ordem_prioridade'),
     path('api/ordens-criadas/<int:pk_ordem>/pecas/', views.get_pecas_ordem, name='get_pecas_ordem'),
     path('api/ordens/atualizar-status/', views.atualizar_status_ordem, name='atualizar_status_ordem'),
     path('api/ordens-iniciadas/', views.get_ordens_iniciadas, name='get_ordens_iniciadas'),

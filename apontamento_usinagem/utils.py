@@ -5,11 +5,13 @@ from .models import Ordem, PecasOrdem, Pecas  # ajuste os imports se necessário
 
 def criar_ordem_usinagem(data):
     with transaction.atomic():
+        prioridade = data.get('ordemPrioridade')
         nova_ordem = Ordem.objects.create(
             obs=data.get('observacoes'),
             grupo_maquina='usinagem',
             data_programacao=data.get("dataProgramacao"),
-            maquina=data.get("maquina") if data.get("maquina") else None
+            maquina=data.get("maquina") if data.get("maquina") else None,
+            ordem_prioridade=int(prioridade) if prioridade not in [None, ''] else None,
         )
 
         PecasOrdem.objects.create(
