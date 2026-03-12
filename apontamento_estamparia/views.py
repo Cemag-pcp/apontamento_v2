@@ -374,6 +374,25 @@ def get_painel_prioridades(request):
     return JsonResponse({'ordens': data, 'usuario_tipo_acesso': usuario_tipo})
 
 
+@require_GET
+def get_indicador_planejado_concluido_hoje(request):
+    hoje = localdate()
+    ordens_hoje = Ordem.objects.filter(
+        grupo_maquina='estamparia',
+        excluida=False,
+        data_programacao=hoje,
+    )
+
+    total_planejado = ordens_hoje.count()
+    total_concluido = ordens_hoje.filter(status_atual='finalizada').count()
+
+    return JsonResponse({
+        'data_referencia': hoje.strftime('%d/%m/%Y'),
+        'planejada': total_planejado,
+        'concluida': total_concluido,
+    })
+
+
 @require_POST
 def retirar_ordem_prioridade(request):
     usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()

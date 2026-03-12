@@ -17,9 +17,9 @@ function carregarPainelPrioridades() {
     if (!container) return;
 
     container.innerHTML = `
-        <div class="spinner-border text-dark" role="status">
-            <span class="sr-only"></span>
-        </div>
+        <li class="d-flex justify-content-center py-4">
+            ${window.getAppLoaderHtml ? window.getAppLoaderHtml({ size: 64 }) : ''}
+        </li>
     `;
 
     fetch('/usinagem/api/painel-prioridades/')
@@ -1930,16 +1930,13 @@ function resetarCardsInicial(filtros = {}) {
 }
 
 function filtro_prox_processo(){
-
-    if (document.getElementById('btn-filtrar-processo') === null) {
+    const selectProcesso = document.getElementById('filtro-processo');
+    if (selectProcesso === null) {
         return;
     }
 
-    const btnFiltro = document.getElementById("btn-filtrar-processo");
-
-    btnFiltro.addEventListener("click", () => {
-        const filtroProcesso = document.getElementById("filtro-processo").value.trim();
-
+    selectProcesso.addEventListener("change", () => {
+        const filtroProcesso = selectProcesso.value.trim();
         const containerProxProcesso = document.querySelector('.containerProxProcesso');
         carregarOrdensAgProProcesso(containerProxProcesso, { processo: filtroProcesso });
     })

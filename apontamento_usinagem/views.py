@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.views.decorators.http import require_POST
-from django.utils.timezone import now,localtime
+from django.utils.timezone import now,localtime, localdate
 from django.utils.dateparse import parse_date
 from django.db.models import Q,Prefetch,Count,OuterRef, Subquery, Exists, Value, IntegerField
 from django.db.models.functions import Coalesce
@@ -307,6 +307,25 @@ def get_painel_prioridades(request):
         })
 
     return JsonResponse({'ordens': data, 'usuario_tipo_acesso': usuario_tipo})
+
+
+@require_GET
+def get_indicador_planejado_concluido_hoje(request):
+    hoje = localdate()
+    ordens_hoje = Ordem.objects.filter(
+        grupo_maquina='usinagem',
+        excluida=False,
+        data_programacao=hoje,
+    )
+
+    total_planejado = ordens_hoje.count()
+    total_concluido = ordens_hoje.filter(status_atual='finalizada').count()
+
+    return JsonResponse({
+        'data_referencia': hoje.strftime('%d/%m/%Y'),
+        'planejada': total_planejado,
+        'concluida': total_concluido,
+    })
 
 
 @require_POST

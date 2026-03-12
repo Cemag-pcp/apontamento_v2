@@ -17,9 +17,9 @@ function carregarPainelPrioridades() {
     if (!container) return;
 
     container.innerHTML = `
-        <div class="spinner-border text-dark" role="status">
-            <span class="sr-only"></span>
-        </div>
+        <li class="d-flex justify-content-center py-4">
+            ${window.getAppLoaderHtml ? window.getAppLoaderHtml({ size: 64 }) : ''}
+        </li>
     `;
 
     fetch('api/painel-prioridades/')
@@ -34,17 +34,16 @@ function carregarPainelPrioridades() {
             const usuarioPodeRetirar = data.usuario_tipo_acesso === 'pcp';
 
             if (!data.ordens || data.ordens.length === 0) {
-                container.innerHTML = '<p class="text-muted mb-0">Nenhuma ordem com prioridade definida.</p>';
+                container.innerHTML = '<li class="text-muted text-center py-3">Nenhuma ordem com prioridade definida.</li>';
                 return;
             }
 
             data.ordens.forEach(ordem => {
-                const item = document.createElement('div');
-                item.className = 'priority-item d-flex justify-content-between align-items-start gap-3';
+                const item = document.createElement('li');
                 item.innerHTML = `
-                    <div class="d-flex align-items-center gap-3">
+                    <div class="priority-line">
                         <span class="priority-number">${ordem.prioridade}</span>
-                        <div>
+                        <div class="simple-list-text">
                             <div class="fw-semibold">#${ordem.ordem} - ${ordem.peca_codigo || 'Sem peça'}</div>
                             <div class="text-muted small">${ordem.peca_descricao || 'Sem descrição'}</div>
                             <div class="text-muted small">Programada: ${ordem.data_programacao || '-'} | Qt.: ${ordem.qtd_planejada || 0}</div>
@@ -85,7 +84,7 @@ function carregarPainelPrioridades() {
         })
         .catch(error => {
             console.error(error);
-            container.innerHTML = '<p class="text-danger mb-0">Erro ao carregar prioridades.</p>';
+            container.innerHTML = '<li class="text-danger text-center py-3">Erro ao carregar prioridades.</li>';
         });
 }
 
