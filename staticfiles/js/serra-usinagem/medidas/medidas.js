@@ -170,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
         section.className = 'mb-4 measurement-section';
         section.dataset.type = type;
         
-        const typeName = type === 'serra' ? 'Serra' : type === 'usinagem' ? 'Usinagem' : 'Furacao';
+        const typeName = type === 'serra' ? 'Serra' : type === 'usinagem' ? 'Usinagem' : 'Furação';
         
         // Obter quantidade produzida ou usar 3 como padrão
         const qtdProduzida = parseInt(document.getElementById('pecasProduzidas').value) || 0;
