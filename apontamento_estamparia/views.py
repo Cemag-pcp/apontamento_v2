@@ -375,6 +375,40 @@ def get_painel_prioridades(request):
 
 
 @require_POST
+def editar_ordem_prioridade(request):
+    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    if usuario_tipo != 'pcp':
+        return JsonResponse({'error': 'Apenas usuarios PCP podem editar prioridade.'}, status=403)
+
+    try:
+        body = json.loads(request.body)
+        ordem_id = body.get('ordem_id')
+        nova_prioridade = body.get('prioridade')
+
+        if not ordem_id:
+            return JsonResponse({'error': 'Ordem nao informada.'}, status=400)
+
+        try:
+            nova_prioridade = int(nova_prioridade)
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'Informe uma prioridade numerica valida.'}, status=400)
+
+        if nova_prioridade < 1:
+            return JsonResponse({'error': 'A prioridade deve ser maior ou igual a 1.'}, status=400)
+
+        ordem = Ordem.objects.get(pk=ordem_id, grupo_maquina='estamparia', excluida=False)
+        ordem.ordem_prioridade = nova_prioridade
+        ordem.save(update_fields=['ordem_prioridade'])
+        transaction.on_commit(lambda: notificar_ordem(ordem))
+
+        return JsonResponse({'message': 'Prioridade atualizada com sucesso.', 'prioridade': ordem.ordem_prioridade})
+    except Ordem.DoesNotExist:
+        return JsonResponse({'error': 'Ordem nao encontrada.'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+
+@require_POST
 def retirar_ordem_prioridade(request):
     usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
     if usuario_tipo != 'pcp':
@@ -389,6 +423,7 @@ def retirar_ordem_prioridade(request):
         ordem = Ordem.objects.get(pk=ordem_id, grupo_maquina='estamparia', excluida=False)
         ordem.ordem_prioridade = None
         ordem.save(update_fields=['ordem_prioridade'])
+        transaction.on_commit(lambda: notificar_ordem(ordem))
         return JsonResponse({'message': 'Prioridade removida com sucesso.'})
     except Ordem.DoesNotExist:
         return JsonResponse({'error': 'Ordem nao encontrada.'}, status=404)
@@ -854,6 +889,8 @@ def planejar_ordem_estamparia(request):
                 ordem=nova_ordem,
                 peca=get_object_or_404(Pecas, codigo=request.POST.get('pecaSelect')),
             )
+
+            transaction.on_commit(lambda: notificar_ordem(nova_ordem))
 
         return JsonResponse({
             'message': 'Status atualizado com sucesso.',

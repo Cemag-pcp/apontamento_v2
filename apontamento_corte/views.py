@@ -7,7 +7,8 @@ from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
-from django.db.models import Q, Count, Sum, F, Max
+from django.db.models import Q, Count, Sum, F, Max, Value, IntegerField
+from django.db.models.functions import Coalesce
 from django.forms.models import model_to_dict
 from django.contrib.auth.decorators import login_required
 
@@ -828,6 +829,8 @@ def gerar_op_duplicada(request, pk_ordem):
                     qtd_planejada=peca['qtd_planejada']
                 )
 
+            transaction.on_commit(lambda: notificar_ordem(nova_ordem))
+
         return JsonResponse({'message': 'Ordem duplicada com sucesso', 'nova_ordem_id': nova_ordem.pk, 'nova_ordem': nova_ordem.ordem_duplicada}, status=201)
 
     except Ordem.DoesNotExist:
@@ -872,7 +875,15 @@ def get_ordens_sequenciadas(request):
         else:
             filtros['ordem'] = int(ordem)
 
-    ordens_sequenciadas = Ordem.objects.filter(~Q(status_atual='finalizada'), **filtros).order_by('ordem_prioridade').select_related('propriedade')
+    ordens_sequenciadas = (
+        Ordem.objects
+        .filter(~Q(status_atual='finalizada'), **filtros)
+        .annotate(
+            prioridade_ordenacao=Coalesce('ordem_prioridade', Value(999999), output_field=IntegerField())
+        )
+        .order_by('prioridade_ordenacao', 'data_programacao', 'id')
+        .select_related('propriedade')
+    )
     
     # Converte cada objeto para dicionário e adiciona o display do grupo_maquina
     data = []
@@ -915,6 +926,7 @@ def resequenciar_ordem(request):
 
             ordem.sequenciada = True
             ordem.save()
+            transaction.on_commit(lambda: notificar_ordem(ordem))
 
             return JsonResponse({'message': 'Ordem sequenciada com sucesso.'}, status=201)
 
@@ -1064,6 +1076,7 @@ def excluir_ordem(request):
         ordem.motivo_retirar_sequenciada = motivo
         
         ordem.save()
+        transaction.on_commit(lambda: notificar_ordem(ordem))
 
         # Apaga os processos associados a essa ordem
         OrdemProcesso.objects.filter(ordem=ordem).delete()
@@ -1102,6 +1115,7 @@ def definir_prioridade(request):
             # Atualiza a ordem solicitada com a nova prioridade
             ordem.ordem_prioridade = prioridade
             ordem.save()
+            transaction.on_commit(lambda: notificar_ordem(ordem))
 
         return JsonResponse({'success': 'Prioridade definida com sucesso.'}, status=201)
 
@@ -1320,6 +1334,8 @@ class SalvarArquivoView(View):
                     peca=peca['peca'],
                     qtd_planejada=peca['qtd_planejada']
                 )
+
+            transaction.on_commit(lambda: notificar_ordem(nova_ordem))
 
         return JsonResponse({'message': 'Dados salvos com sucesso!'})
     

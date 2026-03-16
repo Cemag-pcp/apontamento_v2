@@ -91,6 +91,42 @@
             padding: 0.75rem;
             background: #fff;
         }
+        .priority-machine-group {
+            border: 1px solid #dbe4f0;
+            border-radius: 0.75rem;
+            padding: 0.9rem;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            min-width: 0;
+        }
+        #prioridades-ordens-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1rem;
+            align-items: start;
+        }
+        .priority-machine-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding-bottom: 0.6rem;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid #dbe4f0;
+        }
+        .priority-machine-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #1f3b5b;
+            margin: 0;
+        }
+        .priority-machine-count {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #4f6b88;
+            background: #eaf2fb;
+            border-radius: 999px;
+            padding: 0.2rem 0.6rem;
+        }
         .priority-number {
             min-width: 2.5rem;
             height: 2.5rem;
@@ -107,6 +143,11 @@
             gap: 0.5rem;
             justify-content: flex-end;
             margin-top: 0.5rem;
+        }
+        @media (max-width: 767.98px) {
+            #prioridades-ordens-list {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 {% endblock %}
@@ -376,7 +417,7 @@
 
                     <div class="row mb-3 align-items-center">
                         <div class="col-md-6">
-                            <label for="ordemPrioridade" class="form-label">Prioridade numÃ©rica:</label>
+                            <label for="ordemPrioridade" class="form-label">Prioridade numérica:</label>
                             <input type="number" class="form-control" id="ordemPrioridade" name="ordemPrioridade" min="1" step="1" placeholder="Ex.: 1, 2, 3..." required>
                             <small class="text-muted">Quanto menor o nÃºmero, maior a prioridade.</small>
                         </div>
