@@ -499,12 +499,17 @@ export async function popularPacotesDaCarga(cargaId) {
 
           const info = document.createElement('div');
           info.className = 'me-2';
+          const codigoItem = item.codigo_peca || '(sem código)';
+          const descricaoItem = item.descricao || '';
+          const badgeForaPlanejado = item.fora_planejado
+            ? '<span class="badge bg-warning text-dark ms-2">Fora do planejado</span>'
+            : '';
           info.innerHTML = `
-            <div><strong>${item.codigo_peca}</strong> - ${item.descricao || ''}</div>
+            <div><strong>${codigoItem}</strong> - ${descricaoItem} ${badgeForaPlanejado}</div>
             <small class="text-muted quantidade-label">Qtde: <span class="quantidade-valor">${item.quantidade}</span></small>
           `;
-          li.dataset.codigo = item.codigo_peca || '';
-          li.dataset.descricao = item.descricao || '';
+          li.dataset.codigo = codigoItem;
+          li.dataset.descricao = descricaoItem;
 
           // BotÃ£o "Alterar pacote"
           const btnAlterar = document.createElement('button');
@@ -619,7 +624,9 @@ export async function popularPacotesDaCarga(cargaId) {
             btnExcluirItem.className = 'btn btn-outline-danger btn-sm';
             btnExcluirItem.innerHTML = '<i class="fas fa-trash"></i>';
             btnExcluirItem.addEventListener('click', async () => {
-              const confirma = confirm('Remover esta peÃ§a do pacote? A quantidade voltarÃ¡ para a pendÃªncia.');
+              const confirma = item.fora_planejado
+                ? confirm('Remover este item fora do planejado do pacote?')
+                : confirm('Remover esta peça do pacote? A quantidade voltará para a pendência.');
               if (!confirma) return;
               const prev = btnExcluirItem.innerHTML;
               btnExcluirItem.disabled = true;

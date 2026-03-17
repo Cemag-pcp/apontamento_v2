@@ -17,9 +17,9 @@ export function carregarPainelPrioridades() {
     if (!container) return;
 
     container.innerHTML = `
-        <div class="spinner-border text-dark" role="status">
-            <span class="sr-only"></span>
-        </div>
+        <li class="d-flex justify-content-center py-4">
+            ${window.getAppLoaderHtml ? window.getAppLoaderHtml({ size: 64 }) : ''}
+        </li>
     `;
 
     fetch('api/painel-prioridades/')
@@ -34,7 +34,7 @@ export function carregarPainelPrioridades() {
             const usuarioPodeRetirar = data.usuario_tipo_acesso === 'pcp';
 
             if (!data.ordens || data.ordens.length === 0) {
-                container.innerHTML = '<p class="text-muted mb-0">Nenhuma ordem com prioridade definida.</p>';
+                container.innerHTML = '<li class="text-muted text-center py-3">Nenhuma ordem com prioridade definida.</li>';
                 return;
             }
 
@@ -122,7 +122,7 @@ export function carregarPainelPrioridades() {
         })
         .catch(error => {
             console.error(error);
-            container.innerHTML = '<p class="text-danger mb-0">Erro ao carregar prioridades.</p>';
+            container.innerHTML = '<li class="text-danger text-center py-3">Erro ao carregar prioridades.</li>';
         });
 }
 
