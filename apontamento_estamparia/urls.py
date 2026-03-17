@@ -11,6 +11,7 @@ urlpatterns = [
 
     path('api/ordens-criadas/', views.get_ordens_criadas, name='get_ordens_criadas'),
     path('api/painel-prioridades/', views.get_painel_prioridades, name='get_painel_prioridades'),
+    path('api/painel-prioridades/editar/', views.editar_ordem_prioridade, name='editar_ordem_prioridade'),
     path('api/painel-prioridades/retirar/', views.retirar_ordem_prioridade, name='retirar_ordem_prioridade'),
     path('api/indicador-planejado-concluido-hoje/', views.get_indicador_planejado_concluido_hoje, name='get_indicador_planejado_concluido_hoje'),
     path('api/ordens-criadas/<int:pk_ordem>/<str:name_maquina>/pecas/', views.get_pecas_ordem, name='get_pecas_ordem'),

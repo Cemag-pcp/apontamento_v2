@@ -226,6 +226,10 @@ function buscarItensInspecao(pagina) {
                     modalInspecao.querySelector('#maquina').value = itemMaquina;
                     modalInspecao.querySelector('#pecasProduzidas').value = itemQtd;
                     modalInspecao.querySelector('#id-inspecao').value = itemId;
+                    if (typeof window.syncMeasurementRowsSerraUsinagem === 'function') {
+                        const linhasPadrao = Math.min(parseInt(itemQtd, 10) || 1, 3);
+                        window.syncMeasurementRowsSerraUsinagem(linhasPadrao, false);
+                    }
 
                     // Desabilitar campos para edição
                     modalInspecao.querySelector('#maquina').disabled = true;
@@ -328,6 +332,15 @@ function buscarItensInspecao(pagina) {
 
 function preencherLinhasMedicao(dados) {
     if (!dados || !dados.tipos_processo) return;
+
+    const totalLinhas = Object.values(dados.tipos_processo).reduce((maiorQuantidade, dadosTipo) => {
+        const quantidadeAmostras = Object.keys(dadosTipo.amostras || {}).length;
+        return Math.max(maiorQuantidade, quantidadeAmostras);
+    }, 1);
+
+    if (typeof window.syncMeasurementRowsSerraUsinagem === 'function') {
+        window.syncMeasurementRowsSerraUsinagem(totalLinhas, false);
+    }
 
     // Para cada tipo de processo (serra, usinagem, furacao)
     for (const [tipo, dadosTipo] of Object.entries(dados.tipos_processo)) {

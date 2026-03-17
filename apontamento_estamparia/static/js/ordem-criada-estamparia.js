@@ -12,7 +12,7 @@ function formatarStatus(status) {
     return labels[status] || status;
 }
 
-function carregarPainelPrioridades() {
+export function carregarPainelPrioridades() {
     const container = document.getElementById('prioridades-ordens-list');
     if (!container) return;
 
@@ -38,48 +38,86 @@ function carregarPainelPrioridades() {
                 return;
             }
 
-            data.ordens.forEach(ordem => {
-                const item = document.createElement('li');
-                item.innerHTML = `
-                    <div class="priority-line">
-                        <span class="priority-number">${ordem.prioridade}</span>
-                        <div class="simple-list-text">
-                            <div class="fw-semibold">#${ordem.ordem} - ${ordem.peca_codigo || 'Sem peça'}</div>
-                            <div class="text-muted small">${ordem.peca_descricao || 'Sem descrição'}</div>
-                            <div class="text-muted small">Programada: ${ordem.data_programacao || '-'} | Qt.: ${ordem.qtd_planejada || 0}</div>
-                        </div>
-                    </div>
-                    <div class="text-end small">
-                        <div class="fw-semibold">${ordem.maquina || 'Sem máquina'}</div>
-                        <div class="text-muted">${formatarStatus(ordem.status_atual)}</div>
-                        <div class="priority-actions">
-                            <button type="button" class="btn btn-sm btn-warning btn-prioridade-iniciar" title="Iniciar">
-                                <i class="fa fa-play"></i>
-                            </button>
-                            ${usuarioPodeRetirar ? `
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-prioridade-retirar" title="Retirar da prioridade">
-                                    <i class="fa fa-times"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
+            const ordensPorMaquina = data.ordens.reduce((acc, ordem) => {
+                const nomeMaquina = ordem.maquina || 'Sem maquina';
+                if (!acc[nomeMaquina]) {
+                    acc[nomeMaquina] = [];
+                }
+                acc[nomeMaquina].push(ordem);
+                return acc;
+            }, {});
+
+            Object.entries(ordensPorMaquina).forEach(([nomeMaquina, ordens]) => {
+                const grupo = document.createElement('section');
+                grupo.className = 'priority-machine-group';
+
+                const cabecalho = document.createElement('div');
+                cabecalho.className = 'priority-machine-header';
+                cabecalho.innerHTML = `
+                    <h5 class="priority-machine-title mb-0">${nomeMaquina}</h5>
+                    <span class="priority-machine-count">${ordens.length} prioridade${ordens.length > 1 ? 's' : ''}</span>
                 `;
+                grupo.appendChild(cabecalho);
 
-                const botaoIniciar = item.querySelector('.btn-prioridade-iniciar');
-                if (botaoIniciar) {
-                    botaoIniciar.addEventListener('click', () => {
-                        mostrarModalIniciar(ordem.id, 'estamparia', ordem.maquina_id);
-                    });
-                }
+                const lista = document.createElement('div');
+                lista.className = 'd-grid gap-2';
 
-                const botaoRetirar = item.querySelector('.btn-prioridade-retirar');
-                if (botaoRetirar) {
-                    botaoRetirar.addEventListener('click', () => {
-                        retirarPrioridadeOrdem(ordem.id);
-                    });
-                }
+                ordens.forEach(ordem => {
+                    const item = document.createElement('div');
+                    item.className = 'priority-item d-flex justify-content-between align-items-start gap-3';
+                    item.innerHTML = `
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="priority-number">${ordem.prioridade}</span>
+                            <div>
+                                <div class="fw-semibold">#${ordem.ordem} - ${ordem.peca_codigo || 'Sem peca'}</div>
+                                <div class="text-muted small">${ordem.peca_descricao || 'Sem descricao'}</div>
+                                <div class="text-muted small">Programada: ${ordem.data_programacao || '-'} | Qt.: ${ordem.qtd_planejada || 0}</div>
+                            </div>
+                        </div>
+                        <div class="text-end small">
+                            <div class="text-muted">${formatarStatus(ordem.status_atual)}</div>
+                            <div class="priority-actions">
+                                <button type="button" class="btn btn-sm btn-warning btn-prioridade-iniciar" title="Iniciar">
+                                    <i class="fa fa-play"></i>
+                                </button>
+                                ${usuarioPodeRetirar ? `
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-prioridade-editar" title="Editar prioridade">
+                                        <i class="fa fa-pen"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger btn-prioridade-retirar" title="Retirar da prioridade">
+                                        <i class="fa fa-times"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
 
-                container.appendChild(item);
+                    const botaoIniciar = item.querySelector('.btn-prioridade-iniciar');
+                    if (botaoIniciar) {
+                        botaoIniciar.addEventListener('click', () => {
+                            mostrarModalIniciar(ordem.id, 'estamparia', ordem.maquina_id);
+                        });
+                    }
+
+                    const botaoEditar = item.querySelector('.btn-prioridade-editar');
+                    if (botaoEditar) {
+                        botaoEditar.addEventListener('click', () => {
+                            editarPrioridadeOrdem(ordem);
+                        });
+                    }
+
+                    const botaoRetirar = item.querySelector('.btn-prioridade-retirar');
+                    if (botaoRetirar) {
+                        botaoRetirar.addEventListener('click', () => {
+                            retirarPrioridadeOrdem(ordem.id);
+                        });
+                    }
+
+                    lista.appendChild(item);
+                });
+
+                grupo.appendChild(lista);
+                container.appendChild(grupo);
             });
         })
         .catch(error => {
@@ -115,6 +153,68 @@ function retirarPrioridadeOrdem(ordemId) {
                 const data = await response.json();
                 if (!response.ok) {
                     throw new Error(data.error || 'Erro ao retirar prioridade.');
+                }
+                return data;
+            })
+            .then(() => {
+                carregarPainelPrioridades();
+                resetarCardsInicial();
+            })
+            .catch(error => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message,
+                    confirmButtonText: 'OK',
+                });
+            });
+    });
+}
+
+function editarPrioridadeOrdem(ordem) {
+    Swal.fire({
+        icon: 'question',
+        title: 'Editar prioridade',
+        input: 'number',
+        inputLabel: `Ordem #${ordem.ordem}`,
+        inputValue: ordem.prioridade,
+        inputAttributes: {
+            min: 1,
+            step: 1,
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Salvar',
+        cancelButtonText: 'Cancelar',
+        inputValidator: value => {
+            if (!value) {
+                return 'Informe a nova prioridade.';
+            }
+
+            const prioridade = Number(value);
+            if (!Number.isInteger(prioridade) || prioridade < 1) {
+                return 'A prioridade deve ser um numero inteiro maior ou igual a 1.';
+            }
+
+            return null;
+        },
+    }).then(result => {
+        if (!result.isConfirmed) return;
+
+        fetch('api/painel-prioridades/editar/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken(),
+            },
+            body: JSON.stringify({
+                ordem_id: ordem.id,
+                prioridade: Number(result.value),
+            }),
+        })
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao editar prioridade.');
                 }
                 return data;
             })

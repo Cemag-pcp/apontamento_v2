@@ -1,4 +1,4 @@
-import { carregarOrdensIniciadas, carregarOrdensAgProProcesso, carregarOrdensInterrompidas } from './ordem-criada-estamparia.js';
+import { carregarOrdensIniciadas, carregarOrdensAgProProcesso, carregarOrdensInterrompidas, carregarPainelPrioridades } from './ordem-criada-estamparia.js';
 
 //testes
 
@@ -22,6 +22,9 @@ socket.onmessage = function(e) {
     console.log("chamando containerProxProcesso");
     const containerProxProcesso = document.querySelector('.containerProxProcesso')
     carregarOrdensAgProProcesso(containerProxProcesso);
+
+    console.log("chamando carregarPainelPrioridades");
+    carregarPainelPrioridades();
 
 };
 
