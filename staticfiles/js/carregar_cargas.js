@@ -276,7 +276,7 @@ export async function popularPacotesDaCarga(cargaId) {
         btnDeletar.title = 'Excluir pacote';
         btnDeletar.addEventListener('click', async (event) => {
           event.stopPropagation();
-          const confirmou = confirm('Deseja excluir este pacote? Os itens voltarÃ£o para as pendÃªncias.');
+          const confirmou = confirm('Deseja excluir este pacote? Os itens voltarão para as pendências.');
           if (!confirmou) return;
           const previous = btnDeletar.innerHTML;
           btnDeletar.disabled = true;

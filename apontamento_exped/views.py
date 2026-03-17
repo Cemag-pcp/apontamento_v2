@@ -466,18 +466,20 @@ def atualizar_quantidade_item(request, item_id):
     if carga.stage not in ('planejamento', 'verificacao'):
         return JsonResponse({'erro': 'AlteraÃ§Ã£o permitida apenas em planejamento ou verificaÃ§Ã£o.'}, status=400)
 
-    pend = item.codigo
+    pend = getattr(item, 'codigo', None)
     atual = int(item.quantidade or 0)
     delta = nova_qt - atual
 
     with transaction.atomic():
-        if delta > 0:
+        if pend and delta > 0:
             disponivel = int(pend.qt_necessaria or 0)
+            if disponivel <= 0:
+                return JsonResponse({'erro': 'Este item não possui saldo pendente para aumentar quantidade.'}, status=400)
             if disponivel < delta:
                 return JsonResponse({'erro': f'Quantidade indisponÃ­vel. Restam {disponivel}.'}, status=400)
             pend.qt_necessaria = disponivel - delta
             pend.save(update_fields=['qt_necessaria'])
-        elif delta < 0:
+        elif pend and delta < 0:
             pend.qt_necessaria = int(pend.qt_necessaria or 0) + abs(delta)
             pend.save(update_fields=['qt_necessaria'])
 
@@ -488,7 +490,7 @@ def atualizar_quantidade_item(request, item_id):
         'mensagem': 'Quantidade atualizada com sucesso.',
         'item_id': item.id,
         'nova_quantidade': nova_qt,
-        'pendente': int(pend.qt_necessaria or 0),
+        'pendente': int(pend.qt_necessaria or 0) if pend else None,
         'carga_id': carga.id,
         'stage': carga.stage,
     }, status=200)
@@ -554,17 +556,26 @@ def duplicar_pacote(request, id):
         proximo_sufixo = (max(sufixos) if sufixos else 0) + 1
         novo_nome = f"{base_nome}.{proximo_sufixo}"
 
-        itens_para_criar = []
+        itens_para_criar_planejados = []
+        itens_para_criar_avulsos = []
         for item in itens_origem:
-            pend = item.codigo
-            disponivel = max(int(pend.qt_necessaria or 0), 0)
             original = int(item.quantidade or 0)
-            usar = min(disponivel, original) if original > 0 else 0
-            if usar > 0:
-                itens_para_criar.append((pend, usar))
+            if original <= 0:
+                continue
 
-        if not itens_para_criar:
-            return JsonResponse({'erro': 'Sem quantidade restante para duplicar itens deste pacote.'}, status=400)
+            pend = getattr(item, 'codigo', None)
+            if pend:
+                disponivel = int(pend.qt_necessaria or 0)
+                if disponivel <= 0:
+                    continue
+                usar = min(disponivel, original)
+                if usar > 0:
+                    itens_para_criar_planejados.append((pend, usar))
+            else:
+                itens_para_criar_avulsos.append(item)
+
+        if not itens_para_criar_planejados and not itens_para_criar_avulsos:
+            return JsonResponse({'erro': 'Sem itens válidos para duplicar neste pacote.'}, status=400)
 
         novo_pacote = Pacote.objects.create(
             nome=novo_nome,
@@ -572,7 +583,7 @@ def duplicar_pacote(request, id):
             criado_por=pacote.criado_por,
         )
 
-        for pend, qtd in itens_para_criar:
+        for pend, qtd in itens_para_criar_planejados:
             ItemPacote.objects.create(
                 pacote=novo_pacote,
                 codigo=pend,
@@ -580,6 +591,16 @@ def duplicar_pacote(request, id):
             )
             pend.qt_necessaria = max(pend.qt_necessaria - qtd, 0)
             pend.save(update_fields=['qt_necessaria'])
+
+        for item in itens_para_criar_avulsos:
+            ItemPacote.objects.create(
+                pacote=novo_pacote,
+                codigo=None,
+                codigo_informado=item.codigo_informado,
+                descricao_informada=item.descricao_informada,
+                fora_planejado=True,
+                quantidade=item.quantidade
+            )
 
     return JsonResponse({
         'mensagem': 'Pacote duplicado com sucesso.',
@@ -596,10 +617,11 @@ def guardar_pacotes(request):
     except json.JSONDecodeError:
         return JsonResponse({"erro": "JSON inválido"}, status=400)
 
-    id_carga         = data.get("idCargaPacote")
-    nome_pacote      = data.get("nomePacote")
+    id_carga = data.get("idCargaPacote")
+    nome_pacote = data.get("nomePacote")
     pacote_existente = data.get("pacoteExistenteId")  # pode vir null/None
-    itens            = data.get("itens", [])
+    itens = data.get("itens", [])
+    itens_fora_planejado = data.get("itensForaPlanejado", [])
 
     if not id_carga:
         return JsonResponse({"erro": "idCargaPacote é obrigatório"}, status=400)
@@ -609,24 +631,22 @@ def guardar_pacotes(request):
     carga = get_object_or_404(Carga, id=id_carga)
 
     with transaction.atomic():
-        # === NOVO: permitir pacote sem itens ===
-        if not itens:
-            if pacote_existente:
-                # >>> usar pacote já existente (e validar a carga)
-                pacote = get_object_or_404(Pacote, id=pacote_existente, carga=carga)
-            else:
-                pacote = Pacote.objects.create(nome=nome_pacote, carga=carga)
-
+        if pacote_existente:
+            pacote = get_object_or_404(Pacote, id=pacote_existente, carga=carga)
         else:
-            # ------- Fluxo original (com itens) -------
+            pacote = Pacote.objects.create(nome=nome_pacote, carga=carga)
+
+        if itens:
             pend_ids = [int(i.get("pendencia_id", 0) or 0) for i in itens]
             if any(pid <= 0 for pid in pend_ids):
                 return JsonResponse({"erro": "Cada item deve conter pendencia_id válido."}, status=400)
 
-            pendencias_qs = (PendenciasPacote.objects
-                             .select_for_update()
-                             .select_related("carreta_carga")
-                             .filter(id__in=pend_ids))
+            pendencias_qs = (
+                PendenciasPacote.objects
+                .select_for_update()
+                .select_related("carreta_carga")
+                .filter(id__in=pend_ids)
+            )
 
             pend_por_id = {p.id: p for p in pendencias_qs}
             faltantes = [pid for pid in pend_ids if pid not in pend_por_id]
@@ -639,6 +659,7 @@ def guardar_pacotes(request):
                         "erro": f"A pendência {p.id} não pertence à carga #{carga.id}"
                     }, status=400)
 
+            itens_criados = []
             for item in itens:
                 try:
                     qtd = int(item.get("quantidade", 0))
@@ -648,37 +669,58 @@ def guardar_pacotes(request):
                     return JsonResponse({"erro": "Quantidade deve ser maior que zero."}, status=400)
 
                 pend_id = int(item.get("pendencia_id"))
-                pend    = pend_por_id[pend_id]
-                if (pend.qt_necessaria - qtd) < 0:
+                pend = pend_por_id[pend_id]
+                saldo_pendente = int(pend.qt_necessaria or 0)
+                if saldo_pendente <= 0:
+                    return JsonResponse({
+                        "erro": f"O item {pend.codigo} - {pend.descricao} não possui saldo pendente para empacotar."
+                    }, status=400)
+                if qtd > saldo_pendente:
                     return JsonResponse({
                         "erro": (
                             f"O item {pend.codigo} - {pend.descricao} "
-                            f"ultrapassa a quantidade pendente (disp: {pend.qt_necessaria}, req: {qtd})"
+                            f"ultrapassa a quantidade pendente (disp: {saldo_pendente}, req: {qtd})"
                         )
                     }, status=400)
 
-            # >>> AQUI: escolher o pacote (existente OU novo)
-            if pacote_existente:
-                pacote = get_object_or_404(Pacote, id=pacote_existente, carga=carga)
-            else:
-                pacote = Pacote.objects.create(nome=nome_pacote, carga=carga)
-
-            itens_criados = []
-            for item in itens:
-                pend_id = int(item["pendencia_id"])
-                qtd     = int(item["quantidade"])
-                pend    = pend_por_id[pend_id]
-
                 itens_criados.append(ItemPacote(
                     pacote=pacote,
-                    codigo_id=pend_id,   # mantém sua lógica atual
+                    codigo_id=pend_id,
                     quantidade=qtd
                 ))
 
                 pend.qt_necessaria = pend.qt_necessaria - qtd
                 pend.save(update_fields=["qt_necessaria"])
 
-            ItemPacote.objects.bulk_create(itens_criados)
+            if itens_criados:
+                ItemPacote.objects.bulk_create(itens_criados)
+
+        if itens_fora_planejado:
+            itens_avulsos = []
+            for item in itens_fora_planejado:
+                codigo = str(item.get("codigo", "")).strip()
+                descricao = str(item.get("descricao", "")).strip()
+                try:
+                    qtd = int(item.get("quantidade", 0))
+                except (TypeError, ValueError):
+                    return JsonResponse({"erro": "Quantidade inválida para item fora do planejado."}, status=400)
+
+                if not codigo or not descricao:
+                    return JsonResponse({"erro": "Código e descrição são obrigatórios para item fora do planejado."}, status=400)
+                if qtd <= 0:
+                    return JsonResponse({"erro": "Quantidade deve ser maior que zero para item fora do planejado."}, status=400)
+
+                itens_avulsos.append(ItemPacote(
+                    pacote=pacote,
+                    codigo=None,
+                    codigo_informado=codigo,
+                    descricao_informada=descricao,
+                    fora_planejado=True,
+                    quantidade=qtd
+                ))
+
+            if itens_avulsos:
+                ItemPacote.objects.bulk_create(itens_avulsos)
 
     # ---- resumo após a criação (inalterado) ----
     pacotes = Pacote.objects.filter(carga_id=id_carga)
@@ -746,11 +788,14 @@ def buscar_pacotes_carga(request, id):
         itens_list = []
         for item in itens:
             cod_obj = getattr(item, 'codigo', None)
+            codigo_peca = getattr(cod_obj, 'codigo', None) or item.codigo_informado
+            descricao = getattr(cod_obj, 'descricao', None) or item.descricao_informada
             itens_list.append({
                 'id': item.id,
-                'codigo_peca': getattr(cod_obj, 'codigo', None),
-                'descricao': getattr(cod_obj, 'descricao', None),
+                'codigo_peca': codigo_peca,
+                'descricao': descricao,
                 'quantidade': item.quantidade,
+                'fora_planejado': bool(getattr(item, 'fora_planejado', False)),
             })
 
         dados.append({

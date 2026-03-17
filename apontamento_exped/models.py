@@ -92,10 +92,15 @@ class ItemPacote(models.Model):
     """
 
     pacote = models.ForeignKey(Pacote, related_name='itens', on_delete=models.CASCADE)
-    codigo = models.ForeignKey(PendenciasPacote, related_name='codigo_item_pacote', on_delete=models.CASCADE)
+    codigo = models.ForeignKey(PendenciasPacote, related_name='codigo_item_pacote', on_delete=models.CASCADE, null=True, blank=True)
+    codigo_informado = models.CharField(max_length=255, blank=True, null=True)
+    descricao_informada = models.CharField(max_length=255, blank=True, null=True)
+    fora_planejado = models.BooleanField(default=False)
     quantidade = models.PositiveIntegerField()
 
     data_criacao = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.codigo}"
+        if self.codigo_id:
+            return f"{self.codigo}"
+        return f"{self.codigo_informado or 'Item avulso'}"
