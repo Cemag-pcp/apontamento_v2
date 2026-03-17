@@ -26,9 +26,11 @@
         .dashboard-title h1 { margin: 0; font-size: 24px; color: #0f172a; }
         .dashboard-title p { margin: 6px 0 0; color: var(--dash-text-muted); }
         .dashboard-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-        .top-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.18fr) minmax(0, 0.82fr) minmax(0, 1fr); gap: 20px; margin-bottom: 24px; }
+        .top-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 24px; }
         .top-card, .process-column { background-color: var(--dash-card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid var(--dash-border); }
         .top-card { min-height: 250px; height: 250px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+        .priority-panel-card { margin-bottom: 24px; }
+        .priority-panel-card .top-card-content { min-height: 220px; }
         .top-card-title, .process-column h3 { font-size: 14px; font-weight: 600; color: var(--dash-text-muted); margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
         .top-card-title > span { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .top-card-title > .btn { flex-shrink: 0; }
@@ -179,18 +181,6 @@
 
         <div class="top-card">
             <div class="top-card-title">
-                <span><i class="fas fa-exclamation-circle"></i> Painel de Prioridades</span>
-                <button class="btn btn-sm top-card-header-action" id="refresh-prioridades">Atualizar</button>
-            </div>
-            <div class="top-card-content">
-                <ul id="prioridades-ordens-list" class="simple-list scrollable">
-                    <li class="d-flex justify-content-center py-4"><div class="app-loader-placeholder" data-size="64"></div></li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="top-card">
-            <div class="top-card-title">
                 <span><i class="fas fa-chart-pie"></i> Concluida x Planejada (Hoje)</span>
                 <button class="btn btn-sm top-card-header-action" id="refresh-ordens">Atualizar</button>
             </div>
@@ -213,6 +203,19 @@
             </div>
         </div>
     </div>
+
+    <div class="top-card priority-panel-card">
+        <div class="top-card-title">
+            <span><i class="fas fa-exclamation-circle"></i> Painel de Prioridades</span>
+            <button class="btn btn-sm top-card-header-action" id="refresh-prioridades">Atualizar</button>
+        </div>
+        <div class="top-card-content">
+            <ul id="prioridades-ordens-list" class="simple-list scrollable">
+                <li class="d-flex justify-content-center py-4"><div class="app-loader-placeholder" data-size="64"></div></li>
+            </ul>
+        </div>
+    </div>
+
     <div class="process-board">
         <div class="process-column">
             <h3><span><i class="fas fa-play-circle" style="color: var(--dash-success);"></i> Processos em Andamento</span></h3>
