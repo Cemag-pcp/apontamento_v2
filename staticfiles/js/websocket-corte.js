@@ -1,4 +1,5 @@
 import { carregarOrdensIniciadas, carregarOrdensInterrompidas } from './ordem-criada.js';
+import { fetchOrdensSequenciadasLaser, fetchOrdensSequenciadasPlasma } from './status-maquina-corte.js';
 
 //testes
 
@@ -18,6 +19,14 @@ socket.onmessage = function(e) {
     console.log("chamando containerInterrompido");
     const containerInterrompido = document.querySelector('.containerInterrompido');
     carregarOrdensInterrompidas(containerInterrompido);
+
+    console.log("chamando fetchOrdensSequenciadasLaser");
+    const tabAtiva = document.querySelector('#laserTabs .nav-link.active');
+    const grupoLaser = tabAtiva ? tabAtiva.dataset.group : 'laser_1';
+    fetchOrdensSequenciadasLaser(grupoLaser);
+
+    console.log("chamando fetchOrdensSequenciadasPlasma");
+    fetchOrdensSequenciadasPlasma();
 
 };
 
