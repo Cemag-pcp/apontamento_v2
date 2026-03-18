@@ -189,7 +189,7 @@ function confirmarAlteracao(ordemId) {
         novaMateriaPrimaId: novaMateriaPrimaId // Adicionando a nova MP selecionada
     };
 
-    console.log("Enviando dados para atualização:", dadosAtualizados);
+    console.log("Enviando dados p/ atualização:", dadosAtualizados);
 
     // Enviar os dados via fetch
     fetch('/serra/atualizar-propriedades/', {
