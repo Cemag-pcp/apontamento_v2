@@ -244,6 +244,7 @@ async function fetchMaquinasDisponiveis() {
         const data = await response.json();
 
         const selectMaquina = document.getElementById('escolhaMaquinaParada');
+        if (!selectMaquina) return;
         selectMaquina.innerHTML = '';
 
         if (data.maquinas_disponiveis.length > 0) {
@@ -315,6 +316,7 @@ function retornarMaquina(maquina) {
 
 async function mostrarModalPararMaquina() {
     const formPararMaquina = document.getElementById('formPararMaquina');
+    if (!formPararMaquina) return;
 
     Swal.fire(window.getAppLoadingSwalOptions({
         title: 'Carregando...',
@@ -384,19 +386,31 @@ document.addEventListener('DOMContentLoaded', function () {
     fetchUltimasPecasProduzidas();
     fetchContagemStatusOrdens();
 
-    document.getElementById('refresh-status-maquinas').addEventListener('click', function () {
-        fetchStatusMaquinas();
-    });
+    const refreshStatusButton = document.getElementById('refresh-status-maquinas');
+    if (refreshStatusButton) {
+        refreshStatusButton.addEventListener('click', function () {
+            fetchStatusMaquinas();
+        });
+    }
 
-    document.getElementById('refresh-pecas').addEventListener('click', function () {
-        fetchUltimasPecasProduzidas();
-    });
+    const refreshPecasButton = document.getElementById('refresh-pecas');
+    if (refreshPecasButton) {
+        refreshPecasButton.addEventListener('click', function () {
+            fetchUltimasPecasProduzidas();
+        });
+    }
 
-    document.getElementById('refresh-ordens').addEventListener('click', function () {
-        fetchContagemStatusOrdens();
-    });
+    const refreshOrdensButton = document.getElementById('refresh-ordens');
+    if (refreshOrdensButton) {
+        refreshOrdensButton.addEventListener('click', function () {
+            fetchContagemStatusOrdens();
+        });
+    }
 
-    document.getElementById('btnPararMaquina').addEventListener('click', () => {
-        mostrarModalPararMaquina();
-    });
+    const btnPararMaquina = document.getElementById('btnPararMaquina');
+    if (btnPararMaquina) {
+        btnPararMaquina.addEventListener('click', () => {
+            mostrarModalPararMaquina();
+        });
+    }
 });
