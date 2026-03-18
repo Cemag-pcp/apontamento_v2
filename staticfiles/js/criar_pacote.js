@@ -4,7 +4,9 @@ import { atualizarSlotAvancar } from './kanbans.js';
 
 document.addEventListener('DOMContentLoaded', function () {
     const itensContainer  = document.getElementById('itensPacote');
+    const itensForaContainer = document.getElementById('itensForaPlanejado');
     const btnAdicionar    = document.getElementById('btnAdicionarItem');
+    const btnAdicionarForaPlanejado = document.getElementById('btnAdicionarItemForaPlanejado');
     const formCriarPacote = document.getElementById('formCriar');
     const btnVoltar       = document.getElementById('btnVoltarVisualizarPacote');
 
@@ -69,6 +71,26 @@ document.addEventListener('DOMContentLoaded', function () {
             row.remove();
         });
 
+        return row;
+    }
+
+    function criarRowItemForaPlanejado() {
+        const row = document.createElement('div');
+        row.className = 'row g-2 align-items-end item-fora-planejado mt-2';
+        row.innerHTML = `
+        <div class="col-md-3">
+            <input type="text" class="form-control campo-codigo-fora" placeholder="Código">
+        </div>
+        <div class="col-md-5">
+            <input type="text" class="form-control campo-descricao-fora" placeholder="Descrição">
+        </div>
+        <div class="col-md-3">
+            <input type="number" class="form-control campo-quantidade-fora" placeholder="Qtd" min="1">
+        </div>
+        <div class="col-md-1 text-end">
+            <button type="button" class="btn btn-danger btn-sm btnRemoverItem" title="Remover item">x</button>
+        </div>
+        `;
         return row;
     }
 
@@ -164,17 +186,28 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Remover item (delegação — mantém compatibilidade com seu padrão)
-    itensContainer.addEventListener('click', function (e) {
-        if (e.target.classList.contains('btnRemoverItem')) {
-            const itemRow = e.target.closest('.item-pacote');
-            if (itemRow) {
-                const select = itemRow.querySelector('.campo-item');
-                if (select && $(select).data('select2')) $(select).select2('destroy');
-                itemRow.remove();
-            }
-        }
+    btnAdicionarForaPlanejado?.addEventListener('click', () => {
+        const row = criarRowItemForaPlanejado();
+        itensForaContainer?.appendChild(row);
     });
+
+    // Remover item (delegação — mantém compatibilidade com seu padrão)
+    function removerLinhaItem(e) {
+        if (!e.target.classList.contains('btnRemoverItem')) return;
+
+        const itemRow = e.target.closest('.item-pacote');
+        if (itemRow) {
+            const select = itemRow.querySelector('.campo-item');
+            if (select && $(select).data('select2')) $(select).select2('destroy');
+            itemRow.remove();
+            return;
+        }
+
+        const rowFora = e.target.closest('.item-fora-planejado');
+        if (rowFora) rowFora.remove();
+    }
+    itensContainer.addEventListener('click', removerLinhaItem);
+    itensForaContainer?.addEventListener('click', removerLinhaItem);
 
     // Submeter formulário
     formCriarPacote.addEventListener('submit', async function (e) {
@@ -226,7 +259,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Monta itens percorrendo as linhas (evita desalinhamento com getAll)
         const itens = [];
+        const itensForaPlanejado = [];
         const rows = itensContainer.querySelectorAll('.item-pacote');
+        const rowsForaPlanejado = itensForaContainer ? itensForaContainer.querySelectorAll('.item-fora-planejado') : [];
 
         rows.forEach((row) => {
             const select = row.querySelector('select[name="pendencia_id[]"]');
@@ -254,6 +289,33 @@ document.addEventListener('DOMContentLoaded', function () {
         //     return;
         // }
         
+        let erroValidacaoForaPlanejado = '';
+        rowsForaPlanejado.forEach((row) => {
+            const codigoEl = row.querySelector('.campo-codigo-fora');
+            const descricaoEl = row.querySelector('.campo-descricao-fora');
+            const qtdEl = row.querySelector('.campo-quantidade-fora');
+
+            const codigo = (codigoEl?.value || '').trim();
+            const descricao = (descricaoEl?.value || '').trim();
+            const quantidade = Number(qtdEl?.value || 0);
+            const linhaPreenchida = Boolean(codigo || descricao || qtdEl?.value);
+
+            if (!linhaPreenchida) return;
+            if (!codigo || !descricao || !Number.isFinite(quantidade) || quantidade <= 0) {
+                erroValidacaoForaPlanejado = 'Preencha código, descrição e quantidade (> 0) para item fora do planejado.';
+                return;
+            }
+
+            itensForaPlanejado.push({ codigo, descricao, quantidade });
+        });
+
+        if (erroValidacaoForaPlanejado) {
+            alert(erroValidacaoForaPlanejado);
+            btnFormCriar.disabled = false;
+            btnFormCriar.innerHTML = 'Salvar';
+            return;
+        }
+
         const pacoteExistenteVal = fd.get('pacoteExistente'); // <select id="pacoteExistente">
 
         const payload = {
@@ -261,7 +323,8 @@ document.addEventListener('DOMContentLoaded', function () {
             observacoesPacote: fd.get('observacoesPacote') || '',
             idCargaPacote: fd.get('idCargaPacote'),
             pacoteExistenteId: pacoteExistenteVal ? Number(pacoteExistenteVal) : null,
-            itens
+            itens,
+            itensForaPlanejado
         };
 
         try {
@@ -319,7 +382,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         } catch (err) {
             console.error(err);
-            alert('Falha na comunicação com o servidor.');
+            alert(err?.message || 'Falha na comunicação com o servidor.');
         } finally {
             btnFormCriar.disabled = false;
             btnFormCriar.innerHTML = 'Salvar';
@@ -338,6 +401,7 @@ document.addEventListener('DOMContentLoaded', function () {
 export async function resetFormCriarPacote({ novaLinha = false, refresh = false } = {}) {
     const formCriarPacote = document.getElementById('formCriar');
     const itensContainer  = document.getElementById('itensPacote');
+    const itensForaContainer = document.getElementById('itensForaPlanejado');
     if (!formCriarPacote || !itensContainer) return;
 
     // destruir Select2 existentes
@@ -348,6 +412,7 @@ export async function resetFormCriarPacote({ novaLinha = false, refresh = false 
     // resetar form e limpar container
     formCriarPacote.reset();
     itensContainer.innerHTML = '';
+    if (itensForaContainer) itensForaContainer.innerHTML = '';
 
     if (!novaLinha) return;
 

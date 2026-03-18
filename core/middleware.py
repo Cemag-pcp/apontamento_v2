@@ -18,8 +18,12 @@ class RotaAccessMiddleware:
         
         PUBLIC_PATHS = [
             "core/login",
-            "almox/solicitar"
+            "almox/solicitar",
+            "expedicao/relatorios/impressao",
         ]
+
+        if path in PUBLIC_PATHS:
+            return self.get_response(request)
         
         print(path)
         # Se o usuário não estiver autenticado, redireciona para o login
