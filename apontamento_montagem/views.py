@@ -1,7 +1,8 @@
 from django.http import JsonResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
-from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q, IntegerField, Max
+from django.utils.dateparse import parse_date
+from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q, IntegerField, Max, OuterRef, Subquery
 from django.db import transaction, models, IntegrityError, connection
 from django.shortcuts import get_object_or_404
 from django.db.models.functions import Coalesce
@@ -10,6 +11,7 @@ from django.core.exceptions import ObjectDoesNotExist
 
 import json
 from datetime import datetime, date, timedelta
+import logging
 import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados
@@ -17,6 +19,9 @@ from core.utils import carregar_planilha_base_geral
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile, PecasFaltantes
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos, CarretasExplodidas
 from inspecao.models import Inspecao
+
+
+logger = logging.getLogger(__name__)
 
 
 def _normalizar_codigo_inspecao(valor):
@@ -1012,7 +1017,7 @@ def api_ordens_finalizadas(request):
 
     return JsonResponse(final_results, safe=False)
 
-def api_tempos(request):
+def _api_tempos_legacy(request):
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT 
@@ -1062,6 +1067,142 @@ def api_tempos(request):
                     last_by_ordem[ordem_id][field] = row[field]
 
     return JsonResponse(results, safe=False)
+
+def api_tempos(request):
+    started_at = now()
+
+    def parse_positive_int(value, default):
+        try:
+            parsed = int(value)
+            return parsed if parsed > 0 else default
+        except (TypeError, ValueError):
+            return default
+
+    page = parse_positive_int(request.GET.get('page'), 1)
+    limit = min(parse_positive_int(request.GET.get('limit'), 100), 500)
+    offset = (page - 1) * limit
+
+    data_inicio = request.GET.get('data_inicio')
+    data_fim = request.GET.get('data_fim')
+    ordem = request.GET.get('ordem')
+    maquina = (request.GET.get('maquina') or '').strip()
+    status = (request.GET.get('status') or '').strip()
+
+    current_piece = PecasOrdem.objects.filter(
+        processo_ordem_id=OuterRef('pk')
+    ).order_by('-id')
+    latest_piece_for_order = PecasOrdem.objects.filter(
+        ordem_id=OuterRef('ordem_id')
+    ).order_by('-processo_ordem__data_inicio', '-id')
+
+    queryset = (
+        OrdemProcesso.objects
+        .filter(
+            ordem__grupo_maquina='montagem',
+            data_inicio__isnull=False,
+        )
+        .select_related('ordem', 'ordem__maquina')
+        .annotate(
+            current_peca=Subquery(current_piece.values('peca')[:1]),
+            current_qt_planejada=Subquery(current_piece.values('qtd_planejada')[:1]),
+            current_qt_boa=Subquery(current_piece.values('qtd_boa')[:1]),
+            latest_peca=Subquery(latest_piece_for_order.values('peca')[:1]),
+            latest_qt_planejada=Subquery(latest_piece_for_order.values('qtd_planejada')[:1]),
+            latest_qt_boa=Subquery(latest_piece_for_order.values('qtd_boa')[:1]),
+            descricao=Coalesce(F('current_peca'), F('latest_peca'), Value('')),
+            qt_planejada=Coalesce(F('current_qt_planejada'), F('latest_qt_planejada')),
+            qt_boa=Coalesce(F('current_qt_boa'), F('latest_qt_boa')),
+            celula=F('ordem__maquina__nome'),
+            ordem_numero=F('ordem__ordem'),
+            ordem_data_carga=F('ordem__data_carga'),
+        )
+    )
+
+    if data_inicio:
+        parsed_data_inicio = parse_date(data_inicio)
+        if parsed_data_inicio is None:
+            return JsonResponse({'error': 'data_inicio inválida. Use YYYY-MM-DD.'}, status=400)
+        queryset = queryset.filter(data_inicio__date__gte=parsed_data_inicio)
+
+    if data_fim:
+        parsed_data_fim = parse_date(data_fim)
+        if parsed_data_fim is None:
+            return JsonResponse({'error': 'data_fim inválida. Use YYYY-MM-DD.'}, status=400)
+        queryset = queryset.filter(data_inicio__date__lte=parsed_data_fim)
+
+    if ordem:
+        try:
+            queryset = queryset.filter(ordem__ordem=int(ordem))
+        except ValueError:
+            return JsonResponse({'error': 'ordem inválida. Use um número inteiro.'}, status=400)
+
+    if maquina:
+        maquina_filter = Q(ordem__maquina__nome__icontains=maquina)
+        if maquina.isdigit():
+            maquina_filter |= Q(ordem__maquina__id=int(maquina))
+        queryset = queryset.filter(maquina_filter)
+
+    if status:
+        queryset = queryset.filter(status=status)
+
+    total = queryset.count()
+    rows = list(
+        queryset
+        .order_by('-data_inicio', '-id')
+        .values(
+            'ordem_id',
+            'ordem_numero',
+            'descricao',
+            'data_inicio',
+            'data_fim',
+            'ordem_data_carga',
+            'qt_planejada',
+            'celula',
+            'status',
+            'qt_boa',
+        )[offset:offset + limit]
+    )
+
+    items = []
+    for row in rows:
+        items.append({
+            'ordem_id': row['ordem_id'],
+            'ordem': row['ordem_numero'],
+            'codigo': _extrair_codigo_peca(row['descricao']),
+            'descricao': row['descricao'],
+            'data_inicio': row['data_inicio'].isoformat() if row['data_inicio'] else None,
+            'data_fim': row['data_fim'].isoformat() if row['data_fim'] else None,
+            'data_carga': row['ordem_data_carga'].isoformat() if row['ordem_data_carga'] else None,
+            'qt_planejada': row['qt_planejada'],
+            'celula': row['celula'],
+            'status': row['status'],
+            'qt_boa': row['qt_boa'],
+        })
+
+    duration_ms = int((now() - started_at).total_seconds() * 1000)
+    logger.info(
+        "montagem.api_tempos page=%s limit=%s total=%s returned=%s duration_ms=%s filtros=%s",
+        page,
+        limit,
+        total,
+        len(items),
+        duration_ms,
+        {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+            'ordem': ordem,
+            'maquina': maquina,
+            'status': status,
+        }
+    )
+
+    return JsonResponse({
+        'items': items,
+        'page': page,
+        'limit': limit,
+        'total': total,
+        'has_next': offset + len(items) < total,
+    })
 
 def retornar_processo(request):
     if request.method != 'POST':
