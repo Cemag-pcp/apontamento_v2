@@ -38,7 +38,31 @@ function carregarPainelPrioridades() {
                 return;
             }
 
-            data.ordens.forEach(ordem => {
+            const ordensPorMaquina = data.ordens.reduce((acc, ordem) => {
+                const nomeMaquina = ordem.maquina || 'Sem máquina';
+                if (!acc[nomeMaquina]) {
+                    acc[nomeMaquina] = [];
+                }
+                acc[nomeMaquina].push(ordem);
+                return acc;
+            }, {});
+
+            Object.entries(ordensPorMaquina).forEach(([nomeMaquina, ordens]) => {
+                const grupo = document.createElement('section');
+                grupo.className = 'priority-machine-group';
+
+                const cabecalho = document.createElement('div');
+                cabecalho.className = 'priority-machine-header';
+                cabecalho.innerHTML = `
+                    <h5 class="priority-machine-title mb-0">${nomeMaquina}</h5>
+                    <span class="priority-machine-count">${ordens.length} prioridade${ordens.length > 1 ? 's' : ''}</span>
+                `;
+                grupo.appendChild(cabecalho);
+
+                const lista = document.createElement('div');
+                lista.className = 'd-grid gap-2';
+
+                ordens.forEach(ordem => {
                 const item = document.createElement('div');
                 item.className = 'priority-item d-flex justify-content-between align-items-start gap-3';
                 item.innerHTML = `
@@ -51,7 +75,6 @@ function carregarPainelPrioridades() {
                         </div>
                     </div>
                     <div class="text-end small">
-                        <div class="fw-semibold">${ordem.maquina || 'Sem máquina'}</div>
                         <div class="text-muted">${formatarStatus(ordem.status_atual)}</div>
                         <div class="priority-actions">
                             <button type="button" class="btn btn-sm btn-warning btn-prioridade-iniciar" title="Iniciar">
@@ -80,7 +103,11 @@ function carregarPainelPrioridades() {
                     });
                 }
 
-                container.appendChild(item);
+                lista.appendChild(item);
+            });
+
+                grupo.appendChild(lista);
+                container.appendChild(grupo);
             });
         })
         .catch(error => {
