@@ -15,13 +15,87 @@ from ..models import (
     CausasNaoConformidade,
     ArquivoCausa,
     ArquivoConformidade,
+    AnaliseBanhoEzinger,
 )
 from core.models import Profile
 
 from datetime import datetime, timedelta
 from collections import defaultdict
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from storages.backends.s3boto3 import S3Boto3Storage
+
+
+EZINGER_ALVO_AK_L95 = Decimal("6.00")
+EZINGER_CAPACIDADE_AK_L95 = Decimal("5950")
+EZINGER_FATOR_AK_L95 = Decimal("1.53")
+EZINGER_PERCENTUAL_ADITIVO = Decimal("0.15")
+EZINGER_ALVO_M_FE_212 = Decimal("1.20")
+EZINGER_CAPACIDADE_M_FE_212 = Decimal("3950")
+EZINGER_FATOR_M_FE_212 = Decimal("0.23")
+
+
+def _calcular_adicao_percentual(valor_percentual_atual, alvo_percentual, capacidade):
+    diferenca_percentual = abs(
+        (valor_percentual_atual / Decimal("100")) - (alvo_percentual / Decimal("100"))
+    )
+    return _round_decimal(diferenca_percentual * capacidade)
+
+
+def _round_decimal(value):
+    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _parse_decimal(value):
+    if value is None or value == "":
+        raise InvalidOperation
+    return Decimal(str(value).replace(",", "."))
+
+
+def _decimal_to_float(value):
+    return float(value) if value is not None else None
+
+
+def _calcular_analise_banho(amostras_desengraxante, amostras_fosfatizante):
+    media_desengraxante = _round_decimal(
+        sum(amostras_desengraxante) / Decimal(len(amostras_desengraxante))
+    )
+    ak_l95_atual = _round_decimal(media_desengraxante * EZINGER_FATOR_AK_L95)
+
+    media_fosfatizante = _round_decimal(
+        sum(amostras_fosfatizante) / Decimal(len(amostras_fosfatizante))
+    )
+    m_fe_212_atual = _round_decimal(media_fosfatizante * EZINGER_FATOR_M_FE_212)
+
+    ak_l95_adicionar = None
+    aditivo_adicionar = None
+    if ak_l95_atual < EZINGER_ALVO_AK_L95:
+        ak_l95_adicionar = _calcular_adicao_percentual(
+            ak_l95_atual,
+            EZINGER_ALVO_AK_L95,
+            EZINGER_CAPACIDADE_AK_L95,
+        )
+        aditivo_adicionar = _round_decimal(
+            ak_l95_adicionar * EZINGER_PERCENTUAL_ADITIVO
+        )
+
+    m_fe_212_adicionar = None
+    if m_fe_212_atual < EZINGER_ALVO_M_FE_212:
+        m_fe_212_adicionar = _calcular_adicao_percentual(
+            m_fe_212_atual,
+            EZINGER_ALVO_M_FE_212,
+            EZINGER_CAPACIDADE_M_FE_212,
+        )
+
+    return {
+        "desengraxante_media": media_desengraxante,
+        "ak_l95_atual": ak_l95_atual,
+        "fosfatizante_media": media_fosfatizante,
+        "m_fe_212_atual": m_fe_212_atual,
+        "ak_l95_adicionar": ak_l95_adicionar,
+        "aditivo_adicionar": aditivo_adicionar,
+        "m_fe_212_adicionar": m_fe_212_adicionar,
+    }
 
 
 def inspecao_pintura(request):
@@ -61,6 +135,126 @@ def inspecao_pintura(request):
             "tipos_tinta": tipos_tinta,
         },
     )
+
+
+def inspecao_banhos_ezinger(request):
+    return render(request, "inspecao_banhos_ezinger.html")
+
+
+def listar_analises_banho_ezinger(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    registros = AnaliseBanhoEzinger.objects.select_related(
+        "registrado_por__user"
+    ).order_by("-registrado_em")
+
+    dados = [
+        {
+            "id": registro.id,
+            "registrado_em": (registro.registrado_em - timedelta(hours=3)).strftime(
+                "%d/%m/%Y %H:%M:%S"
+            ),
+            "registrado_por": (
+                registro.registrado_por.user.username
+                if registro.registrado_por and registro.registrado_por.user
+                else "-"
+            ),
+            "observacao": registro.observacao or "-",
+            "desengraxante_amostras": [
+                _decimal_to_float(registro.desengraxante_amostra_1),
+                _decimal_to_float(registro.desengraxante_amostra_2),
+                _decimal_to_float(registro.desengraxante_amostra_3),
+            ],
+            "desengraxante_media": _decimal_to_float(registro.desengraxante_media),
+            "ak_l95_atual": _decimal_to_float(registro.ak_l95_atual),
+            "fosfatizante_amostras": [
+                _decimal_to_float(registro.fosfatizante_amostra_1),
+                _decimal_to_float(registro.fosfatizante_amostra_2),
+                _decimal_to_float(registro.fosfatizante_amostra_3),
+            ],
+            "fosfatizante_media": _decimal_to_float(registro.fosfatizante_media),
+            "m_fe_212_atual": _decimal_to_float(registro.m_fe_212_atual),
+            "ak_l95_adicionar": _decimal_to_float(registro.ak_l95_adicionar),
+            "aditivo_adicionar": _decimal_to_float(registro.aditivo_adicionar),
+            "m_fe_212_adicionar": _decimal_to_float(registro.m_fe_212_adicionar),
+        }
+        for registro in registros
+    ]
+
+    return JsonResponse({"dados": dados}, status=200)
+
+
+def salvar_analise_banho_ezinger(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    try:
+        registro_id = request.POST.get("registro_id")
+        registrado_em = request.POST.get("registrado_em")
+        if not registrado_em:
+            return JsonResponse({"error": "Informe a data do registro."}, status=400)
+
+        amostras_desengraxante = [
+            _parse_decimal(request.POST.get("desengraxante_amostra_1")),
+            _parse_decimal(request.POST.get("desengraxante_amostra_2")),
+            _parse_decimal(request.POST.get("desengraxante_amostra_3")),
+        ]
+        amostras_fosfatizante = [
+            _parse_decimal(request.POST.get("fosfatizante_amostra_1")),
+            _parse_decimal(request.POST.get("fosfatizante_amostra_2")),
+            _parse_decimal(request.POST.get("fosfatizante_amostra_3")),
+        ]
+    except InvalidOperation:
+        return JsonResponse(
+            {"error": "Preencha todas as amostras com valores numéricos válidos."},
+            status=400,
+        )
+
+    try:
+        data_registro = timezone.make_aware(datetime.fromisoformat(registrado_em))
+    except ValueError:
+        return JsonResponse({"error": "Data do registro inválida."}, status=400)
+
+    calculos = _calcular_analise_banho(
+        amostras_desengraxante=amostras_desengraxante,
+        amostras_fosfatizante=amostras_fosfatizante,
+    )
+
+    perfil = Profile.objects.filter(user=request.user).first()
+    observacao = request.POST.get("observacao", "").strip()
+    defaults = {
+        "registrado_em": data_registro,
+        "registrado_por": perfil,
+        "observacao": observacao or None,
+        "desengraxante_amostra_1": amostras_desengraxante[0],
+        "desengraxante_amostra_2": amostras_desengraxante[1],
+        "desengraxante_amostra_3": amostras_desengraxante[2],
+        "desengraxante_media": calculos["desengraxante_media"],
+        "ak_l95_atual": calculos["ak_l95_atual"],
+        "fosfatizante_amostra_1": amostras_fosfatizante[0],
+        "fosfatizante_amostra_2": amostras_fosfatizante[1],
+        "fosfatizante_amostra_3": amostras_fosfatizante[2],
+        "fosfatizante_media": calculos["fosfatizante_media"],
+        "m_fe_212_atual": calculos["m_fe_212_atual"],
+        "ak_l95_adicionar": calculos["ak_l95_adicionar"],
+        "aditivo_adicionar": calculos["aditivo_adicionar"],
+        "m_fe_212_adicionar": calculos["m_fe_212_adicionar"],
+    }
+
+    if registro_id:
+        try:
+            registro = AnaliseBanhoEzinger.objects.get(pk=registro_id)
+        except AnaliseBanhoEzinger.DoesNotExist:
+            return JsonResponse({"error": "Registro não encontrado."}, status=404)
+
+        for campo, valor in defaults.items():
+            setattr(registro, campo, valor)
+        registro.save()
+        return JsonResponse({"success": True, "id": registro.id, "updated": True}, status=200)
+
+    registro = AnaliseBanhoEzinger.objects.create(**defaults)
+    return JsonResponse({"success": True, "id": registro.id, "created": True}, status=201)
 
 
 def alerta_itens_pintura(request):

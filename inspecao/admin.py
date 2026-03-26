@@ -8,6 +8,7 @@ from .models import (
     ArquivoCausa,
     InspecaoRecebimento,
     InspecaoRecebimentoItem,
+    AnaliseBanhoEzinger,
     InspecaoEstanqueidade,
     ReinspecaoEstanqueidade,
     DadosExecucaoInspecaoEstanqueidade,
@@ -95,6 +96,20 @@ class InspecaoRecebimentoItemAdmin(ProfilePermissionMixin, admin.ModelAdmin):
     )
     list_display_links = ("criado_em",)
 
+class AnaliseBanhoEzingerAdmin(ProfilePermissionMixin, admin.ModelAdmin):
+    list_display = (
+        "id",
+        "registrado_em",
+        "registrado_por",
+        "observacao",
+        "ak_l95_atual",
+        "m_fe_212_atual",
+        "ak_l95_adicionar",
+        "aditivo_adicionar",
+        "m_fe_212_adicionar",
+    )
+    list_display_links = ("registrado_em",)
+
 admin.site.register(Inspecao, InspecaoAdmin)
 admin.site.register(DadosExecucaoInspecao, DadosExecucaoInspecaoAdmin)
 admin.site.register(Reinspecao, ReinspecaoAdmin)
@@ -109,3 +124,4 @@ admin.site.register(InfoAdicionaisExecTubosCilindros, InfoAdicionaisExecTubosCil
 admin.site.register(DetalhesPressaoTanque, DetalhesPressaoTanqueAdmin)
 admin.site.register(InspecaoRecebimento, InspecaoRecebimentoAdmin)
 admin.site.register(InspecaoRecebimentoItem, InspecaoRecebimentoItemAdmin)
+admin.site.register(AnaliseBanhoEzinger, AnaliseBanhoEzingerAdmin)

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %} <title>Banhos EZINGER</title> {% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="/static/css/inspecao.css">
+    <link rel="stylesheet" href="{% static 'css/pintura/banhos-ezinger.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 mb-4">
+    <div>
+        <h2 class="my-0">Dados de Análise de Banhos - EZINGER</h2>
+        <p class="text-muted mb-0 mt-2">Registro das amostras, concentração atual e quantidade sugerida para correção.</p>
+    </div>
+    <button class="btn btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#modal-banho-ezinger">
+        Registrar banho
+    </button>
+</div>
+
+<section class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <div class="row g-4 mb-4">
+            <div class="col-xl-6">
+                <h5 class="mb-3">Percentuais por dia registrado</h5>
+                <div class="ezinger-chart-wrap">
+                    <canvas id="ezinger-percentuais-chart"></canvas>
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <h5 class="mb-3">Acumulado a adicionar por dia</h5>
+                <div class="ezinger-chart-wrap">
+                    <canvas id="ezinger-acumulado-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0 ezinger-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Registrado por</th>
+                        <th>Obs.</th>
+                        <th>Desengraxante</th>
+                        <th>AK L95 atual</th>
+                        <th>Fosfatizante</th>
+                        <th>M FE 212 atual</th>
+                        <th>AK L95 adicionar</th>
+                        <th>Aditivo</th>
+                        <th>M FE 212 adicionar</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="ezinger-registros-body">
+                    <tr>
+                        <td colspan="11" class="text-center text-muted py-4">Carregando registros...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="ezinger-paginacao" class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3"></div>
+    </div>
+</section>
+
+{% include 'modal_inspecao/modal_banho_ezinger.html' %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static 'js/pintura/banhos-ezinger.js' %}?v=20260326-1"></script>
+{% endblock %}

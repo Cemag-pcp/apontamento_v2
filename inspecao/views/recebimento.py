@@ -353,6 +353,7 @@ def recebimento_inspecionados(request):
             {
                 "data": data,
                 "meta": {
+                    "id": registro.id,
                     "data_inspecao": registro.data_inspecao.strftime("%d/%m/%Y %H:%M"),
                     "inspetor": (
                         registro.inspetor.user.username
@@ -362,6 +363,7 @@ def recebimento_inspecionados(request):
                     "resultado": registro.get_resultado_display(),
                     "observacao": registro.observacao or "",
                 },
+                "dados_inspecao": registro.dados_inspecao or {},
             }
         )
 
@@ -377,7 +379,13 @@ def recebimento_inspecionados(request):
         }
         for header in headers:
             display[header] = linha["data"].get(header, "")
-        rows.append({"data": display})
+        rows.append(
+            {
+                "data": display,
+                "meta": linha["meta"],
+                "dados_inspecao": linha["dados_inspecao"],
+            }
+        )
 
     return JsonResponse(
         {

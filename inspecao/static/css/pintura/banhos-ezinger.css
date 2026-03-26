@@ -1,0 +1,81 @@
+.ezinger-table th,
+.ezinger-table td {
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+.ezinger-chart-wrap {
+    position: relative;
+    min-height: 320px;
+}
+
+.ezinger-pagination-info {
+    font-size: 0.9rem;
+    color: #4b5563;
+}
+
+.ezinger-entry-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.ezinger-panel {
+    border: 1px solid #d8dee6;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: #fff;
+}
+
+.ezinger-panel-header,
+.ezinger-summary-title {
+    background: #1d4ed8;
+    color: #fff;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 0.85rem 1rem;
+    text-align: center;
+}
+
+.ezinger-summary {
+    border: 1px solid #d8dee6;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: #fff;
+}
+
+.ezinger-summary-section,
+.ezinger-summary-subsection,
+.ezinger-summary-value {
+    padding: 0.75rem 1rem;
+    text-align: center;
+    border-bottom: 1px solid #d8dee6;
+}
+
+.ezinger-summary-section {
+    font-size: 1.1rem;
+    text-transform: uppercase;
+}
+
+.ezinger-summary-subsection {
+    font-size: 0.95rem;
+}
+
+.ezinger-summary-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    border-bottom: 0;
+}
+
+@media (max-width: 991.98px) {
+    .ezinger-entry-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .ezinger-summary-value {
+        font-size: 1.35rem;
+    }
+}

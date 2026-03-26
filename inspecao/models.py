@@ -1,7 +1,9 @@
 from django.db import models
+from django.utils import timezone
 from core.models import Profile
 from cadastro.models import PecasEstanqueidade
 from storages.backends.s3boto3 import S3Boto3Storage
+from decimal import Decimal
 
 class Inspecao(models.Model):
 
@@ -236,6 +238,64 @@ class InspecaoRecebimentoItem(models.Model):
 
     def __str__(self):
         return f"Recebimento Item {self.id}"
+
+
+class AnaliseBanhoEzinger(models.Model):
+    registrado_em = models.DateTimeField(default=timezone.now)
+    registrado_por = models.ForeignKey(
+        Profile, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    observacao = models.CharField(max_length=255, null=True, blank=True)
+
+    desengraxante_amostra_1 = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    desengraxante_amostra_2 = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    desengraxante_amostra_3 = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    desengraxante_media = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    ak_l95_atual = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+
+    fosfatizante_amostra_1 = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    fosfatizante_amostra_2 = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    fosfatizante_amostra_3 = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    fosfatizante_media = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    m_fe_212_atual = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+
+    ak_l95_adicionar = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    aditivo_adicionar = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    m_fe_212_adicionar = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+
+    class Meta:
+        verbose_name = "Análise de Banho EZINGER"
+        verbose_name_plural = "Análises de Banho EZINGER"
+        ordering = ("-registrado_em",)
+
+    def __str__(self):
+        return f"Banho EZINGER {self.id} - {self.registrado_em:%d/%m/%Y %H:%M}"
 
 
 #### Inspecao Estanqueidade ####

@@ -79,6 +79,26 @@
     </div>
 </div>
 
+<div class="modal fade" id="modal-ficha-inspecao-recebimento" tabindex="-1" aria-labelledby="modalFichaInspecaoRecebimentoLabel">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalFichaInspecaoRecebimentoLabel">Ficha de inspeção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="ficha-inspecao-resumo-recebimento" class="row small mb-3"></div>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm align-middle" id="tabela-ficha-inspecao-recebimento">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modal-inspecao-recebimento" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInspecaoRecebimentoLabel">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
@@ -115,6 +135,13 @@
                                     <input type="number" class="form-control text-center" id="qtd-unidades-recebimento" value="1" min="1" max="30">
                                     <button type="button" class="btn btn-outline-secondary" id="btn-qtd-mais-recebimento">+</button>
                                 </div>
+                            </div>
+                            <div class="mb-3" id="container-tipo-tubos-barras" style="display:none;">
+                                <label for="tipo-tubos-barras" class="form-label form-label-sm fw-semibold">Tipo</label>
+                                <select id="tipo-tubos-barras" class="form-select form-select-sm">
+                                    <option value="barra" selected>Barra</option>
+                                    <option value="tubo">Tubo</option>
+                                </select>
                             </div>
                             <ul class="nav nav-tabs nav-tabs-sm mb-0" id="tabs-unidades-recebimento"></ul>
                             <div class="tab-content border border-top-0 rounded-bottom p-2" id="content-unidades-recebimento" style="max-height:55vh;overflow-y:auto;"></div>
@@ -286,7 +313,9 @@
         const filtro = (document.getElementById("pesquisa-inspecionados-recebimento").value || "").toLowerCase();
         const filtradas = rows.filter((row) => {
             if (!filtro) return true;
-            const texto = Object.values(row.data || {}).join(" ").toLowerCase();
+            const textoBase = Object.values(row.data || {}).join(" ").toLowerCase();
+            const textoFicha = JSON.stringify(row.dados_inspecao || {}).toLowerCase();
+            const texto = `${textoBase} ${textoFicha}`;
             return texto.includes(filtro);
         });
 
@@ -303,12 +332,15 @@
             th.textContent = col;
             headerRow.appendChild(th);
         });
+        const thAcoes = document.createElement("th");
+        thAcoes.textContent = "Acoes";
+        headerRow.appendChild(thAcoes);
         thead.appendChild(headerRow);
 
         if (!filtradas.length) {
             const tr = document.createElement("tr");
             const td = document.createElement("td");
-            td.colSpan = columns.length || 1;
+            td.colSpan = (columns.length || 1) + 1;
             td.className = "text-center text-muted";
             td.textContent = "Nenhum item inspecionado.";
             tr.appendChild(td);
@@ -321,6 +353,14 @@
                     td.textContent = row.data?.[col] || "";
                     tr.appendChild(td);
                 });
+                const tdAcao = document.createElement("td");
+                const btnFicha = document.createElement("button");
+                btnFicha.type = "button";
+                btnFicha.className = "btn btn-sm btn-outline-dark";
+                btnFicha.textContent = "Ver ficha";
+                btnFicha.addEventListener("click", () => abrirFichaInspecaoRecebimento(row));
+                tdAcao.appendChild(btnFicha);
+                tr.appendChild(tdAcao);
                 tbody.appendChild(tr);
             });
         }
@@ -345,8 +385,121 @@
         }
     }
 
+    function formatarRotuloFicha(chave) {
+        return String(chave || "")
+            .replace(/^u\d+_/, "")
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (letra) => letra.toUpperCase());
+    }
+
+    function abrirFichaInspecaoRecebimento(row) {
+        const resumo = document.getElementById("ficha-inspecao-resumo-recebimento");
+        const tabela = document.getElementById("tabela-ficha-inspecao-recebimento");
+        const thead = tabela.querySelector("thead");
+        const tbody = tabela.querySelector("tbody");
+        const unidades = row?.dados_inspecao?.unidades || [];
+
+        resumo.innerHTML = "";
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+        const resumoCampos = [
+            ["Data inspeção", row?.meta?.data_inspecao || ""],
+            ["Inspetor", row?.meta?.inspetor || ""],
+            ["Resultado", row?.meta?.resultado || ""],
+            ["Observação", row?.meta?.observacao || ""],
+        ];
+
+        resumoCampos.forEach(([label, value]) => {
+            const dt = document.createElement("dt");
+            dt.className = "col-sm-3 text-muted";
+            dt.textContent = label;
+            const dd = document.createElement("dd");
+            dd.className = "col-sm-9";
+            dd.textContent = value || "-";
+            resumo.appendChild(dt);
+            resumo.appendChild(dd);
+        });
+
+        if (!unidades.length) {
+            const headerRow = document.createElement("tr");
+            const th = document.createElement("th");
+            th.textContent = "Ficha";
+            headerRow.appendChild(th);
+            thead.appendChild(headerRow);
+
+            const tr = document.createElement("tr");
+            const td = document.createElement("td");
+            td.className = "text-center text-muted";
+            td.textContent = "Este registro não possui dados detalhados por unidade.";
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+        } else {
+            const camposExtras = [];
+            unidades.forEach((unidade) => {
+                Object.keys(unidade.campos || {}).forEach((campo) => {
+                    if (!camposExtras.includes(campo)) camposExtras.push(campo);
+                });
+            });
+
+            const colunas = ["unidade", "resultado", "observacao", ...camposExtras];
+            const headerRow = document.createElement("tr");
+            colunas.forEach((coluna) => {
+                const th = document.createElement("th");
+                th.textContent = formatarRotuloFicha(coluna);
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+
+            unidades.forEach((unidade) => {
+                const tr = document.createElement("tr");
+                colunas.forEach((coluna) => {
+                    const td = document.createElement("td");
+                    if (coluna === "unidade") {
+                        td.textContent = unidade.unidade ?? "";
+                    } else if (coluna === "resultado") {
+                        td.textContent = unidade.resultado || "";
+                    } else if (coluna === "observacao") {
+                        td.textContent = unidade.observacao || "";
+                    } else {
+                        td.textContent = unidade.campos?.[coluna] || "";
+                    }
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById("modal-ficha-inspecao-recebimento"));
+        modal.show();
+    }
+
     // â”€â”€â”€ helpers do formulÃ¡rio dinÃ¢mico â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let classeAtual = "";
+    let tipoTubosBarrasAtual = "barra";
+
+    function capturarValoresFormularioRecebimento() {
+        const form = document.getElementById("form-inspecao-recebimento");
+        if (!form) return {};
+
+        const valores = {};
+        const campos = form.querySelectorAll("input[name], select[name], textarea[name]");
+        campos.forEach((campo) => {
+            valores[campo.name] = campo.value;
+        });
+        return valores;
+    }
+
+    function reaplicarValoresFormularioRecebimento(valores) {
+        if (!valores || typeof valores !== "object") return;
+
+        Object.entries(valores).forEach(([name, value]) => {
+            const campo = document.querySelector(`#form-inspecao-recebimento [name="${CSS.escape(name)}"]`);
+            if (campo) {
+                campo.value = value;
+            }
+        });
+    }
 
     function selectConformidade(prefix, name, label) {
         const fullName = `${prefix}${name}`;
@@ -558,6 +711,130 @@
             return html;
         },
 
+        "Tubos e barras": (prefix) => {
+            let html = "";
+            html += `<input type="hidden" name="${prefix}tipo_tubos_barras" value="${tipoTubosBarrasAtual}">`;
+            if (tipoTubosBarrasAtual === "tubo") {
+                html += secao("Visual");
+                html += selectConformidade(prefix, "visual_amassados_trincas", "Amassados / Trincas");
+                html += selectConformidade(prefix, "visual_torcao", "Torção");
+                html += secao("Dimensional");
+                html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento</label>`
+                      + `<input type="text" name="${prefix}dim_comprimento" class="form-control form-control-sm"></div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
+                      + `<input type="text" name="${prefix}dim_diametro_externo" class="form-control form-control-sm"></div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">esp. parede do tubo</label>`
+                      + `<input type="text" name="${prefix}dim_espessura_parede_tubo" class="form-control form-control-sm"></div>`;
+            } else {
+                html += secao("Dimensional");
+                html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento</label>`
+                      + `<input type="text" name="${prefix}dim_comprimento" class="form-control form-control-sm"></div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">externo</label>`
+                      + `<input type="text" name="${prefix}dim_externo" class="form-control form-control-sm"></div>`;
+                html += secao("Visual");
+                html += selectConformidade(prefix, "visual_oxidacao", "Oxidação");
+                html += selectConformidade(prefix, "visual_trincas_falhas", "Trincas / Falhas");
+                html += secao("Dureza");
+                html += `<div class="mb-2"><label class="form-label form-label-sm fw-normal mb-1">Dureza</label>`;
+                html += `<div class="row g-1">`;
+                for (let i = 1; i <= 3; i++) {
+                    html += `<div class="col-4"><div class="input-group input-group-sm">`
+                          + `<span class="input-group-text">${i}°</span>`
+                          + `<input type="text" name="${prefix}dureza_${i}" class="form-control form-control-sm">`
+                          + `</div></div>`;
+                }
+                html += `</div></div>`;
+            }
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Cilindros": (prefix) => {
+            let html = "";
+            html += secao("Visual");
+            html += selectConformidade(prefix, "visual_amassado", "Amassado");
+            html += selectConformidade(prefix, "visual_pintura", "Pintura");
+            html += selectConformidade(prefix, "teste_estanqueidade", "Teste de estanqueidade");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Compensados Navais": (prefix) => {
+            let html = "";
+            html += secao("Visual");
+            html += selectConformidade(prefix, "visual_trincas_falhas", "Trincas / Falhas");
+            html += selectConformidade(prefix, "visual_deformacoes", "Deformações");
+            html += selectConformidade(prefix, "visual_furos", "Furos");
+            html += secao("Dimensional");
+            html += `<div class="fw-semibold small mt-2 mb-2">Comprimento</div>`;
+            html += `<div class="row g-1 mb-2">`;
+            for (let i = 1; i <= 2; i++) {
+                html += `<div class="col-6"><div class="input-group input-group-sm">`
+                      + `<span class="input-group-text">${i}°</span>`
+                      + `<input type="text" name="${prefix}comprimento_${i}" class="form-control form-control-sm">`
+                      + `</div></div>`;
+            }
+            html += `</div>`;
+            html += `<div class="fw-semibold small mt-2 mb-2">Largura</div>`;
+            html += `<div class="row g-1 mb-2">`;
+            for (let i = 1; i <= 2; i++) {
+                html += `<div class="col-6"><div class="input-group input-group-sm">`
+                      + `<span class="input-group-text">${i}°</span>`
+                      + `<input type="text" name="${prefix}largura_${i}" class="form-control form-control-sm">`
+                      + `</div></div>`;
+            }
+            html += `</div>`;
+            html += selectConformidade(prefix, "teste_imersao", "Teste de imersao");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Serviço de Usinagem": (prefix) => {
+            let html = "";
+            html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento 1</label>`
+                  + `<input type="text" name="${prefix}comprimento_1" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento 2</label>`
+                  + `<input type="text" name="${prefix}comprimento_2" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">externo 1</label>`
+                  + `<input type="text" name="${prefix}externo_1" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">externo 2</label>`
+                  + `<input type="text" name="${prefix}externo_2" class="form-control form-control-sm"></div>`;
+            html += selectConformidade(prefix, "visual", "Visual");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">dureza</label>`
+                  + `<input type="text" name="${prefix}dureza" class="form-control form-control-sm"></div>`;
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Lâminas": (prefix) => {
+            let html = "";
+            html += `<div class="mb-2"><label class="form-label form-label-sm">Comprimento</label>`
+                  + `<input type="text" name="${prefix}comprimento" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">Larg total</label>`
+                  + `<input type="text" name="${prefix}larg_total" class="form-control form-control-sm"></div>`;
+            html += `<div class="mb-2"><label class="form-label form-label-sm">Comp lamina</label>`
+                  + `<input type="text" name="${prefix}comp_lamina" class="form-control form-control-sm"></div>`;
+            html += selectConformidade(prefix, "altura", "Altura");
+            html += selectConformidade(prefix, "visual", "Visual");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
         "Rolamentos": (prefix) => {
             let html = "";
             html += secao("Dimensional");
@@ -639,6 +916,9 @@
     };
 
     function renderUnidades(qtd) {
+        const valoresAtuais = capturarValoresFormularioRecebimento();
+        const abaAtivaAtual = document.querySelector('#tabs-unidades-recebimento button.active');
+        const alvoAbaAtiva = abaAtivaAtual ? abaAtivaAtual.getAttribute("data-bs-target") : "#unit-tab-1";
         const builder = FORMULARIOS[classeAtual] || FORMULARIOS["_generico"];
         const tabsEl = document.getElementById("tabs-unidades-recebimento");
         const contentEl = document.getElementById("content-unidades-recebimento");
@@ -663,6 +943,12 @@
             pane.innerHTML = builder(prefix);
             contentEl.appendChild(pane);
         }
+
+        reaplicarValoresFormularioRecebimento(valoresAtuais);
+
+        const abaAtiva = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="${alvoAbaAtiva}"]`)
+            || document.querySelector('#tabs-unidades-recebimento button[data-bs-target="#unit-tab-1"]');
+        if (abaAtiva) abaAtiva.click();
     }
 
     function abrirModalRecebimento(row) {
@@ -690,6 +976,12 @@
             || row.data_completa?.["Classe de Inspeção"]
             || ""
         ).trim();
+        const containerTipoTubosBarras = document.getElementById("container-tipo-tubos-barras");
+        const selectTipoTubosBarras = document.getElementById("tipo-tubos-barras");
+        const isTubosEBarras = classeAtual === "Tubos e barras";
+        containerTipoTubosBarras.style.display = isTubosEBarras ? "" : "none";
+        tipoTubosBarrasAtual = "barra";
+        selectTipoTubosBarras.value = tipoTubosBarrasAtual;
         const resultadoLoteInput = document.getElementById("resultado-lote-recebimento");
         if (resultadoLoteInput) resultadoLoteInput.value = "";
         const quantidadeLoteInput = document.getElementById("quantidade-lote-recebimento");
@@ -821,6 +1113,11 @@
             const val = Math.min(30, Math.max(1, parseInt(e.target.value) || 1));
             e.target.value = val;
             renderUnidades(val);
+        });
+        document.getElementById("tipo-tubos-barras").addEventListener("change", (e) => {
+            tipoTubosBarrasAtual = e.target.value === "tubo" ? "tubo" : "barra";
+            const qtd = parseInt(document.getElementById("qtd-unidades-recebimento").value) || 1;
+            renderUnidades(qtd);
         });
     });
 </script>

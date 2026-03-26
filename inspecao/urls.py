@@ -21,6 +21,8 @@ urlpatterns = [
     path('api/itens-inspecionados-pintura/', pintura.get_itens_inspecionados_pintura, name='itens-inspecionados-pintura'),
     path('api/itens-reinspecao-pintura/', pintura.get_itens_reinspecao_pintura, name='itens-reinspecao-pintura'),
     path('api/alerta-itens-pintura/', pintura.alerta_itens_pintura, name='alerta-itens-pintura'),
+    path('api/banhos-ezinger/', pintura.listar_analises_banho_ezinger, name='listar-banhos-ezinger'),
+    path('api/banhos-ezinger/salvar/', pintura.salvar_analise_banho_ezinger, name='salvar-banhos-ezinger'),
 
     path('api/historico-pintura/<int:id>', pintura.get_historico_pintura, name='historico-pintura'),
     path('api/historico-causas-pintura/<int:id>', pintura.get_historico_causas_pintura, name='historico-causas-pintura'),
@@ -110,6 +112,7 @@ urlpatterns += [
     path('corte/', corte.inspecao_corte, name='inspecao-corte'),
     path('estamparia/', estamparia.inspecao_estamparia, name='inspecao-estamparia'),
     path('pintura/', pintura.inspecao_pintura, name='inspecao-pintura'),
+    path('banhos-ezinger/', pintura.inspecao_banhos_ezinger, name='inspecao-banhos-ezinger'),
     path('verificacao-funcional-pintura/', verificacao_funcional.verificacao_funcional_pintura, name='verificacao-funcional-pintura'),
     path('recebimento/', recebimento.inspecao_recebimento, name='inspecao-recebimento'),
     path('tubos-cilindros/', estanqueidade.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),

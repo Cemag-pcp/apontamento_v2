@@ -37,9 +37,14 @@
         }
         .priority-panel-card {
             margin-bottom: 24px;
+            height: auto;
+            min-height: 320px;
         }
         .priority-panel-card .top-card-content {
             min-height: 220px;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 0.35rem;
         }
         .top-card-title, .process-column h3 { font-size: 14px; font-weight: 600; color: var(--dash-text-muted); margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
         .top-card-title > span {
@@ -313,6 +318,7 @@
             padding: 0.9rem;
             background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
             min-width: 0;
+            overflow: visible;
         }
         #prioridades-ordens-list {
             display: grid;
@@ -334,6 +340,9 @@
             font-weight: 700;
             color: #1f3b5b;
             margin: 0;
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
         }
         .priority-machine-count {
             font-size: 0.78rem;
@@ -342,6 +351,7 @@
             background: #eaf2fb;
             border-radius: 999px;
             padding: 0.2rem 0.6rem;
+            flex-shrink: 0;
         }
         .priority-number {
             min-width: 34px;
@@ -362,6 +372,7 @@
             gap: 4px;
             margin-top: 6px;
             justify-content: flex-end;
+            flex-wrap: wrap;
         }
         #prioridades-ordens-list > li {
             align-items: center;
@@ -379,19 +390,22 @@
         #prioridades-ordens-list > li > div:first-child > div:last-child > div:first-child {
             color: var(--dash-text-main);
             font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            white-space: normal;
+            overflow-wrap: anywhere;
         }
         #prioridades-ordens-list > li > div:first-child > div:last-child > div:nth-child(2) {
             font-size: 12px;
             color: var(--dash-text-muted) !important;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            white-space: normal;
+            overflow-wrap: anywhere;
         }
         #prioridades-ordens-list > li > div:first-child > div:last-child > div:nth-child(3) {
-            display: none;
+            display: block;
+            font-size: 12px;
+            color: var(--dash-text-muted) !important;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            margin-top: 2px;
         }
         #prioridades-ordens-list > li > .text-end.small > div:first-child,
         #prioridades-ordens-list > li > .text-end.small > div:nth-child(2) {
@@ -402,9 +416,27 @@
             align-items: center;
             gap: 6px;
             margin-left: 8px;
+            flex-wrap: wrap;
         }
         #prioridades-ordens-list .priority-actions {
             margin-top: 0;
+        }
+        .priority-item {
+            padding: 0.75rem 0.8rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.7rem;
+            background: rgba(255, 255, 255, 0.9);
+        }
+        .priority-item > div:first-child {
+            min-width: 0;
+            flex: 1;
+        }
+        .priority-item .d-flex.align-items-center.gap-3 {
+            align-items: flex-start !important;
+            min-width: 0;
+        }
+        .priority-item .text-end.small {
+            align-self: center;
         }
         .machine-line {
             display: flex;
@@ -435,6 +467,18 @@
         @media (max-width: 767.98px) {
             #prioridades-ordens-list {
                 grid-template-columns: 1fr;
+            }
+            .priority-machine-header,
+            .priority-item {
+                display: block !important;
+            }
+            .priority-machine-count,
+            .priority-item .text-end.small {
+                margin-top: 0.5rem;
+            }
+            .priority-item .text-end.small {
+                margin-left: 0;
+                justify-content: flex-start;
             }
         }
     </style>

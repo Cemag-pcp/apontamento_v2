@@ -1,0 +1,137 @@
+<div class="modal fade" data-bs-backdrop="static" id="modal-banho-ezinger" tabindex="-1" aria-labelledby="modal-banho-ezinger-label" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="modal-banho-ezinger-label">Registrar banho - EZINGER</h5>
+                    <p class="text-muted mb-0 small">Preencha os resultados das amostras para calcular automaticamente a análise atual e o quanto adicionar.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="form-banho-ezinger">
+                <input type="hidden" name="registro_id" id="registro_id">
+                <div class="modal-body" style="max-height: calc(100vh - 210px); overflow-y: auto;">
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label" for="registrado_em">Data do registro</label>
+                            <input class="form-control" type="datetime-local" name="registrado_em" id="registrado_em" required>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label" for="observacao">Observações</label>
+                            <textarea class="form-control" name="observacao" id="observacao" rows="2" placeholder="Digite observações do registro"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="ezinger-entry-grid">
+                        <div class="ezinger-panel">
+                            <div class="ezinger-panel-header">Desengraxante</div>
+                            <table class="table table-bordered align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Nº da amostra</th>
+                                        <th>Resultado</th>
+                                        <th>Média</th>
+                                        <th>Média x 1,53</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Amostra 1</td>
+                                        <td><input class="form-control ezinger-input" type="number" step="0.01" min="0" name="desengraxante_amostra_1" id="desengraxante_amostra_1" required></td>
+                                        <td rowspan="3" class="text-center fw-semibold" id="desengraxante_media_display">Sem valores</td>
+                                        <td rowspan="3" class="text-center fw-semibold" id="ak_l95_atual_display">Sem valor de média</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Amostra 2</td>
+                                        <td><input class="form-control ezinger-input" type="number" step="0.01" min="0" name="desengraxante_amostra_2" id="desengraxante_amostra_2" required></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Amostra 3</td>
+                                        <td><input class="form-control ezinger-input" type="number" step="0.01" min="0" name="desengraxante_amostra_3" id="desengraxante_amostra_3" required></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="ezinger-panel">
+                            <div class="ezinger-panel-header">Fosfatizante</div>
+                            <table class="table table-bordered align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Nº da amostra</th>
+                                        <th>Resultado</th>
+                                        <th>Média</th>
+                                        <th>Média x 0,23</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Amostra 1</td>
+                                        <td><input class="form-control ezinger-input" type="number" step="0.01" min="0" name="fosfatizante_amostra_1" id="fosfatizante_amostra_1" required></td>
+                                        <td rowspan="3" class="text-center fw-semibold" id="fosfatizante_media_display">Sem valores</td>
+                                        <td rowspan="3" class="text-center fw-semibold" id="m_fe_212_atual_display">Sem valor de média</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Amostra 2</td>
+                                        <td><input class="form-control ezinger-input" type="number" step="0.01" min="0" name="fosfatizante_amostra_2" id="fosfatizante_amostra_2" required></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Amostra 3</td>
+                                        <td><input class="form-control ezinger-input" type="number" step="0.01" min="0" name="fosfatizante_amostra_3" id="fosfatizante_amostra_3" required></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="ezinger-summary mt-4">
+                        <div class="ezinger-summary-title">Análise atual</div>
+                        <div class="row g-0">
+                            <div class="col-md-6 border-end">
+                                <div class="ezinger-summary-section">Desengraxante</div>
+                                <div class="ezinger-summary-subsection">AK L95</div>
+                                <div class="ezinger-summary-value" id="analise_ak_l95_resumo">Sem valor de média</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="ezinger-summary-section">Fosfatizante</div>
+                                <div class="ezinger-summary-subsection">M FE 212</div>
+                                <div class="ezinger-summary-value" id="analise_m_fe_212_resumo">Sem valor de média</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ezinger-summary mt-3">
+                        <div class="ezinger-summary-title">Quanto adicionar</div>
+                        <div class="row g-0">
+                            <div class="col-md-8 border-end">
+                                <div class="ezinger-summary-section">Desengraxante</div>
+                                <div class="row g-0">
+                                    <div class="col-md-6 border-end">
+                                        <div class="ezinger-summary-subsection">AK L95</div>
+                                        <div class="ezinger-summary-value" id="ak_l95_adicionar_display">Limite acima do especificado</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="ezinger-summary-subsection">Aditivo</div>
+                                        <div class="ezinger-summary-value" id="aditivo_adicionar_display">Limite acima do especificado</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="ezinger-summary-section">Fosfatizante</div>
+                                <div class="ezinger-summary-subsection">M FE 212</div>
+                                <div class="ezinger-summary-value" id="m_fe_212_adicionar_display">Limite acima do especificado</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success" id="salvar-banho-ezinger">
+                        <span class="spinner-border spinner-border-sm d-none" id="spinner-banho-ezinger" aria-hidden="true"></span>
+                        <span id="texto-botao-banho-ezinger">Confirmar</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
