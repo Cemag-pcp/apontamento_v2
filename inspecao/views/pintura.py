@@ -57,11 +57,13 @@ def _decimal_to_float(value):
 
 
 def _calcular_analise_banho(amostras_desengraxante, amostras_fosfatizante):
+    desengraxante_acumulado = _round_decimal(sum(amostras_desengraxante))
     media_desengraxante = _round_decimal(
         sum(amostras_desengraxante) / Decimal(len(amostras_desengraxante))
     )
     ak_l95_atual = _round_decimal(media_desengraxante * EZINGER_FATOR_AK_L95)
 
+    fosfatizante_acumulado = _round_decimal(sum(amostras_fosfatizante))
     media_fosfatizante = _round_decimal(
         sum(amostras_fosfatizante) / Decimal(len(amostras_fosfatizante))
     )
@@ -89,8 +91,10 @@ def _calcular_analise_banho(amostras_desengraxante, amostras_fosfatizante):
 
     return {
         "desengraxante_media": media_desengraxante,
+        "desengraxante_acumulado": desengraxante_acumulado,
         "ak_l95_atual": ak_l95_atual,
         "fosfatizante_media": media_fosfatizante,
+        "fosfatizante_acumulado": fosfatizante_acumulado,
         "m_fe_212_atual": m_fe_212_atual,
         "ak_l95_adicionar": ak_l95_adicionar,
         "aditivo_adicionar": aditivo_adicionar,
@@ -146,7 +150,7 @@ def listar_analises_banho_ezinger(request):
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
     registros = AnaliseBanhoEzinger.objects.select_related(
-        "registrado_por__user"
+        "registrado_por__user", "adicao_registrada_por__user"
     ).order_by("-registrado_em")
 
     dados = [
@@ -160,6 +164,19 @@ def listar_analises_banho_ezinger(request):
                 if registro.registrado_por and registro.registrado_por.user
                 else "-"
             ),
+            "adicao_registrada": bool(registro.adicao_registrada_em),
+            "adicao_registrada_em": (
+                (registro.adicao_registrada_em - timedelta(hours=3)).strftime(
+                    "%d/%m/%Y %H:%M:%S"
+                )
+                if registro.adicao_registrada_em
+                else None
+            ),
+            "adicao_registrada_por": (
+                registro.adicao_registrada_por.user.username
+                if registro.adicao_registrada_por and registro.adicao_registrada_por.user
+                else None
+            ),
             "observacao": registro.observacao or "-",
             "desengraxante_amostras": [
                 _decimal_to_float(registro.desengraxante_amostra_1),
@@ -167,6 +184,9 @@ def listar_analises_banho_ezinger(request):
                 _decimal_to_float(registro.desengraxante_amostra_3),
             ],
             "desengraxante_media": _decimal_to_float(registro.desengraxante_media),
+            "desengraxante_acumulado": _decimal_to_float(
+                registro.desengraxante_acumulado
+            ),
             "ak_l95_atual": _decimal_to_float(registro.ak_l95_atual),
             "fosfatizante_amostras": [
                 _decimal_to_float(registro.fosfatizante_amostra_1),
@@ -174,6 +194,9 @@ def listar_analises_banho_ezinger(request):
                 _decimal_to_float(registro.fosfatizante_amostra_3),
             ],
             "fosfatizante_media": _decimal_to_float(registro.fosfatizante_media),
+            "fosfatizante_acumulado": _decimal_to_float(
+                registro.fosfatizante_acumulado
+            ),
             "m_fe_212_atual": _decimal_to_float(registro.m_fe_212_atual),
             "ak_l95_adicionar": _decimal_to_float(registro.ak_l95_adicionar),
             "aditivo_adicionar": _decimal_to_float(registro.aditivo_adicionar),
@@ -231,11 +254,13 @@ def salvar_analise_banho_ezinger(request):
         "desengraxante_amostra_2": amostras_desengraxante[1],
         "desengraxante_amostra_3": amostras_desengraxante[2],
         "desengraxante_media": calculos["desengraxante_media"],
+        "desengraxante_acumulado": calculos["desengraxante_acumulado"],
         "ak_l95_atual": calculos["ak_l95_atual"],
         "fosfatizante_amostra_1": amostras_fosfatizante[0],
         "fosfatizante_amostra_2": amostras_fosfatizante[1],
         "fosfatizante_amostra_3": amostras_fosfatizante[2],
         "fosfatizante_media": calculos["fosfatizante_media"],
+        "fosfatizante_acumulado": calculos["fosfatizante_acumulado"],
         "m_fe_212_atual": calculos["m_fe_212_atual"],
         "ak_l95_adicionar": calculos["ak_l95_adicionar"],
         "aditivo_adicionar": calculos["aditivo_adicionar"],
@@ -255,6 +280,32 @@ def salvar_analise_banho_ezinger(request):
 
     registro = AnaliseBanhoEzinger.objects.create(**defaults)
     return JsonResponse({"success": True, "id": registro.id, "created": True}, status=201)
+
+
+def registrar_adicao_banho_ezinger(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+
+    registro_id = request.POST.get("registro_id")
+    if not registro_id:
+        return JsonResponse({"error": "Registro nÃ£o informado."}, status=400)
+
+    try:
+        registro = AnaliseBanhoEzinger.objects.get(pk=registro_id)
+    except AnaliseBanhoEzinger.DoesNotExist:
+        return JsonResponse({"error": "Registro nÃ£o encontrado."}, status=404)
+
+    if registro.adicao_registrada_em:
+        return JsonResponse(
+            {"error": "A adiÃ§Ã£o deste registro jÃ¡ foi confirmada."}, status=400
+        )
+
+    perfil = Profile.objects.filter(user=request.user).first()
+    registro.adicao_registrada_em = timezone.now()
+    registro.adicao_registrada_por = perfil
+    registro.save(update_fields=["adicao_registrada_em", "adicao_registrada_por"])
+
+    return JsonResponse({"success": True, "id": registro.id}, status=200)
 
 
 def alerta_itens_pintura(request):

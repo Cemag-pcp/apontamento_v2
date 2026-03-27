@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/alerta-itens-pintura/', pintura.alerta_itens_pintura, name='alerta-itens-pintura'),
     path('api/banhos-ezinger/', pintura.listar_analises_banho_ezinger, name='listar-banhos-ezinger'),
     path('api/banhos-ezinger/salvar/', pintura.salvar_analise_banho_ezinger, name='salvar-banhos-ezinger'),
+    path('api/banhos-ezinger/registrar-adicao/', pintura.registrar_adicao_banho_ezinger, name='registrar-adicao-banhos-ezinger'),
 
     path('api/historico-pintura/<int:id>', pintura.get_historico_pintura, name='historico-pintura'),
     path('api/historico-causas-pintura/<int:id>', pintura.get_historico_causas_pintura, name='historico-causas-pintura'),

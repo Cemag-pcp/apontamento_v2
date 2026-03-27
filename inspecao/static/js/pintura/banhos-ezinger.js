@@ -6,11 +6,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const textoBotao = document.getElementById("texto-botao-banho-ezinger");
     const dataRegistroInput = document.getElementById("registrado_em");
     const registroIdInput = document.getElementById("registro_id");
+    const modalRegistrarAdicaoElement = document.getElementById("modal-registrar-adicao-ezinger");
+    const registrarAdicaoRegistroIdInput = document.getElementById("registrar-adicao-registro-id");
+    const registrarAdicaoDescricao = document.getElementById("registrar-adicao-descricao");
+    const confirmarRegistrarAdicaoButton = document.getElementById("confirmar-registrar-adicao");
+    const spinnerRegistrarAdicao = document.getElementById("spinner-registrar-adicao");
+    const textoRegistrarAdicao = document.getElementById("texto-registrar-adicao");
     const chartCanvas = document.getElementById("ezinger-percentuais-chart");
     const acumuladoChartCanvas = document.getElementById("ezinger-acumulado-chart");
+    const consumoMensalChartCanvas = document.getElementById("ezinger-consumo-mensal-chart");
     const paginacaoContainer = document.getElementById("ezinger-paginacao");
     let percentuaisChart = null;
     let acumuladoChart = null;
+    let consumoMensalChart = null;
     let registros = [];
     let paginaAtual = 1;
     const REGISTROS_POR_PAGINA = 10;
@@ -68,6 +76,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const [datePart] = value.split(" ");
         const [day, month, year] = datePart.split("/");
         return `${year}-${month}-${day}`;
+    };
+    const parsePtBrMonth = (value) => {
+        const [datePart] = value.split(" ");
+        const [, month, year] = datePart.split("/");
+        return `${year}-${month}`;
     };
     const parsePtBrDateTimeToLocalInput = (value) => {
         const [datePart, timePart] = value.split(" ");
@@ -225,7 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!dados.length) {
             registrosBody.innerHTML = `
                 <tr>
-                    <td colspan="11" class="text-center text-muted py-4">Nenhum registro encontrado.</td>
+                    <td colspan="13" class="text-center text-muted py-4">Nenhum registro encontrado.</td>
                 </tr>
             `;
             renderPagination(0);
@@ -246,16 +259,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td>${item.registrado_por}</td>
                 <td>${item.observacao ?? "-"}</td>
                 <td>${item.desengraxante_media !== null ? formatNumber(item.desengraxante_media) : "-"}</td>
+                <td>${item.desengraxante_acumulado !== null ? formatNumber(item.desengraxante_acumulado) : "-"}</td>
                 <td>${item.ak_l95_atual !== null ? formatPercent(item.ak_l95_atual) : "-"}</td>
                 <td>${item.fosfatizante_media !== null ? formatNumber(item.fosfatizante_media) : "-"}</td>
+                <td>${item.fosfatizante_acumulado !== null ? formatNumber(item.fosfatizante_acumulado) : "-"}</td>
                 <td>${item.m_fe_212_atual !== null ? formatPercent(item.m_fe_212_atual) : "-"}</td>
                 <td>${item.ak_l95_adicionar !== null ? formatNumber(item.ak_l95_adicionar) : "Limite acima do especificado"}</td>
                 <td>${item.aditivo_adicionar !== null ? formatNumber(item.aditivo_adicionar) : "Limite acima do especificado"}</td>
                 <td>${item.m_fe_212_adicionar !== null ? formatNumber(item.m_fe_212_adicionar) : "Limite acima do especificado"}</td>
                 <td>
+                    <div class="d-flex align-items-center gap-2">
                     <button type="button" class="btn btn-outline-primary btn-sm ezinger-editar" data-id="${item.id}">
                         Editar
                     </button>
+                    <button
+                        type="button"
+                        class="btn btn-sm ${item.adicao_registrada ? "btn-outline-success" : "btn-outline-secondary"} ezinger-registrar-adicao"
+                        data-id="${item.id}"
+                        title="${item.adicao_registrada ? `Adição registrada por ${item.adicao_registrada_por || "-"} em ${item.adicao_registrada_em || "-"}` : "Registrar adição"}"
+                        ${item.adicao_registrada ? "disabled" : ""}
+                    >
+                        <i class="bi ${item.adicao_registrada ? "bi-check-circle-fill" : "bi-plus-circle"}"></i>
+                    </button>
+                    </div>
                 </td>
             </tr>
         `).join("");
@@ -285,6 +311,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 updateSummary();
 
                 const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            });
+        });
+
+        registrosBody.querySelectorAll(".ezinger-registrar-adicao").forEach((button) => {
+            button.addEventListener("click", () => {
+                const item = registros.find((registro) => String(registro.id) === button.dataset.id);
+                if (!item || item.adicao_registrada || !modalRegistrarAdicaoElement) {
+                    return;
+                }
+
+                if (registrarAdicaoRegistroIdInput) {
+                    registrarAdicaoRegistroIdInput.value = item.id;
+                }
+
+                if (registrarAdicaoDescricao) {
+                    registrarAdicaoDescricao.textContent = `Confirma o registro da adição do banho de ${item.registrado_em}?`;
+                }
+
+                const modal = new bootstrap.Modal(modalRegistrarAdicaoElement);
                 modal.show();
             });
         });
@@ -472,10 +518,92 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
+    const renderMonthlyConsumptionChart = (dados) => {
+        if (!consumoMensalChartCanvas || typeof Chart === "undefined") {
+            return;
+        }
+
+        const agrupadoPorMes = dados.reduce((acc, item) => {
+            const mes = parsePtBrMonth(item.registrado_em);
+            if (!acc[mes]) {
+                acc[mes] = {
+                    hclConsumido: 0,
+                    naohConsumido: 0,
+                };
+            }
+
+            acc[mes].hclConsumido += Number(item.desengraxante_acumulado || 0);
+            acc[mes].naohConsumido += Number(item.fosfatizante_acumulado || 0);
+
+            return acc;
+        }, {});
+
+        const labels = Object.keys(agrupadoPorMes).sort();
+        const hclData = labels.map((label) =>
+            Number(agrupadoPorMes[label].hclConsumido.toFixed(2))
+        );
+        const naohData = labels.map((label) =>
+            Number(agrupadoPorMes[label].naohConsumido.toFixed(2))
+        );
+
+        if (consumoMensalChart) {
+            consumoMensalChart.destroy();
+        }
+
+        consumoMensalChart = new Chart(consumoMensalChartCanvas.getContext("2d"), {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: "HCl consumido (mL)",
+                        data: hclData,
+                        backgroundColor: "rgba(217, 119, 6, 0.78)",
+                        borderColor: "#b45309",
+                        borderWidth: 1,
+                    },
+                    {
+                        label: "NaOH consumido (mL)",
+                        data: naohData,
+                        backgroundColor: "rgba(8, 145, 178, 0.78)",
+                        borderColor: "#0e7490",
+                        borderWidth: 1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: "index",
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        position: "top",
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `${context.dataset.label}: ${formatNumber(context.parsed.y)} mL`,
+                        },
+                    },
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => `${formatNumber(value)} mL`,
+                        },
+                    },
+                },
+            },
+        });
+    };
+
     const loadRecords = async () => {
         registrosBody.innerHTML = `
             <tr>
-                <td colspan="11" class="text-center text-muted py-4">Carregando registros...</td>
+                <td colspan="13" class="text-center text-muted py-4">Carregando registros...</td>
             </tr>
         `;
 
@@ -492,16 +620,18 @@ document.addEventListener("DOMContentLoaded", () => {
             renderRows(registros);
             renderChart(registros);
             renderAccumulatedChart(registros);
+            renderMonthlyConsumptionChart(registros);
         } catch (error) {
             registrosBody.innerHTML = `
                 <tr>
-                    <td colspan="11" class="text-center text-danger py-4">${error.message}</td>
+                    <td colspan="13" class="text-center text-danger py-4">${error.message}</td>
                 </tr>
             `;
             registros = [];
             renderPagination(0);
             renderChart([]);
             renderAccumulatedChart([]);
+            renderMonthlyConsumptionChart([]);
         }
     };
 
@@ -568,6 +698,75 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    if (confirmarRegistrarAdicaoButton) {
+        confirmarRegistrarAdicaoButton.addEventListener("click", async () => {
+            const registroId = registrarAdicaoRegistroIdInput ? registrarAdicaoRegistroIdInput.value : "";
+            if (!registroId) {
+                return;
+            }
+
+            spinnerRegistrarAdicao?.classList.remove("d-none");
+            if (textoRegistrarAdicao) {
+                textoRegistrarAdicao.textContent = "Salvando...";
+            }
+            confirmarRegistrarAdicaoButton.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append("registro_id", registroId);
+
+                const response = await fetch("/inspecao/api/banhos-ezinger/registrar-adicao/", {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": getCsrfToken(),
+                    },
+                    body: formData,
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || "Erro ao registrar adiÃ§Ã£o.");
+                }
+
+                const modal = bootstrap.Modal.getInstance(modalRegistrarAdicaoElement);
+                if (modal) {
+                    modal.hide();
+                }
+
+                if (registrarAdicaoRegistroIdInput) {
+                    registrarAdicaoRegistroIdInput.value = "";
+                }
+
+                await loadRecords();
+
+                if (typeof Swal !== "undefined") {
+                    Swal.fire({
+                        icon: "success",
+                        title: "Adição registrada com sucesso",
+                        timer: 1800,
+                        showConfirmButton: false,
+                    });
+                }
+            } catch (error) {
+                if (typeof Swal !== "undefined") {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Erro ao registrar adiÃ§Ã£o",
+                        text: error.message,
+                    });
+                } else {
+                    window.alert(error.message);
+                }
+            } finally {
+                spinnerRegistrarAdicao?.classList.add("d-none");
+                if (textoRegistrarAdicao) {
+                    textoRegistrarAdicao.textContent = "Confirmar";
+                }
+                confirmarRegistrarAdicaoButton.disabled = false;
+            }
+        });
+    }
+
     modalElement.addEventListener("hidden.bs.modal", () => {
         form.reset();
         if (registroIdInput) {
@@ -579,6 +778,24 @@ document.addEventListener("DOMContentLoaded", () => {
         textoBotao.textContent = "Confirmar";
         updateSummary();
     });
+
+    if (modalRegistrarAdicaoElement) {
+        modalRegistrarAdicaoElement.addEventListener("hidden.bs.modal", () => {
+            if (registrarAdicaoRegistroIdInput) {
+                registrarAdicaoRegistroIdInput.value = "";
+            }
+            if (registrarAdicaoDescricao) {
+                registrarAdicaoDescricao.textContent = "Esse registro será marcado como adição realizada.";
+            }
+            spinnerRegistrarAdicao?.classList.add("d-none");
+            if (textoRegistrarAdicao) {
+                textoRegistrarAdicao.textContent = "Confirmar";
+            }
+            if (confirmarRegistrarAdicaoButton) {
+                confirmarRegistrarAdicaoButton.disabled = false;
+            }
+        });
+    }
 
     inputIds.forEach((id) => {
         const input = document.getElementById(id);

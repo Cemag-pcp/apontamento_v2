@@ -245,7 +245,15 @@ class AnaliseBanhoEzinger(models.Model):
     registrado_por = models.ForeignKey(
         Profile, on_delete=models.SET_NULL, null=True, blank=True
     )
+    adicao_registrada_por = models.ForeignKey(
+        Profile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="banhos_ezinger_com_adicao_registrada",
+    )
     observacao = models.CharField(max_length=255, null=True, blank=True)
+    adicao_registrada_em = models.DateTimeField(null=True, blank=True)
 
     desengraxante_amostra_1 = models.DecimalField(
         max_digits=6, decimal_places=2, default=Decimal("0.00")
@@ -258,6 +266,9 @@ class AnaliseBanhoEzinger(models.Model):
     )
     desengraxante_media = models.DecimalField(
         max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    desengraxante_acumulado = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0.00")
     )
     ak_l95_atual = models.DecimalField(
         max_digits=6, decimal_places=2, default=Decimal("0.00")
@@ -274,6 +285,9 @@ class AnaliseBanhoEzinger(models.Model):
     )
     fosfatizante_media = models.DecimalField(
         max_digits=6, decimal_places=2, default=Decimal("0.00")
+    )
+    fosfatizante_acumulado = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal("0.00")
     )
     m_fe_212_atual = models.DecimalField(
         max_digits=6, decimal_places=2, default=Decimal("0.00")

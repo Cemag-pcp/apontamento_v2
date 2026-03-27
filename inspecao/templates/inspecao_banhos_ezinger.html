@@ -24,16 +24,22 @@
 <section class="card shadow-sm border-0 mb-4">
     <div class="card-body">
         <div class="row g-4 mb-4">
-            <div class="col-xl-6">
+            <div class="col-xl-4">
                 <h5 class="mb-3">Percentuais por dia registrado</h5>
                 <div class="ezinger-chart-wrap">
                     <canvas id="ezinger-percentuais-chart"></canvas>
                 </div>
             </div>
-            <div class="col-xl-6">
+            <div class="col-xl-4">
                 <h5 class="mb-3">Acumulado a adicionar por dia</h5>
                 <div class="ezinger-chart-wrap">
                     <canvas id="ezinger-acumulado-chart"></canvas>
+                </div>
+            </div>
+            <div class="col-xl-4">
+                <h5 class="mb-3">Consumido por mês</h5>
+                <div class="ezinger-chart-wrap">
+                    <canvas id="ezinger-consumo-mensal-chart"></canvas>
                 </div>
             </div>
         </div>
@@ -45,19 +51,21 @@
                         <th>Data</th>
                         <th>Registrado por</th>
                         <th>Obs.</th>
-                        <th>Desengraxante</th>
-                        <th>AK L95 atual</th>
-                        <th>Fosfatizante</th>
-                        <th>M FE 212 atual</th>
-                        <th>AK L95 adicionar</th>
+                        <th>HCl (ml)</th>
+                        <th>Acum. Desengraxante</th>
+                        <th>% AK L95</th>
+                        <th>NaOH (mL)</th>
+                        <th>Acum. Fosfatizante</th>
+                        <th>% M FE 212</th>
+                        <th>AK L95 adic.</th>
                         <th>Aditivo</th>
-                        <th>M FE 212 adicionar</th>
+                        <th>M FE 212 adic.</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody id="ezinger-registros-body">
                     <tr>
-                        <td colspan="11" class="text-center text-muted py-4">Carregando registros...</td>
+                        <td colspan="13" class="text-center text-muted py-4">Carregando registros...</td>
                     </tr>
                 </tbody>
             </table>
@@ -69,9 +77,32 @@
 
 {% include 'modal_inspecao/modal_banho_ezinger.html' %}
 
+<div class="modal fade" id="modal-registrar-adicao-ezinger" tabindex="-1" aria-labelledby="modal-registrar-adicao-ezinger-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modal-registrar-adicao-ezinger-label">Confirmar adição</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="registrar-adicao-registro-id">
+                <p class="mb-2">Confirma o registro da adição deste banho?</p>
+                <p class="text-muted mb-0 small" id="registrar-adicao-descricao">Esse registro será marcado como adição realizada.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="confirmar-registrar-adicao">
+                    <span class="spinner-border spinner-border-sm d-none" id="spinner-registrar-adicao" aria-hidden="true"></span>
+                    <span id="texto-registrar-adicao">Confirmar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{% static 'js/pintura/banhos-ezinger.js' %}?v=20260326-1"></script>
+<script src="{% static 'js/pintura/banhos-ezinger.js' %}?v=20260327-2"></script>
 {% endblock %}
