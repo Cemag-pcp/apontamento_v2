@@ -341,7 +341,11 @@ def atualizar_status_ordem(request):
 
                 # verifica se a peça é da célula "serralheria", se sim cria inspeção
                 maquina_nome = ordem.maquina.nome.strip().lower() if ordem.maquina and ordem.maquina.nome else ""
-                precisa_inspecao = conjunto_inspecionado or maquina_nome == "serralheria"
+                precisa_inspecao = conjunto_inspecionado or maquina_nome in {
+                    "serralheria",
+                    "transbordo",
+                    "roçadeira",
+                }
 
                 if precisa_inspecao and not Inspecao.objects.filter(pecas_ordem_montagem=ultimo_peca_ordem).exists():
                     Inspecao.objects.create(

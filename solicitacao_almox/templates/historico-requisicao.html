@@ -2,35 +2,69 @@
 {% load static %}
 {% block content %}
 
-<div class="container mt-5">
-    <h2>Histórico de Requisições</h2>
-    <table id="execucaoTable" class="display table table-sm table-striped" style="width:100%">
-        <thead>
-            <tr>
-                <th>RPA</th>
-                <th>Innovaro</th>
-                <th>Data de Solicitação</th>
-                <th>Classe de Requisição</th>
-                <th>Item</th>
-                <th>Quantidade</th>
-                <th>Centro de Custo</th>
-                <th>Solicitante</th>
-                <th>Observações</th>
-                <th>Entregue por</th>
-                <th>Data de Entrega</th>
-                <th>Status almox</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- O DataTables preencherá automaticamente as linhas do corpo da tabela -->
-        </tbody>
-    </table>
+<div class="container-fluid px-4 mt-4">
+    <h2>Historico de Requisicoes</h2>
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label" for="data_solicitacao_inicio">Data solicitacao inicial</label>
+                    <input type="date" class="form-control" id="data_solicitacao_inicio">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="data_solicitacao_fim">Data solicitacao final</label>
+                    <input type="date" class="form-control" id="data_solicitacao_fim">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="data_entrega_inicio">Data entrega inicial</label>
+                    <input type="date" class="form-control" id="data_entrega_inicio">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="data_entrega_fim">Data entrega final</label>
+                    <input type="date" class="form-control" id="data_entrega_fim">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="chave_innovaro">Chave Innovaro</label>
+                    <input type="text" class="form-control" id="chave_innovaro" placeholder="Digite a chave Innovaro">
+                </div>
+                <div class="col-md-8 d-flex gap-2 flex-wrap justify-content-md-end">
+                    <button type="button" class="btn btn-outline-secondary" id="limpar-filtros-requisicao">Limpar filtros</button>
+                    <a class="btn btn-success" id="exportar-csv-requisicao" href="#">Exportar CSV</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="execucaoTable" class="display table table-sm table-striped w-100 mb-0">
+                    <thead>
+                        <tr>
+                            <th>RPA</th>
+                            <th>Innovaro</th>
+                            <th>Data de Solicitacao</th>
+                            <th>Classe de Requisicao</th>
+                            <th>Item</th>
+                            <th>Quantidade</th>
+                            <th>Centro de Custo</th>
+                            <th>Solicitante</th>
+                            <th>Observacoes</th>
+                            <th>Entregue por</th>
+                            <th>Data de Entrega</th>
+                            <th>Status almox</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
-
-<script src="{% static 'js/datatable-historico-requisicao.js' %}"></script>
-
+<script src="{% static 'js/datatable-historico-requisicao.js' %}?v=20260327-2"></script>
 {% endblock %}

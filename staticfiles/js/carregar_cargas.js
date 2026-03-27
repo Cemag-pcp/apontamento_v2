@@ -7,7 +7,7 @@ function classeCorBadge(cor) {
   const c = String(cor || '').toLowerCase();
   switch (c) {
     case 'amarelo':  return 'bg-warning text-dark';
-    case 'laranja':  return 'bg-orange text-dark'; // se nÃ£o tiver, usa 'bg-warning'
+    case 'laranja':  return 'bg-orange text-dark'; // se não tiver, usa 'bg-warning'
     case 'cinza':    return 'bg-secondary';
     case 'azul':     return 'bg-primary';
     case 'verde':    return 'bg-success';
@@ -409,7 +409,7 @@ export async function popularPacotesDaCarga(cargaId) {
                 const qtd = checados.length;
                 const confirmado = await Swal.fire({
                   title: 'Confirmar exclusÃ£o',
-                  text: `Deseja excluir ${qtd} foto(s) selecionada(s)? Esta aÃ§Ã£o nÃ£o pode ser desfeita.`,
+                  text: `Deseja excluir ${qtd} foto(s) selecionada(s)? Esta aÃ§Ã£o não pode ser desfeita.`,
                   icon: 'warning',
                   showCancelButton: true,
                   confirmButtonColor: '#d33',
@@ -439,7 +439,7 @@ export async function popularPacotesDaCarga(cargaId) {
 
                   Toast.fire({ icon: 'success', title: `${qtd} foto(s) excluÃ­da(s) com sucesso.` });
 
-                  // Atualiza flag do botÃ£o "Ver foto" se nÃ£o houver mais fotos
+                  // Atualiza flag do botÃ£o "Ver foto" se não houver mais fotos
                   if (!novosDados.fotos?.length) {
                     fotoIcon.remove();
                   }
@@ -540,7 +540,7 @@ export async function popularPacotesDaCarga(cargaId) {
             if (outros.length === 0) {
               const opt = document.createElement('option');
               opt.value = '';
-              opt.textContent = 'NÃ£o hÃ¡ outros pacotes';
+              opt.textContent = 'não hÃ¡ outros pacotes';
               sel.appendChild(opt);
               sel.disabled = true;
               helper.textContent = 'Crie outro pacote para mover este item.';

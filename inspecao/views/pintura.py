@@ -284,16 +284,16 @@ def salvar_analise_banho_ezinger(request):
 
 def registrar_adicao_banho_ezinger(request):
     if request.method != "POST":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo não permitido"}, status=405)
 
     registro_id = request.POST.get("registro_id")
     if not registro_id:
-        return JsonResponse({"error": "Registro nÃ£o informado."}, status=400)
+        return JsonResponse({"error": "Registro não informado."}, status=400)
 
     try:
         registro = AnaliseBanhoEzinger.objects.get(pk=registro_id)
     except AnaliseBanhoEzinger.DoesNotExist:
-        return JsonResponse({"error": "Registro nÃ£o encontrado."}, status=404)
+        return JsonResponse({"error": "Registro não encontrado."}, status=404)
 
     if registro.adicao_registrada_em:
         return JsonResponse(

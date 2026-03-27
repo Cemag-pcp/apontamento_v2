@@ -70,7 +70,7 @@ def _row_hash(row_data):
 def _load_recebimento_sheet():
     credentials = get_google_credentials()
     if credentials is None:
-        return None, "Credenciais do Google Sheets nÃ£o encontradas."
+        return None, "Credenciais do Google Sheets não encontradas."
 
     try:
         gc = gspread.service_account_from_dict(credentials)
@@ -201,7 +201,7 @@ def _reconcile_recebimento_items(items, incoming_dados, row_index, sheet_hash, d
 
 def sincronizar_recebimento(request):
     if request.method != "POST":
-        return JsonResponse({"error": "MÃ©todo nÃ£o permitido"}, status=405)
+        return JsonResponse({"error": "MÃ©todo não permitido"}, status=405)
 
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")

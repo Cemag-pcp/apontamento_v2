@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <select class="form-select" name="inspecao_total" id="inspecao_total">
                 <option value="" selected hidden disabled></option>
                 <option value="Nao">N&atilde;o</option>
-                <option value="NÃ£o" hidden>N&atilde;o</option>
+                <option value="não" hidden>N&atilde;o</option>
                 <option value="Sim">Sim</option>
             </select>
         </div>

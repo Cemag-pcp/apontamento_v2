@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseRedirect, HttpResponse, Http404
+from django.http import JsonResponse, HttpResponseRedirect, HttpResponse, Http404, StreamingHttpResponse
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError
@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import transaction
 from django.core.serializers import serialize
+import csv
 
 from cadastro_almox.models import (
     Cc,
@@ -166,6 +167,90 @@ def historico_requisicao(request):
     return render(request, "historico-requisicao.html")
 
 
+def _base_queryset_historico_requisicao():
+    return SolicitacaoRequisicao.objects.select_related(
+        "item",
+        "funcionario",
+        "cc",
+        "classe_requisicao",
+        "entregue_por",
+    )
+
+
+def _aplicar_filtros_historico_requisicao(solicitacoes, data):
+    search_value = data.get("search[value]", "") or data.get("search", "")
+    data_solicitacao_inicio = data.get("data_solicitacao_inicio", "")
+    data_solicitacao_fim = data.get("data_solicitacao_fim", "")
+    data_entrega_inicio = data.get("data_entrega_inicio", "")
+    data_entrega_fim = data.get("data_entrega_fim", "")
+    chave_innovaro = data.get("chave_innovaro", "")
+
+    if search_value:
+        solicitacoes = solicitacoes.filter(
+            Q(item__nome__icontains=search_value)
+            | Q(funcionario__nome__icontains=search_value)
+            | Q(classe_requisicao__nome__icontains=search_value)
+        )
+
+    if data_solicitacao_inicio:
+        solicitacoes = solicitacoes.filter(
+            data_solicitacao__date__gte=data_solicitacao_inicio
+        )
+
+    if data_solicitacao_fim:
+        solicitacoes = solicitacoes.filter(
+            data_solicitacao__date__lte=data_solicitacao_fim
+        )
+
+    if data_entrega_inicio:
+        solicitacoes = solicitacoes.filter(data_entrega__date__gte=data_entrega_inicio)
+
+    if data_entrega_fim:
+        solicitacoes = solicitacoes.filter(data_entrega__date__lte=data_entrega_fim)
+
+    if chave_innovaro:
+        solicitacoes = solicitacoes.filter(
+            chave_innovaro__icontains=chave_innovaro.strip()
+        )
+
+    return solicitacoes
+
+
+def _serializar_historico_requisicao(solicitacao):
+    status = "Pendente entrega" if solicitacao.entregue_por is None else "Entregue"
+    data_ajustada_solicitacao = solicitacao.data_solicitacao - timedelta(hours=3)
+
+    if solicitacao.data_entrega:
+        data_ajustada_entrega = solicitacao.data_entrega - timedelta(hours=3)
+        data_entrega_formatada = data_ajustada_entrega.strftime("%d/%m/%Y %H:%M")
+    else:
+        data_entrega_formatada = ""
+
+    return {
+        "classe_requisicao": solicitacao.classe_requisicao.nome,
+        "quantidade": solicitacao.quantidade,
+        "obs": solicitacao.obs,
+        "data_solicitacao": data_ajustada_solicitacao.strftime("%d/%m/%Y %H:%M"),
+        "cc__nome": solicitacao.cc.nome if solicitacao.cc else "",
+        "funcionario__nome": solicitacao.funcionario.nome,
+        "item__nome": solicitacao.item.nome,
+        "entregue_por__nome": (
+            solicitacao.entregue_por.nome if solicitacao.entregue_por else "não Entregue"
+        ),
+        "ultima_atualizacao": solicitacao.data_solicitacao.strftime("%d/%m/%Y %H:%M"),
+        "data_entrega": data_entrega_formatada,
+        "status": status,
+        "rpa": None
+        if not solicitacao.rpa
+        else (
+            solicitacao.rpa
+            if len(solicitacao.rpa) <= 45
+            else f"{solicitacao.rpa[:45]}..."
+        ),
+        "chave_innovaro": solicitacao.chave_innovaro or "",
+    }
+
+
 @csrf_exempt
 def solicitacao_data_requisicao(request):
     if request.method == "POST":
@@ -244,6 +329,93 @@ def solicitacao_data_requisicao(request):
                 "data": data,
             }
         )
+
+
+@csrf_exempt
+def solicitacao_data_requisicao(request):
+    if request.method == "POST":
+        draw = int(request.POST.get("draw", 0))
+        start = int(request.POST.get("start", 0))
+        length = int(request.POST.get("length", 10))
+
+        solicitacoes = _base_queryset_historico_requisicao()
+        solicitacoes = _aplicar_filtros_historico_requisicao(
+            solicitacoes, request.POST
+        )
+        solicitacoes = solicitacoes.order_by("-data_solicitacao")
+
+        paginator = Paginator(solicitacoes, length)
+        page_number = start // length + 1
+        solicitacoes_page = paginator.get_page(page_number)
+
+        data = [
+            _serializar_historico_requisicao(solicitacao)
+            for solicitacao in solicitacoes_page
+        ]
+
+        return JsonResponse(
+            {
+                "draw": draw,
+                "recordsTotal": paginator.count,
+                "recordsFiltered": paginator.count,
+                "data": data,
+            }
+        )
+
+
+@login_required
+def exportar_historico_requisicao_csv(request):
+    solicitacoes = _base_queryset_historico_requisicao()
+    solicitacoes = _aplicar_filtros_historico_requisicao(solicitacoes, request.GET)
+    solicitacoes = solicitacoes.order_by("-data_solicitacao")
+
+    class Echo:
+        def write(self, value):
+            return value
+
+    def generate_rows():
+        writer = csv.writer(Echo(), delimiter=";")
+        yield "\ufeff"
+        yield writer.writerow(
+            [
+                "RPA",
+                "Chave Innovaro",
+                "Data de Solicitacao",
+                "Classe de Requisicao",
+                "Item",
+                "Quantidade",
+                "Solicitante",
+                "Observacoes",
+                "Entregue por",
+                "Data de Entrega",
+                "Status almox",
+            ]
+        )
+
+        for solicitacao in solicitacoes.iterator(chunk_size=500):
+            item = _serializar_historico_requisicao(solicitacao)
+            yield writer.writerow(
+                [
+                    item["rpa"] or "",
+                    item["chave_innovaro"],
+                    item["data_solicitacao"],
+                    item["classe_requisicao"],
+                    item["item__nome"],
+                    item["quantidade"],
+                    item["funcionario__nome"],
+                    item["obs"] or "",
+                    item["entregue_por__nome"],
+                    item["data_entrega"],
+                    item["status"],
+                ]
+            )
+
+    response = StreamingHttpResponse(
+        generate_rows(),
+        content_type="text/csv; charset=utf-8",
+    )
+    response["Content-Disposition"] = 'attachment; filename="historico_requisicao.csv"'
+    return response
 
 
 @login_required
@@ -332,6 +504,174 @@ def solicitacao_data_transferencia(request):
                 "data": data,
             }
         )
+
+
+def _base_queryset_historico_transferencia():
+    return SolicitacaoTransferencia.objects.select_related(
+        "item",
+        "funcionario",
+        "deposito_destino",
+        "entregue_por",
+    )
+
+
+def _aplicar_filtros_historico_transferencia(solicitacoes, data):
+    search_value = data.get("search[value]", "") or data.get("search", "")
+    data_solicitacao_inicio = data.get("data_solicitacao_inicio", "")
+    data_solicitacao_fim = data.get("data_solicitacao_fim", "")
+    data_entrega_inicio = data.get("data_entrega_inicio", "")
+    data_entrega_fim = data.get("data_entrega_fim", "")
+    chave_innovaro = data.get("chave_innovaro", "")
+
+    if search_value:
+        solicitacoes = solicitacoes.filter(
+            Q(item__nome__icontains=search_value)
+            | Q(funcionario__nome__icontains=search_value)
+            | Q(deposito_destino__nome__icontains=search_value)
+            | Q(chave_innovaro__icontains=search_value)
+        )
+
+    if data_solicitacao_inicio:
+        solicitacoes = solicitacoes.filter(
+            data_solicitacao__date__gte=data_solicitacao_inicio
+        )
+
+    if data_solicitacao_fim:
+        solicitacoes = solicitacoes.filter(
+            data_solicitacao__date__lte=data_solicitacao_fim
+        )
+
+    if data_entrega_inicio:
+        solicitacoes = solicitacoes.filter(data_entrega__date__gte=data_entrega_inicio)
+
+    if data_entrega_fim:
+        solicitacoes = solicitacoes.filter(data_entrega__date__lte=data_entrega_fim)
+
+    if chave_innovaro:
+        solicitacoes = solicitacoes.filter(
+            chave_innovaro__icontains=chave_innovaro.strip()
+        )
+
+    return solicitacoes
+
+
+def _serializar_historico_transferencia(solicitacao):
+    status = "Pendente entrega" if solicitacao.entregue_por is None else "Entregue"
+    data_ajustada_solicitacao = solicitacao.data_solicitacao - timedelta(hours=3)
+
+    if solicitacao.data_entrega:
+        data_ajustada_entrega = solicitacao.data_entrega - timedelta(hours=3)
+        data_entrega_formatada = data_ajustada_entrega.strftime("%d/%m/%Y %H:%M")
+    else:
+        data_entrega_formatada = ""
+
+    return {
+        "quantidade": solicitacao.quantidade,
+        "obs": solicitacao.obs,
+        "data_solicitacao": data_ajustada_solicitacao.strftime("%d/%m/%Y %H:%M"),
+        "deposito_destino__nome": solicitacao.deposito_destino.nome,
+        "funcionario__nome": solicitacao.funcionario.nome,
+        "item__nome": solicitacao.item.nome,
+        "entregue_por__nome": (
+            solicitacao.entregue_por.nome if solicitacao.entregue_por else ""
+        ),
+        "data_entrega": data_entrega_formatada,
+        "status": status,
+        "rpa": None
+        if not solicitacao.rpa
+        else (
+            solicitacao.rpa
+            if len(solicitacao.rpa) <= 45
+            else f"{solicitacao.rpa[:45]}..."
+        ),
+        "chave_innovaro": solicitacao.chave_innovaro or "",
+    }
+
+
+@csrf_exempt
+def solicitacao_data_transferencia(request):
+    if request.method == "POST":
+        draw = int(request.POST.get("draw", 0))
+        start = int(request.POST.get("start", 0))
+        length = int(request.POST.get("length", 10))
+
+        solicitacoes = _base_queryset_historico_transferencia()
+        solicitacoes = _aplicar_filtros_historico_transferencia(
+            solicitacoes, request.POST
+        )
+        solicitacoes = solicitacoes.order_by("-data_solicitacao")
+
+        paginator = Paginator(solicitacoes, length)
+        solicitacoes_page = paginator.get_page(start // length + 1)
+
+        data = [
+            _serializar_historico_transferencia(solicitacao)
+            for solicitacao in solicitacoes_page
+        ]
+
+        return JsonResponse(
+            {
+                "draw": draw,
+                "recordsTotal": paginator.count,
+                "recordsFiltered": paginator.count,
+                "data": data,
+            }
+        )
+
+
+@login_required
+def exportar_historico_transferencia_csv(request):
+    solicitacoes = _base_queryset_historico_transferencia()
+    solicitacoes = _aplicar_filtros_historico_transferencia(solicitacoes, request.GET)
+    solicitacoes = solicitacoes.order_by("-data_solicitacao")
+
+    class Echo:
+        def write(self, value):
+            return value
+
+    def generate_rows():
+        writer = csv.writer(Echo(), delimiter=";")
+        yield "\ufeff"
+        yield writer.writerow(
+            [
+                "RPA",
+                "Chave Innovaro",
+                "Data de Solicitacao",
+                "Item",
+                "Quantidade",
+                "Deposito de destino",
+                "Solicitante",
+                "Observacoes",
+                "Entregue por",
+                "Data de Entrega",
+                "Status almox",
+            ]
+        )
+
+        for solicitacao in solicitacoes.iterator(chunk_size=500):
+            item = _serializar_historico_transferencia(solicitacao)
+            yield writer.writerow(
+                [
+                    item["rpa"] or "",
+                    item["chave_innovaro"],
+                    item["data_solicitacao"],
+                    item["item__nome"],
+                    item["quantidade"],
+                    item["deposito_destino__nome"],
+                    item["funcionario__nome"],
+                    item["obs"] or "",
+                    item["entregue_por__nome"],
+                    item["data_entrega"],
+                    item["status"],
+                ]
+            )
+
+    response = StreamingHttpResponse(
+        generate_rows(),
+        content_type="text/csv; charset=utf-8",
+    )
+    response["Content-Disposition"] = 'attachment; filename="historico_transferencia.csv"'
+    return response
 
 
 def cadastro_novo_item(request):

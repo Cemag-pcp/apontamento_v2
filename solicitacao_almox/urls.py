@@ -10,9 +10,11 @@ urlpatterns = [
 
     path('historico/requisicao/', views.historico_requisicao, name='historico_requisicao'),
     path('api/historico/processa-historico-requisicao/', views.solicitacao_data_requisicao, name='solicitacao_data_requisicao'),
+    path('historico/requisicao/exportar-csv/', views.exportar_historico_requisicao_csv, name='exportar_historico_requisicao_csv'),
     
     path('historico/transferencia/', views.historico_transferencia, name='historico_transferencia'),
     path('api/historico/processa-historico-transferencia/', views.solicitacao_data_transferencia, name='solicitacao_data_transferencia'),
+    path('historico/transferencia/exportar-csv/', views.exportar_historico_transferencia_csv, name='exportar_historico_transferencia_csv'),
 
     path('api/cadastrar-novo-item/', views.cadastro_novo_item, name='cadastro_novo_item'),
     path('api/cadastrar-nova-matricula/', views.cadastro_nova_matricula, name='cadastro_nova_matricula'),
