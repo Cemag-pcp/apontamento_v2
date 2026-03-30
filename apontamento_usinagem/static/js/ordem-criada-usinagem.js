@@ -731,6 +731,9 @@ export function carregarOrdensInterrompidas(container, filtros = {}) {
                         </div>
                         <div class="card-body bg-light">
                             <p class="card-text mb-2 small">
+                                <strong>Motivo da interrupção:</strong> ${ordem.motivo_interrupcao || 'Sem motivo'}
+                            </p>
+                            <p class="card-text mb-2 small">
                                 <strong>Observação:</strong> ${ordem.obs || 'N/A'}
                             </p>
                             <p class="card-text mb-2 small">

@@ -53,10 +53,18 @@ def planejamento(request):
     motivos = MotivoInterrupcao.objects.filter(setor__nome='corte', visivel=True)
     operadores = Operador.objects.filter(setor__nome='corte')
     espessuras = Espessura.objects.all()
+    maquinas_plasma = Maquina.objects.filter(setor__nome='corte', nome__icontains='plasma').order_by('nome')
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='serra').exclude(nome='Finalizada parcial')
     motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='corte')
 
-    return render(request, 'apontamento_corte/planejamento.html', {'motivos':motivos,'operadores':operadores,'espessuras':espessuras,'motivos_maquina_parada':motivos_maquina_parada,'motivos_exclusao':motivos_exclusao})
+    return render(request, 'apontamento_corte/planejamento.html', {
+        'motivos': motivos,
+        'operadores': operadores,
+        'espessuras': espessuras,
+        'maquinas_plasma': maquinas_plasma,
+        'motivos_maquina_parada': motivos_maquina_parada,
+        'motivos_exclusao': motivos_exclusao,
+    })
 
 def get_pecas_ordem(request, pk_ordem):
     try:
@@ -785,7 +793,7 @@ def gerar_op_duplicada(request, pk_ordem):
         if maquina:
             maquina_ordem = get_object_or_404(Maquina, pk=maquina)
         else:
-            maquina_ordem = ordem_original.maquina.nome if ordem_original.maquina.nome in ['laser_1', 'laser_2','laser_3'] else None
+            maquina_ordem = ordem_original.maquina
 
         with transaction.atomic():
             # Cria a nova ordem como duplicada
@@ -1243,6 +1251,7 @@ class SalvarArquivoView(View):
         tipo_chapa = request.POST.get('tipo_chapa')
         retalho = request.POST.get('retalho') == 'true'  # Converte 'true' para True e 'false' para False
         tipo_maquina = request.POST.get('maquina')
+        maquina_planejada = request.POST.get('maquinaPlanejada')
         data_programacao = request.POST.get('dataProgramacao')
 
         if not uploaded_file:
@@ -1258,7 +1267,12 @@ class SalvarArquivoView(View):
 
         tipo_maquina_tratada = tipo_maquina.replace("_"," ").title()
 
-        tipo_maquina_object = get_object_or_404(Maquina, nome__contains=tipo_maquina_tratada) if tipo_maquina in ['laser_1','laser_2','laser_3'] else None
+        if tipo_maquina == 'plasma':
+            if not maquina_planejada:
+                return JsonResponse({'error': 'Selecione a máquina de plasma.'}, status=400)
+            tipo_maquina_object = get_object_or_404(Maquina, pk=int(maquina_planejada), setor__nome='corte')
+        else:
+            tipo_maquina_object = get_object_or_404(Maquina, nome__contains=tipo_maquina_tratada) if tipo_maquina in ['laser_1','laser_2','laser_3'] else None
 
         if tipo_maquina =='plasma':
             excel_tratado,propriedades = tratamento_planilha_plasma(ordem_producao_excel)
