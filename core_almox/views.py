@@ -5,7 +5,16 @@ from django.http import JsonResponse, HttpResponse
 
 from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
 from solicitacao_almox.forms import SolicitacaoRequisicaoForm, SolicitacaoTransferenciaForm
-from cadastro_almox.models import OperadorAlmox, Funcionario, ItensSolicitacao, ItensTransferencia
+from cadastro_almox.forms import RegraSlaAlmoxForm
+from cadastro_almox.models import (
+    OperadorAlmox,
+    Funcionario,
+    ItensSolicitacao,
+    ItensTransferencia,
+    RegraSlaAlmox,
+)
+from core_almox.models import RegistroAcaoSolicitacaoAlmox
+from core.utils import notificar_acao_almox
 
 from datetime import datetime
 from automacoes.conexao_plan import busca_saldo_recurso_central
@@ -16,11 +25,45 @@ from zoneinfo import ZoneInfo
 
 env=environ.Env()
 
+
+def _gerar_payload_solicitacao(solicitacao, tipo_solicitacao):
+    payload = {
+        'id': solicitacao.id,
+        'tipo_solicitacao': tipo_solicitacao,
+        'funcionario': str(solicitacao.funcionario),
+        'item': str(solicitacao.item),
+        'quantidade': str(solicitacao.quantidade),
+        'obs': solicitacao.obs or '',
+    }
+
+    if tipo_solicitacao == 'requisicao':
+        payload['classe_requisicao'] = str(solicitacao.classe_requisicao)
+        payload['cc'] = str(solicitacao.cc)
+    else:
+        payload['deposito_destino'] = str(solicitacao.deposito_destino)
+
+    return payload
+
+
+def _registrar_acao_solicitacao(request, solicitacao, tipo_solicitacao, acao, motivo):
+    RegistroAcaoSolicitacaoAlmox.objects.create(
+        tipo_solicitacao=tipo_solicitacao,
+        acao=acao,
+        solicitacao_id_original=solicitacao.id,
+        motivo=motivo.strip(),
+        payload=_gerar_payload_solicitacao(solicitacao, tipo_solicitacao),
+        usuario=request.user if request.user.is_authenticated else None,
+    )
+
 @login_required
 def lista_solicitacoes(request):
     tipo_sol = request.POST.get("type_sol")
-    requisicoes = SolicitacaoRequisicao.objects.filter(entregue_por=None)
-    transferencias = SolicitacaoTransferencia.objects.filter(entregue_por=None)
+    requisicoes = SolicitacaoRequisicao.objects.filter(entregue_por=None).select_related(
+        "funcionario", "item", "classe_requisicao", "status"
+    )
+    transferencias = SolicitacaoTransferencia.objects.filter(entregue_por=None).select_related(
+        "funcionario", "item", "status"
+    )
     operadores_entrega = OperadorAlmox.objects.filter(status=True)
 
     draw = int(request.POST.get('draw', 1))
@@ -51,6 +94,7 @@ def lista_solicitacoes(request):
             solicitacao.data_entrega = data_entrega
             
             solicitacao.save()
+            notificar_acao_almox("entregar", tipo_solicitacao, solicitacao.id)
 
             # return redirect("sol_page")
 
@@ -60,13 +104,21 @@ def lista_solicitacoes(request):
             })
 
         elif "apagar" in request.POST:
-            
+            motivo = (request.POST.get("motivo_exclusao") or "").strip()
+            if not motivo:
+                return JsonResponse({'status': 'Erro', 'mensagem': 'Informe o motivo da exclusao.'}, status=400)
+
             solicitacao_id = request.POST.get("solicitacao_id")
             tipo_solicitacao = request.POST.get("tipo_solicitacao")
             if tipo_solicitacao == "requisicao":
-                SolicitacaoRequisicao.objects.filter(id=solicitacao_id).delete()
+                solicitacao = get_object_or_404(SolicitacaoRequisicao, id=solicitacao_id)
             else:
-                SolicitacaoTransferencia.objects.filter(id=solicitacao_id).delete()
+                solicitacao = get_object_or_404(SolicitacaoTransferencia, id=solicitacao_id)
+
+            _registrar_acao_solicitacao(request, solicitacao, tipo_solicitacao, 'exclusao', motivo)
+            solicitacao_pk = solicitacao.id
+            solicitacao.delete()
+            notificar_acao_almox("apagar", tipo_solicitacao, solicitacao_pk)
 
             # return redirect("sol_page")
             return JsonResponse({
@@ -135,6 +187,7 @@ def lista_solicitacoes(request):
             "funcionario": f"{req.funcionario.matricula} - {req.funcionario.nome}",
             "item": f"{req.item.codigo} - {req.item.nome}",  # Supondo que 'nome' é o campo que contém o nome do item
             "quantidade": req.quantidade,
+            "prioridade": req.status.prioridade if req.status else "",
             "classe_requisicao": req.classe_requisicao.nome,
             "saldo": req.saldo,
             "data_solicitacao": req.data_solicitacao.isoformat(),
@@ -171,6 +224,7 @@ def lista_solicitacoes(request):
             "funcionario": f"{trans.funcionario.matricula} - {trans.funcionario.nome}",
             "item": f"{trans.item.codigo} - {trans.item.nome}",  # Supondo que 'nome' é o campo que contém o nome do item
             "quantidade": trans.quantidade,
+            "prioridade": trans.status.prioridade if trans.status else "",
             "saldo": trans.saldo,
             "data_solicitacao": trans.data_solicitacao.isoformat(),
             "acoes": 'acoes'
@@ -316,3 +370,40 @@ def processarCodigos(requisicoes,transferencias):
         item.saldo = saldos.get(item.item.codigo, '0')
     
     return 'teste'
+
+
+@login_required
+def configuracoes_sla(request):
+    regra_edicao = None
+    regra_id = request.GET.get('editar')
+
+    if regra_id:
+        regra_edicao = get_object_or_404(RegraSlaAlmox, pk=regra_id)
+
+    if request.method == 'POST':
+        acao = request.POST.get('acao')
+
+        if acao == 'excluir':
+            regra = get_object_or_404(RegraSlaAlmox, pk=request.POST.get('regra_id'))
+            regra.delete()
+            return redirect('configuracoes_sla')
+
+        regra_pk = request.POST.get('regra_id')
+        regra_instancia = None
+        if regra_pk:
+            regra_instancia = get_object_or_404(RegraSlaAlmox, pk=regra_pk)
+
+        form = RegraSlaAlmoxForm(request.POST, instance=regra_instancia)
+        if form.is_valid():
+            form.save()
+            return redirect('configuracoes_sla')
+        regra_edicao = regra_instancia
+    else:
+        form = RegraSlaAlmoxForm(instance=regra_edicao)
+
+    context = {
+        'form': form,
+        'regra_edicao': regra_edicao,
+        'regras_sla': RegraSlaAlmox.objects.all(),
+    }
+    return render(request, 'home/configuracoes_sla.html', context)

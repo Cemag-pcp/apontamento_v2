@@ -1,15 +1,26 @@
 from django import forms
 from .models import *
+from cadastro_almox.models import RegraSlaAlmox
 
 class SolicitacaoRequisicaoForm(forms.ModelForm):
+    status = forms.ModelChoiceField(
+        queryset=RegraSlaAlmox.objects.filter(ativo=True).order_by('minutos_limite', 'prioridade'),
+        required=True,
+    )
+
     class Meta:
         model = SolicitacaoRequisicao
-        fields = ['funcionario', 'cc', 'item', 'classe_requisicao', 'quantidade', 'obs']
+        fields = ['funcionario', 'cc', 'item', 'classe_requisicao', 'quantidade', 'status', 'obs']
 
 class SolicitacaoTransferenciaForm(forms.ModelForm):
+    status = forms.ModelChoiceField(
+        queryset=RegraSlaAlmox.objects.filter(ativo=True).order_by('minutos_limite', 'prioridade'),
+        required=True,
+    )
+
     class Meta:
         model = SolicitacaoTransferencia
-        fields = ['funcionario', 'deposito_destino', 'item', 'quantidade', 'obs']
+        fields = ['funcionario', 'deposito_destino', 'item', 'quantidade', 'status', 'obs']
 
 class SolicitacaoCadastroItemRequisicaoForm(forms.ModelForm):
     class Meta:

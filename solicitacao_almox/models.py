@@ -8,6 +8,7 @@ from cadastro_almox.models import (
     DepositoDestino,
     ItensTransferencia,
     OperadorAlmox,
+    RegraSlaAlmox,
 )
 
 import datetime
@@ -25,6 +26,13 @@ class SolicitacaoRequisicao(models.Model):
         ClasseRequisicao, on_delete=models.CASCADE, related_name="requisicao_classe"
     )
     quantidade = models.FloatField()
+    status = models.ForeignKey(
+        RegraSlaAlmox,
+        on_delete=models.PROTECT,
+        related_name="requisicoes_status",
+        null=True,
+        blank=True,
+    )
     obs = models.TextField(blank=True, null=True)
     data_solicitacao = models.DateTimeField(auto_now_add=True)
     entregue_por = models.ForeignKey(
@@ -56,6 +64,13 @@ class SolicitacaoTransferencia(models.Model):
         ItensTransferencia, on_delete=models.CASCADE, related_name="transferencia_itens"
     )
     quantidade = models.FloatField()
+    status = models.ForeignKey(
+        RegraSlaAlmox,
+        on_delete=models.PROTECT,
+        related_name="transferencias_status",
+        null=True,
+        blank=True,
+    )
     obs = models.TextField(blank=True, null=True)
     data_solicitacao = models.DateTimeField(auto_now_add=True)
     entregue_por = models.ForeignKey(

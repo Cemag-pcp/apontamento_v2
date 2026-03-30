@@ -25,6 +25,7 @@
             <th>Funcionário</th>
             <th>Item</th>
             <th>Quantidade</th>
+            <th>Prioridade</th>
             <th>Classe de Requisição</th>
             <th>Saldo</th>
             <th>Data de Solicitação</th>
@@ -44,6 +45,7 @@
             <th>Funcionário</th>
             <th>Item</th>
             <th>Quantidade</th>
+            <th>Prioridade</th>
             <th>Saldo</th>
             <th>Data de Solicitação</th>
             <th>Ações</th>
@@ -110,6 +112,10 @@
                     <input type="hidden" class="tipo_solicitacao" name="tipo_solicitacao">
                     <input type="hidden" class="solicitacao_id" name="solicitacao_id">
                     <input type="hidden" name="apagar">
+                    <div class="mb-3">
+                        <label for="motivoExclusao" class="form-label">Motivo da exclusao</label>
+                        <textarea class="form-control" id="motivoExclusao" name="motivo_exclusao" rows="3" required></textarea>
+                    </div>
 
                 </form>
             </div>
@@ -169,6 +175,10 @@
 
                 <input type="hidden" name="solicitacao_id" id="solicitacaoIdEditarReq">
                 <input type="hidden" name="tipo_solicitacao" id="tipoSolicitacaoEditarReq">
+                <div class="mb-3">
+                    <label for="motivoEdicaoRequisicao" class="form-label">Motivo da edicao</label>
+                    <textarea class="form-control" id="motivoEdicaoRequisicao" name="motivo_edicao" rows="3" required></textarea>
+                </div>
                 
                 <div class="text-end">
                     <button id="buttonSubmitEditarReq" type="submit" class="btn btn-success">Salvar Alterações</button>
@@ -219,6 +229,10 @@
 
                 <input type="hidden" name="solicitacao_id" id="solicitacaoIdEditarTra">
                 <input type="hidden" name="tipo_solicitacao" id="tipoSolicitacaoEditarTra">
+                <div class="mb-3">
+                    <label for="motivoEdicaoTransferencia" class="form-label">Motivo da edicao</label>
+                    <textarea class="form-control" id="motivoEdicaoTransferencia" name="motivo_edicao" rows="3" required></textarea>
+                </div>
             
                 <div class="row justify-content-center">
                     <div class="col-md-12 text-end">
@@ -370,6 +384,7 @@
         var formModal = document.getElementById("formConfirmacaoExclusao");
         formModal.querySelector('.tipo_solicitacao').value = tipoSolicitacao;
         formModal.querySelector('.solicitacao_id').value = solicitacaoId;
+        formModal.querySelector('#motivoExclusao').value = '';
 
         // Abre o modal de confirmação
         var confirmaModal = new bootstrap.Modal(document.getElementById('confirmarExclusao'));
@@ -380,7 +395,14 @@
     function confirmarExclusao(button){
         // Submete o formulário com a escolha
         var formExclusao = document.getElementById("formConfirmacaoExclusao");
- 
+        var motivoExclusao = formExclusao.querySelector('#motivoExclusao');
+
+        if (!motivoExclusao.value.trim()) {
+            motivoExclusao.focus();
+            alert('Informe o motivo da exclusao.');
+            return;
+        }
+
         var url = `{% url "lista_solicitacoes" %}`; 
         var formData = $(formExclusao).serialize();
         $.ajax({
@@ -512,6 +534,7 @@
                     editarRequisicaoModal.show();
                     var editarRequisicaoForm = document.getElementById('editarFormRequisicao');
                     editarRequisicaoForm.action = url;
+                    editarRequisicaoForm.querySelector('#motivoEdicaoRequisicao').value = '';
 
                     spinnerRequisicao.style.display = 'none';
                     botaoEditarTextRequisicao.textContent = "Editar";
@@ -522,6 +545,7 @@
                     editarTransferenciaModal.show();
                     var editarTransferenciaForm = document.getElementById('editarFormTransferencia');
                     editarTransferenciaForm.action = url;
+                    editarTransferenciaForm.querySelector('#motivoEdicaoTransferencia').value = '';
 
                     spinnerTransferencia.style.display = 'none';
                     botaoEditarTextTransferencia.textContent = "Editar";
@@ -673,6 +697,13 @@
 
     $('#editarFormRequisicao').on('submit',function(event){
         event.preventDefault();
+        const motivoEdicaoReq = document.getElementById('motivoEdicaoRequisicao');
+
+        if (!motivoEdicaoReq.value.trim()) {
+            motivoEdicaoReq.focus();
+            alert('Informe o motivo da edicao.');
+            return;
+        }
 
         let formEditReqData = $(this).serialize();
         const buttonSubmitEditReq = document.getElementById('buttonSubmitEditarReq');
@@ -714,6 +745,13 @@
 
     $('#editarFormTransferencia').on('submit',function(event){
         event.preventDefault();
+        const motivoEdicaoTra = document.getElementById('motivoEdicaoTransferencia');
+
+        if (!motivoEdicaoTra.value.trim()) {
+            motivoEdicaoTra.focus();
+            alert('Informe o motivo da edicao.');
+            return;
+        }
 
         let formEditTraData = $(this).serialize();
         const buttonSubmitEditTra = document.getElementById('buttonSubmitEditarTra');
@@ -759,6 +797,27 @@
     var operadores;
     let tableReq;
     let tableTra;
+
+    const almoxWsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const almoxSocket = new WebSocket(`${almoxWsProtocol}://${window.location.host}/ws/almox/solicitacoes/`);
+
+    almoxSocket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        console.log("Atualizacao websocket almox:", data);
+
+        if (tableReq) {
+            tableReq.ajax.reload(null, false);
+        }
+
+        if (tableTra) {
+            tableTra.ajax.reload(null, false);
+        }
+    };
+
+    almoxSocket.onclose = function() {
+        console.warn('WebSocket do almoxarifado desconectado');
+    };
+
     $(document).ready(function (){
         let data_saldo;
 
@@ -790,6 +849,7 @@
                 { data: 'funcionario'},
                 { data: 'item'},
                 { data: 'quantidade'},
+                { data: 'prioridade'},
                 { data: 'classe_requisicao'},
                 { data: 'saldo'},
                 { data: 'data_solicitacao', 
@@ -855,6 +915,7 @@
                 { data: 'funcionario'},
                 { data: 'item'},
                 { data: 'quantidade'},
+                { data: 'prioridade'},
                 { data: 'saldo'},
                 { data: 'data_solicitacao', 
                   render: function(data, type, row) {

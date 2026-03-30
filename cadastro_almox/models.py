@@ -60,3 +60,20 @@ class OperadorAlmox(models.Model):
     def __str__(self):
 
         return f'{self.matricula} - {self.nome}'
+
+
+class RegraSlaAlmox(models.Model):
+
+    prioridade = models.CharField(max_length=50, unique=True)
+    minutos_limite = models.PositiveIntegerField()
+    ativo = models.BooleanField(default=True)
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['minutos_limite', 'prioridade']
+        verbose_name = 'Regra de SLA'
+        verbose_name_plural = 'Regras de SLA'
+
+    def __str__(self):
+        return f'{self.prioridade} - {self.minutos_limite} minutos'

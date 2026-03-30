@@ -18,7 +18,10 @@ from cadastro_almox.models import (
     DepositoDestino,
     ClasseRequisicao,
     OperadorAlmox,
+    RegraSlaAlmox,
 )
+from core_almox.models import RegistroAcaoSolicitacaoAlmox
+from core.utils import notificar_acao_almox
 
 from .forms import (
     SolicitacaoRequisicaoForm,
@@ -51,6 +54,7 @@ def criar_solicitacoes(request):
     depositos_destino = DepositoDestino.objects.all()
     form_requisicao = SolicitacaoRequisicaoForm(request.POST, prefix="requisicao")
     centro_custo = Cc.objects.all()
+    status_sla = RegraSlaAlmox.objects.filter(ativo=True).order_by("minutos_limite", "prioridade")
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
@@ -115,6 +119,7 @@ def criar_solicitacoes(request):
         "itens": itens_requisicao,
         "itens_transferencia": itens_transferencia,
         "centro_custo": centro_custo,
+        "status_sla": status_sla,
     }
 
     return render(request, "solicitacao.html", context)
@@ -184,10 +189,12 @@ def _aplicar_filtros_historico_requisicao(solicitacoes, data):
     data_entrega_inicio = data.get("data_entrega_inicio", "")
     data_entrega_fim = data.get("data_entrega_fim", "")
     chave_innovaro = data.get("chave_innovaro", "")
+    codigo_item = data.get("codigo_item", "")
 
     if search_value:
         solicitacoes = solicitacoes.filter(
             Q(item__nome__icontains=search_value)
+            | Q(item__codigo__icontains=search_value)
             | Q(funcionario__nome__icontains=search_value)
             | Q(classe_requisicao__nome__icontains=search_value)
         )
@@ -213,6 +220,9 @@ def _aplicar_filtros_historico_requisicao(solicitacoes, data):
             chave_innovaro__icontains=chave_innovaro.strip()
         )
 
+    if codigo_item:
+        solicitacoes = solicitacoes.filter(item__codigo__icontains=codigo_item.strip())
+
     return solicitacoes
 
 
@@ -233,6 +243,8 @@ def _serializar_historico_requisicao(solicitacao):
         "data_solicitacao": data_ajustada_solicitacao.strftime("%d/%m/%Y %H:%M"),
         "cc__nome": solicitacao.cc.nome if solicitacao.cc else "",
         "funcionario__nome": solicitacao.funcionario.nome,
+        "item": f"{solicitacao.item.codigo} - {solicitacao.item.nome}",
+        "item__codigo": solicitacao.item.codigo,
         "item__nome": solicitacao.item.nome,
         "entregue_por__nome": (
             solicitacao.entregue_por.nome if solicitacao.entregue_por else "não Entregue"
@@ -400,7 +412,7 @@ def exportar_historico_requisicao_csv(request):
                     item["chave_innovaro"],
                     item["data_solicitacao"],
                     item["classe_requisicao"],
-                    item["item__nome"],
+                    item["item"],
                     item["quantidade"],
                     item["funcionario__nome"],
                     item["obs"] or "",
@@ -522,10 +534,13 @@ def _aplicar_filtros_historico_transferencia(solicitacoes, data):
     data_entrega_inicio = data.get("data_entrega_inicio", "")
     data_entrega_fim = data.get("data_entrega_fim", "")
     chave_innovaro = data.get("chave_innovaro", "")
+    codigo_item = data.get("codigo_item", "")
+    codigo_item = data.get("codigo_item", "")
 
     if search_value:
         solicitacoes = solicitacoes.filter(
             Q(item__nome__icontains=search_value)
+            | Q(item__codigo__icontains=search_value)
             | Q(funcionario__nome__icontains=search_value)
             | Q(deposito_destino__nome__icontains=search_value)
             | Q(chave_innovaro__icontains=search_value)
@@ -552,6 +567,9 @@ def _aplicar_filtros_historico_transferencia(solicitacoes, data):
             chave_innovaro__icontains=chave_innovaro.strip()
         )
 
+    if codigo_item:
+        solicitacoes = solicitacoes.filter(item__codigo__icontains=codigo_item.strip())
+
     return solicitacoes
 
 
@@ -571,6 +589,8 @@ def _serializar_historico_transferencia(solicitacao):
         "data_solicitacao": data_ajustada_solicitacao.strftime("%d/%m/%Y %H:%M"),
         "deposito_destino__nome": solicitacao.deposito_destino.nome,
         "funcionario__nome": solicitacao.funcionario.nome,
+        "item": f"{solicitacao.item.codigo} - {solicitacao.item.nome}",
+        "item__codigo": solicitacao.item.codigo,
         "item__nome": solicitacao.item.nome,
         "entregue_por__nome": (
             solicitacao.entregue_por.nome if solicitacao.entregue_por else ""
@@ -595,10 +615,13 @@ def solicitacao_data_transferencia(request):
         start = int(request.POST.get("start", 0))
         length = int(request.POST.get("length", 10))
 
-        solicitacoes = _base_queryset_historico_transferencia()
+        solicitacoes_base = _base_queryset_historico_transferencia()
+        total_registros = solicitacoes_base.count()
+
         solicitacoes = _aplicar_filtros_historico_transferencia(
-            solicitacoes, request.POST
+            solicitacoes_base, request.POST
         )
+        total_filtrado = solicitacoes.count()
         solicitacoes = solicitacoes.order_by("-data_solicitacao")
 
         paginator = Paginator(solicitacoes, length)
@@ -612,8 +635,8 @@ def solicitacao_data_transferencia(request):
         return JsonResponse(
             {
                 "draw": draw,
-                "recordsTotal": paginator.count,
-                "recordsFiltered": paginator.count,
+                "recordsTotal": total_registros,
+                "recordsFiltered": total_filtrado,
                 "data": data,
             }
         )
@@ -655,7 +678,7 @@ def exportar_historico_transferencia_csv(request):
                     item["rpa"] or "",
                     item["chave_innovaro"],
                     item["data_solicitacao"],
-                    item["item__nome"],
+                    item["item"],
                     item["quantidade"],
                     item["deposito_destino__nome"],
                     item["funcionario__nome"],
@@ -967,6 +990,12 @@ def edit_solicitacao_cadastro_matricula(request, pk):
 def edit_solicitacao(request, tipo_solicitacao, requisicao_id):
 
     if request.method == "POST":
+        motivo_edicao = (request.POST.get("motivo_edicao") or "").strip()
+        if not motivo_edicao:
+            return JsonResponse(
+                {"status": "Erro", "mensagem": "Informe o motivo da edicao."},
+                status=400,
+            )
 
         if tipo_solicitacao == "requisicao":
             print(request.POST)
@@ -1009,6 +1038,30 @@ def edit_solicitacao(request, tipo_solicitacao, requisicao_id):
             solicitacao.quantidade = quantidade
 
             solicitacao.save()
+
+        RegistroAcaoSolicitacaoAlmox.objects.create(
+            tipo_solicitacao=tipo_solicitacao,
+            acao="edicao",
+            solicitacao_id_original=solicitacao.id,
+            motivo=motivo_edicao,
+            payload={
+                "id": solicitacao.id,
+                "tipo_solicitacao": tipo_solicitacao,
+                "funcionario": str(solicitacao.funcionario),
+                "item": str(solicitacao.item),
+                "quantidade": str(solicitacao.quantidade),
+                "obs": solicitacao.obs or "",
+                "classe_requisicao": str(solicitacao.classe_requisicao)
+                if tipo_solicitacao == "requisicao"
+                else "",
+                "cc": str(solicitacao.cc) if tipo_solicitacao == "requisicao" else "",
+                "deposito_destino": str(solicitacao.deposito_destino)
+                if tipo_solicitacao == "transferencia"
+                else "",
+            },
+            usuario=request.user if request.user.is_authenticated else None,
+        )
+        notificar_acao_almox("editar", tipo_solicitacao, solicitacao.id)
 
         return JsonResponse({"status": "Sucesso", "tipo": tipo_solicitacao})
 

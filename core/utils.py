@@ -30,6 +30,21 @@ def notificar_ordem(ordem):
         }
     )
 
+
+def notificar_acao_almox(tipo_acao, tipo_solicitacao, solicitacao_id):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        "almox_solicitacoes",
+        {
+            "type": "enviar_acao_almox",
+            "data": {
+                "acao": tipo_acao,
+                "tipo_solicitacao": tipo_solicitacao,
+                "solicitacao_id": solicitacao_id,
+            },
+        },
+    )
+
 # def notificacao_almoxarifado(
 #     titulo: str,
 #     mensagem: str,

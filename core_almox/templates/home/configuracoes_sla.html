@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <h2 class="mb-1">Configuracoes de SLA</h2>
+            <p class="text-muted mb-0">Cadastre tempos limite por prioridade para o atendimento do almoxarifado.</p>
+        </div>
+        <div class="text-muted small">
+            Exemplo: Alto - 40 minutos, Medio - 120 minutos
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">
+                        {% if regra_edicao %}
+                            Editar regra
+                        {% else %}
+                            Nova regra
+                        {% endif %}
+                    </h3>
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {% if regra_edicao %}
+                            <input type="hidden" name="regra_id" value="{{ regra_edicao.id }}">
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.prioridade.id_for_label }}">{{ form.prioridade.label }}</label>
+                            {{ form.prioridade }}
+                            {% for error in form.prioridade.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.minutos_limite.id_for_label }}">{{ form.minutos_limite.label }}</label>
+                            {{ form.minutos_limite }}
+                            {% for error in form.minutos_limite.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="form-check form-switch mb-4">
+                            {{ form.ativo }}
+                            <label class="form-check-label" for="{{ form.ativo.id_for_label }}">{{ form.ativo.label }}</label>
+                        </div>
+
+                        {% for error in form.non_field_errors %}
+                            <div class="alert alert-danger py-2">{{ error }}</div>
+                        {% endfor %}
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                {% if regra_edicao %}
+                                    Salvar alteracoes
+                                {% else %}
+                                    Cadastrar regra
+                                {% endif %}
+                            </button>
+
+                            {% if regra_edicao %}
+                                <a href="{% url 'configuracoes_sla' %}" class="btn btn-outline-secondary">Cancelar</a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="h5 mb-0">Regras cadastradas</h3>
+                        <span class="badge text-bg-light">{{ regras_sla|length }} regra{{ regras_sla|length|pluralize }}</span>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Prioridade</th>
+                                    <th>Tempo limite</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Acoes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for regra in regras_sla %}
+                                    <tr>
+                                        <td class="fw-semibold">{{ regra.prioridade }}</td>
+                                        <td>{{ regra.minutos_limite }} minuto{{ regra.minutos_limite|pluralize }}</td>
+                                        <td>
+                                            {% if regra.ativo %}
+                                                <span class="badge text-bg-success">Ativa</span>
+                                            {% else %}
+                                                <span class="badge text-bg-secondary">Inativa</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="d-inline-flex gap-2">
+                                                <a href="{% url 'configuracoes_sla' %}?editar={{ regra.id }}" class="btn btn-outline-primary btn-sm">Editar</a>
+                                                <form method="post" onsubmit="return confirm('Excluir a regra {{ regra.prioridade }}?');">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="acao" value="excluir">
+                                                    <input type="hidden" name="regra_id" value="{{ regra.id }}">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">Excluir</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">
+                                            Nenhuma regra de SLA cadastrada.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

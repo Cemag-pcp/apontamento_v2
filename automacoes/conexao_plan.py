@@ -26,10 +26,10 @@ def busca_saldo_recurso_central(codigos):
     
     # Verificar cache
     if codigos_tupla in cache:
-        print(f'✓ Cache hit: {len(codigos)} códigos')
+        print(f'Cache hit: {len(codigos)} codigos')
         return cache[codigos_tupla]
     
-    print(f'⚠ Cache miss: buscando {len(codigos)} códigos do banco de dados')
+    print(f'Cache miss: buscando {len(codigos)} codigos do banco de dados')
     
     try:
         # Normalizar códigos para busca (remover espaços)
@@ -46,8 +46,8 @@ def busca_saldo_recurso_central(codigos):
         data_ultimo_saldo = "N/A"
         
         print(f"\n{'='*80}")
-        print(f"📋 BUSCANDO NA TABELA ConsultaSaldoInnovaro:")
-        print(f"   Total de códigos a buscar: {len(codigos_set)}")
+        print("BUSCANDO NA TABELA ConsultaSaldoInnovaro:")
+        print(f"   Total de codigos a buscar: {len(codigos_set)}")
         
         for registro in registros:
             codigo = str(registro['codigo']).strip()
@@ -61,14 +61,14 @@ def busca_saldo_recurso_central(codigos):
             
             # Debug: mostrar primeiros 10 resultados
             if len(codigos_encontrados) <= 10:
-                print(f"   ✓ {codigo}: {saldo}")
+                print(f"   OK {codigo}: {saldo}")
         
         codigos_nao_encontrados = [cod for cod in codigos_set if cod not in codigos_encontrados]
         print(f"{'='*80}\n")
         
-        print(f"✓ Saldo recuperado para {len(saldo_dict)} itens, {len(codigos_nao_encontrados)} não encontrados")
+        print(f"Saldo recuperado para {len(saldo_dict)} itens, {len(codigos_nao_encontrados)} nao encontrados")
         if codigos_nao_encontrados and len(codigos_nao_encontrados) <= 5:
-            print(f"   Códigos não encontrados: {codigos_nao_encontrados}")
+            print(f"   Codigos nao encontrados: {codigos_nao_encontrados}")
         
         # Armazenar no cache e retornar
         resultado = (saldo_dict, data_ultimo_saldo)
@@ -77,7 +77,7 @@ def busca_saldo_recurso_central(codigos):
         return resultado
         
     except Exception as exc:
-        print(f"❌ Erro ao buscar saldo: {str(exc)}")
+        print(f"Erro ao buscar saldo: {str(exc)}")
         import traceback
         traceback.print_exc()
         return {}, "Erro ao conectar"
