@@ -14,6 +14,7 @@ $(document).ready(function () {
         dataEntregaInicio: $("#data_entrega_inicio"),
         dataEntregaFim: $("#data_entrega_fim"),
         chaveInnovaro: $("#chave_innovaro"),
+        codigoItem: $("#codigo_item"),
     };
     const exportarCsv = $("#exportar_csv");
 
@@ -35,6 +36,9 @@ $(document).ready(function () {
         if (filtros.chaveInnovaro.val()) {
             params.set("chave_innovaro", filtros.chaveInnovaro.val());
         }
+        if (filtros.codigoItem.val()) {
+            params.set("codigo_item", filtros.codigoItem.val());
+        }
 
         const queryString = params.toString();
         exportarCsv.attr(
@@ -51,6 +55,7 @@ $(document).ready(function () {
             filtros.dataEntregaInicio.val(),
             filtros.dataEntregaFim.val(),
             filtros.chaveInnovaro.val(),
+            filtros.codigoItem.val(),
         ].some((valor) => (valor || "").trim() !== "");
     }
 
@@ -77,6 +82,7 @@ $(document).ready(function () {
                 d.data_entrega_inicio = filtros.dataEntregaInicio.val();
                 d.data_entrega_fim = filtros.dataEntregaFim.val();
                 d.chave_innovaro = filtros.chaveInnovaro.val();
+                d.codigo_item = filtros.codigoItem.val();
             },
         },
         columns: [
@@ -94,7 +100,7 @@ $(document).ready(function () {
             },
             { data: "chave_innovaro", orderable: false, defaultContent: "" },
             { data: "data_solicitacao", orderable: false },
-            { data: "item__nome", orderable: false },
+            { data: "item", orderable: false },
             { data: "quantidade", orderable: false },
             { data: "deposito_destino__nome", orderable: false },
             { data: "funcionario__nome", orderable: false },
@@ -173,7 +179,7 @@ $(document).ready(function () {
 
     $("#aplicar_filtros").on("click", function () {
         atualizarEstadoBotaoExportacao();
-        table.ajax.reload();
+        table.ajax.reload(null, true);
     });
 
     $("#limpar_filtros").on("click", function () {
@@ -181,7 +187,7 @@ $(document).ready(function () {
             campo.val("");
         });
         atualizarEstadoBotaoExportacao();
-        table.ajax.reload();
+        table.ajax.reload(null, true);
     });
 
     exportarCsv.on("click", function (event) {
