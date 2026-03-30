@@ -5,6 +5,7 @@ $(document).ready(function () {
         dataEntregaInicio: $("#data_entrega_inicio"),
         dataEntregaFim: $("#data_entrega_fim"),
         chaveInnovaro: $("#chave_innovaro"),
+        codigoItem: $("#codigo_item"),
     };
 
     const buildExportUrl = () => {
@@ -25,6 +26,9 @@ $(document).ready(function () {
         if (filtros.chaveInnovaro.val()) {
             params.set("chave_innovaro", filtros.chaveInnovaro.val());
         }
+        if (filtros.codigoItem.val()) {
+            params.set("codigo_item", filtros.codigoItem.val());
+        }
 
         return `/almox/historico/requisicao/exportar-csv/?${params.toString()}`;
     };
@@ -36,6 +40,7 @@ $(document).ready(function () {
             filtros.dataEntregaInicio.val(),
             filtros.dataEntregaFim.val(),
             filtros.chaveInnovaro.val(),
+            filtros.codigoItem.val(),
         ].some((valor) => (valor || "").trim() !== "");
     };
 
@@ -61,6 +66,7 @@ $(document).ready(function () {
                 d.data_entrega_inicio = filtros.dataEntregaInicio.val();
                 d.data_entrega_fim = filtros.dataEntregaFim.val();
                 d.chave_innovaro = filtros.chaveInnovaro.val();
+                d.codigo_item = filtros.codigoItem.val();
             }
         },
         columns: [
@@ -80,7 +86,7 @@ $(document).ready(function () {
             { data: "chave_innovaro", orderable: false },
             { data: "data_solicitacao", orderable: false },
             { data: "classe_requisicao", orderable: false },
-            { data: "item__nome", orderable: false },
+            { data: "item", orderable: false },
             { data: "quantidade", orderable: false },
             { data: "cc__nome", orderable: false },
             { data: "funcionario__nome", orderable: false },
@@ -121,12 +127,18 @@ $(document).ready(function () {
         updateExportButtonState();
     });
 
+    filtros.codigoItem.on("input", function () {
+        table.ajax.reload();
+        updateExportButtonState();
+    });
+
     $("#limpar-filtros-requisicao").on("click", function () {
         filtros.dataSolicitacaoInicio.val("");
         filtros.dataSolicitacaoFim.val("");
         filtros.dataEntregaInicio.val("");
         filtros.dataEntregaFim.val("");
         filtros.chaveInnovaro.val("");
+        filtros.codigoItem.val("");
         updateExportButtonState();
         table.ajax.reload();
     });
