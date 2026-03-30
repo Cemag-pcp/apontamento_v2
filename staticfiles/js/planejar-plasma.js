@@ -113,6 +113,7 @@ document.getElementById('confirmButton').addEventListener('click', async (event)
     const descricaoInput = document.getElementById('descricaoOpPlasma');
     const tipoChapaInput = document.getElementById('tipoChapa');
     const retalhoCheckbox = document.getElementById('retalhoPlasma');
+    const maquinaPlanejadaSelect = document.getElementById('maquinaPlanejadaPlasma');
     const dataProgramacao = document.getElementById('dataProgramacao').value;
 
     const formData = new FormData();
@@ -121,6 +122,7 @@ document.getElementById('confirmButton').addEventListener('click', async (event)
     formData.append('descricao', descricaoInput.value)
     formData.append('tipo_chapa', tipoChapaInput.value)
     formData.append('maquina', 'plasma')
+    formData.append('maquinaPlanejada', maquinaPlanejadaSelect.value)
     formData.append('retalho', retalhoCheckbox.checked)
     formData.append('dataProgramacao', dataProgramacao)
 
