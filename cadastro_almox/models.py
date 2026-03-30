@@ -66,6 +66,7 @@ class RegraSlaAlmox(models.Model):
 
     prioridade = models.CharField(max_length=50, unique=True)
     minutos_limite = models.PositiveIntegerField()
+    cor = models.CharField(max_length=7, default='#6c757d')
     ativo = models.BooleanField(default=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)

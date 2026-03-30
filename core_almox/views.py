@@ -26,6 +26,21 @@ from zoneinfo import ZoneInfo
 env=environ.Env()
 
 
+def _cor_texto_contraste(cor_hex):
+    if not cor_hex or len(cor_hex) != 7 or not cor_hex.startswith("#"):
+        return "#ffffff"
+
+    try:
+        r = int(cor_hex[1:3], 16)
+        g = int(cor_hex[3:5], 16)
+        b = int(cor_hex[5:7], 16)
+    except ValueError:
+        return "#ffffff"
+
+    luminancia = (0.299 * r) + (0.587 * g) + (0.114 * b)
+    return "#000000" if luminancia > 186 else "#ffffff"
+
+
 def _gerar_payload_solicitacao(solicitacao, tipo_solicitacao):
     payload = {
         'id': solicitacao.id,
@@ -188,6 +203,8 @@ def lista_solicitacoes(request):
             "item": f"{req.item.codigo} - {req.item.nome}",  # Supondo que 'nome' é o campo que contém o nome do item
             "quantidade": req.quantidade,
             "prioridade": req.status.prioridade if req.status else "",
+            "prioridade_cor": req.status.cor if req.status else "#6c757d",
+            "prioridade_cor_texto": _cor_texto_contraste(req.status.cor) if req.status else "#ffffff",
             "classe_requisicao": req.classe_requisicao.nome,
             "saldo": req.saldo,
             "data_solicitacao": req.data_solicitacao.isoformat(),
@@ -225,6 +242,8 @@ def lista_solicitacoes(request):
             "item": f"{trans.item.codigo} - {trans.item.nome}",  # Supondo que 'nome' é o campo que contém o nome do item
             "quantidade": trans.quantidade,
             "prioridade": trans.status.prioridade if trans.status else "",
+            "prioridade_cor": trans.status.cor if trans.status else "#6c757d",
+            "prioridade_cor_texto": _cor_texto_contraste(trans.status.cor) if trans.status else "#ffffff",
             "saldo": trans.saldo,
             "data_solicitacao": trans.data_solicitacao.isoformat(),
             "acoes": 'acoes'

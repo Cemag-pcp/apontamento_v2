@@ -6,7 +6,7 @@ from .models import RegraSlaAlmox
 class RegraSlaAlmoxForm(forms.ModelForm):
     class Meta:
         model = RegraSlaAlmox
-        fields = ['prioridade', 'minutos_limite', 'ativo']
+        fields = ['prioridade', 'minutos_limite', 'cor', 'ativo']
         widgets = {
             'prioridade': forms.TextInput(
                 attrs={
@@ -21,6 +21,12 @@ class RegraSlaAlmoxForm(forms.ModelForm):
                     'placeholder': 'Ex.: 40',
                 }
             ),
+            'cor': forms.TextInput(
+                attrs={
+                    'class': 'form-control form-control-color',
+                    'type': 'color',
+                }
+            ),
             'ativo': forms.CheckboxInput(
                 attrs={
                     'class': 'form-check-input',
@@ -31,6 +37,7 @@ class RegraSlaAlmoxForm(forms.ModelForm):
         labels = {
             'prioridade': 'Prioridade',
             'minutos_limite': 'Tempo limite (minutos)',
+            'cor': 'Cor da flag',
             'ativo': 'Regra ativa',
         }
 
@@ -39,3 +46,15 @@ class RegraSlaAlmoxForm(forms.ModelForm):
         if not prioridade:
             raise forms.ValidationError('Informe a prioridade da regra.')
         return prioridade
+
+    def clean_cor(self):
+        cor = (self.cleaned_data['cor'] or '').strip()
+        if len(cor) != 7 or not cor.startswith('#'):
+            raise forms.ValidationError('Informe uma cor hexadecimal valida.')
+
+        try:
+            int(cor[1:], 16)
+        except ValueError:
+            raise forms.ValidationError('Informe uma cor hexadecimal valida.')
+
+        return cor.lower()

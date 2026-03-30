@@ -46,6 +46,17 @@
                             {% endfor %}
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.cor.id_for_label }}">{{ form.cor.label }}</label>
+                            <div class="d-flex align-items-center gap-3">
+                                {{ form.cor }}
+                                <span class="text-muted small">Selecione a cor usada na flag da prioridade.</span>
+                            </div>
+                            {% for error in form.cor.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
                         <div class="form-check form-switch mb-4">
                             {{ form.ativo }}
                             <label class="form-check-label" for="{{ form.ativo.id_for_label }}">{{ form.ativo.label }}</label>
@@ -86,6 +97,7 @@
                             <thead>
                                 <tr>
                                     <th>Prioridade</th>
+                                    <th>Cor</th>
                                     <th>Tempo limite</th>
                                     <th>Status</th>
                                     <th class="text-end">Acoes</th>
@@ -95,6 +107,12 @@
                                 {% for regra in regras_sla %}
                                     <tr>
                                         <td class="fw-semibold">{{ regra.prioridade }}</td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge" style="background-color: {{ regra.cor }}; color: #fff;">{{ regra.prioridade }}</span>
+                                                <span class="text-muted small">{{ regra.cor }}</span>
+                                            </div>
+                                        </td>
                                         <td>{{ regra.minutos_limite }} minuto{{ regra.minutos_limite|pluralize }}</td>
                                         <td>
                                             {% if regra.ativo %}
@@ -117,7 +135,7 @@
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="4" class="text-center text-muted py-4">
+                                        <td colspan="5" class="text-center text-muted py-4">
                                             Nenhuma regra de SLA cadastrada.
                                         </td>
                                     </tr>
