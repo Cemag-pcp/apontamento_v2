@@ -147,12 +147,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.length === 0) {
                 tabelaPU.innerHTML = `
                     <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
+                        <td colspan="4" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
                     </tr>
                 `;
                 tabelaPO.innerHTML = `
                     <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
+                        <td colspan="4" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
                     </tr>
                 `;
                 return;
@@ -185,14 +185,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!temPU) {
                 tabelaPU.innerHTML = `
                     <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhum dado do tipo PU encontrado.</td>
+                        <td colspan="4" class="text-center text-muted">Nenhum dado do tipo PU encontrado.</td>
                     </tr>
                 `;
             }
             if (!temPO) {
                 tabelaPO.innerHTML = `
                     <tr>
-                        <td colspan="3" class="text-center text-muted">Nenhum dado do tipo PÓ encontrado.</td>
+                        <td colspan="4" class="text-center text-muted">Nenhum dado do tipo PÓ encontrado.</td>
                     </tr>
                 `;
             }
@@ -311,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.length === 0) {
                 tabela.innerHTML = `
                     <tr>
-                        <td colspan="5" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
+                        <td colspan="6" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
                     </tr>
                 `;
                 return;
@@ -323,7 +323,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${formatDateBr(item.Data)}</td>
                         <td>${item["N° de peças produzidas"]}</td>
                         <td>${item["N° de inspeções"]}</td>
-                        <td>${item["N° de não conformidades"]}</td>
+                        <td>${item["N° de peças não conforme"]}</td>
+                        <td>${item["Lotes não conforme"]}</td>
                         <td>${item["% de inspeção"]}</td>
                     </tr>
                 `;

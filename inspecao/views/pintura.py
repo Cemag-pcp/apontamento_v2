@@ -1137,7 +1137,8 @@ def indicador_pintura_resumo_analise_temporal(request):
                 "Data": f"{int(ano)}-{int(mes_num):02}",
                 "N° de peças produzidas": int(total_prod or 0),
                 "N° de inspeções": int(total_insp or 0),
-                "N° de não conformidades": int(total_ordens_nc or 0),
+                "N° de peças não conforme": int(total_nc or 0),
+                "Lotes não conforme": int(total_ordens_nc or 0),
                 "% de inspeção": f"{perc_insp:.2f} %",
             }
         )
@@ -1162,22 +1163,22 @@ def causas_nao_conformidade_mensal(request):
 
     sql = """
         SELECT
-        TO_CHAR(app.data, 'YYYY-MM') AS mes,
-        c.nome AS causa,
-        SUM(cnc.quantidade) AS total_nao_conformidades,
-        app.peca as peca,
-        app.ordem_id as ordem_id
-    FROM apontamento_v2.inspecao_causasnaoconformidade cnc
-    JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
-    JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
-    JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c ON cnc.id = cnc_c.causasnaoconformidade_id
-    JOIN apontamento_v2.inspecao_causas c ON c.id = cnc_c.causas_id
-    JOIN apontamento_v2.apontamento_pintura_pecasordem app ON app.id = i.pecas_ordem_pintura_id
-    WHERE i.pecas_ordem_pintura_id IS NOT NULL
-    AND app.data >= %(data_inicio)s
-    AND app.data < %(data_fim)s
-    GROUP BY mes, c.nome, app.peca, app.ordem_id
-    ORDER BY mes ASC, c.nome ASC;
+            TO_CHAR(app.data, 'YYYY-MM') AS mes,
+            STRING_AGG(DISTINCT c.nome, ', ' ORDER BY c.nome) AS causa,
+            MAX(cnc.quantidade) AS total_nao_conformidades,
+            app.peca AS peca,
+            app.ordem_id AS ordem_id
+        FROM apontamento_v2.inspecao_causasnaoconformidade cnc
+        JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
+        JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
+        JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c ON cnc.id = cnc_c.causasnaoconformidade_id
+        JOIN apontamento_v2.inspecao_causas c ON c.id = cnc_c.causas_id
+        JOIN apontamento_v2.apontamento_pintura_pecasordem app ON app.id = i.pecas_ordem_pintura_id
+        WHERE i.pecas_ordem_pintura_id IS NOT NULL
+          AND app.data >= %(data_inicio)s
+          AND app.data < %(data_fim)s
+        GROUP BY mes, app.peca, app.ordem_id, cnc.id
+        ORDER BY mes ASC, app.ordem_id ASC, app.peca ASC;
     """
 
     with connection.cursor() as cursor:
@@ -1280,10 +1281,10 @@ def causas_nao_conformidade_por_tipo(request):
     sql = """
     SELECT
         TO_CHAR(pop.data, 'YYYY-MM') AS data_inspecao,
-        c.nome AS Causa,
+        STRING_AGG(DISTINCT c.nome, ', ' ORDER BY c.nome) AS Causa,
         UPPER(pop.tipo) AS Tipo,
         pop.peca AS Peça,
-        SUM(cnc.quantidade) AS Quantidade
+        MAX(cnc.quantidade) AS Quantidade
     FROM apontamento_v2.inspecao_causasnaoconformidade cnc
     JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
     JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
@@ -1293,8 +1294,8 @@ def causas_nao_conformidade_por_tipo(request):
     WHERE i.pecas_ordem_pintura_id IS NOT NULL
       AND pop.data >= %(data_inicio)s
       AND pop.data < %(data_fim)s
-    GROUP BY TO_CHAR(pop.data, 'YYYY-MM'), c.nome, UPPER(pop.tipo), pop.peca
-    ORDER BY data_inspecao, Causa, Tipo, Peça;
+    GROUP BY TO_CHAR(pop.data, 'YYYY-MM'), UPPER(pop.tipo), pop.peca, cnc.id
+    ORDER BY data_inspecao, Tipo, Peça, Causa;
     """
 
     with connection.cursor() as cursor:

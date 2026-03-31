@@ -23,6 +23,7 @@ from django.db.models.functions import (
     ExtractMonth,
     TruncDay
 )
+from django.contrib.postgres.aggregates import StringAgg
 
 from ..models import (
     Inspecao,
@@ -1270,14 +1271,17 @@ def causas_nao_conformidade_mensal_estamparia(request):
             ),
         )
         .values(
+            "id",
             "mes_formatado",
-            "causas__nome",
             "destino",
             "peca_info",
             "informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__ordem_id",
         )
-        .annotate(total_nao_conformidades=Sum("qt_nao_conformidade"))
-        .order_by("mes_formatado", "causas__nome")
+        .annotate(
+            causas=StringAgg("causas__nome", delimiter=", ", distinct=True),
+            total_nao_conformidades=Max("qt_nao_conformidade"),
+        )
+        .order_by("mes_formatado", "informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__ordem_id", "peca_info")
     )
 
     # Formatação final
@@ -1285,7 +1289,7 @@ def causas_nao_conformidade_mensal_estamparia(request):
         {
             "Data": item["mes_formatado"],
             "ID Ordem": item["informacoes_adicionais_estamparia__dados_exec_inspecao__inspecao__pecas_ordem_estamparia__ordem_id"],
-            "Causa": item["causas__nome"],
+            "Causa": item["causas"],
             "Destino": item["destino"],
             "Peça": item["peca_info"],
             "Soma do N° Total de não conformidades": item["total_nao_conformidades"],
