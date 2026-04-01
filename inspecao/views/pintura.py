@@ -996,7 +996,8 @@ def indicador_pintura_analise_temporal(request):
             SUM(qtd_boa) AS total_produzido
         FROM apontamento_v2.apontamento_pintura_pecasordem
         WHERE qtd_boa IS NOT NULL
-            AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+            AND data >= %(data_inicio)s
+            AND data < %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
     ),
     inspecoes_total AS (
@@ -1008,7 +1009,8 @@ def indicador_pintura_analise_temporal(request):
         FROM apontamento_v2.apontamento_pintura_pecasordem app
         INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_pintura_id = app.id
         INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
-        WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        WHERE app.data >= %(data_inicio)s
+          AND app.data < %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
     )
     SELECT 
@@ -1059,7 +1061,7 @@ def indicador_pintura_resumo_analise_temporal(request):
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
         if data_fim:
-            data_fim = datetime.strptime(data_fim, "%Y-%m-%d")
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
     except ValueError:
         return JsonResponse(
             {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
@@ -1073,7 +1075,8 @@ def indicador_pintura_resumo_analise_temporal(request):
         SUM(qtd_boa) AS total_produzido
     FROM apontamento_v2.apontamento_pintura_pecasordem
     WHERE qtd_boa IS NOT NULL
-        AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+        AND data >= %(data_inicio)s
+        AND data < %(data_fim)s
     GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
     ),
     inspecoes_total AS (
@@ -1085,7 +1088,8 @@ def indicador_pintura_resumo_analise_temporal(request):
         FROM apontamento_v2.apontamento_pintura_pecasordem app
         INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_pintura_id = app.id
         INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
-        WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        WHERE app.data >= %(data_inicio)s
+          AND app.data < %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
     ),
     nc_ordens AS (
@@ -1100,7 +1104,7 @@ def indicador_pintura_resumo_analise_temporal(request):
         JOIN apontamento_v2.apontamento_pintura_pecasordem app ON app.id = i.pecas_ordem_pintura_id
         WHERE i.pecas_ordem_pintura_id IS NOT NULL
             AND app.data >= %(data_inicio)s
-            AND app.data < %(data_fim)s + INTERVAL '1 day'
+            AND app.data < %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
     )
     SELECT 
@@ -1162,23 +1166,33 @@ def causas_nao_conformidade_mensal(request):
         )
 
     sql = """
+        WITH causas_por_registro AS (
+            SELECT
+                app.data::date AS data_inspecao,
+                app.peca AS peca,
+                app.ordem_id AS ordem_id,
+                cnc.quantidade AS quantidade,
+                STRING_AGG(DISTINCT c.nome, ', ' ORDER BY c.nome) AS causa
+            FROM apontamento_v2.inspecao_causasnaoconformidade cnc
+            JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
+            JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
+            JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c ON cnc.id = cnc_c.causasnaoconformidade_id
+            JOIN apontamento_v2.inspecao_causas c ON c.id = cnc_c.causas_id
+            JOIN apontamento_v2.apontamento_pintura_pecasordem app ON app.id = i.pecas_ordem_pintura_id
+            WHERE i.pecas_ordem_pintura_id IS NOT NULL
+              AND app.data >= %(data_inicio)s
+              AND app.data < %(data_fim)s
+            GROUP BY app.data::date, app.peca, app.ordem_id, cnc.id, cnc.quantidade
+        )
         SELECT
-            TO_CHAR(app.data, 'YYYY-MM') AS mes,
-            STRING_AGG(DISTINCT c.nome, ', ' ORDER BY c.nome) AS causa,
-            MAX(cnc.quantidade) AS total_nao_conformidades,
-            app.peca AS peca,
-            app.ordem_id AS ordem_id
-        FROM apontamento_v2.inspecao_causasnaoconformidade cnc
-        JOIN apontamento_v2.inspecao_dadosexecucaoinspecao de ON cnc.dados_execucao_id = de.id
-        JOIN apontamento_v2.inspecao_inspecao i ON de.inspecao_id = i.id
-        JOIN apontamento_v2.inspecao_causasnaoconformidade_causa cnc_c ON cnc.id = cnc_c.causasnaoconformidade_id
-        JOIN apontamento_v2.inspecao_causas c ON c.id = cnc_c.causas_id
-        JOIN apontamento_v2.apontamento_pintura_pecasordem app ON app.id = i.pecas_ordem_pintura_id
-        WHERE i.pecas_ordem_pintura_id IS NOT NULL
-          AND app.data >= %(data_inicio)s
-          AND app.data < %(data_fim)s
-        GROUP BY mes, app.peca, app.ordem_id, cnc.id
-        ORDER BY mes ASC, app.ordem_id ASC, app.peca ASC;
+            TO_CHAR(data_inspecao, 'YYYY-MM-DD') AS data_execucao,
+            causa,
+            SUM(quantidade) AS total_nao_conformidades,
+            peca,
+            ordem_id
+        FROM causas_por_registro
+        GROUP BY data_inspecao, peca, ordem_id, causa
+        ORDER BY data_inspecao ASC, ordem_id ASC, peca ASC, causa ASC;
     """
 
     with connection.cursor() as cursor:
