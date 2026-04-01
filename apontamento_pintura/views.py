@@ -1561,47 +1561,60 @@ def api_ordens_finalizadas(request):
         'cinza escuro': 'CE',
     }
 
-    dados = PecasOrdem.objects.select_related(
-        'ordem',
-        'operador_fim',
-    ).filter(
-        qtd_boa__gt=0,
-        operador_fim__isnull=False
-    ).annotate(
-        ordem_numero=F('ordem__ordem'),
-        codigo=F('peca'),
-        descricao=F('peca'),
-        cor=F('ordem__cor'),
-        data_carga=F('ordem__data_carga'),
-        data_apontamento=F('data'),
-        operador_nome=Concat(
-            F('operador_fim__matricula'),
-            Value(' - '),
-            F('operador_fim__nome'),
-            output_field=CharField()
-        ),
-    ).order_by('data_apontamento')
+    dados = (
+        PecasOrdem.objects
+        .filter(
+            qtd_boa__gt=0,
+            operador_fim__isnull=False
+        )
+        .annotate(
+            ordem_numero=F('ordem__ordem'),
+            cor=F('ordem__cor'),
+            data_carga=F('ordem__data_carga'),
+            data_apontamento=F('data'),
+            operador_nome=Concat(
+                F('operador_fim__matricula'),
+                Value(' - '),
+                F('operador_fim__nome'),
+                output_field=CharField()
+            ),
+        )
+        .values(
+            'ordem_numero',
+            'peca',
+            'qtd_planejada',
+            'cor',
+            'qtd_boa',
+            'tipo',
+            'data_carga',
+            'data_apontamento',
+            'operador_nome',
+        )
+        .order_by('data_apontamento')
+        .iterator(chunk_size=1000)
+    )
 
     resultado = []
     for d in dados:
-        parte_direita = (d.peca or "").partition(" - ")[2]  # '' se não houver ' - '
+        peca = d['peca'] or ''
+        parte_direita = peca.partition(" - ")[2]
 
         resultado.append({
-            'ordem': d.ordem.ordem,
-            'codigo': d.peca.split(" - ")[0],
+            'ordem': d['ordem_numero'],
+            'codigo': peca.split(" - ")[0] if peca else '',
             'descricao': parte_direita,
-            'qtd_planejada': d.qtd_planejada,
-            'cor': mapa_cor.get(d.ordem.cor, d.ordem.cor),
-            'qtd_boa': d.qtd_boa,
+            'qtd_planejada': d['qtd_planejada'],
+            'cor': mapa_cor.get(d['cor'], d['cor']),
+            'qtd_boa': d['qtd_boa'],
             'col5': '',
-            'tipo': d.tipo,
-            'data_carga': d.ordem.data_carga,
-            'data_apontamento': (d.data - timedelta(hours=3)).date(),
+            'tipo': d['tipo'],
+            'data_carga': d['data_carga'],
+            'data_apontamento': (d['data_apontamento'] - timedelta(hours=3)).date() if d['data_apontamento'] else None,
             'col1': '',
             'col2': '',
             'col3': '',
             'col4': '',
-            'operador': f"{d.operador_fim.matricula} - {d.operador_fim.nome}" if d.operador_fim else '',
+            'operador': d['operador_nome'] or '',
         })
 
     return JsonResponse(resultado, safe=False)
@@ -1653,8 +1666,6 @@ def api_tempos(request):
             LEFT JOIN apontamento_v2.cadastro_operador co_inicio ON co_inicio.id = cp.operador_inicio_id
             ORDER BY o.ordem, cp.data_pendura;
         """)
-        columns = [col[0] for col in cursor.description]
-        results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     # Trata os dados para saída final
     def format_data(dt):
@@ -1663,8 +1674,23 @@ def api_tempos(request):
         return ""
 
     final_results = []
-    for row in results_raw:
-        conjunto = row.get('conjunto', '')
+    for row in cursor:
+        (
+            ordem,
+            conjunto,
+            qt_planejada,
+            cor,
+            quantidade_pendurada,
+            cambao,
+            tipo,
+            data_carga,
+            data_fim,
+            operador_inicio,
+            operador_fim,
+            data_pendura,
+        ) = row
+
+        conjunto = conjunto or ''
         partes = conjunto.split(' - ', maxsplit=1)
 
         if len(partes) == 2:
@@ -1677,24 +1703,24 @@ def api_tempos(request):
             descricao = ""
 
         final_results.append({
-            'ordem': row.get('ordem'),
+            'ordem': ordem,
             'codigo': codigo,
             'descricao': descricao,
-            'qt_planejada': row.get('qt_planejada'),
-            'cor': row.get('cor'),
-            'quantidade_pendurada': row.get('quantidade_pendurada'),
-            'cambao': row.get('cambao'),
-            'tipo': row.get('tipo'),
-            'data_carga': format_data(row.get('data_carga')),
-            'data_fim': format_data(row.get('data_fim')),
+            'qt_planejada': qt_planejada,
+            'cor': cor,
+            'quantidade_pendurada': quantidade_pendurada,
+            'cambao': cambao,
+            'tipo': tipo,
+            'data_carga': format_data(data_carga),
+            'data_fim': format_data(data_fim),
             'col1': '',
             'col2': '',
             'col3': '',
             'col4': '',
-            'operador_inicio': row.get('operador_inicio') or '',
-            'operador_fim': row.get('operador_fim') or '',
+            'operador_inicio': operador_inicio or '',
+            'operador_fim': operador_fim or '',
             'col5': '',
-            'data_pendura': format_data(row.get('data_pendura')),
+            'data_pendura': format_data(data_pendura),
         })
 
     return JsonResponse(final_results, safe=False)

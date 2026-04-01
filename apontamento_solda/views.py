@@ -1036,8 +1036,6 @@ def api_ordens_finalizadas(request):
                 AND po.qtd_boa > 0
             ORDER BY co.data_fim;
         """)
-        columns = [col[0] for col in cursor.description]
-        results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     def format_data(dt):
         if isinstance(dt, (datetime, date)):
@@ -1051,8 +1049,9 @@ def api_ordens_finalizadas(request):
         return ""
 
     final_results = []
-    for row in results_raw:
-        conjunto = row.get('conjunto', '')
+    for row in cursor:
+        ordem, maquina, conjunto, total_produzido, data_carga, data_finalizacao, operador, obs = row
+        conjunto = conjunto or ''
         partes = conjunto.split(' - ', maxsplit=1)
 
         if len(partes) == 2:
@@ -1065,15 +1064,15 @@ def api_ordens_finalizadas(request):
             descricao = ""
 
         final_results.append({
-            'ordem': row.get('ordem'),
-            'maquina': row.get('maquina'),
+            'ordem': ordem,
+            'maquina': maquina,
             'codigo': codigo,
             'descricao': descricao,
-            'total_produzido': row.get('total_produzido'),
-            'data_carga': format_data(row.get('data_carga')),
-            'data_finalizacao': format_data_hora(row.get('data_finalizacao')),
-            'operador': row.get('operador'),
-            'obs': row.get('obs'),
+            'total_produzido': total_produzido,
+            'data_carga': format_data(data_carga),
+            'data_finalizacao': format_data_hora(data_finalizacao),
+            'operador': operador,
+            'obs': obs,
         })
 
     return JsonResponse(final_results, safe=False)

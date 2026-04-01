@@ -832,7 +832,6 @@ def buscar_pacotes_carga(request, id):
 
 def listar_pacotes_criados(request, id):
     # garante que a carga existe (opcional)
-    print(id)
     carga = get_object_or_404(Carga, id=id)
 
     pacotes = list(
@@ -1087,8 +1086,6 @@ def mostrar_pendencias(request, carregamento_id):
         }
         for p in qs
     ]
-
-    print(itens)
 
     return JsonResponse({
         "total_itens": len(itens),
