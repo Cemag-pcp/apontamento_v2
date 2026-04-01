@@ -1427,8 +1427,6 @@ def propriedades_ordem_api(request):
                 'nova_mp_id': prop.nova_mp_id,
             })
 
-        print(propriedades)
-
         return JsonResponse({
             'results': propriedades,
             'page': page_obj.number,
