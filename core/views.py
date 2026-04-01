@@ -621,8 +621,6 @@ class CustomLoginView(LoginView):
             login(self.request, user)
 
         end_time = time.time()
-        print(f"Tempo de login: {end_time - start_time:.2f} segundos")  # Log de tempo de login
-
         return super().form_valid(form)
 
     def form_invalid(self, form):

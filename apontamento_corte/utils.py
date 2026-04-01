@@ -354,7 +354,6 @@ def tratamento_planilha_laser3(tree):
     if tempo_estimato_total_elem is not None and tempo_estimato_total_elem.text:
         tempo_estimado_total_horas = float(tempo_estimato_total_elem.text)
         tempo_estimado_total_horas = converter_minutos_para_horas(tempo_estimado_total_horas)
-        print("Tempo estimado total:", tempo_estimado_total_horas)
     else:
         print("Elemento <TotalRuntime> não encontrado ou vazio.")
 

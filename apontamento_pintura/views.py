@@ -1643,8 +1643,8 @@ def api_tempos(request):
     data_pendura
     """
 
-    with connection.cursor() as cursor:
-        cursor.execute("""
+    cursor = connection.cursor()
+    cursor.execute("""
             SELECT
                 o.id AS ordem,                              
                 po.peca AS conjunto,                   
@@ -1723,6 +1723,7 @@ def api_tempos(request):
             'data_pendura': format_data(data_pendura),
         })
 
+    cursor.close()
     return JsonResponse(final_results, safe=False)
 
 def verificar_cor_cambao(cor_antes_de_finalizar, cambao_nome):
