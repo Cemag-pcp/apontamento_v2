@@ -1015,6 +1015,18 @@ def criar_ordem_fora_sequenciamento(request):
         return JsonResponse({'message': 'Ordem criada com sucesso!'})
 
 def api_ordens_finalizadas(request):
+    def format_data(dt):
+        if isinstance(dt, (datetime, date)):
+            return dt.strftime("%d/%m/%Y")
+        return ""
+
+    def format_data_hora(dt):
+        if isinstance(dt, (datetime, date)):
+            data_final = dt - timedelta(hours=3) 
+            return data_final.strftime("%d/%m/%Y %H:%M")
+        return ""
+
+    final_results = []
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT 
@@ -1037,43 +1049,31 @@ def api_ordens_finalizadas(request):
             ORDER BY co.data_fim;
         """)
 
-    def format_data(dt):
-        if isinstance(dt, (datetime, date)):
-            return dt.strftime("%d/%m/%Y")
-        return ""
+        for row in cursor:
+            ordem, maquina, conjunto, total_produzido, data_carga, data_finalizacao, operador, obs = row
+            conjunto = conjunto or ''
+            partes = conjunto.split(' - ', maxsplit=1)
 
-    def format_data_hora(dt):
-        if isinstance(dt, (datetime, date)):
-            data_final = dt - timedelta(hours=3) 
-            return data_final.strftime("%d/%m/%Y %H:%M")
-        return ""
+            if len(partes) == 2:
+                codigo = partes[0].strip()
+                descricao = partes[1].strip()
+                if descricao.startswith(codigo):
+                    descricao = descricao[len(codigo):].strip(" -")
+            else:
+                codigo = conjunto.strip()
+                descricao = ""
 
-    final_results = []
-    for row in cursor:
-        ordem, maquina, conjunto, total_produzido, data_carga, data_finalizacao, operador, obs = row
-        conjunto = conjunto or ''
-        partes = conjunto.split(' - ', maxsplit=1)
-
-        if len(partes) == 2:
-            codigo = partes[0].strip()
-            descricao = partes[1].strip()
-            if descricao.startswith(codigo):
-                descricao = descricao[len(codigo):].strip(" -")
-        else:
-            codigo = conjunto.strip()
-            descricao = ""
-
-        final_results.append({
-            'ordem': ordem,
-            'maquina': maquina,
-            'codigo': codigo,
-            'descricao': descricao,
-            'total_produzido': total_produzido,
-            'data_carga': format_data(data_carga),
-            'data_finalizacao': format_data_hora(data_finalizacao),
-            'operador': operador,
-            'obs': obs,
-        })
+            final_results.append({
+                'ordem': ordem,
+                'maquina': maquina,
+                'codigo': codigo,
+                'descricao': descricao,
+                'total_produzido': total_produzido,
+                'data_carga': format_data(data_carga),
+                'data_finalizacao': format_data_hora(data_finalizacao),
+                'operador': operador,
+                'obs': obs,
+            })
 
     return JsonResponse(final_results, safe=False)
 
