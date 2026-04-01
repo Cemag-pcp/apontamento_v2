@@ -139,28 +139,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const tabelaPU = document.querySelector('#table-pu tbody');
             const tabelaPO = document.querySelector('#table-po tbody');
+            const rankingPU = document.querySelector('#table-ranking-pu tbody');
+            const rankingPO = document.querySelector('#table-ranking-po tbody');
 
             tabelaPU.innerHTML = '';
             tabelaPO.innerHTML = '';
+            rankingPU.innerHTML = '';
+            rankingPO.innerHTML = '';
 
             // Se não houver nenhum dado, exibe mensagem nas duas tabelas
             if (data.length === 0) {
-                tabelaPU.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
-                    </tr>
-                `;
-                tabelaPO.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
-                    </tr>
-                `;
+                const semDados4 = `<tr><td colspan="4" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                const semDados2 = `<tr><td colspan="2" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                tabelaPU.innerHTML = semDados4;
+                tabelaPO.innerHTML = semDados4;
+                rankingPU.innerHTML = semDados2;
+                rankingPO.innerHTML = semDados2;
                 return;
             }
 
             // Se houver dados, separa por tipo
             let temPU = false;
             let temPO = false;
+            const totaisPU = {};
+            const totaisPO = {};
 
             data.forEach(item => {
                 const rowHTML = `
@@ -175,26 +177,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (item.Tipo === 'PU') {
                     tabelaPU.insertAdjacentHTML('beforeend', rowHTML);
                     temPU = true;
+                    totaisPU[item.Causa] = (totaisPU[item.Causa] || 0) + item.Quantidade;
                 } else if (item.Tipo === 'PÓ') {
                     tabelaPO.insertAdjacentHTML('beforeend', rowHTML);
                     temPO = true;
+                    totaisPO[item.Causa] = (totaisPO[item.Causa] || 0) + item.Quantidade;
                 }
             });
 
             // Se um dos tipos não veio na resposta, exibe aviso individual
             if (!temPU) {
-                tabelaPU.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="text-center text-muted">Nenhum dado do tipo PU encontrado.</td>
-                    </tr>
-                `;
+                tabelaPU.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum dado do tipo PU encontrado.</td></tr>`;
+                rankingPU.innerHTML = `<tr><td colspan="2" class="text-center text-muted">Nenhum dado do tipo PU encontrado.</td></tr>`;
+            } else {
+                Object.entries(totaisPU)
+                    .sort((a, b) => b[1] - a[1])
+                    .forEach(([causa, quantidade]) => {
+                        rankingPU.insertAdjacentHTML('beforeend', `<tr><td>${causa}</td><td>${quantidade}</td></tr>`);
+                    });
             }
+
             if (!temPO) {
-                tabelaPO.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="text-center text-muted">Nenhum dado do tipo PÓ encontrado.</td>
-                    </tr>
-                `;
+                tabelaPO.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum dado do tipo PÓ encontrado.</td></tr>`;
+                rankingPO.innerHTML = `<tr><td colspan="2" class="text-center text-muted">Nenhum dado do tipo PÓ encontrado.</td></tr>`;
+            } else {
+                Object.entries(totaisPO)
+                    .sort((a, b) => b[1] - a[1])
+                    .forEach(([causa, quantidade]) => {
+                        rankingPO.insertAdjacentHTML('beforeend', `<tr><td>${causa}</td><td>${quantidade}</td></tr>`);
+                    });
             }
 
         } catch (error) {
@@ -217,12 +228,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             const tabela = document.querySelector('#table-causas tbody');
+            const tabelaRankingVazia = document.querySelector('#table-ranking-causas tbody');
             tabela.innerHTML = '';
+            tabelaRankingVazia.innerHTML = '';
 
             if (data.length === 0) {
                 tabela.innerHTML = `
                     <tr>
                         <td colspan="5" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
+                    </tr>
+                `;
+                tabelaRankingVazia.innerHTML = `
+                    <tr>
+                        <td colspan="2" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
                     </tr>
                 `;
                 return;
@@ -240,6 +258,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 tabela.insertAdjacentHTML('beforeend', row);
             });
+
+            // Preenche o ranking agrupado por causa
+            const tabelaRanking = tabelaRankingVazia;
+
+            const totais = {};
+            data.forEach(item => {
+                totais[item.nome_causa] = (totais[item.nome_causa] || 0) + item.quantidade;
+            });
+
+            Object.entries(totais)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([causa, quantidade]) => {
+                    tabelaRanking.insertAdjacentHTML('beforeend', `
+                        <tr>
+                            <td>${causa}</td>
+                            <td>${quantidade}</td>
+                        </tr>
+                    `);
+                });
 
         } catch (error) {
             console.error('Erro ao carregar tabela de causas:', error);
