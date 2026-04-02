@@ -738,12 +738,13 @@ def get_pecas(request):
     page = int(request.GET.get('page', 1))  # Página atual (padrão é 1)
     per_page = int(request.GET.get('per_page', 10))  # Itens por página (padrão é 10)
 
-    # Filtra as peças com base no termo de busca (opcional)
-    pecas_query = Pecas.objects.all()
+    pecas_query = Pecas.objects.filter(setor__nome='usinagem')
     if search:
         pecas_query = pecas_query.filter(
             Q(codigo__icontains=search) | Q(descricao__icontains=search)
-        ).order_by('codigo')
+        )
+
+    pecas_query = pecas_query.distinct().order_by('codigo')
 
     # Paginação
     paginator = Paginator(pecas_query, per_page)

@@ -24,7 +24,7 @@
 
 <!-- Header Banner -->
 <div class="pintura-header-banner mb-4">
-    Índice de Não Conformidade — Montagem
+    Índice de Não Conformidade — Montagem / Tanque / Tubos e Cilindros
 </div>
 
 <!-- Filtro de Datas -->
@@ -54,18 +54,16 @@
     </div>
 </div>
 
-<!-- Gráfico + KPIs -->
+<!-- Gráfico Combinado + KPIs -->
 <div class="row mb-4">
-    <!-- Gráfico -->
     <div class="col-md-8">
         <div class="card h-100">
             <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <div class="d-flex align-items-center mb-3">
                     <h6 class="fw-bold text-uppercase mb-0" style="color:#0d1b35;letter-spacing:1px;">
-                        MONTAGEM — Análise Temporal
+                        MONTAGEM / TANQUE / TUBOS — Análise Temporal Combinada
                     </h6>
                 </div>
-                <!-- Filtro exclusivo da análise temporal -->
                 <div class="row g-2 align-items-end mb-3">
                     <div class="col-auto">
                         <label for="startDateTemporal" class="form-label form-label-sm mb-1">De</label>
@@ -86,9 +84,7 @@
             </div>
         </div>
     </div>
-    <!-- KPI Cards -->
     <div class="col-md-4 d-flex flex-column gap-2 justify-content-between">
-        <!-- Índice Global -->
         <div class="indice-global-wrap">
             <div class="indice-global-badge">
                 <div class="ig-title">Índice<br>Global</div>
@@ -96,16 +92,12 @@
             </div>
         </div>
         <div class="kpi-arrow-card">
-            <div class="kpi-lbl">Total de Peças Produzidas</div>
-            <div class="kpi-val" id="kpi-pecas-produzidas">--</div>
-        </div>
-        <div class="kpi-arrow-card">
-            <div class="kpi-lbl">Total de Peças Inspecionadas</div>
+            <div class="kpi-lbl">Total de Inspeções</div>
             <div class="kpi-val" id="kpi-pecas-inspecionadas">--</div>
         </div>
         <div class="kpi-arrow-card">
-            <div class="kpi-lbl">% de Inspeção</div>
-            <div class="kpi-val" id="kpi-pct-inspecao">--</div>
+            <div class="kpi-lbl">% de Não Conformidade</div>
+            <div class="kpi-val" id="kpi-pct-nc">--</div>
         </div>
         <div class="kpi-arrow-card kpi-teal">
             <div class="kpi-lbl">N° de Não Conformidades</div>
@@ -114,23 +106,27 @@
     </div>
 </div>
 
-<!-- Tabelas: Produção + Causas -->
+<!-- Tabelas de Inspeção por Setor -->
 <div class="row mb-4">
-    <div class="col-md-6">
+    <!-- Montagem -->
+    <div class="col-md-4">
         <div class="card h-100">
             <div class="card-header ch-blue">
-                Dados de Produção e Inspeção
+                Dados de Inspeção
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table" id="table-producao">
+                <div class="px-3 pt-3 pb-1">
+                    <span class="tipo-badge">Montagem</span>
+                </div>
+                <div class="table-container">
+                    <table class="table table-fixed-header" id="table-montagem">
                         <thead>
                             <tr>
-                                <th>Data Referência</th>
-                                <th>Produzidas</th>
-                                <th>Inspeções</th>
-                                <th>Não Conformes</th>
-                                <th>% Inspeção</th>
+                                <th>Data</th>
+                                <th>Prod.</th>
+                                <th>Insp.</th>
+                                <th>NC</th>
+                                <th>% Insp.</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -139,20 +135,50 @@
             </div>
         </div>
     </div>
-    <div class="col-md-6">
+    <!-- Tanque -->
+    <div class="col-md-4">
         <div class="card h-100">
-            <div class="card-header ch-orange">
-                Causas de Não Conformidades
+            <div class="card-header ch-blue">
+                Dados de Inspeção
             </div>
             <div class="card-body p-0">
+                <div class="px-3 pt-3 pb-1">
+                    <span class="tipo-badge teal">Tanque</span>
+                </div>
                 <div class="table-container">
-                    <table class="table table-fixed-header" id="table-causas">
+                    <table class="table table-fixed-header" id="table-tanque">
                         <thead>
                             <tr>
-                                <th>Data Inspeção</th>
-                                <th>Peça</th>
-                                <th>Causa</th>
-                                <th>Quantidade</th>
+                                <th>Data</th>
+                                <th>Inspeções</th>
+                                <th>NC</th>
+                                <th>% NC</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Tubos e Cilindros -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header ch-blue">
+                Dados de Inspeção
+            </div>
+            <div class="card-body p-0">
+                <div class="px-3 pt-3 pb-1">
+                    <span class="tipo-badge" style="background:#6d28d9;color:#fff;">Tubos e Cilindros</span>
+                </div>
+                <div class="table-container">
+                    <table class="table table-fixed-header" id="table-tubos">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Inspeções</th>
+                                <th>NC</th>
+                                <th>% NC</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -163,7 +189,89 @@
     </div>
 </div>
 
-<!-- Carrossel de Imagens -->
+<!-- Causas por Setor -->
+<div class="row mb-4">
+    <!-- Causas Montagem -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header ch-orange">
+                Causas de Não Conformidades
+            </div>
+            <div class="card-body p-0">
+                <div class="px-3 pt-3 pb-1">
+                    <span class="tipo-badge">Montagem</span>
+                </div>
+                <div class="table-container">
+                    <table class="table table-fixed-header" id="table-causas-montagem">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Peça</th>
+                                <th>Causa</th>
+                                <th>Qtd</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Causas Tanque -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header ch-orange">
+                Causas de Não Conformidades
+            </div>
+            <div class="card-body p-0">
+                <div class="px-3 pt-3 pb-1">
+                    <span class="tipo-badge teal">Tanque</span>
+                </div>
+                <div class="table-container">
+                    <table class="table table-fixed-header" id="table-causas-tanque">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Peça</th>
+                                <th>Causa</th>
+                                <th>Qtd</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Causas Tubos -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header ch-orange">
+                Causas de Não Conformidades
+            </div>
+            <div class="card-body p-0">
+                <div class="px-3 pt-3 pb-1">
+                    <span class="tipo-badge" style="background:#6d28d9;color:#fff;">Tubos e Cilindros</span>
+                </div>
+                <div class="table-container">
+                    <table class="table table-fixed-header" id="table-causas-tubos">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Peça</th>
+                                <th>Causa</th>
+                                <th>Qtd</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Carrossel de Imagens (Montagem + Tubos) -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
@@ -187,12 +295,12 @@
     </div>
 </div>
 
-<!-- Gráfico de Causas -->
+<!-- Gráfico de Causas Combinado -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header ch-orange">
-                Distribuição de Causas de Não Conformidades
+                Distribuição de Causas de Não Conformidades — Combinado
             </div>
             <div class="card-body">
                 <div class="chart-container">
