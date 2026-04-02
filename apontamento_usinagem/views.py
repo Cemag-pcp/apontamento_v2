@@ -35,6 +35,38 @@ TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
 # Certifique-se de que a pasta existe
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+def _extrair_chave_retorno_erp(retorno):
+    if not isinstance(retorno, dict):
+        return ''
+
+    for campo in ('chaveProducao', 'chave', 'productionKey'):
+        valor = retorno.get(campo)
+        if valor not in (None, ''):
+            return str(valor).strip()
+
+    for valor in retorno.values():
+        if isinstance(valor, dict):
+            chave = _extrair_chave_retorno_erp(valor)
+            if chave:
+                return chave
+
+    return ''
+
+
+def _normalizar_chave_apontamento_erp(retorno_api, payload_integracao):
+    chave = _extrair_chave_retorno_erp(retorno_api)
+    if chave:
+        return chave, None
+
+    retorno_serializado = json.dumps(retorno_api, ensure_ascii=False, default=str)[:1200]
+    chave_fallback = f"sem-chave:{payload_integracao.get('id')}"
+    aviso = (
+        'ERP confirmou o apontamento, mas não retornou chave explícita. '
+        f'Retorno bruto: {retorno_serializado}'
+    )
+    return chave_fallback, aviso
+
+
 def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
     """
     Tenta apontar no ERP sem interromper o fluxo do operador.
@@ -63,7 +95,7 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
             return
 
         payload_integracao = {
-            "id": "Apontamento 1",
+            "id": f"usinagem-item-{item.id}",
             "data": localtime(now()).strftime('%d/%m/%Y'),
             "pessoa": "4357",
             "recurso": str(item.peca.codigo if item.peca else ""),
@@ -132,8 +164,11 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
         item.data_apontamento = now()
         item.tipo_apontamento = 'api'
         item.resp_apontamento = user_ref
-        item.chave_apontamento = str(resposta_api_json.get('chaveProducao') or '')
-        item.erro_apontamento = None
+        item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+            resposta_api_json,
+            payload_integracao,
+        )
+        item.erro_apontamento = aviso_chave
         item.save(update_fields=[
             'apontado',
             'data_apontamento',
@@ -1014,7 +1049,7 @@ def api_erp_apontar_item_usinagem(request, pk):
     payload_integracao = None
     if tipo_apontamento == 'api':
         payload_integracao = {
-            "id": "Apontamento 1",
+            "id": f"usinagem-item-{item.id}",
             "data": localtime(now()).strftime('%d/%m/%Y'),
             "pessoa": "4357",
             "recurso": str(item.peca.codigo if item.peca else ""),
@@ -1103,8 +1138,11 @@ def api_erp_apontar_item_usinagem(request, pk):
                 )
 
             if status_erp.lower() == 'success':
-                item.chave_apontamento = str(resposta_api_json.get('chaveProducao') or '')
-                item.erro_apontamento = None
+                item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+                    resposta_api_json,
+                    payload_integracao,
+                )
+                item.erro_apontamento = aviso_chave
             else:
                 item.erro_apontamento = str(resposta_api_json)
                 item.tipo_apontamento = 'api'

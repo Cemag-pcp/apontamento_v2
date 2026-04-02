@@ -45,6 +45,38 @@ class IntegracaoERPError(Exception):
         self.retorno_api = retorno_api
 
 
+def _extrair_chave_retorno_erp(retorno):
+    if not isinstance(retorno, dict):
+        return ''
+
+    for campo in ('chaveProducao', 'chave', 'productionKey'):
+        valor = retorno.get(campo)
+        if valor not in (None, ''):
+            return str(valor).strip()
+
+    for valor in retorno.values():
+        if isinstance(valor, dict):
+            chave = _extrair_chave_retorno_erp(valor)
+            if chave:
+                return chave
+
+    return ''
+
+
+def _normalizar_chave_apontamento_erp(retorno_api, payload_integracao):
+    chave = _extrair_chave_retorno_erp(retorno_api)
+    if chave:
+        return chave, None
+
+    retorno_serializado = json.dumps(retorno_api, ensure_ascii=False, default=str)[:1200]
+    chave_fallback = f"sem-chave:{payload_integracao.get('id')}"
+    aviso = (
+        'ERP confirmou o apontamento, mas não retornou chave explícita. '
+        f'Retorno bruto: {retorno_serializado}'
+    )
+    return chave_fallback, aviso
+
+
 def _marcar_apontamento_manual(item, user):
     item.apontado = True
     item.data_apontamento = now()
@@ -174,8 +206,11 @@ def _apontar_item_via_api_erp_estamparia(item, user):
             retorno_api=resposta_api_json,
         )
 
-    item.chave_apontamento = str(resposta_api_json.get('chaveProducao') or '')
-    item.erro_apontamento = None
+    item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+        resposta_api_json,
+        payload_integracao,
+    )
+    item.erro_apontamento = aviso_chave
     item.apontado = True
     item.data_apontamento = now()
     item.tipo_apontamento = 'api'
@@ -1257,8 +1292,11 @@ def api_erp_apontar_item_estamparia(request, pk):
                 )
 
             if status_erp.lower() == 'success':
-                item.chave_apontamento = str(resposta_api_json.get('chaveProducao') or '')
-                item.erro_apontamento = None
+                item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+                    resposta_api_json,
+                    payload_integracao,
+                )
+                item.erro_apontamento = aviso_chave
             else:
                 item.erro_apontamento = str(resposta_api_json)
                 item.tipo_apontamento = 'api'
