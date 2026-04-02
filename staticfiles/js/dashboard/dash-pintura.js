@@ -5,11 +5,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
 
+    const filterBtnTemporal = document.getElementById('filterBtnTemporal');
+    const resetBtnTemporal  = document.getElementById('resetBtnTemporal');
+    const startDateTemporal = document.getElementById('startDateTemporal');
+    const endDateTemporal   = document.getElementById('endDateTemporal');
+
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Análise temporal começa 6 meses atrás por padrão
+    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
     startDateInput.valueAsDate = firstDayOfMonth;
     endDateInput.valueAsDate = today;
+
+    startDateTemporal.valueAsDate = sixMonthsAgo;
+    endDateTemporal.valueAsDate   = today;
 
     function formatDateBr(value) {
         const raw = String(value || '').trim();
@@ -193,7 +203,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 Object.entries(totaisPU)
                     .sort((a, b) => b[1] - a[1])
                     .forEach(([causa, quantidade]) => {
-                        rankingPU.insertAdjacentHTML('beforeend', `<tr><td>${causa}</td><td>${quantidade}</td></tr>`);
+                        rankingPU.insertAdjacentHTML('beforeend',
+                            `<tr><td>${causa}</td><td>${quantidade.toLocaleString('pt-BR')}</td></tr>`);
                     });
             }
 
@@ -204,7 +215,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 Object.entries(totaisPO)
                     .sort((a, b) => b[1] - a[1])
                     .forEach(([causa, quantidade]) => {
-                        rankingPO.insertAdjacentHTML('beforeend', `<tr><td>${causa}</td><td>${quantidade}</td></tr>`);
+                        rankingPO.insertAdjacentHTML('beforeend',
+                            `<tr><td>${causa}</td><td>${quantidade.toLocaleString('pt-BR')}</td></tr>`);
                     });
             }
 
@@ -273,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     tabelaRanking.insertAdjacentHTML('beforeend', `
                         <tr>
                             <td>${causa}</td>
-                            <td>${quantidade}</td>
+                            <td>${quantidade.toLocaleString('pt-BR')}</td>
                         </tr>
                     `);
                 });
@@ -351,6 +363,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td colspan="6" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
                     </tr>
                 `;
+                atualizarKPIs(0, 0, 0);
                 return;
             }
 
@@ -368,13 +381,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 tabela.insertAdjacentHTML('beforeend', row);
             });
 
+            const totalProd = data.reduce((s, i) => s + i["N° de peças produzidas"], 0);
+            const totalInsp = data.reduce((s, i) => s + i["N° de inspeções"], 0);
+            const totalNC   = data.reduce((s, i) => s + i["N° de peças não conforme"], 0);
+            atualizarKPIs(totalProd, totalInsp, totalNC);
+
         } catch (error) {
             console.error('Erro ao carregar tabela de produção:', error);
             alert('Erro ao carregar dados de produção.');
         }
     }
 
-    // Botão FILTRAR
+    function atualizarKPIs(totalProd, totalInsp, totalNC) {
+        const pctInsp     = totalProd > 0 ? (totalInsp / totalProd * 100).toFixed(0) : 0;
+        const indiceGlobal = totalInsp > 0 ? (totalNC / totalInsp * 100).toFixed(2).replace('.', ',') : '0,00';
+
+        document.getElementById('kpi-pecas-pintadas').textContent     = totalProd.toLocaleString('pt-BR');
+        document.getElementById('kpi-pecas-inspecionadas').textContent = totalInsp.toLocaleString('pt-BR');
+        document.getElementById('kpi-pct-inspecao').textContent        = pctInsp + '%';
+        document.getElementById('kpi-nao-conformidade').textContent    = totalNC.toLocaleString('pt-BR');
+        document.getElementById('kpi-indice-global').textContent       = indiceGlobal + '%';
+    }
+
+    // ── Filtro TEMPORAL (apenas o gráfico) ──
+    filterBtnTemporal.addEventListener('click', function() {
+        const s = startDateTemporal.value;
+        const e = endDateTemporal.value;
+        if (!s || !e) { alert('Selecione as datas do período temporal.'); return; }
+        if (s > e)    { alert('A data inicial deve ser anterior à data final.'); return; }
+        carregarGraficoProducao(s, e);
+    });
+
+    resetBtnTemporal.addEventListener('click', function() {
+        startDateTemporal.valueAsDate = sixMonthsAgo;
+        endDateTemporal.valueAsDate   = today;
+        carregarGraficoProducao(startDateTemporal.value, endDateTemporal.value);
+    });
+
+    // ── Filtro GLOBAL (KPI cards + demais seções) ──
     filterBtn.addEventListener('click', function() {
         const startDate = startDateInput.value;
         const endDate = endDateInput.value;
@@ -383,53 +427,46 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Por favor, selecione as datas de início e fim.');
             return;
         }
-
         if (startDate > endDate) {
             alert('A data inicial deve ser anterior à data final.');
             return;
         }
 
-        // Limpa alertas antigos e mostra o atual
         document.querySelectorAll('.alert-info').forEach(el => el.remove());
-
         const filterInfo = document.createElement('div');
         filterInfo.className = 'alert alert-info mt-3';
         filterInfo.innerText = `Filtro aplicado: ${formatDateBr(startDate)} até ${formatDateBr(endDate)}`;
         document.querySelector('.card-body').appendChild(filterInfo);
 
-        carregarGraficoProducao(startDate, endDate);
+        carregarTabelaProducao(startDate, endDate);
         carregarGraficoCausas(startDate, endDate);
-        carregarCarrosselImagens(startDateInput.value, endDateInput.value);
-        carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
-        carregarTabelaCausas(startDateInput.value, endDateInput.value);
-        carregarTabelaCausasDiaria(startDateInput.value, endDateInput.value);
-        carregarTabelaProducao(startDateInput.value, endDateInput.value);
-
+        carregarCarrosselImagens(startDate, endDate);
+        carregarTabelasPorTipo(startDate, endDate);
+        carregarTabelaCausas(startDate, endDate);
+        carregarTabelaCausasDiaria(startDate, endDate);
     });
 
-    // Botão RESET
+    // Botão RESET global
     resetBtn.addEventListener('click', function() {
-        startDateInput.valueAsDate = lastMonth;
+        startDateInput.valueAsDate = firstDayOfMonth;
         endDateInput.valueAsDate = today;
         document.querySelectorAll('.alert-info').forEach(el => el.remove());
-        carregarGraficoProducao(startDateInput.value, endDateInput.value);
+        carregarTabelaProducao(startDateInput.value, endDateInput.value);
         carregarGraficoCausas(startDateInput.value, endDateInput.value);
         carregarCarrosselImagens(startDateInput.value, endDateInput.value);
         carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
         carregarTabelaCausas(startDateInput.value, endDateInput.value);
         carregarTabelaCausasDiaria(startDateInput.value, endDateInput.value);
-        carregarTabelaProducao(startDateInput.value, endDateInput.value);
-
     });
 
     // Carrega dados ao abrir a página
-    carregarGraficoProducao(startDateInput.value, endDateInput.value);
+    carregarGraficoProducao(startDateTemporal.value, endDateTemporal.value);  // gráfico → filtro temporal
+    carregarTabelaProducao(startDateInput.value, endDateInput.value);          // KPIs → filtro global
     carregarGraficoCausas(startDateInput.value, endDateInput.value);
     carregarCarrosselImagens(startDateInput.value, endDateInput.value);
     carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
     carregarTabelaCausas(startDateInput.value, endDateInput.value);
     carregarTabelaCausasDiaria(startDateInput.value, endDateInput.value);
-    carregarTabelaProducao(startDateInput.value, endDateInput.value);
 
 });
 
