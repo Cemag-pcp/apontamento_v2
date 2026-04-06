@@ -1364,10 +1364,21 @@ def atualizar_pecas_ordem(request):
     return JsonResponse({'status':'success'})
 
 def api_ordens_finalizadas(request):
-    
+
+    hoje = localdate()
+
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT 
+            SELECT
                 o.ordem AS ordem,
                 m.nome AS maquina,
                 p.codigo AS peca,
@@ -1377,7 +1388,7 @@ def api_ordens_finalizadas(request):
                 TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
                 CONCAT(f.matricula, ' - ', f.nome) AS operador,
                 o.obs_operador AS obs,
-                
+
                 NULL::text AS espaco_1,
                 NULL::text AS espaco_2,
                 NULL::text AS espaco_3,
@@ -1390,12 +1401,12 @@ def api_ordens_finalizadas(request):
             JOIN apontamento_v2.cadastro_pecas p ON ope.peca_id = p.id
             LEFT JOIN apontamento_v2.cadastro_maquina m ON o.maquina_id = m.id
             LEFT JOIN apontamento_v2.cadastro_operador f ON o.operador_final_id = f.id
-            WHERE 
+            WHERE
                 o.status_atual = 'finalizada'
-                AND o.ultima_atualizacao >= '2025-04-08'
+                AND (o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN %s AND %s
                 AND ope.qtd_boa > 0
             ORDER BY o.ultima_atualizacao;
-        """)
+        """, [data_inicio, data_fim])
         columns = [col[0] for col in cursor.description]
 
         results_raw = [dict(zip(columns, row)) for row in cursor.fetchall()]

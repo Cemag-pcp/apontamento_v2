@@ -969,10 +969,21 @@ def api_ordens_finalizadas(request):
             return data_final.strftime("%d/%m/%Y %H:%M")
         return ""
 
+    hoje = localtime(now()).date()
+
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
     final_results = []
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT 
+            SELECT
                 o.ordem,
                 m.nome AS maquina,
                 po.peca AS conjunto,
@@ -985,12 +996,12 @@ def api_ordens_finalizadas(request):
             LEFT JOIN apontamento_v2.cadastro_maquina m ON m.id = o.maquina_id
             LEFT JOIN apontamento_v2.cadastro_operador op ON op.id = o.operador_final_id
             INNER JOIN apontamento_v2.apontamento_montagem_pecasordem po ON o.id = po.ordem_id
-            INNER JOIN apontamento_v2.core_ordemprocesso co on co.id = po.processo_ordem_id 
-            WHERE 
-                co.data_fim >= '2025-04-08'
+            INNER JOIN apontamento_v2.core_ordemprocesso co on co.id = po.processo_ordem_id
+            WHERE
+                DATE(co.data_fim - INTERVAL 3 HOUR) BETWEEN %s AND %s
                 AND po.qtd_boa > 0
             ORDER BY co.data_fim;
-        """)
+        """, [data_inicio, data_fim])
 
         for row in cursor:
             ordem, maquina, conjunto, total_produzido, data_carga, data_finalizacao, operador, obs = row

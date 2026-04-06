@@ -1561,11 +1561,28 @@ def api_ordens_finalizadas(request):
         'cinza escuro': 'CE',
     }
 
+    brasil_tz = timezone("America/Sao_Paulo")
+    hoje = now().astimezone(brasil_tz).date()
+
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    inicio_utc = brasil_tz.localize(datetime(data_inicio.year, data_inicio.month, data_inicio.day, 0, 0, 0))
+    fim_utc = brasil_tz.localize(datetime(data_fim.year, data_fim.month, data_fim.day, 23, 59, 59))
+
     dados = (
         PecasOrdem.objects
         .filter(
             qtd_boa__gt=0,
-            operador_fim__isnull=False
+            operador_fim__isnull=False,
+            data__gte=inicio_utc,
+            data__lte=fim_utc,
         )
         .annotate(
             ordem_numero=F('ordem__ordem'),

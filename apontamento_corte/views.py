@@ -944,15 +944,27 @@ def resequenciar_ordem(request):
     return JsonResponse({'error': 'Método não permitido.'}, status=405)
 
 def api_ordens_finalizadas(request):
+
+    hoje = localtime(now()).date()
+
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT 
+            SELECT
                 COALESCE(o.ordem::TEXT, o.ordem_duplicada) AS ordem,
                 poc.peca,
                 poc.qtd_planejada,
-                
+
                 -- tamanho_chapa: prioridade para tamanho, senão extrai da descricao_mp
-                CASE 
+                CASE
                     WHEN p.tamanho IS NOT NULL THEN p.tamanho
                     WHEN p.descricao_mp IS NOT NULL THEN SPLIT_PART(p.descricao_mp, ' - ', 2)
                     ELSE NULL
@@ -963,7 +975,7 @@ def api_ordens_finalizadas(request):
 
                 -- espessura_final = espessura + sigla tipo_chapa
                 TRIM(
-                    TRIM(COALESCE(p.espessura, '')) || 
+                    TRIM(COALESCE(p.espessura, '')) ||
                     CASE p.tipo_chapa
                         WHEN 'inox' THEN ' Inox'
                         WHEN 'anti_derrapante' THEN ' A.D'
@@ -976,17 +988,17 @@ def api_ordens_finalizadas(request):
                 CONCAT(op.matricula, ' - ', op.nome) AS operador,
                 TO_CHAR(o.ultima_atualizacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
                 poc.qtd_boa AS total_produzido,
-                p.retalho 
+                p.retalho
             FROM apontamento_v2.core_ordem o
             INNER JOIN apontamento_v2.apontamento_corte_pecasordem poc ON poc.ordem_id = o.id
             LEFT JOIN apontamento_v2.core_propriedadesordem p ON o.id = p.ordem_id
             LEFT JOIN apontamento_v2.cadastro_operador op ON op.id = o.operador_final_id
-            WHERE 
+            WHERE
                 o.status_atual = 'finalizada'
-                AND o.ultima_atualizacao >= '2025-04-08'
+                AND (o.ultima_atualizacao - interval '3 hours')::date BETWEEN %s AND %s
                 AND poc.qtd_boa > 0
             ORDER BY o.ultima_atualizacao, peca;
-        """)
+        """, [data_inicio, data_fim])
         columns = [col[0] for col in cursor.description]
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
