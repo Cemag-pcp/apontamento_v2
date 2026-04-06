@@ -21,7 +21,7 @@ function carregarTabela(pagina) {
         .then(response => response.json())
         .then(data => {
             atualizarTabela(data.ordens);
-            atualizarPaginacao(data.total_ordens, pagina);
+            atualizarPaginacao(data.total_ordens, pagina, 100);
         })
         .finally(() => mostrarLoading(false));
 }
@@ -160,8 +160,8 @@ function confirmarAlteracao(ordemId) {
 }
 
 //  Atualiza a paginação
-function atualizarPaginacao(totalRegistros, paginaAtual) {
-    const totalPaginas = Math.ceil(totalRegistros / 10);
+function atualizarPaginacao(totalRegistros, paginaAtual, limit = 100) {
+    const totalPaginas = Math.ceil(totalRegistros / limit);
     const paginacaoContainer = document.getElementById("paginacao-container");
 
     paginacaoContainer.innerHTML = "";
@@ -207,8 +207,15 @@ function atualizarPaginacao(totalRegistros, paginaAtual) {
 
     for (let i = startPage; i <= endPage; i++) {
         const botaoPagina = document.createElement("button");
-        botaoPagina.classList.add("btn", "btn-sm", i === paginaAtual ? "btn-primary" : "btn-outline-secondary");
+        const isAtual = i === paginaAtual;
+        botaoPagina.classList.add("btn", "btn-sm", isAtual ? "btn-primary" : "btn-outline-secondary");
         botaoPagina.textContent = i;
+        if (isAtual) {
+            botaoPagina.style.fontWeight = "700";
+            botaoPagina.style.outline = "3px solid #0a58ca";
+            botaoPagina.style.outlineOffset = "2px";
+            botaoPagina.disabled = true;
+        }
         botaoPagina.addEventListener("click", () => carregarTabela(i));
         paginacaoContainer.appendChild(botaoPagina);
     }
@@ -236,11 +243,13 @@ function atualizarPaginacao(totalRegistros, paginaAtual) {
     paginacaoContainer.appendChild(botaoProximo);
 }
 
-//  Exibe ou oculta o spinner de carregamento
 function mostrarLoading(mostrar) {
-    const spinner = document.getElementById("loading-spinner");
-    if (spinner) {
-        spinner.style.display = mostrar ? "block" : "none";
+    const overlay = document.getElementById("table-overlay");
+    if (!overlay) return;
+    if (mostrar) {
+        overlay.style.display = "flex";
+    } else {
+        overlay.style.display = "none";
     }
 }
 
