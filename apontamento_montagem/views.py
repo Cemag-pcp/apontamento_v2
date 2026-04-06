@@ -998,7 +998,7 @@ def api_ordens_finalizadas(request):
             INNER JOIN apontamento_v2.apontamento_montagem_pecasordem po ON o.id = po.ordem_id
             INNER JOIN apontamento_v2.core_ordemprocesso co on co.id = po.processo_ordem_id
             WHERE
-                DATE(co.data_fim - INTERVAL 3 HOUR) BETWEEN %s AND %s
+                (co.data_fim - INTERVAL '3 hours')::date BETWEEN %s AND %s
                 AND po.qtd_boa > 0
             ORDER BY co.data_fim;
         """, [data_inicio, data_fim])
