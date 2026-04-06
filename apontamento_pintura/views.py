@@ -1660,29 +1660,42 @@ def api_tempos(request):
     data_pendura
     """
 
+    brasil_tz = timezone("America/Sao_Paulo")
+    hoje = now().astimezone(brasil_tz).date()
+
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
     cursor = connection.cursor()
     cursor.execute("""
             SELECT
-                o.id AS ordem,                              
-                po.peca AS conjunto,                   
-                po.qtd_planejada AS qt_planejada,        
-                o.cor,                                
-                cp.quantidade_pendurada,             
-                apc.nome as cambao,    
-                po.tipo,                              
-                o.data_carga,                         
-                cp.data_fim,                          
+                o.id AS ordem,
+                po.peca AS conjunto,
+                po.qtd_planejada AS qt_planejada,
+                o.cor,
+                cp.quantidade_pendurada,
+                apc.nome as cambao,
+                po.tipo,
+                o.data_carga,
+                cp.data_fim,
                 concat(co_inicio.matricula, ' - ', co_inicio.nome) AS operador_inicio,
                 concat(co_fim.matricula, ' - ', co_fim.nome) AS operador_fim,
-                cp.data_pendura                       
+                cp.data_pendura
             FROM apontamento_v2.core_ordem o
             INNER JOIN apontamento_v2.apontamento_pintura_pecasordem po ON po.ordem_id = o.id
             INNER JOIN apontamento_v2.apontamento_pintura_cambaopecas cp ON cp.peca_ordem_id = po.id
             INNER JOIN apontamento_v2.apontamento_pintura_cambao apc on apc.id = cp.cambao_id
             LEFT JOIN apontamento_v2.cadastro_operador co_fim ON co_fim.id = po.operador_fim_id
             LEFT JOIN apontamento_v2.cadastro_operador co_inicio ON co_inicio.id = cp.operador_inicio_id
+            WHERE (cp.data_pendura AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN %s AND %s
             ORDER BY o.ordem, cp.data_pendura;
-        """)
+        """, [data_inicio, data_fim])
 
     # Trata os dados para saída final
     def format_data(dt):

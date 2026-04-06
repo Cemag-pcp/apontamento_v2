@@ -1,5 +1,8 @@
+import logging
 from django.shortcuts import render
 from django.http import JsonResponse
+
+logger = logging.getLogger(__name__)
 from django.views import View
 from django.conf import settings
 from django.db import transaction, connection
@@ -112,14 +115,14 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
                     "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                     json=payload_integracao,
                     auth=("luan araujo", "luanaraujo7"),
-                    timeout=20,
+                    timeout=(10, 60),
                 )
             else:
                 response_integracao = requests.post(
                     "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                     json=payload_integracao,
                     auth=("luan araujo", "luanaraujo7"),
-                    timeout=20,
+                    timeout=(10, 60),
                 )
         except requests.RequestException as exc:
             item.erro_apontamento = str(exc)[:2000]
@@ -169,6 +172,13 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
             payload_integracao,
         )
         item.erro_apontamento = aviso_chave
+    except Exception:
+        # Fluxo silencioso por requisito: nunca interromper a finalização do operador.
+        return
+
+    # Save separado do bloco silencioso: se falhar aqui o ERP já registrou a chave
+    # e precisamos saber disso para reconciliação manual.
+    try:
         item.save(update_fields=[
             'apontado',
             'data_apontamento',
@@ -177,9 +187,15 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
             'chave_apontamento',
             'erro_apontamento',
         ])
-    except Exception:
-        # Fluxo silencioso por requisito: nunca interromper a finalização do operador.
-        return
+    except Exception as exc_save:
+        logger.error(
+            "ERP apontou com sucesso mas falhou ao salvar no banco. "
+            "item_id=%s chave_erp=%s erro=%s",
+            item_id,
+            item.chave_apontamento,
+            exc_save,
+            exc_info=True,
+        )
 
 def extrair_numeracao(nome_arquivo):
     match = re.search(r"(?i)OP(\d+)", nome_arquivo)  # (?i) torna a busca case insensitive
@@ -1064,14 +1080,14 @@ def api_erp_apontar_item_usinagem(request, pk):
                     "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                     json=payload_integracao,
                     auth=("luan araujo", "luanaraujo7"),
-                    timeout=20,
+                    timeout=(10, 60),
                 )
             else:
                 response_integracao = requests.post(
                     "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                     json=payload_integracao,
                     auth=("luan araujo", "luanaraujo7"),
-                    timeout=20,
+                    timeout=(10, 60),
                 )
         except requests.RequestException as exc:
             return JsonResponse(

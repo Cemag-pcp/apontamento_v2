@@ -1,6 +1,9 @@
+import logging
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 from django.db import transaction, connection
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage
@@ -122,14 +125,14 @@ def _apontar_item_via_api_erp_estamparia(item, user):
                 "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                 json=payload_integracao,
                 auth=("luan araujo", "luanaraujo7"),
-                timeout=20,
+                timeout=(10, 60),
             )
         else:
             response_integracao = requests.post(
                 "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                 json=payload_integracao,
                 auth=("luan araujo", "luanaraujo7"),
-                timeout=20,
+                timeout=(10, 60),
             )
     except requests.RequestException as exc:
         raise IntegracaoERPError(
@@ -215,14 +218,27 @@ def _apontar_item_via_api_erp_estamparia(item, user):
     item.data_apontamento = now()
     item.tipo_apontamento = 'api'
     item.resp_apontamento = user if getattr(user, 'is_authenticated', False) else None
-    item.save(update_fields=[
-        'chave_apontamento',
-        'erro_apontamento',
-        'apontado',
-        'data_apontamento',
-        'tipo_apontamento',
-        'resp_apontamento',
-    ])
+
+    # Save separado: ERP já registrou a chave — se o banco falhar aqui precisamos saber.
+    try:
+        item.save(update_fields=[
+            'chave_apontamento',
+            'erro_apontamento',
+            'apontado',
+            'data_apontamento',
+            'tipo_apontamento',
+            'resp_apontamento',
+        ])
+    except Exception as exc_save:
+        logger.error(
+            "ERP apontou com sucesso mas falhou ao salvar no banco. "
+            "item_id=%s chave_erp=%s erro=%s",
+            item.id,
+            item.chave_apontamento,
+            exc_save,
+            exc_info=True,
+        )
+        raise
 
     return {
         'payload_enviado': payload_integracao,
@@ -704,10 +720,20 @@ def atualizar_status_ordem(request):
                     try:
                         item_erp = PecasOrdem.objects.get(pk=item_id_para_apontamento_erp)
                         _apontar_item_via_api_erp_estamparia(item_erp, request_user)
-                    except (PecasOrdem.DoesNotExist, IntegracaoERPError):
-                        # Não bloquear a operação do operador.
-                        # O erro fica salvo em `erro_apontamento` para tratativa posterior no ERP.
+                    except PecasOrdem.DoesNotExist:
                         pass
+                    except IntegracaoERPError:
+                        # Erro de negócio/comunicação com ERP — já salvo em erro_apontamento.
+                        pass
+                    except Exception as exc_inesperado:
+                        # Erro inesperado (ex: falha no banco ao salvar chave após ERP confirmar).
+                        logger.error(
+                            "Erro inesperado no pós-commit ERP estamparia. "
+                            "item_id=%s erro=%s",
+                            item_id_para_apontamento_erp,
+                            exc_inesperado,
+                            exc_info=True,
+                        )
 
             transaction.on_commit(_executar_pos_commit)
 
@@ -1271,14 +1297,14 @@ def api_erp_apontar_item_estamparia(request, pk):
                     "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                     json=payload_integracao,
                     auth=("luan araujo", "luanaraujo7"),
-                    timeout=20,
+                    timeout=(10, 60),
                 )
             else:
                 response_integracao = requests.post(
                     "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                     json=payload_integracao,
                     auth=("luan araujo", "luanaraujo7"),
-                    timeout=20,
+                    timeout=(10, 60),
                 )
         except requests.RequestException as exc:
             return JsonResponse(
