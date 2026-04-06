@@ -26,18 +26,56 @@
         <h4 class="mb-3 text-secondary">Pesquise a ordem</h4>
         <!-- Formulário de Filtro -->
         <form id="filtro-form" class="mb-4">
-            <div class="row g-3 align-items-center">
-                <div class="col-md-3">
-                    <input type="text" class="form-control" name="filtro-ordem" id="filtro-ordem" placeholder="Filtrar por ordem">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Ordem</label>
+                    <input type="text" class="form-control" id="filtro-ordem" placeholder="Nº da ordem">
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label fw-semibold">Peça (código)</label>
+                    <input type="text" class="form-control" id="filtro-peca" placeholder="Ex: 1234">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Máquina</label>
+                    <select class="form-select" id="filtro-maquina">
+                        <option value="">Todas</option>
+                        {% for maquina in maquinas %}
+                        <option value="{{ maquina.id }}">{{ maquina.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Criação de</label>
+                    <input type="date" class="form-control" id="filtro-data-criacao-inicio">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Criação até</label>
+                    <input type="date" class="form-control" id="filtro-data-criacao-fim">
+                </div>
+                <div class="col-md-2 d-flex gap-2">
                     <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                    <button type="button" id="btn-limpar" class="btn btn-outline-secondary w-100">Limpar</button>
                 </div>
             </div>
         </form>
     
-        <div class="table-container">
-            <table class="table table-bordered">
+        <div class="table-container" style="position: relative;">
+            <!-- Overlay de loading -->
+            <div id="table-overlay" style="
+                display: none;
+                position: absolute;
+                inset: 0;
+                background: rgba(255,255,255,0.6);
+                z-index: 10;
+                align-items: center;
+                justify-content: center;
+            ">
+                <div class="spinner-border text-primary" role="status" style="width: 2.5rem; height: 2.5rem;">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+
+            <table class="table table-bordered" id="tabela-principal">
                 <thead>
                     <tr>
                         <th>Ordem</th>
@@ -49,12 +87,7 @@
                         <th>Ações</th>
                     </tr>
                 </thead>
-                <tbody id="tabela-corpo">
-                    <div id="loading-spinner">🔄 Carregando...</div>
-                    <tr>
-                        <td colspan="6">🔄 Carregando dados...</td>
-                    </tr>
-                </tbody>
+                <tbody id="tabela-corpo"></tbody>
             </table>
         </div>
 

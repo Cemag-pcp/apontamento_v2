@@ -290,36 +290,85 @@ def get_ordens_criadas(request):
     filtro_maquina = request.GET.get('maquina', '').strip()
     status_atual = request.GET.get('status', '').strip()
     data_programada = request.GET.get('data-programada', '').strip()
+    data_criacao_inicio = request.GET.get('data_criacao_inicio', '').strip()
+    data_criacao_fim = request.GET.get('data_criacao_fim', '').strip()
 
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
 
-    # Criamos uma subquery para obter a primeira peça associada à ordem
-    primeira_peca = PecasOrdem.objects.filter(
-        ordem=OuterRef('pk')
-    ).order_by('id')[:1]
+    # Filtros base reutilizados no count e na query principal
+    filtros_base = dict(grupo_maquina='estamparia', excluida=False)
 
-    # Query principal das ordens
-    ordens_queryset = Ordem.objects.filter(
-        grupo_maquina='estamparia',
-        excluida=False,
-    ).annotate(
-        peca_codigo=Subquery(primeira_peca.values('peca__codigo')),
-        peca_descricao=Subquery(primeira_peca.values('peca__descricao')),
-        peca_quantidade=Subquery(primeira_peca.values('qtd_planejada')),
-        prioridade_ordenacao=Coalesce('ordem_prioridade', Value(999999), output_field=IntegerField()),
-    ).order_by('status_prioridade', 'prioridade_ordenacao', '-ultima_atualizacao')#.exclude(status_atual='finalizada')
+    # Query principal das ordens — select_related evita N+1 em maquina
+    # prefetch_related evita N+1 em pecas (1 query extra no total, não 1 por ordem)
+    ordens_queryset = (
+        Ordem.objects
+        .filter(**filtros_base)
+        .select_related('maquina')
+        .prefetch_related(
+            Prefetch(
+                'ordem_pecas_estamparia',
+                queryset=PecasOrdem.objects.select_related('peca').only(
+                    'id', 'ordem_id', 'qtd_boa', 'qtd_morta', 'qtd_planejada',
+                    'peca__id', 'peca__codigo', 'peca__descricao',
+                ).order_by('id'),
+            )
+        )
+        .only(
+            'id', 'ordem', 'grupo_maquina', 'data_criacao', 'data_programacao',
+            'obs', 'ordem_prioridade', 'status_atual', 'ultima_atualizacao',
+            'status_prioridade', 'maquina__id', 'maquina__nome',
+        )
+        .annotate(
+            prioridade_ordenacao=Coalesce('ordem_prioridade', Value(999999), output_field=IntegerField()),
+        )
+        .order_by('status_prioridade', 'prioridade_ordenacao', '-ultima_atualizacao')
+    )
 
     if filtro_ordem:
         ordens_queryset = ordens_queryset.filter(ordem=filtro_ordem)
     if filtro_peca:
-        ordens_queryset = ordens_queryset.filter(peca_codigo=filtro_peca)
+        ordens_queryset = ordens_queryset.filter(
+            ordem_pecas_estamparia__peca__codigo=filtro_peca
+        ).distinct()
     if filtro_maquina:
         ordens_queryset = ordens_queryset.filter(maquina__id=filtro_maquina)
     if status_atual:
         ordens_queryset = ordens_queryset.filter(status_atual=status_atual)
     if data_programada:
         ordens_queryset = ordens_queryset.filter(data_programacao=data_programada)
+    if data_criacao_inicio:
+        dt_inicio = parse_date(data_criacao_inicio)
+        if dt_inicio:
+            ordens_queryset = ordens_queryset.filter(data_criacao__date__gte=dt_inicio)
+    if data_criacao_fim:
+        dt_fim = parse_date(data_criacao_fim)
+        if dt_fim:
+            ordens_queryset = ordens_queryset.filter(data_criacao__date__lte=dt_fim)
+
+    # COUNT separado sem anotações — muito mais rápido que paginator.count na queryset anotada
+    count_queryset = Ordem.objects.filter(**filtros_base)
+    if filtro_ordem:
+        count_queryset = count_queryset.filter(ordem=filtro_ordem)
+    if filtro_peca:
+        count_queryset = count_queryset.filter(
+            ordem_pecas_estamparia__peca__codigo=filtro_peca
+        ).distinct()
+    if filtro_maquina:
+        count_queryset = count_queryset.filter(maquina__id=filtro_maquina)
+    if status_atual:
+        count_queryset = count_queryset.filter(status_atual=status_atual)
+    if data_programada:
+        count_queryset = count_queryset.filter(data_programacao=data_programada)
+    if data_criacao_inicio:
+        dt_inicio = parse_date(data_criacao_inicio)
+        if dt_inicio:
+            count_queryset = count_queryset.filter(data_criacao__date__gte=dt_inicio)
+    if data_criacao_fim:
+        dt_fim = parse_date(data_criacao_fim)
+        if dt_fim:
+            count_queryset = count_queryset.filter(data_criacao__date__lte=dt_fim)
+    total_ordens = count_queryset.count()
 
     # Paginação
     paginator = Paginator(ordens_queryset, limit)
@@ -331,46 +380,50 @@ def get_ordens_criadas(request):
     # Monta os dados para a resposta
     data = []
     for ordem in ordens_page:
+        pecas = list(ordem.ordem_pecas_estamparia.all())  # usa cache do prefetch, sem query extra
+        primeira_peca = pecas[0] if pecas else None
+        maquina_nome = ordem.maquina.nome if ordem.maquina else "Sem máquina planejada"
+        maquina_id = ordem.maquina.id if ordem.maquina else "Sem máquina planejada"
+
         data.append({
             'id': ordem.pk,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y'),
-            'maquina': ordem.maquina.nome if ordem.maquina else "Sem máquina planejada",
-            'maquina_id': ordem.maquina.id if ordem.maquina else "Sem máquina planejada",
+            'maquina': maquina_nome,
+            'maquina_id': maquina_id,
             'obs': ordem.obs,
             'ordem_prioridade': ordem.ordem_prioridade,
             'status_atual': ordem.status_atual,
             'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M'),
             'peca': {
-                'codigo': ordem.peca_codigo,
-                'descricao': ordem.peca_descricao,
-                'quantidade': ordem.peca_quantidade,
-            } if ordem.peca_codigo else None,
+                'codigo': primeira_peca.peca.codigo if primeira_peca and primeira_peca.peca else None,
+                'descricao': primeira_peca.peca.descricao if primeira_peca and primeira_peca.peca else None,
+                'quantidade': primeira_peca.qtd_planejada if primeira_peca else None,
+            } if primeira_peca else None,
             'info_pecas': [
                 {
-                    'ordem_id':ordem.pk,
+                    'ordem_id': ordem.pk,
                     'ordem': ordem.ordem,
                     'data_criacao': ordem.data_criacao,
-                    'maquina': ordem.maquina.nome if ordem.maquina else "Sem máquina planejada",
-                    'id': peca_ordem.id,
-                    'peca_id': peca_ordem.peca.id,
-                    'peca_codigo': peca_ordem.peca.codigo,
-                    'peca_nome': peca_ordem.peca.descricao if peca_ordem.peca.descricao else 'Sem descrição',
-                    'quantidade': peca_ordem.qtd_planejada,
-                    'qtd_morta': peca_ordem.qtd_morta,
-                    'qtd_boa': peca_ordem.qtd_boa
+                    'maquina': maquina_nome,
+                    'id': p.id,
+                    'peca_id': p.peca.id,
+                    'peca_codigo': p.peca.codigo,
+                    'peca_nome': p.peca.descricao if p.peca.descricao else 'Sem descrição',
+                    'quantidade': p.qtd_planejada,
+                    'qtd_morta': p.qtd_morta,
+                    'qtd_boa': p.qtd_boa,
                 }
-                for peca_ordem in ordem.ordem_pecas_estamparia.all() if peca_ordem.qtd_boa > 0
-            ]  # Lista todas as peças associadas
-
+                for p in pecas if p.qtd_boa > 0
+            ],
         })
 
     return JsonResponse({
         'ordens': data,
-        'total_ordens': paginator.count,  # Envia total de ordens
-        'has_next': ordens_page.has_next(),  # Envia se há próxima página
+        'total_ordens': total_ordens,
+        'has_next': ordens_page.has_next(),
     })
 
 @require_GET
@@ -980,8 +1033,8 @@ def api_apontamentos_peca(request):
     return JsonResponse(resultado, safe=False)
 
 def historico(request):
-
-    return render(request, "apontamento_estamparia/historico.html")
+    maquinas = Maquina.objects.filter(setor__nome='estamparia', tipo='maquina').order_by('nome').values('id', 'nome')
+    return render(request, "apontamento_estamparia/historico.html", {'maquinas': maquinas})
 
 
 @login_required

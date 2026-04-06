@@ -2,24 +2,28 @@
 // let ordensCarregadas = [];
 
 function carregarTabela(pagina) {
-    mostrarLoading(true); // Exibe o spinner
+    mostrarLoading(true);
 
     document.getElementById('pagina-atual').value = pagina;
 
-    const ordemEscolhida = document.getElementById('filtro-ordem')?.value || '';
+    const params = new URLSearchParams({
+        page: pagina,
+        limit: 100,
+        status: 'finalizada',
+        ordem: document.getElementById('filtro-ordem')?.value || '',
+        peca: document.getElementById('filtro-peca')?.value || '',
+        maquina: document.getElementById('filtro-maquina')?.value || '',
+        data_criacao_inicio: document.getElementById('filtro-data-criacao-inicio')?.value || '',
+        data_criacao_fim: document.getElementById('filtro-data-criacao-fim')?.value || '',
+    });
 
-    const filtros = {
-        ordem: encodeURIComponent(ordemEscolhida),
-    };
-
-    fetch(`/estamparia/api/ordens-criadas/?page=${pagina}&limit=100&status=finalizada&ordem=${filtros.ordem}`)
+    fetch(`/estamparia/api/ordens-criadas/?${params}`)
         .then(response => response.json())
         .then(data => {
-            console.log(data.ordens); // Debug para verificar os dados recebidos
             atualizarTabela(data.ordens);
             atualizarPaginacao(data.total_ordens, pagina);
         })
-        .finally(() => mostrarLoading(false)); // Oculta o spinner
+        .finally(() => mostrarLoading(false));
 }
 
 //  Atualiza a tabela
@@ -392,14 +396,20 @@ function getCSRFToken() {
 
 //  Configuração inicial ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
-    
-    configurarBotaoVerPecas();
-    // salvarPecas();
 
-    // Ação do botão de filtro
+    configurarBotaoVerPecas();
+
     document.getElementById("filtro-form").addEventListener("submit", (event) => {
         event.preventDefault();
-        mostrarLoading(true);
+        carregarTabela(1);
+    });
+
+    document.getElementById("btn-limpar").addEventListener("click", () => {
+        document.getElementById('filtro-ordem').value = '';
+        document.getElementById('filtro-peca').value = '';
+        document.getElementById('filtro-maquina').value = '';
+        document.getElementById('filtro-data-criacao-inicio').value = '';
+        document.getElementById('filtro-data-criacao-fim').value = '';
         carregarTabela(1);
     });
 
