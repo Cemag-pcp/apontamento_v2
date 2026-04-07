@@ -227,8 +227,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             let prod = 0, insp = 0, nc = 0;
             data.forEach(item => {
+                const inspItem = Number(item["N° de inspeções"]) || 0;
                 prod += Number(item["N° de peças produzidas"]) || 0;
-                insp += Number(item["N° de inspeções"]) || 0;
+                insp += inspItem;
                 nc   += Number(item["N° de não conformidades"]) || 0;
                 tbody.insertAdjacentHTML('beforeend', `
                     <tr>
