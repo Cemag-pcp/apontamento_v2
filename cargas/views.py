@@ -1285,9 +1285,25 @@ def ordens_status_montagem(request):
         traz as ordens aguardando inicio, em andamento e finalizadas na montagem
     """
 
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+
+    ano_atual = datetime.now().year
+
+    try:
+        data_inicio = parse_date(data_inicio_str) if data_inicio_str else datetime(ano_atual, 1, 1).date()
+        data_fim = parse_date(data_fim_str) if data_fim_str else datetime.now().date()
+    except (ValueError, TypeError):
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    if data_inicio is None or data_fim is None:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
     # Monta os filtros para a model Ordem
     filtros_ordem = {
-        'grupo_maquina': 'montagem'
+        'grupo_maquina': 'montagem',
+        'data_carga__gte': data_inicio,
+        'data_carga__lte': data_fim,
     }
 
     # Máquinas a excluir da contagem / retorno

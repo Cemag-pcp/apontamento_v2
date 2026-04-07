@@ -231,10 +231,10 @@ body {
     background: var(--db-orange);
     color: #fff;
     text-align: center;
-    padding: 18px 28px 36px;
+    padding: 18px 24px 40px;
     clip-path: polygon(0 0, 100% 0, 100% 68%, 50% 100%, 0 68%);
     width: 155px;
-    min-height: 135px;
+    min-height: 168px;
 }
 .ig-title {
     font-size: 0.75rem;
@@ -247,6 +247,19 @@ body {
 .ig-value {
     font-size: 2.1rem;
     font-weight: 900;
+}
+.ig-meta-label {
+    margin-top: 4px;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    opacity: 0.9;
+}
+.ig-meta-value {
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.1;
 }
 
 /* ── KPI Arrow Cards ── */

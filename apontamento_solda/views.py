@@ -1078,9 +1078,20 @@ def api_ordens_finalizadas(request):
     return JsonResponse(final_results, safe=False)
 
 def api_tempos(request):
+    hoje = localtime(now()).date()
+
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
+    except ValueError:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT 
+            SELECT
                 o.id as id_ordem,
                 o.ordem AS ordem,
                 po.peca AS codigo,
@@ -1096,9 +1107,13 @@ def api_tempos(request):
             LEFT JOIN apontamento_v2.core_ordemprocesso op ON op.ordem_id = o.id
             LEFT JOIN apontamento_v2.apontamento_solda_pecasordem po ON po.processo_ordem_id = op.id
             LEFT JOIN apontamento_v2.cadastro_maquina m ON o.maquina_id = m.id
-            WHERE o.grupo_maquina = 'solda' AND op.data_inicio IS NOT null and o.ordem_pai_id is null and qtd_planejada notnull 
+            WHERE o.grupo_maquina = 'solda'
+              AND op.data_inicio IS NOT NULL
+              AND o.ordem_pai_id IS NULL
+              AND qtd_planejada IS NOT NULL
+              AND (op.data_inicio AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN %s AND %s
             ORDER BY o.ordem, op.data_inicio
-        """)
+        """, [data_inicio, data_fim])
         columns = [col[0] for col in cursor.description]
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]
 

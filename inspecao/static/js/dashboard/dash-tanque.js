@@ -86,6 +86,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── KPIs ───────────────────────────────────────────────────────────────
     function atualizarKPIs(totalInsp, totalNC) {
+        document.getElementById('kpi-total-produzido').textContent =
+            totalInsp.toLocaleString('pt-BR');
         document.getElementById('kpi-pecas-inspecionadas').textContent =
             totalInsp.toLocaleString('pt-BR');
         document.getElementById('kpi-nao-conformidade').textContent =

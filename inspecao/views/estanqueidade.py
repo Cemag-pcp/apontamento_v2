@@ -26,6 +26,7 @@ from django.db.models.functions import (
     TruncMonth,
     ExtractYear,
     ExtractMonth,
+    Coalesce,
 )
 from django.db.models.functions.window import RowNumber
 
@@ -50,6 +51,19 @@ from core.models import Profile
 from datetime import datetime, timedelta
 from collections import defaultdict
 import json
+
+
+def _get_prefixed_post_list(query_dict, prefix):
+    values = query_dict.getlist(prefix)
+    if values:
+        return values
+
+    bracket_prefix = f"{prefix}["
+    collected = []
+    for key in query_dict.keys():
+        if key.startswith(bracket_prefix) and key.endswith("]"):
+            collected.extend(query_dict.getlist(key))
+    return collected
 
 
 def inspecao_tanque(request):
@@ -445,7 +459,9 @@ def envio_inspecao_tubos_cilindros(request):
                 reinspecao.save()
                 # Itera sobre todas as causas (causas_1, causas_2, etc.)
                 for i in range(1, quantidade_total_causas + 1):
-                    causas = request.POST.getlist(f"causas_{i}")  # Lista de causas
+                    causas = _get_prefixed_post_list(
+                        request.POST, f"causas_{i}"
+                    )  # Lista de causas
                     quantidade = request.POST.get(f"quantidade_{i}")
                     imagens = request.FILES.getlist(f"imagens_{i}")  # Lista de arquivos
 
@@ -550,8 +566,8 @@ def envio_reinspecao_tubos_cilindros(request):
             if reteste_status_estanqueidade == "Não Conforme":
                 # Itera sobre todas as causas (causas_1, causas_2, etc.)
                 for i in range(1, quantidade_total_causas + 1):
-                    causas = request.POST.getlist(
-                        f"causas_reinspecao_{i}"
+                    causas = _get_prefixed_post_list(
+                        request.POST, f"causas_reinspecao_{i}"
                     )  # Lista de causas
                     quantidade = request.POST.get(f"quantidade_reinspecao_{i}")
                     imagens = request.FILES.getlist(
@@ -1625,6 +1641,7 @@ def causas_nao_conformidade_mensal_tanque(request):
     nao_conformidades = DetalhesPressaoTanque.objects.filter(
         nao_conformidade=True,
         dados_exec_inspecao__inspecao_estanqueidade__peca__tipo="tanque",
+        dados_exec_inspecao__num_execucao=0,
     )
 
     # Aplica filtros de data se fornecidos
@@ -1654,7 +1671,12 @@ def causas_nao_conformidade_mensal_tanque(request):
             )
         )
         .values("mes_formatado", "peca_info")
-        .annotate(quantidade=Count("id"))
+        .annotate(
+            quantidade=Count(
+                "dados_exec_inspecao__inspecao_estanqueidade_id",
+                distinct=True,
+            )
+        )
         .order_by("mes_formatado", "peca_info")
     )
 
@@ -1839,6 +1861,11 @@ def causas_nao_conformidade_mensal_tubos_cilindros(request):
         causa__isnull=False,  # Filtra registros sem causa antes da agregação
     )
 
+    queryset = CausasNaoConformidadeEstanqueidade.objects.filter(
+        info_tubos_cilindros__dados_exec_inspecao__data_exec__isnull=False,
+        info_tubos_cilindros__dados_exec_inspecao__inspecao_estanqueidade__peca__isnull=False,
+    )
+
     if data_inicio:
         queryset = queryset.filter(
             info_tubos_cilindros__dados_exec_inspecao__data_exec__gte=data_inicio
@@ -1864,18 +1891,19 @@ def causas_nao_conformidade_mensal_tubos_cilindros(request):
                 Value(' - '),
                 'info_tubos_cilindros__dados_exec_inspecao__inspecao_estanqueidade__peca__descricao',
                 output_field=CharField(),
-            )
+            ),
+            causa_nome=Coalesce("causa__nome", Value("Sem causa informada")),
         )
-        .values("mes_formatado", "causa__nome", "peca_info")
+        .values("mes_formatado", "causa_nome", "peca_info")
         .annotate(total_nao_conformidades=Sum("quantidade"))
-        .order_by("mes_formatado", "causa__nome", "peca_info")
+        .order_by("mes_formatado", "causa_nome", "peca_info")
     )
 
     # Formatação final
     resultado = [
         {
             "Data": item["mes_formatado"],
-            "Causa": item["causa__nome"],
+            "Causa": item["causa_nome"],
             "Peca": item["peca_info"],  # Adiciona a informação da peça
             "Soma do N° Total de não conformidades": item["total_nao_conformidades"],
         }

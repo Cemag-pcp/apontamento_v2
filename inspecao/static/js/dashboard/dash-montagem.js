@@ -5,14 +5,14 @@ const productionChart = new Chart(document.getElementById('productionChart').get
         labels: [],
         datasets: [
             {
-                label: 'Total de Inspeções',
+                label: 'Total produzido',
                 data: [],
                 backgroundColor: 'rgba(27, 42, 74, 0.75)',
                 borderColor: 'rgba(27, 42, 74, 1)',
                 borderWidth: 1
             },
             {
-                label: 'Total de Não Conformidades',
+                label: 'Quantidade inspecionada',
                 data: [],
                 backgroundColor: 'rgba(224, 90, 43, 0.75)',
                 borderColor: 'rgba(224, 90, 43, 1)',
@@ -115,6 +115,14 @@ document.addEventListener('DOMContentLoaded', function () {
         return p.length ? '?' + p.join('&') : '';
     }
 
+    function normalizeMonthKey(value) {
+        const raw = String(value || '').trim();
+        const match = raw.match(/^(\d{4})-(\d{1,2})$/);
+        if (!match) return raw;
+        const [, year, month] = match;
+        return `${year}-${month.padStart(2, '0')}`;
+    }
+
     async function safeFetch(url) {
         const r = await fetch(url);
         if (!r.ok) throw new Error(`Erro ao buscar ${url}`);
@@ -122,7 +130,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ── KPIs ───────────────────────────────────────────────────────────────
-    function atualizarKPIs(totalInsp, totalNC) {
+    function atualizarKPIs(totalProd, totalInsp, totalNC) {
+        document.getElementById('kpi-total-produzido').textContent =
+            totalProd.toLocaleString('pt-BR');
         document.getElementById('kpi-pecas-inspecionadas').textContent =
             totalInsp.toLocaleString('pt-BR');
         document.getElementById('kpi-nao-conformidade').textContent =
@@ -140,30 +150,60 @@ document.addEventListener('DOMContentLoaded', function () {
         const qs = buildParams(s, e);
         try {
             const [dataMon, dataTan, dataTub] = await Promise.all([
-                safeFetch(`/inspecao/montagem/api/indicador-montagem-analise-temporal/${qs}`),
-                safeFetch(`/inspecao/tanque/api/indicador-tanque-analise-temporal/${qs}`),
-                safeFetch(`/inspecao/tubos-cilindros/api/indicador-tubos-cilindros-analise-temporal/${qs}`)
+                safeFetch(`/inspecao/montagem/api/indicador-montagem-resumo-analise-temporal/${qs}`),
+                safeFetch(`/inspecao/tanque/api/indicador-tanque-resumo-analise-temporal/${qs}`),
+                safeFetch(`/inspecao/tubos-cilindros/api/indicador-tubos-cilindros-resumo-analise-temporal/${qs}`)
             ]);
 
-            // Merge by month label; preserve order from all three sources
+            console.log('[dash-montagem] grafico resumo montagem', dataMon);
+            console.log('[dash-montagem] grafico resumo tanque', dataTan);
+            console.log('[dash-montagem] grafico resumo tubos', dataTub);
+
             const mesSet = new Map();
-            const addToMap = (arr) => arr.forEach(item => {
-                if (!mesSet.has(item.mes)) mesSet.set(item.mes, { mon: 0, tan: 0, tub: 0, nc: 0, insp: 0 });
-            });
-            addToMap(dataMon); addToMap(dataTan); addToMap(dataTub);
+            const ensureMonth = (mes) => {
+                const key = normalizeMonthKey(mes);
+                if (!mesSet.has(key)) mesSet.set(key, { prod: 0, insp: 0, nc: 0 });
+                return mesSet.get(key);
+            };
 
-            [...dataMon, ...dataTan, ...dataTub].forEach(item => {
-                const v = mesSet.get(item.mes);
-                v.insp += item.qtd_peca_inspecionada;
-                v.nc   += Math.round(item.taxa_nao_conformidade * item.qtd_peca_inspecionada);
+            dataMon.forEach(item => {
+                const mes = item.Data;
+                const v = ensureMonth(mes);
+                v.prod += Number(item["N° de peças produzidas"]) || 0;
+                v.insp += Number(item["N° de inspeções"]) || 0;
+                v.nc += Number(item["N° de não conformidades"]) || 0;
             });
 
-            const labels = [...mesSet.keys()];
+            dataTan.forEach(item => {
+                const mes = item.Data;
+                const v = ensureMonth(mes);
+                const insp = Number(item["N° de inspeções"]) || 0;
+                v.prod += insp;
+                v.insp += insp;
+                v.nc += Number(item["N° de não conformidades"]) || 0;
+            });
+
+            dataTub.forEach(item => {
+                const mes = item.Data;
+                const v = ensureMonth(mes);
+                const insp = Number(item["N° de inspeções"]) || 0;
+                v.prod += insp;
+                v.insp += insp;
+                v.nc += Number(item["N° de não conformidades"]) || 0;
+            });
+
+            const labels = [...mesSet.keys()].sort();
             const vals   = [...mesSet.values()];
 
+            console.log('[dash-montagem] grafico consolidado', labels.map((mes, index) => ({
+                mes,
+                ...vals[index],
+                taxa_nc: vals[index].insp > 0 ? parseFloat((vals[index].nc / vals[index].insp * 100).toFixed(2)) : 0
+            })));
+
             productionChart.data.labels = labels;
-            productionChart.data.datasets[0].data = vals.map(v => v.insp);
-            productionChart.data.datasets[1].data = vals.map(v => v.nc);
+            productionChart.data.datasets[0].data = vals.map(v => v.prod);
+            productionChart.data.datasets[1].data = vals.map(v => v.insp);
             productionChart.data.datasets[2].data = vals.map(v =>
                 v.insp > 0 ? parseFloat((v.nc / v.insp * 100).toFixed(2)) : 0
             );
@@ -183,11 +223,13 @@ document.addEventListener('DOMContentLoaded', function () {
             tbody.innerHTML = '';
             if (!data.length) {
                 tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-2">Sem dados.</td></tr>`;
-                return { insp: 0, nc: 0 };
+                return { prod: 0, insp: 0, nc: 0 };
             }
-            let insp = 0, nc = 0;
+            let prod = 0, insp = 0, nc = 0;
             data.forEach(item => {
-                insp += Number(item["N° de inspeções"]) || 0;
+                const inspItem = Number(item["N° de inspeções"]) || 0;
+                prod += Number(item["N° de peças produzidas"]) || 0;
+                insp += inspItem;
                 nc   += Number(item["N° de não conformidades"]) || 0;
                 tbody.insertAdjacentHTML('beforeend', `
                     <tr>
@@ -198,10 +240,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         <td>${item["% de inspeção"]}</td>
                     </tr>`);
             });
-            return { insp, nc };
+            return { prod, insp, nc };
         } catch (err) {
             console.error(err);
-            return { insp: 0, nc: 0 };
+            return { prod: 0, insp: 0, nc: 0 };
         }
     }
 
@@ -214,27 +256,28 @@ document.addEventListener('DOMContentLoaded', function () {
             const tbody = document.querySelector('#table-tanque tbody');
             tbody.innerHTML = '';
             if (!data.length) {
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-2">Sem dados.</td></tr>`;
-                return { insp: 0, nc: 0 };
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-2">Sem dados.</td></tr>`;
+                return { prod: 0, insp: 0, nc: 0 };
             }
-            let insp = 0, nc = 0;
+            let prod = 0, insp = 0, nc = 0;
             data.forEach(item => {
                 const i = Number(item["N° de inspeções"]) || 0;
                 const n = Number(item["N° de não conformidades"]) || 0;
-                insp += i; nc += n;
+                prod += i; insp += i; nc += n;
                 const pct = i > 0 ? ((n / i) * 100).toFixed(2).replace('.', ',') + '%' : '0,00%';
                 tbody.insertAdjacentHTML('beforeend', `
                     <tr>
                         <td>${item.Data}</td>
                         <td>${i.toLocaleString('pt-BR')}</td>
+                        <td>${i.toLocaleString('pt-BR')}</td>
                         <td>${n.toLocaleString('pt-BR')}</td>
                         <td>${pct}</td>
                     </tr>`);
             });
-            return { insp, nc };
+            return { prod, insp, nc };
         } catch (err) {
             console.error(err);
-            return { insp: 0, nc: 0 };
+            return { prod: 0, insp: 0, nc: 0 };
         }
     }
 
@@ -247,25 +290,27 @@ document.addEventListener('DOMContentLoaded', function () {
             const tbody = document.querySelector('#table-tubos tbody');
             tbody.innerHTML = '';
             if (!data.length) {
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-2">Sem dados.</td></tr>`;
-                return { insp: 0, nc: 0 };
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-2">Sem dados.</td></tr>`;
+                return { prod: 0, insp: 0, nc: 0 };
             }
-            let insp = 0, nc = 0;
+            let prod = 0, insp = 0, nc = 0;
             data.forEach(item => {
+                prod += Number(item["N° de inspeções"]) || 0;
                 insp += Number(item["N° de inspeções"]) || 0;
                 nc   += Number(item["N° de não conformidades"]) || 0;
                 tbody.insertAdjacentHTML('beforeend', `
                     <tr>
                         <td>${item.Data}</td>
                         <td>${item["N° de inspeções"]}</td>
+                        <td>${item["N° de inspeções"]}</td>
                         <td>${item["N° de não conformidades"]}</td>
                         <td>${item["% de não conformidade"]}</td>
                     </tr>`);
             });
-            return { insp, nc };
+            return { prod, insp, nc };
         } catch (err) {
             console.error(err);
-            return { insp: 0, nc: 0 };
+            return { prod: 0, insp: 0, nc: 0 };
         }
     }
 
@@ -429,9 +474,10 @@ document.addEventListener('DOMContentLoaded', function () {
             carregarCausasTubos(s, e)
         ]);
 
+        const totalProd = (kpiMon.prod || 0) + (kpiTan.prod || kpiTan.insp || 0) + (kpiTub.prod || kpiTub.insp || 0);
         const totalInsp = kpiMon.insp + kpiTan.insp + kpiTub.insp;
         const totalNC   = kpiMon.nc  + kpiTan.nc  + kpiTub.nc;
-        atualizarKPIs(totalInsp, totalNC);
+        atualizarKPIs(totalProd, totalInsp, totalNC);
         atualizarGraficoCausas(causMon, causTan, causTub);
         carregarCarrosselImagens(s, e);
     }
