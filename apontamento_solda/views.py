@@ -1044,7 +1044,8 @@ def api_ordens_finalizadas(request):
             INNER JOIN apontamento_v2.apontamento_solda_pecasordem po ON o.id = po.ordem_id
             INNER JOIN apontamento_v2.core_ordemprocesso co on co.id = po.processo_ordem_id 
             WHERE 
-                co.data_fim >= '2025-04-08'
+                (co.data_fim AT TIME ZONE 'America/Sao_Paulo')::date >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '1 day'
+                AND (co.data_fim AT TIME ZONE 'America/Sao_Paulo')::date <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
                 AND po.qtd_boa > 0
             ORDER BY co.data_fim;
         """)

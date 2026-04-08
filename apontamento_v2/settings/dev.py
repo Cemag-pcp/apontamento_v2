@@ -26,16 +26,20 @@ CSRF_TRUSTED_ORIGINS = [
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'dj_db_conn_pool.backends.postgresql',
         'NAME': env('DB_NAME'),
         'USER': env('DB_USER'),
         'PASSWORD': env('DB_PASSWORD'),
         'HOST': env('DB_HOST'),
         'PORT': env('DB_PORT'),
-        'CONN_MAX_AGE': 60,
-        'CONN_HEALTH_CHECKS': True,
+        'CONN_MAX_AGE': 0,
+        'POOL_OPTIONS': {
+            'POOL_SIZE': 5,
+            'MAX_OVERFLOW': 5,
+            'RECYCLE': 300,
+        },
         'OPTIONS': {
-            'options': '-c search_path='+env('BASE_PROD'),
+            'options': '-c search_path=' + env('BASE_PROD'),
             'connect_timeout': 5,
         },
     }

@@ -95,6 +95,28 @@ def listar_programas(request):
         'total': len(dados)
     })
 
+
+def _saldo_disponivel_programacao(peca_ordem, programa_id_excluir=None):
+    qtd_pendurada = (
+        CambaoPecas.objects.filter(peca_ordem=peca_ordem).aggregate(
+            total=Sum("quantidade_pendurada", output_field=models.FloatField())
+        )["total"]
+        or 0
+    )
+
+    programacoes = Programacao.objects.filter(peca_ordem=peca_ordem)
+    if programa_id_excluir:
+        programacoes = programacoes.exclude(programa_id=programa_id_excluir)
+
+    qtd_programada = (
+        programacoes.aggregate(
+            total=Sum("qtd_programacao", output_field=models.FloatField())
+        )["total"]
+        or 0
+    )
+
+    return max(0, peca_ordem.qtd_planejada - qtd_pendurada - qtd_programada)
+
 @csrf_exempt
 def deletar_programa(request):
     """
@@ -644,6 +666,129 @@ def adicionar_pecas_programacao(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+@csrf_exempt
+def editar_programa(request):
+    """
+    Edita um programa de pintura em lote.
+    Espera:
+    {
+        "programa_id": 1,
+        "itens": [
+            {"id": 10, "peca_ordem_id": 25, "quantidade": 4},
+            {"peca_ordem_id": 30, "quantidade": 2}
+        ]
+    }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'MÃ©todo nÃ£o permitido'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        programa_id = data.get('programa_id')
+        itens = data.get('itens', [])
+
+        if not programa_id:
+            return JsonResponse({'error': 'ID do programa Ã© obrigatÃ³rio'}, status=400)
+
+        if not itens:
+            return JsonResponse({'error': 'Informe ao menos um item para o programa'}, status=400)
+
+        programa = get_object_or_404(Programa, id=programa_id)
+        programacoes_atuais = {
+            programacao.id: programacao
+            for programacao in Programacao.objects.filter(programa=programa)
+        }
+
+        quantidades_por_peca = defaultdict(float)
+        itens_normalizados = []
+
+        for item in itens:
+            programacao_id = item.get('id')
+            peca_ordem_id = item.get('peca_ordem_id')
+            quantidade = item.get('quantidade')
+
+            if not peca_ordem_id:
+                return JsonResponse({'error': 'Toda linha precisa ter um conjunto selecionado'}, status=400)
+
+            try:
+                quantidade = float(quantidade)
+            except (TypeError, ValueError):
+                return JsonResponse({'error': 'Quantidade invÃ¡lida informada'}, status=400)
+
+            if quantidade <= 0:
+                return JsonResponse({'error': 'A quantidade deve ser maior que zero'}, status=400)
+
+            peca_ordem = get_object_or_404(
+                PecasOrdem.objects.select_related('ordem'),
+                id=peca_ordem_id,
+            )
+
+            if peca_ordem.ordem.cor != programa.cor:
+                return JsonResponse(
+                    {'error': f'A peÃ§a {peca_ordem.peca} nÃ£o pertence Ã  cor do programa.'},
+                    status=400
+                )
+
+            quantidades_por_peca[peca_ordem.id] += quantidade
+            itens_normalizados.append({
+                'id': int(programacao_id) if programacao_id else None,
+                'peca_ordem': peca_ordem,
+                'quantidade': quantidade,
+            })
+
+        for peca_ordem_id, quantidade_total in quantidades_por_peca.items():
+            peca_ordem = next(
+                item['peca_ordem'] for item in itens_normalizados if item['peca_ordem'].id == peca_ordem_id
+            )
+            qtd_disponivel = _saldo_disponivel_programacao(peca_ordem, programa_id_excluir=programa.id)
+
+            if quantidade_total > qtd_disponivel:
+                return JsonResponse(
+                    {
+                        'error': (
+                            f'A peça {peca_ordem.peca} só possui '
+                            f'{qtd_disponivel} unidades disponíveis para planejamento.'
+                        )
+                    },
+                    status=400
+                )
+
+        with transaction.atomic():
+            ids_recebidos = set()
+
+            for item in itens_normalizados:
+                programacao_id = item['id']
+                peca_ordem = item['peca_ordem']
+                quantidade = item['quantidade']
+
+                if programacao_id:
+                    programacao = programacoes_atuais.get(programacao_id)
+                    if not programacao:
+                        return JsonResponse(
+                            {'error': 'Uma das linhas enviadas nÃ£o pertence ao programa informado'},
+                            status=400
+                        )
+
+                    programacao.peca_ordem = peca_ordem
+                    programacao.qtd_programacao = quantidade
+                    programacao.save(update_fields=['peca_ordem', 'qtd_programacao'])
+                    ids_recebidos.add(programacao.id)
+                else:
+                    nova_programacao = Programacao.objects.create(
+                        programa=programa,
+                        peca_ordem=peca_ordem,
+                        qtd_programacao=quantidade,
+                    )
+                    ids_recebidos.add(nova_programacao.id)
+
+            Programacao.objects.filter(programa=programa).exclude(id__in=ids_recebidos).delete()
+
+        return JsonResponse({'success': True, 'message': 'Programa atualizado com sucesso'})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @csrf_exempt
 def remover_peca_programa(request):
@@ -1568,7 +1713,7 @@ def api_ordens_finalizadas(request):
     data_fim_str = request.GET.get('data_fim')
 
     try:
-        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje - timedelta(days=1)
         data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)

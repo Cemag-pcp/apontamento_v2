@@ -851,7 +851,7 @@ def verificar_mp_pecas_na_ordem(request):
     
 def api_apontamentos_peca(request):
     ordens = (
-        Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra', excluida=False)
+        Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra', excluida=False, ordem_pecas_serra__data__date__gte=now().date() - timedelta(days=1))
         .exclude(Q(ordem_pecas_serra__peca__codigo='GRAU') | Q(ordem_pecas_serra__peca__codigo='RECORTE'))  # Exclui GRAU e RECORTE
         .select_related('operador_final', 'maquina')  # Para otimizar a relação com operador_final
         .prefetch_related('ordem_pecas_serra__peca')  # Ajustado para usar o related_name correto
@@ -893,7 +893,7 @@ def api_apontamentos_peca(request):
 
 def api_apontamentos_mp(request):
     propriedades_ordens = (
-        PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra', ordem__excluida=False)
+        PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra', ordem__excluida=False, ordem__ordem_pecas_serra__data__date__gte=now().date() - timedelta(days=1))
         .exclude(Q(mp_codigo__codigo='GRAU') | Q(mp_codigo__codigo='RECORTE'))  # Exclui GRAU e RECORTE
         .select_related('ordem', 'mp_codigo', 'nova_mp')  # Otimiza consultas relacionadas
         # .order_by('ordem__ordem_pecas_serra__data')  # Ordena pelo campo `data` da tabela `Ordem`

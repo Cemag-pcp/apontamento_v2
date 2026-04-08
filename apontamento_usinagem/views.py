@@ -1239,7 +1239,8 @@ def api_ordens_finalizadas(request):
             LEFT JOIN apontamento_v2.cadastro_operador f ON o.operador_final_id = f.id
             WHERE 
                 o.status_atual = 'finalizada'
-                AND o.ultima_atualizacao >= '2025-04-08'
+                AND (o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo')::date >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '1 day'
+                AND (o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo')::date <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
                 AND ope.qtd_boa > 0
             ORDER BY o.ultima_atualizacao;
         """)

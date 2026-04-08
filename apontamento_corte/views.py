@@ -951,7 +951,7 @@ def api_ordens_finalizadas(request):
     data_fim_str = request.GET.get('data_fim')
 
     try:
-        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje - timedelta(days=1)
         data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
     except ValueError:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
@@ -1041,7 +1041,8 @@ def api_ordens_finalizadas_mp(request):
         WHERE 
             o.status_atual = 'finalizada'
         AND o.grupo_maquina IN ('laser_1', 'laser_2', 'plasma','laser_3')
-        AND o.ultima_atualizacao >= '2025-04-08'
+        AND (o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo')::date >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '1 day'
+        AND (o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo')::date <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
         ORDER BY o.ultima_atualizacao;
         """)
 
@@ -1059,11 +1060,13 @@ def api_ordens_criadas(request):
                 poc.peca,
                 poc.qtd_planejada,
                 o.status_atual,
-                m.nome AS maquina
+                m.nome AS maquina,
+                TO_CHAR(o.ultima_atualizacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS ultima_atualizacao
             FROM apontamento_v2.core_ordem o
             INNER JOIN apontamento_v2.apontamento_corte_pecasordem poc ON poc.ordem_id = o.id
             LEFT JOIN apontamento_v2.cadastro_maquina m ON m.id = o.maquina_id
-            WHERE o.ultima_atualizacao >= '2025-04-08'
+            WHERE (o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo')::date >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '1 day'
+            AND (o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo')::date <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
             ORDER BY o.ultima_atualizacao;
         """)
         columns = [col[0] for col in cursor.description]
