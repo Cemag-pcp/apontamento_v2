@@ -29,6 +29,12 @@ function classeCorBadge(cor) {
   }
 })();
 
+function possuiFornecedoresPendentes(codigosEspeciais, fornecedores) {
+  return Object.entries(codigosEspeciais || {}).some(([tipo, itens = []]) =>
+    itens.some(({ codigo }) => !(fornecedores[`${tipo}_${codigo}`] || '').trim())
+  );
+}
+
 export async function popularPacotesDaCarga(cargaId) {
 
   const Toast = Swal.mixin({
@@ -58,11 +64,9 @@ export async function popularPacotesDaCarga(cargaId) {
 
     // Atualiza o badge de fornecedores no card do kanban se necessário
     if (data.status_carga === 'verificacao') {
-      const tiposEspeciais = Array.isArray(data.tipos_especiais) ? data.tipos_especiais : [];
-      const fornecedores   = data.fornecedores || {};
-      const fornecedoresPendentes = tiposEspeciais.length > 0 && tiposEspeciais.some(tipo => {
-        return !fornecedores[`fornecedor_${tipo.toLowerCase()}`]?.trim();
-      });
+      const codigosEspeciais = data.codigos_especiais || {};
+      const fornecedores = data.fornecedores || {};
+      const fornecedoresPendentes = possuiFornecedoresPendentes(codigosEspeciais, fornecedores);
 
       const cardEl = document.querySelector(`.card-kanban[data-id="${cargaId}"]`);
       if (cardEl) {
@@ -116,13 +120,10 @@ export async function popularPacotesDaCarga(cargaId) {
     `;
 
     // Botão de fornecedores (apenas na etapa verificação, se houver tipos especiais)
-    const tiposEspeciais = Array.isArray(data.tipos_especiais) ? data.tipos_especiais : [];
+    const codigosEspeciais = data.codigos_especiais || {};
     const fornecedores = data.fornecedores || {};
-    if (data.status_carga === 'verificacao' && tiposEspeciais.length > 0) {
-      const todosFornecidos = tiposEspeciais.every(tipo => {
-        const key = `fornecedor_${tipo.toLowerCase()}`;
-        return fornecedores[key]?.trim();
-      });
+    if (data.status_carga === 'verificacao' && Object.keys(codigosEspeciais).length > 0) {
+      const todosFornecidos = !possuiFornecedoresPendentes(codigosEspeciais, fornecedores);
       const btnCls = todosFornecidos ? 'btn-success' : 'btn-warning';
       const btnLabel = todosFornecidos
         ? '<i class="fas fa-check-circle me-1"></i>Fornecedores informados'
@@ -154,7 +155,7 @@ export async function popularPacotesDaCarga(cargaId) {
     const btnAbrirForn = modalBody.querySelector('#btnAbrirFornecedores');
     if (btnAbrirForn) {
       btnAbrirForn.addEventListener('click', () => {
-        abrirModalFornecedores(cargaId, tiposEspeciais, fornecedores);
+        abrirModalFornecedores(cargaId, codigosEspeciais, fornecedores);
       });
     }
 
@@ -1047,26 +1048,53 @@ function impressaoZebra(id_pacote, cliente, data_carga, nome_pacote){
 
 // ===== Modal de Fornecedores de Peças Especiais =====
 
-export function abrirModalFornecedores(cargaId, tiposEspeciais, fornecedores) {
+function renderizarInputsFornecedor(containerId, tipo, itens, fornecedores) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  itens.forEach(({ codigo, descricao }) => {
+    const fornecedorAtual = fornecedores[`${tipo}_${codigo}`] || '';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'border rounded p-2 bg-light-subtle';
+    wrapper.innerHTML = `
+      <div class="small fw-semibold mb-1">${codigo}</div>
+      <div class="small text-muted mb-2">${descricao || 'Sem descrição'}</div>
+      <input
+        type="text"
+        class="form-control forn-input-item"
+        data-tipo="${tipo}"
+        data-codigo="${codigo}"
+        placeholder="Nome do fornecedor"
+        value="${fornecedorAtual.replace(/"/g, '&quot;')}"
+      >
+    `;
+    container.appendChild(wrapper);
+  });
+}
+
+export function abrirModalFornecedores(cargaId, codigosEspeciais, fornecedores) {
   document.getElementById('fornCargaId').value = cargaId;
 
   const grupoMap = {
-    'Pneu':     { grupo: 'fornGrupoPneu',     input: 'fornInputPneu',     key: 'fornecedor_pneu' },
-    'Cilindro': { grupo: 'fornGrupoCilindro', input: 'fornInputCilindro', key: 'fornecedor_cilindro' },
-    'Roda':     { grupo: 'fornGrupoRoda',     input: 'fornInputRoda',     key: 'fornecedor_roda' },
+    'Pneu':     { grupo: 'fornGrupoPneu', container: 'fornInputsPneu' },
+    'Cilindro': { grupo: 'fornGrupoCilindro', container: 'fornInputsCilindro' },
+    'Roda':     { grupo: 'fornGrupoRoda', container: 'fornInputsRoda' },
   };
 
-  Object.entries(grupoMap).forEach(([tipo, { grupo, input, key }]) => {
+  Object.entries(grupoMap).forEach(([tipo, { grupo, container }]) => {
     const grupoEl = document.getElementById(grupo);
-    const inputEl = document.getElementById(input);
-    if (!grupoEl || !inputEl) return;
+    if (!grupoEl) return;
+    const itens = Array.isArray(codigosEspeciais[tipo]) ? codigosEspeciais[tipo] : [];
 
-    if (tiposEspeciais.includes(tipo)) {
+    if (itens.length > 0) {
       grupoEl.classList.remove('d-none');
-      inputEl.value = fornecedores[key] || '';
+      renderizarInputsFornecedor(container, tipo, itens, fornecedores);
     } else {
       grupoEl.classList.add('d-none');
-      inputEl.value = '';
+      const containerEl = document.getElementById(container);
+      if (containerEl) containerEl.innerHTML = '';
     }
   });
 
@@ -1095,11 +1123,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const cargaId = document.getElementById('fornCargaId').value;
     const spin = document.getElementById('spinFornecedores');
 
-    const payload = {
-      fornecedor_pneu:     (document.getElementById('fornInputPneu')?.value || '').trim(),
-      fornecedor_cilindro: (document.getElementById('fornInputCilindro')?.value || '').trim(),
-      fornecedor_roda:     (document.getElementById('fornInputRoda')?.value || '').trim(),
-    };
+    const payload = Array.from(document.querySelectorAll('#formFornecedores .forn-input-item')).map((input) => ({
+      tipo: input.dataset.tipo || '',
+      codigo: input.dataset.codigo || '',
+      fornecedor: (input.value || '').trim(),
+    }));
 
     btnSalvar.disabled = true;
     spin?.classList.remove('d-none');

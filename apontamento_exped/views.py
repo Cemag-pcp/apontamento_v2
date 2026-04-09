@@ -11,7 +11,7 @@ from django.db.models.functions import Coalesce
 from django.utils.timezone import localtime
 
 from cargas.utils import get_data_from_sheets,tratando_dados
-from .models import Carga,ItemPacote,Pacote,VerificacaoPacote, CarretaCarga, ImagemPacote, PendenciasPacote, ItemPacote, FornecedoresCarga
+from .models import Carga,ItemPacote,Pacote,VerificacaoPacote, CarretaCarga, ImagemPacote, PendenciasPacote, ItemPacote, FornecedorItemCarga
 from .utils import chamar_impressora, buscar_conjuntos_carreta, limpar_cor, chamar_impressora_qrcode
 from cadastro.models import CarretasExplodidas
 
@@ -89,22 +89,31 @@ def parse_total(v):
 # Tipos especiais de peças que exigem fornecedor informado antes de avançar da verificação
 _TIPOS_ESPECIAIS = ['Pneu', 'Cilindro', 'Roda']
 
-def _detectar_tipos_especiais_da_carga(carga_id):
-    """Retorna lista dos tipos especiais presentes nos itens da carga."""
+def _detectar_codigos_especiais_da_carga(carga_id):
+    """
+    Retorna dict {tipo: [{codigo, descricao}, ...]} com os códigos únicos
+    de peças especiais presentes nos itens da carga.
+    """
     itens = ItemPacote.objects.filter(
         pacote__carga_id=carga_id
     ).select_related('codigo')
 
-    tipos = set()
+    # tipo -> {codigo: descricao}
+    codigos = {tipo: {} for tipo in _TIPOS_ESPECIAIS}
     for item in itens:
         cod_obj = getattr(item, 'codigo', None)
-        codigo = getattr(cod_obj, 'codigo', '') or item.codigo_informado or ''
-        descricao = getattr(cod_obj, 'descricao', '') or item.descricao_informada or ''
+        codigo = (getattr(cod_obj, 'codigo', '') or item.codigo_informado or '').strip()
+        descricao = (getattr(cod_obj, 'descricao', '') or item.descricao_informada or '').strip()
         texto = f"{codigo} {descricao}".upper()
         for tipo in _TIPOS_ESPECIAIS:
-            if tipo.upper() in texto:
-                tipos.add(tipo)
-    return sorted(tipos)
+            if tipo.upper() in texto and codigo:
+                codigos[tipo][codigo] = descricao
+
+    return {
+        tipo: [{'codigo': c, 'descricao': d} for c, d in cod_dict.items()]
+        for tipo, cod_dict in codigos.items()
+        if cod_dict
+    }
 
 
 # =========== Template inicial ==========
@@ -168,16 +177,17 @@ def relatorios_impressao(request):
             .order_by('nome', 'id')
         )
 
-        cargas = Carga.objects.filter(data_carga=data_consulta)
+        cargas_qs = Carga.objects.filter(data_carga=data_consulta)
+        cargas = cargas_qs
         if cliente:
             cargas = cargas.filter(cliente=cliente)
 
         cargas = (
             cargas
             .prefetch_related(
-                Prefetch('pacotes', queryset=pacotes_qs)
+                Prefetch('pacotes', queryset=pacotes_qs),
+                Prefetch('fornecedores_itens', queryset=FornecedorItemCarga.objects.all())
             )
-            .select_related('fornecedores')
             .order_by('cliente', 'carga', 'id')
         )
 
@@ -195,6 +205,15 @@ def relatorios_impressao(request):
                 for item in carretas_agrupadas
             ]
 
+    # fornecedores_map: {carga_id: {codigo: fornecedor}}
+    fornecedores_map = {}
+    if data_consulta:
+        for carga_obj in cargas:
+            fdict = {}
+            for f in carga_obj.fornecedores_itens.all():
+                fdict[f.codigo] = f.fornecedor
+            fornecedores_map[carga_obj.id] = fdict
+
     context = {
         'data_str': data_str,
         'data_consulta': data_consulta,
@@ -203,6 +222,7 @@ def relatorios_impressao(request):
         'cargas': cargas,
         'report_ready': bool(data_str),
         'cliente': cliente,
+        'fornecedores_map': fornecedores_map,
     }
     return render(request, 'apontamento_exped/relatorios_impressao.html', context)
 
@@ -440,28 +460,27 @@ def buscar_cargas(request):
     # Detectar fornecedores pendentes (apenas cargas em verificação)
     verificacao_ids = [c['id'] for c in cargas if c['stage'] == 'verificacao']
 
-    # cargas_com_tipo: mapa tipo -> set de carga_ids que têm itens desse tipo
-    cargas_com_tipo = {'Pneu': set(), 'Cilindro': set(), 'Roda': set()}
+    # codigos_por_carga: carga_id -> {tipo -> set of codigos}
+    codigos_por_carga = defaultdict(lambda: defaultdict(set))
     if verificacao_ids:
-        for tipo in _TIPOS_ESPECIAIS:
-            t = tipo.upper()
-            ids = (
-                ItemPacote.objects
-                .filter(pacote__carga_id__in=verificacao_ids)
-                .filter(
-                    Q(codigo__codigo__icontains=t) | Q(codigo__descricao__icontains=t) |
-                    Q(codigo_informado__icontains=t) | Q(descricao_informada__icontains=t)
-                )
-                .values_list('pacote__carga_id', flat=True)
-                .distinct()
-            )
-            cargas_com_tipo[tipo] = set(ids)
+        items_verif = ItemPacote.objects.filter(
+            pacote__carga_id__in=verificacao_ids
+        ).values('pacote__carga_id', 'codigo__codigo', 'codigo__descricao',
+                 'codigo_informado', 'descricao_informada')
 
-        # fornecedores já salvos para essas cargas
-        forn_map = {
-            f.carga_id: f
-            for f in FornecedoresCarga.objects.filter(carga_id__in=verificacao_ids)
-        }
+        for row in items_verif:
+            codigo = (row['codigo__codigo'] or row['codigo_informado'] or '').strip()
+            descricao = (row['codigo__descricao'] or row['descricao_informada'] or '').strip()
+            texto = f"{codigo} {descricao}".upper()
+            cid_row = row['pacote__carga_id']
+            for tipo in _TIPOS_ESPECIAIS:
+                if tipo.upper() in texto and codigo:
+                    codigos_por_carga[cid_row][tipo].add(codigo)
+
+        # fornecedores já salvos para essas cargas: carga_id -> {(tipo, codigo) -> fornecedor}
+        forn_map = defaultdict(dict)
+        for f in FornecedorItemCarga.objects.filter(carga_id__in=verificacao_ids):
+            forn_map[f.carga_id][(f.tipo, f.codigo)] = f.fornecedor
     else:
         forn_map = {}
 
@@ -482,11 +501,11 @@ def buscar_cargas(request):
 
         # Badge de fornecedores pendentes
         if carga['stage'] == 'verificacao':
-            forn = forn_map.get(cid)
-            faltando = (
-                (cid in cargas_com_tipo['Pneu']     and not (forn and forn.fornecedor_pneu.strip()))     or
-                (cid in cargas_com_tipo['Cilindro']  and not (forn and forn.fornecedor_cilindro.strip())) or
-                (cid in cargas_com_tipo['Roda']      and not (forn and forn.fornecedor_roda.strip()))
+            codigos = codigos_por_carga.get(cid, {})
+            faltando = any(
+                not forn_map.get(cid, {}).get((tipo, cod), '').strip()
+                for tipo, cods in codigos.items()
+                for cod in cods
             )
             carga['fornecedores_pendentes'] = faltando
         else:
@@ -923,20 +942,13 @@ def buscar_pacotes_carga(request, id):
         .order_by('carreta', 'id')
     )
 
-    # Tipos especiais e fornecedores (só relevante no estágio verificação)
-    tipos_especiais = []
+    # Códigos especiais e fornecedores (só relevante no estágio verificação)
+    codigos_especiais = {}
     fornecedores = {}
     if carga.stage == 'verificacao':
-        tipos_especiais = _detectar_tipos_especiais_da_carga(carga.id)
-        try:
-            forn = carga.fornecedores
-            fornecedores = {
-                'fornecedor_pneu': forn.fornecedor_pneu,
-                'fornecedor_cilindro': forn.fornecedor_cilindro,
-                'fornecedor_roda': forn.fornecedor_roda,
-            }
-        except FornecedoresCarga.DoesNotExist:
-            fornecedores = {'fornecedor_pneu': '', 'fornecedor_cilindro': '', 'fornecedor_roda': ''}
+        codigos_especiais = _detectar_codigos_especiais_da_carga(carga.id)
+        salvos = FornecedorItemCarga.objects.filter(carga=carga)
+        fornecedores = {f"{f.tipo}_{f.codigo}": f.fornecedor for f in salvos}
 
     return JsonResponse({
         'pacotes': dados,
@@ -945,7 +957,7 @@ def buscar_pacotes_carga(request, id):
         'data_carga': carga.data_carga.strftime("%d/%m/%Y"),
         'carga': carga.carga,
         'carretas': carretas,
-        'tipos_especiais': tipos_especiais,
+        'codigos_especiais': codigos_especiais,
         'fornecedores': fornecedores,
     })
 
@@ -991,22 +1003,17 @@ def alterar_stage(request, id):
     if stage_atual == 'planejamento':
         carga.stage = 'verificacao'
     elif stage_atual == 'verificacao':
-        # Verificar fornecedores obrigatórios para tipos especiais presentes
-        tipos_presentes = _detectar_tipos_especiais_da_carga(id)
-        if tipos_presentes:
-            try:
-                forn = carga.fornecedores
-            except FornecedoresCarga.DoesNotExist:
-                forn = None
-
-            faltando = []
-            if 'Pneu' in tipos_presentes and not (forn and forn.fornecedor_pneu.strip()):
-                faltando.append('Pneu')
-            if 'Cilindro' in tipos_presentes and not (forn and forn.fornecedor_cilindro.strip()):
-                faltando.append('Cilindro')
-            if 'Roda' in tipos_presentes and not (forn and forn.fornecedor_roda.strip()):
-                faltando.append('Roda')
-
+        # Verificar fornecedores obrigatórios para cada código especial presente
+        codigos_especiais = _detectar_codigos_especiais_da_carga(id)
+        if codigos_especiais:
+            salvos = {(f.tipo, f.codigo): f.fornecedor
+                      for f in FornecedorItemCarga.objects.filter(carga=carga)}
+            faltando = [
+                f"{tipo} ({item['codigo']})"
+                for tipo, itens in codigos_especiais.items()
+                for item in itens
+                if not salvos.get((tipo, item['codigo']), '').strip()
+            ]
             if faltando:
                 return JsonResponse({
                     'erro': f'Informe o fornecedor de {", ".join(faltando)} antes de avançar.'
@@ -1027,24 +1034,33 @@ def alterar_stage(request, id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def salvar_fornecedores(request, carga_id):
-    """Salva/atualiza os fornecedores de peças especiais para uma carga."""
+    """Salva/atualiza os fornecedores por código de peça especial para uma carga."""
     carga = get_object_or_404(Carga, id=carga_id)
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
         return JsonResponse({'erro': 'JSON inválido.'}, status=400)
 
-    obj, _ = FornecedoresCarga.objects.get_or_create(carga=carga)
-    obj.fornecedor_pneu = data.get('fornecedor_pneu', obj.fornecedor_pneu).strip()
-    obj.fornecedor_cilindro = data.get('fornecedor_cilindro', obj.fornecedor_cilindro).strip()
-    obj.fornecedor_roda = data.get('fornecedor_roda', obj.fornecedor_roda).strip()
-    obj.save()
+    # data é uma lista de {tipo, codigo, fornecedor}
+    if not isinstance(data, list):
+        return JsonResponse({'erro': 'Formato inválido. Esperado lista de {tipo, codigo, fornecedor}.'}, status=400)
 
-    tipos_presentes = _detectar_tipos_especiais_da_carga(carga.id)
-    faltando = (
-        ('Pneu'     in tipos_presentes and not obj.fornecedor_pneu.strip())     or
-        ('Cilindro' in tipos_presentes and not obj.fornecedor_cilindro.strip()) or
-        ('Roda'     in tipos_presentes and not obj.fornecedor_roda.strip())
+    with transaction.atomic():
+        for entry in data:
+            tipo = entry.get('tipo', '').strip()
+            codigo = entry.get('codigo', '').strip()
+            fornecedor = entry.get('fornecedor', '').strip()
+            if tipo and codigo:
+                obj, _ = FornecedorItemCarga.objects.get_or_create(carga=carga, tipo=tipo, codigo=codigo)
+                obj.fornecedor = fornecedor
+                obj.save()
+
+    codigos_especiais = _detectar_codigos_especiais_da_carga(carga.id)
+    salvos = {(f.tipo, f.codigo): f.fornecedor for f in FornecedorItemCarga.objects.filter(carga=carga)}
+    faltando = any(
+        not salvos.get((tipo, item['codigo']), '').strip()
+        for tipo, itens in codigos_especiais.items()
+        for item in itens
     )
     return JsonResponse({'mensagem': 'Fornecedores salvos com sucesso!', 'fornecedores_pendentes': faltando})
 
