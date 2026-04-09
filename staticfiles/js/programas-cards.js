@@ -1,5 +1,10 @@
 import { resetarCardsInicial } from './ordem-criada-pintura.js';
 
+let programaEdicaoAtual = null;
+let itensDisponiveisPrograma = [];
+let ultimoFiltroCards = {};
+let termoBuscaItensPrograma = '';
+
 /**
  * Módulo para gerenciar a visualização em cards dos programas de pintura
  * Mostra programas com suas respectivas peças, cores e status
@@ -27,6 +32,7 @@ const PRIORIDADE_CORES = {
  * @param {Object} filtros - Filtros para buscar programas (data_inicial, data_final, tipo_tinta, cor)
  */
 export const carregarProgramasCards = async (filtros = {}) => {
+    ultimoFiltroCards = filtros;
     const container = document.getElementById('cards-container');
     
     if (!container) {
@@ -52,7 +58,7 @@ export const carregarProgramasCards = async (filtros = {}) => {
         if (filtros.tipo_tinta) params.append('tipo_tinta', filtros.tipo_tinta);
         if (filtros.cor) params.append('cor', filtros.cor);
 
-        const response = await fetch(`/pintura/api/listar-programas/`);
+        const response = await fetch(`/pintura/api/listar-programas/?${params.toString()}`);
         
         if (!response.ok) {
             throw new Error('Erro ao buscar programas');
@@ -150,9 +156,14 @@ const criarCardPrograma = (programa) => {
                 </div>
             </div>
             <div class="card-footer bg-transparent border-top py-2">
-                <button class="btn btn-success btn-sm w-100" onclick='iniciarPrograma(${programa.id}, "${programa.tipo_tinta}", "${programa.cor}", ${JSON.stringify(programa.pecas)}, this)'>
-                    <i class="fas fa-play me-2"></i>Iniciar
-                </button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary btn-sm flex-fill" onclick='editarPrograma(${JSON.stringify(programa)}, this)'>
+                        <i class="fas fa-pen me-2"></i>Editar
+                    </button>
+                    <button class="btn btn-success btn-sm flex-fill" onclick='iniciarPrograma(${programa.id}, "${programa.tipo_tinta}", "${programa.cor}", ${JSON.stringify(programa.pecas)}, this)'>
+                        <i class="fas fa-play me-2"></i>Iniciar
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -226,6 +237,167 @@ const getStatusBadge = (status) => {
 /**
  * Funções globais para ações dos cards
  */
+const normalizarDataCarga = (dataCarga) => {
+    if (!dataCarga) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dataCarga)) return dataCarga;
+
+    const partes = dataCarga.split('/');
+    if (partes.length === 3) {
+        const [dia, mes, ano] = partes;
+        return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+    }
+
+    return '';
+};
+
+const buscarItensDisponiveisPrograma = async (cor, dataCarga) => {
+    const params = new URLSearchParams({
+        type_template: 'programacao',
+        cor: cor || '',
+        data_carga: normalizarDataCarga(dataCarga),
+    });
+
+    const response = await fetch(`/pintura/api/ordens-criadas/?${params.toString()}`);
+    if (!response.ok) {
+        throw new Error('Erro ao carregar itens disponiveis');
+    }
+
+    const data = await response.json();
+    return data.ordens || [];
+};
+
+const montarOpcoesSelectItem = (selectedId) => {
+    const itensUnicos = new Map();
+
+    itensDisponiveisPrograma.forEach((item) => {
+        itensUnicos.set(String(item.peca_ordem_id), item);
+    });
+
+    (programaEdicaoAtual?.pecas || []).forEach((item) => {
+        const key = String(item.peca_ordem_id);
+        if (!itensUnicos.has(key)) {
+            itensUnicos.set(key, {
+                peca_ordem_id: item.peca_ordem_id,
+                peca_codigo: item.peca_codigo,
+                ordem: item.ordem,
+                qt_restante: 0
+            });
+        }
+    });
+
+    const options = [`<option value="">Selecione...</option>`];
+    itensUnicos.forEach((item, key) => {
+        const selected = key === String(selectedId) ? 'selected' : '';
+        options.push(`<option value="${key}" data-ordem="${item.ordem || ''}" data-codigo="${item.peca_codigo}" data-disponivel="${item.qt_restante || 0}" ${selected}>#${item.ordem || ''} - ${item.peca_codigo}</option>`);
+    });
+
+    return options.join('');
+};
+
+const atualizarSelectAdicionar = () => {
+    const select = document.getElementById('editarProgramaItemSelect');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Selecione um item disponível...</option>';
+    itensDisponiveisPrograma.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item.peca_ordem_id;
+        option.textContent = `#${item.ordem || ''} - ${item.peca_codigo} (${item.qt_restante} disponÃ­vel)`;
+        option.dataset.ordem = item.ordem || '';
+        option.dataset.codigo = item.peca_codigo;
+        option.dataset.disponivel = item.qt_restante || 0;
+        select.appendChild(option);
+    });
+};
+
+const renderizarTabelaEdicaoPrograma = () => {
+    const tbody = document.getElementById('editarProgramaTabelaBody');
+    if (!tbody) return;
+
+    if (!programaEdicaoAtual?.pecas?.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Nenhum item no planejamento.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = programaEdicaoAtual.pecas.map((peca, index) => {
+        const itemDisponivel = itensDisponiveisPrograma.find((item) => String(item.peca_ordem_id) === String(peca.peca_ordem_id));
+        const saldoBase = Number(
+            peca.disponivel ?? itemDisponivel?.qt_restante ?? 0
+        );
+        const saldo = peca.id
+            ? saldoBase + Number(peca.quantidade || 0)
+            : saldoBase;
+
+        return `
+            <tr data-index="${index}">
+                <td class="editar-programa-ordem">#${peca.ordem || ''}</td>
+                <td><select class="form-select form-select-sm editar-programa-select">${montarOpcoesSelectItem(peca.peca_ordem_id)}</select></td>
+                <td class="editar-programa-disponivel">${saldo}</td>
+                <td><input type="number" class="form-control form-control-sm editar-programa-quantidade" min="1" value="${peca.quantidade}"></td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger editar-programa-remover"><i class="fas fa-trash-alt"></i></button></td>
+            </tr>
+        `;
+    }).join('');
+
+    tbody.querySelectorAll('.editar-programa-select').forEach((select) => {
+        select.addEventListener('change', (event) => {
+            const row = event.target.closest('tr');
+            const index = Number(row.dataset.index);
+            const option = event.target.selectedOptions[0];
+
+            programaEdicaoAtual.pecas[index].peca_ordem_id = option.value;
+            programaEdicaoAtual.pecas[index].ordem = option.dataset.ordem || '';
+            programaEdicaoAtual.pecas[index].peca_codigo = option.dataset.codigo || '';
+            programaEdicaoAtual.pecas[index].disponivel = Number(option.dataset.disponivel || 0);
+            programaEdicaoAtual.pecas[index].id = null;
+
+            row.querySelector('.editar-programa-ordem').textContent = `#${option.dataset.ordem || ''}`;
+            row.querySelector('.editar-programa-disponivel').textContent = option.dataset.disponivel || '0';
+        });
+    });
+
+    tbody.querySelectorAll('.editar-programa-quantidade').forEach((input) => {
+        input.addEventListener('input', (event) => {
+            const row = event.target.closest('tr');
+            const index = Number(row.dataset.index);
+            programaEdicaoAtual.pecas[index].quantidade = event.target.value;
+        });
+    });
+
+    tbody.querySelectorAll('.editar-programa-remover').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            const row = event.target.closest('tr');
+            const index = Number(row.dataset.index);
+            programaEdicaoAtual.pecas.splice(index, 1);
+            renderizarTabelaEdicaoPrograma();
+        });
+    });
+};
+
+const abrirModalEdicaoPrograma = async (programa) => {
+    programaEdicaoAtual = JSON.parse(JSON.stringify(programa));
+    const dataCargaPrograma = programa.pecas?.[0]?.data_carga || '';
+    itensDisponiveisPrograma = await buscarItensDisponiveisPrograma(programa.cor, dataCargaPrograma);
+    programaEdicaoAtual.pecas = (programaEdicaoAtual.pecas || []).map((peca) => {
+        const itemDisponivel = itensDisponiveisPrograma.find((item) => String(item.peca_ordem_id) === String(peca.peca_ordem_id));
+        return {
+            ...peca,
+            disponivel: Number(itemDisponivel?.qt_restante || 0),
+        };
+    });
+
+    document.getElementById('editarProgramaResumo').textContent = `Programa #${String(programa.num_programa).padStart(3, '0')} | ${programa.cor} | ${programa.tipo_tinta}`;
+    document.getElementById('editarProgramaQuantidadeNova').value = 1;
+    termoBuscaItensPrograma = '';
+    document.getElementById('editarProgramaBuscaItem').value = '';
+
+    atualizarSelectAdicionar();
+    renderizarTabelaEdicaoPrograma();
+
+    const modal = new bootstrap.Modal(document.getElementById('modalEditarPrograma'));
+    modal.show();
+};
+
 window.visualizarPrograma = (programaId) => {
     console.log('Visualizar programa:', programaId);
     // Implementar lógica de visualização
@@ -445,4 +617,134 @@ style.textContent = `
 document.head.appendChild(style);
 
 // Exportar funções
+window.editarPrograma = async (programa) => {
+    try {
+        await abrirModalEdicaoPrograma(programa);
+    } catch (error) {
+        console.error('Erro ao abrir ediÃ§Ã£o do programa:', error);
+        alert('Erro ao carregar os dados para ediÃ§Ã£o.');
+    }
+};
+
+document.getElementById('btnAdicionarItemPrograma')?.addEventListener('click', () => {
+    if (!programaEdicaoAtual) return;
+
+    const select = document.getElementById('editarProgramaItemSelect');
+    const quantidadeInput = document.getElementById('editarProgramaQuantidadeNova');
+    const option = select?.selectedOptions?.[0];
+    const quantidade = Number(quantidadeInput?.value || 0);
+
+    if (!option || !option.value) {
+        alert('Selecione um item para adicionar.');
+        return;
+    }
+
+    if (!quantidade || quantidade <= 0) {
+        alert('Informe uma quantidade vÃ¡lida.');
+        return;
+    }
+
+    const itemExistente = programaEdicaoAtual.pecas.find(
+        (item) => String(item.peca_ordem_id) === String(option.value)
+    );
+
+    if (itemExistente) {
+        itemExistente.quantidade = Number(itemExistente.quantidade || 0) + quantidade;
+    } else {
+        programaEdicaoAtual.pecas.push({
+            id: null,
+            peca_ordem_id: option.value,
+            ordem: option.dataset.ordem || '',
+            peca_codigo: option.dataset.codigo || '',
+            disponivel: Number(option.dataset.disponivel || 0),
+            quantidade
+        });
+    }
+
+    quantidadeInput.value = 1;
+    select.value = '';
+    renderizarTabelaEdicaoPrograma();
+});
+
+document.getElementById('btnSalvarEdicaoPrograma')?.addEventListener('click', async () => {
+    if (!programaEdicaoAtual) return;
+
+    const itens = (programaEdicaoAtual.pecas || []).map((item) => ({
+        id: item.id || undefined,
+        peca_ordem_id: item.peca_ordem_id,
+        quantidade: Number(item.quantidade)
+    }));
+
+    if (!itens.length) {
+        alert('O programa precisa ter pelo menos um item.');
+        return;
+    }
+
+    if (itens.some((item) => !item.peca_ordem_id || !item.quantidade || item.quantidade <= 0)) {
+        alert('Revise conjunto e quantidade de todos os itens antes de salvar.');
+        return;
+    }
+
+    const botaoSalvar = document.getElementById('btnSalvarEdicaoPrograma');
+    const textoOriginal = botaoSalvar.innerHTML;
+    botaoSalvar.disabled = true;
+    botaoSalvar.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Salvando...';
+
+    try {
+        const response = await fetch('/pintura/api/editar-programa/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                programa_id: programaEdicaoAtual.id,
+                itens
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Erro ao salvar programa');
+        }
+
+        const modalElement = document.getElementById('modalEditarPrograma');
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        modalInstance?.hide();
+
+        const cardsTabAtiva = document.getElementById('cards-tab');
+        if (cardsTabAtiva?.classList.contains('active')) {
+            carregarProgramasCards(ultimoFiltroCards);
+        }
+    } catch (error) {
+        console.error('Erro ao salvar ediÃ§Ã£o do programa:', error);
+        alert(error.message || 'Erro ao salvar programa.');
+    } finally {
+        botaoSalvar.disabled = false;
+        botaoSalvar.innerHTML = textoOriginal;
+    }
+});
+
+document.getElementById('editarProgramaBuscaItem')?.addEventListener('input', (event) => {
+    termoBuscaItensPrograma = event.target.value || '';
+
+    const select = document.getElementById('editarProgramaItemSelect');
+    if (!select) return;
+
+    const termo = termoBuscaItensPrograma.trim().toLowerCase();
+    select.innerHTML = '<option value="">Selecione um item disponivel...</option>';
+
+    itensDisponiveisPrograma.forEach((item) => {
+        const textoBusca = `#${item.ordem || ''} ${item.peca_codigo || ''}`.toLowerCase();
+        if (termo && !textoBusca.includes(termo)) return;
+
+        const option = document.createElement('option');
+        option.value = item.peca_ordem_id;
+        option.textContent = `#${item.ordem || ''} - ${item.peca_codigo} (${item.qt_restante} disponivel)`;
+        option.dataset.ordem = item.ordem || '';
+        option.dataset.codigo = item.peca_codigo;
+        option.dataset.disponivel = item.qt_restante || 0;
+        select.appendChild(option);
+    });
+});
+
 export default carregarProgramasCards;
