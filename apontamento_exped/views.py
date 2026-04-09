@@ -214,6 +214,17 @@ def relatorios_impressao(request):
                 fdict[f.codigo] = f.fornecedor
             fornecedores_map[carga_obj.id] = fdict
 
+            # Facilita o uso no template de impressão: cada item já sai com o
+            # fornecedor resolvido pelo código da peça.
+            for pacote in carga_obj.pacotes.all():
+                for item in pacote.itens.all():
+                    codigo_item = (
+                        (getattr(getattr(item, 'codigo', None), 'codigo', None))
+                        or item.codigo_informado
+                        or ''
+                    ).strip()
+                    item.fornecedor_relatorio = fdict.get(codigo_item, '')
+
     context = {
         'data_str': data_str,
         'data_consulta': data_consulta,
