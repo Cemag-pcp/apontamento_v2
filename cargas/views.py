@@ -1284,11 +1284,12 @@ def ordens_status_montagem(request):
     data_inicio_str = request.GET.get('data_inicio')
     data_fim_str = request.GET.get('data_fim')
 
-    ano_atual = datetime.now().year
+    hoje = now().date()
+    ontem = hoje - timedelta(days=1)
 
     try:
-        data_inicio = parse_date(data_inicio_str) if data_inicio_str else datetime(ano_atual, 1, 1).date()
-        data_fim = parse_date(data_fim_str) if data_fim_str else datetime.now().date()
+        data_inicio = parse_date(data_inicio_str) if data_inicio_str else ontem
+        data_fim = parse_date(data_fim_str) if data_fim_str else hoje
     except (ValueError, TypeError):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
@@ -1298,8 +1299,8 @@ def ordens_status_montagem(request):
     # Monta os filtros para a model Ordem
     filtros_ordem = {
         'grupo_maquina': 'montagem',
-        'data_carga__gte': data_inicio,
-        'data_carga__lte': data_fim,
+        'ultima_atualizacao__date__gte': data_inicio,
+        'ultima_atualizacao__date__lte': data_fim,
     }
 
     # Máquinas a excluir da contagem / retorno
@@ -1343,7 +1344,7 @@ def ordens_status_montagem(request):
         restante=ExpressionWrapper(
             F('total_planejada') - F('total_boa'), output_field=FloatField()
         )
-    ).order_by('-ordem__ultima_atualizacao')[:1000]
+    ).order_by('ordem__ultima_atualizacao')
 
     resultado_final = list(pecas_ordem_agg)
 
