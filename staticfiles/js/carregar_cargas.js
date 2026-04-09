@@ -1,6 +1,6 @@
 ﻿import { getCookie } from './criar_caixa.js';
 import { resetFormCriarPacote } from './criar_pacote.js';
-import { atualizarSlotAvancar } from './kanbans.js';
+import { atualizarSlotAvancar, preencherSlotAvancar } from './kanbans.js';
 
 // helper pra mapear a cor (pt-BR) -> classe do Bootstrap
 function classeCorBadge(cor) {
@@ -56,6 +56,34 @@ export async function popularPacotesDaCarga(cargaId) {
     const response = await fetch(`api/buscar-pacote/${cargaId}/`);
     const data = await response.json();
 
+    // Atualiza o badge de fornecedores no card do kanban se necessário
+    if (data.status_carga === 'verificacao') {
+      const tiposEspeciais = Array.isArray(data.tipos_especiais) ? data.tipos_especiais : [];
+      const fornecedores   = data.fornecedores || {};
+      const fornecedoresPendentes = tiposEspeciais.length > 0 && tiposEspeciais.some(tipo => {
+        return !fornecedores[`fornecedor_${tipo.toLowerCase()}`]?.trim();
+      });
+
+      const cardEl = document.querySelector(`.card-kanban[data-id="${cargaId}"]`);
+      if (cardEl) {
+        const pendentesAntes = cardEl.dataset.fornecedoresPendentes === 'true';
+        if (fornecedoresPendentes !== pendentesAntes) {
+          cardEl.dataset.fornecedoresPendentes = fornecedoresPendentes ? 'true' : 'false';
+          const slot = cardEl.querySelector('.slot-avancar');
+          if (slot) {
+            preencherSlotAvancar({
+              id:                                Number(cargaId),
+              stage:                             cardEl.dataset.stage,
+              todos_pacotes_tem_foto_verificacao: cardEl.dataset.todosPhotoVerificacao === 'true',
+              todos_pacotes_tem_foto_despachado:  cardEl.dataset.todosPhotoDespachado  === 'true',
+              fornecedores_pendentes:             fornecedoresPendentes,
+              total_pendente:                    Number(cardEl.dataset.totalPendente || 0),
+            }, slot);
+          }
+        }
+      }
+    }
+
     // monta a linha das carretas
     const carretas = Array.isArray(data.carretas) ? data.carretas : [];
     const carretasChips = carretas.length
@@ -87,6 +115,27 @@ export async function popularPacotesDaCarga(cargaId) {
         </div>
     `;
 
+    // Botão de fornecedores (apenas na etapa verificação, se houver tipos especiais)
+    const tiposEspeciais = Array.isArray(data.tipos_especiais) ? data.tipos_especiais : [];
+    const fornecedores = data.fornecedores || {};
+    if (data.status_carga === 'verificacao' && tiposEspeciais.length > 0) {
+      const todosFornecidos = tiposEspeciais.every(tipo => {
+        const key = `fornecedor_${tipo.toLowerCase()}`;
+        return fornecedores[key]?.trim();
+      });
+      const btnCls = todosFornecidos ? 'btn-success' : 'btn-warning';
+      const btnLabel = todosFornecidos
+        ? '<i class="fas fa-check-circle me-1"></i>Fornecedores informados'
+        : '<i class="fas fa-exclamation-triangle me-1"></i>Informar Fornecedores (obrigatório)';
+      infoHTML += `
+        <div>
+          <button type="button" class="btn ${btnCls} btn-sm" id="btnAbrirFornecedores">
+            ${btnLabel}
+          </button>
+        </div>
+      `;
+    }
+
     if (data.status_carga !== 'despachado') {
       infoHTML += `
         <div>
@@ -95,12 +144,19 @@ export async function popularPacotesDaCarga(cargaId) {
           </button>
         </div>
       `;
-      
     }
 
     infoHTML += `</div>`; // fecha a div de linha
-    
+
     modalBody.innerHTML = infoHTML;
+
+    // Wiring do botão de fornecedores
+    const btnAbrirForn = modalBody.querySelector('#btnAbrirFornecedores');
+    if (btnAbrirForn) {
+      btnAbrirForn.addEventListener('click', () => {
+        abrirModalFornecedores(cargaId, tiposEspeciais, fornecedores);
+      });
+    }
 
     if (data.status_carga !== 'despachado') {
       // Busca o botÃ£o dentro do escopo do modal, que Ã© mais eficiente
@@ -988,3 +1044,115 @@ function impressaoZebra(id_pacote, cliente, data_carga, nome_pacote){
   });
 
 }
+
+// ===== Modal de Fornecedores de Peças Especiais =====
+
+export function abrirModalFornecedores(cargaId, tiposEspeciais, fornecedores) {
+  document.getElementById('fornCargaId').value = cargaId;
+
+  const grupoMap = {
+    'Pneu':     { grupo: 'fornGrupoPneu',     input: 'fornInputPneu',     key: 'fornecedor_pneu' },
+    'Cilindro': { grupo: 'fornGrupoCilindro', input: 'fornInputCilindro', key: 'fornecedor_cilindro' },
+    'Roda':     { grupo: 'fornGrupoRoda',     input: 'fornInputRoda',     key: 'fornecedor_roda' },
+  };
+
+  Object.entries(grupoMap).forEach(([tipo, { grupo, input, key }]) => {
+    const grupoEl = document.getElementById(grupo);
+    const inputEl = document.getElementById(input);
+    if (!grupoEl || !inputEl) return;
+
+    if (tiposEspeciais.includes(tipo)) {
+      grupoEl.classList.remove('d-none');
+      inputEl.value = fornecedores[key] || '';
+    } else {
+      grupoEl.classList.add('d-none');
+      inputEl.value = '';
+    }
+  });
+
+  // Fecha o modal de pacotes para evitar conflito de backdrop
+  const modalPacotesEl = document.getElementById('visualizarPacote');
+  bootstrap.Modal.getInstance(modalPacotesEl)?.hide();
+
+  const modalFornEl = document.getElementById('modalFornecedores');
+
+  // Ao fechar o modal de fornecedores, reabre o de pacotes
+  const reabrir = () => {
+    const modalPacotes = bootstrap.Modal.getOrCreateInstance(modalPacotesEl);
+    modalPacotes.show();
+    modalFornEl.removeEventListener('hidden.bs.modal', reabrir);
+  };
+  modalFornEl.addEventListener('hidden.bs.modal', reabrir);
+
+  bootstrap.Modal.getOrCreateInstance(modalFornEl).show();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btnSalvar = document.getElementById('btnSalvarFornecedores');
+  if (!btnSalvar) return;
+
+  btnSalvar.addEventListener('click', async () => {
+    const cargaId = document.getElementById('fornCargaId').value;
+    const spin = document.getElementById('spinFornecedores');
+
+    const payload = {
+      fornecedor_pneu:     (document.getElementById('fornInputPneu')?.value || '').trim(),
+      fornecedor_cilindro: (document.getElementById('fornInputCilindro')?.value || '').trim(),
+      fornecedor_roda:     (document.getElementById('fornInputRoda')?.value || '').trim(),
+    };
+
+    btnSalvar.disabled = true;
+    spin?.classList.remove('d-none');
+
+    try {
+      const resp = await fetch(`api/salvar-fornecedores/${cargaId}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.erro || 'Erro ao salvar fornecedores.');
+      }
+
+      const respData = await resp.json().catch(() => ({}));
+      const fornecedoresPendentes = respData.fornecedores_pendentes ?? false;
+
+      // Atualiza apenas o card correspondente no kanban
+      const cardEl = document.querySelector(`.card-kanban[data-id="${cargaId}"]`);
+      if (cardEl) {
+        cardEl.dataset.fornecedoresPendentes = fornecedoresPendentes ? 'true' : 'false';
+        const slot = cardEl.querySelector('.slot-avancar');
+        if (slot) {
+          preencherSlotAvancar({
+            id:                               Number(cargaId),
+            stage:                            cardEl.dataset.stage,
+            todos_pacotes_tem_foto_verificacao: cardEl.dataset.todosPhotoVerificacao === 'true',
+            todos_pacotes_tem_foto_despachado:  cardEl.dataset.todosPhotoDespachado  === 'true',
+            fornecedores_pendentes:             fornecedoresPendentes,
+            total_pendente:                   Number(cardEl.dataset.totalPendente || 0),
+          }, slot);
+        }
+      }
+
+      const currentCargaId = document.getElementById('idCargaPacote').value;
+      const modalFornEl = document.getElementById('modalFornecedores');
+      const modalPacotesEl = document.getElementById('visualizarPacote');
+      const recarregar = () => {
+        if (currentCargaId) popularPacotesDaCarga(currentCargaId);
+        modalPacotesEl.removeEventListener('shown.bs.modal', recarregar);
+      };
+      modalPacotesEl.addEventListener('shown.bs.modal', recarregar);
+      bootstrap.Modal.getInstance(modalFornEl)?.hide();
+    } catch (err) {
+      alert(err.message || 'Erro ao salvar fornecedores.');
+    } finally {
+      btnSalvar.disabled = false;
+      spin?.classList.add('d-none');
+    }
+  });
+});

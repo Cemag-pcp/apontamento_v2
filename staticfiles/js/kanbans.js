@@ -209,88 +209,51 @@ export function criarBotaoAvancar(cargaId) {
  * - Para estágio 'planejamento': busca pendências e decide entre ALERTA x BOTÃO.
  * - Demais estágios: mantém sua lógica original.
  */
-export async function preencherSlotAvancar(carga, slotEl) {
-  // Limpa o slot
+export function preencherSlotAvancar(carga, slotEl) {
+  const pend = (carga.total_pendente == null) ? null : Number(carga.total_pendente);
   slotEl.innerHTML = '';
 
+  // ── Planejamento ──────────────────────────────────────
   if (carga.stage === 'planejamento') {
-    // container horizontal para botão + avisos
-    const row = document.createElement('div');
-    row.className = 'd-flex align-items-center gap-2';
-
-    // botão sempre presente
-    const btn = criarBotaoAvancar(carga.id);
-    row.appendChild(btn);
-
-    // verificar pendências
-    let totalPend = null;
-    try {
-      totalPend = await verificarPendencias(carga.id);
-    } catch (_) {
-      totalPend = null;
+    slotEl.appendChild(criarBotaoAvancar(carga.id));
+    if (pend > 0) {
+      const b = document.createElement('span');
+      b.className = 'badge bg-warning text-dark';
+      b.title = `${pend} item(ns) sem pacotes`;
+      b.textContent = `${pend} pendente(s)`;
+      slotEl.appendChild(b);
     }
-
-    const pend = (totalPend === null || totalPend === undefined) ? null : Number(totalPend);
-
-    if (pend === null) {
-      const warn = document.createElement('div');
-      warn.className = 'alert alert-secondary mb-0 py-1 px-2 small';
-      warn.textContent = 'Não foi possível verificar pendências.';
-      row.appendChild(warn);
-    } else if (pend > 0) {
-      const warn = document.createElement('div');
-      warn.className = 'alert alert-warning mb-0 py-1 px-2 small';
-      warn.textContent = `Contém ${pend} item(ns) sem pacotes.`;
-      row.appendChild(warn);
-    }
-
-    slotEl.replaceChildren(row);
     return;
   }
 
-  // --- Demais estágios ---
-  if (carga.stage === 'verificacao' && carga.todos_pacotes_tem_foto_verificacao) {
-    // Verificação ok -> botão avançar
-    slotEl.replaceChildren(criarBotaoAvancar(carga.id));
-  } else if (carga.stage === 'despachado' && carga.todos_pacotes_tem_foto_despachado) {
-    // Despachado -> badge OK
-    const ok = document.createElement('span');
-    ok.className = 'badge bg-success';
-    ok.textContent = 'Despachado';
-    slotEl.replaceChildren(ok);
-  } else {
-    // Aguardando fotos -> badge + (novo) warning de pendências ao lado
-    const row = document.createElement('div');
-    row.className = 'd-flex align-items-center gap-2';
+  // ── Verificação: tudo ok ──────────────────────────────
+  if (carga.stage === 'verificacao' && carga.todos_pacotes_tem_foto_verificacao && !carga.fornecedores_pendentes) {
+    slotEl.appendChild(criarBotaoAvancar(carga.id));
+    return;
+  }
 
-    const pendBadge = document.createElement('span');
-    pendBadge.className = 'badge bg-warning';
-    pendBadge.textContent = 'Aguardando fotos';
-    row.appendChild(pendBadge);
+  // ── Despachado: tudo ok ───────────────────────────────
+  if (carga.stage === 'despachado' && carga.todos_pacotes_tem_foto_despachado) {
+    const b = document.createElement('span');
+    b.className = 'badge bg-success';
+    b.textContent = 'Concluído';
+    slotEl.appendChild(b);
+    return;
+  }
 
-    // buscar pendências para exibir ao lado
-    let totalPend = null;
-    try {
-      totalPend = await verificarPendencias(carga.id);
-    } catch (_) {
-      totalPend = null;
-    }
-    const pend = (totalPend === null || totalPend === undefined) ? null : Number(totalPend);
-
-    if (pend === null) {
-      const warn = document.createElement('div');
-      warn.className = 'alert alert-secondary mb-0 py-1 px-2 small';
-      warn.textContent = 'Não foi possível verificar pendências.';
-      row.appendChild(warn);
-    } else if (pend > 0) {
-      const warn = document.createElement('div');
-      warn.className = 'alert alert-warning mb-0 py-1 px-2 small';
-      warn.textContent = `Contém ${pend} item(ns) sem pacotes.`;
-      row.appendChild(warn);
-    }
-    // se pend === 0, não mostra o warning (fica só o badge)
-
-    slotEl.replaceChildren(row);
+  // ── Pendências bloqueando avanço ──────────────────────
+  if (carga.stage === 'verificacao' && !carga.todos_pacotes_tem_foto_verificacao) {
+    const b = document.createElement('span');
+    b.className = 'badge bg-warning text-dark';
+    b.textContent = 'Aguardando fotos';
+    slotEl.appendChild(b);
+  }
+  if (carga.fornecedores_pendentes) {
+    const b = document.createElement('span');
+    b.className = 'badge bg-danger';
+    b.title = 'Informe os fornecedores de peças especiais para avançar';
+    b.textContent = 'Fornecedores';
+    slotEl.appendChild(b);
   }
 }
 
@@ -356,90 +319,124 @@ export async function atualizarSlotAvancar(dataId, todas_fotos_verificacao, etap
   console.log('alterado com sucesso', pend);
 }
 
+// Mapeia stage para classe de badge Bootstrap
+function stageBadgeClass(stage) {
+  switch ((stage || '').toLowerCase()) {
+    case 'planejamento': return 'bg-primary';
+    case 'verificacao':  return 'bg-warning text-dark';
+    case 'despachado':   return 'bg-success';
+    default:             return 'bg-secondary';
+  }
+}
+
+function stageBadgeLabel(stage) {
+  switch ((stage || '').toLowerCase()) {
+    case 'planejamento': return 'Apontamento';
+    case 'verificacao':  return 'Verificação';
+    case 'despachado':   return 'Despachado';
+    default:             return stage || '—';
+  }
+}
+
 /**
  * Cria o card do Kanban.
- * Observação: o "slot" do avançar é preenchido depois (assíncrono),
- * para permitir a chamada na API de pendências sem travar a renderização.
  */
 export function createKanbanCard(carga) {
-  
+  const stage = (carga.stage || '').toLowerCase();
+
   const card = document.createElement('div');
-  card.className = 'card card-kanban shadow-sm mb-2';
+  card.className = 'card card-kanban shadow-sm';
   card.draggable = true;
-  
-  console.log(carga);
+  card.dataset.id                       = carga.id;
+  card.dataset.stage                    = stage;
+  card.dataset.cliente                  = (carga.cliente || '').toLowerCase();
+  card.dataset.dataCarga                = (carga.data_carga || '');
+  card.dataset.todosPhotoVerificacao    = carga.todos_pacotes_tem_foto_verificacao ? 'true' : 'false';
+  card.dataset.todosPhotoDespachado     = carga.todos_pacotes_tem_foto_despachado  ? 'true' : 'false';
+  card.dataset.fornecedoresPendentes    = carga.fornecedores_pendentes             ? 'true' : 'false';
+  card.dataset.totalPendente            = carga.total_pendente || 0;
 
-  card.dataset.id = carga.id;
-  card.dataset.stage = (carga.stage || '').toLowerCase();
-  card.dataset.cliente = (carga.cliente || '').toLowerCase();
-  card.dataset.dataCarga = (carga.data_carga || ''); // formato YYYY-MM-DD
-
+  // ── Header ──────────────────────────────────────────
   const header = document.createElement('div');
-  header.className = 'card-header py-1 d-flex justify-content-between align-items-center';
-  const title = document.createElement('span');
-  title.className = 'fw-semibold text-truncate';
-  title.textContent = `#${carga.id} - ${carga.carga}`;
+  header.className = 'card-header';
 
-  const actions = document.createElement('div');
-  actions.className = 'd-flex align-items-center gap-2';
+  const title = document.createElement('span');
+  title.className = 'ck-title';
+  title.title = `#${carga.id} — ${carga.carga}`;
+  title.textContent = `#${carga.id} — ${carga.carga}`;
 
   const deleteBtn = document.createElement('button');
-  deleteBtn.className = 'btn btn-sm btn-outline-danger';
+  deleteBtn.className = 'btn btn-sm btn-outline-danger py-0 px-1 flex-shrink-0';
   deleteBtn.title = 'Excluir carregamento';
-  deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+  deleteBtn.innerHTML = '<i class="fas fa-trash fa-xs"></i>';
   deleteBtn.addEventListener('click', async () => {
-    const confirmou = confirm('Deseja excluir este carregamento e todos os seus pacotes?');
-    if (!confirmou) return;
+    if (!confirm('Deseja excluir este carregamento e todos os seus pacotes?')) return;
     deleteBtn.disabled = true;
-    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
     try {
       await excluirCarregamento(carga.id, card);
     } finally {
       if (document.body.contains(deleteBtn)) {
         deleteBtn.disabled = false;
-        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+        deleteBtn.innerHTML = '<i class="fas fa-trash fa-xs"></i>';
       }
     }
   });
 
-  actions.appendChild(deleteBtn);
   header.appendChild(title);
-  header.appendChild(actions);
+  header.appendChild(deleteBtn);
 
-  // Corpo do card com layout compacto e slot para avan?ar
+  // ── Body ─────────────────────────────────────────────
   const body = document.createElement('div');
   body.className = 'card-body';
-  const stageKey = mapStage(carga);
-  const printBtnHtml = stageKey === 'verificacao'
-    ? `<button class="btn btn-sm btn-outline-secondary imprimir-pacotes" title="Imprimir pacotes" data-id-carga="${carga.id}">
-         <i class="fas fa-print"></i>
-       </button>`
-    : '';
-  body.innerHTML = `
-    <div class="meta-row">
-      <span class="meta"><i class="far fa-calendar"></i>${formatarData(carga.data_carga)}</span>
-      <span class="meta"><i class="fas fa-layer-group"></i>${(carga.stage || '').toUpperCase()}</span>
-    </div>
-    <div class="cliente text-truncate" title="${carga.cliente || ''}">${carga.cliente || ''}</div>
-    <div class="meta-row">
-      <span class="meta status-carretas"></span>
-      <span class="meta status-por-carreta"></span>
-    </div>
-    <div class="actions-row">
-      <button class="btn btn-sm btn-outline-primary ver-pacotes" title="Ver pacotes"
-              data-bs-toggle="modal" data-bs-target="#visualizarPacote" data-id-carga="${carga.id}">
-        <i class="fas fa-box"></i> Pacotes
-      </button>
-      ${printBtnHtml}
-      <span class="slot-avancar"></span>
-    </div>
-  `;
 
-  // Renderiza o badge de status assim que o card for montado:
-  renderStatusCarretas(body.querySelector('.status-carretas'), carga.id);
+  // Linha 1: data + badge de etapa
+  const infoRow = document.createElement('div');
+  infoRow.className = 'ck-info-row';
 
-  // Evento: abrir modal de pacotes (mantido)
-  body.querySelector('.ver-pacotes').addEventListener('click', function () {
+  const dateSpan = document.createElement('span');
+  dateSpan.className = 'ck-date';
+  dateSpan.innerHTML = `<i class="far fa-calendar-alt"></i>${formatarData(carga.data_carga)}`;
+
+  const stageBadge = document.createElement('span');
+  stageBadge.className = `badge ck-stage ${stageBadgeClass(stage)}`;
+  stageBadge.textContent = stageBadgeLabel(stage);
+
+  infoRow.appendChild(dateSpan);
+  infoRow.appendChild(stageBadge);
+
+  // Linha 2: cliente
+  const clienteDiv = document.createElement('div');
+  clienteDiv.className = 'ck-cliente';
+  clienteDiv.title = carga.cliente || '';
+  clienteDiv.textContent = carga.cliente || '—';
+
+  // Linha 3: carretas
+  const carretasDiv = document.createElement('div');
+  carretasDiv.className = 'ck-carretas';
+  const carretasSpan = document.createElement('span');
+  carretasSpan.className = 'status-carretas';
+  carretasDiv.appendChild(carretasSpan);
+
+  // Linha 4: badges de alerta
+  const alertsDiv = document.createElement('div');
+  alertsDiv.className = 'ck-alerts';
+
+  // Linha 5: footer — botões à esquerda, slot avançar à direita
+  const footer = document.createElement('div');
+  footer.className = 'ck-footer';
+
+  const btns = document.createElement('div');
+  btns.className = 'ck-btns';
+
+  const verPacotesBtn = document.createElement('button');
+  verPacotesBtn.className = 'btn btn-sm btn-outline-primary ver-pacotes';
+  verPacotesBtn.title = 'Ver pacotes';
+  verPacotesBtn.setAttribute('data-bs-toggle', 'modal');
+  verPacotesBtn.setAttribute('data-bs-target', '#visualizarPacote');
+  verPacotesBtn.setAttribute('data-id-carga', carga.id);
+  verPacotesBtn.innerHTML = '<i class="fas fa-box me-1"></i>Pacotes';
+  verPacotesBtn.addEventListener('click', function () {
     const cargaId = this.getAttribute('data-id-carga');
     const hidden = document.getElementById('idCargaPacote');
     if (hidden) hidden.value = cargaId;
@@ -447,22 +444,38 @@ export function createKanbanCard(carga) {
     if (modalTitle) modalTitle.textContent = `Pacotes da carga #${cargaId}`;
     popularPacotesDaCarga(cargaId);
   });
+  btns.appendChild(verPacotesBtn);
 
-  const printBtn = body.querySelector('.imprimir-pacotes');
-  if (printBtn) {
-    printBtn.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const cargaId = printBtn.getAttribute('data-id-carga');
-      imprimirPacotesDaCarga(cargaId);
+  if (stage === 'verificacao') {
+    const printBtn = document.createElement('button');
+    printBtn.className = 'btn btn-sm btn-outline-secondary imprimir-pacotes';
+    printBtn.title = 'Imprimir pacotes';
+    printBtn.setAttribute('data-id-carga', carga.id);
+    printBtn.innerHTML = '<i class="fas fa-print"></i>';
+    printBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      imprimirPacotesDaCarga(carga.id);
     });
+    btns.appendChild(printBtn);
   }
 
-  // Preencher o slot do avançar (botão/alerta) de forma assíncrona
-  // const slotAvancar = body.querySelector('.slot-avancar');
-  // preencherSlotAvancar(carga, slotAvancar);
+  const slotAvancar = document.createElement('span');
+  slotAvancar.className = 'slot-avancar';
 
-  // Drag events (mantidos)
+  footer.appendChild(btns);
+  footer.appendChild(slotAvancar);
+
+  body.appendChild(infoRow);
+  body.appendChild(clienteDiv);
+  body.appendChild(carretasDiv);
+  body.appendChild(alertsDiv);
+  body.appendChild(footer);
+
+  // Renderiza badge de carretas
+  renderStatusCarretas(carretasSpan, carga.id);
+
+  // Drag
   card.addEventListener('dragstart', (e) => {
     e.dataTransfer.setData('text/plain', String(carga.id));
     e.dataTransfer.effectAllowed = 'move';
@@ -512,8 +525,15 @@ document.getElementById('formAvancarEstagio').addEventListener('submit', async f
       if (!destinoCol) {
         console.error('Coluna destino não encontrada:', `col-${stageKey}`);
       } else {
-        destinoCol.appendChild(cardEl);          // move o card
-        cardEl.dataset.stage = data.novo_stage;  // opcional
+        destinoCol.appendChild(cardEl);
+        cardEl.dataset.stage = data.novo_stage;
+
+        // Atualiza o badge de estágio no topo do card
+        const stageBadgeEl = cardEl.querySelector('.ck-stage');
+        if (stageBadgeEl) {
+          stageBadgeEl.className = `badge ck-stage ${stageBadgeClass(data.novo_stage)}`;
+          stageBadgeEl.textContent = stageBadgeLabel(data.novo_stage);
+        }
       }
     }
 

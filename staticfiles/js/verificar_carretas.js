@@ -35,7 +35,7 @@ export async function renderStatusCarretas(targetEl, cargaId) {
 
     const badge = document.createElement('span');
     badge.className = 'badge rounded-pill bg-danger';
-    badge.innerHTML = `<i class="fas fa-exclamation-triangle me-1"></i>Pendências`;
+    badge.innerHTML = `<i class="fas fa-exclamation-triangle me-1"></i>Algumas carretas estão faltando`;
     badge.setAttribute('data-bs-toggle', 'tooltip');
     badge.setAttribute('data-bs-placement', 'top');
     badge.setAttribute('data-bs-title', tip);
