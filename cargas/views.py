@@ -1543,21 +1543,32 @@ def pecas_status_retrabalho_pintura(request):
 
 
 def ordens_finalizadas_pintura_inicio_ano(request):
-    """"
-        traz as ordens finalizadas da pintura desde o início
     """
+    Traz as ordens finalizadas da pintura filtradas por data_derruba (data_fim).
+    Padrão: ontem e hoje (America/Sao_Paulo).
+    Aceita parâmetros opcionais: data_inicio e data_fim (formato YYYY-MM-DD).
+    """
+    from zoneinfo import ZoneInfo
 
-    ano_atual = datetime.now().date().year
+    tz = ZoneInfo('America/Sao_Paulo')
+    hoje = datetime.now(tz).date()
+    ontem = hoje - timedelta(days=1)
 
-    data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    data_inicio_str = request.GET.get('data_inicio', '')
+    data_fim_str    = request.GET.get('data_fim', '')
 
+    data_inicio = parse_date(data_inicio_str) if data_inicio_str else ontem
+    data_fim    = parse_date(data_fim_str)    if data_fim_str    else hoje
+
+    data_hora_atual = datetime.now(tz).strftime("%d/%m/%Y %H:%M:%S")
 
     qs = (
         CambaoPecas.objects
         .filter(
             peca_ordem__ordem__grupo_maquina='pintura',
-            status__isnull=False,
-            status='finalizada'
+            status='finalizada',
+            data_fim__date__gte=data_inicio,
+            data_fim__date__lte=data_fim,
         )
         .select_related('peca_ordem', 'peca_ordem__ordem', 'cambao')
         .annotate(
@@ -1567,7 +1578,6 @@ def ordens_finalizadas_pintura_inicio_ano(request):
             qtd_planejada=F('peca_ordem__qtd_planejada'),
             cor=F('peca_ordem__ordem__cor'),
 
-            # use nomes sem colidir com fields reais
             data_criacao_fmt=ToChar(F('peca_ordem__ordem__data_criacao'), Value('DD/MM/YYYY')),
             data_carga_fmt=ToChar(F('peca_ordem__ordem__data_carga'), Value('DD/MM/YYYY')),
             data_pendura_fmt=ToChar(
@@ -1581,9 +1591,8 @@ def ordens_finalizadas_pintura_inicio_ano(request):
 
             tipo=F('cambao__tipo'),
             cambao_nome=F('cambao__nome'),
-            data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()) # já vem string
+            data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()),
         )
-        .filter(peca_ordem__ordem__data_carga__year=ano_atual)
         .values(
             'id_ordem',
             'ordem',
@@ -1592,26 +1601,19 @@ def ordens_finalizadas_pintura_inicio_ano(request):
             'cor',
             'status',
             'quantidade_pendurada',
-
-            # valores formatados
             'data_criacao_fmt',
             'data_carga_fmt',
             'data_pendura_fmt',
             'data_derruba_fmt',
-            
             'tipo',
             'cambao_nome',
             'data_ultima_atualizacao',
         )
-        .order_by('-data_fim')
+        .order_by('data_fim')
     )
 
-    data = list(qs)[::-1]
-
-    resultado_final_concat = data
-
     resultado_final_concat = sorted(
-        resultado_final_concat,
+        list(qs),
         key=lambda x: parse_data_fmt(x.get('data_derruba_fmt', ''))
     )
 
