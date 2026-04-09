@@ -92,16 +92,28 @@
                                                 <tr>
                                                     <th>Código</th>
                                                     <th>Descrição</th>
-                                                    <th>Quantidade</th>
+                                                    <th>Qtd</th>
+                                                    <th>Fornecedor</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {% for item in pacote.itens.all %}
+                                                {% with desc=item.codigo.descricao|default:item.descricao_informada|lower %}
                                                 <tr>
-                                                    <td>{{ item.codigo.codigo }}</td>
-                                                    <td>{{ item.codigo.descricao }}</td>
+                                                    <td>{{ item.codigo.codigo|default:item.codigo_informado }}</td>
+                                                    <td>{{ item.codigo.descricao|default:item.descricao_informada }}</td>
                                                     <td>{{ item.quantidade }}</td>
+                                                    <td>
+                                                        {% if "pneu" in desc %}
+                                                            {{ carga.fornecedores.fornecedor_pneu }}
+                                                        {% elif "cilindro" in desc %}
+                                                            {{ carga.fornecedores.fornecedor_cilindro }}
+                                                        {% elif "roda" in desc %}
+                                                            {{ carga.fornecedores.fornecedor_roda }}
+                                                        {% endif %}
+                                                    </td>
                                                 </tr>
+                                                {% endwith %}
                                                 {% endfor %}
                                             </tbody>
                                         </table>

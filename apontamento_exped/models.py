@@ -85,6 +85,19 @@ class PendenciasPacote(models.Model):
     def __str__(self):
         return f"{self.codigo}"
 
+class FornecedoresCarga(models.Model):
+    """
+    Armazena os fornecedores de peças especiais (Pneu, Cilindro, Roda)
+    identificadas nos itens da carga. Obrigatório para avançar da verificação.
+    """
+    carga = models.OneToOneField(Carga, on_delete=models.CASCADE, related_name='fornecedores')
+    fornecedor_pneu = models.CharField(max_length=255, blank=True)
+    fornecedor_cilindro = models.CharField(max_length=255, blank=True)
+    fornecedor_roda = models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return f"Fornecedores - Carga {self.carga_id}"
+
 class ItemPacote(models.Model):
 
     """

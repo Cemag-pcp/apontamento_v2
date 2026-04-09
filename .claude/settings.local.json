@@ -4,7 +4,8 @@
       "Read(//c/Users/pcp2/.claude/plugins/marketplaces/ui-ux-pro-max-skill/.claude/skills/ui-ux-pro-max/**)",
       "Bash(python scripts/search.py \"manufacturing industrial inspection dashboard data tables\" --design-system -p \"Pintura Dashboard\" -f markdown)",
       "Bash(python3 scripts/search.py \"manufacturing industrial inspection dashboard data tables\" --design-system -p \"Pintura Dashboard\" -f markdown)",
-      "Bash(python3 \"cli/assets/scripts/search.py\" \"manufacturing industrial inspection dashboard data tables\" --design-system -p \"Pintura Dashboard\" -f markdown)"
+      "Bash(python3 \"cli/assets/scripts/search.py\" \"manufacturing industrial inspection dashboard data tables\" --design-system -p \"Pintura Dashboard\" -f markdown)",
+      "Bash(python:*)"
     ]
   }
 }

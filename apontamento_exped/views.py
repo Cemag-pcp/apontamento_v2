@@ -11,7 +11,7 @@ from django.db.models.functions import Coalesce
 from django.utils.timezone import localtime
 
 from cargas.utils import get_data_from_sheets,tratando_dados
-from .models import Carga,ItemPacote,Pacote,VerificacaoPacote, CarretaCarga, ImagemPacote, PendenciasPacote, ItemPacote
+from .models import Carga,ItemPacote,Pacote,VerificacaoPacote, CarretaCarga, ImagemPacote, PendenciasPacote, ItemPacote, FornecedoresCarga
 from .utils import chamar_impressora, buscar_conjuntos_carreta, limpar_cor, chamar_impressora_qrcode
 from cadastro.models import CarretasExplodidas
 
@@ -85,7 +85,28 @@ def parse_total(v):
         return int(Decimal(s))  # garante 1.000 -> 1000,  "2,0" -> 2
     except (InvalidOperation, ValueError):
         return 0
-    
+
+# Tipos especiais de peças que exigem fornecedor informado antes de avançar da verificação
+_TIPOS_ESPECIAIS = ['Pneu', 'Cilindro', 'Roda']
+
+def _detectar_tipos_especiais_da_carga(carga_id):
+    """Retorna lista dos tipos especiais presentes nos itens da carga."""
+    itens = ItemPacote.objects.filter(
+        pacote__carga_id=carga_id
+    ).select_related('codigo')
+
+    tipos = set()
+    for item in itens:
+        cod_obj = getattr(item, 'codigo', None)
+        codigo = getattr(cod_obj, 'codigo', '') or item.codigo_informado or ''
+        descricao = getattr(cod_obj, 'descricao', '') or item.descricao_informada or ''
+        texto = f"{codigo} {descricao}".upper()
+        for tipo in _TIPOS_ESPECIAIS:
+            if tipo.upper() in texto:
+                tipos.add(tipo)
+    return sorted(tipos)
+
+
 # =========== Template inicial ==========
 
 def planejamento(request):
@@ -156,6 +177,7 @@ def relatorios_impressao(request):
             .prefetch_related(
                 Prefetch('pacotes', queryset=pacotes_qs)
             )
+            .select_related('fornecedores')
             .order_by('cliente', 'carga', 'id')
         )
 
@@ -370,27 +392,107 @@ def criar_caixa(request):
 
 def buscar_cargas(request):
 
-    cargas = Carga.objects.all().values('id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'stage', 'data_criacao')
+    cargas = list(Carga.objects.all().values(
+        'id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'stage', 'data_criacao'
+    ))
 
-    # verifica se todos os pacotes dessa carga contém foto
+    if not cargas:
+        return JsonResponse([], safe=False)
+
+    carga_ids = [c['id'] for c in cargas]
+
+    # 1 query: total de pacotes por carga
+    total_pacotes_map = {
+        r['carga_id']: r['total']
+        for r in Pacote.objects
+            .filter(carga_id__in=carga_ids)
+            .values('carga_id')
+            .annotate(total=Count('id'))
+    }
+
+    # 1 query: pacotes com foto de verificação por carga
+    foto_verif_map = {
+        r['carga_id']: r['total']
+        for r in Pacote.objects
+            .filter(carga_id__in=carga_ids, pacote_imagem__stage='verificacao')
+            .values('carga_id')
+            .annotate(total=Count('id', distinct=True))
+    }
+
+    # 1 query: pacotes com foto de despachado por carga
+    foto_desp_map = {
+        r['carga_id']: r['total']
+        for r in Pacote.objects
+            .filter(carga_id__in=carga_ids, pacote_imagem__stage='despachado')
+            .values('carga_id')
+            .annotate(total=Count('id', distinct=True))
+    }
+
+    # 1 query: total de itens pendentes por carga
+    pendente_map = {
+        r['carreta_carga__carga_id']: r['total']
+        for r in PendenciasPacote.objects
+            .filter(carreta_carga__carga_id__in=carga_ids, qt_necessaria__gt=0)
+            .values('carreta_carga__carga_id')
+            .annotate(total=Sum('qt_necessaria'))
+    }
+
+    # Detectar fornecedores pendentes (apenas cargas em verificação)
+    verificacao_ids = [c['id'] for c in cargas if c['stage'] == 'verificacao']
+
+    # cargas_com_tipo: mapa tipo -> set de carga_ids que têm itens desse tipo
+    cargas_com_tipo = {'Pneu': set(), 'Cilindro': set(), 'Roda': set()}
+    if verificacao_ids:
+        for tipo in _TIPOS_ESPECIAIS:
+            t = tipo.upper()
+            ids = (
+                ItemPacote.objects
+                .filter(pacote__carga_id__in=verificacao_ids)
+                .filter(
+                    Q(codigo__codigo__icontains=t) | Q(codigo__descricao__icontains=t) |
+                    Q(codigo_informado__icontains=t) | Q(descricao_informada__icontains=t)
+                )
+                .values_list('pacote__carga_id', flat=True)
+                .distinct()
+            )
+            cargas_com_tipo[tipo] = set(ids)
+
+        # fornecedores já salvos para essas cargas
+        forn_map = {
+            f.carga_id: f
+            for f in FornecedoresCarga.objects.filter(carga_id__in=verificacao_ids)
+        }
+    else:
+        forn_map = {}
+
     for carga in cargas:
-        pacotes = Pacote.objects.filter(carga_id=carga['id'])
-        total_pacotes = pacotes.count()
-        pacotes_com_foto_verificacao = ImagemPacote.objects.filter(pacote__in=pacotes, stage='verificacao').values('pacote').distinct().count()
-        pacotes_com_foto_despachado = ImagemPacote.objects.filter(pacote__in=pacotes, stage='despachado').values('pacote').distinct().count()
-        
-        # VERIFICA SE TODOS PACOTES FORAM CRIADOS
-        total = (
-            PendenciasPacote.objects
-            .filter(carreta_carga__carga_id=carga['id'], qt_necessaria__gt=0)
-            .aggregate(total=Coalesce(Sum('qt_necessaria'), 0))
-            ['total']
+        cid = carga['id']
+        total_pac = total_pacotes_map.get(cid, 0)
+        foto_verif = foto_verif_map.get(cid, 0)
+        foto_desp = foto_desp_map.get(cid, 0)
+        pendente = pendente_map.get(cid, 0)
+
+        carga['todos_pacotes_tem_foto_verificacao'] = (
+            total_pac > 0 and total_pac == foto_verif and pendente == 0
         )
+        carga['todos_pacotes_tem_foto_despachado'] = (
+            total_pac > 0 and total_pac == foto_desp
+        )
+        carga['total_pendente'] = pendente
 
-        carga['todos_pacotes_tem_foto_verificacao'] = (total_pacotes > 0 and total_pacotes == pacotes_com_foto_verificacao and total == 0)
-        carga['todos_pacotes_tem_foto_despachado'] = (total_pacotes > 0 and total_pacotes == pacotes_com_foto_despachado)
+        # Badge de fornecedores pendentes
+        if carga['stage'] == 'verificacao':
+            forn = forn_map.get(cid)
+            faltando = (
+                (cid in cargas_com_tipo['Pneu']     and not (forn and forn.fornecedor_pneu.strip()))     or
+                (cid in cargas_com_tipo['Cilindro']  and not (forn and forn.fornecedor_cilindro.strip())) or
+                (cid in cargas_com_tipo['Roda']      and not (forn and forn.fornecedor_roda.strip()))
+            )
+            carga['fornecedores_pendentes'] = faltando
+        else:
+            carga['fornecedores_pendentes'] = False
 
-    return JsonResponse(list(cargas), safe=False)
+    return JsonResponse(cargas, safe=False)
 
 @csrf_exempt
 @require_http_methods(["DELETE", "POST"])
@@ -821,6 +923,21 @@ def buscar_pacotes_carga(request, id):
         .order_by('carreta', 'id')
     )
 
+    # Tipos especiais e fornecedores (só relevante no estágio verificação)
+    tipos_especiais = []
+    fornecedores = {}
+    if carga.stage == 'verificacao':
+        tipos_especiais = _detectar_tipos_especiais_da_carga(carga.id)
+        try:
+            forn = carga.fornecedores
+            fornecedores = {
+                'fornecedor_pneu': forn.fornecedor_pneu,
+                'fornecedor_cilindro': forn.fornecedor_cilindro,
+                'fornecedor_roda': forn.fornecedor_roda,
+            }
+        except FornecedoresCarga.DoesNotExist:
+            fornecedores = {'fornecedor_pneu': '', 'fornecedor_cilindro': '', 'fornecedor_roda': ''}
+
     return JsonResponse({
         'pacotes': dados,
         'status_carga': carga.stage,
@@ -828,6 +945,8 @@ def buscar_pacotes_carga(request, id):
         'data_carga': carga.data_carga.strftime("%d/%m/%Y"),
         'carga': carga.carga,
         'carretas': carretas,
+        'tipos_especiais': tipos_especiais,
+        'fornecedores': fornecedores,
     })
 
 def listar_pacotes_criados(request, id):
@@ -872,6 +991,27 @@ def alterar_stage(request, id):
     if stage_atual == 'planejamento':
         carga.stage = 'verificacao'
     elif stage_atual == 'verificacao':
+        # Verificar fornecedores obrigatórios para tipos especiais presentes
+        tipos_presentes = _detectar_tipos_especiais_da_carga(id)
+        if tipos_presentes:
+            try:
+                forn = carga.fornecedores
+            except FornecedoresCarga.DoesNotExist:
+                forn = None
+
+            faltando = []
+            if 'Pneu' in tipos_presentes and not (forn and forn.fornecedor_pneu.strip()):
+                faltando.append('Pneu')
+            if 'Cilindro' in tipos_presentes and not (forn and forn.fornecedor_cilindro.strip()):
+                faltando.append('Cilindro')
+            if 'Roda' in tipos_presentes and not (forn and forn.fornecedor_roda.strip()):
+                faltando.append('Roda')
+
+            if faltando:
+                return JsonResponse({
+                    'erro': f'Informe o fornecedor de {", ".join(faltando)} antes de avançar.'
+                }, status=400)
+
         carga.stage = 'despachado'
     else:
         return JsonResponse({'erro': 'Estágio atual inválido para avanço automático.'}, status=400)
@@ -883,6 +1023,30 @@ def alterar_stage(request, id):
         'stage_antigo': stage_atual,
         'novo_stage': carga.stage,
     }, status=200)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def salvar_fornecedores(request, carga_id):
+    """Salva/atualiza os fornecedores de peças especiais para uma carga."""
+    carga = get_object_or_404(Carga, id=carga_id)
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'erro': 'JSON inválido.'}, status=400)
+
+    obj, _ = FornecedoresCarga.objects.get_or_create(carga=carga)
+    obj.fornecedor_pneu = data.get('fornecedor_pneu', obj.fornecedor_pneu).strip()
+    obj.fornecedor_cilindro = data.get('fornecedor_cilindro', obj.fornecedor_cilindro).strip()
+    obj.fornecedor_roda = data.get('fornecedor_roda', obj.fornecedor_roda).strip()
+    obj.save()
+
+    tipos_presentes = _detectar_tipos_especiais_da_carga(carga.id)
+    faltando = (
+        ('Pneu'     in tipos_presentes and not obj.fornecedor_pneu.strip())     or
+        ('Cilindro' in tipos_presentes and not obj.fornecedor_cilindro.strip()) or
+        ('Roda'     in tipos_presentes and not obj.fornecedor_roda.strip())
+    )
+    return JsonResponse({'mensagem': 'Fornecedores salvos com sucesso!', 'fornecedores_pendentes': faltando})
 
 @csrf_exempt
 def confirmar_pacote(request, id):

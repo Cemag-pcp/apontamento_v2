@@ -1140,20 +1140,17 @@ def ordens_em_andamento_finalizada_pintura(request):
 
     ordens_aguardando_iniciar = []
 
-    mes_atual = datetime.now().date().month
-    ano_atual = datetime.now().date().year
-
-    mes_prev = mes_atual -1 if mes_atual > 1 else 12
-    mes_prox = mes_atual +1 if mes_atual <12 else 1
-
-    meses = [mes_prev, mes_atual, mes_prox]
+    from pytz import timezone as pytz_timezone
+    br_tz = pytz_timezone('America/Sao_Paulo')
+    hoje_br = now().astimezone(br_tz).date()
+    ontem_br = hoje_br - timedelta(days=1)
 
     data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
 
     for ordem in resultado_json_ordens_criadas['ordens']:
         data_carga_datetime = datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
-        if data_carga_datetime.month not in meses:
+        if not (ontem_br <= data_carga_datetime <= hoje_br):
             continue
 
         #adicionar que a ordem aguardando_iniciar criando do mês atual
@@ -1205,8 +1202,7 @@ def ordens_em_andamento_finalizada_pintura(request):
             cambao_nome=F('cambao__nome'),
             data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()) # já vem string
         )
-        .filter(peca_ordem__ordem__data_carga__month__in=meses,
-                peca_ordem__ordem__data_carga__year=ano_atual)
+        .filter(peca_ordem__ordem__data_carga__range=[ontem_br, hoje_br])
         .values(
             'id_ordem',
             'ordem',
