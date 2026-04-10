@@ -1134,23 +1134,46 @@ def ordens_em_andamento_finalizada_pintura(request):
     """"
         traz as ordens aguardando inicio, em andamento e finalizadas na pintura
     """
+    data_inicio_str = request.GET.get('data_inicio')
+    data_fim_str = request.GET.get('data_fim')
+
+    from pytz import timezone as pytz_timezone
+    br_tz = pytz_timezone('America/Sao_Paulo')
+    hoje_br = now().astimezone(br_tz).date()
+    ultima_data_carga = (
+        Ordem.objects
+        .filter(grupo_maquina='pintura', data_carga__isnull=False)
+        .aggregate(ultima_data=Max('data_carga'))['ultima_data']
+    )
+    data_fim_padrao = ultima_data_carga or hoje_br
+    data_inicio_padrao = data_fim_padrao - timedelta(days=30)
+
+    try:
+        data_inicio = parse_date(data_inicio_str) if data_inicio_str else data_inicio_padrao
+        data_fim = parse_date(data_fim_str) if data_fim_str else data_fim_padrao
+    except (ValueError, TypeError):
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    if data_inicio is None or data_fim is None:
+        return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    request_mutable = request.GET.copy()
+    request_mutable['data_inicio'] = data_inicio.isoformat()
+    request_mutable['data_fim'] = data_fim.isoformat()
+    request.GET = request_mutable
+
     resultado = ordens_criadas_pintura(request)
 
     resultado_json_ordens_criadas = json.loads(resultado.content)
 
     ordens_aguardando_iniciar = []
 
-    from pytz import timezone as pytz_timezone
-    br_tz = pytz_timezone('America/Sao_Paulo')
-    hoje_br = now().astimezone(br_tz).date()
-    ontem_br = hoje_br - timedelta(days=1)
-
     data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
 
     for ordem in resultado_json_ordens_criadas['ordens']:
         data_carga_datetime = datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
-        if not (ontem_br <= data_carga_datetime <= hoje_br):
+        if not (data_inicio <= data_carga_datetime <= data_fim):
             continue
 
         #adicionar que a ordem aguardando_iniciar criando do mês atual
@@ -1202,7 +1225,7 @@ def ordens_em_andamento_finalizada_pintura(request):
             cambao_nome=F('cambao__nome'),
             data_ultima_atualizacao=Value(data_hora_atual, output_field=CharField()) # já vem string
         )
-        .filter(peca_ordem__ordem__data_carga__range=[ontem_br, hoje_br])
+        .filter(peca_ordem__ordem__data_carga__range=[data_inicio, data_fim])
         .values(
             'id_ordem',
             'ordem',
@@ -1285,11 +1308,17 @@ def ordens_status_montagem(request):
     data_fim_str = request.GET.get('data_fim')
 
     hoje = now().date()
-    ontem = hoje - timedelta(days=1)
+    ultima_data_carga = (
+        Ordem.objects
+        .filter(grupo_maquina='montagem', data_carga__isnull=False)
+        .aggregate(ultima_data=Max('data_carga'))['ultima_data']
+    )
+    data_fim_padrao = ultima_data_carga or hoje
+    data_inicio_padrao = data_fim_padrao - timedelta(days=30)
 
     try:
-        data_inicio = parse_date(data_inicio_str) if data_inicio_str else ontem
-        data_fim = parse_date(data_fim_str) if data_fim_str else hoje
+        data_inicio = parse_date(data_inicio_str) if data_inicio_str else data_inicio_padrao
+        data_fim = parse_date(data_fim_str) if data_fim_str else data_fim_padrao
     except (ValueError, TypeError):
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
 
@@ -1299,8 +1328,8 @@ def ordens_status_montagem(request):
     # Monta os filtros para a model Ordem
     filtros_ordem = {
         'grupo_maquina': 'montagem',
-        'ultima_atualizacao__date__gte': data_inicio,
-        'ultima_atualizacao__date__lte': data_fim,
+        'data_carga__gte': data_inicio,
+        'data_carga__lte': data_fim,
     }
 
     # Máquinas a excluir da contagem / retorno
