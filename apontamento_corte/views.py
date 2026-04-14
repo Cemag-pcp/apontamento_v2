@@ -7,7 +7,7 @@ from django.core.paginator import Paginator, EmptyPage
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
-from django.db.models import Q, Count, Sum, F, Max, Value, IntegerField
+from django.db.models import Q, Count, Sum, F, Max, Value, IntegerField, Prefetch
 from django.db.models.functions import Coalesce
 from django.forms.models import model_to_dict
 from django.contrib.auth.decorators import login_required
@@ -390,7 +390,12 @@ def get_ordens_interrompidas(request):
     usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
 
     # Filtra as ordens com base no status 'interrompida'
-    ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_corte').select_related('propriedade') \
+    processos_interrompidos = Prefetch(
+        'processos',
+        queryset=OrdemProcesso.objects.filter(status='interrompida').order_by('-data_inicio').select_related('motivo_interrupcao'),
+        to_attr='processos_interrompidos_cache'
+    )
+    ordens_queryset = Ordem.objects.prefetch_related(processos_interrompidos, 'ordem_pecas_corte').select_related('propriedade', 'maquina') \
         .filter(status_atual='interrompida', grupo_maquina__in=['plasma','laser_1','laser_2','laser_3'])
 
     # Paginação (opcional)
@@ -402,8 +407,9 @@ def get_ordens_interrompidas(request):
     # Monta os dados para retorno
     data = []
     for ordem in ordens_page:
-        # Obtém o último processo interrompido (caso tenha mais de um)
-        ultimo_processo_interrompido = ordem.processos.filter(status='interrompida').order_by('-data_inicio').first()
+        # Obtém o último processo interrompido usando o prefetch já carregado
+        processos_cache = getattr(ordem, 'processos_interrompidos_cache', [])
+        ultimo_processo_interrompido = processos_cache[0] if processos_cache else None
 
         data.append({
             'id': ordem.id,

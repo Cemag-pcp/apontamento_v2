@@ -23,9 +23,10 @@ DATABASES = {
         'PORT': env('DB_PORT'),
         'CONN_MAX_AGE': 0,
         'POOL_OPTIONS': {
-            'POOL_SIZE': 5,
-            'MAX_OVERFLOW': 5,
+            'POOL_SIZE': 10,
+            'MAX_OVERFLOW': 10,
             'RECYCLE': 300,
+            'TIMEOUT': 10,
         },
         'OPTIONS': {
             'options': '-c search_path=' + env('BASE_PROD'),

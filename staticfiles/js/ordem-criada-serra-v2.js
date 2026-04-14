@@ -1,5 +1,66 @@
 import { fetchStatusMaquinas, fetchUltimasPecasProduzidas, fetchContagemStatusOrdens } from './status-maquina-v2.js';
 
+const ordensSelecionadas = new Set();
+
+function atualizarResumoSelecao() {
+    const totalSelecionadas = ordensSelecionadas.size;
+    const contador = document.getElementById('selecionadas-count');
+    const botaoExcluirLote = document.getElementById('btnExcluirSelecionadas');
+    const selecionarPagina = document.getElementById('selecionar-todas-ordens');
+    const checkboxesVisiveis = Array.from(document.querySelectorAll('.ordem-checkbox'));
+    const marcadasVisiveis = checkboxesVisiveis.filter((checkbox) => checkbox.checked).length;
+
+    if (contador) {
+        contador.textContent = `${totalSelecionadas} selecionada(s)`;
+    }
+
+    if (botaoExcluirLote) {
+        botaoExcluirLote.disabled = totalSelecionadas === 0;
+    }
+
+    if (selecionarPagina) {
+        selecionarPagina.checked = checkboxesVisiveis.length > 0 && marcadasVisiveis === checkboxesVisiveis.length;
+        selecionarPagina.indeterminate = marcadasVisiveis > 0 && marcadasVisiveis < checkboxesVisiveis.length;
+    }
+}
+
+function limparSelecaoOrdens() {
+    ordensSelecionadas.clear();
+    document.querySelectorAll('.ordem-checkbox').forEach((checkbox) => {
+        checkbox.checked = false;
+    });
+    atualizarResumoSelecao();
+}
+
+async function excluirOrdens(ordensIds, setor, motivoExclusao) {
+    const resultados = await Promise.all(
+        ordensIds.map(async (ordemId) => {
+            const response = await fetch('/core/api/excluir-ordem/', {
+                method: 'POST',
+                body: JSON.stringify({
+                    ordem_id: ordemId,
+                    setor: setor,
+                    motivo: motivoExclusao
+                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                }
+            });
+
+            const body = await response.json();
+
+            if (!response.ok) {
+                throw new Error(body.error || `Erro ao excluir a ordem ${ordemId}.`);
+            }
+
+            return body;
+        })
+    );
+
+    return resultados;
+}
+
 export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
     
@@ -14,6 +75,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
 
                 if (ordens.length > 0) {
                     ordens.forEach(ordem => {
+                        const podeExcluir = !['finalizada', 'iniciada', 'interrompida'].includes(ordem.status_atual);
 
                         const card = document.createElement('div');
                         card.classList.add('col-md-4'); // Adiciona a classe de coluna
@@ -21,6 +83,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         card.dataset.ordemId = ordem.ordem; // Adiciona o ID da ordem para referência
                         card.dataset.grupoMaquina = ordem.grupo_maquina || ''; // Adiciona o grupo máquina
                         card.dataset.obs = ordem.obs || ''; // Adiciona observações
+                        card.dataset.ordemPk = ordem.id;
                     
                         let statusBadge = ''; // Variável para armazenar o HTML do badge
 
@@ -84,8 +147,20 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         <div class="card shadow-sm bg-light text-dark">
                             <div class="card-body">
                                 <h5 class="card-title d-flex justify-content-between align-items-center">
-                                    #${ordem.ordem}
-                                    ${statusBadge}
+                                    <span class="d-flex align-items-center gap-2">
+                                        <input
+                                            class="ordem-checkbox me-2"
+                                            type="checkbox"
+                                            value="${ordem.id}"
+                                            aria-label="Selecionar ordem ${ordem.ordem} para exclusão em lote"
+                                            title="${podeExcluir ? 'Selecionar ordem para exclusão em lote' : 'Esta ordem não pode ser excluída nesse status'}"
+                                            style="width: 18px; height: 18px; margin: 0; accent-color: #dc3545; flex: 0 0 auto;"
+                                            ${ordensSelecionadas.has(String(ordem.id)) ? 'checked' : ''}
+                                            ${podeExcluir ? '' : 'disabled'}
+                                        >
+                                        <span>#${ordem.ordem}</span>
+                                    </span>
+                                    <span>${statusBadge}</span>
                                 </h5>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">Criado em: ${ordem.data_criacao}</p>
                                 <p class="text-muted mb-2" style="font-size: 0.85rem;">Programada para: ${ordem.data_programacao}</p>
@@ -132,6 +207,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonRetornar = card.querySelector('.btn-retornar');
                         const buttonExcluir= card.querySelector('.btn-excluir');
                         const buttonDuplicar= card.querySelector('.btn-duplicar');
+                        const checkboxSelecionar = card.querySelector('.ordem-checkbox');
 
                         // Adiciona evento ao botão "Ver Peças", se existir
                         if (buttonVerPeca) {
@@ -182,9 +258,29 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                             });
                         }
 
+                        if (checkboxSelecionar) {
+                            checkboxSelecionar.addEventListener('change', ({ target }) => {
+                                if (target.disabled) {
+                                    return;
+                                }
+
+                                const ordemId = String(target.value);
+
+                                if (target.checked) {
+                                    ordensSelecionadas.add(ordemId);
+                                } else {
+                                    ordensSelecionadas.delete(ordemId);
+                                }
+
+                                atualizarResumoSelecao();
+                            });
+                        }
+
                         // Adiciona o card ao container
                         container.appendChild(card);
                     });
+
+                    atualizarResumoSelecao();
 
                     // Esconde o botão "Carregar Mais" caso `has_next` seja false
                     const loadMoreButton = document.getElementById('loadMore');
@@ -654,6 +750,7 @@ function resetarCardsInicial(filtros = {}) {
 
     // Carrega a primeira página automaticamente
     container.innerHTML = ''; // Limpa o container antes de carregar novos resultados
+    limparSelecaoOrdens();
     fetchOrdens();
 
     // Configurar o botão "Carregar Mais"
@@ -1236,8 +1333,12 @@ function mostrarModalExcluir(ordemId, setor) {
     const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
     const modalTitle = document.getElementById('modalExcluirLabel');
     const formExcluir = document.getElementById('formExcluir');
+    const textoAjuda = document.getElementById('modalExcluirDescricao');
 
     modalTitle.innerHTML = `Excluir Ordem ${ordemId}`;
+    if (textoAjuda) {
+        textoAjuda.textContent = 'Selecione o motivo para excluir esta ordem.';
+    }
     modal.show();
 
     // Remove listeners antigos e adiciona novo
@@ -1303,6 +1404,111 @@ function mostrarModalExcluir(ordemId, setor) {
             });
         });
     });
+}
+
+function mostrarModalExcluirEmLote(ordensIds, setor) {
+    const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+    const modalTitle = document.getElementById('modalExcluirLabel');
+    const formExcluir = document.getElementById('formExcluir');
+    const textoAjuda = document.getElementById('modalExcluirDescricao');
+    const totalOrdens = ordensIds.length;
+
+    modalTitle.innerHTML = `Excluir ${totalOrdens} ordens`;
+
+    if (textoAjuda) {
+        textoAjuda.textContent = 'Selecione o motivo para excluir todas as ordens marcadas.';
+    }
+
+    modal.show();
+
+    const clonedForm = formExcluir.cloneNode(true);
+    formExcluir.parentNode.replaceChild(clonedForm, formExcluir);
+
+    clonedForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(clonedForm);
+        const motivoExclusao = formData.get('motivoExclusao');
+
+        Swal.fire({
+            title: 'Excluindo...',
+            text: 'Por favor, aguarde enquanto as ordens estão sendo excluídas.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        excluirOrdens(ordensIds, setor, motivoExclusao)
+            .then(() => {
+                limparSelecaoOrdens();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: `${totalOrdens} ordens excluídas com sucesso.`,
+                });
+
+                modal.hide();
+                document.getElementById('ordens-container').innerHTML = '';
+                resetarCardsInicial();
+            })
+            .catch((error) => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message || 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
+                });
+            });
+    });
+}
+
+function inicializarExclusaoEmLote() {
+    const botaoExcluirLote = document.getElementById('btnExcluirSelecionadas');
+    const selecionarPagina = document.getElementById('selecionar-todas-ordens');
+
+    if (botaoExcluirLote) {
+        botaoExcluirLote.addEventListener('click', () => {
+            const ordensIds = Array.from(ordensSelecionadas);
+
+            if (ordensIds.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Selecione ao menos uma ordem',
+                    text: 'Marque uma ou mais ordens para excluir em lote.',
+                });
+                return;
+            }
+
+            mostrarModalExcluirEmLote(ordensIds, 'serra');
+        });
+    }
+
+    if (selecionarPagina) {
+        selecionarPagina.addEventListener('change', ({ target }) => {
+            document.querySelectorAll('.ordem-checkbox').forEach((checkbox) => {
+                if (checkbox.disabled) {
+                    checkbox.checked = false;
+                    ordensSelecionadas.delete(String(checkbox.value));
+                    return;
+                }
+
+                checkbox.checked = target.checked;
+                const ordemId = String(checkbox.value);
+
+                if (target.checked) {
+                    ordensSelecionadas.add(ordemId);
+                } else {
+                    ordensSelecionadas.delete(ordemId);
+                }
+            });
+
+            atualizarResumoSelecao();
+        });
+    }
+
+    atualizarResumoSelecao();
 }
 
 // Modal para "Duplicar"
@@ -2365,6 +2571,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         configurarSelect2('#filtro-peca', 'api/get-peca/', null, true);
 
         inicializarEventosOrdem();
+        inicializarExclusaoEmLote();
         criarOrdem();
         filtro();
         importarOrdensSerra();
