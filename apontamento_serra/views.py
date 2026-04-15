@@ -892,8 +892,39 @@ def api_apontamentos_peca(request):
     return JsonResponse(resultado, safe=False)
 
 def api_apontamentos_mp(request):
+    hoje = localtime(now()).date()
+
+    data_inicio_str = request.GET.get('data_inicio') or request.GET.get('data_iniio')
+    data_fim_str = request.GET.get('data_fim')
+
+    if data_inicio_str and not data_fim_str:
+        data_fim_str = data_inicio_str
+    elif data_fim_str and not data_inicio_str:
+        data_inicio_str = data_fim_str
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje - timedelta(days=1)
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
+    except ValueError:
+        return JsonResponse(
+            {'erro': 'Formato de data inválido. Use YYYY-MM-DD em data_inicio e data_fim.'},
+            status=400
+        )
+
+    if data_inicio > data_fim:
+        return JsonResponse(
+            {'erro': 'data_inicio não pode ser maior que data_fim.'},
+            status=400
+        )
+
     propriedades_ordens = (
-        PropriedadesOrdem.objects.filter(ordem__status_atual='finalizada', ordem__grupo_maquina='serra', ordem__excluida=False, ordem__ordem_pecas_serra__data__date__gte=now().date() - timedelta(days=1))
+        PropriedadesOrdem.objects.filter(
+            ordem__status_atual='finalizada',
+            ordem__grupo_maquina='serra',
+            ordem__excluida=False,
+            ordem__ordem_pecas_serra__data__date__gte=data_inicio,
+            ordem__ordem_pecas_serra__data__date__lte=data_fim,
+        )
         .exclude(Q(mp_codigo__codigo='GRAU') | Q(mp_codigo__codigo='RECORTE'))  # Exclui GRAU e RECORTE
         .select_related('ordem', 'mp_codigo', 'nova_mp')  # Otimiza consultas relacionadas
         # .order_by('ordem__ordem_pecas_serra__data')  # Ordena pelo campo `data` da tabela `Ordem`
