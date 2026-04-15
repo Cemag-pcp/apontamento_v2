@@ -891,6 +891,88 @@ def api_apontamentos_peca(request):
 
     return JsonResponse(resultado, safe=False)
 
+def api_apontamentos_peca(request):
+    hoje = localtime(now()).date()
+
+    data_inicio_str = request.GET.get('data_inicio') or request.GET.get('data_iniio')
+    data_fim_str = request.GET.get('data_fim')
+
+    if data_inicio_str and not data_fim_str:
+        data_fim_str = data_inicio_str
+    elif data_fim_str and not data_inicio_str:
+        data_inicio_str = data_fim_str
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje - timedelta(days=1)
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date() if data_fim_str else hoje
+    except ValueError:
+        return JsonResponse(
+            {'erro': 'Formato de data inválido. Use YYYY-MM-DD em data_inicio e data_fim.'},
+            status=400
+        )
+
+    if data_inicio > data_fim:
+        return JsonResponse(
+            {'erro': 'data_inicio não pode ser maior que data_fim.'},
+            status=400
+        )
+
+    apontamentos_filtrados = (
+        PecasOrdem.objects.filter(
+            data__date__gte=data_inicio,
+            data__date__lte=data_fim,
+        )
+        .exclude(Q(peca__codigo='GRAU') | Q(peca__codigo='RECORTE'))
+        .select_related('peca')
+    )
+
+    ordens = (
+        Ordem.objects.filter(
+            status_atual='finalizada',
+            grupo_maquina='serra',
+            excluida=False,
+            ordem_pecas_serra__data__date__gte=data_inicio,
+            ordem_pecas_serra__data__date__lte=data_fim,
+        )
+        .exclude(Q(ordem_pecas_serra__peca__codigo='GRAU') | Q(ordem_pecas_serra__peca__codigo='RECORTE'))
+        .select_related('operador_final', 'maquina')
+        .prefetch_related(Prefetch('ordem_pecas_serra', queryset=apontamentos_filtrados))
+        .distinct()
+    )
+
+    resultado = []
+    vistos = set()
+    for ordem in ordens:
+        for apontamento in ordem.ordem_pecas_serra.all():
+            chave_unica = (ordem.id, apontamento.peca.id)
+            if chave_unica in vistos:
+                continue
+
+            vistos.add(chave_unica)
+            data_final = localtime(apontamento.data) if apontamento.data else None
+
+            resultado.append({
+                "ordem": ordem.ordem,
+                "codigo_peca": apontamento.peca.codigo,
+                "descricao_peca": apontamento.peca.descricao if apontamento.peca.descricao else 'Cadastrar descrição',
+                "qtd_boa": apontamento.qtd_boa,
+                "qtd_morta": apontamento.qtd_morta,
+                "qtd_planejada": apontamento.qtd_planejada,
+                "obs_plano": ordem.obs,
+                "maquina": ordem.maquina.nome if ordem.maquina else None,
+                "obs_operador": ordem.obs_operador,
+                "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
+                "data_final": data_final
+            })
+
+    resultado.sort(key=lambda x: x['data_final'] or datetime.min.replace(tzinfo=None))
+
+    for item in resultado:
+        if item['data_final']:
+            item['data_final'] = item['data_final'].strftime('%d/%m/%Y %H:%M')
+
+    return JsonResponse(resultado, safe=False)
+
 def api_apontamentos_mp(request):
     hoje = localtime(now()).date()
 
