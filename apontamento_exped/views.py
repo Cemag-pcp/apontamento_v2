@@ -1248,6 +1248,25 @@ def excluir_foto(request, foto_id):
     imagem.delete()
     return JsonResponse({'mensagem': 'Foto excluída com sucesso.'})
 
+@require_http_methods(["DELETE"])
+def excluir_pendencia(request, pendencia_id):
+    pendencia = get_object_or_404(PendenciasPacote, id=pendencia_id)
+
+    itens_vinculados = ItemPacote.objects.filter(codigo=pendencia).select_related('pacote')
+    if itens_vinculados.exists():
+        nomes = ', '.join(
+            i.pacote.nome for i in itens_vinculados[:5]
+        )
+        return JsonResponse({
+            'erro': (
+                f'Esta pendência está vinculada a itens nos pacotes: {nomes}. '
+                'Remova os itens dos pacotes antes de excluir a pendência.'
+            )
+        }, status=400)
+
+    pendencia.delete()
+    return JsonResponse({'mensagem': 'Pendência removida com sucesso.'})
+
 @require_http_methods(["GET"])
 def mostrar_pendencias(request, carregamento_id):
     """

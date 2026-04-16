@@ -5,7 +5,8 @@
       "Bash(python scripts/search.py \"manufacturing industrial inspection dashboard data tables\" --design-system -p \"Pintura Dashboard\" -f markdown)",
       "Bash(python3 scripts/search.py \"manufacturing industrial inspection dashboard data tables\" --design-system -p \"Pintura Dashboard\" -f markdown)",
       "Bash(python3 \"cli/assets/scripts/search.py\" \"manufacturing industrial inspection dashboard data tables\" --design-system -p \"Pintura Dashboard\" -f markdown)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(cmd *)"
     ]
   }
 }

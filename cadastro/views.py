@@ -10,7 +10,7 @@ from django.db.models import Prefetch, Count, Q
 from django.views.decorators.csrf import csrf_exempt
 
 from .forms import UploadCSVForm
-from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas, ItensExplodidos
+from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas, ItensExplodidos, CarretasExplodidas
 from . import views
 
 import csv
@@ -707,3 +707,115 @@ def cadastro_itens_explodidos(request):
             'total_items': paginator.count,
         }
     )
+
+
+@login_required
+def cadastro_carretas_explodidas(request):
+    return render(request, 'cadastro_carretas_explodidas.html')
+
+
+@csrf_exempt
+@login_required
+def cadastro_carretas_explodidas_api(request):
+
+    CAMPOS_TEXTO = [
+        'grupo1', 'grupo2', 'codigo_peca', 'descricao_peca',
+        'mp_peca', 'total_peca', 'conjunto_peca',
+        'primeiro_processo', 'segundo_processo', 'carreta', 'grupo', 'peso',
+    ]
+
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parametros de paginacao invalidos.'}, status=400)
+
+        queryset = CarretasExplodidas.objects.all().order_by('id')
+
+        search = request.GET.get('search', '').strip()
+        carreta_filtro = request.GET.get('carreta', '').strip()
+
+        if search:
+            queryset = queryset.filter(
+                Q(codigo_peca__icontains=search) |
+                Q(descricao_peca__icontains=search)
+            )
+        if carreta_filtro:
+            queryset = queryset.filter(carreta__icontains=carreta_filtro)
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        results = [
+            {campo: getattr(obj, campo) for campo in ['id'] + CAMPOS_TEXTO}
+            for obj in page_obj.object_list
+        ]
+
+        carretas_lista = (
+            CarretasExplodidas.objects
+            .exclude(carreta__isnull=True)
+            .exclude(carreta='')
+            .values_list('carreta', flat=True)
+            .distinct()
+            .order_by('carreta')
+        )
+
+        return JsonResponse({
+            'results': results,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+            'meta': {
+                'carretas': list(carretas_lista),
+            },
+        })
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        obj = CarretasExplodidas()
+        for campo in CAMPOS_TEXTO:
+            setattr(obj, campo, (data.get(campo) or '').strip() or None)
+        obj.save()
+        return JsonResponse({'success': 'Registro criado com sucesso.', 'id': obj.id}, status=201)
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        obj_id = data.get('id')
+        if not obj_id:
+            return JsonResponse({'error': 'ID nao informado.'}, status=400)
+
+        obj = get_object_or_404(CarretasExplodidas, id=obj_id)
+        for campo in CAMPOS_TEXTO:
+            setattr(obj, campo, (data.get(campo) or '').strip() or None)
+        obj.save()
+        return JsonResponse({'success': 'Registro atualizado com sucesso.'})
+
+    if request.method == 'DELETE':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        obj_id = data.get('id')
+        if not obj_id:
+            return JsonResponse({'error': 'ID nao informado.'}, status=400)
+
+        obj = get_object_or_404(CarretasExplodidas, id=obj_id)
+        obj.delete()
+        return JsonResponse({'success': 'Registro removido com sucesso.'})
+
+    return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)

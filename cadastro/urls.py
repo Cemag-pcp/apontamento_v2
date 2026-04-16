@@ -32,4 +32,8 @@ urlpatterns = [
     path('api/cadastro-conjuntos/', views.cadastro_conjuntos_api, name='cadastro_conjuntos_api'),
     path('cadastro-itens-explodidos/', views.cadastro_itens_explodidos, name='cadastro_itens_explodidos'),
 
+    # Carretas Explodidas
+    path('carretas-explodidas/', views.cadastro_carretas_explodidas, name='cadastro_carretas_explodidas'),
+    path('api/carretas-explodidas/', views.cadastro_carretas_explodidas_api, name='cadastro_carretas_explodidas_api'),
+
 ]

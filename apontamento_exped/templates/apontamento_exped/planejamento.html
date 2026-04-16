@@ -13,6 +13,12 @@
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
   <style>
+      .pkg-items { }
+      .item-row { transition: background .12s; }
+      .item-row:hover { background: #f0f4ff; }
+      .item-row-empty { color: #6c757d; }
+      .min-w-0 { min-width: 0; }
+
       .table-container {
           max-height: 500px;
           overflow-y: auto;
@@ -405,6 +411,41 @@
             </div>
         </div>
     </div>
+</div>
+
+<!-- Modal: visualizar pendências -->
+<div class="modal fade" id="modalVisualizarPendencias" tabindex="-1" aria-labelledby="modalVisualizarPendenciasLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalVisualizarPendenciasLabel">Itens Pendentes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="pendencias-loading" class="text-center py-4">
+          <div class="spinner-border spinner-border-sm text-secondary me-2"></div> Carregando...
+        </div>
+        <div id="pendencias-conteudo" class="d-none">
+          <div id="pendencias-resumo" class="mb-3 small text-muted"></div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Carreta</th>
+                  <th>Código</th>
+                  <th>Descrição</th>
+                  <th class="text-end">Qt. Necessária</th>
+                  <th class="text-center" style="width:80px;">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="pendencias-tbody"></tbody>
+            </table>
+          </div>
+          <div id="pendencias-vazio" class="text-center text-muted py-4 d-none">Nenhuma pendência encontrada.</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Modal: para criar pacote -->
