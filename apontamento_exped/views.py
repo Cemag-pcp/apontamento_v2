@@ -88,6 +88,7 @@ def parse_total(v):
 
 # Tipos especiais de peças que exigem fornecedor informado antes de avançar da verificação
 _TIPOS_ESPECIAIS = ['Pneu', 'Cilindro', 'Roda']
+_PROCESSOS_PENDENCIA_CARRETA = ['PINTAR', 'COMPONENTE EXTRA']
 
 def _detectar_codigos_especiais_da_carga(carga_id):
     """
@@ -116,6 +117,114 @@ def _detectar_codigos_especiais_da_carga(carga_id):
     }
 
 
+def _buscar_componentes_por_carreta(lista_carretas):
+    carretas_normalizadas = sorted({
+        strip_color_suffix(carreta).strip().upper()
+        for carreta in (lista_carretas or [])
+        if strip_color_suffix(carreta).strip()
+    })
+
+    if not carretas_normalizadas:
+        return {}
+
+    qs = (
+        CarretasExplodidas.objects
+        .filter(
+            carreta__in=carretas_normalizadas,
+            primeiro_processo__in=_PROCESSOS_PENDENCIA_CARRETA,
+        )
+        .order_by('carreta', 'codigo_peca')
+        .distinct('carreta', 'codigo_peca')
+        .values('carreta', 'codigo_peca', 'descricao_peca', 'total_peca')
+    )
+
+    grupos_por_carreta = defaultdict(list)
+    for row in qs:
+        total_peca = parse_total(row.get('total_peca'))
+        if total_peca <= 0:
+            continue
+
+        carreta_key = strip_color_suffix(row.get('carreta') or '').strip().upper()
+        if not carreta_key:
+            continue
+
+        grupos_por_carreta[carreta_key].append({
+            'codigo_base': strip_color_suffix(row.get('codigo_peca') or ''),
+            'descricao_limpa': clean_description(row.get('descricao_peca') or ''),
+            'total_por_carreta': total_peca,
+        })
+
+    return grupos_por_carreta
+
+
+def _criar_pendencias_para_carretas_carga(carretas_carga, somente_sem_pendencias=False):
+    carretas_carga = list(carretas_carga or [])
+    if not carretas_carga:
+        return {
+            'carretas_processadas': 0,
+            'pendencias_criadas': 0,
+            'carretas_sem_componentes': [],
+            'carretas_sem_pendencias': [],
+        }
+
+    if somente_sem_pendencias:
+        ids = [carreta.id for carreta in carretas_carga]
+        ids_com_pendencia = set(
+            PendenciasPacote.objects
+            .filter(carreta_carga_id__in=ids)
+            .values_list('carreta_carga_id', flat=True)
+            .distinct()
+        )
+        carretas_sem_pendencias = [c for c in carretas_carga if c.id not in ids_com_pendencia]
+    else:
+        carretas_sem_pendencias = carretas_carga
+
+    grupos_por_carreta = _buscar_componentes_por_carreta([c.carreta for c in carretas_sem_pendencias])
+
+    total_pendencias = 0
+    carretas_sem_componentes = []
+
+    for carreta_carga in carretas_sem_pendencias:
+        carreta_limpa = strip_color_suffix(carreta_carga.carreta).strip().upper()
+        quantidade_carreta = safe_int(carreta_carga.quantidade, default=0)
+
+        if not carreta_limpa or quantidade_carreta <= 0:
+            continue
+
+        componentes = grupos_por_carreta.get(carreta_limpa, [])
+        if not componentes:
+            carretas_sem_componentes.append(carreta_limpa)
+            continue
+
+        pendencias_to_create = []
+        for comp in componentes:
+            qt_necessaria = quantidade_carreta * comp['total_por_carreta']
+            if qt_necessaria <= 0:
+                continue
+
+            pendencias_to_create.append(PendenciasPacote(
+                carreta_carga=carreta_carga,
+                codigo=comp['codigo_base'],
+                descricao=comp['descricao_limpa'],
+                qt_necessaria=qt_necessaria,
+            ))
+
+        if pendencias_to_create:
+            PendenciasPacote.objects.bulk_create(pendencias_to_create)
+            total_pendencias += len(pendencias_to_create)
+
+    return {
+        'carretas_processadas': len(carretas_sem_pendencias),
+        'pendencias_criadas': total_pendencias,
+        'carretas_sem_componentes': sorted(set(carretas_sem_componentes)),
+        'carretas_sem_pendencias': sorted({
+            strip_color_suffix(c.carreta).strip().upper()
+            for c in carretas_sem_pendencias
+            if strip_color_suffix(c.carreta).strip()
+        }),
+    }
+
+
 # =========== Template inicial ==========
 
 def planejamento(request):
@@ -136,7 +245,7 @@ def relatorios_clientes_api(request):
     try:
         data_consulta = datetime.strptime(data_str, '%Y-%m-%d').date()
     except ValueError:
-        return JsonResponse({'error': 'Data inv?lida. Use o formato AAAA-MM-DD.'}, status=400)
+        return JsonResponse({'error': 'Data invalida. Use o formato AAAA-MM-DD.'}, status=400)
 
     clientes = (
         Carga.objects
@@ -302,13 +411,12 @@ def carretas(request):
 @transaction.atomic
 def criar_caixa(request):
     if request.method != 'POST':
-        return JsonResponse({'erro': 'Método não permitido'}, status=405)
+        return JsonResponse({'erro': 'Metodo nao permitido'}, status=405)
 
-    # --- Parse do JSON ---
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
-        return JsonResponse({'erro': 'JSON inválido'}, status=400)
+        return JsonResponse({'erro': 'JSON invalido'}, status=400)
 
     data_carga     = data.get('data_carga')
     carga_nome     = data.get('carga_nome')
@@ -319,7 +427,6 @@ def criar_caixa(request):
     if not itens:
         return JsonResponse({'erro': 'Nenhum item informado'}, status=400)
 
-    # --- Cria Carga ---
     hora_atual = timezone.now().strftime("%H%M%S")
     carga = Carga.objects.create(
         nome=f"{carga_nome}_{cliente_codigo}_{str(data_carga).replace('-', '')}_{hora_atual}",
@@ -329,46 +436,9 @@ def criar_caixa(request):
         obs_pacote=observacoes
     )
 
-    # --- Carretas limpas vindas dos itens (remove sufixo só se for sigla válida) ---
-    lista_carretas = [strip_color_suffix(item.get('codigo_peca', '')).strip() for item in itens if item.get('codigo_peca')]
-
-    if not lista_carretas:
-        return JsonResponse({'erro': 'Nenhuma carreta válida nos itens'}, status=400)
-
-    # --- Buscar componentes em CarretasExplodidas (apenas PINTAR) ---
-    # Mudança aqui
-    qs = (CarretasExplodidas.objects
-        .filter(carreta__in=lista_carretas,
-                primeiro_processo__in=['PINTAR', 'COMPONENTE EXTRA'])
-        .order_by('carreta', 'codigo_peca')
-        .distinct('carreta', 'codigo_peca')
-        .values('carreta', 'codigo_peca', 'descricao_peca', 'total_peca'))
-    
-    # --- Preparar base agrupada por carreta, com tratamento de código/descrição ---
-    grupos_por_carreta = defaultdict(list)
-    for row in qs:
-        codigo_peca       = row.get('codigo_peca') or ''
-        descricao_peca    = row.get('descricao_peca') or ''
-        total_peca      = parse_total(row.get('total_peca'))
-        carreta_db_raw  = (row.get('carreta') or '')
-
-        carreta_key = strip_color_suffix(carreta_db_raw).strip().upper()
-
-        codigo_base       = strip_color_suffix(codigo_peca)
-        descricao_limpa   = clean_description(descricao_peca)
-        total_por_carreta = safe_int(total_peca, default=0)
-
-        if carreta_key and total_peca > 0:
-            grupos_por_carreta[carreta_key].append({
-                'codigo_base': strip_color_suffix(codigo_peca),
-                'descricao_limpa': clean_description(descricao_peca),
-                'total_por_carreta': total_peca,
-            })
-
-    total_pendencias = 0
     created_carretas = 0
+    carretas_carga_criadas = []
 
-    # --- Criar CarretaCarga e Pendencias por item ---
     for item in itens:
         carreta_raw        = item.get('codigo_peca', '')
         quantidade_carreta = safe_int(item.get('quantidade'), default=0)
@@ -386,38 +456,23 @@ def criar_caixa(request):
             cor=cor
         )
         created_carretas += 1
+        carretas_carga_criadas.append(carreta_carga_object)
 
-        componentes = grupos_por_carreta.get(carreta_limpa, [])
-        if not componentes:
-            continue
+    if not carretas_carga_criadas:
+        return JsonResponse({'erro': 'Nenhuma carreta valida nos itens'}, status=400)
 
-        pendencias_to_create = []
-        for comp in componentes:
-            total_por_carreta = comp['total_por_carreta']
-            qt_necessaria     = quantidade_carreta * total_por_carreta
-            if qt_necessaria <= 0:
-                continue
-
-            pendencias_to_create.append(PendenciasPacote(
-                carreta_carga=carreta_carga_object,
-                codigo=comp['codigo_base'],
-                descricao=comp['descricao_limpa'],
-                qt_necessaria=qt_necessaria
-            ))
-
-        if pendencias_to_create:
-            PendenciasPacote.objects.bulk_create(pendencias_to_create)
-            total_pendencias += len(pendencias_to_create)
+    resultado_pendencias = _criar_pendencias_para_carretas_carga(carretas_carga_criadas)
 
     return JsonResponse({
         'mensagem': 'Caixa criada com sucesso!',
         'id': carga.id,
         'carretas_criadas': created_carretas,
-        'pendencias_criadas': total_pendencias,
+        'pendencias_criadas': resultado_pendencias['pendencias_criadas'],
         'stage': 'verificacao',
         'cliente': cliente_codigo,
         'data_carga': data_carga,
         'carga': carga_nome,
+        'carretas_sem_componentes': resultado_pendencias['carretas_sem_componentes'],
 
     }, status=201)
 
@@ -1312,6 +1367,99 @@ def verificar_pendencias(request, carregamento_id):
     )
 
     return JsonResponse({"total_itens_pendente": int(total)})
+
+
+@csrf_exempt
+@transaction.atomic
+@require_http_methods(["POST"])
+def reatualizar_carretas_faltantes(request, carga_id):
+    carga = get_object_or_404(Carga, id=carga_id)
+    if carga.stage == 'despachado':
+        return JsonResponse({'erro': 'Nao e permitido reprocessar carretas em cargas despachadas.'}, status=400)
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'erro': 'JSON invalido.'}, status=400)
+
+    carreta_alvo = strip_color_suffix(payload.get('carreta') or '').strip().upper()
+    if not carreta_alvo:
+        return JsonResponse({'erro': 'Informe a carreta pendente para reprocessar.'}, status=400)
+
+    carretas_qs = list(
+        CarretaCarga.objects
+        .select_for_update()
+        .filter(carga_id=carga_id, carreta__iexact=carreta_alvo)
+        .order_by('id')
+    )
+
+    if not carretas_qs:
+        return JsonResponse({'erro': f'Carreta {carreta_alvo} nao encontrada nesta carga.'}, status=404)
+
+    possui_pendencias = PendenciasPacote.objects.filter(
+        carreta_carga_id__in=[c.id for c in carretas_qs]
+    ).exists()
+    if possui_pendencias:
+        return JsonResponse({'erro': f'A carreta {carreta_alvo} ja possui pendencias geradas.'}, status=400)
+
+    resultado = _criar_pendencias_para_carretas_carga(carretas_qs, somente_sem_pendencias=False)
+
+    faltando_qs = (
+        CarretaCarga.objects
+        .filter(carga_id=carga_id)
+        .exclude(id__in=PendenciasPacote.objects.filter(
+            carreta_carga__carga_id=carga_id
+        ).values('carreta_carga_id'))
+        .values_list('carreta', flat=True)
+        .distinct()
+    )
+    faltando = sorted({
+        strip_color_suffix(carreta).strip().upper()
+        for carreta in faltando_qs
+        if strip_color_suffix(carreta).strip()
+    })
+
+    total_pendente = (
+        PendenciasPacote.objects
+        .filter(carreta_carga__carga_id=carga_id, qt_necessaria__gt=0)
+        .aggregate(total=Coalesce(Sum('qt_necessaria'), 0))
+        ['total']
+    ) or 0
+
+    if carreta_alvo in faltando:
+        if carreta_alvo in (resultado.get('carretas_sem_componentes') or []):
+            return JsonResponse({
+                'erro': (
+                    f'Nao foi possivel gerar pendencias para a carreta {carreta_alvo}. '
+                    'Ela nao possui componentes elegiveis na base explodida.'
+                ),
+                'carga_id': carga_id,
+                'carreta': carreta_alvo,
+                'faltando_gerar': faltando,
+                'carretas_sem_componentes': resultado.get('carretas_sem_componentes') or [],
+                'total_pendente': int(total_pendente),
+            }, status=400)
+
+        return JsonResponse({
+            'erro': f'Nao foi possivel gerar pendencias para a carreta {carreta_alvo}.',
+            'carga_id': carga_id,
+            'carreta': carreta_alvo,
+            'faltando_gerar': faltando,
+            'carretas_sem_componentes': resultado.get('carretas_sem_componentes') or [],
+            'total_pendente': int(total_pendente),
+        }, status=400)
+
+    return JsonResponse({
+        'mensagem': 'Carreta reprocessada com sucesso.',
+        'carga_id': carga_id,
+        'carreta_reprocessada': carreta_alvo,
+        'carretas_reprocessadas': resultado['carretas_sem_pendencias'],
+        'pendencias_criadas': resultado['pendencias_criadas'],
+        'carretas_sem_componentes': resultado['carretas_sem_componentes'],
+        'faltando_gerar': faltando,
+        'ok': len(faltando) == 0,
+        'total_pendente': int(total_pendente),
+    }, status=200)
 
 @require_http_methods(['GET'])
 def comparar_carretas_geradas(request, carga_id):

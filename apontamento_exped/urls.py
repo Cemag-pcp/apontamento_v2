@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/pendencias/item/<int:pendencia_id>/excluir/', views.excluir_pendencia, name='excluir_pendencia'),
     path('api/verificar-pendencias/<int:carregamento_id>/', views.verificar_pendencias, name='verificar_pendencias'),
     path('api/comparar-carretas-geradas/<int:carga_id>/', views.comparar_carretas_geradas, name='comparar_carretas_geradas'),
+    path('api/reprocessar-carretas-faltantes/<int:carga_id>/', views.reatualizar_carretas_faltantes, name='reatualizar_carretas_faltantes'),
     path('api/qt-pendente-carretas/<int:carga_id>/', views.quantidade_pendente_carretas, name='quantidade_pendente_carretas'),
     path('api/listar-pacotes-criados/<int:id>/', views.listar_pacotes_criados, name='listar_pacotes_criados'),
     path('api/salvar-fornecedores/<int:carga_id>/', views.salvar_fornecedores, name='salvar_fornecedores'),

@@ -671,3 +671,28 @@ document.addEventListener('DOMContentLoaded', () => {
   carregarCargasKanban();
   document.getElementById('btnRefreshKanban')?.addEventListener('click', carregarCargasKanban);
 });
+
+window.addEventListener('expedicao:carretas-reprocessadas', (event) => {
+  const detail = event.detail || {};
+  const cargaId = detail.cargaId;
+  if (!cargaId) return;
+
+  const cardEl = document.querySelector(`.card-kanban[data-id="${cargaId}"]`);
+  if (!cardEl) return;
+
+  if (detail.totalPendente != null) {
+    cardEl.dataset.totalPendente = Number(detail.totalPendente);
+  }
+
+  const slot = cardEl.querySelector('.slot-avancar');
+  if (!slot) return;
+
+  preencherSlotAvancar({
+    id: Number(cargaId),
+    stage: cardEl.dataset.stage,
+    todos_pacotes_tem_foto_verificacao: cardEl.dataset.todosPhotoVerificacao === 'true',
+    todos_pacotes_tem_foto_despachado: cardEl.dataset.todosPhotoDespachado === 'true',
+    fornecedores_pendentes: cardEl.dataset.fornecedoresPendentes === 'true',
+    total_pendente: Number(cardEl.dataset.totalPendente || 0),
+  }, slot);
+});
