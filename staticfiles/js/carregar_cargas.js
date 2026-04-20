@@ -104,19 +104,24 @@ export async function popularPacotesDaCarga(cargaId) {
       : `<span class="text-muted">Sem carretas</span>`;
 
     let infoHTML = `
-      <div class="d-flex justify-content-between align-items-center mb-3" id="cabecalhoPacotes">
-        <div>
-          <strong>Cliente:</strong> ${data.cliente_carga} |
-          <strong>Dt. Carga:</strong> ${data.data_carga} |
-          <strong>Carga:</strong> ${data.carga}
-          <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
-            ${carretasChips}
+      <div class="border rounded-3 p-3 mb-3" style="background:linear-gradient(135deg,#f8f9fa 0%,#fff 100%);" id="cabecalhoPacotes">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+          <div class="d-flex gap-4 flex-wrap align-items-center">
+            <div>
+              <div class="text-uppercase text-secondary fw-semibold" style="font-size:.62rem;letter-spacing:.09em;">Carga</div>
+              <div class="fw-bold small">${data.carga}</div>
+            </div>
+            <div>
+              <div class="text-uppercase text-secondary fw-semibold" style="font-size:.62rem;letter-spacing:.09em;">Cliente</div>
+              <div class="fw-bold small">${data.cliente_carga}</div>
+            </div>
+            <div>
+              <div class="text-uppercase text-secondary fw-semibold" style="font-size:.62rem;letter-spacing:.09em;">Data</div>
+              <div class="fw-bold small">${data.data_carga}</div>
+            </div>
           </div>
-        </div>
-        <div class="ms-3 flex-grow-1">
-          <label class="form-label mb-1 small">Filtrar por c\u00f3digo ou descri\u00e7\u00e3o</label>
-          <input type="text" id="filtroItensPacote" class="form-control form-control-sm" placeholder="Digite c\u00f3digo ou parte da descri\u00e7\u00e3o">
-        </div>
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <input type="text" id="filtroItensPacote" class="form-control form-control-sm" placeholder="Filtrar itens..." style="min-width:175px;">
     `;
 
     // Botão de fornecedores (apenas na etapa verificação, se houver tipos especiais)
@@ -128,26 +133,23 @@ export async function popularPacotesDaCarga(cargaId) {
       const btnLabel = todosFornecidos
         ? '<i class="fas fa-check-circle me-1"></i>Fornecedores informados'
         : '<i class="fas fa-exclamation-triangle me-1"></i>Informar Fornecedores (obrigatório)';
-      infoHTML += `
-        <div>
-          <button type="button" class="btn ${btnCls} btn-sm" id="btnAbrirFornecedores">
-            ${btnLabel}
-          </button>
-        </div>
-      `;
+      infoHTML += `<button type="button" class="btn ${btnCls} btn-sm" id="btnAbrirFornecedores">${btnLabel}</button>`;
     }
+
+    infoHTML += `<button type="button" class="btn btn-outline-warning btn-sm" id="btnVisualizarPendencias"><i class="fas fa-clock me-1"></i>Pendências</button>`;
 
     if (data.status_carga !== 'despachado') {
-      infoHTML += `
-        <div>
-          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#criarPacoteModal" id='btnAbrirModalCriarPacote'>
-            <i class="fas fa-plus me-2"></i>Criar Pacote
-          </button>
-        </div>
-      `;
+      infoHTML += `<button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#criarPacoteModal" id="btnAbrirModalCriarPacote"><i class="fas fa-plus me-1"></i>Criar Pacote</button>`;
     }
 
-    infoHTML += `</div>`; // fecha a div de linha
+    infoHTML += `
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-1 mt-3">
+          ${carretasChips}
+        </div>
+      </div>
+    `;
 
     modalBody.innerHTML = infoHTML;
 
@@ -157,6 +159,12 @@ export async function popularPacotesDaCarga(cargaId) {
       btnAbrirForn.addEventListener('click', () => {
         abrirModalFornecedores(cargaId, codigosEspeciais, fornecedores);
       });
+    }
+
+    // Wiring do botão de pendências
+    const btnPendencias = modalBody.querySelector('#btnVisualizarPendencias');
+    if (btnPendencias) {
+      btnPendencias.addEventListener('click', () => abrirModalPendencias(cargaId));
     }
 
     if (data.status_carga !== 'despachado') {
@@ -250,7 +258,7 @@ export async function popularPacotesDaCarga(cargaId) {
       let algumVisivel = false;
 
       colunas.forEach((col) => {
-        const itens = col.querySelectorAll('li.list-group-item');
+        const itens = col.querySelectorAll('.item-row');
         let visiveisCard = 0;
         itens.forEach((li) => {
           const cod = (li.dataset.codigo || '').toLowerCase();
@@ -282,16 +290,30 @@ export async function popularPacotesDaCarga(cargaId) {
       col.dataset.pacoteId = pacote.id;  // facilita filtros
 
       const card = document.createElement('div');
-      card.className = 'card mb-3 shadow-sm';
-      card.style.height = '300px';  // Altura padrÃ£o
+      card.className = 'card mb-3 border-0';
       card.style.display = 'flex';
       card.style.flexDirection = 'column';
+      card.style.maxHeight = '420px';
+      card.style.boxShadow = '0 2px 10px rgba(0,0,0,.09)';
+      card.style.borderRadius = '10px';
+      card.style.overflow = 'hidden';
+
+      let statusBadgeHtml = '';
+      if (pacote.status_qualidade === 'ok') {
+        statusBadgeHtml = '<span class="badge bg-success ms-2" style="font-size:.6rem;"><i class="fas fa-check me-1"></i>Confirmado</span>';
+      } else if (pacote.status_expedicao === 'ok') {
+        statusBadgeHtml = '<span class="badge bg-primary ms-2" style="font-size:.6rem;"><i class="fas fa-check me-1"></i>Expedição</span>';
+      }
 
       const header = document.createElement('div');
-      header.className = 'card-header d-flex justify-content-between align-items-center py-2 px-3';
-      const headerTitle = document.createElement('strong');
-      headerTitle.className = 'text-truncate w-100';
-      headerTitle.textContent = pacote.nome;
+      header.className = 'd-flex justify-content-between align-items-center py-2 px-3';
+      header.style.background = 'linear-gradient(90deg,#e9ecef,#f8f9fa)';
+      header.style.borderBottom = '1px solid rgba(0,0,0,.07)';
+      header.style.flexShrink = '0';
+
+      const headerLeft = document.createElement('div');
+      headerLeft.className = 'd-flex align-items-center min-w-0 flex-grow-1 me-2';
+      headerLeft.innerHTML = `<span class="fw-semibold text-truncate small" title="${pacote.nome}">${pacote.nome}</span>${statusBadgeHtml}`;
 
       const headerActions = document.createElement('div');
       headerActions.className = 'd-flex align-items-center gap-2 flex-shrink-0';
@@ -359,7 +381,7 @@ export async function popularPacotesDaCarga(cargaId) {
 
         headerActions.appendChild(btnDeletar);
       }
-      header.appendChild(headerTitle);
+      header.appendChild(headerLeft);
       header.appendChild(headerActions);
 
       // Flag de foto ao lado do nome do pacote
@@ -525,45 +547,40 @@ export async function popularPacotesDaCarga(cargaId) {
       }
 
       const body = document.createElement('div');
-      body.className = 'card-body px-3 py-2';
+      body.className = 'px-0 py-0';
       body.style.overflowY = 'auto';
       body.style.flex = '1';
 
-      const dataCriacao = document.createElement('small');
-      dataCriacao.className = 'text-muted d-block mb-2';
+      const dataCriacao = document.createElement('div');
+      dataCriacao.className = 'text-muted px-3 pt-2 pb-1';
+      dataCriacao.style.fontSize = '.68rem';
       dataCriacao.innerText = `Criado em: ${pacote.data_criacao}`;
 
-      const lista = document.createElement('ul');
-      lista.className = 'list-group list-group-flush';
+      const lista = document.createElement('div');
+      lista.className = 'pkg-items';
 
-      // Marque o card e a UL com o id do pacote para facilitar o update no DOM
       card.dataset.pacoteId = pacote.id;
-
-      // const lista = document.createElement('ul');
-      lista.className = 'list-group list-group-flush';
       lista.dataset.pacoteId = pacote.id;
 
       if (pacote.itens.length === 0) {
-        const vazio = document.createElement('li');
-        vazio.className = 'list-group-item text-muted';
+        const vazio = document.createElement('div');
+        vazio.className = 'item-row item-row-empty text-muted small px-3 py-2';
         vazio.innerText = 'Nenhum item no pacote.';
         lista.appendChild(vazio);
       } else {
         pacote.itens.forEach((item, idx) => {
-          const li = document.createElement('li');
-          li.className = 'list-group-item d-flex justify-content-between align-items-start py-1';
+          const li = document.createElement('div');
+          li.className = 'item-row d-flex align-items-center gap-2 px-3 py-1 border-bottom';
           li.dataset.itemId = (item.id ?? idx);
 
-          const info = document.createElement('div');
-          info.className = 'me-2';
           const codigoItem = item.codigo_peca || '(sem código)';
           const descricaoItem = item.descricao || '';
-          const badgeForaPlanejado = item.fora_planejado
-            ? '<span class="badge bg-warning text-dark ms-2">Fora do planejado</span>'
-            : '';
+
+          const info = document.createElement('div');
+          info.className = 'flex-grow-1 min-w-0';
           info.innerHTML = `
-            <div><strong>${codigoItem}</strong> - ${descricaoItem} ${badgeForaPlanejado}</div>
-            <small class="text-muted quantidade-label">Qtde: <span class="quantidade-valor">${item.quantidade}</span></small>
+            <div class="fw-semibold text-truncate" style="font-size:.78rem;" title="${codigoItem}">${codigoItem}</div>
+            <div class="text-muted text-truncate" style="font-size:.72rem;" title="${descricaoItem}">${descricaoItem}${item.fora_planejado ? ' <span class="badge bg-warning text-dark" style="font-size:.6rem;">Fora do plan.</span>' : ''}</div>
           `;
           li.dataset.codigo = codigoItem;
           li.dataset.descricao = descricaoItem;
@@ -620,49 +637,40 @@ export async function popularPacotesDaCarga(cargaId) {
           });
 
           li.appendChild(info);
-          
+
+          const actionsDiv = document.createElement('div');
+          actionsDiv.className = 'd-flex align-items-center gap-1 flex-shrink-0';
+
           const podeEditarQtd = (data.status_carga === 'planejamento' || data.status_carga === 'verificacao');
           if (podeEditarQtd) {
-            const quantidadeWrapper = document.createElement('div');
-            quantidadeWrapper.className = 'd-flex align-items-center gap-1 mt-1';
-
             const inputQtd = document.createElement('input');
             inputQtd.type = 'number';
             inputQtd.min = '1';
             inputQtd.value = item.quantidade;
-            inputQtd.className = 'form-control form-control-sm w-auto';
+            inputQtd.className = 'form-control form-control-sm text-center';
+            inputQtd.style.width = '52px';
+            inputQtd.style.fontSize = '.78rem';
 
             const btnSalvarQtd = document.createElement('button');
             btnSalvarQtd.type = 'button';
-            btnSalvarQtd.className = 'btn btn-outline-secondary btn-sm';
-            btnSalvarQtd.innerHTML = '<i class=\"fas fa-save\"></i>';
-            btnSalvarQtd.title = 'Atualizar quantidade do item';
+            btnSalvarQtd.className = 'btn btn-outline-secondary btn-sm p-1';
+            btnSalvarQtd.innerHTML = '<i class="fas fa-save" style="font-size:.7rem;"></i>';
+            btnSalvarQtd.title = 'Salvar quantidade';
 
             btnSalvarQtd.addEventListener('click', async () => {
               const novaQt = parseInt(inputQtd.value, 10);
-              if (!novaQt || novaQt <= 0) {
-                alert('Quantidade invÃ¡lida.');
-                return;
-              }
-
+              if (!novaQt || novaQt <= 0) { alert('Quantidade inválida.'); return; }
               const prevText = btnSalvarQtd.innerHTML;
               btnSalvarQtd.disabled = true;
-              btnSalvarQtd.innerHTML = '<span class=\"spinner-border spinner-border-sm\" role=\"status\" aria-hidden=\"true\"></span>';
+              btnSalvarQtd.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
               try {
                 const resp = await fetch(`api/pacotes/itens/${item.id}/atualizar-quantidade/`, {
                   method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                  },
+                  headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
                   body: JSON.stringify({ quantidade: novaQt })
                 });
                 const dataResp = await resp.json().catch(() => ({}));
-                if (!resp.ok) {
-                  throw new Error(dataResp?.erro || 'Erro ao atualizar quantidade.');
-                }
-                const qVal = li.querySelector('.quantidade-valor');
-                if (qVal) qVal.textContent = dataResp.nova_quantidade;
+                if (!resp.ok) throw new Error(dataResp?.erro || 'Erro ao atualizar quantidade.');
                 inputQtd.value = dataResp.nova_quantidade;
               } catch (error) {
                 alert(error.message || 'Erro ao atualizar quantidade.');
@@ -672,14 +680,11 @@ export async function popularPacotesDaCarga(cargaId) {
               }
             });
 
-            quantidadeWrapper.appendChild(inputQtd);
-            quantidadeWrapper.appendChild(btnSalvarQtd);
-            info.appendChild(quantidadeWrapper);
-
             const btnExcluirItem = document.createElement('button');
             btnExcluirItem.type = 'button';
-            btnExcluirItem.className = 'btn btn-outline-danger btn-sm';
-            btnExcluirItem.innerHTML = '<i class="fas fa-trash"></i>';
+            btnExcluirItem.className = 'btn btn-outline-danger btn-sm p-1';
+            btnExcluirItem.innerHTML = '<i class="fas fa-trash" style="font-size:.7rem;"></i>';
+            btnExcluirItem.title = 'Remover item';
             btnExcluirItem.addEventListener('click', async () => {
               const confirma = item.fora_planejado
                 ? confirm('Remover este item fora do planejado do pacote?')
@@ -687,40 +692,47 @@ export async function popularPacotesDaCarga(cargaId) {
               if (!confirma) return;
               const prev = btnExcluirItem.innerHTML;
               btnExcluirItem.disabled = true;
-              btnExcluirItem.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+              btnExcluirItem.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
               try {
                 const resp = await fetch(`api/pacotes/itens/${item.id}/deletar/`, {
                   method: 'DELETE',
                   headers: { 'X-CSRFToken': getCookie('csrftoken') }
                 });
                 const dataResp = await resp.json().catch(() => ({}));
-                if (!resp.ok) {
-                  throw new Error(dataResp?.erro || 'Erro ao remover peÃ§a.');
-                }
+                if (!resp.ok) throw new Error(dataResp?.erro || 'Erro ao remover peça.');
                 li.remove();
-                // se lista ficar vazia, mostra aviso
-                if (!lista.querySelector('li')) {
-                  const vazio = document.createElement('li');
-                  vazio.className = 'list-group-item text-muted';
+                if (!lista.querySelector('.item-row:not(.item-row-empty)')) {
+                  const vazio = document.createElement('div');
+                  vazio.className = 'item-row item-row-empty text-muted small px-3 py-2';
                   vazio.innerText = 'Nenhum item no pacote.';
                   lista.appendChild(vazio);
                 }
               } catch (error) {
-                alert(error.message || 'Erro ao remover peÃ§a.');
+                alert(error.message || 'Erro ao remover peça.');
               } finally {
                 btnExcluirItem.disabled = false;
                 btnExcluirItem.innerHTML = prev;
               }
             });
-            quantidadeWrapper.appendChild(btnExcluirItem);
+
+            actionsDiv.appendChild(inputQtd);
+            actionsDiv.appendChild(btnSalvarQtd);
+            actionsDiv.appendChild(btnExcluirItem);
+          } else {
+            const qtyBadge = document.createElement('span');
+            qtyBadge.className = 'badge bg-light text-dark border';
+            qtyBadge.style.fontSize = '.72rem';
+            qtyBadge.textContent = `×${item.quantidade}`;
+            actionsDiv.appendChild(qtyBadge);
           }
 
           if (data.status_carga === 'planejamento' && pacote.status_expedicao !== 'ok') {
-            li.appendChild(btnAlterar);
+            actionsDiv.appendChild(btnAlterar);
           } else if (data.status_carga === 'verificacao' && pacote.status_qualidade !== 'ok') {
-            li.appendChild(btnAlterar);
-          };
+            actionsDiv.appendChild(btnAlterar);
+          }
 
+          li.appendChild(actionsDiv);
           lista.appendChild(li);
         });
       }
@@ -757,7 +769,9 @@ export async function popularPacotesDaCarga(cargaId) {
       body.appendChild(lista);
 
       const footer = document.createElement('div');
-      footer.className = 'card-footer d-flex flex-column gap-2';
+      footer.className = 'card-footer d-flex flex-column gap-1 py-2';
+      footer.style.borderTop = '1px solid rgba(0,0,0,.07)';
+      footer.style.background = '#fafafa';
 
       // BotÃ£o de adicionar foto
       const btnFoto = document.createElement('button');
@@ -993,16 +1007,13 @@ export function wireModalAlterarPacote(){
         throw new Error(msg || 'Falha ao mover item.');
       }
 
-      // Atualiza DOM localmente (move o <li> para a lista do pacote destino)
+      // Atualiza DOM localmente (move o item para a lista do pacote destino)
       if (window._editingItemLi) {
-        const cardsContainer = document.getElementById('cardsContainer') || document; // ajuste se seu container tiver id
-        const ulDestino = cardsContainer.querySelector(`ul.list-group[data-pacote-id="${destinoId}"]`);
-        if (ulDestino) {
-          // remove aviso "Nenhum item..." se existir
-          const vazio = ulDestino.querySelector('.list-group-item.text-muted');
+        const pkgItemsDestino = document.querySelector(`.pkg-items[data-pacote-id="${destinoId}"]`);
+        if (pkgItemsDestino) {
+          const vazio = pkgItemsDestino.querySelector('.item-row-empty');
           if (vazio) vazio.remove();
-
-          ulDestino.appendChild(window._editingItemLi);
+          pkgItemsDestino.appendChild(window._editingItemLi);
         }
       }
 
@@ -1184,3 +1195,94 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+async function abrirModalPendencias(cargaId) {
+  const modalEl = document.getElementById('modalVisualizarPendencias');
+  if (!modalEl) return;
+
+  const loading = modalEl.querySelector('#pendencias-loading');
+  const conteudo = modalEl.querySelector('#pendencias-conteudo');
+  const tbody = modalEl.querySelector('#pendencias-tbody');
+  const resumo = modalEl.querySelector('#pendencias-resumo');
+  const vazio = modalEl.querySelector('#pendencias-vazio');
+
+  loading.classList.remove('d-none');
+  conteudo.classList.add('d-none');
+  tbody.innerHTML = '';
+
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+
+  async function carregarPendencias() {
+    loading.classList.remove('d-none');
+    conteudo.classList.add('d-none');
+    tbody.innerHTML = '';
+
+    try {
+      const resp = await fetch(`api/pendencias/${cargaId}/`);
+      if (!resp.ok) throw new Error('Erro ao buscar pendências.');
+      const data = await resp.json();
+      const itens = data.itens || [];
+
+      resumo.textContent = `Total: ${itens.length} item(ns) pendente(s)`;
+
+      if (itens.length === 0) {
+        vazio.classList.remove('d-none');
+      } else {
+        vazio.classList.add('d-none');
+        itens.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.dataset.id = item.id;
+          tr.innerHTML = `
+            <td>${item.carreta ?? '-'}</td>
+            <td>${item.codigo ?? '-'}</td>
+            <td>${item.descricao ?? '-'}</td>
+            <td class="text-end">${item.qt_necessaria ?? 0}</td>
+            <td class="text-center">
+              <button class="btn btn-outline-danger btn-sm btn-excluir-pendencia" title="Excluir pendência">
+                <i class="fas fa-trash"></i>
+              </button>
+            </td>
+          `;
+
+          tr.querySelector('.btn-excluir-pendencia').addEventListener('click', async () => {
+            const confirmado = await Swal.fire({
+              icon: 'warning',
+              title: 'Excluir pendência?',
+              text: `${item.codigo} — ${item.descricao}`,
+              showCancelButton: true,
+              confirmButtonText: 'Excluir',
+              cancelButtonText: 'Cancelar',
+              confirmButtonColor: '#dc3545',
+            });
+            if (!confirmado.isConfirmed) return;
+
+            try {
+              const csrftoken = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] ?? '';
+              const delResp = await fetch(`api/pendencias/item/${item.id}/excluir/`, {
+                method: 'DELETE',
+                headers: { 'X-CSRFToken': csrftoken },
+              });
+              if (!delResp.ok) throw new Error('Erro ao excluir.');
+              tr.remove();
+              const restantes = tbody.querySelectorAll('tr').length;
+              resumo.textContent = `Total: ${restantes} item(ns) pendente(s)`;
+              if (restantes === 0) vazio.classList.remove('d-none');
+            } catch (err) {
+              Swal.fire({ icon: 'error', title: 'Erro', text: err.message });
+            }
+          });
+
+          tbody.appendChild(tr);
+        });
+      }
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-danger text-center py-3">${err.message}</td></tr>`;
+    } finally {
+      loading.classList.add('d-none');
+      conteudo.classList.remove('d-none');
+    }
+  }
+
+  await carregarPendencias();
+}
