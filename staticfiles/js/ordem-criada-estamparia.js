@@ -2218,6 +2218,12 @@ document.addEventListener('DOMContentLoaded', () => {
         insertTag: function (data, tag) {
             data.unshift(tag);
         },
+        language: {
+            noResults: function () {
+                const termoDigitado = $('.select2-container--open .select2-search__field').val()?.trim();
+                return termoDigitado ? `criar + ${termoDigitado}` : 'Nenhum resultado encontrado';
+            }
+        },
         placeholder: 'Selecione a peça',
         ajax: {
             url: 'api/get-pecas/',
