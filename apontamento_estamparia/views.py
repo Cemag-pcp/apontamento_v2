@@ -18,7 +18,7 @@ from django.views.decorators.http import require_POST
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso,MaquinaParada, Profile
-from cadastro.models import MotivoInterrupcao, Pecas, Operador, MotivoMaquinaParada, MotivoExclusao, Maquina
+from cadastro.models import MotivoInterrupcao, Pecas, Operador, MotivoMaquinaParada, MotivoExclusao, Maquina, Setor
 from inspecao.models import Inspecao, DadosExecucaoInspecao
 from .utils_dashboard import *
 from apontamento_serra.utils import formatar_timedelta
@@ -258,12 +258,14 @@ def planejamento(request):
     operadores = Operador.objects.filter(setor__nome='estamparia')
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='estamparia').exclude(nome='Finalizada parcial')
     motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='estamparia')
+    setor_estamparia = Setor.objects.filter(nome__iexact='estamparia').first()
 
     return render(request, 'apontamento_estamparia/planejamento.html', {
                                                                     'motivos': motivos,
                                                                     'operadores':operadores,
                                                                     'motivos_maquina_parada':motivos_maquina_parada,
-                                                                    'motivos_exclusao': motivos_exclusao})
+                                                                    'motivos_exclusao': motivos_exclusao,
+                                                                    'setor_estamparia_id': setor_estamparia.id if setor_estamparia else ''})
 
 def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:

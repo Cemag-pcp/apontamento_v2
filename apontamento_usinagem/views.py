@@ -18,7 +18,7 @@ from django.contrib.auth.decorators import login_required
 
 from .models import Ordem,PecasOrdem
 from core.models import OrdemProcesso, MaquinaParada, Profile
-from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada, MotivoExclusao
+from cadastro.models import MotivoInterrupcao, Pecas, Operador, Maquina, MotivoMaquinaParada, MotivoExclusao, Setor
 from inspecao.models import Inspecao
 from .utils import criar_ordem_usinagem
 
@@ -210,12 +210,14 @@ def planejamento(request):
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='usinagem').exclude(nome='Finalizada parcial')
     motivos_exclusao = MotivoExclusao.objects.filter(setor__nome='usinagem')
     processos = Maquina.objects.filter(setor__nome='usinagem', tipo='processo')
+    setor_usinagem = Setor.objects.filter(nome__iexact='usinagem').first()
 
     return render(request, 'apontamento_usinagem/planejamento.html', {'motivos':motivos,
                                                                       'operadores':operadores,
                                                                       'motivos_maquina_parada':motivos_maquina_parada,
                                                                       'motivos_exclusao': motivos_exclusao,
-                                                                      'processos': processos})
+                                                                      'processos': processos,
+                                                                      'setor_usinagem_id': setor_usinagem.id if setor_usinagem else ''})
 
 def processos(request):
 

@@ -2164,12 +2164,66 @@ function filtro() {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    const pecaCreateConfig = document.getElementById('pecaCreateConfig');
+    const cadastroPecaUrl = pecaCreateConfig?.dataset?.cadastroPecaUrl || '';
+    const setorEstampariaId = pecaCreateConfig?.dataset?.setorEstampariaId || '';
 
     resetarCardsInicial();
     modalPlanejar();
     carregarPainelPrioridades();
+
+    async function criarPecaEstamparia(codigoPeca) {
+        if (!cadastroPecaUrl || !setorEstampariaId) {
+            throw new Error('Configuracao de cadastro de peca indisponivel.');
+        }
+
+        const response = await fetch(cadastroPecaUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({
+                codigo: codigoPeca,
+                setor_ids: [Number(setorEstampariaId)]
+            })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || 'Nao foi possivel criar a peca.');
+        }
+
+        return {
+            id: codigoPeca,
+            text: codigoPeca
+        };
+    }
     
     $('#pecaSelect').select2({
+        tags: true,
+        createTag: function (params) {
+            const termo = (params.term || '').trim();
+            if (!termo) {
+                return null;
+            }
+
+            return {
+                id: termo,
+                text: `criar + ${termo}`,
+                newTag: true,
+                codigoPeca: termo
+            };
+        },
+        insertTag: function (data, tag) {
+            data.unshift(tag);
+        },
+        language: {
+            noResults: function () {
+                const termoDigitado = $('.select2-container--open .select2-search__field').val()?.trim();
+                return termoDigitado ? `criar + ${termoDigitado}` : 'Nenhum resultado encontrado';
+            }
+        },
         placeholder: 'Selecione a peça',
         ajax: {
             url: 'api/get-pecas/',
@@ -2198,6 +2252,55 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         minimumInputLength: 0,
         dropdownParent: $('#modalEstamparia'),
+        escapeMarkup: function (markup) {
+            return markup;
+        },
+    });
+
+    $('#pecaSelect').on('select2:selecting', function (event) {
+        const itemSelecionado = event.params?.args?.data;
+        if (!itemSelecionado?.newTag) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const codigoPeca = (itemSelecionado.codigoPeca || itemSelecionado.id || '').trim();
+        if (!codigoPeca) {
+            return;
+        }
+
+        Swal.fire({
+            icon: 'question',
+            title: 'Criar peca?',
+            text: `Deseja criar a peca ${codigoPeca} no setor estamparia?`,
+            showCancelButton: true,
+            confirmButtonText: 'Confirmar',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (!result.isConfirmed) {
+                return;
+            }
+
+            try {
+                const novaPeca = await criarPecaEstamparia(codigoPeca);
+                const select = $('#pecaSelect');
+                const option = new Option(novaPeca.text, novaPeca.id, true, true);
+                select.append(option).trigger('change');
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso',
+                    text: `Peca ${codigoPeca} criada com sucesso.`
+                });
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message
+                });
+            }
+        });
     });
 
     const containerIniciado = document.querySelector('.containerProcesso');
