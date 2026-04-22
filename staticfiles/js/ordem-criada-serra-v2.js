@@ -2261,8 +2261,7 @@ function addPeca() {
                 params.page = params.page || 1;
                 return {
                     results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
+                        ...item
                     })),
                     pagination: {
                         more: data.pagination.more
@@ -2478,10 +2477,50 @@ function importarOrdensSerra() {
     });
 }
 
+function definirMpSelecionada(mpId, mpText) {
+    const mpSelect = $('#mpEscolhida');
+    if (!mpSelect.length || !mpId) return;
+
+    const textoOpcao = mpText || mpId;
+    let option = mpSelect.find(`option[value="${mpId}"]`);
+
+    if (!option.length) {
+        option = new Option(textoOpcao, mpId, true, true);
+        mpSelect.append(option);
+    } else {
+        option.prop('selected', true);
+        option.text(textoOpcao);
+    }
+
+    mpSelect.val(mpId).trigger('change');
+}
+
+function limparMpSelecionada() {
+    const mpSelect = $('#mpEscolhida');
+    if (!mpSelect.length) return;
+
+    mpSelect.val(null).trigger('change');
+}
+
+function atualizarMateriaPrimaPelaPecaSelecionada(selectElement, item = null) {
+    const selectedItem = item || $(selectElement).select2('data')?.[0];
+
+    if (!selectedItem?.mp_id) {
+        limparMpSelecionada();
+        return;
+    }
+
+    definirMpSelecionada(selectedItem.mp_id, selectedItem.mp_text);
+}
+
 function inicializarEventosOrdem() {
 
     $('#mpEscolhida').on('change.select2', function () {
         verificarOrdemCriada();
+    });
+
+    $(document).on('select2:select', '.pecasCriarOrdem', function (event) {
+        atualizarMateriaPrimaPelaPecaSelecionada(this, event.params?.data);
     });
 
     // Evento para todos os Select2 de peças
@@ -2626,8 +2665,7 @@ function configurarSelect2(selector, url, parent = null, allowClear = false) {
             }),
             processResults: (data, params) => ({
                 results: data.results.map(item => ({
-                    id: item.id,
-                    text: item.text
+                    ...item
                 })),
                 pagination: { more: data.pagination?.more || false }
             }),
