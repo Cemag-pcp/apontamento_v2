@@ -849,47 +849,47 @@ def verificar_mp_pecas_na_ordem(request):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
     
-def api_apontamentos_peca(request):
-    ordens = (
-        Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra', excluida=False, ordem_pecas_serra__data__date__gte=now().date() - timedelta(days=1))
-        .exclude(Q(ordem_pecas_serra__peca__codigo='GRAU') | Q(ordem_pecas_serra__peca__codigo='RECORTE'))  # Exclui GRAU e RECORTE
-        .select_related('operador_final', 'maquina')  # Para otimizar a relação com operador_final
-        .prefetch_related('ordem_pecas_serra__peca')  # Ajustado para usar o related_name correto
-        .distinct()  # Evitar duplicatas
-    )
+# def api_apontamentos_peca(request):
+#     ordens = (
+#         Ordem.objects.filter(status_atual='finalizada', grupo_maquina='serra', excluida=False, ordem_pecas_serra__data__date__gte=now().date() - timedelta(days=1))
+#         .exclude(Q(ordem_pecas_serra__peca__codigo='GRAU') | Q(ordem_pecas_serra__peca__codigo='RECORTE'))  # Exclui GRAU e RECORTE
+#         .select_related('operador_final', 'maquina')  # Para otimizar a relação com operador_final
+#         .prefetch_related('ordem_pecas_serra__peca')  # Ajustado para usar o related_name correto
+#         .distinct()  # Evitar duplicatas
+#     )
 
-    # Constrói o resultado manualmente
-    resultado = []
-    vistos = set()  # Rastreamos os itens já processados
-    for ordem in ordens:
-        for apontamento in ordem.ordem_pecas_serra.all():
-            chave_unica = (ordem.id, apontamento.peca.id)  # Identificador único
-            if chave_unica not in vistos:
-                vistos.add(chave_unica)  # Marca como visto
-                data_final = localtime(apontamento.data) if apontamento.data else None
+#     # Constrói o resultado manualmente
+#     resultado = []
+#     vistos = set()  # Rastreamos os itens já processados
+#     for ordem in ordens:
+#         for apontamento in ordem.ordem_pecas_serra.all():
+#             chave_unica = (ordem.id, apontamento.peca.id)  # Identificador único
+#             if chave_unica not in vistos:
+#                 vistos.add(chave_unica)  # Marca como visto
+#                 data_final = localtime(apontamento.data) if apontamento.data else None
 
-                resultado.append({
-                    "ordem": ordem.ordem,
-                    "codigo_peca": apontamento.peca.codigo,
-                    "descricao_peca": apontamento.peca.descricao if apontamento.peca.descricao else 'Cadastrar descrição',
-                    "qtd_boa": apontamento.qtd_boa,
-                    "qtd_morta": apontamento.qtd_morta,
-                    "qtd_planejada": apontamento.qtd_planejada,
-                    "obs_plano": ordem.obs,
-                    "maquina": ordem.maquina.nome,
-                    "obs_operador": ordem.obs_operador,
-                    "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
-                    "data_final": data_final  # Mantemos o objeto datetime para ordenação
-                })
+#                 resultado.append({
+#                     "ordem": ordem.ordem,
+#                     "codigo_peca": apontamento.peca.codigo,
+#                     "descricao_peca": apontamento.peca.descricao if apontamento.peca.descricao else 'Cadastrar descrição',
+#                     "qtd_boa": apontamento.qtd_boa,
+#                     "qtd_morta": apontamento.qtd_morta,
+#                     "qtd_planejada": apontamento.qtd_planejada,
+#                     "obs_plano": ordem.obs,
+#                     "maquina": ordem.maquina.nome,
+#                     "obs_operador": ordem.obs_operador,
+#                     "operador": f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
+#                     "data_final": data_final  # Mantemos o objeto datetime para ordenação
+#                 })
     
-    resultado.sort(key=lambda x: x['data_final'])
+#     resultado.sort(key=lambda x: x['data_final'])
 
-    # Converte a data para o formato desejado após ordenar
-    for item in resultado:
-        if item['data_final']:
-            item['data_final'] = item['data_final'].strftime('%d/%m/%Y %H:%M')
+#     # Converte a data para o formato desejado após ordenar
+#     for item in resultado:
+#         if item['data_final']:
+#             item['data_final'] = item['data_final'].strftime('%d/%m/%Y %H:%M')
 
-    return JsonResponse(resultado, safe=False)
+#     return JsonResponse(resultado, safe=False)
 
 def api_apontamentos_peca(request):
     hoje = localtime(now()).date()

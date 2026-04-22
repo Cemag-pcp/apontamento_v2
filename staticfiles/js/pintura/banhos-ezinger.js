@@ -34,6 +34,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const TARGET_M_FE_212 = 1.2;
     const CAPACITY_M_FE_212 = 3950;
     const M_FE_212_FACTOR = 0.23;
+    const AK_L95_LIMITE_INFERIOR = 5;
+    const AK_L95_LIMITE_SUPERIOR = 7;
+    const M_FE_212_LIMITE_INFERIOR = 0.9;
+    const M_FE_212_LIMITE_SUPERIOR = 1.2;
 
     const inputIds = [
         "desengraxante_amostra_1",
@@ -377,6 +381,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2));
         });
+        const akL95LimiteInferiorData = labels.map(() => AK_L95_LIMITE_INFERIOR);
+        const akL95LimiteSuperiorData = labels.map(() => AK_L95_LIMITE_SUPERIOR);
+        const mFe212LimiteInferiorData = labels.map(() => M_FE_212_LIMITE_INFERIOR);
+        const mFe212LimiteSuperiorData = labels.map(() => M_FE_212_LIMITE_SUPERIOR);
 
         if (percentuaisChart) {
             percentuaisChart.destroy();
@@ -403,6 +411,54 @@ document.addEventListener("DOMContentLoaded", () => {
                         backgroundColor: "rgba(21, 128, 61, 0.18)",
                         tension: 0.25,
                         borderWidth: 2,
+                        fill: false,
+                    },
+                    {
+                        label: "AK L95 lim. inf. (5%)",
+                        data: akL95LimiteInferiorData,
+                        borderColor: "#7c3aed",
+                        backgroundColor: "rgba(124, 58, 237, 0.12)",
+                        tension: 0,
+                        borderWidth: 2,
+                        borderDash: [8, 6],
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        fill: false,
+                    },
+                    {
+                        label: "AK L95 lim. sup. (7%)",
+                        data: akL95LimiteSuperiorData,
+                        borderColor: "#dc2626",
+                        backgroundColor: "rgba(220, 38, 38, 0.12)",
+                        tension: 0,
+                        borderWidth: 2,
+                        borderDash: [8, 6],
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        fill: false,
+                    },
+                    {
+                        label: "M FE 212 lim. inf. (0,9%)",
+                        data: mFe212LimiteInferiorData,
+                        borderColor: "#ea580c",
+                        backgroundColor: "rgba(234, 88, 12, 0.12)",
+                        tension: 0,
+                        borderWidth: 2,
+                        borderDash: [8, 6],
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        fill: false,
+                    },
+                    {
+                        label: "M FE 212 lim. sup. (1,2%)",
+                        data: mFe212LimiteSuperiorData,
+                        borderColor: "#a16207",
+                        backgroundColor: "rgba(161, 98, 7, 0.12)",
+                        tension: 0,
+                        borderWidth: 2,
+                        borderDash: [8, 6],
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
                         fill: false,
                     },
                 ],
