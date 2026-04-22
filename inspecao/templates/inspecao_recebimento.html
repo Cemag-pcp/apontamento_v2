@@ -693,6 +693,17 @@
             return html;
         },
 
+        "Arame de Solda": (prefix) => {
+            let html = "";
+            html += secao("Visual");
+            html += selectConformidade(prefix, "visual_oxidacao", "Oxidação");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
         "Galvanizados": (prefix) => {
             let html = "";
             html += secao("Dimensional");
@@ -900,6 +911,8 @@
             let html = "";
             html += secao("Visual");
             html += selectConformidade(prefix, "visual_rachados_falhas_deformacoes_cortes", "Rachados / Falhas / Deformações / Cortes");
+            html += secao("Funcional");
+            html += selectConformidade(prefix, "teste_inflar", "Teste inflar");
             html += secao("Resultado");
             html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
             html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`

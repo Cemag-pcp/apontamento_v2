@@ -587,11 +587,26 @@ def get_peca(request):
     # Paginação
     paginator = Paginator(peca_query, per_page)
     peca_page = paginator.get_page(page)
+    mp_map = {
+        mp.codigo: mp.descricao
+        for mp in Mp.objects.filter(
+            codigo__in=[peca.materia_prima for peca in peca_page if peca.materia_prima]
+        )
+    }
 
     # Monta os resultados paginados no formato esperado pelo Select2
     data = {
         'results': [
-            {'id': peca.codigo, 'text': f"{peca.codigo} - {peca.descricao}"} for peca in peca_page
+            {
+                'id': peca.codigo,
+                'text': f"{peca.codigo} - {peca.descricao}",
+                'mp_id': peca.materia_prima,
+                'mp_text': (
+                    f"{peca.materia_prima} - {mp_map[peca.materia_prima]}"
+                    if peca.materia_prima and mp_map.get(peca.materia_prima)
+                    else peca.materia_prima
+                )
+            } for peca in peca_page
         ],
         'pagination': {
             'more': peca_page.has_next()  # Se há mais páginas

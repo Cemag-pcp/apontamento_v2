@@ -1164,6 +1164,7 @@ def api_erp_apontamentos_estamparia(request):
             'id': item.id,
             'ordem_id': item.ordem_id,
             'ordem': item.ordem.ordem if item.ordem else '',
+            'obs_operador': item.ordem.obs_operador if item.ordem else '',
             'peca_codigo': item.peca.codigo if item.peca else '',
             'peca_descricao': item.peca.descricao if item.peca else '',
             'qtd_boa': item.qtd_boa,
