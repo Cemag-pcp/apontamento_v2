@@ -74,7 +74,7 @@ class Operador(models.Model):
     
 class Mp(models.Model):
 
-    codigo = models.CharField(max_length=10)
+    codigo = models.CharField(max_length=100)
     descricao = models.CharField(max_length=255)
     setor = models.ForeignKey(Setor, on_delete=models.CASCADE, related_name='setor')
 

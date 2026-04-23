@@ -38,6 +38,22 @@ def extrair_numeracao(nome_arquivo):
         return match.group(1)
     return None
 
+def obter_ou_criar_mp_serra(mp_codigo, descricao=None):
+    mp_codigo = (mp_codigo or '').strip()
+    if not mp_codigo:
+        return None
+
+    mp = Mp.objects.filter(codigo=mp_codigo).first()
+    if mp:
+        return mp
+
+    setor_serra = get_object_or_404(Setor, nome='serra')
+    return Mp.objects.create(
+        codigo=mp_codigo,
+        descricao=(descricao or mp_codigo).strip() or mp_codigo,
+        setor=setor_serra,
+    )
+
 @login_required
 def planejamento(request):
 
@@ -616,51 +632,56 @@ def get_peca(request):
     return JsonResponse(data)
 
 def criar_ordem(request):
-    if request.method == "POST":
-        try:
-            # Carrega o JSON enviado no corpo da requisição
-            data = json.loads(request.body)
-            
-            with transaction.atomic():
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': 'Método não permitido.'}, status=405)
 
-                # Criação da nova ordem
-                nova_ordem = Ordem.objects.create(
-                    obs=data.get('descricao', ''),  # Usa o valor de 'descricao' ou string vazia caso não exista
-                    grupo_maquina='serra',
-                    data_programacao=data.get('dataProgramacao')
-                )
+    try:
+        # Carrega o JSON enviado no corpo da requisição
+        data = json.loads(request.body)
 
-                # Criação das propriedades da ordem
-                mp = Mp.objects.filter(codigo=data.get('mp')).first()
-                if not mp:
-                    return JsonResponse({'status': 'error', 'message': f'MP com código {data.get("mp")} não encontrada.'}, status=404)
-                
-                PropriedadesOrdem.objects.create(
+        with transaction.atomic():
+
+            # Criação da nova ordem
+            nova_ordem = Ordem.objects.create(
+                obs=data.get('descricao', ''),  # Usa o valor de 'descricao' ou string vazia caso não exista
+                grupo_maquina='serra',
+                data_programacao=data.get('dataProgramacao')
+            )
+
+            # Criação das propriedades da ordem
+            mp = obter_ou_criar_mp_serra(
+                data.get('mp'),
+                data.get('descricao_mp') or data.get('descricaoMp')
+            )
+            if not mp:
+                return JsonResponse({'status': 'error', 'message': 'Código de MP é obrigatório.'}, status=400)
+
+            PropriedadesOrdem.objects.create(
+                ordem=nova_ordem,
+                mp_codigo=mp,
+                tamanho=data.get('tamanhoVara', 0),  # Usa valor padrão caso 'tamanho' não exista
+                quantidade=0 if data.get('quantidade') == '' else data.get('quantidade'),  # Usa valor padrão caso 'qtd' não exista
+                retalho=(data.get('retalho') == 'on')  # Converte "on" para True e ausente para False
+            )
+
+            # Iteração para criar peças associadas à ordem
+            for peca in data.get('pecas', []):  # Garante que 'pecas' seja uma lista, mesmo se não existir
+                PecasOrdem.objects.create(
                     ordem=nova_ordem,
-                    mp_codigo=mp,
-                    tamanho=data.get('tamanhoVara', 0),  # Usa valor padrão caso 'tamanho' não exista
-                    quantidade=0 if data.get('quantidade') == '' else data.get('quantidade'),  # Usa valor padrão caso 'qtd' não exista
-                    retalho=(data.get('retalho') == 'on')  # Converte "on" para True e ausente para False
+                    peca=get_object_or_404(Pecas, codigo=peca.get('peca')),
+                    qtd_planejada=peca.get('quantidade', 0),  # Usa valor padrão caso 'quantidade' não exista
                 )
 
-                # Iteração para criar peças associadas à ordem
-                for peca in data.get('pecas', []):  # Garante que 'pecas' seja uma lista, mesmo se não existir
-                    PecasOrdem.objects.create(
-                        ordem=nova_ordem,
-                        peca=get_object_or_404(Pecas, codigo=peca.get('peca')),
-                        qtd_planejada=peca.get('quantidade', 0),  # Usa valor padrão caso 'quantidade' não exista
-                    )
+            # Retorna sucesso se tudo foi processado
+            return JsonResponse({'status': 'success', 'message': 'Ordem criada com sucesso!'})
 
-                # Retorna sucesso se tudo foi processado
-                return JsonResponse({'status': 'success', 'message': 'Ordem criada com sucesso!'})
+    except json.JSONDecodeError as e:
+        # Captura erro ao decodificar JSON
+        return JsonResponse({'status': 'error', 'message': 'Erro ao processar JSON', 'details': str(e)}, status=400)
 
-        except json.JSONDecodeError as e:
-            # Captura erro ao decodificar JSON
-            return JsonResponse({'status': 'error', 'message': 'Erro ao processar JSON', 'details': str(e)}, status=400)
-
-        except Exception as e:
-            # Captura erros genéricos
-            return JsonResponse({'status': 'error', 'message': 'Erro ao criar a ordem', 'details': str(e)}, status=500)
+    except Exception as e:
+        # Captura erros genéricos
+        return JsonResponse({'status': 'error', 'message': 'Erro ao criar a ordem', 'details': str(e)}, status=500)
 
 def adicionar_pecas_ordem(request):
 
@@ -819,6 +840,11 @@ def verificar_mp_pecas_na_ordem(request):
                 "status": "warning",
                 "message": "Código de MP e lista de peças são obrigatórios."
             }, status=400)
+
+        obter_ou_criar_mp_serra(
+            mp_codigo,
+            data.get("descricao_mp") or data.get("descricaoMp")
+        )
 
         # Converte para set para operações mais eficientes
         pecas_filter = set(pecas_codigos)
