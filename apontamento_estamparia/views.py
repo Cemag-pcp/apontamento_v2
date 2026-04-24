@@ -964,32 +964,36 @@ def get_ordens_ag_prox_proc(request):
 
 def get_pecas(request):
     """
-    Retorna uma lista paginada de peças, com suporte a busca por código ou descrição.
+    Retorna uma lista paginada de pecas, com suporte a busca por codigo ou descricao.
     """
-    # Obtém os parâmetros da requisição
-    search = request.GET.get('search', '').strip()  # Termo de busca
-    page = int(request.GET.get('page', 1))  # Página atual (padrão é 1)
-    per_page = int(request.GET.get('per_page', 10))  # Itens por página (padrão é 10)
+    search = request.GET.get('search', '').strip()
+    page = int(request.GET.get('page', 1))
+    per_page = int(request.GET.get('per_page', 10))
+    search_normalizado = ''.join(search.split())
 
-    # Filtra as peças com base no termo de busca (opcional)
     pecas_query = Pecas.objects.all()
     if search:
         pecas_query = pecas_query.filter(
             Q(codigo__icontains=search) | Q(descricao__icontains=search)
         ).order_by('codigo')
+    else:
+        pecas_query = pecas_query.order_by('codigo')
 
-    # Paginação
+    existe_codigo_exato = False
+    if search_normalizado:
+        existe_codigo_exato = Pecas.objects.filter(codigo__iexact=search_normalizado).exists()
+
     paginator = Paginator(pecas_query, per_page)
     pecas_page = paginator.get_page(page)
 
-    # Monta os resultados paginados no formato esperado pelo Select2
     data = {
         'results': [
             {'id': peca.codigo, 'text': f"{peca.codigo} - {peca.descricao}"} for peca in pecas_page
         ],
         'pagination': {
-            'more': pecas_page.has_next()  # Se há mais páginas
+            'more': pecas_page.has_next()
         },
+        'exact_match': existe_codigo_exato,
     }
 
     return JsonResponse(data)
@@ -1827,3 +1831,5 @@ def dashboard_producao_inspecao(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+

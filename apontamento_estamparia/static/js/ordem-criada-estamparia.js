@@ -2199,31 +2199,19 @@ document.addEventListener('DOMContentLoaded', () => {
             text: codigoPeca
         };
     }
-    
-    $('#pecaSelect').select2({
-        tags: true,
-        createTag: function (params) {
-            const termo = (params.term || '').trim();
-            if (!termo) {
-                return null;
-            }
+    function normalizarCodigoPeca(valor) {
+        return String(valor || '')
+            .trim()
+            .replace(/\s+/g, '')
+            .toUpperCase();
+    }
 
-            return {
-                id: termo,
-                text: `criar + ${termo}`,
-                newTag: true,
-                codigoPeca: termo
-            };
-        },
-        insertTag: function (data, tag) {
-            data.unshift(tag);
-        },
-        language: {
-            noResults: function () {
-                const termoDigitado = $('.select2-container--open .select2-search__field').val()?.trim();
-                return termoDigitado ? `criar + ${termoDigitado}` : 'Nenhum resultado encontrado';
-            }
-        },
+    function podeMostrarOpcaoCriarPeca(termo) {
+        const termoSemEspacos = String(termo || '').trim().replace(/\s+/g, '');
+        return /^\d{6,}$/.test(termoSemEspacos);
+    }
+
+    $('#pecaSelect').select2({
         placeholder: 'Selecione a peça',
         ajax: {
             url: 'api/get-pecas/',
@@ -2238,11 +2226,31 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             processResults: function (data, params) {
                 params.page = params.page || 1;
+                const termoBusca = (params.term || '').trim();
+                const termoNormalizado = normalizarCodigoPeca(termoBusca);
+                const resultados = (data.results || []).map(item => ({
+                    id: item.id,
+                    text: item.text
+                }));
+
+                const pecaJaExiste = termoNormalizado && resultados.some((item) => {
+                    const idNormalizado = normalizarCodigoPeca(item.id);
+                    const textNormalizado = normalizarCodigoPeca(item.text);
+                    return idNormalizado === termoNormalizado || textNormalizado === termoNormalizado;
+                });
+                const pecaExisteNoBanco = !!data.exact_match;
+
+                if (termoBusca && !pecaJaExiste && !pecaExisteNoBanco && podeMostrarOpcaoCriarPeca(termoBusca)) {
+                    resultados.unshift({
+                        id: `__create__:${termoBusca}`,
+                        text: `criar + ${termoBusca}`,
+                        newTag: true,
+                        codigoPeca: termoBusca
+                    });
+                }
+
                 return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
+                    results: resultados,
                     pagination: {
                         more: data.pagination.more
                     }
@@ -2320,3 +2328,4 @@ document.addEventListener('DOMContentLoaded', () => {
     filtro();
 
 });
+
