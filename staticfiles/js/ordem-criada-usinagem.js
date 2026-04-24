@@ -2065,24 +2065,19 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
     
-    $('#pecaSelect').select2({
-        tags: true,
-        createTag: function (params) {
-            const termo = (params.term || '').trim();
-            if (!termo) {
-                return null;
-            }
+    function normalizarCodigoPeca(valor) {
+        return String(valor || '')
+            .trim()
+            .replace(/\s+/g, '')
+            .toUpperCase();
+    }
 
-            return {
-                id: termo,
-                text: `criar + ${termo}`,
-                newTag: true,
-                codigoPeca: termo
-            };
-        },
-        insertTag: function (data, tag) {
-            data.unshift(tag);
-        },
+    function podeMostrarOpcaoCriarPeca(termo) {
+        const termoSemEspacos = String(termo || '').trim().replace(/\s+/g, '');
+        return /^\d{6,}$/.test(termoSemEspacos);
+    }
+
+    $('#pecaSelect').select2({
         placeholder: 'Selecione a peça',
         ajax: {
             url: '/usinagem/api/get-pecas/',
@@ -2097,11 +2092,31 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             processResults: function (data, params) {
                 params.page = params.page || 1;
+
+                const termoBusca = (params.term || '').trim();
+                const termoNormalizado = normalizarCodigoPeca(termoBusca);
+                const resultados = (data.results || []).map(item => ({
+                    id: item.id,
+                    text: item.text
+                }));
+
+                const pecaJaExiste = termoNormalizado && resultados.some((item) => {
+                    const idNormalizado = normalizarCodigoPeca(item.id);
+                    const textNormalizado = normalizarCodigoPeca(item.text);
+                    return idNormalizado === termoNormalizado || textNormalizado === termoNormalizado;
+                });
+
+                if (termoBusca && !pecaJaExiste && podeMostrarOpcaoCriarPeca(termoBusca)) {
+                    resultados.unshift({
+                        id: `__create__:${termoBusca}`,
+                        text: `criar + ${termoBusca}`,
+                        newTag: true,
+                        codigoPeca: termoBusca
+                    });
+                }
+
                 return {
-                    results: data.results.map(item => ({
-                        id: item.id,
-                        text: item.text
-                    })),
+                    results: resultados,
                     pagination: {
                         more: data.pagination.more
                     }
