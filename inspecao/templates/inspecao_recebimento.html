@@ -10,12 +10,12 @@
 
 {% block content %}
 
-<h2 class="fw-bold my-4">Inspecao de Recebimento</h2>
+<h2 class="fw-bold my-4">Inspeção de Recebimento</h2>
 
 <ul class="nav nav-tabs mt-3" style="background-color: #f4f4f5;">
     <li class="nav-item" style="width: 50%;">
         <a id="tab-pendencias-recebimento" class="nav-link tab-active active text-center" style="font-size: 0.875rem;" onclick="toggleTab('pendencias-recebimento','inspecionados-recebimento', this)">
-            Pendencias
+            Pendências
         </a>
     </li>
     <li class="nav-item" style="width: 50%;">
@@ -30,7 +30,7 @@
         <h4 style="width: 60%;">Pendencias</h4>
         <div class="d-flex gap-2 align-items-center">
             <input type="date" class="form-control" id="data-sincronizar-recebimento" style="max-width: 170px;">
-            <button type="button" class="btn btn-outline-primary" id="btn-sincronizar-recebimento">
+            <button type="button" class="btn btn-outline-primary" id="btn-sincronizar-recebimento" disabled>
                 Sincronizar
             </button>
             <div class="input-group" style="max-width: 320px;">
@@ -206,6 +206,13 @@
 
     function sincronizarRecebimento() {
         const btn = document.getElementById("btn-sincronizar-recebimento");
+        const dataInput = document.getElementById("data-sincronizar-recebimento");
+        const dataSelecionada = dataInput && dataInput.value ? dataInput.value : "";
+        if (!dataSelecionada) {
+            alert("Preencha a data para sincronizar.");
+            return;
+        }
+
         btn.disabled = true;
         const textoOriginal = btn.textContent;
         btn.textContent = "Sincronizando...";
@@ -216,9 +223,8 @@
             headers["X-CSRFToken"] = csrfInput.value;
         }
 
-        const dataInput = document.getElementById("data-sincronizar-recebimento");
         const payload = {
-            cutoff_date: dataInput && dataInput.value ? dataInput.value : ""
+            cutoff_date: dataSelecionada
         };
 
         fetch("/inspecao/api/recebimento/sincronizar/", {
@@ -238,9 +244,16 @@
                 alert(error.message || "Erro ao sincronizar.");
             })
             .finally(() => {
-                btn.disabled = false;
+                atualizarEstadoBotaoSincronizarRecebimento();
                 btn.textContent = textoOriginal;
             });
+    }
+
+    function atualizarEstadoBotaoSincronizarRecebimento() {
+        const btn = document.getElementById("btn-sincronizar-recebimento");
+        const dataInput = document.getElementById("data-sincronizar-recebimento");
+        if (!btn || !dataInput) return;
+        btn.disabled = !(dataInput.value && dataInput.value.trim());
     }
 
     function renderPendencias() {
@@ -267,7 +280,7 @@
             headerRow.appendChild(th);
         });
         const thAcoes = document.createElement("th");
-        thAcoes.textContent = "Acoes";
+        thAcoes.textContent = "Ações";
         headerRow.appendChild(thAcoes);
         thead.appendChild(headerRow);
 
@@ -494,10 +507,17 @@
         if (!valores || typeof valores !== "object") return;
 
         Object.entries(valores).forEach(([name, value]) => {
-            const campo = document.querySelector(`#form-inspecao-recebimento [name="${CSS.escape(name)}"]`);
-            if (campo) {
-                campo.value = value;
+            let campo = document.querySelector(`#form-inspecao-recebimento [name="${CSS.escape(name)}"]`);
+
+            if (!campo) {
+                const matchBmc = name.match(/^(u\d+_)bmc_medida_(\d+)_(nome|valor)$/);
+                if (matchBmc) {
+                    adicionarBlocoBmc(matchBmc[1], {}, parseInt(matchBmc[2], 10));
+                    campo = document.querySelector(`#form-inspecao-recebimento [name="${CSS.escape(name)}"]`);
+                }
             }
+
+            if (campo) campo.value = value;
         });
     }
 
@@ -517,6 +537,116 @@
 
     function secao(titulo) {
         return `<h6 class="fw-semibold mt-3 mb-1 border-bottom pb-1">${titulo}</h6>`;
+    }
+
+    function normalizarClasseTexto(valor) {
+        return String(valor || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, "")
+            .toLowerCase();
+    }
+
+    function classeAtualEhBombasMotoresComponentes() {
+        const normalizado = normalizarClasseTexto(classeAtual);
+        return normalizado === "bombas/motores/componentes"
+            || normalizado === "bombasmotorescomponentes";
+    }
+
+    function getBmcContainerId(prefix) {
+        return `bmc-extra-${String(prefix || "").replace(/[^a-zA-Z0-9]/g, "")}`;
+    }
+
+    function getBmcProximoIndice(prefix) {
+        const container = document.getElementById(getBmcContainerId(prefix));
+        if (!container) return 1;
+
+        const indices = Array.from(container.querySelectorAll(".bmc-linha-medida"))
+            .map((bloco) => parseInt(bloco.dataset.bmcIndex || "0", 10))
+            .filter((n) => Number.isFinite(n) && n > 0);
+
+        return indices.length ? Math.max(...indices) + 1 : 1;
+    }
+
+    function adicionarBlocoBmc(prefix, dados = {}, indiceForcado = null) {
+        const container = document.getElementById(getBmcContainerId(prefix));
+        if (!container) return null;
+
+        const indice = Number.isFinite(indiceForcado) && indiceForcado > 0
+            ? indiceForcado
+            : getBmcProximoIndice(prefix);
+
+        const blocoExistente = container.querySelector(`.bmc-linha-medida[data-bmc-index="${indice}"]`);
+        const nomeCampo = `${prefix}bmc_medida_${indice}_nome`;
+        const medidaCampo = `${prefix}bmc_medida_${indice}_valor`;
+
+        if (blocoExistente) {
+            const inputNomeExistente = blocoExistente.querySelector(`input[name="${CSS.escape(nomeCampo)}"]`);
+            const inputMedidaExistente = blocoExistente.querySelector(`input[name="${CSS.escape(medidaCampo)}"]`);
+
+            if (inputNomeExistente && dados.nome !== undefined) inputNomeExistente.value = dados.nome;
+            if (inputMedidaExistente && dados.medida !== undefined) inputMedidaExistente.value = dados.medida;
+            return blocoExistente;
+        }
+
+        const bloco = document.createElement("div");
+        bloco.className = "d-flex gap-2 align-items-end mb-2 bmc-linha-medida";
+        bloco.dataset.bmcIndex = String(indice);
+        bloco.innerHTML = `
+            <div class="flex-fill">
+                <input type="text" name="${nomeCampo}" class="form-control form-control-sm" placeholder="Nome da medida" required>
+            </div>
+            <div class="flex-fill">
+                <input type="text" name="${medidaCampo}" class="form-control form-control-sm" placeholder="Medida" required>
+            </div>
+            <div>
+                <button type="button" class="btn btn-outline-danger btn-sm btn-remover-bmc-item" title="Remover linha">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(bloco);
+
+        const inputNome = bloco.querySelector(`input[name="${CSS.escape(nomeCampo)}"]`);
+        const inputMedida = bloco.querySelector(`input[name="${CSS.escape(medidaCampo)}"]`);
+
+        if (inputNome && dados.nome !== undefined) inputNome.value = dados.nome;
+        if (inputMedida && dados.medida !== undefined) inputMedida.value = dados.medida;
+
+        const btnRemover = bloco.querySelector(".btn-remover-bmc-item");
+        if (btnRemover) {
+            btnRemover.addEventListener("click", () => bloco.remove());
+        }
+
+        return bloco;
+    }
+
+    function obterModeloBmcDaUnidade1(valoresAtuais) {
+        const modeloMap = new Map();
+        Object.entries(valoresAtuais || {}).forEach(([nomeCampo, valorCampo]) => {
+            const match = nomeCampo.match(/^u1_bmc_medida_(\d+)_(nome|valor)$/);
+            if (!match) return;
+            const indice = parseInt(match[1], 10);
+            const tipo = match[2];
+            if (!modeloMap.has(indice)) {
+                modeloMap.set(indice, { nome: "", medida: "" });
+            }
+            if (tipo === "nome") {
+                modeloMap.get(indice).nome = valorCampo;
+            } else {
+                modeloMap.get(indice).medida = valorCampo;
+            }
+        });
+
+        return Array.from(modeloMap.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([indice, dados]) => ({
+                indice,
+                dados: {
+                    nome: dados.nome || "",
+                    medida: "",
+                },
+            }));
     }
 
     const FORMULARIOS = {
@@ -702,6 +832,25 @@
             html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
                   + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
             return html;
+        },
+
+        "Bombas/Motores/Componentes": (prefix) => {
+            let html = "";
+            html += secao("Itens da inspeção");
+            html += `<div class="d-flex justify-content-between align-items-center mb-2">`
+                  + `<label class="form-label form-label-sm mb-0">Campos adicionais</label>`
+                  + `<button type="button" class="btn btn-outline-primary btn-sm btn-add-bmc-field" data-prefix="${prefix}">Adicionar campo</button>`
+                  + `</div>`;
+            html += `<div id="${getBmcContainerId(prefix)}" class="bmc-extra-fields"></div>`;
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
+        "Bombas / Motores / Componentes": (prefix) => {
+            return FORMULARIOS["Bombas/Motores/Componentes"](prefix);
         },
 
         "Galvanizados": (prefix) => {
@@ -930,9 +1079,18 @@
 
     function renderUnidades(qtd) {
         const valoresAtuais = capturarValoresFormularioRecebimento();
+        const modeloBmcUnidade1 = classeAtualEhBombasMotoresComponentes()
+            ? obterModeloBmcDaUnidade1(valoresAtuais)
+            : [];
         const abaAtivaAtual = document.querySelector('#tabs-unidades-recebimento button.active');
         const alvoAbaAtiva = abaAtivaAtual ? abaAtivaAtual.getAttribute("data-bs-target") : "#unit-tab-1";
-        const builder = FORMULARIOS[classeAtual] || FORMULARIOS["_generico"];
+        let builder = FORMULARIOS[classeAtual];
+        if (!builder && classeAtualEhBombasMotoresComponentes()) {
+            builder = FORMULARIOS["Bombas/Motores/Componentes"];
+        }
+        if (!builder) {
+            builder = FORMULARIOS["_generico"];
+        }
         const tabsEl = document.getElementById("tabs-unidades-recebimento");
         const contentEl = document.getElementById("content-unidades-recebimento");
         tabsEl.innerHTML = "";
@@ -955,6 +1113,16 @@
             pane.id = `unit-tab-${u}`;
             pane.innerHTML = builder(prefix);
             contentEl.appendChild(pane);
+
+            if (classeAtualEhBombasMotoresComponentes()) {
+                if (modeloBmcUnidade1.length) {
+                    modeloBmcUnidade1.forEach((itemModelo) => {
+                        adicionarBlocoBmc(prefix, itemModelo.dados, itemModelo.indice);
+                    });
+                } else {
+                    adicionarBlocoBmc(prefix);
+                }
+            }
         }
 
         reaplicarValoresFormularioRecebimento(valoresAtuais);
@@ -1014,6 +1182,10 @@
 
         const qtd = parseInt(document.getElementById("qtd-unidades-recebimento").value) || 1;
         const form = document.getElementById("form-inspecao-recebimento");
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
         const formData = new FormData(form);
 
         // coleta dados por unidade
@@ -1040,6 +1212,32 @@
                     unitObservacao = value.trim();
                 } else {
                     unitData[field] = value;
+                }
+            }
+
+            if (classeAtualEhBombasMotoresComponentes()) {
+                const indicesItens = new Set();
+                Object.keys(unitData).forEach((field) => {
+                    const match = field.match(/^bmc_medida_(\d+)_(nome|valor)$/);
+                    if (match) indicesItens.add(match[1]);
+                });
+
+                if (!indicesItens.size) {
+                    alert(`Adicione ao menos uma medida para a Unidade ${u}.`);
+                    const tabBtn = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="#unit-tab-${u}"]`);
+                    if (tabBtn) tabBtn.click();
+                    return;
+                }
+
+                for (const indice of indicesItens) {
+                    const nomeMedida = String(unitData[`bmc_medida_${indice}_nome`] || "").trim();
+                    const valorMedida = String(unitData[`bmc_medida_${indice}_valor`] || "").trim();
+                    if (!nomeMedida || !valorMedida) {
+                        alert(`Preencha nome e medida em todos os campos adicionados para a Unidade ${u}.`);
+                        const tabBtn = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="#unit-tab-${u}"]`);
+                        if (tabBtn) tabBtn.click();
+                        return;
+                    }
                 }
             }
 
@@ -1104,10 +1302,20 @@
         carregarPendencias();
         carregarInspecionados();
 
+        document.addEventListener("click", (event) => {
+            const btnAdicionarCampo = event.target.closest(".btn-add-bmc-field");
+            if (!btnAdicionarCampo) return;
+            const prefix = btnAdicionarCampo.dataset.prefix || "";
+            if (!prefix) return;
+            adicionarBlocoBmc(prefix);
+        });
+
         document.getElementById("pesquisa-pendencias-recebimento").addEventListener("input", renderPendencias);
         document.getElementById("pesquisa-inspecionados-recebimento").addEventListener("input", renderInspecionados);
         document.getElementById("form-inspecao-recebimento").addEventListener("submit", salvarInspecaoRecebimento);
         document.getElementById("btn-sincronizar-recebimento").addEventListener("click", sincronizarRecebimento);
+        document.getElementById("data-sincronizar-recebimento").addEventListener("input", atualizarEstadoBotaoSincronizarRecebimento);
+        atualizarEstadoBotaoSincronizarRecebimento();
 
         // controles de quantidade de unidades
         document.getElementById("btn-qtd-menos-recebimento").addEventListener("click", () => {
