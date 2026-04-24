@@ -673,6 +673,50 @@
     </div>
 </div>
 
+<!-- Modal editar informações da ordem -->
+<div class="modal fade" id="modalEditarInfoCorte" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalEditarInfoCorteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEditarInfoCorteLabel">Editar Ordem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarInfoCorte">
+                    <input type="hidden" id="editOrdemIdCorte">
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="editQtdChapasCorte" class="form-label">Quantidade de chapas</label>
+                            <input type="number" class="form-control" id="editQtdChapasCorte" min="1" step="1" required>
+                        </div>
+                        <div class="col-md-8">
+                            <label for="editObsCorte" class="form-label">Observação</label>
+                            <textarea class="form-control" id="editObsCorte" rows="2" placeholder="Algum comentário adicional"></textarea>
+                        </div>
+                    </div>
+
+                    <h6 class="text-center mt-3">Peças da ordem (recalculadas proporcionalmente)</h6>
+                    <table class="table table-bordered table-sm text-center">
+                        <thead>
+                            <tr class="table-light">
+                                <th>Peça</th>
+                                <th>Quantidade</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyPecasEditarCorte"></tbody>
+                    </table>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal iniciar ordem -->
 <div class="modal fade" id="modalIniciar" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalIniciarLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">

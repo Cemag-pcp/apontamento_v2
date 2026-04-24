@@ -25,6 +25,7 @@ import os
 import tempfile
 import re
 import json
+import math
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 from datetime import datetime, time, timedelta
@@ -169,6 +170,74 @@ def get_ordens_criadas(request):
     } for ordem in ordens_page]
 
     return JsonResponse({'ordens': data})
+
+def editar_informacoes_ordem(request):
+    if request.method != 'PATCH':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+    try:
+        with transaction.atomic():
+            body = json.loads(request.body)
+
+            ordem_id = body.get('ordem_id')
+            obs = body.get('obs', '')
+            qtd_chapas = body.get('qtdChapas')
+
+            if not ordem_id:
+                return JsonResponse({'error': 'Informe a ordem.'}, status=400)
+
+            try:
+                qtd_chapas = float(qtd_chapas)
+            except (TypeError, ValueError):
+                return JsonResponse({'error': 'Quantidade de chapas inválida.'}, status=400)
+
+            if qtd_chapas <= 0:
+                return JsonResponse({'error': 'Quantidade de chapas deve ser maior que zero.'}, status=400)
+
+            ordem = get_object_or_404(
+                Ordem,
+                pk=ordem_id,
+                grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3']
+            )
+
+            if ordem.status_atual == 'finalizada':
+                return JsonResponse({'error': 'Não é possível editar ordens finalizadas.'}, status=400)
+
+            propriedade = getattr(ordem, 'propriedade', None)
+            if not propriedade:
+                return JsonResponse({'error': 'Propriedades da ordem não encontradas.'}, status=404)
+
+            qtd_chapas_atual = float(propriedade.quantidade or 0)
+            if qtd_chapas_atual <= 0:
+                return JsonResponse({'error': 'Quantidade atual de chapas inválida para recálculo.'}, status=400)
+
+            fator = qtd_chapas / qtd_chapas_atual
+
+            ordem.obs = obs
+            ordem.save()
+
+            propriedade.quantidade = qtd_chapas
+            propriedade.save()
+
+            pecas_ordem = list(PecasOrdem.objects.filter(ordem=ordem))
+            for peca in pecas_ordem:
+                nova_quantidade = math.floor(float(peca.qtd_planejada) * fator)
+                peca.qtd_planejada = max(nova_quantidade, 0)
+
+            if pecas_ordem:
+                PecasOrdem.objects.bulk_update(pecas_ordem, ['qtd_planejada'])
+
+            transaction.on_commit(lambda: notificar_ordem(ordem))
+
+            return JsonResponse({
+                'message': 'Informações atualizadas com sucesso.',
+                'ordem_id': ordem.id,
+                'qtd_chapas': propriedade.quantidade,
+                'obs': ordem.obs,
+            })
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 def atualizar_status_ordem(request):
     if request.method == 'PATCH':

@@ -1,4 +1,4 @@
-import { carregarOrdensIniciadas, carregarOrdensInterrompidas, mostrarPecas, mostrarModalIniciar, resetarCardsInicial} from './ordem-criada.js';
+import { carregarOrdensIniciadas, carregarOrdensInterrompidas, mostrarPecas, mostrarModalEditarInfo, mostrarModalIniciar, resetarCardsInicial} from './ordem-criada.js';
 
 document.addEventListener('DOMContentLoaded', function () {
     // Atualiza automaticamente ao carregar a página
@@ -209,6 +209,9 @@ export function fetchOrdensSequenciadasLaser(grupo = 'laser_1') {
                             <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
                                 <i class="fa fa-play"></i>
                             </button>
+                            <button class="btn btn-outline-secondary btn-sm btn-editar-info-seq me-2" title="Editar dados da ordem">
+                                <i class="fa fa-pencil"></i>
+                            </button>
                             <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
                                 <i class="fa fa-eye"></i>
                             </button>
@@ -222,6 +225,9 @@ export function fetchOrdensSequenciadasLaser(grupo = 'laser_1') {
                     } else {
                         botoesAcao = `
                         <div>
+                            <button class="btn btn-outline-secondary btn-sm btn-editar-info-seq me-2" title="Editar dados da ordem">
+                                <i class="fa fa-pencil"></i>
+                            </button>
                             <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
                                 <i class="fa fa-eye"></i>
                             </button>
@@ -271,6 +277,7 @@ export function fetchOrdensSequenciadasLaser(grupo = 'laser_1') {
                     const buttonVerPeca = card.querySelector('.btn-ver-peca');
                     const buttonIniciar = card.querySelector('.btn-iniciar');
                     const buttonRetirarSequenciamento = card.querySelector('.btn-retirar-sequenciamento');
+                    const buttonEditarInfoSeq = card.querySelector('.btn-editar-info-seq');
 
                     if (buttonVerPeca) {
                         buttonVerPeca.addEventListener('click', () => {
@@ -287,6 +294,12 @@ export function fetchOrdensSequenciadasLaser(grupo = 'laser_1') {
                     if (buttonRetirarSequenciamento) {
                         buttonRetirarSequenciamento.addEventListener('click', () => {
                             mostrarModalExcluir(ordem.id, ordem.grupo_maquina);
+                        });
+                    }
+
+                    if (buttonEditarInfoSeq && ordem.status_atual !== 'finalizada') {
+                        buttonEditarInfoSeq.addEventListener('click', () => {
+                            mostrarModalEditarInfo(ordem.id, ordem.obs || '');
                         });
                     }
 
@@ -388,6 +401,9 @@ export function fetchOrdensSequenciadasPlasma() {
                             <button class="btn btn-warning btn-sm btn-iniciar" title="Iniciar">
                                 <i class="fa fa-play"></i>
                             </button>
+                            <button class="btn btn-outline-secondary btn-sm btn-editar-info-seq me-2" title="Editar dados da ordem">
+                                <i class="fa fa-pencil"></i>
+                            </button>
                             <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
                                 <i class="fa fa-eye"></i>
                             </button>
@@ -401,6 +417,9 @@ export function fetchOrdensSequenciadasPlasma() {
                     } else {
                         botoesAcao = `
                         <div>
+                            <button class="btn btn-outline-secondary btn-sm btn-editar-info-seq me-2" title="Editar dados da ordem">
+                                <i class="fa fa-pencil"></i>
+                            </button>
                             <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
                                 <i class="fa fa-eye"></i>
                             </button>
@@ -448,6 +467,7 @@ export function fetchOrdensSequenciadasPlasma() {
                     const buttonVerPeca = card.querySelector('.btn-ver-peca');
                     const buttonIniciar = card.querySelector('.btn-iniciar');
                     const buttonRetirarSequenciamento = card.querySelector('.btn-retirar-sequenciamento');
+                    const buttonEditarInfoSeq = card.querySelector('.btn-editar-info-seq');
 
                     if (buttonIniciar){
                         buttonIniciar.addEventListener('click', () => {
@@ -462,6 +482,12 @@ export function fetchOrdensSequenciadasPlasma() {
                     if (buttonRetirarSequenciamento){
                         buttonRetirarSequenciamento.addEventListener('click', () => {
                             mostrarModalExcluir(ordem.id, ordem.grupo_maquina);
+                        });
+                    }
+
+                    if (buttonEditarInfoSeq && ordem.status_atual !== 'finalizada') {
+                        buttonEditarInfoSeq.addEventListener('click', () => {
+                            mostrarModalEditarInfo(ordem.id, ordem.obs || '');
                         });
                     }
                 });
