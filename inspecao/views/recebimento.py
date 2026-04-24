@@ -421,15 +421,34 @@ def inspecionar_recebimento(request):
     sheet_hash = _row_hash(row_data)
     classe_inspecao = _get_classe_inspecao(row_data)
 
-    if classe_inspecao == "Adaptadores e terminais":
-        unidades = dados_inspecao.get("unidades") if isinstance(dados_inspecao, dict) else None
-        if not isinstance(unidades, list) or not unidades:
-            return JsonResponse(
-                {"error": "Informe o teste de rosqueamento para as unidades inspecionadas."},
-                status=400,
-            )
+    materiais_inspecao = []
+    if isinstance(dados_inspecao, dict):
+        materiais_val = dados_inspecao.get("materiais")
+        if isinstance(materiais_val, list):
+            materiais_inspecao = materiais_val
 
-        for unidade in unidades:
+    if classe_inspecao == "Adaptadores e terminais":
+        if materiais_inspecao:
+            conjuntos_unidades = [m.get("unidades") for m in materiais_inspecao if isinstance(m, dict)]
+            if not any(isinstance(unidades, list) and unidades for unidades in conjuntos_unidades):
+                return JsonResponse(
+                    {"error": "Informe o teste de rosqueamento para as unidades inspecionadas."},
+                    status=400,
+                )
+            unidades_iteracao = []
+            for unidades in conjuntos_unidades:
+                if isinstance(unidades, list):
+                    unidades_iteracao.extend(unidades)
+        else:
+            unidades = dados_inspecao.get("unidades") if isinstance(dados_inspecao, dict) else None
+            if not isinstance(unidades, list) or not unidades:
+                return JsonResponse(
+                    {"error": "Informe o teste de rosqueamento para as unidades inspecionadas."},
+                    status=400,
+                )
+            unidades_iteracao = unidades
+
+        for unidade in unidades_iteracao:
             campos = unidade.get("campos") if isinstance(unidade, dict) else None
             teste_rosqueamento = ""
             if isinstance(campos, dict):
