@@ -89,6 +89,15 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         if (ordem.status_atual === 'finalizada') {
                             dataFinalizacao = `<p class="text-success fw-semibold mb-2" style="font-size: 0.85rem;">Finalizada em: ${ordem.ultima_atualizacao}</p>`
                         }
+
+                        const botaoEditarInfo = ordem.status_atual !== 'finalizada'
+                            ? `
+                                <button class="btn btn-outline-secondary btn-sm btn-editar-info me-2" title="Editar dados da ordem">
+                                    <i class="fa fa-pencil"></i>
+                                </button>
+                            `
+                            : '';
+
                         // Monta o card com os botões dinâmicos
                         card.innerHTML = `
                         <div class="card shadow-sm bg-light text-dark">
@@ -114,6 +123,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                                 <button class="btn btn-primary btn-sm btn-ver-peca me-2" title="Ver Peças">
                                     <i class="fa fa-eye"></i>
                                 </button>
+                                ${botaoEditarInfo}
                                 ${botaoAcao} <!-- Insere os botões dinâmicos aqui -->
                             </div>
                         </div>`;
@@ -126,6 +136,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         const buttonRetornar = card.querySelector('.btn-retornar');
                         const buttonSequenciar = card.querySelector('.btn-sequenciar');
                         const buttonExcluir= card.querySelector('.btn-excluir');
+                        const buttonEditarInfo = card.querySelector('.btn-editar-info');
 
                         // Adiciona evento ao botão "Ver Peças", se existir
                         if (buttonVerPeca) {
@@ -173,6 +184,12 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         if (buttonExcluir) {
                             buttonExcluir.addEventListener('click', () => {
                                 mostrarModalExcluir(ordem.id);
+                            });
+                        }
+
+                        if (buttonEditarInfo) {
+                            buttonEditarInfo.addEventListener('click', () => {
+                                mostrarModalEditarInfo(ordem.id, ordem.obs || '');
                             });
                         }
 
@@ -512,6 +529,177 @@ export function mostrarPecas(ordemId) {
                 icon: 'error',
                 title: 'Erro',
                 text: 'Erro ao carregar as peças. Por favor, tente novamente.',
+            });
+        });
+}
+
+export function mostrarModalEditarInfo(ordemId, obsAtual = '') {
+    const modalEl = document.getElementById('modalEditarInfoCorte');
+    const formEditar = document.getElementById('formEditarInfoCorte');
+    const modalTitle = document.getElementById('modalEditarInfoCorteLabel');
+
+    if (!modalEl || !formEditar || !modalTitle) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Não foi possível abrir o modal de edição.',
+        });
+        return;
+    }
+
+    modalTitle.innerHTML = `Editar Ordem ${ordemId}`;
+
+    Swal.fire({
+        title: 'Carregando...',
+        text: 'Buscando informações da ordem...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    fetch(`api/ordens-criadas/${ordemId}/pecas/`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao buscar informações da ordem.');
+            }
+            return response.json();
+        })
+        .then(data => {
+            Swal.close();
+
+            const clonedForm = formEditar.cloneNode(true);
+            formEditar.parentNode.replaceChild(clonedForm, formEditar);
+
+            const novoFormEditar = document.getElementById('formEditarInfoCorte');
+            const ordemInput = document.getElementById('editOrdemIdCorte');
+            const qtdChapasInput = document.getElementById('editQtdChapasCorte');
+            const obsInput = document.getElementById('editObsCorte');
+            const tbodyPecas = document.getElementById('tbodyPecasEditarCorte');
+
+            if (!novoFormEditar || !ordemInput || !qtdChapasInput || !obsInput || !tbodyPecas) {
+                throw new Error('Elementos do modal de edição não encontrados.');
+            }
+
+            ordemInput.value = ordemId;
+            obsInput.value = obsAtual || '';
+
+            const qtdInicialChapas = parseFloat(data.propriedades?.quantidade || 0);
+            const qtdBase = qtdInicialChapas > 0 ? qtdInicialChapas : 1;
+            qtdChapasInput.value = qtdBase;
+            qtdChapasInput.dataset.qtdChapaOriginal = qtdBase;
+
+            if (Array.isArray(data.pecas) && data.pecas.length > 0) {
+                tbodyPecas.innerHTML = data.pecas.map((peca) => `
+                    <tr>
+                        <td>${peca.peca}</td>
+                        <td class="peca-quantidade-edicao" data-quantidade-inicial="${parseFloat(peca.quantidade) || 0}">
+                            ${parseFloat(peca.quantidade) || 0}
+                        </td>
+                    </tr>
+                `).join('');
+            } else {
+                tbodyPecas.innerHTML = `
+                    <tr>
+                        <td colspan="2" class="text-muted">Não há peças cadastradas para esta ordem.</td>
+                    </tr>
+                `;
+            }
+
+            const recalcularQuantidades = () => {
+                const novaQtdChapas = parseFloat(qtdChapasInput.value);
+                const qtdOriginalChapas = parseFloat(qtdChapasInput.dataset.qtdChapaOriginal || 0);
+
+                if (!novaQtdChapas || novaQtdChapas <= 0 || !qtdOriginalChapas || qtdOriginalChapas <= 0) {
+                    return;
+                }
+
+                tbodyPecas.querySelectorAll('.peca-quantidade-edicao').forEach((cell) => {
+                    const qtdInicial = parseFloat(cell.dataset.quantidadeInicial || 0);
+                    const novaQtd = Math.floor((qtdInicial / qtdOriginalChapas) * novaQtdChapas);
+                    cell.textContent = Number.isFinite(novaQtd) ? novaQtd : 0;
+                });
+            };
+
+            qtdChapasInput.addEventListener('input', recalcularQuantidades);
+
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+
+            novoFormEditar.addEventListener('submit', (event) => {
+                event.preventDefault();
+
+                const qtdChapas = parseFloat(document.getElementById('editQtdChapasCorte').value);
+                const obs = document.getElementById('editObsCorte').value;
+
+                if (!qtdChapas || qtdChapas <= 0) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Quantidade inválida',
+                        text: 'Informe uma quantidade de chapas maior que zero.',
+                    });
+                    return;
+                }
+
+                Swal.fire({
+                    title: 'Salvando...',
+                    text: 'Atualizando informações da ordem.',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                fetch('api/ordens/editar-informacoes/', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({
+                        ordem_id: ordemId,
+                        qtdChapas: qtdChapas,
+                        obs: obs,
+                    })
+                })
+                    .then(async (response) => {
+                        const dataResposta = await response.json();
+                        if (!response.ok) {
+                            throw new Error(dataResposta.error || 'Erro ao atualizar a ordem.');
+                        }
+                        return dataResposta;
+                    })
+                    .then(() => {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso',
+                            text: 'Informações da ordem atualizadas.',
+                        });
+
+                        modal.hide();
+
+                        resetarCardsInicial();
+                        const containerIniciado = document.querySelector('.containerProcesso');
+                        carregarOrdensIniciadas(containerIniciado);
+
+                        const containerInterrompido = document.querySelector('.containerInterrompido');
+                        carregarOrdensInterrompidas(containerInterrompido);
+                    })
+                    .catch((error) => {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: error.message,
+                        });
+                    });
+            });
+        })
+        .catch(error => {
+            Swal.close();
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: error.message || 'Não foi possível carregar os dados da ordem.',
             });
         });
 }
