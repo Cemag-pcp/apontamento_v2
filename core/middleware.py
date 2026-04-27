@@ -1,8 +1,20 @@
-from django.shortcuts import render,redirect
+from django.shortcuts import render, redirect
 from django.urls import reverse
-
+from django.core.cache import cache
 
 from core.models import RotaAcesso
+
+_ROTA_CACHE_KEY = 'rota_acesso_map'
+_ROTA_CACHE_TTL = 300  # 5 minutos
+
+
+def _get_rota(path):
+    rota_map = cache.get(_ROTA_CACHE_KEY)
+    if rota_map is None:
+        rota_map = {r.nome: r for r in RotaAcesso.objects.all()}
+        cache.set(_ROTA_CACHE_KEY, rota_map, _ROTA_CACHE_TTL)
+    return rota_map.get(path)
+
 
 class RotaAccessMiddleware:
     def __init__(self, get_response):
@@ -52,8 +64,8 @@ class RotaAccessMiddleware:
         elif profile and getattr(profile, "tipo_acesso", "").lower() == "almoxarifado" and 'almox' in path:
             return self.get_response(request)
 
-        # Busca a rota no banco de dados
-        rota = RotaAcesso.objects.filter(nome=path).first()
+        # Busca a rota (cache em memória para reduzir queries ao banco)
+        rota = _get_rota(path)
 
         # Se a rota **não existir no banco**, bloqueia o acesso
         if not rota:

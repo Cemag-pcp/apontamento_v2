@@ -477,10 +477,17 @@ def criar_caixa(request):
     }, status=201)
 
 def buscar_cargas(request):
+    from django.utils import timezone
+    from datetime import timedelta
 
-    cargas = list(Carga.objects.all().values(
-        'id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'stage', 'data_criacao'
-    ))
+    # Cargas ativas (planejamento/verificação) + despachadas recentes (últimos 30 dias)
+    # O kanban já limita despachadas a 5 no frontend, mas sem filtro aqui todas são processadas
+    corte_despachado = timezone.now() - timedelta(days=30)
+    cargas = list(
+        Carga.objects
+        .exclude(stage='despachado', data_criacao__lt=corte_despachado)
+        .values('id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'stage', 'data_criacao')
+    )
 
     if not cargas:
         return JsonResponse([], safe=False)
