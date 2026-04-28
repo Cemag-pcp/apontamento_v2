@@ -1,10 +1,82 @@
 import { renderCallendar } from './full-calendar.js';
 
+const MENSAGEM_SEM_DADOS = "O Comercial ainda não liberou essa carga. Verificar com o responsável.";
+
+function formatarDataIsoParaBr(dataIso) {
+    if (!dataIso) {
+        return "";
+    }
+
+    const [ano, mes, dia] = dataIso.split("-");
+    if (!ano || !mes || !dia) {
+        return dataIso;
+    }
+
+    return `${dia}/${mes}/${ano}`;
+}
+
+function renderizarDatasSugeridas(cargas) {
+    const container = document.getElementById("datasSugeridasContainer");
+    const lista = document.getElementById("datasSugeridasLista");
+
+    if (!container || !lista) {
+        return;
+    }
+
+    const datasUnicas = [...new Set((cargas || []).map((item) => item.data_carga).filter(Boolean))].sort();
+    const sugestoesAtuais = {};
+    (cargas || []).forEach((item) => {
+        if (item.data_carga && item.data_sugerida_planejamento) {
+            sugestoesAtuais[item.data_carga] = item.data_sugerida_planejamento;
+        }
+    });
+
+    if (datasUnicas.length === 0) {
+        container.style.display = "none";
+        lista.innerHTML = "";
+        return;
+    }
+
+    container.style.display = "block";
+    lista.innerHTML = "";
+
+    datasUnicas.forEach((dataOriginal) => {
+        const linha = document.createElement("div");
+        linha.className = "row g-2 align-items-center border rounded p-2";
+        linha.innerHTML = `
+            <div class="col-sm-6">
+                <label class="form-label mb-0"><strong>${formatarDataIsoParaBr(dataOriginal)}</strong></label>
+                <div class="small text-muted">Data liberada/original</div>
+            </div>
+            <div class="col-sm-6">
+                <input
+                    type="date"
+                    class="form-control sugestao-data-planejamento"
+                    data-data-original="${dataOriginal}"
+                    value="${sugestoesAtuais[dataOriginal] || ''}"
+                >
+            </div>
+        `;
+        lista.appendChild(linha);
+    });
+}
+
+function coletarSugestoesDatas() {
+    const inputs = document.querySelectorAll(".sugestao-data-planejamento");
+    const sugestoes = {};
+
+    inputs.forEach((input) => {
+        sugestoes[input.dataset.dataOriginal] = input.value || "";
+    });
+
+    return sugestoes;
+}
+
 function carregarBaseCarretas() {
     const dataInicio = document.getElementById('data-inicio').value;
     const dataFim = document.getElementById('data-fim').value;
 
-    return fetch(`api/buscar-carretas-base/?data_inicio=${dataInicio}&data_fim=${dataFim}`, {
+    return fetch(`api/cargas-liberadas/?data_inicio=${dataInicio}&data_fim=${dataFim}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -12,10 +84,14 @@ function carregarBaseCarretas() {
     })
     .then(response => response.json())
     .then(data => {
-        popularTabelaResumo(data.cargas.cargas); // Chama a função para popular a tabela
+        const cargas = data?.cargas?.cargas || [];
+        popularTabelaResumo(cargas);
+        renderizarDatasSugeridas(cargas);
+        return cargas;
     })
     .catch(error => {
         console.error('Erro ao carregar os dados:', error);
+        renderizarDatasSugeridas([]);
     });
 }
 
@@ -23,11 +99,11 @@ function popularTabelaResumo(cargas) {
     const tabelaResumo = document.getElementById('tabelaResumo');
 
     if (cargas.length === 0) {
-        tabelaResumo.innerHTML = "<tr><td colspan='4'>Nenhum dado disponível</td></tr>";
+        tabelaResumo.innerHTML = `<tr><td colspan='4'>${MENSAGEM_SEM_DADOS}</td></tr>`;
         return;
     }
 
-    tabelaResumo.innerHTML = ""; // Limpa a tabela antes de popular os novos dados
+    tabelaResumo.innerHTML = "";
 
     cargas.forEach(item => {
         const linha = document.createElement('tr');
@@ -35,7 +111,7 @@ function popularTabelaResumo(cargas) {
             <td>${item.data_carga}</td>
             <td>${item.codigo_recurso}</td>
             <td>${item.quantidade}</td>
-            <td>${item.presente_no_carreta}</td>
+            <td>${item.presente_no_carreta ?? ''}</td>
         `;
         tabelaResumo.appendChild(linha);
     });
@@ -77,11 +153,12 @@ function gerarPlanejamento() {
     const dataInicio = document.getElementById("data-inicio").value;
     const dataFim = document.getElementById("data-fim").value;
     const setor = document.getElementById("setorSelect").value;
+    const sugestoesDatas = coletarSugestoesDatas();
 
     btngerarPlanejamento.disabled = true;
     btngerarPlanejamento.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
 
-    const url = `api/gerar-dados-ordem/?data_inicio=${dataInicio}&data_fim=${dataFim}&setor=${setor}`;
+    const url = `api/gerar-dados-ordem/?data_inicio=${dataInicio}&data_fim=${dataFim}&setor=${setor}&sugestoes_datas=${encodeURIComponent(JSON.stringify(sugestoesDatas))}`;
 
     fetch(url, {
         method: "GET",
@@ -90,12 +167,12 @@ function gerarPlanejamento() {
     .then(response => {
         return response.json().then(data => {
             if (!response.ok) {
-                throw data; // Lança o erro para ser tratado no catch
+                throw data;
             }
             return data;
         });
     })
-    .then(data => {
+    .then(() => {
         alert("Planejamento gerado com sucesso!");
         renderCallendar();
     })
@@ -169,11 +246,9 @@ async function gerarEtiquetaQrCode() {
         };
 
         try {
-            const resp = await fetch(`api/buscar-carretas-base/?data_inicio=${encodeURIComponent(dataInicio)}&data_fim=${encodeURIComponent(dataFim)}`);
+            const resp = await fetch(`api/cargas-liberadas/?data_inicio=${encodeURIComponent(dataInicio)}&data_fim=${encodeURIComponent(dataFim)}`);
             if (!resp.ok) throw new Error("Erro ao buscar cargas");
             const payload = await resp.json();
-
-            console.log(payload);
 
             const lista = Array.isArray(payload?.cargas?.cargas) ? payload.cargas.cargas : [];
             const celulas = Array.isArray(payload?.cargas?.celulas) ? payload.cargas.celulas : [];
@@ -202,7 +277,6 @@ async function gerarEtiquetaQrCode() {
                 try {
                     meta = JSON.parse(keyStr);
                 } catch {
-                    // fallback silencioso
                 }
 
                 const cargaNome = meta?.carga ?? "Sem carga";
@@ -227,17 +301,15 @@ async function gerarEtiquetaQrCode() {
                 chk.value = keyStr;
                 chk.dataset.carga = cargaNome;
                 chk.dataset.dataCarga = dataCarga;
-                chk.checked = true; // Marca todos os checkboxes
+                chk.checked = true;
                 chk.onchange = e => {
-                    const card = e.target.closest(".card-carga-montagem");
-                    // Quando desmarcar a carga, desmarcar todas as células dessa carga
+                    const cardAtual = e.target.closest(".card-carga-montagem");
                     if (!e.target.checked) {
-                        card.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
+                        cardAtual.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
                             cel.checked = false;
                         });
                     } else {
-                        // Quando marcar a carga, marcar todas as células dessa carga
-                        card.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
+                        cardAtual.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
                             cel.checked = true;
                         });
                     }
@@ -286,12 +358,11 @@ async function gerarEtiquetaQrCode() {
                         ck.type = "checkbox";
                         ck.name = "celulaMontagem";
                         ck.value = nome;
-                        ck.checked = true; // Marca todas as células por padrão
+                        ck.checked = true;
                         ck.onchange = e => {
-                            // Se marcar uma célula e a carga não está marcada, marcar a carga
                             if (e.target.checked) {
-                                const card = e.target.closest(".card-carga-montagem");
-                                const chkCarga = card.querySelector('input[name="cargaMontagem"]');
+                                const cardAtual = e.target.closest(".card-carga-montagem");
+                                const chkCarga = cardAtual.querySelector('input[name="cargaMontagem"]');
                                 if (chkCarga && !chkCarga.checked) {
                                     chkCarga.checked = true;
                                 }
@@ -323,17 +394,16 @@ async function gerarEtiquetaQrCode() {
                 btnConfirmar.innerHTML = 'Confirmando...';
 
                 try {
-                    // Coleta cada carga com suas respectivas células
                     const cargasComCelulas = Array.from(selecionadas).map(chk => {
                         const card = chk.closest(".card-carga-montagem");
-                        const celulas = Array.from(
+                        const celulasSelecionadas = Array.from(
                             card.querySelectorAll('input[name="celulaMontagem"]:checked')
                         ).map(cel => cel.value);
-                        
+
                         return {
                             nome: chk.dataset.carga,
                             data_carga: chk.dataset.dataCarga,
-                            celulas: celulas
+                            celulas: celulasSelecionadas
                         };
                     });
 
@@ -356,7 +426,6 @@ async function gerarEtiquetaQrCode() {
 
                     const data = await r.json();
                     alert(`Total de impressões: ${data.payload}`);
-                    // document.getElementById("modalMontagem").remove();
                 } catch (error) {
                     console.error(error);
                     alert("Erro ao processar a solicitação.");
@@ -374,30 +443,9 @@ async function gerarEtiquetaQrCode() {
         }
 
     } else if (setor === 'pintura') {
-        // abrir um modal mostrando as cargas e as carretas logo abaixo de cada carga
-
-        // carga 1
-        //  carreta 1 - 2 un.
-        //  carreta 2 - 3 un.
-        //      celula 1
-        //      celula 2
-        //      celula 3
-
-        // carga 2
-        //  carreta 1 - 2 un.
-        //  carreta 2 - 3 un.
-        //      celula 1
-        //      celula 2
-        //      celula 3
-
-        // ao lado de cada carga terá um checkbox para marcar
-        // será enviado para o backend apenas a carga escolhida e a dataInicio.
-        // terá também um grupo de itens com chckbox, podendo escolher mais de 1 contendo as celulas
-
-        const dataFim = dataInicio;
+        const dataFimLocal = dataInicio;
         btnGerarEtiquetas.disabled = true;
 
-        // cria (ou reaproveita) um modal simples
         const ensureModal = () => {
             let modal = document.getElementById("modalPintura");
             if (!modal) {
@@ -446,8 +494,7 @@ async function gerarEtiquetaQrCode() {
         };
 
         try {
-            // busca carretas/cargas
-            const resp = await fetch(`api/buscar-carretas-base/?data_inicio=${encodeURIComponent(dataInicio)}&data_fim=${encodeURIComponent(dataFim)}`);
+            const resp = await fetch(`api/cargas-liberadas/?data_inicio=${encodeURIComponent(dataInicio)}&data_fim=${encodeURIComponent(dataFimLocal)}`);
             if (!resp.ok) throw new Error(`Falha ao buscar cargas (${resp.status})`);
             const payload = await resp.json();
             const lista = Array.isArray(payload?.cargas?.cargas) ? payload.cargas.cargas : [];
@@ -457,7 +504,6 @@ async function gerarEtiquetaQrCode() {
                 ? payload.celulas
                 : [];
 
-            // filtra apenas as presentes e agrupa por nome da carga
             const grupos = lista
             .filter(item => item?.presente_no_carreta === '✅')
             .reduce((acc, item) => {
@@ -471,168 +517,160 @@ async function gerarEtiquetaQrCode() {
             body.innerHTML = "";
 
             if (Object.keys(grupos).length === 0) {
-                body.innerHTML = `<p style="margin:8px 0 16px">Nenhuma carga presente no período informado.</p>`;
+                body.innerHTML = `<p style="margin:8px 0 16px">${MENSAGEM_SEM_DADOS}</p>`;
             } else {
-            // monta a lista: carga (checkbox) e, abaixo, carretas com quantidades
-            const wrap = document.createElement("div");
-            wrap.style.display = "grid";
-            wrap.style.gap = "14px";
+                const wrap = document.createElement("div");
+                wrap.style.display = "grid";
+                wrap.style.gap = "14px";
 
-            Object.entries(grupos).forEach(([cargaNome, itens]) => {
-                const card = document.createElement("div");
+                Object.entries(grupos).forEach(([cargaNome, itens]) => {
+                    const card = document.createElement("div");
                     Object.assign(card.style, {
-                    border: "1px solid #eee",
-                    borderRadius: "10px",
-                    padding: "12px",
-                    
-                });
-                
-                card.classList.add("card-carga-pintura");
-
-                // header da carga com checkbox (apenas uma pode ser marcada)
-                const header = document.createElement("label");
-                header.style.display = "flex";
-                header.style.alignItems = "center";
-                header.style.gap = "10px";
-                header.style.marginBottom = "8px";
-
-                const chk = document.createElement("input");
-                chk.type = "checkbox";
-                chk.name = "cargaEscolhida";
-                chk.value = cargaNome;
-                chk.addEventListener("change", (e) => {
-                // garante seleção única
-                if (e.target.checked) {
-                    document.querySelectorAll('input[name="cargaEscolhida"]').forEach(el => {
-                        if (el !== e.target) el.checked = false;
-                    });
-                }
-                });
-
-                const titulo = document.createElement("strong");
-                titulo.textContent = cargaNome;
-
-                header.appendChild(chk);
-                header.appendChild(titulo);
-                card.appendChild(header);
-
-                // lista de carretas (codigo_recurso) e quantidades
-                const ul = document.createElement("ul");
-                ul.style.margin = "0 0 0 28px";
-                ul.style.padding = "0";
-                ul.style.listStyle = "disc";
-
-                itens.forEach(it => {
-                    const li = document.createElement("li");
-                    li.style.margin = "4px 0";
-                    li.textContent = `${it.codigo_recurso} — ${it.quantidade} un.`;
-                    ul.appendChild(li);
-                });
-
-                card.appendChild(ul);
-
-                if (celulas.length) {
-                    const celWrap = document.createElement("div");
-                    celWrap.style.margin = "8px 0 0 28px";
-
-                    const celTitulo = document.createElement("div");
-                    celTitulo.textContent = "Células:";
-                    celTitulo.style.fontSize = "12px";
-                    celTitulo.style.marginBottom = "4px";
-                    celWrap.appendChild(celTitulo);
-
-                    const celList = document.createElement("div");
-                    celList.style.display = "flex";
-                    celList.style.flexWrap = "wrap";
-                    celList.style.gap = "6px 12px";
-
-                    celulas.forEach(obj => {
-                        const celNome = obj?.celula ?? obj; // aceita {celula: 'X'} ou 'X'
-
-                        const lbl = document.createElement("label");
-                        lbl.style.display = "flex";
-                        lbl.style.alignItems = "center";
-                        lbl.style.gap = "4px";
-                        lbl.style.fontSize = "12px";
-
-                        const ck = document.createElement("input");
-                        ck.type = "checkbox";
-                        ck.name = "celulaPintura";
-                        ck.value = celNome;
-
-                        lbl.appendChild(ck);
-                        lbl.appendChild(document.createTextNode(celNome));
-                        celList.appendChild(lbl);
+                        border: "1px solid #eee",
+                        borderRadius: "10px",
+                        padding: "12px",
                     });
 
-                    celWrap.appendChild(celList);
-                    card.appendChild(celWrap);
-                }
+                    card.classList.add("card-carga-pintura");
 
-                wrap.appendChild(card);
-            });
+                    const header = document.createElement("label");
+                    header.style.display = "flex";
+                    header.style.alignItems = "center";
+                    header.style.gap = "10px";
+                    header.style.marginBottom = "8px";
 
-            body.appendChild(wrap);
-            }
+                    const chk = document.createElement("input");
+                    chk.type = "checkbox";
+                    chk.name = "cargaEscolhida";
+                    chk.value = cargaNome;
+                    chk.addEventListener("change", (e) => {
+                        if (e.target.checked) {
+                            document.querySelectorAll('input[name="cargaEscolhida"]').forEach(el => {
+                                if (el !== e.target) el.checked = false;
+                            });
+                        }
+                    });
 
-            // ação do confirmar
-            document.getElementById("confirmarCargaPintura").onclick = async () => {
-            const selecionada = /** @type {HTMLInputElement|null} */(document.querySelector('input[name="cargaEscolhida"]:checked'));
-            if (!selecionada) {
-                alert("Selecione uma carga para confirmar.");
-                return;
-            }
+                    const titulo = document.createElement("strong");
+                    titulo.textContent = cargaNome;
 
-            // NOVO: pega apenas as células marcadas dentro do card da carga selecionada
-            const cardSelecionado = selecionada.closest(".card-carga-pintura");
-            const celulasSelecionadas = cardSelecionado
-                ? Array.from(cardSelecionado.querySelectorAll('input[name="celulaPintura"]:checked')).map(el => el.value)
-                : [];
+                    header.appendChild(chk);
+                    header.appendChild(titulo);
+                    card.appendChild(header);
 
-            document.getElementById("confirmarCargaPintura").innerHTML = 'Imprimindo...';
-            document.getElementById("confirmarCargaPintura").disabled = true;
+                    const ul = document.createElement("ul");
+                    ul.style.margin = "0 0 0 28px";
+                    ul.style.padding = "0";
+                    ul.style.listStyle = "disc";
 
-            const payload = {
-                data_inicio: dataInicio,
-                carga: selecionada.value,
-                // NOVO: adiciona as células escolhidas na mesma estrutura
-                celulas: celulasSelecionadas,
-            };
+                    itens.forEach(it => {
+                        const li = document.createElement("li");
+                        li.style.margin = "4px 0";
+                        li.textContent = `${it.codigo_recurso} — ${it.quantidade} un.`;
+                        ul.appendChild(li);
+                    });
 
-            try {
-                const r = await fetch("api/imprimir-etiquetas-pintura/", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                });
+                    card.appendChild(ul);
 
-                let bodyMsg = "";
-                try {
-                    const ct = r.headers.get("content-type") || "";
-                    if (ct.includes("application/json")) {
-                        const data = await r.json();
-                        bodyMsg = typeof data === "string" ? data : JSON.stringify(data, null, 2);
-                    } else {
-                        bodyMsg = (await r.text()) || "(sem corpo)";
+                    if (celulas.length) {
+                        const celWrap = document.createElement("div");
+                        celWrap.style.margin = "8px 0 0 28px";
+
+                        const celTitulo = document.createElement("div");
+                        celTitulo.textContent = "Células:";
+                        celTitulo.style.fontSize = "12px";
+                        celTitulo.style.marginBottom = "4px";
+                        celWrap.appendChild(celTitulo);
+
+                        const celList = document.createElement("div");
+                        celList.style.display = "flex";
+                        celList.style.flexWrap = "wrap";
+                        celList.style.gap = "6px 12px";
+
+                        celulas.forEach(obj => {
+                            const celNome = obj?.celula ?? obj;
+
+                            const lbl = document.createElement("label");
+                            lbl.style.display = "flex";
+                            lbl.style.alignItems = "center";
+                            lbl.style.gap = "4px";
+                            lbl.style.fontSize = "12px";
+
+                            const ck = document.createElement("input");
+                            ck.type = "checkbox";
+                            ck.name = "celulaPintura";
+                            ck.value = celNome;
+
+                            lbl.appendChild(ck);
+                            lbl.appendChild(document.createTextNode(celNome));
+                            celList.appendChild(lbl);
+                        });
+
+                        celWrap.appendChild(celList);
+                        card.appendChild(celWrap);
                     }
+
+                    wrap.appendChild(card);
+                });
+
+                body.appendChild(wrap);
+            }
+
+            document.getElementById("confirmarCargaPintura").onclick = async () => {
+                const selecionada = document.querySelector('input[name="cargaEscolhida"]:checked');
+                if (!selecionada) {
+                    alert("Selecione uma carga para confirmar.");
+                    return;
+                }
+
+                const cardSelecionado = selecionada.closest(".card-carga-pintura");
+                const celulasSelecionadas = cardSelecionado
+                    ? Array.from(cardSelecionado.querySelectorAll('input[name="celulaPintura"]:checked')).map(el => el.value)
+                    : [];
+
+                document.getElementById("confirmarCargaPintura").innerHTML = 'Imprimindo...';
+                document.getElementById("confirmarCargaPintura").disabled = true;
+
+                const payload = {
+                    data_inicio: dataInicio,
+                    carga: selecionada.value,
+                    celulas: celulasSelecionadas,
+                };
+
+                try {
+                    const r = await fetch("api/imprimir-etiquetas-pintura/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                    });
+
+                    let bodyMsg = "";
+                    try {
+                        const ct = r.headers.get("content-type") || "";
+                        if (ct.includes("application/json")) {
+                            const data = await r.json();
+                            bodyMsg = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+                        } else {
+                            bodyMsg = (await r.text()) || "(sem corpo)";
+                        }
                     } catch {
                         bodyMsg = "(falha ao ler corpo da resposta)";
                     }
 
                     if (!r.ok) {
-                    throw new Error(`Falha ao confirmar carga (${r.status})\n${bodyMsg}`);
+                        throw new Error(`Falha ao confirmar carga (${r.status})\n${bodyMsg}`);
+                    }
+
+                    alert(`Total de impressões: ${bodyMsg.payload}`);
+
+                    document.getElementById("confirmarCargaPintura").innerHTML = 'Confirmar';
+                    document.getElementById("confirmarCargaPintura").disabled = false;
+
+                    document.getElementById("modalPintura")?.remove();
+                } catch (err) {
+                    console.error(err);
+                    alert("Não foi possível confirmar. Tente novamente.");
                 }
-
-                alert(`Total de impressões: ${bodyMsg.payload}`);
-
-                document.getElementById("confirmarCargaPintura").innerHTML = 'Confirmar';
-                document.getElementById("confirmarCargaPintura").disabled = false;
-
-                document.getElementById("modalPintura")?.remove();
-            } catch (err) {
-                console.error(err);
-                alert("Não foi possível confirmar. Tente novamente.");
-            }
             };
 
         } catch (err) {
@@ -643,9 +681,8 @@ async function gerarEtiquetaQrCode() {
         }
 
     } else {
-        console.log("Escolha montagem ou pintura")
+        console.log("Escolha montagem ou pintura");
     }
-
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -655,28 +692,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnGerarEtiquetas = document.getElementById('gerarEtiquetas');
 
     btPesquisar.addEventListener('click', () => {
-        btPesquisar.disabled = true; // Desabilita o botão antes de carregar os dados
+        btPesquisar.disabled = true;
         btPesquisar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pesquisando...';
-    
-        carregarBaseCarretas().finally(() => {
-            btPesquisar.disabled = false; // Reabilita o botão após a execução
-            btngerarSequenciamento.disabled = false;
-            btngerarPlanejamento.disabled = false;
-            btnGerarEtiquetas.disabled = false;
-            btPesquisar.innerHTML = '<i class="fas fa-search"></i> Pesquisar';
 
+        carregarBaseCarretas().then((cargas) => {
+            const habilitarAcoes = Array.isArray(cargas) && cargas.length > 0;
+            btngerarSequenciamento.disabled = !habilitarAcoes;
+            btngerarPlanejamento.disabled = !habilitarAcoes;
+            btnGerarEtiquetas.disabled = !habilitarAcoes;
+        }).finally(() => {
+            btPesquisar.disabled = false;
+            btPesquisar.innerHTML = '<i class="fas fa-search"></i> Pesquisar';
         });
     });
 
     btngerarSequenciamento.addEventListener('click', () => {
-        btngerarSequenciamento.disabled = true; // Desabilita o botão antes de carregar os dados
-        
+        btngerarSequenciamento.disabled = true;
+
         gerarArquivos().finally(() => {
-            btngerarSequenciamento.disabled = false; // Reabilita o botão após a execução
+            btngerarSequenciamento.disabled = false;
         });
     });
 
     btngerarPlanejamento.addEventListener("click", gerarPlanejamento);
     btnGerarEtiquetas.addEventListener("click", gerarEtiquetaQrCode);
-
 });

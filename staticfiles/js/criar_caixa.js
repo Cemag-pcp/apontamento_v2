@@ -57,10 +57,11 @@ document.addEventListener('DOMContentLoaded', function() {
     selectCliente.addEventListener('change', function() {
         const cliente = this.value;
         const data = dataCarga.value;
+        const carga = selectCarga.value;
         
-        if (data && cliente) {
+        if (data && cliente && carga) {
             // Chama API para buscar carretas
-            buscarCarretas(data, cliente);
+            buscarCarretas(data, carga, cliente);
             etapa4.style.display = 'block';
         } else {
             etapa4.style.display = 'none';
@@ -261,9 +262,9 @@ const COLOR_HEX = {
 };
 
 // Função para buscar carretas via API
-async function buscarCarretas(data, clienteId) {
+async function buscarCarretas(data, carga, clienteId) {
     etapa4.style.display = 'none';
-    console.log('Buscando carretas para data:', data, 'e cliente:', clienteId);
+    console.log('Buscando carretas para data:', data, 'carga:', carga, 'e cliente:', clienteId);
 
     // estado de loading (opcional)
     carretasContainer.innerHTML = `
@@ -271,7 +272,7 @@ async function buscarCarretas(data, clienteId) {
     `;
 
     try {
-        const url = `api/carretas_disponiveis/?data_carga=${encodeURIComponent(data)}&cliente=${encodeURIComponent(clienteId)}`;
+        const url = `api/carretas_disponiveis/?data_carga=${encodeURIComponent(data)}&carga=${encodeURIComponent(carga)}&cliente=${encodeURIComponent(clienteId)}`;
         const response = await fetch(url);
         if (!response.ok) {
         throw new Error(`Erro na API: ${response.status}`);
