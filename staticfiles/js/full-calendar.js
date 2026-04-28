@@ -1,53 +1,132 @@
-export function renderCallendar() {
-    var calendarEl = document.getElementById('calendario');
+function getCsrfToken() {
+    return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] ?? '';
+}
 
-    var calendar = new FullCalendar.Calendar(calendarEl, {
+export function renderCallendar(options = {}) {
+    const calendarEl = document.getElementById('calendario');
+    if (!calendarEl) {
+        return null;
+    }
+
+    const interactive =
+        options.interactive ??
+        (calendarEl.dataset.interactive !== 'false');
+    const eventsUrl =
+        options.eventsUrl ??
+        calendarEl.dataset.eventsUrl ??
+        null;
+    const dayMaxEventRowsAttr = calendarEl.dataset.dayMaxEventRows;
+    const dayMaxEventRows =
+        dayMaxEventRowsAttr === undefined
+            ? true
+            : dayMaxEventRowsAttr === 'false'
+            ? false
+            : Number(dayMaxEventRowsAttr);
+
+    // Se não houver eventsUrl, exibe tanto produção quanto liberações
+    const extraUrls = calendarEl.dataset.extraEventsUrl
+        ? calendarEl.dataset.extraEventsUrl.split(',').map(u => u.trim())
+        : [];
+
+    const primaryUrl = eventsUrl ?? '/cargas/api/andamento-cargas';
+
+    if (calendarEl._fullCalendarInstance) {
+        calendarEl._fullCalendarInstance.destroy();
+        calendarEl._fullCalendarInstance = null;
+    }
+
+    function buildSource(url) {
+        return function(fetchInfo, successCallback, failureCallback) {
+            fetch(`${url}?start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
+                .then(r => r.json())
+                .then(data => successCallback(data))
+                .catch(err => failureCallback(err));
+        };
+    }
+
+    const eventSources = [primaryUrl, ...extraUrls].map(buildSource);
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         locale: 'pt-br',
-        editable: true, // Permite arrastar eventos no calendário
-        eventDurationEditable: false, // Impede alteração da duração
-        events: function(fetchInfo, successCallback, failureCallback) {
-            let start = fetchInfo.startStr;
-            let end = fetchInfo.endStr;
+        editable: interactive,
+        eventDurationEditable: false,
+        displayEventTime: false,
+        dayMaxEventRows: Number.isNaN(dayMaxEventRows) ? true : dayMaxEventRows,
+        expandRows: calendarEl.dataset.calendarLayout === 'liberacao',
+        eventDisplay: 'block',
+        eventContent: function(arg) {
+            const wrapper = document.createElement('div');
+            wrapper.style.lineHeight = '1.15';
+            wrapper.style.whiteSpace = 'normal';
+            wrapper.style.overflow = 'hidden';
 
-            // Faz a requisição de eventos para o calendário
-            fetch(`api/andamento-cargas?start=${start}&end=${end}`)
-                .then(response => response.json())
-                .then(data => successCallback(data))
-                .catch(error => failureCallback(error));
+            const title = document.createElement('div');
+            title.textContent = arg.event.title || '';
+            title.style.fontSize = '0.8rem';
+            title.style.fontWeight = '600';
+            title.style.color = '#fff';
+
+            wrapper.appendChild(title);
+
+            if (arg.event.extendedProps?.tipo === 'liberacao') {
+                const dataCarga = document.createElement('div');
+                dataCarga.textContent = arg.event.extendedProps?.data_carga || '';
+                dataCarga.style.fontSize = '0.68rem';
+                dataCarga.style.opacity = '0.9';
+                dataCarga.style.color = '#fff';
+
+                const meta = document.createElement('div');
+                meta.textContent = arg.event.extendedProps?.liberado_em || '';
+                meta.style.fontSize = '0.68rem';
+                meta.style.opacity = '0.9';
+                meta.style.color = '#fff';
+
+                if (dataCarga.textContent) {
+                    wrapper.appendChild(dataCarga);
+                }
+                if (meta.textContent) {
+                    wrapper.appendChild(meta);
+                }
+            }
+
+            return { domNodes: [wrapper] };
         },
-        eventClick: function (info) {
-            let setor = info.event.extendedProps.setor;
-            let dataAtual = info.event.startStr;
-            let eventId = info.event.id || `${setor}-${dataAtual}`;
+        eventSources: eventSources,
+        eventClick: function(info) {
+            if (info.event.extendedProps?.tipo === 'liberacao') {
+                abrirDetalhesLiberacao(info.event.extendedProps.carga_uuid);
+                return;
+            }
 
-            document.getElementById("modalSetor").innerText = setor;
-            document.getElementById("eventId").value = eventId;
-            document.getElementById("setor").value = setor;
-            document.getElementById("dataAtual").value = dataAtual;
-            document.getElementById("novaData").value = dataAtual;
+            if (!interactive) {
+                return;
+            }
 
-            let escolhaModal = new bootstrap.Modal(document.getElementById("modalEscolha"));
+            const setor = info.event.extendedProps.setor;
+            const dataAtual = info.event.startStr;
+            const eventId = info.event.id || `${setor}-${dataAtual}`;
+
+            document.getElementById('modalSetor').innerText = setor;
+            document.getElementById('eventId').value = eventId;
+            document.getElementById('setor').value = setor;
+            document.getElementById('dataAtual').value = dataAtual;
+            document.getElementById('novaData').value = dataAtual;
+
+            const escolhaModal = new bootstrap.Modal(document.getElementById('modalEscolha'));
             escolhaModal.show();
 
-            // document.getElementById("btnRemanejar").onclick = function () {
-            //     escolhaModal.hide();
-            //     let modalRemanejar = new bootstrap.Modal(document.getElementById("modalRemanejar"));
-            //     modalRemanejar.show();
-            // };
-
-            document.getElementById("btnExcluirCarga").onclick = function () {
+            document.getElementById('btnExcluirCarga').onclick = function() {
                 escolhaModal.hide();
-                let modalExcluirCarga = new bootstrap.Modal(document.getElementById("modalExcluirCarga"));
+                const modalExcluirCarga = new bootstrap.Modal(document.getElementById('modalExcluirCarga'));
                 modalExcluirCarga.show();
             };
 
-            document.getElementById("confirmarExclusao").onclick = function () {
+            document.getElementById('confirmarExclusao').onclick = function() {
+                const setorAtual = document.getElementById('setor').value;
+                const dataSelecionada = document.getElementById('dataAtual').value;
 
-                let setor = document.getElementById('setor').value;
-                let dataAtual = document.getElementById('dataAtual').value;
-
-                const modalElement = document.getElementById("modalExcluirCarga");
+                const modalElement = document.getElementById('modalExcluirCarga');
                 const modalInstance = bootstrap.Modal.getInstance(modalElement);
                 if (modalInstance) {
                     modalInstance.hide();
@@ -63,22 +142,23 @@ export function renderCallendar() {
                     }
                 });
 
-                fetch(`api/excluir-planejamento/`, {
+                fetch('/cargas/api/excluir-planejamento/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        data: dataAtual,   // ex: "2025-06-03"
-                        setor: setor       // ex: "montagem"
+                        data: dataSelecionada,
+                        setor: setorAtual
                     })
                 })
                 .then(response => {
-                    if (!response.ok) throw new Error("Erro ao excluir ordens");
+                    if (!response.ok) {
+                        throw new Error('Erro ao excluir ordens');
+                    }
                     return response.json();
                 })
                 .then(data => {
-
                     if (data.error) {
                         Swal.fire({
                             icon: 'error',
@@ -87,22 +167,15 @@ export function renderCallendar() {
                             confirmButtonText: 'OK'
                         });
                     } else {
-                        
                         renderCallendar();
-
                         Swal.fire({
                             icon: 'success',
                             title: 'Planejamento excluido com sucesso!',
-                            // html: `
-                            //     <p><strong>${data.novas_ordens_criadas}</strong> novas ordens foram criadas com sucesso!</p>
-                            //     <p><strong>Ordens que precisam ser atualizadas manualmente:</strong></p>
-                            //     <p>${ordensTexto}</p>
-                            // `,
                             confirmButtonText: 'OK'
                         });
                     }
                 })
-                .catch(error => {
+                .catch(() => {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro!',
@@ -110,10 +183,9 @@ export function renderCallendar() {
                         confirmButtonText: 'OK'
                     });
                 });
-
             };
 
-            document.getElementById("btnAtualizar").onclick = function () {
+            document.getElementById('btnAtualizar').onclick = function() {
                 Swal.fire({
                     title: 'Aguarde...',
                     text: 'Atualizando informações...',
@@ -126,7 +198,7 @@ export function renderCallendar() {
 
                 escolhaModal.hide();
 
-                fetch(`api/atualizar-planejamento/?data_inicio=${dataAtual}&setor=${setor}`, {
+                fetch(`/cargas/api/atualizar-planejamento/?data_inicio=${dataAtual}&setor=${setor}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -134,7 +206,6 @@ export function renderCallendar() {
                 })
                 .then(response => response.json())
                 .then(data => {
-
                     if (data.error) {
                         Swal.fire({
                             icon: 'error',
@@ -143,17 +214,16 @@ export function renderCallendar() {
                             confirmButtonText: 'OK'
                         });
                     } else {
-                        
-                        let ordensTexto = "";
+                        let ordensTexto = '';
 
                         if (Array.isArray(data.ordens_com_apontamentos)) {
-                        ordensTexto = data.ordens_com_apontamentos.length > 0
-                            ? data.ordens_com_apontamentos.map(ordem =>
-                                `Chave: ${ordem.id || "indefinido"} | Data: ${ordem.data_carga || "indefinida"} | Grupo Máquina: ${ordem.grupo_maquina || "indefinido"}`
-                            ).join("<br>")
-                            : "Nenhuma ordem precisa ser atualizada manualmente.";
+                            ordensTexto = data.ordens_com_apontamentos.length > 0
+                                ? data.ordens_com_apontamentos.map(ordem =>
+                                    `Chave: ${ordem.id || 'indefinido'} | Data: ${ordem.data_carga || 'indefinida'} | Grupo Máquina: ${ordem.grupo_maquina || 'indefinido'}`
+                                ).join('<br>')
+                                : 'Nenhuma ordem precisa ser atualizada manualmente.';
                         } else {
-                        ordensTexto = "Nenhuma ordem precisa ser atualizada manualmente.";
+                            ordensTexto = 'Nenhuma ordem precisa ser atualizada manualmente.';
                         }
 
                         Swal.fire({
@@ -169,7 +239,7 @@ export function renderCallendar() {
                     }
                 })
                 .catch(error => {
-                    console.error("Erro ao buscar detalhes da carga:", error);
+                    console.error('Erro ao buscar detalhes da carga:', error);
 
                     Swal.fire({
                         icon: 'error',
@@ -180,69 +250,220 @@ export function renderCallendar() {
                 });
             };
         },
-        eventDrop: function (info) {
-            let newDate = info.event.startStr;
-            let setor = info.event.extendedProps.setor;
-            let dataAtual = info.oldEvent.startStr;
-            let eventId = info.event.id || `${setor}-${dataAtual}`;
+        eventDrop: interactive ? function(info) {
+            const newDate = info.event.startStr;
+            const setor = info.event.extendedProps.setor;
+            const dataAtual = info.oldEvent.startStr;
 
             remanejarCarga(setor, dataAtual, newDate);
-        }
+        } : undefined
     });
 
     calendar.render();
+    calendarEl._fullCalendarInstance = calendar;
 
+    const confirmarRemanejamento = document.getElementById('confirmarRemanejamento');
+    if (interactive && confirmarRemanejamento) {
+        confirmarRemanejamento.onclick = function() {
+            const eventId = document.getElementById('eventId').value;
+            const setor = document.getElementById('setor').value;
+            const dataAtual = document.getElementById('dataAtual').value;
+            const novaData = document.getElementById('novaData').value;
 
+            if (!novaData) {
+                alert('Por favor, selecione uma nova data.');
+                return;
+            }
 
-    document.getElementById('confirmarRemanejamento').addEventListener('click', function () {
-        let eventId = document.getElementById('eventId').value;
-        let setor = document.getElementById('setor').value;
-        let dataAtual = document.getElementById('dataAtual').value;
-        let novaData = document.getElementById('novaData').value;
+            const eventoAtualizado = calendar.getEventById(eventId);
 
-        if (!novaData) {
-            alert('Por favor, selecione uma nova data.');
+            if (eventoAtualizado) {
+                alert(`Carga do setor ${setor} remanejada para ${novaData}`);
+            }
+
+            remanejarCarga(setor, dataAtual, novaData);
+
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalRemanejar'));
+            modal.hide();
+        };
+    }
+
+    return calendar;
+}
+
+async function abrirDetalhesLiberacao(cargaUuid) {
+    const modalElement = document.getElementById('modalDetalhesLiberacao');
+    const titulo = document.getElementById('detalhesLiberacaoTitulo');
+    const subtitulo = document.getElementById('detalhesLiberacaoSubtitulo');
+    const tabela = document.getElementById('detalhesLiberacaoTabela');
+    const acoes = document.getElementById('detalhesLiberacaoAcoes');
+
+    if (!modalElement || !titulo || !subtitulo || !tabela || !acoes || !cargaUuid) {
+        return;
+    }
+
+    titulo.textContent = 'Carregando...';
+    subtitulo.textContent = '';
+    tabela.innerHTML = "<tr><td colspan='3'>Carregando itens...</td></tr>";
+    acoes.innerHTML = '';
+
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+
+    try {
+        const response = await fetch(`/cargas/api/liberacoes/${cargaUuid}/`);
+        const payload = await response.json();
+
+        if (!response.ok) {
+            throw new Error(payload.error || 'Erro ao carregar detalhes da carga.');
+        }
+
+        titulo.textContent = `${payload.carga} v${payload.versao}`;
+        let subtituloHtml = `Data carga: ${payload.data_carga_formatada || payload.data_carga} | Liberado em: ${payload.liberado_em} | Usuário: ${payload.liberado_por}`;
+        if (payload.data_sugerida_planejamento_formatada || payload.data_sugerida_planejamento) {
+            subtituloHtml += `<br><span style="color:#dc3545;font-weight:600">Data sugerida: ${payload.data_sugerida_planejamento_formatada || payload.data_sugerida_planejamento}</span>`;
+        }
+        subtitulo.innerHTML = subtituloHtml;
+
+        if (payload.data_sugerida_planejamento) {
+            const btnAplicar = document.createElement('button');
+            btnAplicar.className = 'btn btn-danger btn-sm';
+            btnAplicar.innerHTML = '<i class="fas fa-calendar-check me-1"></i>Mudar para data sugerida';
+            btnAplicar.addEventListener('click', async () => {
+                const confirmado = window.confirm(`Confirmar a altera??o da carga para a data sugerida ${payload.data_sugerida_planejamento_formatada || payload.data_sugerida_planejamento}?`);
+                if (!confirmado) {
+                    return;
+                }
+
+                const htmlOriginal = btnAplicar.innerHTML;
+                btnAplicar.disabled = true;
+                btnAplicar.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Aplicando...';
+
+                try {
+                    const responseAplicar = await fetch(`/cargas/api/liberacoes/${payload.carga_uuid}/aplicar-data-sugerida/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCsrfToken(),
+                        },
+                    });
+                    const payloadAplicar = await responseAplicar.json();
+                    if (!responseAplicar.ok) {
+                        throw new Error(payloadAplicar.error || 'Erro ao aplicar data sugerida.');
+                    }
+
+                    alert(payloadAplicar.message || 'Data sugerida aplicada com sucesso.');
+                    modal.hide();
+                    renderCallendar();
+                } catch (error) {
+                    console.error(error);
+                    alert(error.message || 'Não foi possível aplicar a data sugerida.');
+                    btnAplicar.disabled = false;
+                    btnAplicar.innerHTML = htmlOriginal;
+                }
+            });
+            acoes.appendChild(btnAplicar);
+        }
+
+        // Botões de link por cliente
+        const linksContainer = document.getElementById('detalhesLiberacaoLinks');
+        if (linksContainer) {
+            linksContainer.innerHTML = '';
+            const clientesUnicos = [...new Set((payload.itens || []).map(i => i.cliente).filter(Boolean))];
+            if (clientesUnicos.length > 0) {
+                clientesUnicos.forEach(async (cliente) => {
+                    try {
+                        const r = await fetch('/cargas/api/gerar-link-acompanhamento/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                            body: JSON.stringify({ data_carga: payload.data_carga, cliente }),
+                        });
+                        const linkData = await r.json();
+                        if (!r.ok) return;
+
+                        const btn = document.createElement('button');
+                        btn.className = 'btn btn-outline-primary btn-sm';
+                        btn.innerHTML = `<i class="fas fa-link me-1"></i>Link: ${cliente}`;
+                        btn.addEventListener('click', () => {
+                            navigator.clipboard.writeText(linkData.url).then(() => {
+                                btn.innerHTML = `<i class="fas fa-check me-1"></i>Copiado!`;
+                                setTimeout(() => { btn.innerHTML = `<i class="fas fa-link me-1"></i>Link: ${cliente}`; }, 2000);
+                            });
+                        });
+                        linksContainer.appendChild(btn);
+                    } catch {}
+                });
+            }
+        }
+
+        if (!Array.isArray(payload.itens) || payload.itens.length === 0) {
+            tabela.innerHTML = "<tr><td colspan='3'>Nenhum item encontrado.</td></tr>";
             return;
         }
 
-        let eventoAtualizado = calendar.getEventById(eventId);
+        tabela.innerHTML = '';
 
-        if (eventoAtualizado) {
-            console.log("Atualizando evento:", eventoAtualizado);
-            alert(`Carga do setor ${setor} remanejada para ${novaData}`);
-        }
+        // Agrupa por cliente + carreta, somando quantidades
+        const agrupado = [];
+        const chaveMap = new Map();
+        payload.itens.forEach((item) => {
+            const cliente = item.cliente || 'Sem cliente';
+            const chave = `${cliente}||${item.codigo_recurso}`;
+            if (chaveMap.has(chave)) {
+                agrupado[chaveMap.get(chave)].quantidade += item.quantidade;
+            } else {
+                chaveMap.set(chave, agrupado.length);
+                agrupado.push({ cliente, codigo_recurso: item.codigo_recurso, quantidade: item.quantidade });
+            }
+        });
 
-        remanejarCarga(setor, dataAtual, novaData);
-
-        var modal = bootstrap.Modal.getInstance(document.getElementById('modalRemanejar'));
-        modal.hide();
-        
-    });
+        let clienteAtual = null;
+        agrupado.forEach((item) => {
+            const linha = document.createElement('tr');
+            linha.innerHTML = `
+                <td class="text-start">${item.cliente !== clienteAtual ? item.cliente : ''}</td>
+                <td>${item.codigo_recurso}</td>
+                <td>${item.quantidade}</td>
+            `;
+            clienteAtual = item.cliente;
+            tabela.appendChild(linha);
+        });
+    } catch (error) {
+        console.error(error);
+        titulo.textContent = 'Erro ao carregar';
+        subtitulo.textContent = error.message || 'Não foi possível carregar os detalhes.';
+        tabela.innerHTML = "<tr><td colspan='3'>Falha ao carregar os itens.</td></tr>";
+    }
 }
 
 function remanejarCarga(setor, dataAtual, novaData) {
-    fetch('api/remanejar-carga/', {
+    fetch('/cargas/api/remanejar-carga/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
             setor: setor,
-            dataAtual: dataAtual,  // Enviamos a data da carga atual
-            dataRemanejar: novaData  //  Nova data para onde a carga será movida
+            dataAtual: dataAtual,
+            dataRemanejar: novaData
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.error) {
-            alert("Erro: " + data.error);
+            alert(`Erro: ${data.error}`);
             renderCallendar();
         } else {
-            alert("Sucesso: " + data.message);
+            alert(`Sucesso: ${data.message}`);
             renderCallendar();
         }
     })
-    .catch(error => console.error("Erro na requisição:", error));
+    .catch(error => console.error('Erro na requisição:', error));
 }
 
-document.addEventListener('DOMContentLoaded', renderCallendar);
+document.addEventListener('DOMContentLoaded', () => {
+    const calendarEl = document.getElementById('calendario');
+    if (calendarEl && calendarEl.dataset.autoRender === 'true') {
+        renderCallendar();
+    }
+});
