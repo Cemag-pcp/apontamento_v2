@@ -1890,6 +1890,25 @@ def parse_data_fmt(data_str):
     except Exception:
         return datetime.min  # Garante que datas inválidas fiquem no início
 
+
+def obter_skip_limit(request, default_limit=200, max_limit=500):
+    skip_str = request.GET.get('skip', '0')
+    limit_str = request.GET.get('limit', str(default_limit))
+
+    try:
+        skip = int(skip_str)
+        limit = int(limit_str)
+    except (TypeError, ValueError):
+        raise ValueError('Par?metros skip e limit devem ser inteiros.')
+
+    if skip < 0:
+        raise ValueError('O par?metro skip deve ser maior ou igual a zero.')
+    if limit <= 0:
+        raise ValueError('O par?metro limit deve ser maior que zero.')
+
+    return skip, min(limit, max_limit) 
+
+
 def ordens_status_montagem(request):
     """"
         traz as ordens aguardando inicio, em andamento e finalizadas na montagem
@@ -1915,6 +1934,11 @@ def ordens_status_montagem(request):
 
     if data_inicio is None or data_fim is None:
         return JsonResponse({'erro': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=400)
+
+    try:
+        skip, limit = obter_skip_limit(request)
+    except ValueError as exc:
+        return JsonResponse({'erro': str(exc)}, status=400)
 
     # Monta os filtros para a model Ordem
     filtros_ordem = {
@@ -1964,7 +1988,7 @@ def ordens_status_montagem(request):
         restante=ExpressionWrapper(
             F('total_planejada') - F('total_boa'), output_field=FloatField()
         )
-    ).order_by('ordem__ultima_atualizacao')
+    ).order_by('ordem__ultima_atualizacao')[skip:skip + limit]
 
     resultado_final = list(pecas_ordem_agg)
 
@@ -1975,6 +1999,12 @@ def ordens_status_solda(request):
     """"
         traz as ordens aguardando inicio, em andamento e finalizadas na solda
     """
+
+    try:
+        skip, limit = obter_skip_limit(request)
+    except ValueError as exc:
+        return JsonResponse({'erro': str(exc)}, status=400)
+     
      
     # Monta os filtros para a model Ordem
     filtros_ordem = {
@@ -2013,7 +2043,7 @@ def ordens_status_solda(request):
         restante=ExpressionWrapper(
             F('total_planejada') - F('total_boa'), output_field=FloatField()
         )
-    ).order_by('-ordem__ultima_atualizacao')[:1000]
+    ).order_by('-ordem__ultima_atualizacao')[skip:skip + limit]
 
     resultado_final = list(pecas_ordem_agg)
 
