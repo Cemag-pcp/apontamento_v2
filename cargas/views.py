@@ -3,20 +3,28 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.db.models.functions import Coalesce, Now
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Sum,Q,CharField,Count,OuterRef, Subquery, F, Value, Avg, Max
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
-from django.utils.timezone import now
+from django.utils.timezone import now, localtime
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.decorators.http import require_POST, require_GET
 from django.db.models import Func, FloatField, ExpressionWrapper
+from django.contrib.auth.decorators import login_required
 
 from apontamento_pintura.models import PecasOrdem as POPintura
 from apontamento_montagem.models import PecasOrdem as POMontagem
 from apontamento_solda.models import PecasOrdem as POSolda
 
 from core.models import Ordem
+from cargas.models import CargaLiberada, CargaLiberadaVersao, LinkAcompanhamento
+from cargas.services import (
+    atualizar_datas_sugeridas_planejamento,
+    liberar_cargas_periodo,
+    listar_cargas_liberadas_para_planejamento,
+    listar_cargas_liberadas_periodo,
+)
 from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
 from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura, imprimir_ordens_pcp_qualidade
@@ -24,6 +32,7 @@ from apontamento_pintura.models import CambaoPecas, Retrabalho
 from apontamento_pintura.views import ordens_criadas as ordens_criadas_pintura
 from apontamento_montagem.views import ordens_criadas as ordens_criadas_montagem
 from inspecao.models import DadosExecucaoInspecao, CausasNaoConformidade, Inspecao
+from apontamento_exped.models import Carga as CargaExpedicao
 
 import pandas as pd
 import os
@@ -41,9 +50,62 @@ django.setup()
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
 logger = logging.getLogger(__name__)
 
+
+def _normalizar_sugestoes_datas(payload_bruto):
+    if not payload_bruto:
+        return {}
+
+    try:
+        payload = json.loads(payload_bruto)
+    except (TypeError, json.JSONDecodeError):
+        raise ValueError("Formato inválido para sugestoes_datas.")
+
+    if not isinstance(payload, dict):
+        raise ValueError("Formato inválido para sugestoes_datas.")
+
+    sugestoes = {}
+    for data_original, data_sugerida in payload.items():
+        try:
+            data_original_obj = datetime.strptime(data_original, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            raise ValueError("As chaves de sugestoes_datas devem estar no formato YYYY-MM-DD.")
+
+        if data_sugerida in ("", None):
+            sugestoes[data_original_obj] = None
+            continue
+
+        try:
+            sugestoes[data_original_obj] = datetime.strptime(data_sugerida, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            raise ValueError("Os valores de sugestoes_datas devem estar no formato YYYY-MM-DD.")
+
+    return sugestoes
+
+
+def _calcular_data_programacao_por_setor(setor, data_carga):
+    if setor == 'montagem':
+        data_programacao = data_carga - timedelta(days=3)
+    elif setor == 'solda':
+        data_programacao = data_carga - timedelta(days=2)
+    elif setor == 'pintura':
+        data_programacao = data_carga - timedelta(days=1)
+    else:
+        return None
+
+    while data_programacao.weekday() in [5, 6]:
+        data_programacao -= timedelta(days=1)
+
+    return data_programacao
+
+@login_required
 def home(request):
 
     return render(request, "cargas/home.html")
+
+@login_required
+def liberacao(request):
+
+    return render(request, "cargas/liberacao.html")
 
 def buscar_dados_carreta_planilha(request):
     data_inicio = request.GET.get('data_inicio')
@@ -64,6 +126,82 @@ def buscar_dados_carreta_planilha(request):
     cargas = consultar_carretas(data_inicio, data_final)
 
     return JsonResponse({'cargas': cargas})
+
+
+def buscar_cargas_liberadas(request):
+    data_inicio = request.GET.get("data_inicio")
+    data_final = request.GET.get("data_fim")
+
+    try:
+        data_inicio_obj = datetime.strptime(data_inicio, "%Y-%m-%d").date() if data_inicio else None
+        data_final_obj = datetime.strptime(data_final, "%Y-%m-%d").date() if data_final else None
+    except ValueError:
+        return JsonResponse({"error": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
+
+    if not data_inicio_obj or not data_final_obj:
+        return JsonResponse({"error": "data_inicio e data_fim são obrigatórios."}, status=400)
+
+    if data_inicio_obj > data_final_obj:
+        return JsonResponse({"error": "A data início deve ser menor ou igual à data fim."}, status=400)
+
+    try:
+        cargas = listar_cargas_liberadas_periodo(data_inicio_obj, data_final_obj)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    return JsonResponse({"cargas": cargas})
+
+@csrf_exempt
+@require_POST
+def liberar_cargas(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Usuário não autenticado."}, status=401)
+
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido."}, status=400)
+
+    data_inicio = data.get("data_inicio")
+    data_fim = data.get("data_fim")
+
+    if not data_inicio or not data_fim:
+        return JsonResponse(
+            {"error": "Os campos data_inicio e data_fim são obrigatórios."},
+            status=400,
+        )
+
+    try:
+        data_inicio_obj = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+        data_fim_obj = datetime.strptime(data_fim, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"error": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
+
+    if data_inicio_obj > data_fim_obj:
+        return JsonResponse(
+            {"error": "A data início deve ser menor ou igual à data fim."},
+            status=400,
+        )
+
+    try:
+        resultado = liberar_cargas_periodo(
+            usuario=request.user,
+            data_inicio=data_inicio_obj,
+            data_fim=data_fim_obj,
+        )
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception as exc:
+        logger.exception("Falha ao liberar cargas")
+        return JsonResponse({"error": f"Erro ao liberar cargas: {exc}"}, status=500)
+
+    return JsonResponse(
+        {
+            "message": "Cargas liberadas com sucesso.",
+            **resultado,
+        },
+        status=201,
+    )
 
 def gerar_arquivos_sequenciamento(request):
     """
@@ -102,30 +240,138 @@ def gerar_arquivos_sequenciamento(request):
     return response
     
 def gerar_dados_sequenciamento(request):
-
-    """
-    Chama a API 'criar_ordem'.
-    """
-
     data_inicio = request.GET.get('data_inicio')
     data_final = request.GET.get('data_fim')
     setor = request.GET.get('setor')
-
-    # data_inicio='2025-07-01'
-    # data_final='2025-07-01'
-    # setor='pintura'
+    sugestoes_brutas = request.GET.get('sugestoes_datas')
 
     if not data_inicio or not data_final or not setor:
         return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)
 
-    intervalo_datas = criar_array_datas(data_inicio, data_final)
+    try:
+        data_inicio_obj = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+        data_final_obj = datetime.strptime(data_final, "%Y-%m-%d").date()
+        sugestoes_datas = _normalizar_sugestoes_datas(sugestoes_brutas)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
 
-    # formatando data string
-    intervalo_datas_formatado = [datetime.strptime(data, "%d/%m/%Y").strftime("%Y-%m-%d") for data in intervalo_datas]
+    try:
+        cargas_liberadas = listar_cargas_liberadas_para_planejamento(
+            data_inicio_obj,
+            data_final_obj,
+        )
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
 
-    # Verifica se já existe uma carga na nova data
-    if Ordem.objects.filter(grupo_maquina=setor, data_carga__in=intervalo_datas_formatado).exists():
-        return JsonResponse({'error': 'Já existe uma carga programada para essa data'}, status=400)
+    if not cargas_liberadas:
+        return JsonResponse(
+            {"error": "Não existem cargas liberadas no período selecionado."},
+            status=400,
+        )
+
+    conflitos_datas = defaultdict(list)
+    datas_finais_por_carga = {}
+    atualizacoes_sugeridas = {}
+
+    for carga_liberada in cargas_liberadas:
+        data_original = carga_liberada["data_carga"]
+        data_sugerida = sugestoes_datas.get(data_original)
+        data_final_carga = data_sugerida or data_original
+
+        conflitos_datas[data_final_carga.isoformat()].append(data_original.isoformat())
+        datas_finais_por_carga[carga_liberada["carga_liberada_id"]] = data_final_carga
+        atualizacoes_sugeridas[carga_liberada["carga_liberada_id"]] = data_sugerida
+
+    conflitos = {
+        data_final_str: datas_origem
+        for data_final_str, datas_origem in conflitos_datas.items()
+        if len(set(datas_origem)) > 1
+    }
+    if conflitos:
+        conflitos_texto = ", ".join(
+            f"{data_final_str} <= {', '.join(sorted(set(datas_origem)))}"
+            for data_final_str, datas_origem in sorted(conflitos.items())
+        )
+        return JsonResponse(
+            {"error": f"Conflito de sugestão de datas: {conflitos_texto}"},
+            status=400,
+        )
+
+    datas_finais = sorted({data.isoformat() for data in datas_finais_por_carga.values()})
+    if Ordem.objects.filter(grupo_maquina=setor, data_carga__in=datas_finais).exists():
+        return JsonResponse(
+            {'error': 'Já existe uma carga programada para a data sugerida selecionada'},
+            status=400,
+        )
+
+    ordens = []
+    for carga_liberada in cargas_liberadas:
+        data_carga_original = carga_liberada["data_carga"]
+        data_carga_planejada = datas_finais_por_carga[carga_liberada["carga_liberada_id"]]
+        tabela_carga = gerar_sequenciamento(
+            data_carga_original.isoformat(),
+            data_carga_original.isoformat(),
+            setor,
+            carga_liberada["carga"],
+        )
+
+        if tabela_carga.empty:
+            continue
+
+        if setor == 'pintura':
+            colunas_grupo = ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor']
+            if 'Carga' in tabela_carga.columns:
+                colunas_grupo.append('Carga')
+            tabela_carga = tabela_carga.groupby(colunas_grupo).agg({'Qtde_total': 'sum'}).reset_index()
+            tabela_carga.drop_duplicates(
+                subset=['Código', 'Datas', 'cor', 'Carga'] if 'Carga' in tabela_carga.columns else ['Código', 'Datas', 'cor'],
+                inplace=True,
+            )
+        else:
+            tabela_carga.drop_duplicates(
+                subset=['Código', 'Datas', 'Célula', 'Carga'] if 'Carga' in tabela_carga.columns else ['Código', 'Datas', 'Célula'],
+                inplace=True,
+            )
+
+        for _, row in tabela_carga.iterrows():
+            ordens.append({
+                "grupo_maquina": setor.lower(),
+                "cor": row["cor"] if setor == 'pintura' else '',
+                "obs": "Ordem gerada automaticamente",
+                "peca_nome": str(row["Código"]) + " - " + row["Peca"],
+                "qtd_planejada": int(row["Qtde_total"]),
+                "data_carga": data_carga_planejada.isoformat(),
+                "setor_conjunto": row["Célula"],
+                "carga_liberada_id": carga_liberada["carga_liberada_id"],
+                "carga_liberada_versao_id": carga_liberada["carga_liberada_versao_id"],
+            })
+
+    if not ordens:
+        return JsonResponse(
+            {"error": "Nenhuma ordem foi gerada a partir das cargas liberadas selecionadas."},
+            status=400,
+        )
+
+    if setor.lower() == 'montagem':
+        resultado = processar_ordens_montagem(request, ordens, grupo_maquina=setor.lower())
+    elif setor.lower() == 'pintura':
+        resultado = processar_ordens_pintura(ordens, grupo_maquina=setor.lower())
+    else:
+        resultado = processar_ordens_solda(ordens, grupo_maquina=setor.lower())
+
+    if "error" in resultado:
+        logger.warning(
+            "gerar_dados_sequenciamento falhou | setor=%s | data_inicio=%s | data_fim=%s | erro=%s | ordens=%s",
+            setor,
+            data_inicio,
+            data_final,
+            resultado.get("error"),
+            ordens
+        )
+        return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
+
+    atualizar_datas_sugeridas_planejamento(atualizacoes_sugeridas)
+    return JsonResponse({"message": "Sequenciamento gerado com sucesso!", "detalhes": "resultado"})
 
     # Gerar os arquivos e a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_final, setor)
@@ -390,6 +636,311 @@ def parse_iso_date(date_str):
     except ValueError:
         return None
 
+def andamento_liberacoes(request):
+    start_date = parse_iso_date(request.GET.get("start"))
+    end_date = parse_iso_date(request.GET.get("end"))
+
+    if not start_date or not end_date:
+        return JsonResponse({"error": "Parâmetros 'start' e 'end' são obrigatórios"}, status=400)
+
+    liberacoes = (
+        CargaLiberada.objects.filter(data_carga__gte=start_date, data_carga__lt=end_date)
+        .annotate(
+            ultima_versao=Max("versoes__versao"),
+            ultimo_liberado_em=Subquery(
+                CargaLiberadaVersao.objects.filter(
+                    carga_liberada=OuterRef("pk")
+                )
+                .order_by("-versao")
+                .values("liberado_em")[:1]
+            ),
+        )
+        .order_by("data_carga", "carga_nome")
+    )
+
+    eventos = [
+        {
+            "id": f"liberacao-{liberacao.carga_uuid}",
+            "title": f"{liberacao.carga_nome} v{liberacao.ultima_versao or 1}",
+            "start": liberacao.data_carga.strftime("%Y-%m-%d"),
+            "allDay": True,
+            "backgroundColor": "#dc3545" if liberacao.data_sugerida_planejamento else "#198754",
+            "borderColor": "#dc3545" if liberacao.data_sugerida_planejamento else "#198754",
+            "extendedProps": {
+                "tipo": "liberacao",
+                "carga_uuid": str(liberacao.carga_uuid),
+                "versao": liberacao.ultima_versao or 1,
+                "liberado_em": (
+                    localtime(liberacao.ultimo_liberado_em).strftime("%d/%m/%Y %H:%M")
+                    if liberacao.ultimo_liberado_em
+                    else ""
+                ),
+                "data_carga": liberacao.data_carga.strftime("%d/%m/%Y"),
+                "data_sugerida_planejamento": (
+                    liberacao.data_sugerida_planejamento.strftime("%d/%m/%Y")
+                    if liberacao.data_sugerida_planejamento
+                    else ""
+                ),
+            },
+        }
+        for liberacao in liberacoes
+    ]
+
+    return JsonResponse(eventos, safe=False)
+
+def detalhes_liberacao(request, carga_uuid):
+    carga = get_object_or_404(CargaLiberada, carga_uuid=carga_uuid)
+    ultima_versao = (
+        carga.versoes.select_related("liberado_por")
+        .prefetch_related("itens")
+        .order_by("-versao")
+        .first()
+    )
+
+    if ultima_versao is None:
+        return JsonResponse({"error": "Nenhuma versão encontrada para esta carga."}, status=404)
+
+    return JsonResponse(
+        {
+            "carga_uuid": str(carga.carga_uuid),
+            "carga": carga.carga_nome,
+            "data_carga": carga.data_carga.strftime("%Y-%m-%d"),
+            "data_carga_formatada": carga.data_carga.strftime("%d/%m/%Y"),
+            "data_sugerida_planejamento": (
+                carga.data_sugerida_planejamento.strftime("%Y-%m-%d")
+                if carga.data_sugerida_planejamento
+                else ""
+            ),
+            "data_sugerida_planejamento_formatada": (
+                carga.data_sugerida_planejamento.strftime("%d/%m/%Y")
+                if carga.data_sugerida_planejamento
+                else ""
+            ),
+            "tem_data_sugerida": bool(carga.data_sugerida_planejamento),
+            "versao": ultima_versao.versao,
+            "liberado_em": localtime(ultima_versao.liberado_em).strftime("%d/%m/%Y %H:%M"),
+            "liberado_por": ultima_versao.liberado_por.username,
+            "itens": [
+                {
+                    "cliente": item.cliente or item.cliente_codigo,
+                    "codigo_recurso": item.codigo_recurso,
+                    "quantidade": item.quantidade,
+                    "presente_no_carreta": item.presente_no_carreta,
+                }
+                for item in ultima_versao.itens.all().order_by("cliente", "cliente_codigo", "codigo_recurso")
+            ],
+        }
+    )
+
+
+@csrf_exempt
+@require_POST
+def aplicar_data_sugerida_liberacao(request, carga_uuid):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Usuário não autenticado."}, status=401)
+
+    with transaction.atomic():
+        carga = (
+            CargaLiberada.objects.select_for_update()
+            .prefetch_related("versoes__itens", "ordens_sequenciadas")
+            .filter(carga_uuid=carga_uuid)
+            .first()
+        )
+
+        if carga is None:
+            return JsonResponse({"error": "Carga não encontrada."}, status=404)
+
+        if not carga.data_sugerida_planejamento:
+            return JsonResponse({"error": "Esta carga não possui data sugerida para aplicar."}, status=400)
+
+        data_atual = carga.data_carga
+        data_destino = carga.data_sugerida_planejamento
+
+        conflito = CargaLiberada.objects.filter(
+            data_carga=data_destino,
+            carga_nome=carga.carga_nome,
+        ).exclude(pk=carga.pk)
+        if conflito.exists():
+            return JsonResponse(
+                {"error": "Já existe uma carga com esse nome na data sugerida."},
+                status=400,
+            )
+
+        ultima_versao = carga.versoes.order_by("-versao").first()
+        clientes = set()
+        if ultima_versao is not None:
+            clientes = {
+                item.cliente or item.cliente_codigo
+                for item in ultima_versao.itens.all()
+                if item.cliente or item.cliente_codigo
+            }
+
+        for ordem in carga.ordens_sequenciadas.all():
+            ordem.data_carga = data_destino
+            ordem.data_programacao = _calcular_data_programacao_por_setor(
+                ordem.grupo_maquina,
+                data_destino,
+            )
+            ordem.save(update_fields=["data_carga", "data_programacao"])
+
+        for cliente in clientes:
+            link_atual = LinkAcompanhamento.objects.filter(
+                data_carga=data_atual,
+                cliente=cliente,
+            ).first()
+            link_destino = LinkAcompanhamento.objects.filter(
+                data_carga=data_destino,
+                cliente=cliente,
+            ).first()
+
+            if link_destino:
+                if link_atual and link_atual.pk != link_destino.pk:
+                    link_atual.delete()
+            elif link_atual:
+                link_atual.data_carga = data_destino
+                link_atual.save(update_fields=["data_carga"])
+            else:
+                LinkAcompanhamento.objects.create(
+                    data_carga=data_destino,
+                    cliente=cliente,
+                )
+
+        carga.data_carga = data_destino
+        carga.data_sugerida_planejamento = None
+        carga.save(update_fields=["data_carga", "data_sugerida_planejamento", "atualizado_em"])
+
+    return JsonResponse(
+        {
+            "message": "Data sugerida aplicada com sucesso.",
+            "carga_uuid": str(carga.carga_uuid),
+            "data_carga": carga.data_carga.strftime("%Y-%m-%d"),
+        }
+    )
+
+
+@require_GET
+def status_carga_por_data(request):
+    data_carga = request.GET.get("data_carga")
+    cliente = (request.GET.get("cliente") or "").strip()
+
+    if not data_carga:
+        return JsonResponse({"error": "O parâmetro data_carga é obrigatório."}, status=400)
+    if not cliente:
+        return JsonResponse({"error": "O parâmetro cliente é obrigatório."}, status=400)
+
+    try:
+        data_carga_obj = datetime.strptime(data_carga, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"error": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
+
+    liberacoes = (
+        CargaLiberadaVersao.objects.filter(
+            carga_liberada__data_carga=data_carga_obj,
+        ).filter(
+            Q(carga_liberada__versoes__itens__cliente=cliente)
+            | Q(carga_liberada__versoes__itens__cliente_codigo=cliente)
+        )
+        .distinct()
+        .order_by("liberado_em")
+    )
+    primeira_liberacao = liberacoes.first()
+    cargas_liberadas_ids = list(
+        liberacoes.values_list("carga_liberada_id", flat=True).distinct()
+    )
+
+    if primeira_liberacao is None:
+        return JsonResponse(
+            {
+                "data_carga": data_carga_obj.strftime("%Y-%m-%d"),
+                "cliente": cliente,
+                "status": "aguardando_liberacao",
+                "descricao": "Aguardando liberação",
+                "historico": [],
+            }
+        )
+
+    primeira_expedicao = (
+        CargaExpedicao.objects.filter(data_carga=data_carga_obj, cliente=cliente)
+        .order_by("data_criacao")
+        .first()
+    )
+    primeira_montagem = (
+        Ordem.objects.filter(
+            grupo_maquina="montagem",
+            data_carga=data_carga_obj,
+            carga_liberada_id__in=cargas_liberadas_ids,
+        )
+        .distinct()
+        .order_by("data_criacao")
+        .first()
+    )
+    primeira_expedida = (
+        CargaExpedicao.objects.filter(
+            data_carga=data_carga_obj,
+            cliente=cliente,
+            stage="despachado",
+            data_despachado__isnull=False,
+        )
+        .order_by("data_despachado")
+        .first()
+    )
+
+    historico = [
+        {
+            "status": "liberado",
+            "descricao": "Liberado",
+            "data": localtime(primeira_liberacao.liberado_em).strftime("%d/%m/%Y"),
+        }
+    ]
+
+    if primeira_montagem is not None:
+        historico.append(
+            {
+                "status": "em_fabricacao",
+                "descricao": "Em fabricação",
+                "data": localtime(primeira_montagem.data_criacao).strftime("%d/%m/%Y"),
+            }
+        )
+
+    if primeira_expedicao is not None:
+        historico.append(
+            {
+                "status": "liberado_expedicao",
+                "descricao": "Liberado para expedição",
+                "data": localtime(primeira_expedicao.data_criacao).strftime("%d/%m/%Y"),
+            }
+        )
+
+    if primeira_expedida is not None:
+        historico.append(
+            {
+                "status": "expedida",
+                "descricao": "Expedida",
+                "data": localtime(primeira_expedida.data_despachado).strftime("%d/%m/%Y"),
+            }
+        )
+
+    if primeira_expedida is not None:
+        return JsonResponse(
+            {
+                "data_carga": data_carga_obj.strftime("%Y-%m-%d"),
+                "cliente": cliente,
+                "status": "expedida",
+                "descricao": "Expedida",
+                "historico": historico,
+            }
+        )
+
+    return JsonResponse(
+        {
+            "data_carga": data_carga_obj.strftime("%Y-%m-%d"),
+            "cliente": cliente,
+            "status": "em_fabricacao" if primeira_montagem is not None else "liberado",
+            "descricao": "Em fabricação" if primeira_montagem is not None else "Liberado",
+            "historico": historico,
+        }
+    )
+
 def andamento_cargas(request):
     """ Retorna as cargas de um setor dentro do intervalo solicitado pelo FullCalendar """
 
@@ -468,13 +1019,53 @@ def andamento_cargas(request):
                 "id": f"{setor}-{data.strftime('%Y-%m-%d')}",  # Gera um ID único baseado no setor e data
                 "title": f"{setor.capitalize()} - {round(percentual_concluido, 2)}%",
                 "start": data.strftime("%Y-%m-%d"),  # Formato correto para FullCalendar
-                "end": data.strftime("%Y-%m-%d"),  # Evento de 1 dia
+                "allDay": True,
                 "backgroundColor": cor,  # Cor baseada no setor
                 "borderColor": cor,
                 "extendedProps": {"setor": setor, "data_atual": data.strftime("%Y-%m-%d")}  # Propriedade personalizada
             })
 
     return JsonResponse(andamento_cargas, safe=False)  # Retorna um ARRAY direto
+
+@login_required
+@require_POST
+@csrf_exempt
+def gerar_link_acompanhamento(request):
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido."}, status=400)
+
+    data_carga = data.get("data_carga")
+    cliente = (data.get("cliente") or "").strip()
+
+    if not data_carga or not cliente:
+        return JsonResponse({"error": "data_carga e cliente são obrigatórios."}, status=400)
+
+    try:
+        data_carga_obj = datetime.strptime(data_carga, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"error": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
+
+    link, _ = LinkAcompanhamento.objects.get_or_create(
+        data_carga=data_carga_obj,
+        cliente=cliente,
+    )
+
+    url = request.build_absolute_uri(
+        reverse("cargas:acompanhamento_cliente", args=[str(link.token)])
+    )
+    return JsonResponse({"url": url, "token": str(link.token)})
+
+
+def acompanhamento_cliente(request, token):
+    link = get_object_or_404(LinkAcompanhamento, token=token)
+    return render(request, "cargas/acompanhamento.html", {
+        "data_carga": link.data_carga.strftime("%Y-%m-%d"),
+        "cliente": link.cliente,
+        "data_carga_formatada": link.data_carga.strftime("%d/%m/%Y"),
+    })
+
 
 def historico_cargas(request):
 

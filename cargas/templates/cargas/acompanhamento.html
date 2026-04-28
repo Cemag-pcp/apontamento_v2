@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acompanhamento do Pedido</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Header ── */
+    .header {
+      width: 100%;
+      background: linear-gradient(135deg, #1a3a5c 0%, #0d6efd 100%);
+      color: #fff;
+      padding: 28px 24px 24px;
+      text-align: center;
+    }
+    .header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: .5px; }
+    .header p  { font-size: .9rem; opacity: .85; margin-top: 4px; }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.10);
+      width: 100%;
+      max-width: 620px;
+      margin: 32px 16px;
+      padding: 32px 28px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .info-row .cliente-nome {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #1a3a5c;
+    }
+    .info-row .data-carga {
+      font-size: .85rem;
+      color: #6c757d;
+      background: #f0f4f8;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .82rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      margin-bottom: 28px;
+    }
+    .status-badge.aguardando  { background: #fff3cd; color: #856404; }
+    .status-badge.producao    { background: #cfe2ff; color: #084298; }
+    .status-badge.expedicao   { background: #d1ecf1; color: #0c5460; }
+    .status-badge.expedida    { background: #d1e7dd; color: #0a3622; }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 1.6s infinite;
+    }
+    .status-badge.expedida .dot { animation: none; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .4; transform: scale(.7); }
+    }
+
+    /* ── Stepper ── */
+    .stepper { position: relative; }
+
+    .step {
+      display: flex;
+      gap: 18px;
+      position: relative;
+    }
+    .step:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      left: 18px;
+      top: 38px;
+      width: 2px;
+      height: calc(100% - 10px);
+      background: #dee2e6;
+      z-index: 0;
+    }
+    .step:not(:last-child).done::before {
+      background: linear-gradient(to bottom, #0d6efd, #0d6efd);
+      animation: fillLine .6s ease forwards;
+    }
+    @keyframes fillLine {
+      from { height: 0; }
+      to   { height: calc(100% - 10px); }
+    }
+
+    .step-icon {
+      flex-shrink: 0;
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      z-index: 1;
+      transition: all .4s;
+    }
+    .step-icon.pending  { background: #e9ecef; color: #adb5bd; }
+    .step-icon.active   { background: #cfe2ff; color: #0d6efd; box-shadow: 0 0 0 4px #cfe2ff80; animation: ringPulse 1.8s infinite; }
+    .step-icon.done     { background: #0d6efd; color: #fff; }
+    .step-icon.final    { background: #198754; color: #fff; }
+
+    @keyframes ringPulse {
+      0%, 100% { box-shadow: 0 0 0 4px #0d6efd22; }
+      50%       { box-shadow: 0 0 0 8px #0d6efd11; }
+    }
+
+    .step-content {
+      padding-bottom: 28px;
+      flex: 1;
+    }
+    .step-title {
+      font-size: .97rem;
+      font-weight: 600;
+      color: #212529;
+      line-height: 1.2;
+      margin-top: 8px;
+    }
+    .step-title.pending { color: #adb5bd; }
+    .step-desc {
+      font-size: .82rem;
+      color: #6c757d;
+      margin-top: 3px;
+    }
+    .step-date {
+      display: inline-block;
+      font-size: .76rem;
+      color: #0d6efd;
+      background: #e7f0ff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-top: 5px;
+    }
+
+    /* ── Skeleton ── */
+    .skeleton { animation: shimmer 1.4s infinite linear; }
+    .skeleton-line {
+      height: 14px; border-radius: 6px;
+      background: linear-gradient(90deg, #e9ecef 25%, #f8f9fa 50%, #e9ecef 75%);
+      background-size: 400% 100%;
+      margin: 6px 0;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
+
+    /* ── Footer ── */
+    .footer {
+      font-size: .75rem;
+      color: #adb5bd;
+      text-align: center;
+      padding: 16px;
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Acompanhamento do Pedido</h1>
+  <p>Cemag | Carretas e Máquinas Agrícolas</p>
+</div>
+
+<div class="card">
+  <div id="loading">
+    <div class="skeleton">
+      <div class="skeleton-line" style="width:60%"></div>
+      <div class="skeleton-line" style="width:35%; margin-bottom:20px"></div>
+      <div class="skeleton-line" style="width:80%"></div>
+      <div class="skeleton-line" style="width:70%"></div>
+      <div class="skeleton-line" style="width:75%"></div>
+      <div class="skeleton-line" style="width:65%"></div>
+    </div>
+  </div>
+
+  <div id="conteudo" style="display:none">
+    <div class="info-row">
+      <span class="cliente-nome" id="nomeCliente"></span>
+      <span class="data-carga" id="dataCarga"></span>
+    </div>
+    <div id="statusBadge" class="status-badge"></div>
+
+    <div class="stepper" id="stepper"></div>
+  </div>
+
+  <div id="erro" style="display:none; color:#dc3545; text-align:center; padding:24px;">
+    Não foi possível carregar o status do pedido.
+  </div>
+</div>
+
+<div class="footer">Cemag | Carretas e Máquinas Agrícolas</div>
+
+<script>
+  const DATA_CARGA = "{{ data_carga }}";
+  const CLIENTE    = "{{ cliente }}";
+  const DATA_FMTD  = "{{ data_carga_formatada }}";
+
+  const PIPELINE = [
+    {
+      key:   "aguardando_liberacao",
+      icon:  "📋",
+      label: "Pedido recebido",
+      desc:  "Seu pedido foi registrado e está em análise.",
+    },
+    {
+      key:   "liberado",
+      icon:  "✅",
+      label: "Liberado",
+      desc:  "O pedido foi liberado para seguir ao planejamento.",
+    },
+    {
+      key:   "em_fabricacao",
+      icon:  "🔧",
+      label: "Em fabricação",
+      desc:  "O produto está sendo fabricado.",
+    },
+    {
+      key:   "liberado_expedicao",
+      icon:  "📦",
+      label: "Pronto para expedição",
+      desc:  "Fabricação concluída, aguardando envio.",
+    },
+    {
+      key:   "expedida",
+      icon:  "🚚",
+      label: "Enviado",
+      desc:  "O produto foi despachado.",
+    },
+  ];
+
+  const BADGE = {
+    aguardando_liberacao: { cls: "aguardando", label: "Aguardando início" },
+    liberado:             { cls: "aguardando", label: "Liberado" },
+    em_fabricacao:        { cls: "producao",   label: "Em fabricação" },
+    expedida:             { cls: "expedida",   label: "Enviado ✓" },
+  };
+
+  async function carregar() {
+    try {
+      const resp = await fetch(
+        `/cargas/api/status-carga/?data_carga=${DATA_CARGA}&cliente=${encodeURIComponent(CLIENTE)}`
+      );
+      if (!resp.ok) throw new Error();
+      const data = await resp.json();
+      renderizar(data);
+    } catch {
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("erro").style.display = "block";
+    }
+  }
+
+  function renderizar(data) {
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("conteudo").style.display = "block";
+
+    document.getElementById("nomeCliente").textContent = CLIENTE;
+
+    // Badge status
+    const badgeInfo = BADGE[data.status] || { cls: "aguardando", label: data.descricao };
+    const badge = document.getElementById("statusBadge");
+    badge.className = "status-badge " + badgeInfo.cls;
+    badge.innerHTML = `<span class="dot"></span>${badgeInfo.label}`;
+
+    // Mapa de datas pelo historico
+    const dateMap = {};
+    (data.historico || []).forEach(h => { dateMap[h.status] = h.data; });
+
+    // Determina o passo atual pelo historico (mais granular que o status principal)
+    // Hierarquia: expedida > liberado_expedicao > em_fabricacao > liberado > aguardando_liberacao
+    let currentIdx = 0;
+    PIPELINE.forEach((step, idx) => {
+      if (dateMap[step.key] || data.status === step.key) {
+        currentIdx = idx;
+      }
+    });
+
+    // Renderizar steps
+    const stepper = document.getElementById("stepper");
+    stepper.innerHTML = "";
+
+    PIPELINE.forEach((step, idx) => {
+      const isDone   = idx < currentIdx;
+      const isActive = idx === currentIdx;
+      const isFinal  = isActive && step.key === "expedida";
+
+      let iconClass = "pending";
+      if (isFinal)       iconClass = "final";
+      else if (isDone)   iconClass = "done";
+      else if (isActive) iconClass = "active";
+
+      let titleClass = isActive || isDone ? "" : "pending";
+
+      const stepEl = document.createElement("div");
+      stepEl.className = "step" + (isDone ? " done" : "");
+      stepEl.innerHTML = `
+        <div class="step-icon ${iconClass}">${isDone || isActive ? "✓" : step.icon}</div>
+        <div class="step-content">
+          <div class="step-title ${titleClass}">${step.label}</div>
+          <div class="step-desc">${step.desc}</div>
+          ${dateMap[step.key] ? `<span class="step-date">Atualizado em: ${dateMap[step.key]}</span>` : ""}
+        </div>
+      `;
+      stepper.appendChild(stepEl);
+    });
+  }
+
+  carregar();
+  // Atualiza a cada 2 minutos
+  setInterval(carregar, 120_000);
+</script>
+</body>
+</html>

@@ -105,6 +105,20 @@ class Ordem(models.Model):
     #Campos para apontamento de montagem e pintura
     data_carga = models.DateField(null=True, blank=True)
     cor = models.CharField(max_length=50, blank=True, null=True) # Cinza, Vermelho, Amarelo...
+    carga_liberada = models.ForeignKey(
+        'cargas.CargaLiberada',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ordens_sequenciadas',
+    )
+    carga_liberada_versao = models.ForeignKey(
+        'cargas.CargaLiberadaVersao',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ordens_sequenciadas',
+    )
 
     #Tempo estimado da ordem (apenas para corte)
     tempo_estimado = models.CharField(max_length=20, blank=True, null=True)  # Exemplo: "00:30:00" (HH:MM:SS)

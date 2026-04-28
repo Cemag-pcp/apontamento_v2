@@ -31,7 +31,7 @@ DATABASES = {
         },
         'OPTIONS': {
             'options': '-c search_path=' + env('BASE_PROD'),
-            'connect_timeout': 5,
+            'connect_timeout': 10,
         },
     }
 }

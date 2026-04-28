@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Liberação de Cargas</title>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'css/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cards-maquina.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css">
+    <style>
+        #calendario[data-calendar-layout="liberacao"] .fc-daygrid-day-frame {
+            min-height: 170px;
+        }
+
+        #calendario[data-calendar-layout="liberacao"] .fc-daygrid-event-harness {
+            margin-bottom: 4px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3><i class="fas fa-unlock-alt"></i> Liberação</h3>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalLiberacao">
+            <i class="fas fa-check-circle"></i> Liberar carga
+        </button>
+    </div>
+
+    <div
+        id="calendario"
+        data-auto-render="true"
+        data-interactive="false"
+        data-events-url="/cargas/api/andamento-liberacoes/"
+        data-calendar-layout="liberacao"
+        data-day-max-event-rows="8"
+    ></div>
+</div>
+
+<div class="modal fade" id="modalLiberacao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-check-circle"></i> Liberar cargas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-sm-6">
+                        <label class="form-label"><strong>Data início</strong></label>
+                        <input type="date" class="form-control" id="liberacao-data-inicio">
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label"><strong>Data fim</strong></label>
+                        <input type="date" class="form-control" id="liberacao-data-fim">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="pesquisarLiberacao">
+                    <i class="fas fa-search"></i> Pesquisar
+                </button>
+
+                <div id="resumoLiberacao" class="alert alert-info mt-3 d-none mb-2"></div>
+
+                <div class="table-responsive mt-3" style="max-height: 320px; overflow-y: auto;">
+                    <table class="table table-bordered text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Carga</th>
+                                <th>Carreta</th>
+                                <th>Quantidade</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaLiberacao">
+                            <tr><td colspan="4">Nenhum dado disponível</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer d-none" id="containerBotaoLiberar">
+                <button class="btn btn-success" id="confirmarLiberacao">
+                    <i class="fas fa-check"></i> Liberar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetalhesLiberacao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="detalhesLiberacaoTitulo">Detalhes da carga</h5>
+                    <div class="text-muted small" id="detalhesLiberacaoSubtitulo"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="detalhesLiberacaoLinks" class="d-flex flex-wrap gap-2 mb-3"></div>
+                <div id="detalhesLiberacaoAcoes" class="d-flex flex-wrap gap-2 mb-3"></div>
+                <div class="table-responsive">
+                    <table class="table table-bordered text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Carreta</th>
+                                <th>Quantidade</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detalhesLiberacaoTabela">
+                            <tr><td colspan="3">Nenhum item encontrado.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script type="module" src="{% static 'js/full-calendar.js' %}"></script>
+<script type="module" src="{% static 'js/liberacao-cargas.js' %}"></script>
+{% endblock %}

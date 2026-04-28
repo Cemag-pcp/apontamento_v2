@@ -34,6 +34,9 @@ class RotaAccessMiddleware:
             "expedicao/relatorios/impressao",
         ]
 
+        if path.startswith("cargas/acompanhamento/"):
+            return self.get_response(request)
+
         if path in PUBLIC_PATHS:
             return self.get_response(request)
         

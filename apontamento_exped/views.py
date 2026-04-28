@@ -11,6 +11,7 @@ from django.db.models.functions import Coalesce
 from django.utils.timezone import localtime
 
 from cargas.utils import get_data_from_sheets,tratando_dados
+from cargas.services import listar_itens_liberados_expedicao
 from .models import Carga,ItemPacote,Pacote,VerificacaoPacote, CarretaCarga, ImagemPacote, PendenciasPacote, ItemPacote, FornecedorItemCarga
 from .utils import chamar_impressora, buscar_conjuntos_carreta, limpar_cor, chamar_impressora_qrcode
 from cadastro.models import CarretasExplodidas
@@ -368,43 +369,70 @@ def cor_recurso(recurso):
 
 def cargas(request):
     data_carga = request.GET.get('data_carga')
+    if not data_carga:
+        return JsonResponse([], safe=False)
 
-    base_carretas, base_carga = get_data_from_sheets()
-    base_carretas, base_carga = tratando_dados(base_carretas, base_carga, data_carga)
+    try:
+        data_carga_obj = datetime.strptime(data_carga, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({'erro': 'Data invalida. Use AAAA-MM-DD.'}, status=400)
 
-    cargas = base_carga['Carga'].unique().tolist()
+    itens = listar_itens_liberados_expedicao(data_carga_obj)
+    cargas = sorted({item['carga'] for item in itens if item.get('carga')})
 
     return JsonResponse(cargas, safe=False)
 
 def clientes(request):
     data_carga = request.GET.get('data_carga')
     carga = request.GET.get('carga')
+    if not data_carga or not carga:
+        return JsonResponse([], safe=False)
 
-    base_carretas, base_carga = get_data_from_sheets()
-    base_carretas, base_carga = tratando_dados(
-        base_carretas, base_carga, data_carga,cliente=None,carga=carga
+    try:
+        data_carga_obj = datetime.strptime(data_carga, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({'erro': 'Data invalida. Use AAAA-MM-DD.'}, status=400)
+
+    itens = listar_itens_liberados_expedicao(data_carga_obj, carga_nome=carga)
+    clientes = sorted(
+        {
+            (item.get('cliente') or item.get('cliente_codigo') or '').strip()
+            for item in itens
+            if (item.get('cliente') or item.get('cliente_codigo'))
+        }
     )
-    
-    clientes = base_carga['PED_PESSOA.CODIGO'].unique().tolist()
 
     return JsonResponse(clientes, safe=False)
 
 def carretas(request):
     cliente = request.GET.get('cliente')
     data_carga = request.GET.get('data_carga')
+    carga = request.GET.get('carga')
 
-    base_carretas, base_carga = get_data_from_sheets()
-    base_carretas, base_carga = tratando_dados(base_carretas, base_carga, data_carga, cliente)
+    if not data_carga or not cliente or not carga:
+        return JsonResponse([], safe=False)
 
-    # criar coluna de cor
-    # procurar na coluna recurso as siglas
-    # VM=VERMELHO,AN=AZUL,VJ=VERDE,LJ=LARANJA,AM=AMARELO,CO=CINZA
+    try:
+        data_carga_obj = datetime.strptime(data_carga, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({'erro': 'Data invalida. Use AAAA-MM-DD.'}, status=400)
 
-    base_carga['cor'] = base_carga['Recurso'].apply(cor_recurso)
+    itens = listar_itens_liberados_expedicao(
+        data_carga_obj,
+        carga_nome=carga,
+        cliente_codigo=cliente,
+    )
 
-    # Mostrar recurso e quantidade
-    carretas = base_carga[['Recurso', 'Qtde', 'PED_NUMEROSERIE','cor']].to_dict(orient='records')
-    
+    carretas = [
+        {
+            'Recurso': item['codigo_recurso'],
+            'Qtde': item['quantidade'],
+            'PED_NUMEROSERIE': item['numero_serie'],
+            'cor': cor_recurso(item['codigo_recurso']),
+        }
+        for item in itens
+    ]
+
     return JsonResponse(carretas, safe=False)
 
 @csrf_exempt
@@ -418,21 +446,24 @@ def criar_caixa(request):
     except json.JSONDecodeError:
         return JsonResponse({'erro': 'JSON invalido'}, status=400)
 
-    data_carga     = data.get('data_carga')
-    carga_nome     = data.get('carga_nome')
-    cliente_codigo = data.get('cliente_codigo')
-    observacoes    = data.get('observacoes')
-    itens          = data.get('itens', [])
+    data_carga  = data.get('data_carga')
+    carga_nome  = data.get('carga_nome')
+    cliente_nome = (data.get('cliente_codigo') or data.get('cliente') or '').strip()
+    observacoes = data.get('observacoes')
+    itens       = data.get('itens', [])
 
     if not itens:
         return JsonResponse({'erro': 'Nenhum item informado'}, status=400)
 
+    if not cliente_nome:
+        return JsonResponse({'erro': 'Cliente não informado'}, status=400)
+
     hora_atual = timezone.now().strftime("%H%M%S")
     carga = Carga.objects.create(
-        nome=f"{carga_nome}_{cliente_codigo}_{str(data_carga).replace('-', '')}_{hora_atual}",
+        nome=f"{carga_nome}_{cliente_nome}_{str(data_carga).replace('-', '')}_{hora_atual}",
         carga=carga_nome,
         data_carga=data_carga,
-        cliente=cliente_codigo,
+        cliente=cliente_nome,
         obs_pacote=observacoes
     )
 
@@ -469,7 +500,7 @@ def criar_caixa(request):
         'carretas_criadas': created_carretas,
         'pendencias_criadas': resultado_pendencias['pendencias_criadas'],
         'stage': 'verificacao',
-        'cliente': cliente_codigo,
+        'cliente': cliente_nome,
         'data_carga': data_carga,
         'carga': carga_nome,
         'carretas_sem_componentes': resultado_pendencias['carretas_sem_componentes'],
@@ -1093,6 +1124,7 @@ def alterar_stage(request, id):
                 }, status=400)
 
         carga.stage = 'despachado'
+        carga.data_despachado = timezone.now()
     else:
         return JsonResponse({'erro': 'Estágio atual inválido para avanço automático.'}, status=400)
 

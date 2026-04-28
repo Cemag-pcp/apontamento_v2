@@ -164,6 +164,31 @@ def tratando_dados(base_carretas, base_carga, data_carga, cliente=None, carga=No
     return dados_carreta,base_carga
 
 def consultar_carretas(data_inicial, data_final):
+    dados_detalhados = consultar_carretas_detalhado(data_inicial, data_final)
+
+    agrupado = {}
+    for row in dados_detalhados["cargas"]:
+        chave = (row["data_carga"], row["codigo_recurso"], row["carga"])
+        if chave not in agrupado:
+            agrupado[chave] = {
+                "data_carga": row["data_carga"],
+                "codigo_recurso": row["codigo_recurso"],
+                "quantidade": 0.0,
+                "presente_no_carreta": row["presente_no_carreta"],
+                "carga": row["carga"],
+                "cliente": row["cliente_codigo"]
+            }
+        agrupado[chave]["quantidade"] += float(row["quantidade"] or 0)
+        if row["presente_no_carreta"] == "✅":
+            agrupado[chave]["presente_no_carreta"] = "✅"
+
+    return {
+        "cargas": list(agrupado.values()),
+        "celulas": dados_detalhados["celulas"],
+    }
+
+
+def consultar_carretas_detalhado(data_inicial, data_final):
     dados_carreta, dados_carga = get_data_from_sheets()
     dados_carreta['Recurso'] = dados_carreta['Recurso'].astype(str)
 
@@ -209,8 +234,26 @@ def consultar_carretas(data_inicial, data_final):
     dados_carga_data_filtrada['PED_QUANTIDADE'] = dados_carga_data_filtrada['PED_QUANTIDADE'].astype(float)
 
     # Agrupa os dados por data e código do recurso
-    carretas_unica = dados_carga_data_filtrada[['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO', 'PED_QUANTIDADE', 'Carga']]
-    agrupado = carretas_unica.groupby(['PED_PREVISAOEMISSAODOC', 'PED_RECURSO.CODIGO', 'Carga'])['PED_QUANTIDADE'].sum().reset_index()
+    carretas_unica = dados_carga_data_filtrada[
+        [
+            'PED_PREVISAOEMISSAODOC',
+            'PED_RECURSO.CODIGO',
+            'PED_QUANTIDADE',
+            'Carga',
+            'PED_PESSOA.CODIGO',
+            'PED_NUMEROSERIE',
+        ]
+    ]
+    agrupado = carretas_unica.groupby(
+        [
+            'PED_PREVISAOEMISSAODOC',
+            'PED_RECURSO.CODIGO',
+            'Carga',
+            'PED_PESSOA.CODIGO',
+            'PED_NUMEROSERIE',
+        ],
+        dropna=False,
+    )['PED_QUANTIDADE'].sum().reset_index()
 
     # Ajusta os códigos dos recursos
     dados_carreta['Recurso'] = dados_carreta['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else x)
@@ -229,7 +272,10 @@ def consultar_carretas(data_inicial, data_final):
             "codigo_recurso": "0" + str(row['PED_RECURSO.CODIGO']) if len(str(row['PED_RECURSO.CODIGO'])) == 5 else str(row['PED_RECURSO.CODIGO']),
             "quantidade": float(row['PED_QUANTIDADE']),
             "presente_no_carreta": row['Contém'],
-            "carga": row['Carga']
+            "carga": row['Carga'],
+            "cliente": "" if pd.isna(row['PED_PESSOA.CODIGO']) else str(row['PED_PESSOA.CODIGO']).strip(),
+            "cliente_codigo": "" if pd.isna(row['PED_PESSOA.CODIGO']) else str(row['PED_PESSOA.CODIGO']).strip(),
+            "numero_serie": "" if pd.isna(row['PED_NUMEROSERIE']) else str(row['PED_NUMEROSERIE']).strip(),
         }
         for _, row in agrupado.iterrows()
     ]
@@ -1925,6 +1971,8 @@ def processar_ordens_montagem(request, ordens_data, atualizacao_ordem=None, grup
                 cor=o.get("cor"),
                 data_criacao=now(),
                 data_carga=data_carga,
+                carga_liberada_id=o.get("carga_liberada_id"),
+                carga_liberada_versao_id=o.get("carga_liberada_versao_id"),
                 ordem=ultimo_numero + i + 1  # atribui manualmente a ordem
             )
 
@@ -2058,6 +2106,8 @@ def processar_ordens_pintura(ordens_data, atualizacao_ordem=None, grupo_maquina=
                 cor=o.get("cor"),
                 data_criacao=now(),
                 data_carga=data_carga,
+                carga_liberada_id=o.get("carga_liberada_id"),
+                carga_liberada_versao_id=o.get("carga_liberada_versao_id"),
                 ordem=ultimo_numero + i + 1
             )
 
@@ -2176,6 +2226,8 @@ def processar_ordens_solda(ordens_data, atualizacao_ordem=None, grupo_maquina='s
                 cor=o.get("cor"),
                 data_criacao=now(),
                 data_carga=data_carga,
+                carga_liberada_id=o.get("carga_liberada_id"),
+                carga_liberada_versao_id=o.get("carga_liberada_versao_id"),
                 ordem=ultimo_numero + i + 1  # atribui manualmente a ordem
             )
 

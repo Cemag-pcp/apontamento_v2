@@ -12,6 +12,7 @@ class Carga(models.Model):
 
     responsavel_criacao = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
+    data_despachado = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=50, choices=[('pendente', 'Pendente'), ('ok', 'Confirmado'), ('erro', 'Erro identificado')], default='pendente')
 
     def __str__(self):
