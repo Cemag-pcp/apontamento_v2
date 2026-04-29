@@ -9,6 +9,16 @@ function authFetch(input, init) {
     });
 }
 
+function mostrarToast(message, type = 'info') {
+    Swal.mixin({
+        toast: true,
+        position: 'bottom-end',
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true,
+    }).fire({ icon: type, title: message });
+}
+
 export const loadOrdens = (container, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
 
@@ -912,15 +922,6 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         return;
     }
 
-    Swal.fire({
-        title: 'Finalizando...',
-        text: 'Por favor, aguarde enquanto a ordem está sendo finalizada.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
     const payload = {
         status: "finalizada",
         ordem_id: parseInt(ordemId),
@@ -928,6 +929,18 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         obs_finalizar: obsFinalizar,
         qt_realizada: parseInt(qtRealizada.value)
     };
+
+    // Optimistic UI: fechar modal e dar feedback imediato
+    const cardElement = document.querySelector(`.containerProcesso [data-ordem-id="${ordemId}"]`);
+    if (cardElement) {
+        cardElement.style.transition = 'opacity 0.2s';
+        cardElement.style.opacity = '0.35';
+        cardElement.style.pointerEvents = 'none';
+    }
+
+    const modalElement = document.getElementById('finalizarModal');
+    bootstrap.Modal.getInstance(modalElement).hide();
+    mostrarToast('Finalizando ordem...', 'info');
 
     authFetch("api/ordens/atualizar-status/", {
         method: 'POST',
@@ -947,14 +960,16 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
     .then(data => {
         carregarOrdensIniciadas(filtros);
         resetarCardsInicial(filtros);
-
-        // Fechar o modal após a finalização bem-sucedida
-        const modalElement = document.getElementById('finalizarModal');
-        const finalizarModal = bootstrap.Modal.getInstance(modalElement);
-        finalizarModal.hide();
-        Swal.close();
+        mostrarToast('Ordem finalizada com sucesso!', 'success');
     })
     .catch(error => {
+        // Rollback visual
+        if (cardElement) {
+            cardElement.style.opacity = '1';
+            cardElement.style.pointerEvents = '';
+        } else {
+            carregarOrdensIniciadas(filtros);
+        }
         Swal.fire({
             icon: 'error',
             title: 'Erro',
@@ -1731,15 +1746,6 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         return;
     }
 
-    Swal.fire({
-        title: 'Finalizando...',
-        text: 'Por favor, aguarde enquanto a ordem está sendo finalizada.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
     const payload = {
         status: "finalizada",
         ordem_id: parseInt(ordemId),
@@ -1748,6 +1754,18 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         qt_realizada: parseInt(qtRealizada.value),
         continua: continua
     };
+
+    // Optimistic UI: fechar modais e dar feedback imediato
+    const cardElementContinuar = document.querySelector(`.containerProcesso [data-ordem-id="${ordemId}"]`);
+    if (cardElementContinuar) {
+        cardElementContinuar.style.transition = 'opacity 0.2s';
+        cardElementContinuar.style.opacity = '0.35';
+        cardElementContinuar.style.pointerEvents = 'none';
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('finalizarModal')).hide();
+    bootstrap.Modal.getInstance(document.getElementById('modalFinalizarParcial')).hide();
+    mostrarToast('Atualizando ordem...', 'info');
 
     authFetch("api/ordens/atualizar-status/", {
         method: 'POST',
@@ -1767,20 +1785,16 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
     .then(data => {
         carregarOrdensIniciadas(filtros);
         resetarCardsInicial(filtros);
-
-        // Fechar o modal após a finalização bem-sucedida
-        const modalElement = document.getElementById('finalizarModal');
-        const finalizarModal = bootstrap.Modal.getInstance(modalElement);
-        finalizarModal.hide();
-
-        // fechar modal de confirmação
-        const modalElementConfirmacao = document.getElementById('modalFinalizarParcial');
-        const finalizarModalConfirmacao = bootstrap.Modal.getInstance(modalElementConfirmacao);
-        finalizarModalConfirmacao.hide();
-
-        Swal.close();
+        mostrarToast('Ordem atualizada com sucesso!', 'success');
     })
     .catch(error => {
+        // Rollback visual
+        if (cardElementContinuar) {
+            cardElementContinuar.style.opacity = '1';
+            cardElementContinuar.style.pointerEvents = '';
+        } else {
+            carregarOrdensIniciadas(filtros);
+        }
         Swal.fire({
             icon: 'error',
             title: 'Erro',
