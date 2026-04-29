@@ -934,7 +934,8 @@ def get_maquinas_disponiveis(request):
 
 @login_required
 def acessos(request):
-
+    if not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso != 'admin':
+        return render(request, 'home/erro-acesso.html', status=403)
     return render(request, 'acessos/acessos.html')
 
 def api_listar_usuarios(request):
@@ -990,6 +991,44 @@ def api_usuario_acessos(request, user_id):
     acessos = [{"id": setor[0], "nome": setor[1], "ativo": setor[0] in (profile.setores_permitidos or [])} for setor in Profile.SETOR_CHOICES]
 
     return JsonResponse({"acessos": acessos})
+
+@csrf_exempt
+@login_required
+def api_criar_usuario(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    if not hasattr(request.user, 'profile') or request.user.profile.tipo_acesso != 'admin':
+        return JsonResponse({"error": "Acesso negado."}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        username = data.get("username", "").strip()
+        password = data.get("password", "").strip()
+        tipo_acesso = data.get("tipo_acesso", "").strip()
+
+        if not username or not password or not tipo_acesso:
+            return JsonResponse({"error": "Usuário, senha e tipo de acesso são obrigatórios."}, status=400)
+
+        tipos_validos = [c[0] for c in Profile.ACESSO_CHOICES]
+        if tipo_acesso not in tipos_validos:
+            return JsonResponse({"error": "Tipo de acesso inválido."}, status=400)
+
+        if User.objects.filter(username=username).exists():
+            return JsonResponse({"error": "Já existe um usuário com esse nome."}, status=400)
+
+        with transaction.atomic():
+            user = User.objects.create_user(username=username, password=password)
+            Profile.objects.create(user=user, tipo_acesso=tipo_acesso)
+
+        return JsonResponse({
+            "message": "Usuário criado com sucesso!",
+            "user": {"id": user.id, "username": user.username, "tipo_acesso": tipo_acesso}
+        }, status=201)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
 
 @csrf_exempt
 def api_atualizar_acessos(request, user_id):

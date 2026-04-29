@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/liberacoes/<uuid:carga_uuid>/aplicar-data-sugerida/', views.aplicar_data_sugerida_liberacao, name="aplicar_data_sugerida_liberacao"),
     path('api/andamento-liberacoes/', views.andamento_liberacoes, name="andamento_liberacoes"),
     path('api/status-carga/', views.status_carga_por_data, name="status_carga_por_data"),
+    path('api/emails-notificacao/', views.api_emails_notificacao, name="emails_notificacao"),
     path('api/gerar-link-acompanhamento/', views.gerar_link_acompanhamento, name="gerar_link_acompanhamento"),
     path('acompanhamento/<uuid:token>/', views.acompanhamento_cliente, name="acompanhamento_cliente"),
     path('api/gerar-arquivos/', views.gerar_arquivos_sequenciamento, name="gerar_arquivos_sequenciamento"),

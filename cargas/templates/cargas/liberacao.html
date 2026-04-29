@@ -24,9 +24,15 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3><i class="fas fa-unlock-alt"></i> Liberação</h3>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalLiberacao">
-            <i class="fas fa-check-circle"></i> Liberar carga
-        </button>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalEmailsNotificacao"
+                    title="Configurar e-mails de notificação">
+                <i class="fas fa-cog"></i>
+            </button>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalLiberacao">
+                <i class="fas fa-check-circle"></i> Liberar carga
+            </button>
+        </div>
     </div>
 
     <div
@@ -120,10 +126,135 @@
         </div>
     </div>
 </div>
+<!-- Modal: Configurar e-mails de notificação -->
+<div class="modal fade" id="modalEmailsNotificacao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-envelope me-2"></i>E-mails de notificação
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Os e-mails abaixo receberão uma notificação sempre que uma carga for liberada.
+                </p>
+
+                <div class="input-group mb-3">
+                    <input type="email" class="form-control" id="inputNovoEmail"
+                           placeholder="novo@email.com" autocomplete="off">
+                    <button class="btn btn-success" type="button" id="btnAdicionarEmail">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
+                <div id="emailErro" class="alert alert-danger py-2 d-none small"></div>
+
+                <ul class="list-group" id="listaEmails">
+                    <li class="list-group-item text-muted text-center small">
+                        <span class="spinner-border spinner-border-sm me-1"></span>Carregando...
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 <script type="module" src="{% static 'js/full-calendar.js' %}"></script>
 <script type="module" src="{% static 'js/liberacao-cargas.js' %}"></script>
+<script>
+(function () {
+    const API = '/cargas/api/emails-notificacao/';
+
+    async function carregarEmails() {
+        const lista = document.getElementById('listaEmails');
+        try {
+            const res = await fetch(API);
+            const data = await res.json();
+            renderizarEmails(data.emails || []);
+        } catch {
+            lista.innerHTML = '<li class="list-group-item text-danger small">Erro ao carregar e-mails.</li>';
+        }
+    }
+
+    function renderizarEmails(emails) {
+        const lista = document.getElementById('listaEmails');
+        if (!emails.length) {
+            lista.innerHTML = '<li class="list-group-item text-muted text-center small">Nenhum e-mail cadastrado.</li>';
+            return;
+        }
+        lista.innerHTML = emails.map(e => `
+            <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                <span class="small"><i class="fas fa-envelope text-muted me-2"></i>${e.email}</span>
+                <button class="btn btn-outline-danger btn-sm py-0 px-2" onclick="removerEmail(${e.id})" title="Remover">
+                    <i class="fas fa-times"></i>
+                </button>
+            </li>
+        `).join('');
+    }
+
+    window.removerEmail = async function (id) {
+        if (!confirm('Remover este e-mail?')) return;
+        try {
+            const res = await fetch(API, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+            });
+            if (!res.ok) {
+                const d = await res.json();
+                alert(d.error || 'Erro ao remover.');
+                return;
+            }
+            carregarEmails();
+        } catch {
+            alert('Erro ao remover e-mail.');
+        }
+    };
+
+    document.getElementById('btnAdicionarEmail').addEventListener('click', async function () {
+        const input = document.getElementById('inputNovoEmail');
+        const erroEl = document.getElementById('emailErro');
+        const email = input.value.trim().toLowerCase();
+        erroEl.classList.add('d-none');
+
+        if (!email) {
+            erroEl.textContent = 'Digite um e-mail válido.';
+            erroEl.classList.remove('d-none');
+            return;
+        }
+
+        this.disabled = true;
+        try {
+            const res = await fetch(API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                erroEl.textContent = data.error || 'Erro ao adicionar.';
+                erroEl.classList.remove('d-none');
+                return;
+            }
+            input.value = '';
+            carregarEmails();
+        } catch {
+            erroEl.textContent = 'Erro de comunicação com o servidor.';
+            erroEl.classList.remove('d-none');
+        } finally {
+            this.disabled = false;
+        }
+    });
+
+    document.getElementById('inputNovoEmail').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('btnAdicionarEmail').click();
+    });
+
+    document.getElementById('modalEmailsNotificacao').addEventListener('show.bs.modal', carregarEmails);
+})();
+</script>
 {% endblock %}

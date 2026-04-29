@@ -3,138 +3,472 @@
 
 {% block links %}
 <link rel="stylesheet" href="{% static 'css/modal-custom.css' %}">
+<style>
+    .badge-operador    { background-color: #6c757d; }
+    .badge-supervisor  { background-color: #0d6efd; }
+    .badge-pcp         { background-color: #198754; }
+    .badge-inspetor    { background-color: #fd7e14; }
+    .badge-almoxarifado{ background-color: #6f42c1; }
+    .badge-admin       { background-color: #dc3545; }
+
+    #searchInput { max-width: 320px; }
+
+    .table thead th { white-space: nowrap; }
+
+    #accessModal .modal-dialog { max-width: 600px; }
+
+    #accessModal .modal-body { max-height: calc(100vh - 220px); overflow-y: auto; }
+
+    .perm-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        user-select: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+    }
+    .perm-section-header:hover { background: #e9ecef; }
+
+    .perm-section-header .chevron { transition: transform .2s; }
+    .perm-section-header.collapsed .chevron { transform: rotate(-90deg); }
+
+    .perm-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 12px;
+        border-radius: 4px;
+        transition: background .15s;
+    }
+    .perm-item:hover { background: #f0f4ff; }
+    .perm-item.hidden { display: none; }
+
+    .perm-counter {
+        font-size: .75rem;
+        background: #0d6efd22;
+        color: #0d6efd;
+        border-radius: 20px;
+        padding: 1px 8px;
+        font-weight: 600;
+    }
+    .perm-counter.all-checked { background: #19875422; color: #198754; }
+
+    #novoUsuarioModal .modal-dialog { max-width: 440px; }
+
+    .toast-container { z-index: 1100; }
+
+    .form-check-label { cursor: pointer; }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2>Gerenciar Acessos</h2>
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Usuário</th>
-                <th>Tipo de Acesso</th>
-                <th>Ações</th>
-            </tr>
-        </thead>
-        <tbody id="userTable">
-            <!-- Usuários serão inseridos aqui via JavaScript -->
-        </tbody>
-    </table>
+<div class="container-fluid mt-4 px-4">
+
+    <!-- Cabeçalho -->
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div>
+            <h4 class="mb-0 fw-bold">Gerenciar Acessos</h4>
+            <small class="text-muted">Usuários cadastrados no sistema</small>
+        </div>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#novoUsuarioModal">
+            <i class="bi bi-person-plus-fill me-1"></i> Novo Usuário
+        </button>
+    </div>
+
+    <!-- Filtro -->
+    <div class="mb-3">
+        <input type="text" id="searchInput" class="form-control form-control-sm"
+               placeholder="Buscar por nome ou tipo de acesso...">
+    </div>
+
+    <!-- Tabela -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:50px">#</th>
+                        <th>Usuário</th>
+                        <th>Tipo de Acesso</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="userTable">
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-muted">
+                            <div class="spinner-border spinner-border-sm me-2"></div>Carregando...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
-<!-- Modal Lateral -->
-<div class="modal fade right" id="accessModal" tabindex="-1" aria-labelledby="accessModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<!-- ============================================================
+     Modal: Gerenciar Permissões
+============================================================ -->
+<div class="modal fade" id="accessModal" tabindex="-1" aria-labelledby="accessModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="accessModalLabel">Gerenciar Acessos</h5>
-                <button type="button" class="btn-close text-white" data-bs-dismiss="modal" aria-label="Close"></button>
+
+            <!-- Header -->
+            <div class="modal-header bg-primary text-white pb-2">
+                <div>
+                    <h5 class="modal-title mb-0" id="accessModalLabel">
+                        <i class="bi bi-shield-lock me-2"></i>Gerenciar Permissões
+                    </h5>
+                    <div class="d-flex align-items-center gap-2 mt-1">
+                        <span class="fw-semibold small" id="userName"></span>
+                        <span class="badge" id="userRoleBadge"></span>
+                        <span class="ms-1 small opacity-75" id="permCounter"></span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
-            <div class="modal-body">
-                <h6 id="userName"></h6>
-                <p class="text-muted" id="userRole"></p>
+
+            <!-- Sub-header: busca + ações globais -->
+            <div class="px-3 pt-3 pb-2 border-bottom bg-light">
+                <div class="input-group input-group-sm mb-2">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="permSearch" placeholder="Buscar permissão...">
+                    <button class="btn btn-outline-secondary" type="button" id="clearPermSearch" title="Limpar busca">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-success btn-sm" onclick="toggleAllPerms(true)">
+                        <i class="bi bi-check2-all me-1"></i>Marcar todos
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="toggleAllPerms(false)">
+                        <i class="bi bi-x-lg me-1"></i>Desmarcar todos
+                    </button>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body p-3">
                 <input type="hidden" id="userId">
                 <div id="accessList">
-                    <!-- Lista de acessos será inserida aqui -->
+                    <!-- Loading state -->
+                    <div id="permLoadingState" class="text-center py-4 text-muted">
+                        <div class="spinner-border spinner-border-sm me-2"></div>Carregando permissões...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSalvarPerms" onclick="saveAccess()">
+                    <i class="bi bi-floppy me-1"></i>Salvar alterações
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     Modal: Novo Usuário
+============================================================ -->
+<div class="modal fade" id="novoUsuarioModal" tabindex="-1" aria-labelledby="novoUsuarioModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="novoUsuarioModalLabel">
+                    <i class="bi bi-person-plus me-2"></i>Cadastrar Novo Usuário
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="novoUsuarioErro" class="alert alert-danger d-none"></div>
+
+                <div class="mb-3">
+                    <label for="novoUsername" class="form-label fw-semibold">Nome de usuário <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="novoUsername" placeholder="Ex: joao.silva" autocomplete="off">
+                </div>
+
+                <div class="mb-3">
+                    <label for="novoPassword" class="form-label fw-semibold">Senha <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="novoPassword" placeholder="Senha" autocomplete="new-password">
+                        <button class="btn btn-outline-secondary" type="button" id="togglePassword" title="Mostrar/ocultar senha">
+                            <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="novoTipoAcesso" class="form-label fw-semibold">Tipo de Acesso <span class="text-danger">*</span></label>
+                    <select class="form-select" id="novoTipoAcesso">
+                        <option value="" disabled selected>Selecione...</option>
+                        <option value="operador">Operador</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="pcp">PCP</option>
+                        <option value="inspetor">Inspetor</option>
+                        <option value="almoxarifado">Almoxarifado</option>
+                        <option value="admin">Admin</option>
+                    </select>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-success" onclick="saveAccess()">Salvar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="btnCriarUsuario" onclick="criarUsuario()">
+                    <i class="bi bi-check-lg me-1"></i>Cadastrar
+                </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast de feedback -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="feedbackToast" class="toast align-items-center text-white border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body" id="toastMsg"></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
         </div>
     </div>
 </div>
 
 <script>
     let users = [];
-    let rotasDisponiveis = [];
+
+    const badgeClass = {
+        operador:     'badge-operador',
+        supervisor:   'badge-supervisor',
+        pcp:          'badge-pcp',
+        inspetor:     'badge-inspetor',
+        almoxarifado: 'badge-almoxarifado',
+        admin:        'badge-admin',
+    };
+
+    function showToast(msg, success = true) {
+        const toast = document.getElementById('feedbackToast');
+        toast.classList.remove('bg-success', 'bg-danger');
+        toast.classList.add(success ? 'bg-success' : 'bg-danger');
+        document.getElementById('toastMsg').innerText = msg;
+        new bootstrap.Toast(toast, { delay: 3500 }).show();
+    }
 
     async function fetchUsers() {
         try {
             const response = await fetch("/core/api/usuarios/");
             users = await response.json();
-            populateUserTable();
+            renderTable(users);
         } catch (error) {
             console.error("Erro ao buscar usuários:", error);
         }
     }
 
-    function populateUserTable() {
+    function renderTable(lista) {
         const tableBody = document.getElementById("userTable");
         tableBody.innerHTML = "";
-        users.forEach(user => {
+
+        if (!lista.length) {
+            tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Nenhum usuário encontrado.</td></tr>';
+            return;
+        }
+
+        lista.forEach((user, idx) => {
+            const cls = badgeClass[user.tipo_acesso] || 'bg-secondary';
             const row = document.createElement("tr");
             row.innerHTML = `
-                <td>${user.username}</td>
-                <td>${user.tipo_acesso}</td>
+                <td class="text-muted small">${idx + 1}</td>
                 <td>
-                    <button class="btn btn-primary btn-sm" onclick="openModal(${user.id})">Gerenciar Acesso</button>
+                    <i class="bi bi-person-circle me-1 text-secondary"></i>
+                    <strong>${user.username}</strong>
+                </td>
+                <td>
+                    <span class="badge ${cls} text-capitalize">${user.tipo_acesso}</span>
+                </td>
+                <td class="text-end">
+                    <button class="btn btn-outline-primary btn-sm" onclick="openModal(${user.id})">
+                        <i class="bi bi-shield-lock me-1"></i>Permissões
+                    </button>
                 </td>
             `;
             tableBody.appendChild(row);
         });
     }
 
+    document.getElementById('searchInput').addEventListener('input', function () {
+        const q = this.value.toLowerCase();
+        const filtrado = users.filter(u =>
+            u.username.toLowerCase().includes(q) ||
+            u.tipo_acesso.toLowerCase().includes(q)
+        );
+        renderTable(filtrado);
+    });
+
+    function updatePermCounter() {
+        const all   = document.querySelectorAll('#accessList input[type="checkbox"]');
+        const checked = document.querySelectorAll('#accessList input[type="checkbox"]:checked');
+        document.getElementById('permCounter').textContent = `${checked.length} / ${all.length} permissões`;
+
+        // Atualiza contadores individuais por seção
+        document.querySelectorAll('.perm-section').forEach(section => {
+            const total   = section.querySelectorAll('input[type="checkbox"]').length;
+            const active  = section.querySelectorAll('input[type="checkbox"]:checked').length;
+            const counter = section.querySelector('.perm-counter');
+            if (counter) {
+                counter.textContent = `${active}/${total}`;
+                counter.classList.toggle('all-checked', active === total);
+            }
+        });
+    }
+
+    function toggleAllPerms(check) {
+        document.querySelectorAll('#accessList input[type="checkbox"]:not([disabled])').forEach(cb => {
+            cb.checked = check;
+        });
+        updatePermCounter();
+    }
+
+    function toggleSectionAll(sectionId, check) {
+        document.querySelectorAll(`#${sectionId} input[type="checkbox"]`).forEach(cb => {
+            cb.checked = check;
+        });
+        updatePermCounter();
+    }
+
+    // Busca em tempo real dentro do modal
+    document.getElementById('permSearch').addEventListener('input', function () {
+        const q = this.value.toLowerCase().trim();
+        document.querySelectorAll('.perm-item').forEach(item => {
+            const label = item.querySelector('label');
+            const match = !q || (label && label.textContent.toLowerCase().includes(q));
+            item.classList.toggle('hidden', !match);
+        });
+        // Mostra/oculta seções que ficaram sem itens visíveis
+        document.querySelectorAll('.perm-section').forEach(section => {
+            const visibles = section.querySelectorAll('.perm-item:not(.hidden)').length;
+            section.closest('.perm-section-wrap').style.display = visibles ? '' : 'none';
+        });
+    });
+
+    document.getElementById('clearPermSearch').addEventListener('click', function () {
+        const input = document.getElementById('permSearch');
+        input.value = '';
+        input.dispatchEvent(new Event('input'));
+    });
+
     async function openModal(userId) {
-        const selectedUser = users.find(user => user.id === userId);
+        const selectedUser = users.find(u => u.id === userId);
         if (!selectedUser) return;
 
+        const cls = badgeClass[selectedUser.tipo_acesso] || 'bg-secondary';
         document.getElementById("userName").innerText = selectedUser.username;
-        document.getElementById("userRole").innerText = `Tipo de Acesso: ${selectedUser.tipo_acesso}`;
+        document.getElementById("permCounter").textContent = '';
+        document.getElementById("permSearch").value = '';
+
+        const badgeEl = document.getElementById("userRoleBadge");
+        badgeEl.className = `badge ${cls} text-capitalize`;
+        badgeEl.innerText = selectedUser.tipo_acesso;
+
         document.getElementById("userId").value = selectedUser.id;
 
+        const accessList = document.getElementById("accessList");
+        accessList.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <div class="spinner-border spinner-border-sm me-2"></div>Carregando permissões...
+            </div>`;
+
+        new bootstrap.Modal(document.getElementById("accessModal")).show();
+
         try {
-            // Busca as permissões disponíveis e as permissões do usuário
             const response = await fetch(`/core/api/listar-acessos/${userId}/`);
             const permissoes = await response.json();
 
-            // Organiza as permissões em um dicionário por "app"
             const permissoesPorApp = {};
             permissoes.forEach(rota => {
-                if (!permissoesPorApp[rota.app]) {
-                    permissoesPorApp[rota.app] = [];
-                }
+                if (!permissoesPorApp[rota.app]) permissoesPorApp[rota.app] = [];
                 permissoesPorApp[rota.app].push(rota);
             });
 
-            const accessList = document.getElementById("accessList");
             accessList.innerHTML = "";
 
-            // Itera sobre os apps e cria as seções
-            Object.entries(permissoesPorApp).forEach(([appName, rotas]) => {
-                accessList.innerHTML += `<h5 class="mt-3">${appName}</h5>`;
+            Object.entries(permissoesPorApp).forEach(([appName, rotas], appIdx) => {
+                const sectionId = `perm-section-${appIdx}`;
+                const collapseId = `perm-collapse-${appIdx}`;
 
+                const wrap = document.createElement('div');
+                wrap.className = 'perm-section-wrap mb-2';
+
+                const total   = rotas.length;
+                const active  = rotas.filter(r => r.ativo).length;
+
+                wrap.innerHTML = `
+                    <div class="perm-section-header" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-grid-3x3-gap-fill text-primary small"></i>
+                            <span class="fw-semibold small">${appName}</span>
+                            <span class="perm-counter ${active === total ? 'all-checked' : ''}">${active}/${total}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-link btn-sm p-0 text-success" title="Marcar todos"
+                                onclick="event.stopPropagation(); toggleSectionAll('${sectionId}', true)">
+                                <i class="bi bi-check2-all"></i>
+                            </button>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-danger" title="Desmarcar todos"
+                                onclick="event.stopPropagation(); toggleSectionAll('${sectionId}', false)">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                            <i class="bi bi-chevron-down chevron text-muted small"></i>
+                        </div>
+                    </div>
+                    <div class="collapse show" id="${collapseId}">
+                        <div id="${sectionId}" class="perm-section pt-1 pb-1"></div>
+                    </div>
+                `;
+
+                const sectionBody = wrap.querySelector(`#${sectionId}`);
                 rotas.forEach(rota => {
-                    accessList.innerHTML += `
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="access-${rota.id}" ${rota.ativo ? "checked" : ""}>
-                            <label class="form-check-label" for="access-${rota.id}">${rota.descricao}</label>
+                    const item = document.createElement('div');
+                    item.className = 'perm-item';
+                    item.innerHTML = `
+                        <label class="form-check-label small flex-grow-1" for="access-${rota.id}" style="cursor:pointer">
+                            ${rota.descricao}
+                        </label>
+                        <div class="form-check form-switch mb-0 ms-2">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   id="access-${rota.id}" ${rota.ativo ? "checked" : ""}
+                                   onchange="updatePermCounter()">
                         </div>
                     `;
+                    sectionBody.appendChild(item);
                 });
+
+                // Atualiza chevron ao colapsar/expandir
+                wrap.querySelector('.perm-section-header').addEventListener('click', function () {
+                    this.classList.toggle('collapsed');
+                });
+
+                accessList.appendChild(wrap);
             });
 
-            // Abre o modal
-            new bootstrap.Modal(document.getElementById("accessModal")).show();
+            updatePermCounter();
 
         } catch (error) {
             console.error("Erro ao buscar permissões:", error);
+            accessList.innerHTML = '<div class="alert alert-danger">Erro ao carregar permissões.</div>';
+            showToast("Erro ao carregar permissões.", false);
         }
     }
-   
+
     async function saveAccess() {
         const userId = document.getElementById('userId').value;
+        const updatedAccesses = Array.from(
+            document.querySelectorAll("#accessList input[type='checkbox']:checked")
+        ).map(input => input.id.replace("access-", ""));
 
-        // Captura todas as permissões ativas diretamente dos checkboxes
-        const updatedAccesses = Array.from(document.querySelectorAll("#accessList input[type='checkbox']:checked"))
-            .map(input => input.id.replace("access-", "")); // Extrai apenas o ID numérico
-
-        console.log("Acessos Selecionados:", updatedAccesses); // Debug: Verifica se há permissões
-
-        if (updatedAccesses.length === 0) {
-            alert("Nenhuma permissão foi selecionada!");
-            return;
-        }
+        const btn = document.getElementById('btnSalvarPerms');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
 
         try {
             const response = await fetch(`/core/api/atualizar-acessos/${userId}/update`, {
@@ -143,22 +477,89 @@
                 body: JSON.stringify({ permissoes: updatedAccesses }),
             });
 
-            if (!response.ok) {
-                throw new Error("Erro ao salvar permissões");
-            }
+            if (!response.ok) throw new Error("Erro ao salvar");
 
-            alert("Acessos atualizados com sucesso!");
-            fetchUsers(); // Atualiza a tabela após salvar
+            bootstrap.Modal.getInstance(document.getElementById("accessModal")).hide();
+            showToast("Permissões atualizadas com sucesso!");
+            fetchUsers();
 
         } catch (error) {
-            console.error("Erro ao salvar permissões:", error);
-            alert("Erro ao salvar acessos. Verifique o console.");
+            console.error(error);
+            showToast("Erro ao salvar permissões.", false);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Salvar alterações';
         }
     }
 
-    // Inicializa a tabela ao carregar a página
+    // Mostrar/ocultar senha
+    document.getElementById('togglePassword').addEventListener('click', function () {
+        const input = document.getElementById('novoPassword');
+        const icon = document.getElementById('togglePasswordIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    });
+
+    // Limpa o modal ao fechar
+    document.getElementById('novoUsuarioModal').addEventListener('hidden.bs.modal', function () {
+        document.getElementById('novoUsername').value = '';
+        document.getElementById('novoPassword').value = '';
+        document.getElementById('novoTipoAcesso').value = '';
+        document.getElementById('novoUsuarioErro').classList.add('d-none');
+        document.getElementById('novoUsuarioErro').innerText = '';
+    });
+
+    async function criarUsuario() {
+        const username   = document.getElementById('novoUsername').value.trim();
+        const password   = document.getElementById('novoPassword').value.trim();
+        const tipoAcesso = document.getElementById('novoTipoAcesso').value;
+        const erroEl     = document.getElementById('novoUsuarioErro');
+        const btn        = document.getElementById('btnCriarUsuario');
+
+        erroEl.classList.add('d-none');
+
+        if (!username || !password || !tipoAcesso) {
+            erroEl.innerText = 'Preencha todos os campos obrigatórios.';
+            erroEl.classList.remove('d-none');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Cadastrando...';
+
+        try {
+            const response = await fetch('/core/api/criar-usuario/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, tipo_acesso: tipoAcesso }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                erroEl.innerText = data.error || 'Erro ao cadastrar usuário.';
+                erroEl.classList.remove('d-none');
+                return;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('novoUsuarioModal')).hide();
+            showToast(`Usuário "${data.user.username}" cadastrado com sucesso!`);
+            fetchUsers();
+
+        } catch (error) {
+            erroEl.innerText = 'Erro de comunicação com o servidor.';
+            erroEl.classList.remove('d-none');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Cadastrar';
+        }
+    }
+
     fetchUsers();
-
 </script>
-
 {% endblock %}

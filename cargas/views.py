@@ -17,8 +17,11 @@ from apontamento_pintura.models import PecasOrdem as POPintura
 from apontamento_montagem.models import PecasOrdem as POMontagem
 from apontamento_solda.models import PecasOrdem as POSolda
 
+from django.core.mail import send_mail
+from django.conf import settings as django_settings
+
 from core.models import Ordem
-from cargas.models import CargaLiberada, CargaLiberadaVersao, LinkAcompanhamento
+from cargas.models import CargaLiberada, CargaLiberadaVersao, LinkAcompanhamento, EmailNotificacaoCarga
 from cargas.services import (
     atualizar_datas_sugeridas_planejamento,
     liberar_cargas_periodo,
@@ -38,6 +41,7 @@ import pandas as pd
 import os
 import io
 import zipfile
+import threading
 from datetime import datetime
 import requests
 import json
@@ -47,8 +51,86 @@ from collections import defaultdict
 import logging
 
 django.setup()
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")  
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apontamento_v2.settings")
 logger = logging.getLogger(__name__)
+
+
+def _enviar_email_carga_liberada(resultado, data_inicio, data_fim, usuario):
+    destinatarios = list(EmailNotificacaoCarga.objects.values_list("email", flat=True))
+    if not destinatarios:
+        return
+
+    cargas = resultado.get("cargas", [])
+    total = resultado.get("total_cargas_liberadas", 0)
+
+    fmt = lambda d: datetime.strptime(d, "%Y-%m-%d").strftime("%d/%m/%Y")
+
+    linhas = "\n".join(
+        f"  • {fmt(c['data_carga'])} — {c['carga']} (v{c['versao']})"
+        for c in cargas
+    )
+
+    assunto = f"[PCP] {total} carga(s) liberada(s) — {fmt(data_inicio)} a {fmt(data_fim)}"
+    corpo = (
+        f"Olá,\n\n"
+        f"O usuário {usuario} liberou {total} carga(s) no período de {fmt(data_inicio)} a {fmt(data_fim)}:\n\n"
+        f"{linhas}\n\n"
+        f"As cargas acima já estão disponíveis para serem planejadas para produção.\n\n"
+        f"Este é um aviso automático do sistema de apontamento.\n"
+    )
+
+    try:
+        send_mail(
+            subject=assunto,
+            message=corpo,
+            from_email=django_settings.DEFAULT_FROM_EMAIL,
+            recipient_list=destinatarios,
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception("Falha ao enviar e-mail de notificação de carga liberada")
+
+
+@csrf_exempt
+@login_required
+def api_emails_notificacao(request):
+    if request.method == "GET":
+        emails = list(EmailNotificacaoCarga.objects.values("id", "email"))
+        return JsonResponse({"emails": emails})
+
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "JSON inválido."}, status=400)
+
+        email = data.get("email", "").strip().lower()
+        if not email:
+            return JsonResponse({"error": "E-mail obrigatório."}, status=400)
+
+        obj, created = EmailNotificacaoCarga.objects.get_or_create(email=email)
+        if not created:
+            return JsonResponse({"error": "E-mail já cadastrado."}, status=400)
+
+        return JsonResponse({"id": obj.id, "email": obj.email}, status=201)
+
+    if request.method == "DELETE":
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "JSON inválido."}, status=400)
+
+        email_id = data.get("id")
+        if not email_id:
+            return JsonResponse({"error": "ID obrigatório."}, status=400)
+
+        deleted, _ = EmailNotificacaoCarga.objects.filter(id=email_id).delete()
+        if not deleted:
+            return JsonResponse({"error": "E-mail não encontrado."}, status=404)
+
+        return JsonResponse({"message": "E-mail removido."})
+
+    return JsonResponse({"error": "Método não permitido."}, status=405)
 
 
 def _normalizar_sugestoes_datas(payload_bruto):
@@ -194,6 +276,12 @@ def liberar_cargas(request):
     except Exception as exc:
         logger.exception("Falha ao liberar cargas")
         return JsonResponse({"error": f"Erro ao liberar cargas: {exc}"}, status=500)
+
+    threading.Thread(
+        target=_enviar_email_carga_liberada,
+        args=(resultado, data_inicio, data_fim, request.user.username),
+        daemon=True,
+    ).start()
 
     return JsonResponse(
         {
@@ -1723,8 +1811,9 @@ class ToChar(Func):
 
 def ordens_em_andamento_finalizada_pintura(request):
     """"
-        traz as ordens aguardando inicio, em andamento e finalizadas na pintura
+    traz as ordens aguardando inicio, em andamento e finalizadas na pintura
     """
+    
     data_inicio_str = request.GET.get('data_inicio')
     data_fim_str = request.GET.get('data_fim')
 
@@ -1760,7 +1849,6 @@ def ordens_em_andamento_finalizada_pintura(request):
     ordens_aguardando_iniciar = []
 
     data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-
 
     for ordem in resultado_json_ordens_criadas['ordens']:
         data_carga_datetime = datetime.strptime(ordem['data_carga'], "%Y-%m-%d").date()
