@@ -1,5 +1,15 @@
 import { confirmarInicioOrdem } from './apontamento-utils.js';
 
+function mostrarToast(message, type = 'info') {
+    Swal.mixin({
+        toast: true,
+        position: 'bottom-end',
+        showConfirmButton: false,
+        timer: 3500,
+        timerProgressBar: true,
+    }).fire({ icon: type, title: message });
+}
+
 function authFetch(input, init) {
     return fetch(input, init).then(response => {
         if (response.status === 401) {
@@ -254,12 +264,14 @@ export function iniciarOrdem(ordemId) {
     });
 }
 
-export function carregarOrdensIniciadas(filtros = {}) {
+export function carregarOrdensIniciadas(filtros = {}, silent = false) {
     const container = document.querySelector('.containerProcesso');
-    container.innerHTML = `
-    <div class="spinner-border text-dark" role="status">
-        <span class="sr-only">Loading...</span>
-    </div>`;
+    if (!silent) {
+        container.innerHTML = `
+        <div class="spinner-border text-dark" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>`;
+    }
 
     authFetch(`api/ordens-iniciadas/?setor=${filtros.setor || ''}`)
         .then(response => response.json())
@@ -1023,15 +1035,6 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         return;
     }
 
-    Swal.fire({
-        title: 'Finalizando...',
-        text: 'Por favor, aguarde enquanto a ordem está sendo finalizada.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
     const payload = {
         status: "finalizada",
         ordem_id: parseInt(ordemId),
@@ -1039,6 +1042,20 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         obs_finalizar: obsFinalizar,
         qt_realizada: parseInt(qtRealizada.value)
     };
+
+    // Optimistic UI: fechar modal e embassar card enquanto processa
+    const modalElement = document.getElementById('finalizarModal');
+    const finalizarModal = bootstrap.Modal.getInstance(modalElement);
+    finalizarModal.hide();
+
+    const cardEl = document.querySelector(`.containerProcesso [data-ordem-id="${ordemId}"]`);
+    if (cardEl) {
+        cardEl.style.transition = 'opacity 0.2s';
+        cardEl.style.opacity = '0.35';
+        cardEl.style.pointerEvents = 'none';
+    }
+
+    mostrarToast('Finalizando ordem...', 'info');
 
     authFetch("api/ordens/atualizar-status/", {
         method: 'POST',
@@ -1056,21 +1073,24 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         return response.json();
     })
     .then(data => {
-        carregarOrdensIniciadas(filtros);
+        // Remove o card após confirmação do servidor
+        if (cardEl && cardEl.parentNode) {
+            cardEl.style.opacity = '0';
+            setTimeout(() => { if (cardEl.parentNode) cardEl.remove(); }, 200);
+        }
+        carregarOrdensIniciadas(filtros, true);
         resetarCardsInicial(filtros);
-
-        // Fechar o modal após a finalização bem-sucedida
-        const modalElement = document.getElementById('finalizarModal');
-        const finalizarModal = bootstrap.Modal.getInstance(modalElement);
-        finalizarModal.hide();
-        Swal.close();
+        mostrarToast('Ordem finalizada com sucesso!', 'success');
     })
     .catch(error => {
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: error.message || 'Erro ao finalizar a ordem. Tente novamente.'
-        });
+        // Rollback: restaura o card
+        if (cardEl) {
+            cardEl.style.opacity = '1';
+            cardEl.style.pointerEvents = '';
+        } else {
+            carregarOrdensIniciadas(filtros);
+        }
+        mostrarToast(error.message || 'Erro ao finalizar a ordem. Tente novamente.', 'error');
     });
 });
 
@@ -1144,15 +1164,6 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         return;
     }
 
-    Swal.fire({
-        title: 'Finalizando...',
-        text: 'Por favor, aguarde enquanto a ordem está sendo finalizada.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
     const payload = {
         status: "finalizada",
         ordem_id: parseInt(ordemId),
@@ -1161,6 +1172,22 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         qt_realizada: parseInt(qtRealizada.value),
         continua: continua
     };
+
+    // Optimistic UI: fechar modais imediatamente e embassar card enquanto processa
+    const modalElement = document.getElementById('finalizarModal');
+    const finalizarModal = bootstrap.Modal.getInstance(modalElement);
+    finalizarModal.hide();
+
+    const modalElementConfirmacao = document.getElementById('modalFinalizarParcial');
+    const finalizarModalConfirmacao = bootstrap.Modal.getInstance(modalElementConfirmacao);
+    finalizarModalConfirmacao.hide();
+
+    const cardEl = document.querySelector(`.containerProcesso [data-ordem-id="${ordemId}"]`);
+    if (cardEl) {
+        cardEl.style.transition = 'opacity 0.2s';
+        cardEl.style.opacity = '0.35';
+        cardEl.style.pointerEvents = 'none';
+    }
 
     authFetch("api/ordens/atualizar-status/", {
         method: 'POST',
@@ -1178,27 +1205,19 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         return response.json();
     })
     .then(data => {
-        carregarOrdensIniciadas(filtros);
+        carregarOrdensIniciadas(filtros, true);
         resetarCardsInicial(filtros);
-
-        // Fechar o modal após a finalização bem-sucedida
-        const modalElement = document.getElementById('finalizarModal');
-        const finalizarModal = bootstrap.Modal.getInstance(modalElement);
-        finalizarModal.hide();
-
-        // fechar modal de confirmação
-        const modalElementConfirmacao = document.getElementById('modalFinalizarParcial');
-        const finalizarModalConfirmacao = bootstrap.Modal.getInstance(modalElementConfirmacao);
-        finalizarModalConfirmacao.hide();
-
-        Swal.close();
+        mostrarToast('Apontamento registrado com sucesso!', 'success');
     })
     .catch(error => {
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: error.message || 'Erro ao finalizar a ordem. Tente novamente.'
-        });
+        // Rollback: restaura o card
+        if (cardEl) {
+            cardEl.style.opacity = '1';
+            cardEl.style.pointerEvents = '';
+        } else {
+            carregarOrdensIniciadas(filtros);
+        }
+        mostrarToast(error.message || 'Erro ao finalizar a ordem. Tente novamente.', 'error');
     });
 });
 
