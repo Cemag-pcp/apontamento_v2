@@ -1,5 +1,9 @@
 
 const typeTemplate = document.getElementById("type_template").value;
+let camboesEmProcessoMap = new Map();
+let itensDisponiveisCambao = [];
+let edicaoCambaoAtual = null;
+let carregandoEdicaoCambao = false;
 
 export const loadOrdens = (container, filtros = {}) => {
     let isLoading = false; // Flag para evitar chamadas duplicadas
@@ -2050,6 +2054,316 @@ if (typeTemplate === 'programacao'){
     });
 }
 
+function formatarQuantidade(valor) {
+    const numero = Number(valor || 0);
+    return Number.isInteger(numero) ? `${numero}` : numero.toLocaleString('pt-BR');
+}
+
+function renderizarTabelaEdicaoCambao() {
+    const tbody = document.getElementById("editarCambaoTabelaBody");
+
+    if (!edicaoCambaoAtual || edicaoCambaoAtual.itens.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted py-4">Nenhum item no cambão.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = edicaoCambaoAtual.itens.map((item, index) => `
+        <tr>
+            <td>${item.ordem || ''}</td>
+            <td title="${item.peca}">${item.peca}</td>
+            <td>${item.data_carga || ''}</td>
+            <td>${formatarQuantidade(item.saldo_disponivel)}</td>
+            <td>
+                <input
+                    type="number"
+                    class="form-control form-control-sm input-quantidade-cambao"
+                    data-index="${index}"
+                    min="0.01"
+                    step="0.01"
+                    value="${item.quantidade_pendurada}"
+                >
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger btn-remover-item-cambao" data-index="${index}" title="Remover item">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+
+    document.querySelectorAll(".input-quantidade-cambao").forEach((input) => {
+        input.addEventListener("input", (event) => {
+            const index = Number(event.target.dataset.index);
+            edicaoCambaoAtual.itens[index].quantidade_pendurada = event.target.value;
+        });
+    });
+
+    document.querySelectorAll(".btn-remover-item-cambao").forEach((botao) => {
+        botao.addEventListener("click", (event) => {
+            const index = Number(event.currentTarget.dataset.index);
+            edicaoCambaoAtual.itens.splice(index, 1);
+            renderizarTabelaEdicaoCambao();
+        });
+    });
+}
+
+function inicializarSelectPesquisaCambao() {
+    const $select = $("#pesquisaCambaoItemSelect");
+    const $modal = $("#modalPesquisarItemCambao");
+
+    if (!$select.length) {
+        return;
+    }
+
+    if ($select.hasClass("select2-hidden-accessible")) {
+        $select.select2("destroy");
+    }
+
+    $select.select2({
+        width: "100%",
+        placeholder: "Selecione uma peça...",
+        allowClear: true,
+        dropdownParent: $modal,
+        minimumInputLength: 2,
+        ajax: {
+            delay: 250,
+            url: "api/ordens-criadas/",
+            dataType: "json",
+            data: (params) => ({
+                data_carga: document.getElementById("pesquisaCambaoDataCarga")?.value || "",
+                type_template: "apontamento",
+                cor: edicaoCambaoAtual?.cor || "",
+                conjunto: params.term || "",
+                "data-programada": "",
+            }),
+            processResults: (data) => {
+                itensDisponiveisCambao = (data.ordens || []).map((item) => ({
+                    peca_ordem_id: item.peca_ordem_id,
+                    ordem: item.ordem,
+                    peca: item.peca_codigo,
+                    saldo_disponivel: item.qt_restante,
+                    data_carga: item.data_carga,
+                }));
+                return {
+                    results: itensDisponiveisCambao.map((item) => ({
+                        id: item.peca_ordem_id,
+                        text: `OP ${item.ordem} | ${item.peca} | saldo ${formatarQuantidade(item.saldo_disponivel)} | ${item.data_carga}`,
+                        ...item,
+                    })),
+                };
+            },
+        },
+        language: {
+            inputTooShort: () => "Digite ao menos 2 caracteres para buscar",
+            noResults: () => "Nenhum item encontrado",
+            searching: () => "Buscando...",
+        },
+    });
+}
+
+function abrirModalPesquisaCambao() {
+    if (!edicaoCambaoAtual) {
+        return;
+    }
+
+    document.getElementById("pesquisaCambaoDataCarga").value = "";
+    document.getElementById("pesquisaCambaoQuantidade").value = "1";
+    document.getElementById("pesquisaCambaoItemSelect").disabled = true;
+    itensDisponiveisCambao = [];
+    inicializarSelectPesquisaCambao();
+    $("#pesquisaCambaoItemSelect").val(null).trigger("change");
+
+    const modal = new bootstrap.Modal(document.getElementById("modalPesquisarItemCambao"));
+    modal.show();
+}
+
+function adicionarItemPesquisadoCambao() {
+    if (!edicaoCambaoAtual) {
+        return;
+    }
+
+    const quantidadeInput = document.getElementById("pesquisaCambaoQuantidade");
+    const quantidade = Number(quantidadeInput.value);
+    const itemSelecionado = ($("#pesquisaCambaoItemSelect").select2("data") || [])[0];
+
+    if (!itemSelecionado) {
+        Swal.fire({
+            icon: "warning",
+            title: "Selecione uma peça",
+            text: "Escolha uma peça para adicionar ao cambão.",
+        });
+        return;
+    }
+
+    if (!quantidade || quantidade <= 0) {
+        Swal.fire({
+            icon: "warning",
+            title: "Quantidade inválida",
+            text: "Informe uma quantidade maior que zero.",
+        });
+        return;
+    }
+
+    const linhaExistente = edicaoCambaoAtual.itens.find((item) => item.peca_ordem_id === itemSelecionado.peca_ordem_id);
+    const quantidadeAtualNoCambao = linhaExistente
+        ? Number(linhaExistente.quantidade_pendurada || 0)
+        : 0;
+    const quantidadeMaximaPermitida = Number(itemSelecionado.saldo_disponivel || 0);
+    const novaQuantidadeTotal = quantidadeAtualNoCambao + quantidade;
+
+    if (novaQuantidadeTotal > quantidadeMaximaPermitida) {
+        const saldoAdicionalDisponivel = Math.max(0, quantidadeMaximaPermitida - quantidadeAtualNoCambao);
+        Swal.fire({
+            icon: "warning",
+            title: "Quantidade indisponível",
+            text: `Esse item possui apenas ${formatarQuantidade(saldoAdicionalDisponivel)} unidade(s) disponível(is) fora de processo e pendente para adicionar ao cambão.`,
+        });
+        return;
+    }
+
+    if (linhaExistente) {
+        linhaExistente.quantidade_pendurada = novaQuantidadeTotal;
+    } else {
+        edicaoCambaoAtual.itens.push({
+            id: null,
+            peca_ordem_id: itemSelecionado.peca_ordem_id,
+            ordem: itemSelecionado.ordem,
+            peca: itemSelecionado.peca,
+            data_carga: itemSelecionado.data_carga,
+            quantidade_pendurada: quantidade,
+            saldo_disponivel: itemSelecionado.saldo_disponivel,
+        });
+    }
+
+    renderizarTabelaEdicaoCambao();
+
+    const modalInstance = bootstrap.Modal.getInstance(document.getElementById("modalPesquisarItemCambao"));
+    if (modalInstance) {
+        modalInstance.hide();
+    }
+}
+
+async function abrirModalEditarCambao(cambaoId) {
+    if (carregandoEdicaoCambao) {
+        return;
+    }
+
+    const cambao = camboesEmProcessoMap.get(Number(cambaoId));
+    if (!cambao) {
+        Swal.fire({
+            icon: "error",
+            title: "Cambão não encontrado",
+            text: "Não foi possível carregar os dados do cambão selecionado.",
+        });
+        return;
+    }
+
+    carregandoEdicaoCambao = true;
+    Swal.fire({
+        title: 'Carregando...',
+        text: `Preparando a edição do cambão #${cambao.nome}.`,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => Swal.showLoading(),
+    });
+
+    edicaoCambaoAtual = {
+        id: cambao.id,
+        nome: cambao.nome,
+        cor: cambao.cor,
+        tipo: cambao.tipo,
+        itens: cambao.pecas.map((peca) => ({
+            id: peca.id,
+            peca_ordem_id: peca.peca_ordem_id,
+            ordem: peca.ordem,
+            peca: peca.peca,
+            data_carga: new Intl.DateTimeFormat('pt-BR').format(new Date(`${peca.data_carga}T00:00:00`)),
+            quantidade_pendurada: peca.quantidade_pendurada,
+            saldo_disponivel: Number(peca.quantidade_pendurada || 0),
+        })),
+    };
+
+    document.getElementById("editarCambaoResumo").textContent = `Cambão #${cambao.nome} • ${cambao.cor} • ${cambao.tipo}`;
+
+    renderizarTabelaEdicaoCambao();
+    Swal.close();
+
+    const modal = new bootstrap.Modal(document.getElementById("modalEditarCambao"));
+    modal.show();
+    carregandoEdicaoCambao = false;
+}
+
+async function salvarEdicaoCambao() {
+    if (!edicaoCambaoAtual) {
+        return;
+    }
+
+    const itens = edicaoCambaoAtual.itens.map((item) => ({
+        id: item.id,
+        peca_ordem_id: item.peca_ordem_id,
+        quantidade: item.quantidade_pendurada,
+    }));
+
+    Swal.fire({
+        title: 'Salvando...',
+        text: 'Atualizando cambão...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+    });
+
+    try {
+        const response = await fetch("api/editar-cambao/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                cambao_id: edicaoCambaoAtual.id,
+                itens,
+            }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Não foi possível salvar as alterações.");
+        }
+
+        Swal.fire({
+            icon: "success",
+            title: "Cambão atualizado",
+            text: data.message || "As alterações foram salvas com sucesso.",
+        });
+
+        const modalInstance = bootstrap.Modal.getInstance(document.getElementById("modalEditarCambao"));
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+
+        cambaoProcesso();
+        resetarCardsInicial();
+    } catch (error) {
+        Swal.fire({
+            icon: "error",
+            title: "Erro ao salvar",
+            text: error.message,
+        });
+    }
+}
+
+document.getElementById("btnSalvarEdicaoCambao")?.addEventListener("click", salvarEdicaoCambao);
+document.getElementById("btnAbrirPesquisaCambao")?.addEventListener("click", abrirModalPesquisaCambao);
+document.getElementById("btnSalvarPesquisaCambao")?.addEventListener("click", adicionarItemPesquisadoCambao);
+document.getElementById("pesquisaCambaoDataCarga")?.addEventListener("change", (event) => {
+    const select = document.getElementById("pesquisaCambaoItemSelect");
+    const possuiData = !!event.target.value;
+    select.disabled = !possuiData;
+    $("#pesquisaCambaoItemSelect").val(null).trigger("change");
+});
+
 export async function cambaoProcesso() {
     const cambaoContainer = document.getElementById("cambao-container");
     // cambaoContainer.innerHTML = `
@@ -2060,6 +2374,7 @@ export async function cambaoProcesso() {
     try {
         const response = await fetch("api/cambao-processo/");
         const data = await response.json();
+        camboesEmProcessoMap = new Map((data.cambao_em_processo || []).map((cambao) => [Number(cambao.id), cambao]));
         cambaoContainer.innerHTML = ""; // Limpa antes de adicionar os novos
 
         if (data.cambao_em_processo.length === 0) {
@@ -2144,6 +2459,9 @@ export async function cambaoProcesso() {
                                         <button id="visualizarConjuntosButton-${cambao.id}" class="btn btn-outline-secondary" title="Visualizar conjuntos completos">
                                             <i class="fas fa-eye"></i>
                                         </button>
+                                        <button class="btn btn-outline-primary btn-editar-cambao" data-cambao-id="${cambao.id}" title="Editar peças e quantidades">
+                                            <i class="fas fa-pen"></i>
+                                        </button>
                                         ${cambao.cambao_status === 'interrompido' 
                                             ? `<button class="btn btn-outline-info btn-retornar" data-cambao-id="${cambao.id}" title="Retornar cambão ao processo">
                                                 <i class="fas fa-play"></i>
@@ -2185,6 +2503,12 @@ export async function cambaoProcesso() {
         });
 
         // Evento de clique para abrir o modal de finalização
+        document.querySelectorAll(".btn-editar-cambao").forEach((botao) => {
+            botao.addEventListener("click", function () {
+                abrirModalEditarCambao(this.dataset.cambaoId);
+            });
+        });
+
         document.querySelectorAll(".btn-finalizar").forEach(botao => {
             botao.addEventListener("click", function () {
                 const cambaoId = this.dataset.cambaoId;

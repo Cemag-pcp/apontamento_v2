@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
 from django.core.paginator import Paginator
-from django.db.models import Sum, Q, Prefetch, Count, OuterRef, Subquery, F, Value, Avg, Value, CharField
+from django.db.models import Sum, Q, Prefetch, Count, OuterRef, Subquery, F, Value, Avg, Value, CharField, Max, Min
 from django.db.models.functions import Coalesce, Concat
 from django.db import transaction, models
 from django.shortcuts import get_object_or_404, render
@@ -116,6 +116,21 @@ def _saldo_disponivel_programacao(peca_ordem, programa_id_excluir=None):
     )
 
     return max(0, peca_ordem.qtd_planejada - qtd_pendurada - qtd_programada)
+
+
+def _saldo_disponivel_cambao(peca_ordem, cambao_id_excluir=None):
+    pecas_no_cambao = CambaoPecas.objects.filter(peca_ordem=peca_ordem)
+    if cambao_id_excluir:
+        pecas_no_cambao = pecas_no_cambao.exclude(cambao_id=cambao_id_excluir)
+
+    qtd_pendurada = (
+        pecas_no_cambao.aggregate(
+            total=Sum("quantidade_pendurada", output_field=models.FloatField())
+        )["total"]
+        or 0
+    )
+
+    return max(0, peca_ordem.qtd_planejada - qtd_pendurada)
 
 @csrf_exempt
 def deletar_programa(request):
@@ -945,9 +960,23 @@ def finalizar_cambao(request):
                 qtd_restante = peca_ordem_original.qtd_planejada - qtd_finalizadas
 
                 if item.quantidade_pendurada > qtd_restante:
+                    quantidade_pendurada = f"{item.quantidade_pendurada:g}"
+                    quantidade_restante = f"{qtd_restante:g}"
+                    quantidade_planejada = f"{peca_ordem_original.qtd_planejada:g}"
+                    quantidade_ja_finalizada = f"{qtd_finalizadas:g}"
+
                     return JsonResponse(
                         {
-                            "error": f"A quantidade finalizada ({item.quantidade_pendurada}) excede o planejado ({qtd_restante})."
+                            "error": (
+                                f"Não foi possível finalizar o cambão porque a peça "
+                                f"'{peca_ordem_original.peca}' da ordem "
+                                f"'{peca_ordem_original.ordem.ordem}' não tem saldo disponível. "
+                                f"Tentativa de finalizar: {quantidade_pendurada}. "
+                                f"Saldo restante: {quantidade_restante}. "
+                                f"Planejado da peça: {quantidade_planejada}. "
+                                f"Já finalizado anteriormente: {quantidade_ja_finalizada}. "
+                                f"Verifique se essa peça já foi concluída ou se o planejamento precisa ser ajustado."
+                            )
                         },
                         status=400,
                     )
@@ -1165,7 +1194,10 @@ def cambao_em_processo(request):
     for cambao in cambao_queryset:
         pecas = [
             {
+                "id": peca.id,
                 "peca_ordem_id": peca.peca_ordem.id,
+                "ordem_id": peca.peca_ordem.ordem.id,
+                "ordem": peca.peca_ordem.ordem.ordem,
                 "peca": peca.peca_ordem.peca,
                 "quantidade_pendurada": peca.quantidade_pendurada,
                 "data_carga": peca.peca_ordem.ordem.data_carga,
@@ -1186,6 +1218,285 @@ def cambao_em_processo(request):
         })
 
     return JsonResponse({"cambao_em_processo": resultado})
+
+
+def itens_disponiveis_cambao(request):
+    cambao_id = request.GET.get("cambao_id")
+    termo = (request.GET.get("q") or "").strip()
+
+    if not cambao_id:
+        return JsonResponse({"error": "ID do cambão é obrigatório"}, status=400)
+
+    cambao = get_object_or_404(Cambao, id=cambao_id)
+    data_carga = request.GET.get("data_carga")
+
+    if not termo or len(termo.strip()) < 2:
+        return JsonResponse({"itens": []})
+
+    filtros = {
+        "grupo_maquina": "pintura",
+        "excluida": False,
+        "cor": cambao.cor,
+    }
+    if data_carga:
+        filtros["data_carga"] = data_carga
+
+    filtros_peca = {"peca__contains": termo}
+
+    primeira_peca = PecasOrdem.objects.filter(
+        ordem=OuterRef("pk"), **filtros_peca
+    ).order_by("id")
+
+    soma_qtd_pendurada = (
+        CambaoPecas.objects.filter(peca_ordem__ordem=OuterRef("pk"))
+        .exclude(cambao_id=cambao.id)
+        .values("peca_ordem__ordem")
+        .annotate(
+            total_quantidade_pendurada=Sum(
+                "quantidade_pendurada", output_field=models.FloatField()
+            )
+        )
+        .values("total_quantidade_pendurada")
+    )
+
+    qt_planejada = primeira_peca.values("qtd_planejada")[:1]
+
+    ordens_queryset = (
+        Ordem.objects.filter(**filtros)
+        .annotate(
+            peca_ordem_id=Subquery(primeira_peca.values("id")[:1]),
+            peca_codigo=Subquery(primeira_peca.values("peca")[:1]),
+            peca_qt_planejada=Subquery(
+                qt_planejada, output_field=models.FloatField()
+            ),
+            soma_qtd_pendurada=Coalesce(
+                Subquery(soma_qtd_pendurada, output_field=models.FloatField()),
+                Value(0.0),
+                output_field=models.FloatField(),
+            ),
+        )
+        .annotate(
+            qt_restante=F("peca_qt_planejada") - F("soma_qtd_pendurada")
+        )
+        .filter(
+            peca_ordem_id__isnull=False,
+            qt_restante__gt=0,
+        )
+        .order_by("-status_prioridade", "data_programacao")[:50]
+    )
+
+    itens = [
+        {
+            "peca_ordem_id": item["peca_ordem_id"],
+            "ordem_id": item["id"],
+            "ordem": item["ordem"],
+            "peca": item["peca_codigo"],
+            "saldo_disponivel": item["qt_restante"],
+            "qtd_planejada": item["peca_qt_planejada"],
+            "data_carga": item["data_carga"].strftime("%d/%m/%Y")
+            if item["data_carga"]
+            else "",
+        }
+        for item in ordens_queryset.values(
+            "id",
+            "ordem",
+            "peca_ordem_id",
+            "peca_codigo",
+            "peca_qt_planejada",
+            "qt_restante",
+            "data_carga",
+        )
+    ]
+
+    return JsonResponse({"itens": itens})
+
+
+@csrf_exempt
+def editar_cambao(request):
+    """
+    Edita as peças penduradas em um cambão.
+    Espera:
+    {
+        "cambao_id": 1,
+        "itens": [
+            {"id": 10, "peca_ordem_id": 25, "quantidade": 4},
+            {"peca_ordem_id": 30, "quantidade": 2}
+        ]
+    }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        cambao_id = data.get("cambao_id")
+        itens = data.get("itens", [])
+
+        if not cambao_id:
+            return JsonResponse({"error": "ID do cambão é obrigatório"}, status=400)
+
+        cambao = get_object_or_404(Cambao, id=cambao_id)
+        registros_atuais = {
+            registro.id: registro
+            for registro in CambaoPecas.objects.filter(cambao=cambao, status="pendurada")
+        }
+        ordens_ids_anteriores = {
+            registro.peca_ordem.ordem_id
+            for registro in registros_atuais.values()
+            if registro.peca_ordem_id
+        }
+
+        if not itens:
+            with transaction.atomic():
+                CambaoPecas.objects.filter(cambao=cambao, status="pendurada").delete()
+                cambao.status = "livre"
+                cambao.cor = ""
+                cambao.save(update_fields=["status", "cor"])
+            for ordem in Ordem.objects.filter(id__in=ordens_ids_anteriores):
+                notificar_ordem(ordem)
+            return JsonResponse({"success": True, "message": "Cambão atualizado com sucesso"})
+
+        quantidades_por_peca = defaultdict(float)
+        itens_normalizados = []
+
+        for item in itens:
+            registro_id = item.get("id")
+            peca_ordem_id = item.get("peca_ordem_id")
+            quantidade = item.get("quantidade")
+
+            if not peca_ordem_id:
+                return JsonResponse(
+                    {"error": "Toda linha precisa ter uma peça selecionada"},
+                    status=400,
+                )
+
+            try:
+                quantidade = float(quantidade)
+            except (TypeError, ValueError):
+                return JsonResponse({"error": "Quantidade inválida informada"}, status=400)
+
+            if quantidade <= 0:
+                return JsonResponse(
+                    {"error": "A quantidade deve ser maior que zero"},
+                    status=400,
+                )
+
+            peca_ordem = get_object_or_404(
+                PecasOrdem.objects.select_related("ordem"),
+                id=peca_ordem_id,
+            )
+            registro_existente = registros_atuais.get(int(registro_id)) if registro_id else None
+            mantendo_peca_original = (
+                registro_existente is not None
+                and registro_existente.peca_ordem_id == peca_ordem.id
+            )
+
+            if not mantendo_peca_original and peca_ordem.ordem.cor != cambao.cor:
+                return JsonResponse(
+                    {"error": f"A peça {peca_ordem.peca} não pertence à cor do cambão."},
+                    status=400,
+                )
+
+            if False and not mantendo_peca_original and peca_ordem.tipo != cambao.tipo:
+                return JsonResponse(
+                    {"error": f"A peça {peca_ordem.peca} não pertence ao tipo do cambão."},
+                    status=400,
+                )
+
+            quantidades_por_peca[peca_ordem.id] += quantidade
+            itens_normalizados.append(
+                {
+                    "id": int(registro_id) if registro_id else None,
+                    "peca_ordem": peca_ordem,
+                    "quantidade": quantidade,
+                }
+            )
+
+        for peca_ordem_id, quantidade_total in quantidades_por_peca.items():
+            peca_ordem = next(
+                item["peca_ordem"]
+                for item in itens_normalizados
+                if item["peca_ordem"].id == peca_ordem_id
+            )
+            saldo_disponivel = _saldo_disponivel_cambao(
+                peca_ordem,
+                cambao_id_excluir=cambao.id,
+            )
+
+            if quantidade_total > saldo_disponivel:
+                return JsonResponse(
+                    {
+                        "error": (
+                            f"A peça {peca_ordem.peca} só possui "
+                            f"{saldo_disponivel:g} unidades disponíveis para este cambão."
+                        )
+                    },
+                    status=400,
+                )
+
+        with transaction.atomic():
+            ordens_ids = set(ordens_ids_anteriores)
+            lote_atual = (
+                CambaoPecas.objects.filter(cambao=cambao, status="pendurada")
+                .values_list("identificador_lote", flat=True)
+                .first()
+            ) or uuid4()
+
+            ids_recebidos = set()
+
+            for item in itens_normalizados:
+                registro_id = item["id"]
+                peca_ordem = item["peca_ordem"]
+                quantidade = item["quantidade"]
+
+                if registro_id:
+                    registro = registros_atuais.get(registro_id)
+                    if not registro:
+                        return JsonResponse(
+                            {"error": "Uma das linhas enviadas não pertence ao cambão informado"},
+                            status=400,
+                        )
+
+                    registro.peca_ordem = peca_ordem
+                    registro.quantidade_pendurada = quantidade
+                    registro.identificador_lote = lote_atual
+                    registro.save(
+                        update_fields=[
+                            "peca_ordem",
+                            "quantidade_pendurada",
+                            "identificador_lote",
+                        ]
+                    )
+                    ids_recebidos.add(registro.id)
+                else:
+                    novo_registro = CambaoPecas.objects.create(
+                        identificador_lote=lote_atual,
+                        cambao=cambao,
+                        peca_ordem=peca_ordem,
+                        quantidade_pendurada=quantidade,
+                        data_pendura=now(),
+                        status="pendurada",
+                    )
+                    ids_recebidos.add(novo_registro.id)
+
+            CambaoPecas.objects.filter(cambao=cambao, status="pendurada").exclude(
+                id__in=ids_recebidos
+            ).delete()
+
+            cambao.status = "em uso"
+            cambao.save(update_fields=["status"])
+
+            ordens_ids.update(
+                item["peca_ordem"].ordem.id
+                for item in itens_normalizados
+            )
+            for ordem in Ordem.objects.filter(id__in=ordens_ids):
+                notificar_ordem(ordem)
+
+        return JsonResponse({"success": True, "message": "Cambão atualizado com sucesso"})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 def listar_operadores(request):
 
