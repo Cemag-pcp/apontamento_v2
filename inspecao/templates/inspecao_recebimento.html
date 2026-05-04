@@ -145,7 +145,7 @@
                                 <label class="form-label mb-0 fw-semibold small">Unidades:</label>
                                 <div class="input-group input-group-sm" style="max-width:110px">
                                     <button type="button" class="btn btn-outline-secondary" id="btn-qtd-menos-recebimento">-</button>
-                                    <input type="number" class="form-control text-center" id="qtd-unidades-recebimento" value="1" min="1" max="30">
+                                    <input type="number" class="form-control text-center" id="qtd-unidades-recebimento" value="1" min="1" max="50">
                                     <button type="button" class="btn btn-outline-secondary" id="btn-qtd-mais-recebimento">+</button>
                                 </div>
                             </div>
@@ -1570,14 +1570,14 @@
         });
         document.getElementById("btn-qtd-mais-recebimento").addEventListener("click", () => {
             const inp = document.getElementById("qtd-unidades-recebimento");
-            const val = Math.min(30, parseInt(inp.value || 1) + 1);
+            const val = Math.min(50, parseInt(inp.value || 1) + 1);
             inp.value = val;
             const material = materiaisRecebimento[materialAtivoIndex];
             if (material) material.qtd = val;
             renderUnidades(val);
         });
         document.getElementById("qtd-unidades-recebimento").addEventListener("change", (e) => {
-            const val = Math.min(30, Math.max(1, parseInt(e.target.value) || 1));
+            const val = Math.min(50, Math.max(1, parseInt(e.target.value) || 1));
             e.target.value = val;
             const material = materiaisRecebimento[materialAtivoIndex];
             if (material) material.qtd = val;
