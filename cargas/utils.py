@@ -704,6 +704,14 @@ def gerar_arquivos(data_inicial, data_final, setor):
                 base_carretas[(base_carretas['Etapa'] == '')].index, inplace=True)
             
             base_carretas = base_carretas.reset_index(drop=True)
+            colunas_dedup_montagem = [
+                coluna for coluna in ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula']
+                if coluna in base_carretas.columns
+            ]
+            if colunas_dedup_montagem:
+                base_carretas = base_carretas.drop_duplicates(
+                    subset=colunas_dedup_montagem
+                ).reset_index(drop=True)
             
             for i in range(len(base_carretas)):
                 recurso = base_carretas.loc[i, 'Recurso']
@@ -1482,6 +1490,9 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             filtro_data = base_carga.loc[escolha_data]
             # filtro_data[filtro_data['Recurso'] == '034550G']
 
+            if carga:
+                filtro_data = filtro_data.loc[filtro_data['Carga'] == carga]
+
             filtro_data = filtro_data.reset_index(drop=True)
             filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
 
@@ -1693,6 +1704,14 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
                 base_carretas[(base_carretas['Etapa3'] == '')].index, inplace=True)
             
             base_carretas = base_carretas.reset_index(drop=True)
+            colunas_dedup_solda = [
+                coluna for coluna in ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula']
+                if coluna in base_carretas.columns
+            ]
+            if colunas_dedup_solda:
+                base_carretas = base_carretas.drop_duplicates(
+                    subset=colunas_dedup_solda
+                ).reset_index(drop=True)
             
             for i in range(len(base_carretas)):
                 if len(base_carretas['Recurso'][i]) == 5:
@@ -1709,6 +1728,9 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
             filtro_data = base_carga.loc[escolha_data]
             # filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
+
+            if carga:
+                filtro_data = filtro_data.loc[filtro_data['Carga'] == carga]
 
             filtro_data = filtro_data.reset_index(drop=True)
             filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)

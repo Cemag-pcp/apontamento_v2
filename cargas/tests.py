@@ -19,6 +19,7 @@ from cargas.services import (
     listar_cargas_liberadas_para_planejamento,
     listar_cargas_liberadas_periodo,
 )
+from cargas.utils import gerar_sequenciamento
 from core.models import Ordem, Profile
 from apontamento_exped.models import Carga as CargaExpedicao
 
@@ -779,6 +780,126 @@ class CargasLiberacaoTests(TestCase):
                 },
             ],
         )
+
+
+class SequenciamentoMontagemTests(TestCase):
+    @patch("cargas.utils.get_data_from_sheets")
+    def test_gerar_sequenciamento_montagem_filtra_por_carga_e_nao_duplica_base(self, get_data_mock):
+        base_carretas = pd.DataFrame(
+            [
+                {
+                    "Recurso": "12345",
+                    "Código": "54321",
+                    "Peca": "Conjunto Teste",
+                    "Qtde": 2,
+                    "Célula": "CEL-01",
+                    "Etapa": "Montagem",
+                    "Etapa2": "",
+                    "Etapa3": "",
+                    "Etapa4": "",
+                    "Etapa5": "",
+                },
+                {
+                    "Recurso": "12345",
+                    "Código": "54321",
+                    "Peca": "Conjunto Teste",
+                    "Qtde": 2,
+                    "Célula": "CEL-01",
+                    "Etapa": "Montagem",
+                    "Etapa2": "",
+                    "Etapa3": "",
+                    "Etapa4": "",
+                    "Etapa5": "",
+                },
+            ]
+        )
+        base_carga = pd.DataFrame(
+            [
+                {
+                    "PED_PREVISAOEMISSAODOC": "05/05/2026",
+                    "PED_RECURSO.CODIGO": "12345",
+                    "PED_QUANTIDADE": 3,
+                    "Carga": "Carga A",
+                },
+                {
+                    "PED_PREVISAOEMISSAODOC": "05/05/2026",
+                    "PED_RECURSO.CODIGO": "12345",
+                    "PED_QUANTIDADE": 4,
+                    "Carga": "Carga B",
+                },
+            ]
+        )
+        get_data_mock.return_value = (base_carretas, base_carga)
+
+        resultado = gerar_sequenciamento(
+            "2026-05-05",
+            "2026-05-05",
+            "montagem",
+            carga="Carga A",
+        )
+
+        self.assertEqual(len(resultado), 1)
+        self.assertEqual(resultado.iloc[0]["Carga"], "Carga A")
+        self.assertEqual(int(resultado.iloc[0]["Qtde_total"]), 6)
+
+    @patch("cargas.utils.get_data_from_sheets")
+    def test_gerar_sequenciamento_solda_filtra_por_carga_e_nao_duplica_base(self, get_data_mock):
+        base_carretas = pd.DataFrame(
+            [
+                {
+                    "Recurso": "12345",
+                    "Código": "54321",
+                    "Peca": "Conjunto Solda",
+                    "Qtde": 2,
+                    "Célula": "CEL-S1",
+                    "Etapa": "",
+                    "Etapa2": "",
+                    "Etapa3": "Solda",
+                    "Etapa4": "",
+                    "Etapa5": "",
+                },
+                {
+                    "Recurso": "12345",
+                    "Código": "54321",
+                    "Peca": "Conjunto Solda",
+                    "Qtde": 2,
+                    "Célula": "CEL-S1",
+                    "Etapa": "",
+                    "Etapa2": "",
+                    "Etapa3": "Solda",
+                    "Etapa4": "",
+                    "Etapa5": "",
+                },
+            ]
+        )
+        base_carga = pd.DataFrame(
+            [
+                {
+                    "PED_PREVISAOEMISSAODOC": "05/05/2026",
+                    "PED_RECURSO.CODIGO": "12345",
+                    "PED_QUANTIDADE": 3,
+                    "Carga": "Carga A",
+                },
+                {
+                    "PED_PREVISAOEMISSAODOC": "05/05/2026",
+                    "PED_RECURSO.CODIGO": "12345",
+                    "PED_QUANTIDADE": 4,
+                    "Carga": "Carga B",
+                },
+            ]
+        )
+        get_data_mock.return_value = (base_carretas, base_carga)
+
+        resultado = gerar_sequenciamento(
+            "2026-05-05",
+            "2026-05-05",
+            "solda",
+            carga="Carga A",
+        )
+
+        self.assertEqual(len(resultado), 1)
+        self.assertEqual(resultado.iloc[0]["Carga"], "Carga A")
+        self.assertEqual(int(resultado.iloc[0]["Qtde_total"]), 6)
 
     def test_api_status_carga_retorna_expedida(self):
         carga_liberada = CargaLiberada.objects.create(

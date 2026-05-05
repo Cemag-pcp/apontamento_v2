@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import os
 import environ
 from dotenv import load_dotenv
@@ -41,6 +42,7 @@ INSTALLED_APPS = [
     'apontamento_solda',
     'apontamento_exped',
     'cargas',
+    'compras',
     'storages',
 
     'channels',
@@ -134,6 +136,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'sucata/static'),
     os.path.join(BASE_DIR, 'inspecao/static'),
     os.path.join(BASE_DIR, 'cadastro/static'),
+    os.path.join(BASE_DIR, 'compras/static'),
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
@@ -156,6 +159,31 @@ RPA_API_KEY = env('RPA_API_KEY')
 LOGIN_URL = '/core/login/'
 LOGIN_REDIRECT_URL = '/core/'  
 LOGOUT_REDIRECT_URL = '/core/login/'  
+
+# Google Sheets - Compras
+GSHEETS_SERVICE_ACCOUNT_INFO = {
+    'type': env('type', default=''),
+    'project_id': env('project_id', default=''),
+    'private_key': env('private_key', default=''),
+    'private_key_id': env('private_key_id', default=''),
+    'client_email': env('client_email', default=''),
+    'client_id': env('client_id', default=''),
+    'auth_uri': env('auth_uri', default=''),
+    'token_uri': env('token_uri', default=''),
+    'auth_provider_x509_cert_url': env('auth_provider_x509_cert_url', default=''),
+    'client_x509_cert_url': env('client_x509_cert_url', default=''),
+    'universe_domain': env('universe_domain', default=''),
+}
+
+if not GSHEETS_SERVICE_ACCOUNT_INFO['private_key']:
+    GSHEETS_SERVICE_ACCOUNT_INFO = json.loads(
+        env('GSHEETS_SERVICE_ACCOUNT_JSON', default='{}')
+    )
+
+if GSHEETS_SERVICE_ACCOUNT_INFO.get('private_key') and "\\n" in GSHEETS_SERVICE_ACCOUNT_INFO['private_key']:
+    GSHEETS_SERVICE_ACCOUNT_INFO['private_key'] = GSHEETS_SERVICE_ACCOUNT_INFO['private_key'].replace("\\n", "\n")
+
+GSHEETS_COMPRAS_SPREADSHEET_NAME = env('GSHEETS_COMPRAS_SPREADSHEET_NAME', default='Análise Previsão de Consumo (CMM / NTP ) DEE')
 
 CHANNEL_LAYERS = {
     "default": {

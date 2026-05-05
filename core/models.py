@@ -255,6 +255,7 @@ class RotaAcesso(models.Model):
         ('cargas', 'Cargas'),
         ('inspecao', 'Inspeção'),
         ('almoxarifado', 'Almoxarifado'),
+        ('compras', 'Compras'),
     ]
 
     nome=models.CharField(max_length=50,unique=True) # exemplo: serra/historico
@@ -272,6 +273,7 @@ class Profile(models.Model):
         ('pcp', 'PCP'),
         ('inspetor', 'Inspetor'),
         ('almoxarifado', 'Almoxarifado'),
+        ('compras', 'Compras'),
         ('admin', 'Admin'),
     ]
 

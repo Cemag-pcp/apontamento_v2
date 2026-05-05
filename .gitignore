@@ -10,3 +10,4 @@ BASE_GERAL.CSV
 .BASE_GERAL.CSV
 cadastro\BASE_GERAL.csv
 cadastro/BASE_GERAL.csv
+compras/data/gsheets_credentials.json

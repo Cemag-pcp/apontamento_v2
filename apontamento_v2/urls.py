@@ -26,6 +26,7 @@ urlpatterns = [
     path('expedicao/', include('apontamento_exped.urls')),
     path('inspecao/', include('inspecao.urls')),
     path('cargas/', include('cargas.urls')),
-    path('sucata/', include('sucata.urls'))
+    path('sucata/', include('sucata.urls')),
+    path('compras/', include('compras.urls')),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}<title>Análise de Compras</title>{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/compras.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Análise de Compras</h5>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+            <span id="ultimaAtualizacao" class="text-muted small"></span>
+            <button class="btn btn-sm btn-outline-secondary" id="btnRefresh">
+                <i class="fas fa-sync-alt"></i> Atualizar dados
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm mb-1">Busca</label>
+                    <input type="text" id="campoBusca" class="form-control form-control-sm"
+                        placeholder="Código ou descrição...">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm mb-1">Produto</label>
+                    <select id="filtroCodigo" class="form-select form-select-sm">
+                        <option value="">Todos os produtos</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1">Grupo</label>
+                    <select id="filtroGrupo" class="form-select form-select-sm">
+                        <option value="">Todos os grupos</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1">Urgência</label>
+                    <select id="filtroUrgencia" class="form-select form-select-sm">
+                        <option value="">Todas</option>
+                        <option value="URGENTE">🔴 Urgente</option>
+                        <option value="PRAZO_CURTO">🟡 Prazo Curto</option>
+                        <option value="PRAZO_OK">🟢 Prazo OK</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-sm btn-primary w-100" id="btnFiltrar">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contadores de urgência -->
+    <div class="row g-2 mb-3" id="contadores" style="display:none!important;">
+        <div class="col-auto">
+            <span class="badge bg-danger fs-6 px-3 py-2" id="ctUrgente">0 urgentes</span>
+        </div>
+        <div class="col-auto">
+            <span class="badge bg-warning text-dark fs-6 px-3 py-2" id="ctPrazoCurto">0 prazo curto</span>
+        </div>
+        <div class="col-auto">
+            <span class="badge bg-success fs-6 px-3 py-2" id="ctPrazoOk">0 OK</span>
+        </div>
+        <div class="col-auto ms-auto">
+            <span class="text-muted small" id="ctTotal"></span>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingTabela" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-muted">Carregando dados da planilha... (pode levar alguns segundos)</p>
+    </div>
+
+    <!-- Tabela -->
+    <div id="tabelaWrapper" style="display:none;">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle" id="tabelaMateriais">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Código</th>
+                        <th>Descrição</th>
+                        <th>Grupo</th>
+                        <th class="text-end">Média 3M</th>
+                        <th class="text-end">Est. Almox</th>
+                        <th class="text-end">Consumo/Dia</th>
+                        <th class="text-end">Dias p/ Zero</th>
+                        <th class="text-end">Ped. Pendente</th>
+                        <th class="text-end">Est. Mínimo</th>
+                        <th>Data Compra</th>
+                        <th>Urgência</th>
+                        <th class="text-center">Gráfico</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyMateriais"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Mensagem sem resultados -->
+    <div id="semResultados" class="alert alert-info" style="display:none;">
+        Nenhum material encontrado com os filtros aplicados.
+    </div>
+
+</div>
+
+<!-- Modal de Projeção de Estoque -->
+<div class="modal fade" id="modalProjecao" tabindex="-1" aria-labelledby="modalProjecaoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalProjecaoLabel">
+                    <i class="fas fa-chart-line me-2 text-primary"></i>
+                    <span id="tituloGrafico">Projeção de Estoque</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body p-3">
+
+                <!-- Loading -->
+                <div id="loadingGrafico" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted small">Calculando projeção...</p>
+                </div>
+
+                <!-- Conteúdo -->
+                <div id="conteudoGrafico" style="display:none;">
+                    <!-- Gráfico Plotly -->
+                    <div id="plotlyDiv" style="height:420px; width:100%;"></div>
+
+                    <!-- Sugestões -->
+                    <hr class="my-3">
+                    <h6 class="fw-bold mb-2"><i class="fas fa-lightbulb me-1 text-warning"></i> Sugestões de Compra</h6>
+                    <div id="painelSugestoes"></div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+<script src="{% static 'js/compras.js' %}"></script>
+{% endblock %}
