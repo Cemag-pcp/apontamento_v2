@@ -1,0 +1,31 @@
+/* compras.css */
+
+.btn-xs {
+    padding: 2px 6px;
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+#plotlyDiv {
+    width: 100%;
+    min-height: 350px;
+}
+
+/* Borda lateral colorida por urgência */
+#tabelaMateriais tr.table-danger td:first-child {
+    border-left: 4px solid #dc3545;
+}
+#tabelaMateriais tr.table-warning td:first-child {
+    border-left: 4px solid #ffc107;
+}
+#tabelaMateriais tr.table-success td:first-child {
+    border-left: 4px solid #198754;
+}
+
+#areaGrafico .card {
+    border-radius: 6px;
+}
+
+#painelSugestoes .alert {
+    border-radius: 6px;
+}
