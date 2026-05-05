@@ -26,7 +26,7 @@ def _adicionar_dias_uteis(data_inicial, num_dias):
 def gerar_sugestoes(projecao: dict) -> list:
     """
     Porta de sugestoes.py. Recebe o dict retornado por get_projecao_para_material
-    e retorna lista de sugestões em formato serializável JSON.
+    e retorna lista de sugestoes em formato serializavel JSON.
     """
     dias_ressupr = float(projecao.get('dias_ressupr', 0) or 0)
     consumo_diario = float(projecao.get('consumo_diario', 0) or 0)
@@ -34,6 +34,10 @@ def gerar_sugestoes(projecao: dict) -> list:
     estoque_minimo = float(projecao.get('estoque_minimo', 0) or 0)
     dias_ate_compra = projecao.get('dias_ate_data_compra')
     ped_compras = float(projecao.get('ped_compras', 0) or 0)
+    chegadas_previstas = projecao.get('chegadas_previstas') or []
+    pedidos_pendentes_count = int(projecao.get('pedidos_pendentes_count', 0) or 0)
+    datas_pedidos_pendentes = projecao.get('datas_pedidos_pendentes') or []
+    chegada_planejada_compra = projecao.get('chegada_planejada_compra') or {}
 
     if dias_ressupr == 0 or consumo_diario == 0:
         return [{
@@ -45,6 +49,11 @@ def gerar_sugestoes(projecao: dict) -> list:
 
     hoje = datetime.now().date()
     data_chegada = _adicionar_dias_uteis(hoje, int(dias_ressupr))
+    data_chegada_planejada = chegada_planejada_compra.get('data')
+    data_chegada_planejada_formatada = (
+        datetime.strptime(data_chegada_planejada, '%Y-%m-%d').strftime('%d/%m/%Y')
+        if data_chegada_planejada else None
+    )
 
     try:
         dias_uteis_ate_chegada = int(np.busday_count(hoje, data_chegada + timedelta(days=1)))
@@ -58,52 +67,134 @@ def gerar_sugestoes(projecao: dict) -> list:
 
     sugestoes = []
 
-    # CENÁRIO 1: Pedido pendente
     if ped_compras > 0:
+        data_estoque_minimo_str = projecao.get('data_estoque_minimo')
+        data_estoque_zero_str   = projecao.get('data_estoque_zero')
+
+        try:
+            dt_minimo = datetime.strptime(data_estoque_minimo_str, '%Y-%m-%d').date() if data_estoque_minimo_str else None
+        except ValueError:
+            dt_minimo = None
+        try:
+            dt_zero = datetime.strptime(data_estoque_zero_str, '%d/%m/%Y').date() if data_estoque_zero_str else None
+        except ValueError:
+            dt_zero = None
+
+        n = pedidos_pendentes_count or 1
+        titulo = (
+            f'{n} pedido{"s" if n > 1 else ""} de compra pendente{"s" if n > 1 else ""}'
+        )
+
+        partes = [
+            f'Há **{n} pedido{"s" if n > 1 else ""}** de compra pendente{"s" if n > 1 else ""}'
+            f' totalizando **{ped_compras:.2f} unidades**.'
+        ]
+
+        chegadas = projecao.get('chegadas_previstas') or []
+        datas_analisadas = set()
+
+        for chegada in chegadas:
+            data_str = chegada.get('data')
+            if not data_str or data_str in datas_analisadas:
+                continue
+            datas_analisadas.add(data_str)
+            try:
+                dt_chegada = datetime.strptime(data_str, '%Y-%m-%d').date()
+            except ValueError:
+                continue
+
+            qtd = chegada.get('quantidade', 0)
+            estoque_apos = chegada.get('estoque_apos_chegada', 0)
+            dt_fmt = dt_chegada.strftime('%d/%m/%Y')
+
+            partes.append(
+                f'A entrega prevista é **{dt_fmt}** ({qtd:.0f} unidades),'
+                f' com estoque projetado após chegada de **{estoque_apos:.2f} unidades**.'
+            )
+
+            if dt_minimo:
+                dias_diff = int(np.busday_count(dt_chegada, dt_minimo))
+                if dias_diff >= 0:
+                    partes.append(
+                        f'✅ O pedido chegará **{dias_diff} dia{"s" if dias_diff != 1 else ""}** antes'
+                        f' do estoque mínimo (previsto para **{dt_minimo.strftime("%d/%m/%Y")}**).'
+                    )
+                else:
+                    partes.append(
+                        f'⚠️ O pedido chegará **{abs(dias_diff)} dia{"s" if abs(dias_diff) != 1 else ""}** APÓS'
+                        f' o estoque mínimo (previsto para **{dt_minimo.strftime("%d/%m/%Y")}**) — risco de ruptura!'
+                    )
+
+            if dt_zero and dt_chegada > dt_zero:
+                dias_atraso_zero = int(np.busday_count(dt_zero, dt_chegada))
+                partes.append(
+                    f'🚨 O estoque zerará **{dias_atraso_zero} dia{"s" if dias_atraso_zero != 1 else ""}**'
+                    f' antes da entrega (estoque zero em **{dt_zero.strftime("%d/%m/%Y")}**)!'
+                )
+
+        if not chegadas and datas_pedidos_pendentes:
+            for data_str in datas_pedidos_pendentes[:3]:
+                try:
+                    dt_chegada = datetime.strptime(data_str, '%Y-%m-%d').date()
+                except ValueError:
+                    continue
+                dt_fmt = dt_chegada.strftime('%d/%m/%Y')
+                if dt_minimo:
+                    dias_diff = int(np.busday_count(dt_chegada, dt_minimo))
+                    if dias_diff >= 0:
+                        partes.append(
+                            f'Entrega prevista para **{dt_fmt}**, chegando **{dias_diff} dia{"s" if dias_diff != 1 else ""}** antes do estoque mínimo (**{dt_minimo.strftime("%d/%m/%Y")}**). ✅'
+                        )
+                    else:
+                        partes.append(
+                            f'Entrega prevista para **{dt_fmt}**, porém **{abs(dias_diff)} dia{"s" if abs(dias_diff) != 1 else ""}** após o estoque mínimo (**{dt_minimo.strftime("%d/%m/%Y")}**) — risco de ruptura! ⚠️'
+                        )
+                else:
+                    partes.append(f'Entrega prevista para **{dt_fmt}**.')
+
         sugestoes.append({
             'tipo': 'info',
-            'titulo': 'Pedido de compra pendente',
-            'mensagem': f'Existe pedido de compra pendente de {ped_compras:.2f} unidades. '
-                        f'Verifique se a entrega chegará antes do estoque mínimo.',
+            'titulo': titulo,
+            'mensagem': ' '.join(partes),
             'qtd_sugerida': None,
         })
         return sugestoes
 
-    # CENÁRIO 2: Estoque crítico (abaixo do mínimo)
+    dt_chegada_fmt = data_chegada_planejada_formatada or data_chegada.strftime('%d/%m/%Y')
+
     if estoque_atual <= estoque_minimo:
         qtd_total = gap_estoque + qtd_ressuprimento
         dias_atraso = abs(dias_ate_compra) if dias_ate_compra is not None else 0
         sugestoes.append({
             'tipo': 'critico',
-            'titulo': f'URGENTE — Prazo venceu há {dias_atraso} dias',
+            'titulo': f'Estoque abaixo do mínimo — prazo vencido há {dias_atraso} dias',
             'mensagem': (
-                f'Estoque crítico abaixo do mínimo! Solicitar compra HOJE.\n'
-                f'Chegada prevista: {data_chegada.strftime("%d/%m/%Y")} ({dias_uteis_ate_chegada} dias úteis)\n'
-                f'Estoque projetado na chegada: {estoque_no_dia_chegada:.2f} unidades\n'
-                f'Gap: {gap_estoque:.2f} | Ressuprimento: {qtd_ressuprimento:.2f}'
+                f'O estoque atual está abaixo do mínimo e o prazo de compra venceu há **{dias_atraso} dias**.'
+                f' Solicite a compra **hoje**. A chegada prevista do material é **{dt_chegada_fmt}**'
+                f' ({dias_uteis_ate_chegada} dias úteis), com estoque projetado na chegada de'
+                f' **{estoque_no_dia_chegada:.2f} unidades**.'
+                f' Gap estimado: **{gap_estoque:.2f}** unidades; ressuprimento necessário: **{qtd_ressuprimento:.2f}** unidades.'
             ),
             'qtd_sugerida': round(qtd_total, 2),
         })
         return sugestoes
 
-    # CENÁRIO 3: Prazo de compra vencido (mas estoque ainda acima do mínimo)
     if dias_ate_compra is not None and dias_ate_compra <= 0:
         dias_atraso = abs(dias_ate_compra)
         qtd_total = gap_estoque + qtd_ressuprimento
         sugestoes.append({
             'tipo': 'urgente',
-            'titulo': f'Prazo venceu há {dias_atraso} dias',
+            'titulo': f'Prazo de compra vencido há {dias_atraso} dias',
             'mensagem': (
-                f'Solicitar compra HOJE.\n'
-                f'Chegada prevista: {data_chegada.strftime("%d/%m/%Y")}\n'
-                f'Estoque projetado na chegada: {estoque_no_dia_chegada:.2f} unidades\n'
-                f'Gap na chegada: {gap_estoque:.2f} | Ressuprimento: {qtd_ressuprimento:.2f}'
+                f'O prazo para solicitar a compra venceu há **{dias_atraso} dias** — solicite **hoje**.'
+                f' A chegada prevista do material é **{dt_chegada_fmt}**, com estoque projetado na chegada de'
+                f' **{estoque_no_dia_chegada:.2f} unidades**.'
+                f' Gap estimado: **{gap_estoque:.2f}** unidades; ressuprimento necessário: **{qtd_ressuprimento:.2f}** unidades.'
             ),
             'qtd_sugerida': round(qtd_total, 2),
         })
         return sugestoes
 
-    # CENÁRIO 4: Alerta preventivo (≤3 dias para o prazo)
     if dias_ate_compra is not None and dias_ate_compra <= 3:
         if estoque_atual < estoque_minimo:
             gap = estoque_minimo - estoque_atual
@@ -112,23 +203,24 @@ def gerar_sugestoes(projecao: dict) -> list:
             qtd = qtd_ressuprimento
         sugestoes.append({
             'tipo': 'alerta',
-            'titulo': f'Alerta preventivo — {dias_ate_compra} dias para o prazo',
+            'titulo': f'Prazo de compra em {dias_ate_compra} dia{"s" if dias_ate_compra != 1 else ""}',
             'mensagem': (
-                f'Iniciar planejamento do pedido de compra nos próximos dias.\n'
-                f'Quantidade padrão de ressuprimento: {qtd_ressuprimento:.2f} unidades ({int(dias_ressupr)} dias)'
+                f'Restam apenas **{dias_ate_compra} dia{"s" if dias_ate_compra != 1 else ""}** para solicitar a compra.'
+                f' Inicie o planejamento do pedido agora. O ressuprimento padrão é de **{qtd_ressuprimento:.2f} unidades**'
+                f' ({int(dias_ressupr)} dias de cobertura), com chegada prevista em **{dt_chegada_fmt}**.'
             ),
             'qtd_sugerida': round(qtd, 2),
         })
         return sugestoes
 
-    # CENÁRIO 5: Tudo OK
     sugestoes.append({
         'tipo': 'ok',
         'titulo': f'Situação controlada — próxima compra em {dias_ate_compra} dias',
         'mensagem': (
-            f'Consumo diário: {consumo_diario:.3f} unidades\n'
-            f'Dias de ressuprimento: {int(dias_ressupr)}\n'
-            f'Quantidade padrão de compra: {qtd_ressuprimento:.2f} unidades'
+            f'O estoque está dentro do planejado. A próxima compra deve ser solicitada em **{dias_ate_compra} dias**,'
+            f' com ressuprimento de **{qtd_ressuprimento:.2f} unidades** ({int(dias_ressupr)} dias de cobertura,'
+            f' consumo diário de **{consumo_diario:.3f} unidades**).'
+            f' Chegada prevista após a compra: **{dt_chegada_fmt}**.'
         ),
         'qtd_sugerida': round(qtd_ressuprimento, 2),
     })

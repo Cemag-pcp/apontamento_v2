@@ -1,7 +1,9 @@
-import pandas as pd
-import numpy as np
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
 
@@ -19,6 +21,65 @@ def _tratar_valor_numerico(valor, default=0):
         return float(valor)
     except (ValueError, TypeError):
         return default
+
+
+def _valor_escalar(valor, default=None):
+    if isinstance(valor, pd.Series):
+        serie = valor.dropna()
+        return serie.iloc[0] if not serie.empty else default
+    return default if valor is None else valor
+
+
+def _repair_text(text):
+    if not isinstance(text, str):
+        return '' if text is None else str(text)
+    repaired = text
+    for _ in range(2):
+        try:
+            candidate = repaired.encode('latin1').decode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            break
+        if candidate == repaired:
+            break
+        repaired = candidate
+    return repaired
+
+
+def _normalize_header(text):
+    repaired = _repair_text(text)
+    lowered = repaired.lower().replace('\n', ' ').strip()
+    lowered = re.sub(r'\s+', ' ', lowered)
+    lowered = (
+        lowered.replace('ã§', 'c')
+        .replace('ç', 'c')
+        .replace('ã£', 'a')
+        .replace('ã¡', 'a')
+        .replace('ã©', 'e')
+        .replace('é', 'e')
+        .replace('ê', 'e')
+        .replace('í', 'i')
+        .replace('ã³', 'o')
+        .replace('ó', 'o')
+        .replace('õ', 'o')
+        .replace('ú', 'u')
+        .replace('â', '')
+        .replace('ª', '')
+        .replace('º', '')
+    )
+    lowered = re.sub(r'[^a-z0-9 ]+', '', lowered)
+    return lowered.strip()
+
+
+def _rename_columns_by_aliases(df, aliases_map):
+    rename_map = {}
+    normalized_columns = {col: _normalize_header(col) for col in df.columns}
+    for target, aliases in aliases_map.items():
+        normalized_aliases = {_normalize_header(alias) for alias in aliases}
+        for original, normalized in normalized_columns.items():
+            if normalized in normalized_aliases and original not in rename_map:
+                rename_map[original] = target
+                break
+    return df.rename(columns=rename_map)
 
 
 def _adicionar_dias_uteis(data_inicial, num_dias):
@@ -44,10 +105,9 @@ def _adicionar_dias_uteis(data_inicial, num_dias):
 
 
 def _ajustar_estoque(row, df_pedidos):
-    """Adiciona pedidos de compra que chegam antes do estoque mínimo."""
-    data_limite = row.get('data_estoque_minimo')
+    data_limite = _valor_escalar(row.get('data_estoque_minimo'))
     if data_limite is None or pd.isna(data_limite):
-        return row['Est.Almox Central']
+        return row['estoque_almox']
 
     if isinstance(data_limite, datetime):
         data_limite = data_limite.date()
@@ -55,168 +115,171 @@ def _ajustar_estoque(row, df_pedidos):
     try:
         data_limite_ts = pd.to_datetime(data_limite)
     except Exception:
-        return row['Est.Almox Central']
+        return row['estoque_almox']
 
-    # Coluna de quantidade pode ter dois nomes
-    try:
-        qde_col = df_pedidos.loc[:, ~df_pedidos.columns.duplicated()]['Qde Ped']
-    except KeyError:
-        try:
-            qde_col = df_pedidos.loc[:, ~df_pedidos.columns.duplicated()]['Qdade Pedido']
-        except KeyError:
-            return row['Est.Almox Central']
-
-    qde_col = qde_col.apply(
-        lambda x: float(str(x).replace('.', '').replace(',', '.'))
-        if not pd.isna(x) and str(x).strip() != '' else 0
-    )
-    df_pedidos = df_pedidos.copy()
-    df_pedidos['Qde Ped Corrigido'] = qde_col
-    df_pedidos['Data Entrega'] = pd.to_datetime(df_pedidos['Data Entrega'], format='%d/%m/%Y', errors='coerce')
+    if 'qde_ped_corrigido' not in df_pedidos.columns:
+        return row['estoque_almox']
 
     pedidos = df_pedidos[
-        (df_pedidos['Código'] == row['Código']) &
-        (df_pedidos['Data Entrega'] <= data_limite_ts)
+        (df_pedidos['codigo'] == row['codigo']) &
+        (df_pedidos['data_entrega'] <= data_limite_ts)
     ]
     if not pedidos.empty:
-        return row['Est.Almox Central'] + pedidos['Qde Ped Corrigido'].sum()
-    return row['Est.Almox Central']
+        return row['estoque_almox'] + pedidos['qde_ped_corrigido'].sum()
+    return row['estoque_almox']
 
 
 def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd.DataFrame) -> dict:
-    """
-    Porta fiel de main_suporte.py::tratamento_geral().
-    Retorna dict com materiais processados, codigos e grupos para filtros.
-    """
     grupo_df = pd.read_csv(DATA_DIR / 'agrupamento_chapas.csv', sep=';')
     grupos_df = pd.read_csv(DATA_DIR / 'grupos_atualizados.csv', sep=',')
-    grupos_df = grupos_df[['Código', 'grupo']]
+    grupos_df = grupos_df.rename(columns={'CÃ³digo': 'codigo'} if 'CÃ³digo' in grupos_df.columns else {})
+    if 'codigo' not in grupos_df.columns:
+        grupos_df = _rename_columns_by_aliases(grupos_df, {'codigo': ['Código', 'CÃ³digo', 'codigo']})
+    grupos_df = grupos_df[['codigo', 'grupo']]
 
-    # --- Processamento do df de simulação ---
-    df = simulacao_df_raw.copy()
+    simulacao_aliases = {
+        'codigo': ['Código', 'CÃ³digo', 'codigo'],
+        'descricao': ['Descrição', 'Descrição', 'DescriÃ§Ã£o', 'descricao'],
+        'media_3m': ['Média 3M', 'MÃ©dia 3M', 'media 3m'],
+        'cons_mes_anterior': ['Cons Mes Anterior', 'Cons Mes\nAnterior'],
+        'simulado_pend_vendas': ['Simulado Pend Vendas', 'Simulado \nPend Vendas'],
+        'estoque_almox': ['Est.Almox Central'],
+        'est_producao': ['Est. Produção', 'Est. ProduÃ§Ã£o'],
+        'estoque_total': ['Estoque Total'],
+        'ped_compras_pendente': ['Ped.Compras Pendente', 'Ped.Compras\n Pendente'],
+        'prev_consumo': ['Prev Con Mov Est(CMM)'],
+        'simulacao': ['SIMULAÇÃO / (F.Pend/Fat.MM)', 'SIMULAÃ‡ÃƒO / (F.Pend/Fat.MM)', 'SIMULACAO / (F.Pend/Fat.MM)'],
+        'dee_dias_em_est': ['DEE - Dias Em Est.'],
+        'dias_ressupr': ['Dias Ressupr', 'Dias\nRessupr'],
+        'dias_seg': ['Dias de seg.'],
+        'estoque_minimo': ['Estoque Mínimo', 'Estoque MÃ­nimo', 'Estoque Minimo'],
+    }
+    pedidos_aliases = {
+        'recurso': ['Recurso'],
+        'data_entrega': ['Data Entrega'],
+        'qde_ped': ['Qde Ped', 'Qdade Pedido'],
+        'codigo': ['Código', 'CÃ³digo', 'codigo'],
+    }
 
-    # Criar linhas agrupadas de chapas
-    duplicated = df[df['Código'].isin(grupo_df['codigo'])].copy()
-    duplicated = duplicated.merge(grupo_df, left_on='Código', right_on='codigo')
-    duplicated['Descrição'] = duplicated['grupo']
-    duplicated['Código'] = duplicated['grupo']
-    df = pd.concat([df, duplicated.drop(columns=['grupo', 'codigo'])]).reset_index(drop=True)
+    df = _rename_columns_by_aliases(simulacao_df_raw.copy(), simulacao_aliases)
+    df_ped = _rename_columns_by_aliases(pedidos_df_raw.copy(), pedidos_aliases)
 
-    # Tratar colunas numéricas
+    duplicated = df[df['codigo'].isin(grupo_df['codigo'])].copy()
+    duplicated = duplicated.merge(grupo_df, left_on='codigo', right_on='codigo')
+    duplicated['descricao'] = duplicated['grupo']
+    duplicated['codigo'] = duplicated['grupo']
+    df = pd.concat([df, duplicated.drop(columns=['grupo'])]).reset_index(drop=True)
+
     colunas_numericas = [
-        'Média 3M', 'Cons Mes\nAnterior', 'Simulado \nPend Vendas',
-        'Est.Almox Central', 'Est. Produção', 'Estoque Total',
-        'Ped.Compras\n Pendente', 'Prev Con Mov Est(CMM)',
-        'SIMULAÇÃO / (F.Pend/Fat.MM)', 'DEE - Dias Em Est.',
-        'Dias\nRessupr', 'Dias de seg.', 'Estoque Mínimo'
+        'media_3m', 'cons_mes_anterior', 'simulado_pend_vendas', 'estoque_almox',
+        'est_producao', 'estoque_total', 'ped_compras_pendente', 'prev_consumo',
+        'simulacao', 'dee_dias_em_est', 'dias_ressupr', 'dias_seg', 'estoque_minimo',
     ]
     for col in colunas_numericas:
         if col in df.columns:
-            default = 10 if col == 'Dias de seg.' else 0
+            default = 10 if col == 'dias_seg' else 0
             df[col] = df[col].apply(lambda x: _tratar_valor_numerico(x, default))
 
-    # Agrupar
     agg = {
-        'Média 3M': 'mean', 'Cons Mes\nAnterior': 'mean',
-        'Dias\nRessupr': 'max', 'Dias de seg.': 'max',
-        'Estoque Mínimo': 'mean', 'Prev Con Mov Est(CMM)': 'mean',
-        'SIMULAÇÃO / (F.Pend/Fat.MM)': 'max',
-        'Simulado \nPend Vendas': 'sum', 'Est.Almox Central': 'sum',
-        'Est. Produção': 'sum', 'Estoque Total': 'sum',
-        'Ped.Compras\n Pendente': 'sum', 'DEE - Dias Em Est.': 'sum',
+        'media_3m': 'mean',
+        'cons_mes_anterior': 'mean',
+        'dias_ressupr': 'max',
+        'dias_seg': 'max',
+        'estoque_minimo': 'mean',
+        'prev_consumo': 'mean',
+        'simulacao': 'max',
+        'simulado_pend_vendas': 'sum',
+        'estoque_almox': 'sum',
+        'est_producao': 'sum',
+        'estoque_total': 'sum',
+        'ped_compras_pendente': 'sum',
+        'dee_dias_em_est': 'sum',
     }
     agg_valido = {k: v for k, v in agg.items() if k in df.columns}
-    df = df.groupby(['Descrição', 'Código']).agg(agg_valido).reset_index()
+    df = df.groupby(['descricao', 'codigo']).agg(agg_valido).reset_index()
+    df = df.loc[:, ~df.columns.duplicated()]
+    df = df.merge(grupos_df, on='codigo', how='left').fillna({'grupo': 'Sem Grupo'})
 
-    # Merge com grupos para filtro
-    df = df.merge(grupos_df, on='Código', how='left').fillna({'grupo': 'Sem Grupo'})
-
-    # --- Processamento de pedidos ---
-    df_ped = pedidos_df_raw.copy()
     renomear_col = list(df_ped.columns)
     if len(renomear_col) > 12:
-        renomear_col[12] = 'Recurso_1'
+        renomear_col[12] = 'recurso_1'
         df_ped.columns = renomear_col
 
-    if 'Recurso' in df_ped.columns:
-        df_ped['Código'] = df_ped['Recurso'].str.split(' - ').str[0]
+    if 'recurso' in df_ped.columns:
+        df_ped['codigo'] = df_ped['recurso'].astype(str).str.split(' - ').str[0]
 
-    df_ped['Data Entrega'] = pd.to_datetime(df_ped['Data Entrega'], format='%d/%m/%Y', errors='coerce')
-    df_ped['Data Entrega'] = df_ped['Data Entrega'].apply(
-        lambda x: x - timedelta(days=1) if pd.notna(x) and x.weekday() == 5
-        else (x + timedelta(days=1) if pd.notna(x) and x.weekday() == 6 else x)
-    )
+    if 'qde_ped' in df_ped.columns:
+        qde_raw = df_ped.loc[:, df_ped.columns == 'qde_ped']
+        qde_serie = qde_raw.iloc[:, 0] if isinstance(qde_raw, pd.DataFrame) else qde_raw
+        df_ped['qde_ped_corrigido'] = qde_serie.apply(
+            lambda x: float(str(x).replace('.', '').replace(',', '.'))
+            if not pd.isna(x) and str(x).strip() != '' else 0
+        )
+    else:
+        df_ped['qde_ped_corrigido'] = 0
 
-    # Duplicar pedidos de chapas agrupadas
-    if 'Código' in df_ped.columns:
-        dup_ped = df_ped[df_ped['Código'].isin(grupo_df['codigo'])].copy()
-        dup_ped = dup_ped.merge(grupo_df, left_on='Código', right_on='codigo')
+    if 'data_entrega' in df_ped.columns:
+        df_ped['data_entrega'] = pd.to_datetime(df_ped['data_entrega'], format='%d/%m/%Y', errors='coerce')
+        df_ped['data_entrega'] = df_ped['data_entrega'].apply(
+            lambda x: x - timedelta(days=1) if pd.notna(x) and x.weekday() == 5
+            else (x + timedelta(days=1) if pd.notna(x) and x.weekday() == 6 else x)
+        )
+
+    if 'codigo' in df_ped.columns:
+        dup_ped = df_ped[df_ped['codigo'].isin(grupo_df['codigo'])].copy()
+        dup_ped = dup_ped.merge(grupo_df, on='codigo')
         if not dup_ped.empty:
-            dup_ped['Recurso'] = dup_ped['grupo']
-            dup_ped['Código'] = dup_ped['grupo']
-            if 'Recurso' in dup_ped.columns:
-                dup_ped['Recurso'] = dup_ped['Recurso'].apply(lambda x: f"{x} - {x}")
-            df_ped = pd.concat([df_ped, dup_ped.drop(columns=['grupo', 'codigo'])]).reset_index(drop=True)
-        if 'Recurso' in df_ped.columns:
-            df_ped = df_ped[df_ped['Recurso'] != '']
+            dup_ped['recurso'] = dup_ped['grupo']
+            dup_ped['codigo'] = dup_ped['grupo']
+            if 'recurso' in dup_ped.columns:
+                dup_ped['recurso'] = dup_ped['recurso'].apply(lambda x: f"{x} - {x}")
+            df_ped = pd.concat([df_ped, dup_ped.drop(columns=['grupo'])]).reset_index(drop=True)
+        if 'recurso' in df_ped.columns:
+            df_ped = df_ped[df_ped['recurso'] != '']
 
-    # --- Cálculos principais ---
     df['consumo_diario'] = df.apply(
         lambda row: max(
-            row.get('SIMULAÇÃO / (F.Pend/Fat.MM)', 0) or 0,
-            row.get('Prev Con Mov Est(CMM)', 0) or 0
+            _valor_escalar(row.get('simulacao'), 0) or 0,
+            _valor_escalar(row.get('prev_consumo'), 0) or 0,
         ) / 20,
-        axis=1
+        axis=1,
     )
 
     hoje = datetime.now().date()
-
     df['dias_ate_estoque_minimo'] = df.apply(
-        lambda row: (row['Est.Almox Central'] - row['Estoque Mínimo']) / row['consumo_diario']
+        lambda row: (row['estoque_almox'] - row['estoque_minimo']) / row['consumo_diario']
         if row['consumo_diario'] > 0 else None,
-        axis=1
+        axis=1,
     )
-    df['data_estoque_minimo'] = df['dias_ate_estoque_minimo'].apply(
-        lambda dias: _adicionar_dias_uteis(hoje, dias)
-    )
+    df['data_estoque_minimo'] = df['dias_ate_estoque_minimo'].apply(lambda dias: _adicionar_dias_uteis(hoje, dias))
     df['data_compra'] = df.apply(
-        lambda row: _adicionar_dias_uteis(row['data_estoque_minimo'], (row['Dias\nRessupr']) * -1)
-        if pd.notna(row.get('data_estoque_minimo')) and pd.notna(row.get('Dias\nRessupr')) else None,
-        axis=1
+        lambda row: _adicionar_dias_uteis(row['data_estoque_minimo'], _valor_escalar(row.get('dias_ressupr'), 0) * -1)
+        if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) and pd.notna(_valor_escalar(row.get('dias_ressupr'))) else None,
+        axis=1,
     )
 
-    # Ajusta estoque com pedidos pendentes antes do mínimo
-    df['Est.Almox Central'] = df.apply(lambda row: _ajustar_estoque(row, df_ped), axis=1)
-
-    # Recalcula com estoque ajustado
+    df['estoque_almox'] = df.apply(lambda row: _ajustar_estoque(row, df_ped), axis=1)
     df['dias_ate_estoque_minimo'] = df.apply(
-        lambda row: (row['Est.Almox Central'] - row['Estoque Mínimo']) / row['consumo_diario']
+        lambda row: (row['estoque_almox'] - row['estoque_minimo']) / row['consumo_diario']
         if row['consumo_diario'] > 0 else None,
-        axis=1
+        axis=1,
     )
-    df['data_estoque_minimo'] = df['dias_ate_estoque_minimo'].apply(
-        lambda dias: _adicionar_dias_uteis(hoje, dias)
-    )
+    df['data_estoque_minimo'] = df['dias_ate_estoque_minimo'].apply(lambda dias: _adicionar_dias_uteis(hoje, dias))
     df['dias_ate_estoque_zero'] = df.apply(
-        lambda row: row['Est.Almox Central'] / row['consumo_diario']
-        if row['consumo_diario'] > 0 else None,
-        axis=1
+        lambda row: row['estoque_almox'] / row['consumo_diario'] if row['consumo_diario'] > 0 else None,
+        axis=1,
     )
-    df['data_estoque_zero'] = df['dias_ate_estoque_zero'].apply(
-        lambda dias: _adicionar_dias_uteis(hoje, dias)
-    )
+    df['data_estoque_zero'] = df['dias_ate_estoque_zero'].apply(lambda dias: _adicionar_dias_uteis(hoje, dias))
     df['data_compra'] = df.apply(
-        lambda row: _adicionar_dias_uteis(row['data_estoque_minimo'], (row['Dias\nRessupr'] + 1) * -1)
-        if pd.notna(row.get('data_estoque_minimo')) and pd.notna(row.get('Dias\nRessupr')) else None,
-        axis=1
+        lambda row: _adicionar_dias_uteis(row['data_estoque_minimo'], (_valor_escalar(row.get('dias_ressupr'), 0) + 1) * -1)
+        if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) and pd.notna(_valor_escalar(row.get('dias_ressupr'))) else None,
+        axis=1,
     )
     df['dias_ate_data_compra'] = df.apply(
-        lambda row: int(np.busday_count(hoje, row['data_compra']))
-        if pd.notna(row.get('data_compra')) else None,
-        axis=1
+        lambda row: int(np.busday_count(hoje, row['data_compra'])) if pd.notna(_valor_escalar(row.get('data_compra'))) else None,
+        axis=1,
     )
 
-    # Flag urgência
     def _flag(dias):
         if dias is None or pd.isna(dias):
             return 'SEM_DADOS'
@@ -228,35 +291,34 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
 
     df['flag_urgencia'] = df['dias_ate_data_compra'].apply(_flag)
 
-    # Remover primeira linha (cabeçalho duplicado da planilha)
-    df = df.iloc[1:].reset_index(drop=True)
+    if len(df) > 1:
+        df = df.iloc[1:].reset_index(drop=True)
 
-    # Montar lista de materiais para serialização JSON
     materiais = []
     for _, row in df.iterrows():
         materiais.append({
-            'codigo': str(row.get('Código', '')),
-            'descricao': str(row.get('Descrição', '')),
-            'grupo': str(row.get('grupo', '')),
-            'media_3m': round(float(row.get('Média 3M', 0) or 0), 2),
-            'estoque_almox': round(float(row.get('Est.Almox Central', 0) or 0), 2),
-            'estoque_total': round(float(row.get('Estoque Total', 0) or 0), 2),
-            'ped_compras': round(float(row.get('Ped.Compras\n Pendente', 0) or 0), 2),
-            'consumo_diario': round(float(row.get('consumo_diario', 0) or 0), 3),
+            'codigo': str(_valor_escalar(row.get('codigo'), '')),
+            'descricao': str(_valor_escalar(row.get('descricao'), '')),
+            'grupo': str(_valor_escalar(row.get('grupo'), '')),
+            'media_3m': round(float(_valor_escalar(row.get('media_3m'), 0) or 0), 2),
+            'estoque_almox': round(float(_valor_escalar(row.get('estoque_almox'), 0) or 0), 2),
+            'estoque_total': round(float(_valor_escalar(row.get('estoque_total'), 0) or 0), 2),
+            'ped_compras': round(float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0), 2),
+            'consumo_diario': round(float(_valor_escalar(row.get('consumo_diario'), 0) or 0), 3),
             'dias_ate_zero': round(float(row['dias_ate_estoque_zero']), 1)
-                if pd.notna(row.get('dias_ate_estoque_zero')) else 9999,
+            if pd.notna(_valor_escalar(row.get('dias_ate_estoque_zero'))) else 9999,
             'dias_ate_data_compra': int(row['dias_ate_data_compra'])
-                if pd.notna(row.get('dias_ate_data_compra')) else None,
+            if pd.notna(_valor_escalar(row.get('dias_ate_data_compra'))) else None,
             'data_compra': row['data_compra'].strftime('%d/%m/%Y')
-                if pd.notna(row.get('data_compra')) else None,
+            if pd.notna(_valor_escalar(row.get('data_compra'))) else None,
             'data_estoque_minimo': row['data_estoque_minimo'].strftime('%d/%m/%Y')
-                if pd.notna(row.get('data_estoque_minimo')) else None,
+            if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) else None,
             'data_estoque_zero': row['data_estoque_zero'].strftime('%d/%m/%Y')
-                if pd.notna(row.get('data_estoque_zero')) else None,
-            'dias_ressupr': round(float(row.get('Dias\nRessupr', 0) or 0), 0),
-            'estoque_minimo': round(float(row.get('Estoque Mínimo', 0) or 0), 2),
-            'flag_urgencia': row['flag_urgencia'],
-            'tem_pedido': 'SIM' if float(row.get('Ped.Compras\n Pendente', 0) or 0) > 0 else 'NÃO',
+            if pd.notna(_valor_escalar(row.get('data_estoque_zero'))) else None,
+            'dias_ressupr': round(float(_valor_escalar(row.get('dias_ressupr'), 0) or 0), 0),
+            'estoque_minimo': round(float(_valor_escalar(row.get('estoque_minimo'), 0) or 0), 2),
+            'flag_urgencia': _valor_escalar(row.get('flag_urgencia'), 'SEM_DADOS'),
+            'tem_pedido': 'SIM' if float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0) > 0 else 'NÃO',
         })
 
     codigos = sorted(set(m['codigo'] for m in materiais if m['codigo']))
@@ -272,42 +334,45 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
 
 
 def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFrame) -> dict:
-    """
-    Retorna dados para o gráfico de projeção de estoque de um material.
-    df e df_ped já devem ser os DataFrames processados por processar_material_direto.
-    """
-    linha = df[df['Código'] == codigo]
+    linha = df[df['codigo'] == codigo]
     if linha.empty:
         return {'error': 'Material não encontrado'}
 
     row = linha.iloc[0]
-    estoque_atual = float(row['Est.Almox Central'])
-    estoque_minimo = float(row.get('Estoque Mínimo', 0) or 0)
-    consumo_diario = float(row.get('consumo_diario', 0) or 0)
-    dias_ressupr = float(row.get('Dias\nRessupr', 0) or 0)
+    estoque_atual = float(_valor_escalar(row.get('estoque_almox'), 0) or 0)
+    estoque_minimo = float(_valor_escalar(row.get('estoque_minimo'), 0) or 0)
+    consumo_diario = float(_valor_escalar(row.get('consumo_diario'), 0) or 0)
+    dias_ressupr = float(_valor_escalar(row.get('dias_ressupr'), 0) or 0)
+    data_compra = _valor_escalar(row.get('data_compra'))
 
-    datas = pd.date_range(start=datetime.now().date(), periods=61, freq='B')
-
-    # Série de consumo real (com pedidos)
+    datas = pd.date_range(start=datetime.now().date(), periods=121, freq='B')
     estoque_atual_dia = estoque_atual
     datas_grafico = []
     estoque_diario = []
+    chegadas_previstas = []
+    pedidos_pendentes_qs = df_ped[df_ped['codigo'] == codigo].copy()
+    pedidos_pendentes_qs = pedidos_pendentes_qs[
+        pd.notna(pedidos_pendentes_qs.get('data_entrega')) &
+        (pedidos_pendentes_qs.get('qde_ped_corrigido', 0) > 0)
+    ]
 
     for data in datas:
         estoque_atual_dia -= consumo_diario
         datas_grafico.append(data.strftime('%Y-%m-%d'))
         estoque_diario.append(round(estoque_atual_dia, 2))
 
-        pedidos_do_dia = df_ped[
-            (df_ped['Código'] == codigo) &
-            (df_ped['Data Entrega'] == data)
-        ]
-        if not pedidos_do_dia.empty and 'Qde Ped Corrigido' in pedidos_do_dia.columns:
-            estoque_atual_dia += pedidos_do_dia['Qde Ped Corrigido'].sum()
+        pedidos_do_dia = df_ped[(df_ped['codigo'] == codigo) & (df_ped['data_entrega'] == data)]
+        if not pedidos_do_dia.empty and 'qde_ped_corrigido' in pedidos_do_dia.columns:
+            quantidade_chegada = float(pedidos_do_dia['qde_ped_corrigido'].sum())
+            estoque_atual_dia += quantidade_chegada
             datas_grafico.append(data.strftime('%Y-%m-%d'))
             estoque_diario.append(round(estoque_atual_dia, 2))
+            chegadas_previstas.append({
+                'data': data.strftime('%Y-%m-%d'),
+                'quantidade': round(quantidade_chegada, 2),
+                'estoque_apos_chegada': round(estoque_atual_dia, 2),
+            })
 
-    # Série ideal (serrote)
     estoque_ideal = estoque_atual
     valor_ideal_compra = dias_ressupr * consumo_diario
     datas_ideal = []
@@ -317,27 +382,42 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
         estoque_ideal -= consumo_diario
         datas_ideal.append(data.strftime('%Y-%m-%d'))
         estoque_ideal_diario.append(round(estoque_ideal, 2))
-
         if estoque_ideal <= estoque_minimo:
             estoque_ideal += valor_ideal_compra
             datas_ideal.append(data.strftime('%Y-%m-%d'))
             estoque_ideal_diario.append(round(estoque_ideal, 2))
 
+    chegada_planejada_compra = None
+    if pd.notna(data_compra):
+        chegada_planejada_data = _adicionar_dias_uteis(data_compra, dias_ressupr)
+        if pd.notna(chegada_planejada_data):
+            chegada_planejada_compra = {
+                'data': pd.to_datetime(chegada_planejada_data).strftime('%Y-%m-%d'),
+                'estoque_referencia': round(estoque_minimo, 2),
+            }
+
     return {
         'codigo': codigo,
-        'descricao': str(row.get('Descrição', '')),
+        'descricao': str(_valor_escalar(row.get('descricao'), '')),
         'estoque_minimo': estoque_minimo,
         'consumo_diario': round(consumo_diario, 3),
         'dias_ressupr': dias_ressupr,
-        'dias_ate_data_compra': int(row['dias_ate_data_compra'])
-            if pd.notna(row.get('dias_ate_data_compra')) else None,
-        'data_compra': row['data_compra'].strftime('%d/%m/%Y')
-            if pd.notna(row.get('data_compra')) else None,
-        'data_estoque_zero': row['data_estoque_zero'].strftime('%d/%m/%Y')
-            if pd.notna(row.get('data_estoque_zero')) else None,
-        'flag_urgencia': str(row.get('flag_urgencia', '')),
+        'dias_ate_data_compra': int(row['dias_ate_data_compra']) if pd.notna(_valor_escalar(row.get('dias_ate_data_compra'))) else None,
+        'data_compra': row['data_compra'].strftime('%d/%m/%Y') if pd.notna(_valor_escalar(row.get('data_compra'))) else None,
+        'data_estoque_zero': row['data_estoque_zero'].strftime('%d/%m/%Y') if pd.notna(_valor_escalar(row.get('data_estoque_zero'))) else None,
+        'flag_urgencia': str(_valor_escalar(row.get('flag_urgencia'), '')),
         'serie_real': {'datas': datas_grafico, 'estoques': estoque_diario},
         'serie_ideal': {'datas': datas_ideal, 'estoques': estoque_ideal_diario},
+        'chegadas_previstas': chegadas_previstas,
+        'pedidos_pendentes_count': int(len(pedidos_pendentes_qs)),
+        'datas_pedidos_pendentes': sorted({
+            data.strftime('%Y-%m-%d')
+            for data in pedidos_pendentes_qs['data_entrega'].tolist()
+            if pd.notna(data)
+        }),
+        'chegada_planejada_compra': chegada_planejada_compra,
         'estoque_atual': round(estoque_atual, 2),
-        'ped_compras': round(float(row.get('Ped.Compras\n Pendente', 0) or 0), 2),
+        'ped_compras': round(float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0), 2),
+        'data_estoque_minimo': row['data_estoque_minimo'].strftime('%Y-%m-%d')
+            if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) else None,
     }

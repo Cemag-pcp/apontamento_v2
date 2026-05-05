@@ -157,6 +157,14 @@
                                     <option value="tubo_quadrado">Tubo quadrado</option>
                                 </select>
                             </div>
+                            <div class="mb-3" id="container-tipo-componentes-cilindros" style="display:none;">
+                                <label for="tipo-componentes-cilindros" class="form-label form-label-sm fw-semibold">Tipo</label>
+                                <select id="tipo-componentes-cilindros" class="form-select form-select-sm">
+                                    <option value="haste" selected>Haste</option>
+                                    <option value="vedacao">Vedação</option>
+                                    <option value="camisa">Camisa</option>
+                                </select>
+                            </div>
                             <ul class="nav nav-tabs nav-tabs-sm mb-0" id="tabs-unidades-recebimento"></ul>
                             <div class="tab-content border border-top-0 rounded-bottom p-2" id="content-unidades-recebimento" style="max-height:55vh;overflow-y:auto;"></div>
                             <div class="d-flex justify-content-end gap-2 mt-3">
@@ -520,6 +528,7 @@
     // â”€â”€â”€ helpers do formulÃ¡rio dinÃ¢mico â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let classeAtual = "";
     let tipoTubosBarrasAtual = "barra";
+    let tipoComponentesCilindrosAtual = "haste";
 
     function capturarValoresFormularioRecebimento() {
         const form = document.getElementById("form-inspecao-recebimento");
@@ -709,6 +718,7 @@
             quantidade_lote: "",
             resultado_lote: "",
             tipo_tubos_barras: "barra",
+            tipo_componentes_cilindros: "haste",
             valores_form: {},
         };
     }
@@ -732,6 +742,7 @@
         if (contentUnidades) contentUnidades.innerHTML = "";
 
         tipoTubosBarrasAtual = "barra";
+        tipoComponentesCilindrosAtual = "haste";
         classeAtual = "";
         materiaisRecebimento = [];
         materialAtivoIndex = 0;
@@ -775,6 +786,7 @@
         material.quantidade_lote = document.getElementById("quantidade-lote-recebimento")?.value || "";
         material.resultado_lote = document.getElementById("resultado-lote-recebimento")?.value || "";
         material.tipo_tubos_barras = tipoTubosBarrasAtual;
+        material.tipo_componentes_cilindros = tipoComponentesCilindrosAtual;
         material.valores_form = capturarValoresFormularioRecebimento();
     }
 
@@ -797,6 +809,9 @@
         tipoTubosBarrasAtual = material.tipo_tubos_barras || "barra";
         const tipoTubosBarrasSelect = document.getElementById("tipo-tubos-barras");
         if (tipoTubosBarrasSelect) tipoTubosBarrasSelect.value = tipoTubosBarrasAtual;
+        tipoComponentesCilindrosAtual = material.tipo_componentes_cilindros || "haste";
+        const tipoComponentesCilindrosSelect = document.getElementById("tipo-componentes-cilindros");
+        if (tipoComponentesCilindrosSelect) tipoComponentesCilindrosSelect.value = tipoComponentesCilindrosAtual;
 
         renderUnidades(material.qtd || 1);
         reaplicarValoresFormularioRecebimento(material.valores_form || {});
@@ -1232,28 +1247,41 @@
 
         "Componentes de Cilindros": (prefix) => {
             let html = "";
-            html += secao("Camisa");
-            html += `<div class="fw-semibold small mt-2 mb-2">Dimensional</div>`;
-            html += `<div class="mb-2"><label class="form-label form-label-sm">Comprimento</label>`
-                  + `<input type="text" name="${prefix}camisa_dim_comprimento" class="form-control form-control-sm"></div>`;
-            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. interno</label>`
-                  + `<input type="text" name="${prefix}camisa_dim_diametro_interno" class="form-control form-control-sm"></div>`;
-            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
-                  + `<input type="text" name="${prefix}camisa_dim_diametro_externo" class="form-control form-control-sm"></div>`;
-            html += selectConformidade(prefix, "camisa_dim_reiture_tubo", "reitude do tubo");
-            html += selectConformidade(prefix, "camisa_dim_circularidade_tubo", "circularidade do tubo");
-            html += `<div class="fw-semibold small mt-2 mb-2">Visual</div>`;
-            html += selectConformidade(prefix, "camisa_visual_oxidacao", "Oxidação");
-
-            html += secao("Haste");
-            html += `<div class="fw-semibold small mt-2 mb-2">Dimensional</div>`;
-            html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento</label>`
-                  + `<input type="text" name="${prefix}haste_dim_comprimento" class="form-control form-control-sm"></div>`;
-            html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
-                  + `<input type="text" name="${prefix}haste_dim_diametro_externo" class="form-control form-control-sm"></div>`;
-            html += `<div class="fw-semibold small mt-2 mb-2">Visual</div>`;
-            html += selectConformidade(prefix, "haste_visual_oxidacao", "oxidação");
-            html += selectConformidade(prefix, "haste_visual_marcacoes", "marcações");
+            html += `<input type="hidden" name="${prefix}tipo_componentes_cilindros" value="${tipoComponentesCilindrosAtual}">`;
+            if (tipoComponentesCilindrosAtual === "camisa") {
+                html += secao("Camisa");
+                html += `<div class="fw-semibold small mt-2 mb-2">Dimensional</div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">Comprimento</label>`
+                      + `<input type="text" name="${prefix}camisa_dim_comprimento" class="form-control form-control-sm"></div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">diam. interno</label>`
+                      + `<input type="text" name="${prefix}camisa_dim_diametro_interno" class="form-control form-control-sm"></div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
+                      + `<input type="text" name="${prefix}camisa_dim_diametro_externo" class="form-control form-control-sm"></div>`;
+                html += selectConformidade(prefix, "camisa_dim_reiture_tubo", "reitude do tubo");
+                html += selectConformidade(prefix, "camisa_dim_circularidade_tubo", "circularidade do tubo");
+                html += `<div class="fw-semibold small mt-2 mb-2">Visual</div>`;
+                html += selectConformidade(prefix, "camisa_visual_oxidacao", "Oxidação");
+            } else if (tipoComponentesCilindrosAtual === "vedacao") {
+                html += secao("Vedação");
+                html += `<div class="fw-semibold small mt-2 mb-2">Dimensional</div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">Diâmetro interno lábio</label>`
+                      + `<input type="text" name="${prefix}vedacao_dim_diametro_interno_labio" class="form-control form-control-sm"></div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">Diâmetro externo lábio</label>`
+                      + `<input type="text" name="${prefix}vedacao_dim_diametro_externo_labio" class="form-control form-control-sm"></div>`;
+                html += `<div class="fw-semibold small mt-2 mb-2">Visual</div>`;
+                html += selectConformidade(prefix, "vedacao_visual_ressecamento", "Ressecamento");
+                html += selectConformidade(prefix, "vedacao_visual_falhas", "Falhas");
+            } else {
+                html += secao("Haste");
+                html += `<div class="fw-semibold small mt-2 mb-2">Dimensional</div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento</label>`
+                      + `<input type="text" name="${prefix}haste_dim_comprimento" class="form-control form-control-sm"></div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
+                      + `<input type="text" name="${prefix}haste_dim_diametro_externo" class="form-control form-control-sm"></div>`;
+                html += `<div class="fw-semibold small mt-2 mb-2">Visual</div>`;
+                html += selectConformidade(prefix, "haste_visual_oxidacao", "oxidação");
+                html += selectConformidade(prefix, "haste_visual_marcacoes", "marcações");
+            }
 
             html += secao("Resultado");
             html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
@@ -1367,10 +1395,16 @@
         ).trim();
         const containerTipoTubosBarras = document.getElementById("container-tipo-tubos-barras");
         const selectTipoTubosBarras = document.getElementById("tipo-tubos-barras");
+        const containerTipoComponentesCilindros = document.getElementById("container-tipo-componentes-cilindros");
+        const selectTipoComponentesCilindros = document.getElementById("tipo-componentes-cilindros");
         const isTubosEBarras = classeAtual === "Tubos e barras";
+        const isComponentesCilindros = classeAtual === "Componentes de Cilindros";
         containerTipoTubosBarras.style.display = isTubosEBarras ? "" : "none";
+        containerTipoComponentesCilindros.style.display = isComponentesCilindros ? "" : "none";
         tipoTubosBarrasAtual = "barra";
         selectTipoTubosBarras.value = tipoTubosBarrasAtual;
+        tipoComponentesCilindrosAtual = "haste";
+        selectTipoComponentesCilindros.value = tipoComponentesCilindrosAtual;
         inicializarMateriaisRecebimento("");
 
         const modalElement = document.getElementById("modal-inspecao-recebimento");
@@ -1487,6 +1521,7 @@
                 quantidade_lote: material?.quantidade_lote || "",
                 resultado_lote: resultadoLoteMaterial,
                 tipo_tubos_barras: material?.tipo_tubos_barras || "barra",
+                tipo_componentes_cilindros: material?.tipo_componentes_cilindros || "haste",
                 unidades: unidadesMaterial,
             });
         }
@@ -1621,6 +1656,13 @@
             tipoTubosBarrasAtual = e.target.value;
             const material = materiaisRecebimento[materialAtivoIndex];
             if (material) material.tipo_tubos_barras = tipoTubosBarrasAtual;
+            const qtd = parseInt(document.getElementById("qtd-unidades-recebimento").value) || 1;
+            renderUnidades(qtd);
+        });
+        document.getElementById("tipo-componentes-cilindros").addEventListener("change", (e) => {
+            tipoComponentesCilindrosAtual = e.target.value;
+            const material = materiaisRecebimento[materialAtivoIndex];
+            if (material) material.tipo_componentes_cilindros = tipoComponentesCilindrosAtual;
             const qtd = parseInt(document.getElementById("qtd-unidades-recebimento").value) || 1;
             renderUnidades(qtd);
         });

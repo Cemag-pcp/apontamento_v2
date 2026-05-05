@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static %}
 
 {% block title %}<title>Análise de Compras</title>{% endblock %}
@@ -20,7 +20,6 @@
         </div>
     </div>
 
-    <!-- Filtros -->
     <div class="card mb-3">
         <div class="card-body py-2">
             <div class="row g-2 align-items-end">
@@ -59,7 +58,6 @@
         </div>
     </div>
 
-    <!-- Contadores de urgência -->
     <div class="row g-2 mb-3" id="contadores" style="display:none!important;">
         <div class="col-auto">
             <span class="badge bg-danger fs-6 px-3 py-2" id="ctUrgente">0 urgentes</span>
@@ -75,13 +73,11 @@
         </div>
     </div>
 
-    <!-- Loading -->
     <div id="loadingTabela" class="text-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
         <p class="mt-2 text-muted">Carregando dados da planilha... (pode levar alguns segundos)</p>
     </div>
 
-    <!-- Tabela -->
     <div id="tabelaWrapper" style="display:none;">
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle" id="tabelaMateriais">
@@ -106,16 +102,14 @@
         </div>
     </div>
 
-    <!-- Mensagem sem resultados -->
     <div id="semResultados" class="alert alert-info" style="display:none;">
         Nenhum material encontrado com os filtros aplicados.
     </div>
 
 </div>
 
-<!-- Modal de Projeção de Estoque -->
 <div class="modal fade" id="modalProjecao" tabindex="-1" aria-labelledby="modalProjecaoLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-fullscreen-xxl-down compras-modal-grafico">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalProjecaoLabel">
@@ -124,28 +118,43 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
-            <div class="modal-body p-3">
-
-                <!-- Loading -->
+            <div class="modal-body p-3 compras-projecao-body">
                 <div id="loadingGrafico" class="text-center py-5">
                     <div class="spinner-border text-primary" role="status"></div>
                     <p class="mt-2 text-muted small">Calculando projeção...</p>
                 </div>
 
-                <!-- Conteúdo -->
                 <div id="conteudoGrafico" style="display:none;">
-                    <!-- Gráfico Plotly -->
-                    <div id="plotlyDiv" style="height:420px; width:100%;"></div>
-
-                    <!-- Sugestões -->
-                    <hr class="my-3">
-                    <h6 class="fw-bold mb-2"><i class="fas fa-lightbulb me-1 text-warning"></i> Sugestões de Compra</h6>
-                    <div id="painelSugestoes"></div>
+                    <section class="compras-projecao-grafico">
+                        <div id="plotlyDiv"></div>
+                    </section>
                 </div>
-
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade compras-modal-lateral" id="modalSugestoesCompra" tabindex="-1" aria-labelledby="modalSugestoesCompraLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalSugestoesCompraLabel">
+                    <i class="fas fa-lightbulb me-2 text-warning"></i>
+                    <span id="tituloSugestoesCompra">Sugestões de Compra</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="loadingSugestoes" class="text-center py-5">
+                    <div class="spinner-border text-warning" role="status"></div>
+                    <p class="mt-2 text-muted small">Carregando sugestões...</p>
+                </div>
+                <div id="conteudoSugestoes" style="display:none;">
+                    <div id="painelSugestoes"></div>
+                </div>
             </div>
         </div>
     </div>

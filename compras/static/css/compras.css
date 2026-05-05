@@ -8,7 +8,8 @@
 
 #plotlyDiv {
     width: 100%;
-    min-height: 350px;
+    min-height: 68vh;
+    height: 100%;
 }
 
 /* Borda lateral colorida por urgência */
@@ -22,10 +23,176 @@
     border-left: 4px solid #198754;
 }
 
-#areaGrafico .card {
-    border-radius: 6px;
+/* ── Cards de Sugestão ─────────────────────────────── */
+
+.sugestao-card {
+    border: 1px solid;
+    border-left-width: 4px;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
 }
 
-#painelSugestoes .alert {
-    border-radius: 6px;
+.sugestao-card-header {
+    margin-bottom: 8px;
+}
+
+.sugestao-tipo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 20px;
+}
+
+.sugestao-card-titulo {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    line-height: 1.35;
+}
+
+.sugestao-mensagem {
+    font-size: 0.84rem;
+    color: #374151;
+    line-height: 1.6;
+    margin: 0 0 10px 0;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.sugestao-mensagem strong {
+    font-weight: 700;
+    color: #111;
+}
+
+.sugestao-qtd-box {
+    margin-top: 12px;
+    border: 2px solid;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: rgba(255,255,255,0.6);
+}
+
+.sugestao-qtd-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.75;
+}
+
+.sugestao-qtd-valor {
+    font-size: 1.55rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.sugestao-qtd-valor small {
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.7;
+    margin-left: 2px;
+}
+
+.sugestao-vazia {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #9ca3af;
+    font-size: 0.85rem;
+    padding: 24px 0;
+    text-align: center;
+}
+
+.sugestao-vazia i {
+    font-size: 1.8rem;
+}
+
+.compras-projecao-body {
+    min-height: 78vh;
+}
+
+.compras-projecao-grafico {
+    min-width: 0;
+    min-height: 72vh;
+}
+
+.compras-modal-grafico {
+    width: min(1500px, calc(100vw - 420px));
+    max-width: none;
+    margin: 1rem auto 1rem 1rem;
+}
+
+.compras-modal-grafico .modal-content {
+    min-height: calc(100vh - 2rem);
+}
+
+.compras-modal-lateral {
+    background: transparent;
+    pointer-events: none;
+}
+
+.compras-modal-lateral .modal-dialog {
+    width: 360px;
+    max-width: 360px;
+    margin: 1rem 1rem 1rem auto;
+    pointer-events: auto;
+}
+
+.compras-modal-lateral .modal-content {
+    min-height: calc(100vh - 2rem);
+    border: 1px solid #ead9a5;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.compras-modal-lateral .modal-body {
+    background: #fffdf5;
+}
+
+#painelSugestoes {
+    max-height: calc(100vh - 10rem);
+    overflow-y: auto;
+}
+
+@media (max-width: 991.98px) {
+    .compras-projecao-body {
+        min-height: auto;
+    }
+
+    .compras-modal-grafico {
+        width: auto;
+        margin: 0;
+    }
+
+    .compras-projecao-grafico {
+        min-height: auto;
+    }
+
+    #plotlyDiv {
+        min-height: 320px;
+    }
+
+    .compras-modal-lateral .modal-dialog {
+        width: auto;
+        max-width: none;
+        margin: 0.5rem;
+    }
+
+    .compras-modal-lateral .modal-content {
+        min-height: auto;
+    }
+
+    #painelSugestoes {
+        max-height: none;
+    }
 }
