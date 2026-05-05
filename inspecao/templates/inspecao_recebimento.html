@@ -154,6 +154,7 @@
                                 <select id="tipo-tubos-barras" class="form-select form-select-sm">
                                     <option value="barra" selected>Barra</option>
                                     <option value="tubo">Tubo</option>
+                                    <option value="tubo_quadrado">Tubo quadrado</option>
                                 </select>
                             </div>
                             <ul class="nav nav-tabs nav-tabs-sm mb-0" id="tabs-unidades-recebimento"></ul>
@@ -1072,15 +1073,22 @@
         "Tubos e barras": (prefix) => {
             let html = "";
             html += `<input type="hidden" name="${prefix}tipo_tubos_barras" value="${tipoTubosBarrasAtual}">`;
-            if (tipoTubosBarrasAtual === "tubo") {
+            if (tipoTubosBarrasAtual === "tubo" || tipoTubosBarrasAtual === "tubo_quadrado") {
                 html += secao("Visual");
                 html += selectConformidade(prefix, "visual_amassados_trincas", "Amassados / Trincas");
                 html += selectConformidade(prefix, "visual_torcao", "Torção");
                 html += secao("Dimensional");
                 html += `<div class="mb-2"><label class="form-label form-label-sm">comprimento</label>`
                       + `<input type="text" name="${prefix}dim_comprimento" class="form-control form-control-sm"></div>`;
-                html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
-                      + `<input type="text" name="${prefix}dim_diametro_externo" class="form-control form-control-sm"></div>`;
+                if (tipoTubosBarrasAtual === "tubo_quadrado") {
+                    html += `<div class="mb-2"><label class="form-label form-label-sm">Lado 1</label>`
+                          + `<input type="text" name="${prefix}dim_lado_1" class="form-control form-control-sm"></div>`;
+                    html += `<div class="mb-2"><label class="form-label form-label-sm">Lado 2</label>`
+                          + `<input type="text" name="${prefix}dim_lado_2" class="form-control form-control-sm"></div>`;
+                } else {
+                    html += `<div class="mb-2"><label class="form-label form-label-sm">diam. externo</label>`
+                          + `<input type="text" name="${prefix}dim_diametro_externo" class="form-control form-control-sm"></div>`;
+                }
                 html += `<div class="mb-2"><label class="form-label form-label-sm">esp. parede do tubo</label>`
                       + `<input type="text" name="${prefix}dim_espessura_parede_tubo" class="form-control form-control-sm"></div>`;
             } else {
@@ -1610,7 +1618,7 @@
             renderUnidades(val);
         });
         document.getElementById("tipo-tubos-barras").addEventListener("change", (e) => {
-            tipoTubosBarrasAtual = e.target.value === "tubo" ? "tubo" : "barra";
+            tipoTubosBarrasAtual = e.target.value;
             const material = materiaisRecebimento[materialAtivoIndex];
             if (material) material.tipo_tubos_barras = tipoTubosBarrasAtual;
             const qtd = parseInt(document.getElementById("qtd-unidades-recebimento").value) || 1;
