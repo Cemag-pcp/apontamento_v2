@@ -127,7 +127,7 @@
                         </div>
                     </div>
                     <div class="col-md-7">
-                        <form id="form-inspecao-recebimento">
+                        <form id="form-inspecao-recebimento" autocomplete="off">
                             <div class="border rounded p-2 mb-3 bg-light">
                                 <div class="row g-2 align-items-end">
                                     <div class="col-8">
@@ -710,6 +710,30 @@
             tipo_tubos_barras: "barra",
             valores_form: {},
         };
+    }
+
+    function limparFormularioRecebimento() {
+        const form = document.getElementById("form-inspecao-recebimento");
+        if (form) {
+            form.reset();
+        }
+
+        const quantidadeLoteInput = document.getElementById("quantidade-lote-recebimento");
+        if (quantidadeLoteInput) quantidadeLoteInput.value = "";
+
+        const resultadoLoteInput = document.getElementById("resultado-lote-recebimento");
+        if (resultadoLoteInput) resultadoLoteInput.value = "";
+
+        const tabsUnidades = document.getElementById("tabs-unidades-recebimento");
+        if (tabsUnidades) tabsUnidades.innerHTML = "";
+
+        const contentUnidades = document.getElementById("content-unidades-recebimento");
+        if (contentUnidades) contentUnidades.innerHTML = "";
+
+        tipoTubosBarrasAtual = "barra";
+        classeAtual = "";
+        materiaisRecebimento = [];
+        materialAtivoIndex = 0;
     }
 
     function rotuloMaterial(material, index) {
@@ -1309,6 +1333,7 @@
 
     function abrirModalRecebimento(row) {
         pendenciaSelecionada = row;
+        limparFormularioRecebimento();
 
         // preenche dados do recebimento
         const container = document.getElementById("detalhes-recebimento");
@@ -1490,6 +1515,7 @@
             .then((result) => {
                 if (!result.ok) throw new Error(result.data.error || "Erro ao salvar.");
                 const modal = bootstrap.Modal.getInstance(document.getElementById("modal-inspecao-recebimento"));
+                limparFormularioRecebimento();
                 if (modal) modal.hide();
                 pendenciaSelecionada = null;
                 carregarPendencias();
@@ -1589,6 +1615,11 @@
             if (material) material.tipo_tubos_barras = tipoTubosBarrasAtual;
             const qtd = parseInt(document.getElementById("qtd-unidades-recebimento").value) || 1;
             renderUnidades(qtd);
+        });
+
+        document.getElementById("modal-inspecao-recebimento").addEventListener("hidden.bs.modal", () => {
+            limparFormularioRecebimento();
+            pendenciaSelecionada = null;
         });
     });
 </script>
