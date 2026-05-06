@@ -185,6 +185,8 @@ if GSHEETS_SERVICE_ACCOUNT_INFO.get('private_key') and "\\n" in GSHEETS_SERVICE_
 
 GSHEETS_COMPRAS_SPREADSHEET_NAME = env('GSHEETS_COMPRAS_SPREADSHEET_NAME', default='Análise Previsão de Consumo (CMM / NTP ) DEE')
 
+GSHEETS_ESTOQUE_SPREADSHEET_ID = env('GSHEETS_ESTOQUE_SPREADSHEET_ID', default='1u2Iza-ocp6ROUBXG9GpfHvEJwLHuW7F2uiO583qqLIE')
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",

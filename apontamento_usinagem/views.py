@@ -791,7 +791,7 @@ def get_pecas(request):
     page = int(request.GET.get('page', 1))  # Página atual (padrão é 1)
     per_page = int(request.GET.get('per_page', 10))  # Itens por página (padrão é 10)
 
-    pecas_query = Pecas.objects.filter(setor__nome='usinagem')
+    pecas_query = Pecas.objects.filter(setor__nome='usinagem', ativo=True)
     if search:
         pecas_query = pecas_query.filter(
             Q(codigo__icontains=search) | Q(descricao__icontains=search)

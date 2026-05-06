@@ -594,7 +594,7 @@ def get_peca(request):
     per_page = int(request.GET.get('per_page', 10))  # Itens por página (padrão é 10)
 
     # Filtra as peças com base no termo de busca (opcional)
-    peca_query = Pecas.objects.all()
+    peca_query = Pecas.objects.filter(ativo=True)
     if search:
         peca_query = peca_query.filter(
             Q(codigo__icontains=search) | Q(descricao__icontains=search)

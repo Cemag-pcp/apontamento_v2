@@ -971,7 +971,7 @@ def get_pecas(request):
     per_page = int(request.GET.get('per_page', 10))
     search_normalizado = ''.join(search.split())
 
-    pecas_query = Pecas.objects.all()
+    pecas_query = Pecas.objects.filter(ativo=True)
     if search:
         pecas_query = pecas_query.filter(
             Q(codigo__icontains=search) | Q(descricao__icontains=search)
@@ -981,7 +981,7 @@ def get_pecas(request):
 
     existe_codigo_exato = False
     if search_normalizado:
-        existe_codigo_exato = Pecas.objects.filter(codigo__iexact=search_normalizado).exists()
+        existe_codigo_exato = Pecas.objects.filter(codigo__iexact=search_normalizado, ativo=True).exists()
 
     paginator = Paginator(pecas_query, per_page)
     pecas_page = paginator.get_page(page)

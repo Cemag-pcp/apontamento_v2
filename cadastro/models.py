@@ -126,6 +126,7 @@ class Pecas(models.Model):
     conjunto = models.ForeignKey(Conjuntos, on_delete=models.CASCADE, related_name='peca_conjunto', null=True, blank=True)
     # caso tenha processo preestabelecido para peça
     processo_1 = models.ForeignKey(Maquina, on_delete=models.CASCADE, related_name='processo_maquina_1', blank=True, null=True)
+    ativo = models.BooleanField(default=True)
 
     class Meta:
         constraints = [

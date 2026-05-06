@@ -360,7 +360,8 @@ def pecas_search_api(request):
     """Retorna lista de Pecas para o select2 pesquisável."""
     q = request.GET.get('q', '').strip()
     queryset = Pecas.objects.filter(
-        Q(codigo__icontains=q) | Q(descricao__icontains=q)
+        Q(codigo__icontains=q) | Q(descricao__icontains=q),
+        ativo=True,
     ).order_by('codigo')[:50]
     results = [{'id': p.id, 'text': f'{p.codigo} - {p.descricao}'} for p in queryset]
     return JsonResponse({'results': results})

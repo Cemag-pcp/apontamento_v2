@@ -217,15 +217,28 @@ def cadastro_pecas_api(request):
 
     if request.method == 'GET':
         page_number = request.GET.get('page', 1)
-        page_size = request.GET.get('page_size', 50)
-        
+        page_size = request.GET.get('page_size', 10)
+
         try:
             page_number = int(page_number)
             page_size = int(page_size)
         except ValueError:
             return JsonResponse({'error': 'Parametros de paginacao invalidos.'}, status=400)
 
-        queryset = Pecas.objects.all().order_by('codigo')
+        queryset = (
+            Pecas.objects
+            .select_related('conjunto', 'processo_1')
+            .prefetch_related('setor')
+            .order_by('codigo')
+        )
+
+        ativo_param = request.GET.get('ativo', 'true').lower()
+        if ativo_param == 'false':
+            queryset = queryset.filter(ativo=False)
+        elif ativo_param == 'all':
+            pass  # sem filtro
+        else:
+            queryset = queryset.filter(ativo=True)
 
         search_param = request.GET.get('search')
         setor_param = request.GET.get('setor')
@@ -267,6 +280,7 @@ def cadastro_pecas_api(request):
                 'processo_1_nome': peca.processo_1.nome if peca.processo_1 else None,
                 'setor_ids': list(peca.setor.values_list('id', flat=True)),
                 'setor_nomes': list(peca.setor.values_list('nome', flat=True)),
+                'ativo': peca.ativo,
             })
 
         conjuntos = [
@@ -397,6 +411,26 @@ def cadastro_pecas_api(request):
         peca.delete()
 
         return JsonResponse({'success': 'Peca removida com sucesso.'})
+
+    if request.method == 'PUT':
+        # Toggle ativo/inativo
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        peca_id = data.get('id')
+        if not peca_id:
+            return JsonResponse({'error': 'ID da peca nao informado.'}, status=400)
+
+        peca = get_object_or_404(Pecas, id=peca_id)
+        peca.ativo = not peca.ativo
+        peca.save(update_fields=['ativo'])
+
+        return JsonResponse({
+            'success': f'Peca {"ativada" if peca.ativo else "desabilitada"} com sucesso.',
+            'ativo': peca.ativo,
+        })
 
     return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
 

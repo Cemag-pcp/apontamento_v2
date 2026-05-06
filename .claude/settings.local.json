@@ -23,7 +23,9 @@
       "Bash(Copy-Item \"C:\\\\Users\\\\pcp2\\\\compras\\\\grafico-compras\\\\graficosCompras\\\\agrupamento_chapas.csv\" \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\\\\compras\\\\data\\\\agrupamento_chapas.csv\" -Force)",
       "Bash(Copy-Item \"C:\\\\Users\\\\pcp2\\\\compras\\\\grafico-compras\\\\graficosCompras\\\\grupos_atualizados.csv\" \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\\\\compras\\\\data\\\\grupos_atualizados.csv\" -Force)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\" -Recurse -Filter \"*.py\")",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\" -Directory)",
+      "Bash(Select-Object Name)"
     ]
   }
 }

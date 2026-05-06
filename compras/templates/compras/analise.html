@@ -8,14 +8,23 @@
 {% endblock %}
 
 {% block content %}
+<div class="compras-dolar-ticker" id="cotacaoDolarWidget" aria-live="polite">
+    <span class="compras-dolar-ticker__label">
+        <i class="fas fa-dollar-sign"></i>
+        Dólar
+    </span>
+    <span class="compras-dolar-ticker__valor" id="cotacaoDolarValor">--</span>
+    <span class="compras-dolar-ticker__meta" id="cotacaoDolarHorario">Aguardando cotação</span>
+</div>
+
 <div class="container-fluid mt-3">
 
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Análise de Compras</h5>
+        <h4 class="compras-section-title mb-0">Análise de Compras — Material Direto</h4>
         <div class="d-flex gap-2 flex-wrap align-items-center">
             <span id="ultimaAtualizacao" class="text-muted small"></span>
             <button class="btn btn-sm btn-outline-secondary" id="btnRefresh">
-                <i class="fas fa-sync-alt"></i> Atualizar dados
+                <i class="fas fa-sync-alt"></i> Atualizar
             </button>
         </div>
     </div>
@@ -79,26 +88,28 @@
     </div>
 
     <div id="tabelaWrapper" style="display:none;">
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle" id="tabelaMateriais">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Código</th>
-                        <th>Descrição</th>
-                        <th>Grupo</th>
-                        <th class="text-end">Média 3M</th>
-                        <th class="text-end">Est. Almox</th>
-                        <th class="text-end">Consumo/Dia</th>
-                        <th class="text-end">Dias p/ Zero</th>
-                        <th class="text-end">Ped. Pendente</th>
-                        <th class="text-end">Est. Mínimo</th>
-                        <th>Data Compra</th>
-                        <th>Urgência</th>
-                        <th class="text-center">Gráfico</th>
-                    </tr>
-                </thead>
-                <tbody id="bodyMateriais"></tbody>
-            </table>
+        <div class="compras-table-shell">
+            <div class="compras-table-wrap">
+                <table class="compras-table" id="tabelaMateriais">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Descrição</th>
+                            <th>Grupo</th>
+                            <th class="num">Média 3M</th>
+                            <th class="num">Est. Almox</th>
+                            <th class="num">Consumo/Dia</th>
+                            <th class="num">Dias p/ Zero</th>
+                            <th class="num">Ped. Pendente</th>
+                            <th class="num">Est. Mínimo</th>
+                            <th>Data Próx. Compra</th>
+                            <th class="center">Situação</th>
+                            <th class="center">Gráfico</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bodyMateriais"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 

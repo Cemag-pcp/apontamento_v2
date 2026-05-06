@@ -955,7 +955,7 @@ def listar_pecas_disponiveis(request):
     
     conjunto_object = get_object_or_404(Conjuntos, codigo=conjunto)
 
-    pecas_disponiveis = Pecas.objects.filter(conjunto=conjunto_object)
+    pecas_disponiveis = Pecas.objects.filter(conjunto=conjunto_object, ativo=True)
 
     return JsonResponse({'pecas':list(pecas_disponiveis.values())})
 
