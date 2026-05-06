@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const state = {
         page: 1,
-        pageSize: 50,
+        pageSize: 10,
         hasNext: false,
         hasPrevious: false,
         filters: {
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isLoading) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10">
+                    <td colspan="11">
                         <div class="loading-ghost w-100"></div>
                     </td>
                 </tr>
@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!items.length) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10" class="text-center text-muted py-4">
+                    <td colspan="11" class="text-center text-muted py-4">
                         Nenhum registro encontrado.
                     </td>
                 </tr>
@@ -197,6 +197,15 @@ document.addEventListener('DOMContentLoaded', () => {
         processoTd.appendChild(buildSelect('processo_1_id', state.meta.maquinas, item.processo_1_id, 'Sem processo'));
         tr.appendChild(processoTd);
 
+        // Coluna Status
+        const statusTd = document.createElement('td');
+        statusTd.className = 'text-center';
+        statusTd.innerHTML = item.ativo
+            ? '<span class="badge bg-success">Ativo</span>'
+            : '<span class="badge bg-secondary">Inativo</span>';
+        tr.appendChild(statusTd);
+
+        // Coluna Ações
         const actionTd = document.createElement('td');
         actionTd.className = 'text-center';
 
@@ -205,7 +214,15 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.innerHTML = '<i class="bi bi-save me-1"></i>Salvar';
         saveBtn.addEventListener('click', () => handleSave(tr, saveBtn));
 
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = item.ativo ? 'btn btn-outline-danger btn-sm' : 'btn btn-outline-success btn-sm';
+        toggleBtn.innerHTML = item.ativo
+            ? '<i class="bi bi-slash-circle me-1"></i>Desabilitar'
+            : '<i class="bi bi-check-circle me-1"></i>Ativar';
+        toggleBtn.addEventListener('click', () => handleToggleAtivo(item.id, toggleBtn, statusTd));
+
         actionTd.appendChild(saveBtn);
+        actionTd.appendChild(toggleBtn);
         tr.appendChild(actionTd);
 
         return tr;
@@ -280,6 +297,44 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             button.disabled = false;
             button.innerHTML = '<i class="bi bi-save me-1"></i>Salvar';
+        }
+    }
+
+    async function handleToggleAtivo(id, btn, statusTd) {
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ id }),
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || 'Nao foi possivel alterar o status.');
+            }
+
+            const data = await response.json();
+            const ativo = data.ativo;
+
+            statusTd.innerHTML = ativo
+                ? '<span class="badge bg-success">Ativo</span>'
+                : '<span class="badge bg-secondary">Inativo</span>';
+
+            btn.className = ativo ? 'btn btn-outline-danger btn-sm' : 'btn btn-outline-success btn-sm';
+            btn.innerHTML = ativo
+                ? '<i class="bi bi-slash-circle me-1"></i>Desabilitar'
+                : '<i class="bi bi-check-circle me-1"></i>Ativar';
+
+            showAlert('success', data.success || 'Status atualizado.');
+        } catch (error) {
+            showAlert('error', error.message);
+            btn.innerHTML = originalHtml;
+        } finally {
+            btn.disabled = false;
         }
     }
 
@@ -395,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10" class="text-danger text-center py-4">
+                    <td colspan="11" class="text-danger text-center py-4">
                         ${error.message}
                     </td>
                 </tr>
