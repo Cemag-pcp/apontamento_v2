@@ -115,15 +115,13 @@ def get_itens_inspecao_serra_usinagem(request):
 
         # Filtro por status0
         if status_param:
-            print(status_param == "Não iniciado")
-            print(status_param)
-            print("Não iniciado")
             if status_param == "Não iniciado":
                 query &= Q(dadosexecucaoinspecao__isnull=True)
             elif status_param == "Em andamento":
                 query &= Q(dadosexecucaoinspecao__isnull=False) & Q(
                     dadosexecucaoinspecao__info_adicionais__inspecao_finalizada=False
                 )
+
             # Removido o caso "finalizado" para não retornar inspeções finalizadas
         else:
             # Filtro padrão: não finalizadas
@@ -185,7 +183,20 @@ def get_itens_inspecao_serra_usinagem(request):
             query &= query_pesquisa
 
         # Aplica a query e ordenação
-        inspecoes = Inspecao.objects.filter(query).distinct().order_by("-data_inspecao")
+        inspecoes = (
+            Inspecao.objects.filter(query)
+            .distinct()
+            .select_related(
+                "pecas_ordem_serra__ordem__maquina",
+                "pecas_ordem_serra__peca",
+                "pecas_ordem_serra__operador",
+                "pecas_ordem_usinagem__ordem__maquina",
+                "pecas_ordem_usinagem__peca",
+                "pecas_ordem_usinagem__operador",
+            )
+            .prefetch_related("dadosexecucaoinspecao_set__info_adicionais")
+            .order_by("-data_inspecao")
+        )
 
         # Paginação
         paginator = Paginator(inspecoes, itens_por_pagina)
@@ -215,10 +226,9 @@ def get_itens_inspecao_serra_usinagem(request):
                 "inspecao_finalizada": False,
             }
 
-            if inspecao.dadosexecucaoinspecao_set.exists():
-                ultima_execucao = inspecao.dadosexecucaoinspecao_set.order_by(
-                    "-num_execucao"
-                ).first()
+            execucoes = list(inspecao.dadosexecucaoinspecao_set.all())
+            if execucoes:
+                ultima_execucao = max(execucoes, key=lambda e: e.num_execucao)
                 if ultima_execucao:
                     status_info["inspecao_completa"] = (
                         ultima_execucao.info_adicionais.inspecao_completa
@@ -369,11 +379,7 @@ def get_itens_reinspecao_serra_usinagem(request):
     # Buscar reinspeções pendentes (não reinspecionadas) para serra ou usinagem
     reinspecoes = Reinspecao.objects.filter(
         reinspecionado=False,
-        inspecao__pecas_ordem_serra__isnull=False,
-        inspecao__dadosexecucaoinspecao__info_adicionais__inspecao_finalizada=True,
-    ) | Reinspecao.objects.filter(
-        reinspecionado=False,
-        inspecao__pecas_ordem_usinagem__isnull=False,
+        Q(inspecao__pecas_ordem_serra__isnull=False) | Q(inspecao__pecas_ordem_usinagem__isnull=False),
         inspecao__dadosexecucaoinspecao__info_adicionais__inspecao_finalizada=True,
     )
 
@@ -459,9 +465,6 @@ def get_itens_reinspecao_serra_usinagem(request):
 
         # Pega a última execução de inspeção (para mostrar dados da inspeção original)
         ultima_execucao = inspecao.execucoes[-1] if inspecao.execucoes else None
-
-        print("ULTIMA EXECUCAO")
-        print(ultima_execucao.num_execucao)
 
         item = {
             "id": inspecao.id,
