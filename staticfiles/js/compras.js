@@ -9,10 +9,10 @@ const URGENCY_ROW_CLASS = {
 };
 
 const URGENCY_BADGE = {
-    URGENTE:    '<span class="compras-badge urgente"><i class="fas fa-arrow-down"></i> Urgente</span>',
-    PRAZO_CURTO:'<span class="compras-badge curto"><i class="fas fa-clock"></i> Prazo curto</span>',
-    PRAZO_OK:   '<span class="compras-badge ok"><i class="fas fa-check"></i> Em dia</span>',
-    SEM_DADOS:  '<span class="compras-badge sem-dado">—</span>',
+    URGENTE: '<span class="badge bg-danger">🔴 Urgente</span>',
+    PRAZO_CURTO: '<span class="badge bg-warning text-dark">🟡 Prazo Curto</span>',
+    PRAZO_OK: '<span class="badge bg-success">🟢 Prazo OK</span>',
+    SEM_DADOS: '<span class="badge bg-secondary">—</span>',
 };
 
 const SUGESTAO_COLORS = {
@@ -28,51 +28,8 @@ const DOLAR_REFRESH_INTERVAL_MS = 60 * 1000;
 let produtoSelect2Inicializado = false;
 
 function fmt(n, decimais = 2) {
-    if (n === null || n === undefined || n === 9999) return '-';
-    return Number(n).toLocaleString('pt-BR', {
-        minimumFractionDigits: decimais,
-        maximumFractionDigits: decimais,
-    });
-}
-
-function fmtDolar(n) {
-    if (n === null || n === undefined || Number.isNaN(Number(n))) return '--';
-    return Number(n).toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-        minimumFractionDigits: 4,
-        maximumFractionDigits: 4,
-    });
-}
-
-function extrairHoraCotacao(texto) {
-    if (!texto) return '--:--';
-
-    const match = String(texto).match(/(\d{2}):(\d{2})/);
-    if (match) return `${match[1]}:${match[2]}`;
-
-    return '--:--';
-}
-
-async function carregarCotacaoDolar(forceRefresh = false) {
-    const widget = document.getElementById('cotacaoDolarWidget');
-    const valor = document.getElementById('cotacaoDolarValor');
-    const horario = document.getElementById('cotacaoDolarHorario');
-
-    try {
-        const qs = new URLSearchParams(forceRefresh ? { refresh: '1' } : {});
-        const resp = await fetch(`/compras/api/dolar/${qs.toString() ? `?${qs.toString()}` : ''}`);
-        const data = await resp.json();
-        if (!resp.ok || data.error) throw new Error(data.error || 'Falha ao consultar cotacao.');
-
-        widget.classList.remove('is-error');
-        valor.textContent = fmtDolar(data.cotacao_venda);
-        horario.textContent = extrairHoraCotacao(data.data_hora_formatada || data.data_hora_cotacao);
-    } catch (e) {
-        widget.classList.add('is-error');
-        valor.textContent = '--';
-        horario.textContent = '--:--';
-    }
+    if (n === null || n === undefined || n === 9999) return '—';
+    return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: decimais, maximumFractionDigits: decimais });
 }
 
 function getParams() {
@@ -84,39 +41,7 @@ function getParams() {
     };
 }
 
-function inicializarFiltroProduto() {
-    if (produtoSelect2Inicializado) return;
-
-    $('#filtroCodigo').select2({
-        theme: 'bootstrap-5',
-        width: '100%',
-        placeholder: 'Todos os produtos',
-        allowClear: true,
-    });
-
-    produtoSelect2Inicializado = true;
-}
-
-function atualizarFiltroProduto(produtos, valorAtual = '') {
-    const sel = document.getElementById('filtroCodigo');
-    if (!sel) return;
-
-    sel.innerHTML = '<option value="">Todos os produtos</option>';
-    (produtos || []).forEach(produto => {
-        const option = new Option(
-            produto.rotulo || produto.codigo,
-            produto.codigo,
-            false,
-            produto.codigo === valorAtual
-        );
-        sel.appendChild(option);
-    });
-
-    if (produtoSelect2Inicializado) {
-        $('#filtroCodigo').trigger('change.select2');
-    }
-}
-
+// ---- Carregamento principal ----
 async function carregarMateriais(params = {}, forceRefresh = false) {
     document.getElementById('loadingTabela').style.display = 'block';
     document.getElementById('tabelaWrapper').style.display = 'none';
@@ -142,11 +67,16 @@ async function carregarMateriais(params = {}, forceRefresh = false) {
         return;
     }
 
-    if (!params.codigo && data.produtos && data.produtos.length) {
-        const atual = document.getElementById('filtroCodigo').value;
-        atualizarFiltroProduto(data.produtos, atual);
+    // Dropdowns (apenas no primeiro load)
+    if (!params.codigo && data.codigos && data.codigos.length) {
+        const sel = document.getElementById('filtroCodigo');
+        const atual = sel.value;
+        sel.innerHTML = '<option value="">Todos os produtos</option>';
+        data.codigos.forEach(c => {
+            const opt = new Option(c, c, false, c === atual);
+            sel.appendChild(opt);
+        });
     }
-
     if (!params.grupo && data.grupos && data.grupos.length) {
         const sel = document.getElementById('filtroGrupo');
         const atual = sel.value;
@@ -178,18 +108,18 @@ function renderTabela(materiais) {
         tr.innerHTML = `
             <td class="col-codigo">${m.codigo}</td>
             <td>${m.descricao}</td>
-            <td style="color:#888;font-size:12px;">${m.grupo || '-'}</td>
-            <td class="num">${fmt(m.media_3m)}</td>
-            <td class="num">${fmt(m.estoque_almox)}</td>
-            <td class="num">${fmt(m.consumo_diario, 3)}</td>
-            <td class="num">${m.dias_ate_zero === 9999 ? '∞' : fmt(m.dias_ate_zero, 1)}</td>
-            <td class="num">${fmt(m.ped_compras)}</td>
-            <td class="num">${fmt(m.estoque_minimo)}</td>
-            <td style="font-size:12px;">${m.data_compra || '-'}</td>
-            <td class="center">${URGENCY_BADGE[m.flag_urgencia] || ''}</td>
-            <td class="center">
+            <td><small class="text-muted">${m.grupo || '—'}</small></td>
+            <td class="text-end">${fmt(m.media_3m)}</td>
+            <td class="text-end">${fmt(m.estoque_almox)}</td>
+            <td class="text-end">${fmt(m.consumo_diario, 3)}</td>
+            <td class="text-end">${m.dias_ate_zero === 9999 ? '∞' : fmt(m.dias_ate_zero, 1)}</td>
+            <td class="text-end">${fmt(m.ped_compras)}</td>
+            <td class="text-end">${fmt(m.estoque_minimo)}</td>
+            <td><small>${m.data_compra || '—'}</small></td>
+            <td>${URGENCY_BADGE[m.flag_urgencia] || ''}</td>
+            <td class="text-center">
                 <button class="btn btn-xs btn-outline-primary btn-grafico"
-                    data-codigo="${m.codigo}" data-descricao="${m.descricao}" title="Ver gráfico">
+                    data-codigo="${m.codigo}" data-descricao="${m.descricao}" title="Ver grafico">
                     <i class="fas fa-chart-line"></i>
                 </button>
             </td>`;
@@ -242,8 +172,7 @@ function getModalSugestoes() {
 }
 
 async function carregarProjecao(codigo, descricao) {
-    document.getElementById('tituloGrafico').textContent = `Projeção - ${codigo}: ${descricao}`;
-    document.getElementById('tituloSugestoesCompra').textContent = `Sugestões - ${codigo}`;
+    document.getElementById('tituloGrafico').textContent = `Projeção — ${codigo}: ${descricao}`;
     document.getElementById('loadingGrafico').style.display = 'block';
     document.getElementById('loadingSugestoes').style.display = 'block';
     document.getElementById('conteudoGrafico').style.display = 'none';
@@ -380,65 +309,7 @@ function renderPlotly(data) {
         })),
     };
 
-    Plotly.newPlot('plotlyDiv', traces, layout, {
-        responsive: true,
-        displayModeBar: false,
-    });
-}
-
-const SUGESTAO_CONFIG = {
-    critico: {
-        icon: 'fas fa-circle-exclamation',
-        accentColor: '#dc3545',
-        bgColor: '#fff5f5',
-        borderColor: '#f5c2c7',
-        labelColor: '#b02a37',
-        label: 'SITUACAO CRITICA',
-    },
-    urgente: {
-        icon: 'fas fa-triangle-exclamation',
-        accentColor: '#d97706',
-        bgColor: '#fffbeb',
-        borderColor: '#fde68a',
-        labelColor: '#92400e',
-        label: 'ACAO URGENTE',
-    },
-    alerta: {
-        icon: 'fas fa-clock',
-        accentColor: '#ca8a04',
-        bgColor: '#fefce8',
-        borderColor: '#fef08a',
-        labelColor: '#713f12',
-        label: 'ALERTA PREVENTIVO',
-    },
-    info: {
-        icon: 'fas fa-box-open',
-        accentColor: '#0284c7',
-        bgColor: '#f0f9ff',
-        borderColor: '#bae6fd',
-        labelColor: '#075985',
-        label: 'PEDIDO PENDENTE',
-    },
-    ok: {
-        icon: 'fas fa-circle-check',
-        accentColor: '#16a34a',
-        bgColor: '#f0fdf4',
-        borderColor: '#bbf7d0',
-        labelColor: '#15803d',
-        label: 'SITUACAO CONTROLADA',
-    },
-    erro: {
-        icon: 'fas fa-ban',
-        accentColor: '#6b7280',
-        bgColor: '#f9fafb',
-        borderColor: '#e5e7eb',
-        labelColor: '#374151',
-        label: 'AVISO',
-    },
-};
-
-function _formatarMensagemSugestao(mensagem) {
-    return mensagem.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    Plotly.newPlot('plotlyDiv', traces, layout, { responsive: true, displayModeBar: false });
 }
 
 function renderSugestoes(sugestoes) {

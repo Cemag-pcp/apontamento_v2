@@ -319,58 +319,10 @@
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
 }
 
-.compras-modal-lateral .modal-body {
-    background: #fffdf5;
+#areaGrafico .card {
+    border-radius: 6px;
 }
 
-#painelSugestoes {
-    max-height: calc(100vh - 10rem);
-    overflow-y: auto;
-}
-
-@media (max-width: 991.98px) {
-    .compras-dolar-ticker {
-        top: auto;
-        bottom: 0.75rem;
-        left: 0.75rem;
-        right: 0.75rem;
-        justify-content: center;
-        flex-wrap: wrap;
-        border-radius: 16px;
-    }
-
-    .compras-projecao-body {
-        min-height: auto;
-    }
-
-    .compras-table-wrap {
-        max-height: calc(100vh - 260px);
-    }
-
-    .compras-modal-grafico {
-        width: auto;
-        margin: 0;
-    }
-
-    .compras-projecao-grafico {
-        min-height: auto;
-    }
-
-    #plotlyDiv {
-        min-height: 320px;
-    }
-
-    .compras-modal-lateral .modal-dialog {
-        width: auto;
-        max-width: none;
-        margin: 0.5rem;
-    }
-
-    .compras-modal-lateral .modal-content {
-        min-height: auto;
-    }
-
-    #painelSugestoes {
-        max-height: none;
-    }
+#painelSugestoes .alert {
+    border-radius: 6px;
 }
