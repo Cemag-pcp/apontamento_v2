@@ -378,8 +378,8 @@ def get_itens_reinspecao_serra_usinagem(request):
 
     # Buscar reinspeções pendentes (não reinspecionadas) para serra ou usinagem
     reinspecoes = Reinspecao.objects.filter(
-        reinspecionado=False,
         Q(inspecao__pecas_ordem_serra__isnull=False) | Q(inspecao__pecas_ordem_usinagem__isnull=False),
+        reinspecionado=False,
         inspecao__dadosexecucaoinspecao__info_adicionais__inspecao_finalizada=True,
     )
 
