@@ -189,7 +189,7 @@ def get_itens_inspecao_serra_usinagem(request):
             .select_related(
                 "pecas_ordem_serra__ordem__maquina",
                 "pecas_ordem_serra__peca",
-                "pecas_ordem_serra__operador",
+                "pecas_ordem_serra__ordem__operador_final",
                 "pecas_ordem_usinagem__ordem__maquina",
                 "pecas_ordem_usinagem__peca",
                 "pecas_ordem_usinagem__operador",
@@ -206,6 +206,9 @@ def get_itens_inspecao_serra_usinagem(request):
         result = []
         for inspecao in page_obj:
             ordem_peca = inspecao.pecas_ordem_serra or inspecao.pecas_ordem_usinagem
+            if not ordem_peca:
+                continue
+
             maquina_nome = (
                 ordem_peca.ordem.maquina.nome if ordem_peca.ordem.maquina else "N/A"
             )
@@ -214,10 +217,11 @@ def get_itens_inspecao_serra_usinagem(request):
             data_ajustada = inspecao.data_inspecao - timedelta(hours=3)
 
             matricula_nome_operador = ""
-            if hasattr(ordem_peca, "operador") and ordem_peca.operador:
-                matricula_nome_operador = (
-                    f"{ordem_peca.operador.matricula} - {ordem_peca.operador.nome}"
-                )
+            operador = getattr(ordem_peca, "operador", None) or getattr(
+                ordem_peca.ordem, "operador_final", None
+            )
+            if operador:
+                matricula_nome_operador = f"{operador.matricula} - {operador.nome}"
 
             # Determina status
             status_info = {
@@ -230,16 +234,18 @@ def get_itens_inspecao_serra_usinagem(request):
             if execucoes:
                 ultima_execucao = max(execucoes, key=lambda e: e.num_execucao)
                 if ultima_execucao:
+                    info_adicionais = getattr(ultima_execucao, "info_adicionais", None)
+
                     status_info["inspecao_completa"] = (
-                        ultima_execucao.info_adicionais.inspecao_completa
+                        info_adicionais.inspecao_completa if info_adicionais else False
                     )
                     status_info["inspecao_finalizada"] = (
-                        ultima_execucao.info_adicionais.inspecao_finalizada
+                        info_adicionais.inspecao_finalizada if info_adicionais else False
                     )
 
-                    if ultima_execucao.info_adicionais.inspecao_finalizada:
+                    if status_info["inspecao_finalizada"]:
                         status_info["status"] = "Finalizada"
-                    elif ultima_execucao.info_adicionais.inspecao_finalizada:
+                    elif status_info["inspecao_completa"]:
                         status_info["status"] = "Completa"
                     else:
                         status_info["status"] = "Em andamento"
@@ -271,7 +277,7 @@ def get_itens_inspecao_serra_usinagem(request):
         )
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return JsonResponse({"error": str(e), "error_type": type(e).__name__}, status=500)
 
 
 @require_GET
