@@ -1656,17 +1656,65 @@ def enviar_etiqueta_impressora(request):
 def enviar_etiqueta_impressora_montagem(request):
     data = json.loads(request.body)
 
+    def _debug_montagem(mensagem, **contexto):
+        detalhes = ", ".join(f"{chave}={valor}" for chave, valor in contexto.items())
+        texto = f"[etiquetas_montagem] {mensagem}"
+        if detalhes:
+            texto = f"{texto} | {detalhes}"
+        print(texto)
+        logger.error(texto)
+
     data_carga = data.get('data_inicio')
     data_fim = data.get('data_fim')
     cargas = data.get('cargas', [])  # Array de objetos {nome, data_carga, celulas}
     celulas = data.get('celulas', [])
 
+    _debug_montagem(
+        "payload recebido",
+        data_inicio=data_carga,
+        data_fim=data_fim,
+        total_cargas=len(cargas),
+        celulas_payload=celulas,
+    )
+
     # o argumento 'teste' é apenas para rodar com a coluna de carga
     itens = gerar_sequenciamento(data_carga, data_fim or data_carga, 'montagem', 'teste') 
+
+    _debug_montagem(
+        "sequenciamento retornado",
+        linhas=len(itens),
+        colunas=list(itens.columns),
+    )
+
+    if itens.empty:
+        _debug_montagem("sem itens para o período selecionado")
+        return JsonResponse(
+            {
+                "error": "Nenhum item de montagem encontrado para o período selecionado.",
+                "debug": "sequenciamento_vazio",
+            },
+            status=400,
+        )
     
     colunas_grupo = [
         "Código", "Peca", "Célula", "Datas","Carga"
     ]
+
+    colunas_faltantes = [coluna for coluna in colunas_grupo + ["Qtde_total"] if coluna not in itens.columns]
+    if colunas_faltantes:
+        _debug_montagem(
+            "colunas obrigatórias ausentes",
+            faltantes=colunas_faltantes,
+            colunas_recebidas=list(itens.columns),
+        )
+        return JsonResponse(
+            {
+                "error": "Os dados do sequenciamento de montagem vieram incompletos para impressão.",
+                "debug": "colunas_faltantes",
+                "colunas_faltantes": colunas_faltantes,
+            },
+            status=500,
+        )
 
     itens_agrupado = (
         itens.groupby(colunas_grupo, as_index=False)["Qtde_total"]
@@ -1691,8 +1739,21 @@ def enviar_etiqueta_impressora_montagem(request):
 
         filtros[(data_str, carga)] = celulas  # mesmo vazio, é restrição explícita
 
+    _debug_montagem(
+        "filtros montados",
+        total_filtros=len(filtros),
+        chaves=list(filtros.keys()),
+    )
+
     if not filtros:
-        return itens_agrupado.iloc[0:0].copy()
+        _debug_montagem("nenhuma carga válida foi enviada no payload")
+        return JsonResponse(
+            {
+                "error": "Nenhuma carga foi informada para imprimir as etiquetas de montagem.",
+                "debug": "filtros_vazios",
+            },
+            status=400,
+        )
 
     def linha_valida(row):
         chave = (row["Datas"], row["Carga"])
@@ -1703,12 +1764,29 @@ def enviar_etiqueta_impressora_montagem(request):
         if celulas_permitidas:
             return row["Célula"] in celulas_permitidas
         else:
-            # se veio lista vazia, NÃO permite nenhuma célula
-            return False
+            # se veio lista vazia, aceita todas as células da carga
+            return True
 
     itens_agrupado = itens_agrupado[itens_agrupado.apply(linha_valida, axis=1)].copy()
 
-    itens_agrupado.sort_values(by=["Célula", "Carga", "Código"], kind="stable").reset_index(drop=True)
+    _debug_montagem(
+        "resultado após filtro",
+        linhas_filtradas=len(itens_agrupado),
+        colunas=list(itens_agrupado.columns),
+    )
+
+    if itens_agrupado.empty:
+        _debug_montagem("filtro de carga/célula não encontrou correspondência")
+        return JsonResponse(
+            {
+                "error": "Nenhum item de montagem corresponde aos filtros de carga e célula informados.",
+                "debug": "filtro_sem_correspondencia",
+            },
+            status=400,
+        )
+
+    colunas_ordenacao = [coluna for coluna in ["Célula", "Carga", "Código"] if coluna in itens_agrupado.columns]
+    itens_agrupado = itens_agrupado.sort_values(by=colunas_ordenacao, kind="stable").reset_index(drop=True)
 
     imprimir_ordens_montagem(itens_agrupado)
 

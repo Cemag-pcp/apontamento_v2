@@ -3,6 +3,7 @@ import numpy as np
 import os
 import datetime
 import gspread
+import logging
 from openpyxl import Workbook, load_workbook
 from datetime import datetime, timedelta
 from google.oauth2 import service_account
@@ -35,6 +36,8 @@ from apontamento_exped.utils import chamar_impressora_pecas_montagem, chamar_imp
 
 import warnings
 warnings.filterwarnings("ignore")
+
+logger = logging.getLogger(__name__)
 
 REDIS_URL = "redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"
 QUEUE_NAME = "print-zebra"
@@ -1334,8 +1337,83 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             # 4️⃣ Merge principal
             # =========================================================
 
+            tab_merge = pd.merge(
+                filtro_data,
+                base_carretas,
+                on="Recurso",
+                how="left",
+                indicator=True,
+            )
+
+            cruzamentos = tab_merge.loc[tab_merge["_merge"] == "both"].copy()
+            nao_cruzados = tab_merge.loc[tab_merge["_merge"] == "left_only"].copy()
+
+            logger.info(
+                "Sequenciamento pintura cruzamento resumo: data=%s carga=%s linhas_carga=%s carretas_base=%s cruzadas=%s sem_carreta=%s",
+                data_escolhida.date(),
+                carga or "todas",
+                len(filtro_data),
+                len(base_carretas),
+                len(cruzamentos),
+                len(nao_cruzados),
+            )
+
+            if not cruzamentos.empty:
+                colunas_cruzamentos_log = [
+                    "Datas",
+                    "Recurso",
+                    "Código",
+                    "Peca",
+                    "Célula",
+                    "cor",
+                    "Qtde_x",
+                    "Qtde_y",
+                ]
+                if "Carga" in cruzamentos.columns:
+                    colunas_cruzamentos_log.insert(1, "Carga")
+
+                cruzamentos_log = (
+                    cruzamentos[colunas_cruzamentos_log]
+                    .drop_duplicates()
+                    .sort_values(["Recurso", "Código", "Peca"])
+                )
+                for row in cruzamentos_log.itertuples(index=False):
+                    logger.info(
+                        "Sequenciamento pintura cruzado: data=%s carga=%s recurso=%s codigo=%s peca=%s celula=%s cor=%s qtd_carga=%s qtd_carreta=%s",
+                        row.Datas,
+                        row.Carga if hasattr(row, "Carga") else carga or "sem_carga",
+                        row.Recurso,
+                        row.Código,
+                        row.Peca,
+                        row.Célula,
+                        row.cor,
+                        row.Qtde_x,
+                        row.Qtde_y,
+                    )
+
+            if not nao_cruzados.empty:
+                colunas_nao_cruzados_log = ["Datas", "Recurso", "cor", "Qtde_x"]
+                if "Carga" in nao_cruzados.columns:
+                    colunas_nao_cruzados_log.insert(1, "Carga")
+
+                nao_cruzados_log = (
+                    nao_cruzados[colunas_nao_cruzados_log]
+                    .drop_duplicates()
+                    .sort_values(["Recurso", "Datas"])
+                )
+                for row in nao_cruzados_log.itertuples(index=False):
+                    logger.warning(
+                        "Sequenciamento pintura sem carreta: data=%s carga=%s recurso=%s cor=%s qtd_carga=%s",
+                        row.Datas,
+                        row.Carga if hasattr(row, "Carga") else carga or "sem_carga",
+                        row.Recurso,
+                        row.cor,
+                        row.Qtde_x,
+                    )
+
             tab_completa = (
-                pd.merge(filtro_data, base_carretas, on="Recurso", how="left")
+                cruzamentos
+                .drop(columns=["_merge"], errors="ignore")
                 .dropna()
                 .reset_index(drop=True)
             )
@@ -1425,17 +1503,23 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             # 8️⃣ Ajuste final de cor conforme Etapa5
             # =========================================================
 
-            def ajustar_cor(row):
-                if row["Etapa5"] == "CINZA":
-                    return pd.Series([row["Código"] + "Cinza", "Cinza"])
-                if row["Etapa5"] == "PRETO":
-                    return pd.Series([row["Código"] + "Preto", "Preto"])
-                return pd.Series([row["Código"] + row["Recurso_cor"], row["cor"]])
-
-            tab_completa[["Recurso_cor", "cor"]] = tab_completa.apply(
-                ajustar_cor,
-                axis=1
+            tab_completa["Código"] = tab_completa["Código"].astype(str)
+            tab_completa["Recurso_cor"] = (
+                tab_completa["Código"] + tab_completa["Recurso_cor"].astype(str)
             )
+
+            mascara_cinza = tab_completa["Etapa5"] == "CINZA"
+            mascara_preto = tab_completa["Etapa5"] == "PRETO"
+
+            tab_completa.loc[mascara_cinza, "Recurso_cor"] = (
+                tab_completa.loc[mascara_cinza, "Código"] + "Cinza"
+            )
+            tab_completa.loc[mascara_cinza, "cor"] = "Cinza"
+
+            tab_completa.loc[mascara_preto, "Recurso_cor"] = (
+                tab_completa.loc[mascara_preto, "Código"] + "Preto"
+            )
+            tab_completa.loc[mascara_preto, "cor"] = "Preto"
 
             tab_completa = tab_completa.reset_index(drop=True)
         
@@ -1490,7 +1574,9 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             filtro_data = base_carga.loc[escolha_data]
             # filtro_data[filtro_data['Recurso'] == '034550G']
 
-            if carga:
+            filtrar_por_carga = bool(carga and carga != "teste")
+
+            if filtrar_por_carga:
                 filtro_data = filtro_data.loc[filtro_data['Carga'] == carga]
 
             filtro_data = filtro_data.reset_index(drop=True)
@@ -1564,7 +1650,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
             tab_completa = tab_completa.drop(
                 columns=['Recurso', 'Qtde_x', 'Qtde_y'])
 
-            if carga:
+            if 'Carga' in tab_completa.columns:
                 tab_completa = tab_completa.groupby(
                     ['Código', 'Peca', 'Célula', 'Datas', 'Carga']).sum()
             else:
