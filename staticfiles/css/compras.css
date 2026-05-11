@@ -173,6 +173,7 @@
 .compras-table tbody tr.urg-critico td:first-child { border-left: 3px solid #e53935; }
 .compras-table tbody tr.urg-curto   td:first-child { border-left: 3px solid #f9a825; }
 .compras-table tbody tr.urg-ok      td:first-child { border-left: 3px solid #43a047; }
+.compras-table tbody tr.urg-pedido  td:first-child { border-left: 3px solid #e65100; }
 
 /* Coluna de código — monospace */
 .compras-table .col-codigo { font-family: monospace; font-size: 12px; color: #444; }
@@ -188,10 +189,11 @@
     border-radius: 4px;
     white-space: nowrap;
 }
-.compras-badge.urgente  { color: #b71c1c; background: #fdecea; }
-.compras-badge.curto    { color: #7c5b00; background: #fff8e1; }
-.compras-badge.ok       { color: #1b5e20; background: #e8f5e9; }
-.compras-badge.sem-dado { color: #777;    background: #f5f5f5; }
+.compras-badge.urgente       { color: #b71c1c; background: #fdecea; }
+.compras-badge.curto         { color: #7c5b00; background: #fff8e1; }
+.compras-badge.ok            { color: #1b5e20; background: #e8f5e9; }
+.compras-badge.sem-dado      { color: #777;    background: #f5f5f5; }
+.compras-badge.pedido-pendente { color: #bf360c; background: #fbe9e7; }
 
 .btn-xs {
     padding: 2px 8px;
