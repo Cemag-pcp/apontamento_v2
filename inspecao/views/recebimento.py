@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 
 import gspread
+from django.core.files.storage import default_storage
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -24,6 +25,26 @@ SHEET_TAB = os.environ.get(
 DEFAULT_CUT_OFF_DATE = "01/02/2026"
 COLUNA_STATUS_IDX = 7  # Coluna H (0-based)
 COLUNAS_EXIBIR = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10]  # A,B,C,D,E,F,G,I,J,K
+
+
+def _salvar_imagem_inspecao_recebimento(uploaded_file, sheet_hash, material_idx, unidade_idx):
+    extensao = os.path.splitext(getattr(uploaded_file, "name", "") or "")[1].lower() or ".jpg"
+    caminho = (
+        f"inspecao_recebimento/{datetime.now().strftime('%Y/%m')}/"
+        f"{sheet_hash}_m{material_idx}_u{unidade_idx}{extensao}"
+    )
+    caminho_salvo = default_storage.save(caminho, uploaded_file)
+
+    try:
+        url = default_storage.url(caminho_salvo)
+    except Exception:
+        url = ""
+
+    return {
+        "arquivo": caminho_salvo,
+        "url": url,
+        "nome": getattr(uploaded_file, "name", ""),
+    }
 
 
 def inspecao_recebimento(request):
@@ -399,20 +420,26 @@ def recebimento_inspecionados(request):
 
 def inspecionar_recebimento(request):
     if request.method != "POST":
-        return JsonResponse({"error": "Método não permitido"}, status=405)
+        return JsonResponse({"error": "Metodo nao permitido"}, status=405)
 
-    try:
-        payload = json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "JSON inválido"}, status=400)
+    if request.content_type and "multipart/form-data" in request.content_type:
+        try:
+            payload = json.loads(request.POST.get("payload", "{}") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "JSON invalido"}, status=400)
+    else:
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "JSON invalido"}, status=400)
 
     row_data = payload.get("data")
     if not isinstance(row_data, dict) or not row_data:
-        return JsonResponse({"error": "Dados da linha não informados"}, status=400)
+        return JsonResponse({"error": "Dados da linha nao informados"}, status=400)
 
     resultado = payload.get("resultado")
     if resultado not in {"conforme", "nao_conforme"}:
-        return JsonResponse({"error": "Resultado inválido"}, status=400)
+        return JsonResponse({"error": "Resultado invalido"}, status=400)
 
     observacao = (payload.get("observacao") or "").strip()
     dados_inspecao = payload.get("dados_inspecao") or None
@@ -466,7 +493,7 @@ def inspecionar_recebimento(request):
             sheet_hash = item.sheet_hash
 
     if InspecaoRecebimento.objects.filter(sheet_hash=sheet_hash).exists():
-        return JsonResponse({"error": "Item já inspecionado"}, status=409)
+        return JsonResponse({"error": "Item ja inspecionado"}, status=409)
 
     inspetor_profile = Profile.objects.filter(user=request.user).first()
 
@@ -474,6 +501,34 @@ def inspecionar_recebimento(request):
         if item and not item.inspecionado:
             item.inspecionado = True
             item.save(update_fields=["inspecionado"])
+
+        if materiais_inspecao:
+            for material_idx, material in enumerate(materiais_inspecao, start=1):
+                if not isinstance(material, dict):
+                    continue
+
+                unidades = material.get("unidades")
+                if not isinstance(unidades, list):
+                    continue
+
+                for unidade_idx, unidade in enumerate(unidades, start=1):
+                    if not isinstance(unidade, dict):
+                        continue
+
+                    campo_imagem = str(unidade.get("imagem_campo") or "").strip()
+                    if not campo_imagem:
+                        continue
+
+                    imagem = request.FILES.get(campo_imagem)
+                    if not imagem:
+                        continue
+
+                    unidade["imagem"] = _salvar_imagem_inspecao_recebimento(
+                        imagem,
+                        sheet_hash,
+                        material_idx,
+                        unidade_idx,
+                    )
 
         InspecaoRecebimento.objects.create(
             inspetor=inspetor_profile,

@@ -251,7 +251,7 @@ def ordens_criadas(request):
         .values("total_quantidade_pendurada")
     )
 
-    # 🔹 soma do que já foi programado (Programacao)
+    # soma do que já foi programado (Programacao)
     soma_qtd_programada = (
         Programacao.objects.filter(peca_ordem__ordem=OuterRef("pk"))
         .values("peca_ordem__ordem")

@@ -482,6 +482,10 @@
             tbody.appendChild(tr);
         } else {
             const camposExtras = [];
+            const possuiImagem = unidadesComMaterial.some((unidade) => {
+                const imagem = unidade?.imagem;
+                return Boolean(imagem?.url || imagem?.arquivo);
+            });
             unidadesComMaterial.forEach((unidade) => {
                 Object.keys(unidade.campos || {}).forEach((campo) => {
                     if (!camposExtras.includes(campo)) camposExtras.push(campo);
@@ -491,6 +495,9 @@
             const colunasBase = materiais.length
                 ? ["material", "unidade", "resultado", "observacao"]
                 : ["unidade", "resultado", "observacao"];
+            if (possuiImagem) {
+                colunasBase.push("imagem");
+            }
             const colunas = [...colunasBase, ...camposExtras];
             const headerRow = document.createElement("tr");
             colunas.forEach((coluna) => {
@@ -512,6 +519,19 @@
                         td.textContent = unidade.resultado || "";
                     } else if (coluna === "observacao") {
                         td.textContent = unidade.observacao || "";
+                    } else if (coluna === "imagem") {
+                        const imagem = unidade?.imagem || {};
+                        const imagemUrl = imagem.url || "";
+                        if (imagemUrl) {
+                            td.innerHTML = `
+                                <a href="${imagemUrl}" target="_blank" rel="noopener noreferrer" class="d-inline-flex flex-column align-items-center gap-1 text-decoration-none">
+                                    <img src="${imagemUrl}" alt="Imagem da inspeção" style="width:72px;height:72px;object-fit:cover;border-radius:0.5rem;border:1px solid #dee2e6;">
+                                    <span class="small">Ampliar</span>
+                                </a>
+                            `;
+                        } else {
+                            td.textContent = "-";
+                        }
                     } else {
                         td.textContent = unidade.campos?.[coluna] || "";
                     }
@@ -537,6 +557,7 @@
         const valores = {};
         const campos = form.querySelectorAll("input[name], select[name], textarea[name]");
         campos.forEach((campo) => {
+            if (campo.type === "file") return;
             valores[campo.name] = campo.value;
         });
         return valores;
@@ -578,6 +599,110 @@
         return `<h6 class="fw-semibold mt-3 mb-1 border-bottom pb-1">${titulo}</h6>`;
     }
 
+    function extrairIndiceUnidade(prefix) {
+        const match = String(prefix || "").match(/^u(\d+)_$/);
+        if (!match) return null;
+        const indice = parseInt(match[1], 10);
+        return Number.isFinite(indice) ? indice : null;
+    }
+
+    function getImagemRecebimentoInputId(prefix, tipo) {
+        return `imagem-recebimento-${String(prefix || "").replace(/[^a-zA-Z0-9]/g, "")}-${tipo}`;
+    }
+
+    function getArquivoImagemUnidade(prefix, material = materiaisRecebimento[materialAtivoIndex]) {
+        if (!material || !material.arquivos_unidades) return null;
+        const indiceUnidade = extrairIndiceUnidade(prefix);
+        if (!indiceUnidade) return null;
+        return material.arquivos_unidades[indiceUnidade] || null;
+    }
+
+    function atualizarStatusImagemRecebimento(prefix, arquivoInfo = getArquivoImagemUnidade(prefix)) {
+        const status = document.querySelector(`[data-imagem-status="${CSS.escape(prefix)}"]`);
+        if (!status) return;
+
+        if (arquivoInfo && arquivoInfo.nome) {
+            const origem = arquivoInfo.origem === "camera" ? "Câmera" : "Anexo";
+            status.textContent = `${origem}: ${arquivoInfo.nome}`;
+            status.classList.remove("text-muted");
+        } else {
+            status.textContent = "Nenhuma imagem selecionada.";
+            status.classList.add("text-muted");
+        }
+    }
+
+    function limparInputsImagemRecebimento(prefix, excecaoId = "") {
+        document.querySelectorAll(`[data-imagem-prefix-input="${CSS.escape(prefix)}"]`).forEach((input) => {
+            if (excecaoId && input.id === excecaoId) return;
+            input.value = "";
+        });
+    }
+
+    function definirArquivoImagemRecebimento(prefix, file, origem, inputId = "") {
+        const material = materiaisRecebimento[materialAtivoIndex];
+        if (!material) return;
+
+        const indiceUnidade = extrairIndiceUnidade(prefix);
+        if (!indiceUnidade) return;
+
+        if (!material.arquivos_unidades) {
+            material.arquivos_unidades = {};
+        }
+
+        if (file) {
+            material.arquivos_unidades[indiceUnidade] = {
+                file,
+                nome: file.name,
+                origem: origem || "arquivo",
+            };
+            limparInputsImagemRecebimento(prefix, inputId);
+        } else {
+            delete material.arquivos_unidades[indiceUnidade];
+            limparInputsImagemRecebimento(prefix);
+        }
+
+        atualizarStatusImagemRecebimento(prefix, material.arquivos_unidades[indiceUnidade] || null);
+    }
+
+    function renderizarStatusImagensRecebimento() {
+        document.querySelectorAll("[data-imagem-status]").forEach((status) => {
+            const prefix = status.dataset.imagemStatus || "";
+            atualizarStatusImagemRecebimento(prefix);
+        });
+    }
+
+    function criarBlocoImagemRecebimento(prefix) {
+        const inputArquivoId = getImagemRecebimentoInputId(prefix, "arquivo");
+        const inputCameraId = getImagemRecebimentoInputId(prefix, "camera");
+        return `<div class="mb-2 mt-2 border rounded p-2 bg-white" data-imagem-prefix="${prefix}">
+            <label class="form-label form-label-sm fw-semibold mb-2">Imagem da inspeção</label>
+            <div class="d-flex flex-wrap gap-2">
+                <label for="${inputArquivoId}" class="btn btn-outline-secondary btn-sm mb-0">Anexar imagem</label>
+                <label for="${inputCameraId}" class="btn btn-outline-primary btn-sm mb-0">Abrir câmera</label>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-imagem-remover="${prefix}">Remover</button>
+            </div>
+            <input type="file" id="${inputArquivoId}" name="${prefix}imagem_arquivo" class="d-none input-imagem-recebimento" data-imagem-prefix-input="${prefix}" data-prefix="${prefix}" data-origem="arquivo" accept="image/*">
+            <input type="file" id="${inputCameraId}" name="${prefix}imagem_camera" class="d-none input-imagem-recebimento" data-imagem-prefix-input="${prefix}" data-prefix="${prefix}" data-origem="camera" accept="image/*" capture="environment">
+            <div class="form-text mt-2">Opcional. No celular, "Abrir câmera" permite fotografar na hora.</div>
+            <div class="small mt-1 text-muted" data-imagem-status="${prefix}">Nenhuma imagem selecionada.</div>
+        </div>`;
+    }
+
+    function injetarCamposImagemRecebimento() {
+        const form = document.getElementById("form-inspecao-recebimento");
+        if (!form) return;
+
+        form.querySelectorAll('textarea[name$="observacao"]').forEach((textarea) => {
+            const prefix = String(textarea.name || "").replace(/observacao$/, "");
+            if (!prefix || form.querySelector(`[data-imagem-prefix="${CSS.escape(prefix)}"]`)) return;
+
+            const container = textarea.closest("div");
+            if (container) {
+                container.insertAdjacentHTML("afterend", criarBlocoImagemRecebimento(prefix));
+            }
+        });
+    }
+
     function aplicarObrigatoriedadeCamposRecebimento() {
         const form = document.getElementById("form-inspecao-recebimento");
         if (!form) return;
@@ -588,7 +713,8 @@
             const nome = String(campo.name || "");
             const sufixo = nome.replace(/^u\d+_/, "");
             const isObservacao = sufixo === "observacao" || sufixo.endsWith("_observacao");
-            campo.required = !isObservacao;
+            const isArquivo = campo.type === "file" || sufixo.startsWith("imagem_");
+            campo.required = !isObservacao && !isArquivo;
         });
 
         const nomeMaterial = document.getElementById("nome-material-recebimento");
@@ -720,6 +846,7 @@
             tipo_tubos_barras: "barra",
             tipo_componentes_cilindros: "haste",
             valores_form: {},
+            arquivos_unidades: {},
         };
     }
 
@@ -788,6 +915,22 @@
         material.tipo_tubos_barras = tipoTubosBarrasAtual;
         material.tipo_componentes_cilindros = tipoComponentesCilindrosAtual;
         material.valores_form = capturarValoresFormularioRecebimento();
+        material.arquivos_unidades = material.arquivos_unidades || {};
+
+        document.querySelectorAll(".input-imagem-recebimento").forEach((input) => {
+            const prefix = input.dataset.prefix || "";
+            const file = input.files && input.files[0] ? input.files[0] : null;
+            if (file && prefix) {
+                const indiceUnidade = extrairIndiceUnidade(prefix);
+                if (indiceUnidade) {
+                    material.arquivos_unidades[indiceUnidade] = {
+                        file,
+                        nome: file.name,
+                        origem: input.dataset.origem || "arquivo",
+                    };
+                }
+            }
+        });
     }
 
     function carregarEstadoMaterialAtivo() {
@@ -1360,7 +1503,9 @@
         }
 
         reaplicarValoresFormularioRecebimento(valoresAtuais);
+        injetarCamposImagemRecebimento();
         aplicarObrigatoriedadeCamposRecebimento();
+        renderizarStatusImagensRecebimento();
 
         const abaAtiva = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="${alvoAbaAtiva}"]`)
             || document.querySelector('#tabs-unidades-recebimento button[data-bs-target="#unit-tab-1"]');
@@ -1503,11 +1648,17 @@
                     return;
                 }
 
+                const arquivoImagem = material?.arquivos_unidades?.[u] || null;
+                const imagemCampo = arquivoImagem ? `imagem_material_${m + 1}_unidade_${u}` : "";
+
                 unidadesMaterial.push({
                     unidade: u,
                     resultado: unitResultado,
                     observacao: unitObservacao,
                     campos: unitData,
+                    imagem_nome: arquivoImagem?.nome || "",
+                    imagem_origem: arquivoImagem?.origem || "",
+                    imagem_campo: imagemCampo,
                 });
 
                 if (unitObservacao) {
@@ -1542,8 +1693,20 @@
         };
 
         const csrfInput = document.querySelector("[name=csrfmiddlewaretoken]");
-        const headers = { "Content-Type": "application/json" };
+        const headers = {};
         if (csrfInput) headers["X-CSRFToken"] = csrfInput.value;
+
+        const formData = new FormData();
+        formData.append("payload", JSON.stringify(payload));
+        materiais.forEach((material, materialIndex) => {
+            (material.unidades || []).forEach((unidade) => {
+                const campoImagem = unidade?.imagem_campo || "";
+                const arquivoImagem = materiaisRecebimento[materialIndex]?.arquivos_unidades?.[unidade.unidade]?.file;
+                if (campoImagem && arquivoImagem) {
+                    formData.append(campoImagem, arquivoImagem, arquivoImagem.name);
+                }
+            });
+        });
 
         const btnSalvar = document.getElementById("btn-salvar-recebimento");
         btnSalvar.disabled = true;
@@ -1552,7 +1715,7 @@
         fetch("/inspecao/api/recebimento/inspecionar/", {
             method: "POST",
             headers,
-            body: JSON.stringify(payload),
+            body: formData,
         })
             .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
             .then((result) => {
@@ -1619,6 +1782,23 @@
             const prefix = btnAdicionarCampo.dataset.prefix || "";
             if (!prefix) return;
             adicionarBlocoBmc(prefix);
+        });
+
+        document.addEventListener("change", (event) => {
+            const inputImagem = event.target.closest(".input-imagem-recebimento");
+            if (!inputImagem) return;
+            const prefix = inputImagem.dataset.prefix || "";
+            const file = inputImagem.files && inputImagem.files[0] ? inputImagem.files[0] : null;
+            if (!prefix || !file) return;
+            definirArquivoImagemRecebimento(prefix, file, inputImagem.dataset.origem || "arquivo", inputImagem.id);
+        });
+
+        document.addEventListener("click", (event) => {
+            const btnRemoverImagem = event.target.closest("[data-imagem-remover]");
+            if (!btnRemoverImagem) return;
+            const prefix = btnRemoverImagem.dataset.imagemRemover || "";
+            if (!prefix) return;
+            definirArquivoImagemRecebimento(prefix, null, "");
         });
 
         document.getElementById("pesquisa-pendencias-recebimento").addEventListener("input", renderPendencias);
