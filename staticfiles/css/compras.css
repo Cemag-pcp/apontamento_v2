@@ -1,5 +1,9 @@
 /* compras.css */
 
+:root {
+    --compras-table-grid-color: #e0e0e0;
+}
+
 .compras-dolar-ticker {
     position: fixed;
     top: 4.65rem;
@@ -81,7 +85,7 @@
 /* Cabeçalho */
 .compras-table thead tr {
     background: #f4f4f4;
-    border-bottom: 2px solid #e0e0e0;
+    border-bottom: 2px solid var(--compras-table-grid-color);
 }
 
 .compras-table thead th {
@@ -96,6 +100,7 @@
     top: 0;
     z-index: 3;
     background: #f4f4f4;
+    border-right: 1px solid var(--compras-table-grid-color);
 }
 
 .compras-table thead th:nth-child(1),
@@ -130,13 +135,13 @@
 .compras-table thead th:nth-child(1),
 .compras-table tbody td:nth-child(1) {
     min-width: 108px;
-    box-shadow: 1px 0 0 #e0e0e0;
+    box-shadow: none;
 }
 
 .compras-table thead th:nth-child(2),
 .compras-table tbody td:nth-child(2) {
     min-width: 280px;
-    box-shadow: 2px 0 0 #c7d0dc;
+    box-shadow: 1px 0 0 var(--compras-table-grid-color);
 }
 
 .compras-table thead th.num  { text-align: right; }
@@ -152,7 +157,13 @@
     padding: 9px 12px;
     vertical-align: middle;
     white-space: nowrap;
-    border-bottom: 1px solid #e0e0e0;
+    border-right: 1px solid var(--compras-table-grid-color);
+    border-bottom: 1px solid var(--compras-table-grid-color);
+}
+
+.compras-table thead th:last-child,
+.compras-table tbody td:last-child {
+    border-right: none;
 }
 
 .compras-table tbody td.num  { text-align: right; }
