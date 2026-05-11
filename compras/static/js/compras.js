@@ -2,17 +2,19 @@
 'use strict';
 
 const URGENCY_ROW_CLASS = {
-    URGENTE:    'urg-critico',
-    PRAZO_CURTO:'urg-curto',
-    PRAZO_OK:   'urg-ok',
-    SEM_DADOS:  '',
+    URGENTE:           'urg-critico',
+    URGENTE_COM_PEDIDO:'urg-pedido',
+    PRAZO_CURTO:       'urg-curto',
+    PRAZO_OK:          'urg-ok',
+    SEM_DADOS:         '',
 };
 
 const URGENCY_BADGE = {
-    URGENTE:    '<span class="compras-badge urgente"><i class="fas fa-arrow-down"></i> Urgente</span>',
-    PRAZO_CURTO:'<span class="compras-badge curto"><i class="fas fa-clock"></i> Prazo curto</span>',
-    PRAZO_OK:   '<span class="compras-badge ok"><i class="fas fa-check"></i> Em dia</span>',
-    SEM_DADOS:  '<span class="compras-badge sem-dado">—</span>',
+    URGENTE:           '<span class="compras-badge urgente"><i class="fas fa-arrow-down"></i> Urgente</span>',
+    URGENTE_COM_PEDIDO:'<span class="compras-badge pedido-pendente"><i class="fas fa-truck"></i> Ped. Pendente</span>',
+    PRAZO_CURTO:       '<span class="compras-badge curto"><i class="fas fa-clock"></i> Prazo curto</span>',
+    PRAZO_OK:          '<span class="compras-badge ok"><i class="fas fa-check"></i> Em dia</span>',
+    SEM_DADOS:         '<span class="compras-badge sem-dado">—</span>',
 };
 
 const SUGESTAO_COLORS = {
@@ -26,6 +28,8 @@ const SUGESTAO_COLORS = {
 
 const DOLAR_REFRESH_INTERVAL_MS = 60 * 1000;
 let produtoSelect2Inicializado = false;
+let materiaisCache = [];
+let sortDataCompraAsc = true;
 
 function fmt(n, decimais = 2) {
     if (n === null || n === undefined || n === 9999) return '-';
@@ -138,7 +142,7 @@ async function carregarMateriais(params = {}, forceRefresh = false) {
         document.getElementById('loadingTabela').style.display = 'none';
         document.getElementById('tabelaWrapper').style.display = 'block';
         document.getElementById('bodyMateriais').innerHTML =
-            `<tr><td colspan="11" class="text-center text-danger">Erro ao carregar dados: ${e.message}</td></tr>`;
+            `<tr><td colspan="14" class="text-center text-danger">Erro ao carregar dados: ${e.message}</td></tr>`;
         return;
     }
 
@@ -154,8 +158,9 @@ async function carregarMateriais(params = {}, forceRefresh = false) {
         data.grupos.forEach(g => sel.appendChild(new Option(g, g, false, g === atual)));
     }
 
-    renderTabela(data.materiais);
-    atualizarContadores(data.materiais);
+    materiaisCache = data.materiais;
+    renderTabela(materiaisCache);
+    atualizarContadores(materiaisCache);
 
     document.getElementById('ultimaAtualizacao').textContent =
         'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
@@ -180,6 +185,9 @@ function renderTabela(materiais) {
             <td>${m.descricao}</td>
             <td style="color:#888;font-size:12px;">${m.grupo || '-'}</td>
             <td class="num">${fmt(m.media_3m)}</td>
+            <td class="num">${fmt(m.cons_mes_anterior)}</td>
+            <td class="num">${fmt(m.simulado_pend_vendas)}</td>
+            <td class="num">${fmt(m.dee_dias_em_est, 1)}</td>
             <td class="num">${fmt(m.estoque_almox)}</td>
             <td class="num">${fmt(m.consumo_diario, 3)}</td>
             <td class="num">${m.dias_ate_zero === 9999 ? '∞' : fmt(m.dias_ate_zero, 1)}</td>
@@ -204,15 +212,33 @@ function renderTabela(materiais) {
     });
 }
 
+function parseDateBR(str) {
+    if (!str) return Infinity;
+    const [d, m, y] = str.split('/');
+    return new Date(`${y}-${m}-${d}`).getTime();
+}
+
+function ordenarPorDataCompra() {
+    const sorted = [...materiaisCache].sort((a, b) => {
+        const diff = parseDateBR(a.data_compra) - parseDateBR(b.data_compra);
+        return sortDataCompraAsc ? diff : -diff;
+    });
+    const th = document.getElementById('thDataCompra');
+    th.querySelector('.sort-icon').textContent = sortDataCompraAsc ? ' ↑' : ' ↓';
+    sortDataCompraAsc = !sortDataCompraAsc;
+    renderTabela(sorted);
+}
+
 function atualizarContadores(materiais) {
     const urgente = materiais.filter(m => m.flag_urgencia === 'URGENTE').length;
+    const urgentePedido = materiais.filter(m => m.flag_urgencia === 'URGENTE_COM_PEDIDO').length;
     const curto = materiais.filter(m => m.flag_urgencia === 'PRAZO_CURTO').length;
     const ok = materiais.filter(m => m.flag_urgencia === 'PRAZO_OK').length;
 
     document.getElementById('ctUrgente').textContent = `${urgente} urgentes`;
     document.getElementById('ctPrazoCurto').textContent = `${curto} prazo curto`;
     document.getElementById('ctPrazoOk').textContent = `${ok} OK`;
-    document.getElementById('ctTotal').textContent = `Total: ${materiais.length} materiais`;
+    document.getElementById('ctTotal').textContent = `Total: ${materiais.length} materiais | ${urgentePedido} c/ ped. pendente`;
 
     const el = document.getElementById('contadores');
     el.removeAttribute('style');

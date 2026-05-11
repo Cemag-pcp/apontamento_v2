@@ -326,7 +326,7 @@ def recebimento_pendencias(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    itens = InspecaoRecebimentoItem.objects.filter(inspecionado=False).order_by("-id")
+    itens = InspecaoRecebimentoItem.objects.filter(inspecionado=False, excluido=False).order_by("-id")
     rows = []
 
     for item in itens:
@@ -347,6 +347,7 @@ def recebimento_pendencias(request):
             "columns": COLUNAS_PENDENCIAS,
             "rows": rows,
             "total": len(rows),
+            "pode_editar": _tem_acesso_edicao(request),
         },
         status=200,
     )
@@ -358,6 +359,7 @@ def recebimento_inspecionados(request):
 
     registros = (
         InspecaoRecebimento.objects.select_related("inspetor__user")
+        .filter(excluido=False)
         .order_by("-data_inspecao")
     )
 
@@ -413,6 +415,7 @@ def recebimento_inspecionados(request):
             "columns": columns,
             "rows": rows,
             "total": len(rows),
+            "pode_editar": _tem_acesso_edicao(request),
         },
         status=200,
     )
@@ -544,3 +547,121 @@ def inspecionar_recebimento(request):
         )
 
     return JsonResponse({"success": True}, status=200)
+
+
+def excluir_recebimento_inspecao(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+    if not _tem_acesso_edicao(request):
+        return JsonResponse({"error": "Sem permissão"}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    registro_id = payload.get("id")
+    if not registro_id:
+        return JsonResponse({"error": "Campo 'id' obrigatório"}, status=400)
+
+    updated = InspecaoRecebimento.objects.filter(id=registro_id).update(excluido=True)
+    if not updated:
+        return JsonResponse({"error": "Registro não encontrado"}, status=404)
+
+    return JsonResponse({"success": True}, status=200)
+
+
+TIPOS_ACESSO_EDICAO = {"supervisor", "admin", "pcp"}
+
+
+def _tem_acesso_edicao(request):
+    profile = Profile.objects.filter(user=request.user).first()
+    return profile is not None and profile.tipo_acesso in TIPOS_ACESSO_EDICAO
+
+
+def editar_recebimento_inspecao(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+    if not _tem_acesso_edicao(request):
+        return JsonResponse({"error": "Sem permissão"}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    registro_id = payload.get("id")
+    if not registro_id:
+        return JsonResponse({"error": "Campo 'id' obrigatório"}, status=400)
+
+    resultado = payload.get("resultado")
+    if resultado not in {"conforme", "nao_conforme"}:
+        return JsonResponse({"error": "Resultado inválido"}, status=400)
+
+    observacao = (payload.get("observacao") or "").strip()
+    dados_inspecao = payload.get("dados_inspecao")
+
+    update_fields = {"resultado": resultado, "observacao": observacao}
+    if dados_inspecao is not None:
+        update_fields["dados_inspecao"] = dados_inspecao
+
+    updated = InspecaoRecebimento.objects.filter(id=registro_id).update(**update_fields)
+    if not updated:
+        return JsonResponse({"error": "Registro não encontrado"}, status=404)
+
+    return JsonResponse({"success": True}, status=200)
+
+
+def excluir_recebimento_inspecao_lote(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+    if not _tem_acesso_edicao(request):
+        return JsonResponse({"error": "Sem permissão"}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    ids = payload.get("ids")
+    if not ids or not isinstance(ids, list):
+        return JsonResponse({"error": "Campo 'ids' deve ser uma lista"}, status=400)
+
+    updated = InspecaoRecebimento.objects.filter(id__in=ids).update(excluido=True)
+    return JsonResponse({"success": True, "excluidos": updated}, status=200)
+
+
+def excluir_recebimento_item(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+    if not _tem_acesso_edicao(request):
+        return JsonResponse({"error": "Sem permissão"}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    item_id = payload.get("id")
+    if not item_id:
+        return JsonResponse({"error": "Campo 'id' obrigatório"}, status=400)
+
+    updated = InspecaoRecebimentoItem.objects.filter(id=item_id).update(excluido=True)
+    if not updated:
+        return JsonResponse({"error": "Item não encontrado"}, status=404)
+
+    return JsonResponse({"success": True}, status=200)
+
+
+def excluir_recebimento_item_lote(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+    if not _tem_acesso_edicao(request):
+        return JsonResponse({"error": "Sem permissão"}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    ids = payload.get("ids")
+    if not ids or not isinstance(ids, list):
+        return JsonResponse({"error": "Campo 'ids' deve ser uma lista"}, status=400)
+
+    updated = InspecaoRecebimentoItem.objects.filter(id__in=ids).update(excluido=True)
+    return JsonResponse({"success": True, "excluidos": updated}, status=200)

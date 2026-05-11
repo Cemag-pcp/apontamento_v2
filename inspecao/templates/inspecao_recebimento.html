@@ -47,6 +47,16 @@
         <span id="qtd-filtrada-pendencias-recebimento" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
 
+    <div id="barra-lote-pendencias" class="d-none align-items-center gap-2 mb-2 p-2 rounded" style="background:#fff3cd; border:1px solid #ffc107;">
+        <span id="lote-pendencias-count" class="fw-semibold text-dark" style="font-size:0.875rem;"></span>
+        <button type="button" class="btn btn-sm btn-danger" id="btn-excluir-lote-pendencias">
+            <i class="bi bi-trash"></i> Excluir selecionados
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-desmarcar-pendencias">
+            Desmarcar todos
+        </button>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-bordered table-sm align-middle" id="tabela-pendencias-recebimento">
             <thead></thead>
@@ -69,6 +79,16 @@
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </span>
         <span id="qtd-filtrada-inspecionados-recebimento" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+    </div>
+
+    <div id="barra-lote-inspecionados" class="d-none align-items-center gap-2 mb-2 p-2 rounded" style="background:#fff3cd; border:1px solid #ffc107;">
+        <span id="lote-inspecionados-count" class="fw-semibold text-dark" style="font-size:0.875rem;"></span>
+        <button type="button" class="btn btn-sm btn-danger" id="btn-excluir-lote-inspecionados">
+            <i class="bi bi-trash"></i> Excluir selecionados
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-desmarcar-inspecionados">
+            Desmarcar todos
+        </button>
     </div>
 
     <div class="table-responsive">
@@ -94,6 +114,48 @@
                         <tbody></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-editar-inspecao-recebimento" tabindex="-1" aria-labelledby="modalEditarInspecaoRecebimentoLabel">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEditarInspecaoRecebimentoLabel">Editar inspeção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editar-inspecao-id">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Resultado geral</label>
+                        <select id="editar-inspecao-resultado" class="form-select">
+                            <option value="conforme">Conforme</option>
+                            <option value="nao_conforme">Nao conforme</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Observação</label>
+                        <textarea id="editar-inspecao-observacao" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div id="editar-inspecao-unidades-wrapper" style="display:none;">
+                    <h6 class="fw-semibold mb-2">Dados por unidade</h6>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm align-middle" id="tabela-editar-inspecao-unidades">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn-salvar-edicao-inspecao">
+                    <i class="bi bi-floppy"></i> Salvar
+                </button>
             </div>
         </div>
     </div>
@@ -183,8 +245,8 @@
 
 {% block scripts %}
 <script>
-    let pendenciasCache = { columns: [], rows: [] };
-    let inspecionadosCache = { columns: [], rows: [] };
+    let pendenciasCache = { columns: [], rows: [], pode_editar: false };
+    let inspecionadosCache = { columns: [], rows: [], pode_editar: false };
     let pendenciaSelecionada = null;
     let materiaisRecebimento = [];
     let materialAtivoIndex = 0;
@@ -280,9 +342,41 @@
         btn.disabled = !(dataInput.value && dataInput.value.trim());
     }
 
+    function _criarCheckbox(value, onChange) {
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.className = "form-check-input";
+        cb.value = value;
+        cb.addEventListener("change", onChange);
+        return cb;
+    }
+
+    function _atualizarBarraLote(tbodySelector, barraId, countId) {
+        const tbody = document.querySelector(tbodySelector);
+        const marcados = tbody ? tbody.querySelectorAll("input.form-check-input:checked").length : 0;
+        const barra = document.getElementById(barraId);
+        const countEl = document.getElementById(countId);
+        if (marcados > 0) {
+            countEl.textContent = `${marcados} ${marcados === 1 ? "item selecionado" : "itens selecionados"}`;
+            barra.classList.remove("d-none");
+            barra.classList.add("d-flex");
+        } else {
+            barra.classList.add("d-none");
+            barra.classList.remove("d-flex");
+        }
+    }
+
+    function _sincronizarSelectAll(checkAll, tbody) {
+        const todos = tbody.querySelectorAll("input.form-check-input[data-row]");
+        const marcados = tbody.querySelectorAll("input.form-check-input[data-row]:checked");
+        checkAll.indeterminate = marcados.length > 0 && marcados.length < todos.length;
+        checkAll.checked = todos.length > 0 && marcados.length === todos.length;
+    }
+
     function renderPendencias() {
         const columns = pendenciasCache.columns || [];
         const rows = pendenciasCache.rows || [];
+        const podeEditar = pendenciasCache.pode_editar === true;
         const filtro = (document.getElementById("pesquisa-pendencias-recebimento").value || "").toLowerCase();
         const filtradas = rows.filter((row) => {
             if (!filtro) return true;
@@ -298,6 +392,23 @@
         tbody.innerHTML = "";
 
         const headerRow = document.createElement("tr");
+
+        let checkAll = null;
+        if (podeEditar) {
+            const thCheck = document.createElement("th");
+            thCheck.style.width = "36px";
+            checkAll = document.createElement("input");
+            checkAll.type = "checkbox";
+            checkAll.className = "form-check-input";
+            checkAll.title = "Selecionar todos";
+            checkAll.addEventListener("change", () => {
+                tbody.querySelectorAll("input.form-check-input[data-row]").forEach((cb) => { cb.checked = checkAll.checked; });
+                _atualizarBarraLote("#tabela-pendencias-recebimento tbody", "barra-lote-pendencias", "lote-pendencias-count");
+            });
+            thCheck.appendChild(checkAll);
+            headerRow.appendChild(thCheck);
+        }
+
         columns.forEach((col) => {
             const th = document.createElement("th");
             th.textContent = col;
@@ -311,7 +422,7 @@
         if (!filtradas.length) {
             const tr = document.createElement("tr");
             const td = document.createElement("td");
-            td.colSpan = columns.length + 1;
+            td.colSpan = columns.length + (podeEditar ? 2 : 1);
             td.className = "text-center text-muted";
             td.textContent = "Nenhuma pendencia encontrada.";
             tr.appendChild(td);
@@ -319,23 +430,50 @@
         } else {
             filtradas.forEach((row) => {
                 const tr = document.createElement("tr");
+
+                if (podeEditar) {
+                    const tdCheck = document.createElement("td");
+                    const cb = _criarCheckbox(row.item_id, () => {
+                        _sincronizarSelectAll(checkAll, tbody);
+                        _atualizarBarraLote("#tabela-pendencias-recebimento tbody", "barra-lote-pendencias", "lote-pendencias-count");
+                    });
+                    cb.dataset.row = "1";
+                    tdCheck.appendChild(cb);
+                    tr.appendChild(tdCheck);
+                }
+
                 columns.forEach((col) => {
                     const td = document.createElement("td");
                     td.textContent = row.data?.[col] || "";
                     tr.appendChild(td);
                 });
+
                 const tdAcao = document.createElement("td");
                 const btn = document.createElement("button");
                 btn.type = "button";
-                btn.className = "btn btn-sm btn-dark";
+                btn.className = podeEditar ? "btn btn-sm btn-dark me-1" : "btn btn-sm btn-dark";
                 btn.textContent = "Inspecionar";
                 btn.addEventListener("click", () => abrirModalRecebimento(row));
                 tdAcao.appendChild(btn);
+                if (podeEditar) {
+                    const btnExcluirItem = document.createElement("button");
+                    btnExcluirItem.type = "button";
+                    btnExcluirItem.className = "btn btn-sm btn-outline-danger";
+                    btnExcluirItem.title = "Excluir pendência";
+                    btnExcluirItem.innerHTML = '<i class="bi bi-trash"></i>';
+                    btnExcluirItem.addEventListener("click", () => excluirPendenciaRecebimento(row.item_id));
+                    tdAcao.appendChild(btnExcluirItem);
+                }
                 tr.appendChild(tdAcao);
                 tbody.appendChild(tr);
             });
         }
 
+        if (podeEditar) {
+            _atualizarBarraLote("#tabela-pendencias-recebimento tbody", "barra-lote-pendencias", "lote-pendencias-count");
+        } else {
+            document.getElementById("barra-lote-pendencias").classList.add("d-none");
+        }
         atualizarBadges(
             "qtd-pendencias-recebimento",
             "qtd-filtrada-pendencias-recebimento",
@@ -347,6 +485,7 @@
     function renderInspecionados() {
         const columns = inspecionadosCache.columns || [];
         const rows = inspecionadosCache.rows || [];
+        const podeEditar = inspecionadosCache.pode_editar === true;
         const filtro = (document.getElementById("pesquisa-inspecionados-recebimento").value || "").toLowerCase();
         const filtradas = rows.filter((row) => {
             if (!filtro) return true;
@@ -364,20 +503,37 @@
         tbody.innerHTML = "";
 
         const headerRow = document.createElement("tr");
+
+        let checkAll = null;
+        if (podeEditar) {
+            const thCheck = document.createElement("th");
+            thCheck.style.width = "36px";
+            checkAll = document.createElement("input");
+            checkAll.type = "checkbox";
+            checkAll.className = "form-check-input";
+            checkAll.title = "Selecionar todos";
+            checkAll.addEventListener("change", () => {
+                tbody.querySelectorAll("input.form-check-input[data-row]").forEach((cb) => { cb.checked = checkAll.checked; });
+                _atualizarBarraLote("#tabela-inspecionados-recebimento tbody", "barra-lote-inspecionados", "lote-inspecionados-count");
+            });
+            thCheck.appendChild(checkAll);
+            headerRow.appendChild(thCheck);
+        }
+
         columns.forEach((col) => {
             const th = document.createElement("th");
             th.textContent = col;
             headerRow.appendChild(th);
         });
         const thAcoes = document.createElement("th");
-        thAcoes.textContent = "Acoes";
+        thAcoes.textContent = "Ações";
         headerRow.appendChild(thAcoes);
         thead.appendChild(headerRow);
 
         if (!filtradas.length) {
             const tr = document.createElement("tr");
             const td = document.createElement("td");
-            td.colSpan = (columns.length || 1) + 1;
+            td.colSpan = (columns.length || 1) + (podeEditar ? 2 : 1);
             td.className = "text-center text-muted";
             td.textContent = "Nenhum item inspecionado.";
             tr.appendChild(td);
@@ -385,6 +541,18 @@
         } else {
             filtradas.forEach((row) => {
                 const tr = document.createElement("tr");
+
+                if (podeEditar) {
+                    const tdCheck = document.createElement("td");
+                    const cb = _criarCheckbox(row.meta.id, () => {
+                        _sincronizarSelectAll(checkAll, tbody);
+                        _atualizarBarraLote("#tabela-inspecionados-recebimento tbody", "barra-lote-inspecionados", "lote-inspecionados-count");
+                    });
+                    cb.dataset.row = "1";
+                    tdCheck.appendChild(cb);
+                    tr.appendChild(tdCheck);
+                }
+
                 columns.forEach((col) => {
                     const td = document.createElement("td");
                     td.textContent = row.data?.[col] || "";
@@ -393,21 +561,130 @@
                 const tdAcao = document.createElement("td");
                 const btnFicha = document.createElement("button");
                 btnFicha.type = "button";
-                btnFicha.className = "btn btn-sm btn-outline-dark";
+                btnFicha.className = podeEditar ? "btn btn-sm btn-outline-dark me-1" : "btn btn-sm btn-outline-dark";
                 btnFicha.textContent = "Ver ficha";
                 btnFicha.addEventListener("click", () => abrirFichaInspecaoRecebimento(row));
                 tdAcao.appendChild(btnFicha);
+                if (podeEditar) {
+                    const btnEditar = document.createElement("button");
+                    btnEditar.type = "button";
+                    btnEditar.className = "btn btn-sm btn-outline-primary";
+                    btnEditar.title = "Editar registro";
+                    btnEditar.innerHTML = '<i class="bi bi-pencil"></i>';
+                    btnEditar.addEventListener("click", () => abrirModalEditarInspecao(row));
+                    tdAcao.appendChild(btnEditar);
+                }
                 tr.appendChild(tdAcao);
                 tbody.appendChild(tr);
             });
         }
 
+        if (podeEditar) {
+            _atualizarBarraLote("#tabela-inspecionados-recebimento tbody", "barra-lote-inspecionados", "lote-inspecionados-count");
+        } else {
+            document.getElementById("barra-lote-inspecionados").classList.add("d-none");
+        }
         atualizarBadges(
             "qtd-inspecionados-recebimento",
             "qtd-filtrada-inspecionados-recebimento",
             rows.length,
             filtradas.length
         );
+    }
+
+    function excluirLotePendencias() {
+        const ids = Array.from(
+            document.querySelectorAll("#tabela-pendencias-recebimento tbody input.form-check-input:checked")
+        ).map((cb) => Number(cb.value));
+        if (!ids.length) return;
+        if (!confirm(`Deseja excluir ${ids.length} ${ids.length === 1 ? "pendência" : "pendências"}? Elas não aparecerão mais na listagem.`)) return;
+        fetch("/inspecao/api/recebimento/excluir-item-lote/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
+            body: JSON.stringify({ ids }),
+        })
+        .then((r) => r.json())
+        .then((data) => {
+            if (data.success) {
+                const idSet = new Set(ids);
+                pendenciasCache.rows = (pendenciasCache.rows || []).filter((r) => !idSet.has(r.item_id));
+                pendenciasCache.total = pendenciasCache.rows.length;
+                renderPendencias();
+            } else {
+                alert("Erro ao excluir: " + (data.error || "desconhecido"));
+            }
+        })
+        .catch(() => alert("Erro de conexão ao excluir pendências."));
+    }
+
+    function excluirLoteInspecionados() {
+        const ids = Array.from(
+            document.querySelectorAll("#tabela-inspecionados-recebimento tbody input.form-check-input:checked")
+        ).map((cb) => Number(cb.value));
+        if (!ids.length) return;
+        if (!confirm(`Deseja excluir ${ids.length} ${ids.length === 1 ? "registro" : "registros"}? Eles não aparecerão mais na listagem.`)) return;
+        fetch("/inspecao/api/recebimento/excluir-inspecao-lote/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
+            body: JSON.stringify({ ids }),
+        })
+        .then((r) => r.json())
+        .then((data) => {
+            if (data.success) {
+                const idSet = new Set(ids);
+                inspecionadosCache.rows = (inspecionadosCache.rows || []).filter((r) => !idSet.has(r.meta.id));
+                inspecionadosCache.total = inspecionadosCache.rows.length;
+                renderInspecionados();
+            } else {
+                alert("Erro ao excluir: " + (data.error || "desconhecido"));
+            }
+        })
+        .catch(() => alert("Erro de conexão ao excluir registros."));
+    }
+
+    function excluirPendenciaRecebimento(itemId) {
+        if (!confirm("Deseja excluir esta pendência? Ela não aparecerá mais na listagem.")) return;
+        fetch("/inspecao/api/recebimento/excluir-item/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
+            body: JSON.stringify({ id: itemId }),
+        })
+        .then((r) => r.json())
+        .then((data) => {
+            if (data.success) {
+                pendenciasCache.rows = (pendenciasCache.rows || []).filter((r) => r.item_id !== itemId);
+                pendenciasCache.total = pendenciasCache.rows.length;
+                renderPendencias();
+            } else {
+                alert("Erro ao excluir: " + (data.error || "desconhecido"));
+            }
+        })
+        .catch(() => alert("Erro de conexão ao excluir pendência."));
+    }
+
+    function excluirInspecaoRecebimento(registroId) {
+        if (!confirm("Deseja excluir este registro de inspeção? Ele não aparecerá mais na listagem.")) return;
+        fetch("/inspecao/api/recebimento/excluir-inspecao/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
+            body: JSON.stringify({ id: registroId }),
+        })
+        .then((r) => r.json())
+        .then((data) => {
+            if (data.success) {
+                inspecionadosCache.rows = (inspecionadosCache.rows || []).filter((r) => r.meta.id !== registroId);
+                inspecionadosCache.total = inspecionadosCache.rows.length;
+                renderInspecionados();
+            } else {
+                alert("Erro ao excluir: " + (data.error || "desconhecido"));
+            }
+        })
+        .catch(() => alert("Erro de conexão ao excluir registro."));
+    }
+
+    function getCsrfToken() {
+        const input = document.querySelector("[name=csrfmiddlewaretoken]");
+        return input ? input.value : "";
     }
 
     function atualizarBadges(idTotal, idFiltrado, total, filtrado) {
@@ -545,7 +822,171 @@
         modal.show();
     }
 
-    // â”€â”€â”€ helpers do formulÃ¡rio dinÃ¢mico â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // --- edição de inspeção ---
+
+    let _editarRowRef = null;
+
+    function abrirModalEditarInspecao(row) {
+        _editarRowRef = row;
+
+        document.getElementById("editar-inspecao-id").value = row.meta.id;
+        document.getElementById("editar-inspecao-resultado").value = row.meta.resultado === "Conforme" ? "conforme" : "nao_conforme";
+        document.getElementById("editar-inspecao-observacao").value = row.meta.observacao || "";
+
+        const wrapper = document.getElementById("editar-inspecao-unidades-wrapper");
+        const thead = document.querySelector("#tabela-editar-inspecao-unidades thead");
+        const tbody = document.querySelector("#tabela-editar-inspecao-unidades tbody");
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+        const materiais = row?.dados_inspecao?.materiais || [];
+        const unidades = row?.dados_inspecao?.unidades || [];
+        const unidadesComMaterial = materiais.length
+            ? materiais.flatMap((m) => (m.unidades || []).map((u) => ({ ...u, __material_nome: m.nome_material || `Material ${m.material || ""}`.trim(), __material_ref: m })))
+            : unidades.map((u) => ({ ...u, __material_ref: null }));
+
+        if (!unidadesComMaterial.length) {
+            wrapper.style.display = "none";
+        } else {
+            wrapper.style.display = "";
+            const camposExtras = [];
+            unidadesComMaterial.forEach((u) => {
+                Object.keys(u.campos || {}).forEach((c) => { if (!camposExtras.includes(c)) camposExtras.push(c); });
+            });
+
+            const CONFORMIDADE_VALUES = new Set(["conforme", "nao_conforme"]);
+            const camposConformidade = new Set();
+            camposExtras.forEach((c) => {
+                const temConformidade = unidadesComMaterial.some((u) => CONFORMIDADE_VALUES.has(u.campos?.[c]));
+                if (temConformidade) camposConformidade.add(c);
+            });
+
+            const colunasBase = materiais.length ? ["material", "unidade", "resultado", "observacao"] : ["unidade", "resultado", "observacao"];
+            const colunas = [...colunasBase, ...camposExtras];
+
+            const headerRow = document.createElement("tr");
+            colunas.forEach((col) => {
+                const th = document.createElement("th");
+                th.textContent = formatarRotuloFicha(col);
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+
+            unidadesComMaterial.forEach((unidade, idx) => {
+                const tr = document.createElement("tr");
+                tr.dataset.unidadeIdx = idx;
+                colunas.forEach((col) => {
+                    const td = document.createElement("td");
+                    if (col === "material") {
+                        td.textContent = unidade.__material_nome || "";
+                    } else if (col === "unidade") {
+                        td.textContent = unidade.unidade ?? "";
+                    } else if (col === "resultado" || camposConformidade.has(col)) {
+                        const sel = document.createElement("select");
+                        sel.className = "form-select form-select-sm";
+                        sel.dataset.campo = col;
+                        if (col !== "resultado") sel.dataset.extra = "1";
+                        const valorAtual = col === "resultado" ? unidade.resultado : (unidade.campos?.[col] || "");
+                        [["conforme", "Conforme"], ["nao_conforme", "Nao conforme"]].forEach(([v, l]) => {
+                            const opt = new Option(l, v, false, valorAtual === v);
+                            sel.appendChild(opt);
+                        });
+                        td.appendChild(sel);
+                    } else if (col === "observacao") {
+                        const inp = document.createElement("input");
+                        inp.type = "text";
+                        inp.className = "form-control form-control-sm";
+                        inp.dataset.campo = "observacao";
+                        inp.value = unidade.observacao || "";
+                        td.appendChild(inp);
+                    } else {
+                        const inp = document.createElement("input");
+                        inp.type = "text";
+                        inp.className = "form-control form-control-sm";
+                        inp.dataset.campo = col;
+                        inp.dataset.extra = "1";
+                        inp.value = unidade.campos?.[col] || "";
+                        td.appendChild(inp);
+                    }
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById("modal-editar-inspecao-recebimento"));
+        modal.show();
+    }
+
+    function salvarEdicaoInspecao() {
+        const id = Number(document.getElementById("editar-inspecao-id").value);
+        const resultado = document.getElementById("editar-inspecao-resultado").value;
+        const observacao = document.getElementById("editar-inspecao-observacao").value.trim();
+
+        const row = _editarRowRef;
+        let dadosInspecaoAtualizado = row?.dados_inspecao ? JSON.parse(JSON.stringify(row.dados_inspecao)) : null;
+
+        const tbody = document.querySelector("#tabela-editar-inspecao-unidades tbody");
+        if (dadosInspecaoAtualizado && tbody && tbody.querySelectorAll("tr").length) {
+            const materiais = dadosInspecaoAtualizado.materiais || [];
+            const unidades = dadosInspecaoAtualizado.unidades || [];
+            const unidadesComMaterial = materiais.length
+                ? materiais.flatMap((m) => (m.unidades || []))
+                : unidades;
+
+            tbody.querySelectorAll("tr").forEach((tr, idx) => {
+                const unidade = unidadesComMaterial[idx];
+                if (!unidade) return;
+                tr.querySelectorAll("[data-campo]").forEach((el) => {
+                    const campo = el.dataset.campo;
+                    const val = el.value;
+                    if (campo === "resultado") unidade.resultado = val;
+                    else if (campo === "observacao") unidade.observacao = val;
+                    else if (el.dataset.extra) {
+                        if (!unidade.campos) unidade.campos = {};
+                        unidade.campos[campo] = val;
+                    }
+                });
+            });
+        }
+
+        const btn = document.getElementById("btn-salvar-edicao-inspecao");
+        btn.disabled = true;
+        btn.textContent = "Salvando...";
+
+        fetch("/inspecao/api/recebimento/editar-inspecao/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
+            body: JSON.stringify({ id, resultado, observacao, dados_inspecao: dadosInspecaoAtualizado }),
+        })
+        .then((r) => r.json())
+        .then((data) => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-floppy"></i> Salvar';
+            if (data.success) {
+                const resultadoDisplay = resultado === "conforme" ? "Conforme" : "Nao conforme";
+                const rowCache = inspecionadosCache.rows?.find((r) => r.meta.id === id);
+                if (rowCache) {
+                    rowCache.meta.resultado = resultadoDisplay;
+                    rowCache.meta.observacao = observacao;
+                    rowCache.data["Resultado"] = resultadoDisplay;
+                    rowCache.data["Observação"] = observacao;
+                    if (dadosInspecaoAtualizado) rowCache.dados_inspecao = dadosInspecaoAtualizado;
+                }
+                bootstrap.Modal.getInstance(document.getElementById("modal-editar-inspecao-recebimento"))?.hide();
+                renderInspecionados();
+            } else {
+                alert("Erro ao salvar: " + (data.error || "desconhecido"));
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-floppy"></i> Salvar';
+            alert("Erro de conexão ao salvar edição.");
+        });
+    }
+
+    // â"€â"€â"€ helpers do formulÃ¡rio dinÃ¢mico â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     let classeAtual = "";
     let tipoTubosBarrasAtual = "barra";
     let tipoComponentesCilindrosAtual = "haste";
@@ -1803,6 +2244,19 @@
 
         document.getElementById("pesquisa-pendencias-recebimento").addEventListener("input", renderPendencias);
         document.getElementById("pesquisa-inspecionados-recebimento").addEventListener("input", renderInspecionados);
+        document.getElementById("btn-salvar-edicao-inspecao").addEventListener("click", salvarEdicaoInspecao);
+        document.getElementById("btn-excluir-lote-pendencias").addEventListener("click", excluirLotePendencias);
+        document.getElementById("btn-excluir-lote-inspecionados").addEventListener("click", excluirLoteInspecionados);
+        document.getElementById("btn-desmarcar-pendencias").addEventListener("click", () => {
+            document.querySelectorAll("#tabela-pendencias-recebimento tbody input.form-check-input").forEach((cb) => { cb.checked = false; });
+            document.querySelectorAll("#tabela-pendencias-recebimento thead input.form-check-input").forEach((cb) => { cb.checked = false; cb.indeterminate = false; });
+            _atualizarBarraLote("#tabela-pendencias-recebimento tbody", "barra-lote-pendencias", "lote-pendencias-count");
+        });
+        document.getElementById("btn-desmarcar-inspecionados").addEventListener("click", () => {
+            document.querySelectorAll("#tabela-inspecionados-recebimento tbody input.form-check-input").forEach((cb) => { cb.checked = false; });
+            document.querySelectorAll("#tabela-inspecionados-recebimento thead input.form-check-input").forEach((cb) => { cb.checked = false; cb.indeterminate = false; });
+            _atualizarBarraLote("#tabela-inspecionados-recebimento tbody", "barra-lote-inspecionados", "lote-inspecionados-count");
+        });
         document.getElementById("form-inspecao-recebimento").addEventListener("submit", salvarInspecaoRecebimento);
         document.getElementById("btn-sincronizar-recebimento").addEventListener("click", sincronizarRecebimento);
         document.getElementById("data-sincronizar-recebimento").addEventListener("input", atualizarEstadoBotaoSincronizarRecebimento);

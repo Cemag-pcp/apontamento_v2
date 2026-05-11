@@ -291,6 +291,9 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
 
     df['flag_urgencia'] = df['dias_ate_data_compra'].apply(_flag)
 
+    mask_pedido = (df['flag_urgencia'] == 'URGENTE') & (df['ped_compras_pendente'] > 0)
+    df.loc[mask_pedido, 'flag_urgencia'] = 'URGENTE_COM_PEDIDO'
+
     if len(df) > 1:
         df = df.iloc[1:].reset_index(drop=True)
 
@@ -301,6 +304,9 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
             'descricao': str(_valor_escalar(row.get('descricao'), '')),
             'grupo': str(_valor_escalar(row.get('grupo'), '')),
             'media_3m': round(float(_valor_escalar(row.get('media_3m'), 0) or 0), 2),
+            'cons_mes_anterior': round(float(_valor_escalar(row.get('cons_mes_anterior'), 0) or 0), 2),
+            'simulado_pend_vendas': round(float(_valor_escalar(row.get('simulado_pend_vendas'), 0) or 0), 2),
+            'dee_dias_em_est': round(float(_valor_escalar(row.get('dee_dias_em_est'), 0) or 0), 1),
             'estoque_almox': round(float(_valor_escalar(row.get('estoque_almox'), 0) or 0), 2),
             'estoque_total': round(float(_valor_escalar(row.get('estoque_total'), 0) or 0), 2),
             'ped_compras': round(float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0), 2),

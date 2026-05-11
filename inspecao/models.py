@@ -220,6 +220,7 @@ class InspecaoRecebimento(models.Model):
     dados_inspecao = models.JSONField(null=True, blank=True)
     resultado = models.CharField(max_length=20, choices=RESULTADO_CHOICES)
     observacao = models.CharField(max_length=255, null=True, blank=True)
+    excluido = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Recebimento {self.id} - {self.resultado}"
@@ -235,6 +236,7 @@ class InspecaoRecebimentoItem(models.Model):
     data_referencia = models.DateField()
     status_h = models.BooleanField(default=False)
     inspecionado = models.BooleanField(default=False)
+    excluido = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Recebimento Item {self.id}"

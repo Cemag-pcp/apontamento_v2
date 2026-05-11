@@ -102,6 +102,11 @@ urlpatterns = [
     path('api/recebimento/pendencias/', recebimento.recebimento_pendencias, name='recebimento-pendencias'),
     path('api/recebimento/inspecionados/', recebimento.recebimento_inspecionados, name='recebimento-inspecionados'),
     path('api/recebimento/inspecionar/', recebimento.inspecionar_recebimento, name='recebimento-inspecionar'),
+    path('api/recebimento/editar-inspecao/', recebimento.editar_recebimento_inspecao, name='recebimento-editar-inspecao'),
+    path('api/recebimento/excluir-inspecao/', recebimento.excluir_recebimento_inspecao, name='recebimento-excluir-inspecao'),
+    path('api/recebimento/excluir-inspecao-lote/', recebimento.excluir_recebimento_inspecao_lote, name='recebimento-excluir-inspecao-lote'),
+    path('api/recebimento/excluir-item/', recebimento.excluir_recebimento_item, name='recebimento-excluir-item'),
+    path('api/recebimento/excluir-item-lote/', recebimento.excluir_recebimento_item_lote, name='recebimento-excluir-item-lote'),
 
 ]
 

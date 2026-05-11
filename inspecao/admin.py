@@ -80,8 +80,10 @@ class InspecaoRecebimentoAdmin(ProfilePermissionMixin, admin.ModelAdmin):
         "planilha_id",
         "aba_nome",
         "linha_planilha",
+        "excluido",
     )
     list_display_links = ("data_inspecao",)
+    list_filter = ("excluido", "resultado")
 
 class InspecaoRecebimentoItemAdmin(ProfilePermissionMixin, admin.ModelAdmin):
     list_display = (
@@ -90,11 +92,13 @@ class InspecaoRecebimentoItemAdmin(ProfilePermissionMixin, admin.ModelAdmin):
         "data_referencia",
         "status_h",
         "inspecionado",
+        "excluido",
         "planilha_id",
         "aba_nome",
         "linha_planilha",
     )
     list_display_links = ("criado_em",)
+    list_filter = ("excluido", "inspecionado")
 
 class AnaliseBanhoEzingerAdmin(ProfilePermissionMixin, admin.ModelAdmin):
     list_display = (

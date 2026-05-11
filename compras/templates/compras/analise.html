@@ -54,6 +54,7 @@
                     <select id="filtroUrgencia" class="form-select form-select-sm">
                         <option value="">Todas</option>
                         <option value="URGENTE">🔴 Urgente</option>
+                        <option value="URGENTE_COM_PEDIDO">🟠 Urgente c/ Ped. Pendente</option>
                         <option value="PRAZO_CURTO">🟡 Prazo Curto</option>
                         <option value="PRAZO_OK">🟢 Prazo OK</option>
                     </select>
@@ -97,12 +98,15 @@
                             <th>Descrição</th>
                             <th>Grupo</th>
                             <th class="num">Média 3M</th>
+                            <th class="num">Cons. Mês Ant.</th>
+                            <th class="num">Simul. Pend. Vendas</th>
+                            <th class="num">DEE Dias Em Est.</th>
                             <th class="num">Est. Almox</th>
                             <th class="num">Consumo/Dia</th>
                             <th class="num">Dias p/ Zero</th>
                             <th class="num">Ped. Pendente</th>
                             <th class="num">Est. Mínimo</th>
-                            <th>Data Próx. Compra</th>
+                            <th id="thDataCompra" style="cursor:pointer;user-select:none;" onclick="ordenarPorDataCompra()">Data Próx. Compra<span class="sort-icon"> ↕</span></th>
                             <th class="center">Situação</th>
                             <th class="center">Gráfico</th>
                         </tr>
