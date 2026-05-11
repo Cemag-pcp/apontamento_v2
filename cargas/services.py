@@ -14,7 +14,7 @@ from cargas.models import (
     CargaLiberadaVersao,
     LinkAcompanhamento,
 )
-from cargas.utils import consultar_carretas, consultar_carretas_detalhado
+from cargas.utils import buscar_celulas, consultar_carretas, consultar_carretas_detalhado
 
 
 def _normalizar_itens(itens):
@@ -251,6 +251,7 @@ def listar_cargas_liberadas_periodo(data_inicio: date, data_fim: date):
     )
 
     itens_saida = []
+    codigos_recurso = set()
     for carga in cargas:
         ultima_versao = (
             carga.versoes_ordenadas[0] if getattr(carga, "versoes_ordenadas", []) else None
@@ -266,6 +267,7 @@ def listar_cargas_liberadas_periodo(data_inicio: date, data_fim: date):
             agrupado[chave] += float(item.quantidade)
 
         for (codigo_recurso, presente_no_carreta), quantidade in agrupado.items():
+            codigos_recurso.add(str(codigo_recurso))
             itens_saida.append(
                 {
                     "data_carga": carga.data_carga.isoformat(),
@@ -282,9 +284,17 @@ def listar_cargas_liberadas_periodo(data_inicio: date, data_fim: date):
                 }
             )
 
+    celulas = []
+    if codigos_recurso:
+        celulas = [
+            {"celula": str(celula)}
+            for celula in buscar_celulas(sorted(codigos_recurso))
+            if pd.notna(celula) and str(celula).strip()
+        ]
+
     return {
         "cargas": itens_saida,
-        "celulas": [],
+        "celulas": celulas,
     }
 
 

@@ -367,6 +367,46 @@ class CargasLiberacaoTests(TestCase):
             ],
         )
 
+    @patch("cargas.services.buscar_celulas")
+    def test_listar_cargas_liberadas_periodo_retorna_celulas_para_modal_montagem(self, buscar_celulas_mock):
+        buscar_celulas_mock.return_value = ["CEL-01", "CEL-02"]
+
+        carga = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 04",
+        )
+        versao = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        CargaLiberadaItem.objects.create(
+            carga_versao=versao,
+            codigo_recurso="012345",
+            quantidade=2,
+            presente_no_carreta="✅",
+        )
+        CargaLiberadaItem.objects.create(
+            carga_versao=versao,
+            codigo_recurso="067890",
+            quantidade=1,
+            presente_no_carreta="✅",
+        )
+
+        payload = listar_cargas_liberadas_periodo(
+            self._date("2026-04-27"),
+            self._date("2026-04-27"),
+        )
+
+        buscar_celulas_mock.assert_called_once_with(["012345", "067890"])
+        self.assertEqual(
+            payload["celulas"],
+            [{"celula": "CEL-01"}, {"celula": "CEL-02"}],
+        )
+
     def test_api_cargas_liberadas_retorna_base_do_sequenciamento(self):
         carga = CargaLiberada.objects.create(
             data_carga=self._date("2026-04-27"),
