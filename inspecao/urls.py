@@ -129,6 +129,7 @@ urlpatterns += [
     path('dashboard/usinagem/', serra_usinagem.dashboard_usinagem, name='dasdashboard_usinagemboard'),
     path('dashboard/tanque/', estanqueidade.dashboard_tanque, name='dashboard-tanque'),
     path('dashboard/tubos-cilindros/', estanqueidade.dashboard_tubos_cilindros, name='dashboard-tubos-cilindros'),
+    path('dashboard/recebimento/', recebimento.dashboard_recebimento, name='dashboard-recebimento'),
 ]
 
 # dashboard
@@ -172,4 +173,10 @@ urlpatterns += [
     path('tubos-cilindros/api/indicador-tubos-cilindros-resumo-analise-temporal/', estanqueidade.indicador_tubos_cilindros_resumo_analise_temporal, name='indicador_tubos_cilindros_resumo_analise_temporal'),
     path('tubos-cilindros/api/imagens-nao-conformidade/', estanqueidade.imagens_nao_conformidade_tubos_cilindros, name='imagens_nao_conformidade_tubos_cilindros'),
     path('tubos-cilindros/api/causas-nao-conformidade/', estanqueidade.causas_nao_conformidade_mensal_tubos_cilindros, name='causas_nao_conformidade_mensal'),
+
+    path('recebimento/api/resumo/', recebimento.api_recebimento_resumo, name='api_recebimento_resumo'),
+    path('recebimento/api/analise-temporal/', recebimento.api_recebimento_analise_temporal, name='api_recebimento_analise_temporal'),
+    path('recebimento/api/por-fornecedor/', recebimento.api_recebimento_por_fornecedor, name='api_recebimento_por_fornecedor'),
+    path('recebimento/api/por-classe/', recebimento.api_recebimento_por_classe, name='api_recebimento_por_classe'),
+    path('recebimento/api/por-tipo-material/', recebimento.api_recebimento_por_tipo_material, name='api_recebimento_por_tipo_material'),
 ]

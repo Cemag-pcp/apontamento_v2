@@ -6,6 +6,279 @@
 
 {% block links %}
 <link rel="stylesheet" href="{% static 'css/inspecao.css' %}">
+<style>
+/* ── Tabela Pendências ───────────────────────────── */
+#tabela-pendencias-recebimento {
+    font-size: .82rem;
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+}
+#tabela-pendencias-recebimento thead th {
+    background: #1e293b;
+    color: #f1f5f9;
+    font-weight: 500;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: .55rem .75rem;
+    white-space: nowrap;
+    border: none;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+#tabela-pendencias-recebimento thead th:first-child { border-radius: 6px 0 0 0; }
+#tabela-pendencias-recebimento thead th:last-child  { border-radius: 0 6px 0 0; }
+#tabela-pendencias-recebimento tbody td {
+    padding: .5rem .75rem;
+    border: none;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+}
+#tabela-pendencias-recebimento tbody tr:last-child td { border-bottom: none; }
+#tabela-pendencias-recebimento tbody tr:hover td { background: #f0f9ff; }
+#tabela-pendencias-recebimento tbody tr:nth-child(even) td { background: #f8fafc; }
+#tabela-pendencias-recebimento tbody tr:nth-child(even):hover td { background: #e0f2fe; }
+
+/* Larguras por coluna (data-col) */
+#tabela-pendencias-recebimento [data-col="check"]          { width: 40px; text-align: center; }
+#tabela-pendencias-recebimento [data-col="Data"]           { width: 88px; white-space: nowrap; }
+#tabela-pendencias-recebimento [data-col="CNPJ"]           { width: 130px; }
+#tabela-pendencias-recebimento [data-col="Fornecedor"]     { min-width: 160px; }
+#tabela-pendencias-recebimento [data-col="Nº Nota fiscal"] { width: 110px; }
+#tabela-pendencias-recebimento [data-col="Tipo de material"]   { width: 130px; }
+#tabela-pendencias-recebimento [data-col="Classe de Inspeção"] { width: 180px; }
+#tabela-pendencias-recebimento [data-col="acoes"]          { width: 145px; text-align: center; white-space: nowrap; }
+
+/* Células com overflow */
+.pend-cell-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0; /* força truncamento em table-layout:fixed */
+}
+.pend-cell-mono { font-family: monospace; font-size: .78rem; color: #475569; }
+
+/* Badges inline */
+.pend-badge {
+    display: inline-block;
+    font-size: .7rem;
+    font-weight: 600;
+    padding: .2em .55em;
+    border-radius: .3rem;
+    white-space: nowrap;
+}
+.pend-badge-classe-0  { background:#dbeafe; color:#1d4ed8; }
+.pend-badge-classe-1  { background:#dcfce7; color:#15803d; }
+.pend-badge-classe-2  { background:#fef9c3; color:#854d0e; }
+.pend-badge-classe-3  { background:#fce7f3; color:#9d174d; }
+.pend-badge-classe-4  { background:#ede9fe; color:#5b21b6; }
+.pend-badge-classe-5  { background:#ffedd5; color:#9a3412; }
+.pend-badge-classe-default { background:#f1f5f9; color:#475569; }
+.pend-badge-tipo { background:#e0f2fe; color:#0369a1; }
+
+/* ── Tabela Inspecionados ────────────────────────── */
+#tabela-inspecionados-recebimento {
+    font-size: .82rem;
+    table-layout: auto;
+    width: 100%;
+    border-collapse: collapse;
+}
+#tabela-inspecionados-recebimento thead th {
+    background: #1e293b;
+    color: #f1f5f9;
+    font-weight: 500;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: .55rem .75rem;
+    white-space: nowrap;
+    border: none;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+#tabela-inspecionados-recebimento thead th:first-child { border-radius: 6px 0 0 0; }
+#tabela-inspecionados-recebimento thead th:last-child  { border-radius: 0 6px 0 0; }
+#tabela-inspecionados-recebimento tbody td {
+    padding: .5rem .75rem;
+    border: none;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+}
+#tabela-inspecionados-recebimento tbody tr:last-child td { border-bottom: none; }
+#tabela-inspecionados-recebimento tbody tr:hover td { background: #f0f9ff; }
+#tabela-inspecionados-recebimento tbody tr:nth-child(even) td { background: #f8fafc; }
+#tabela-inspecionados-recebimento tbody tr:nth-child(even):hover td { background: #e0f2fe; }
+
+#tabela-inspecionados-recebimento [data-col="check"]          { width: 40px; text-align: center; }
+#tabela-inspecionados-recebimento [data-col="Data inspeção"]  { width: 130px; white-space: nowrap; }
+#tabela-inspecionados-recebimento [data-col="Inspetor"]       { width: 110px; }
+#tabela-inspecionados-recebimento [data-col="Resultado"]      { width: 120px; text-align: center; }
+#tabela-inspecionados-recebimento [data-col="Observação"]     { max-width: 180px; }
+#tabela-inspecionados-recebimento [data-col="CNPJ"]           { width: 130px; }
+#tabela-inspecionados-recebimento [data-col="Fornecedor"]     { max-width: 200px; }
+#tabela-inspecionados-recebimento [data-col="Tipo de material"]   { width: 130px; }
+#tabeta-inspecionados-recebimento [data-col="Classe de Inspeção"] { width: 180px; }
+#tabela-inspecionados-recebimento [data-col="acoes"]          { width: 130px; text-align: center; white-space: nowrap; }
+
+.insp-badge-conforme     { background:#dcfce7; color:#15803d; }
+.insp-badge-nao-conforme { background:#fee2e2; color:#b91c1c; }
+
+/* ── Ficha de inspeção (documento) ───────────────── */
+.ficha-doc {
+    background: #fff;
+    font-size: .875rem;
+    color: #1e293b;
+    padding: 2rem 2.5rem;
+}
+.ficha-doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid #1e293b;
+    margin-bottom: 1.5rem;
+}
+.ficha-doc-title { font-size: 1rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #1e293b; }
+.ficha-doc-subtitle { font-size: .75rem; color: #64748b; margin-top: .15rem; }
+.ficha-doc-id { text-align: right; font-size: .75rem; color: #64748b; line-height: 1.6; }
+.ficha-doc-id strong { display: block; font-size: .95rem; color: #1e293b; }
+
+.ficha-section { margin-bottom: 1.5rem; }
+.ficha-section-title {
+    font-size: .65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #64748b;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: .3rem;
+    margin-bottom: .85rem;
+}
+.ficha-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: .6rem 1.5rem;
+}
+.ficha-field { display: flex; flex-direction: column; }
+.ficha-field-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .15rem; }
+.ficha-field-value { font-size: .875rem; color: #1e293b; font-weight: 500; }
+.ficha-field-value.mono { font-family: monospace; font-size: .8rem; }
+
+.ficha-resultado-box {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: .85rem 1.25rem;
+    border-radius: .5rem;
+    margin-top: .5rem;
+}
+.ficha-resultado-box.conforme     { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.ficha-resultado-box.nao-conforme { background: #fff1f2; border: 1px solid #fecdd3; }
+.ficha-resultado-pill {
+    font-size: .95rem;
+    font-weight: 700;
+    padding: .35em .9em;
+    border-radius: 2rem;
+    white-space: nowrap;
+}
+.ficha-resultado-pill.conforme     { background: #16a34a; color: #fff; }
+.ficha-resultado-pill.nao-conforme { background: #dc2626; color: #fff; }
+.ficha-resultado-obs { font-size: .82rem; color: #475569; font-style: italic; }
+
+.ficha-unidades-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.ficha-unidades-table thead th {
+    background: #1e293b;
+    color: #f1f5f9;
+    padding: .45rem .7rem;
+    font-size: .68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    white-space: nowrap;
+    border: none;
+}
+.ficha-unidades-table tbody td {
+    padding: .45rem .7rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+.ficha-unidades-table tbody tr:last-child td { border-bottom: none; }
+.ficha-unidades-table tbody tr:nth-child(even) td { background: #f8fafc; }
+.ficha-unidades-table .result-conf  { color: #15803d; font-weight: 600; }
+.ficha-unidades-table .result-nc    { color: #b91c1c; font-weight: 600; }
+.ficha-unidades-table .ficha-material-group td {
+    background: #f1f5f9;
+    color: #334155;
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding: .4rem .7rem;
+    border-top: 2px solid #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
+}
+.ficha-unidades-table .ficha-material-group:first-child td { border-top: none; }
+
+/* ── Cards de edição por unidade ─────────────────── */
+.edit-material-header {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #475569;
+    background: #e2e8f0;
+    border-radius: .4rem .4rem 0 0;
+    padding: .45rem .85rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.edit-unidade-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: .4rem;
+    margin-bottom: .75rem;
+    overflow: hidden;
+}
+.edit-unidade-card + .edit-unidade-card { border-top: none; border-radius: 0 0 .4rem .4rem; }
+.edit-unidade-header {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: .35rem .85rem;
+    font-size: .75rem;
+    font-weight: 600;
+    color: #334155;
+}
+.edit-unidade-body {
+    padding: .75rem .85rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: .6rem 1rem;
+}
+.edit-field { display: flex; flex-direction: column; gap: .2rem; }
+.edit-field label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; }
+.edit-material-group { margin-bottom: 1.25rem; }
+
+.ficha-doc-footer {
+    margin-top: 2rem;
+    padding-top: .75rem;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: .72rem;
+    color: #94a3b8;
+}
+
+@media print {
+    .modal-header, .modal-footer { display: none !important; }
+    .modal-body { padding: 0 !important; }
+    .ficha-doc { padding: 1.5rem; }
+}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -101,60 +374,68 @@
 
 <div class="modal fade" id="modal-ficha-inspecao-recebimento" tabindex="-1" aria-labelledby="modalFichaInspecaoRecebimentoLabel">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalFichaInspecaoRecebimentoLabel">Ficha de inspeção</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div id="ficha-inspecao-resumo-recebimento" class="row small mb-3"></div>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-sm align-middle" id="tabela-ficha-inspecao-recebimento">
-                        <thead></thead>
-                        <tbody></tbody>
-                    </table>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0 px-4 pt-3" style="background:#f8fafc;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-clipboard2-check text-primary fs-5"></i>
+                    <span class="fw-semibold" style="font-size:.95rem;" id="modalFichaInspecaoRecebimentoLabel">Ficha de Inspeção de Recebimento</span>
                 </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()" title="Imprimir">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+            </div>
+            <div class="modal-body p-0" style="background:#f8fafc;">
+                <div id="ficha-doc-container" class="ficha-doc"></div>
             </div>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="modal-editar-inspecao-recebimento" tabindex="-1" aria-labelledby="modalEditarInspecaoRecebimentoLabel">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalEditarInspecaoRecebimentoLabel">Editar inspeção</h5>
+            <div class="modal-header border-bottom" style="background:#f8fafc;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-pencil-square text-primary fs-5"></i>
+                    <span class="fw-semibold" id="modalEditarInspecaoRecebimentoLabel">Editar inspeção</span>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="background:#f8fafc;">
                 <input type="hidden" id="editar-inspecao-id">
-                <div class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Resultado geral</label>
-                        <select id="editar-inspecao-resultado" class="form-select">
-                            <option value="conforme">Conforme</option>
-                            <option value="nao_conforme">Nao conforme</option>
-                        </select>
+
+                <div class="card mb-4 border-0 shadow-sm">
+                    <div class="card-header bg-white fw-semibold" style="font-size:.82rem; text-transform:uppercase; letter-spacing:.05em; color:#64748b;">
+                        Resultado geral
                     </div>
-                    <div class="col-md-8">
-                        <label class="form-label fw-semibold">Observação</label>
-                        <textarea id="editar-inspecao-observacao" class="form-control" rows="2"></textarea>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label form-label-sm fw-semibold">Resultado</label>
+                                <select id="editar-inspecao-resultado" class="form-select form-select-sm">
+                                    <option value="conforme">Conforme</option>
+                                    <option value="nao_conforme">Nao conforme</option>
+                                </select>
+                            </div>
+                            <div class="col-md-9">
+                                <label class="form-label form-label-sm fw-semibold">Observação</label>
+                                <textarea id="editar-inspecao-observacao" class="form-control form-control-sm" rows="2"></textarea>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
                 <div id="editar-inspecao-unidades-wrapper" style="display:none;">
-                    <h6 class="fw-semibold mb-2">Dados por unidade</h6>
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-sm align-middle" id="tabela-editar-inspecao-unidades">
-                            <thead></thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
+                    <div id="editar-inspecao-unidades-cards"></div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer bg-white">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-primary" id="btn-salvar-edicao-inspecao">
-                    <i class="bi bi-floppy"></i> Salvar
+                    <i class="bi bi-floppy"></i> Salvar alterações
                 </button>
             </div>
         </div>
@@ -225,6 +506,7 @@
                                     <option value="haste" selected>Haste</option>
                                     <option value="vedacao">Vedação</option>
                                     <option value="camisa">Camisa</option>
+                                    <option value="fechamento_camisa">Fechamento da camisa</option>
                                 </select>
                             </div>
                             <ul class="nav nav-tabs nav-tabs-sm mb-0" id="tabs-unidades-recebimento"></ul>
@@ -393,10 +675,23 @@
 
         const headerRow = document.createElement("tr");
 
+        // paleta de cores para badges de Classe de Inspeção
+        const _classeColorMap = {};
+        const _classePalette = [0,1,2,3,4,5];
+        let _classeColorIdx = 0;
+        const _classeColor = (val) => {
+            if (!val) return "pend-badge-classe-default";
+            if (!_classeColorMap[val]) {
+                _classeColorMap[val] = `pend-badge-classe-${_classePalette[_classeColorIdx % _classePalette.length]}`;
+                _classeColorIdx++;
+            }
+            return _classeColorMap[val];
+        };
+
         let checkAll = null;
         if (podeEditar) {
             const thCheck = document.createElement("th");
-            thCheck.style.width = "36px";
+            thCheck.dataset.col = "check";
             checkAll = document.createElement("input");
             checkAll.type = "checkbox";
             checkAll.className = "form-check-input";
@@ -411,10 +706,12 @@
 
         columns.forEach((col) => {
             const th = document.createElement("th");
+            th.dataset.col = col;
             th.textContent = col;
             headerRow.appendChild(th);
         });
         const thAcoes = document.createElement("th");
+        thAcoes.dataset.col = "acoes";
         thAcoes.textContent = "Ações";
         headerRow.appendChild(thAcoes);
         thead.appendChild(headerRow);
@@ -423,8 +720,8 @@
             const tr = document.createElement("tr");
             const td = document.createElement("td");
             td.colSpan = columns.length + (podeEditar ? 2 : 1);
-            td.className = "text-center text-muted";
-            td.textContent = "Nenhuma pendencia encontrada.";
+            td.className = "text-center text-muted py-4";
+            td.innerHTML = '<i class="bi bi-inbox me-2"></i>Nenhuma pendência encontrada.';
             tr.appendChild(td);
             tbody.appendChild(tr);
         } else {
@@ -433,6 +730,8 @@
 
                 if (podeEditar) {
                     const tdCheck = document.createElement("td");
+                    tdCheck.dataset.col = "check";
+                    tdCheck.style.textAlign = "center";
                     const cb = _criarCheckbox(row.item_id, () => {
                         _sincronizarSelectAll(checkAll, tbody);
                         _atualizarBarraLote("#tabela-pendencias-recebimento tbody", "barra-lote-pendencias", "lote-pendencias-count");
@@ -444,11 +743,34 @@
 
                 columns.forEach((col) => {
                     const td = document.createElement("td");
-                    td.textContent = row.data?.[col] || "";
+                    td.dataset.col = col;
+                    const val = row.data?.[col] || "";
+
+                    if (col === "Classe de Inspeção" && val) {
+                        const badge = document.createElement("span");
+                        badge.className = `pend-badge ${_classeColor(val)}`;
+                        badge.textContent = val;
+                        td.appendChild(badge);
+                    } else if (col === "Tipo de material" && val) {
+                        const badge = document.createElement("span");
+                        badge.className = "pend-badge pend-badge-tipo";
+                        badge.textContent = val;
+                        td.appendChild(badge);
+                    } else if (col === "CNPJ") {
+                        td.classList.add("pend-cell-mono");
+                        td.textContent = val;
+                    } else if (col === "Fornecedor") {
+                        td.classList.add("pend-cell-truncate");
+                        td.textContent = val;
+                        td.title = val;
+                    } else {
+                        td.textContent = val;
+                    }
                     tr.appendChild(td);
                 });
 
                 const tdAcao = document.createElement("td");
+                tdAcao.dataset.col = "acoes";
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.className = podeEditar ? "btn btn-sm btn-dark me-1" : "btn btn-sm btn-dark";
@@ -504,10 +826,21 @@
 
         const headerRow = document.createElement("tr");
 
+        const _inspClasseColorMap = {};
+        let _inspClasseColorIdx = 0;
+        const _inspClasseColor = (val) => {
+            if (!val) return "pend-badge-classe-default";
+            if (!_inspClasseColorMap[val]) {
+                _inspClasseColorMap[val] = `pend-badge-classe-${_inspClasseColorIdx % 6}`;
+                _inspClasseColorIdx++;
+            }
+            return _inspClasseColorMap[val];
+        };
+
         let checkAll = null;
         if (podeEditar) {
             const thCheck = document.createElement("th");
-            thCheck.style.width = "36px";
+            thCheck.dataset.col = "check";
             checkAll = document.createElement("input");
             checkAll.type = "checkbox";
             checkAll.className = "form-check-input";
@@ -522,10 +855,12 @@
 
         columns.forEach((col) => {
             const th = document.createElement("th");
+            th.dataset.col = col;
             th.textContent = col;
             headerRow.appendChild(th);
         });
         const thAcoes = document.createElement("th");
+        thAcoes.dataset.col = "acoes";
         thAcoes.textContent = "Ações";
         headerRow.appendChild(thAcoes);
         thead.appendChild(headerRow);
@@ -534,8 +869,8 @@
             const tr = document.createElement("tr");
             const td = document.createElement("td");
             td.colSpan = (columns.length || 1) + (podeEditar ? 2 : 1);
-            td.className = "text-center text-muted";
-            td.textContent = "Nenhum item inspecionado.";
+            td.className = "text-center text-muted py-4";
+            td.innerHTML = '<i class="bi bi-inbox me-2"></i>Nenhum item inspecionado.';
             tr.appendChild(td);
             tbody.appendChild(tr);
         } else {
@@ -544,6 +879,8 @@
 
                 if (podeEditar) {
                     const tdCheck = document.createElement("td");
+                    tdCheck.dataset.col = "check";
+                    tdCheck.style.textAlign = "center";
                     const cb = _criarCheckbox(row.meta.id, () => {
                         _sincronizarSelectAll(checkAll, tbody);
                         _atualizarBarraLote("#tabela-inspecionados-recebimento tbody", "barra-lote-inspecionados", "lote-inspecionados-count");
@@ -555,10 +892,40 @@
 
                 columns.forEach((col) => {
                     const td = document.createElement("td");
-                    td.textContent = row.data?.[col] || "";
+                    td.dataset.col = col;
+                    const val = row.data?.[col] || "";
+
+                    if (col === "Resultado" && val) {
+                        const isConforme = val.toLowerCase().startsWith("con");
+                        const badge = document.createElement("span");
+                        badge.className = `pend-badge ${isConforme ? "insp-badge-conforme" : "insp-badge-nao-conforme"}`;
+                        badge.textContent = val;
+                        td.appendChild(badge);
+                    } else if (col === "Classe de Inspeção" && val) {
+                        const badge = document.createElement("span");
+                        badge.className = `pend-badge ${_inspClasseColor(val)}`;
+                        badge.textContent = val;
+                        td.appendChild(badge);
+                    } else if (col === "Tipo de material" && val) {
+                        const badge = document.createElement("span");
+                        badge.className = "pend-badge pend-badge-tipo";
+                        badge.textContent = val;
+                        td.appendChild(badge);
+                    } else if (col === "CNPJ") {
+                        td.classList.add("pend-cell-mono");
+                        td.textContent = val;
+                    } else if (col === "Fornecedor" || col === "Observação") {
+                        td.classList.add("pend-cell-truncate");
+                        td.textContent = val;
+                        if (val) td.title = val;
+                    } else {
+                        td.textContent = val;
+                    }
                     tr.appendChild(td);
                 });
+
                 const tdAcao = document.createElement("td");
+                tdAcao.dataset.col = "acoes";
                 const btnFicha = document.createElement("button");
                 btnFicha.type = "button";
                 btnFicha.className = podeEditar ? "btn btn-sm btn-outline-dark me-1" : "btn btn-sm btn-outline-dark";
@@ -707,116 +1074,144 @@
     }
 
     function abrirFichaInspecaoRecebimento(row) {
-        const resumo = document.getElementById("ficha-inspecao-resumo-recebimento");
-        const tabela = document.getElementById("tabela-ficha-inspecao-recebimento");
-        const thead = tabela.querySelector("thead");
-        const tbody = tabela.querySelector("tbody");
+        const container = document.getElementById("ficha-doc-container");
+        container.innerHTML = "";
+
         const materiais = row?.dados_inspecao?.materiais || [];
-        const unidades = row?.dados_inspecao?.unidades || [];
+        const unidades  = row?.dados_inspecao?.unidades  || [];
         const unidadesComMaterial = materiais.length
-            ? materiais.flatMap((material) =>
-                (material.unidades || []).map((unidade) => ({
-                    ...unidade,
-                    __material_nome: material.nome_material || `Material ${material.material || ""}`.trim(),
-                }))
-            )
+            ? materiais.flatMap((m) => (m.unidades || []).map((u) => ({
+                ...u,
+                __material_nome: m.nome_material || `Material ${m.material || ""}`.trim(),
+              })))
             : unidades;
 
-        resumo.innerHTML = "";
-        thead.innerHTML = "";
-        tbody.innerHTML = "";
+        const resultado   = row?.meta?.resultado  || "";
+        const isConforme  = resultado.toLowerCase().startsWith("con");
+        const resultClass = isConforme ? "conforme" : "nao-conforme";
 
-        const resumoCampos = [
-            ["Data inspeção", row?.meta?.data_inspecao || ""],
-            ["Inspetor", row?.meta?.inspetor || ""],
-            ["Resultado", row?.meta?.resultado || ""],
-            ["Observação", row?.meta?.observacao || ""],
-        ];
+        const geradoEm = new Date().toLocaleString("pt-BR");
+        const registroId = row?.meta?.id || "";
 
-        resumoCampos.forEach(([label, value]) => {
-            const dt = document.createElement("dt");
-            dt.className = "col-sm-3 text-muted";
-            dt.textContent = label;
-            const dd = document.createElement("dd");
-            dd.className = "col-sm-9";
-            dd.textContent = value || "-";
-            resumo.appendChild(dt);
-            resumo.appendChild(dd);
-        });
+        // ── dados do recebimento (da planilha)
+        const dadosPlanilha = row?.data || {};
+        const CAMPOS_ORDEM  = ["Data", "Fornecedor", "CNPJ", "Nº Nota fiscal", "Tipo de material", "Classe de Inspeção"];
+        const camposPlanilha = CAMPOS_ORDEM.filter(k => k in dadosPlanilha).concat(
+            Object.keys(dadosPlanilha).filter(k => !CAMPOS_ORDEM.includes(k))
+        );
 
-        if (!unidadesComMaterial.length) {
-            const headerRow = document.createElement("tr");
-            const th = document.createElement("th");
-            th.textContent = "Ficha";
-            headerRow.appendChild(th);
-            thead.appendChild(headerRow);
+        const _field = (label, value, mono = false) => `
+            <div class="ficha-field">
+                <span class="ficha-field-label">${label}</span>
+                <span class="ficha-field-value${mono ? " mono" : ""}">${value || "—"}</span>
+            </div>`;
 
-            const tr = document.createElement("tr");
-            const td = document.createElement("td");
-            td.className = "text-center text-muted";
-            td.textContent = "Este registro não possui dados detalhados por unidade.";
-            tr.appendChild(td);
-            tbody.appendChild(tr);
-        } else {
+        const planilhaFields = camposPlanilha.map(k => _field(k, dadosPlanilha[k], k === "CNPJ")).join("");
+
+        // ── tabela de unidades
+        let unidadesHtml = "";
+        if (unidadesComMaterial.length) {
             const camposExtras = [];
-            const possuiImagem = unidadesComMaterial.some((unidade) => {
-                const imagem = unidade?.imagem;
-                return Boolean(imagem?.url || imagem?.arquivo);
-            });
-            unidadesComMaterial.forEach((unidade) => {
-                Object.keys(unidade.campos || {}).forEach((campo) => {
-                    if (!camposExtras.includes(campo)) camposExtras.push(campo);
-                });
+            const possuiImagem = unidadesComMaterial.some(u => Boolean(u?.imagem?.url || u?.imagem?.arquivo));
+            unidadesComMaterial.forEach(u => {
+                Object.keys(u.campos || {}).forEach(c => { if (!camposExtras.includes(c)) camposExtras.push(c); });
             });
 
-            const colunasBase = materiais.length
-                ? ["material", "unidade", "resultado", "observacao"]
-                : ["unidade", "resultado", "observacao"];
-            if (possuiImagem) {
-                colunasBase.push("imagem");
-            }
+            // "material" sai das colunas — vira linha de agrupamento
+            const colunasBase = ["unidade", "resultado", "observacao"];
+            if (possuiImagem) colunasBase.push("imagem");
             const colunas = [...colunasBase, ...camposExtras];
-            const headerRow = document.createElement("tr");
-            colunas.forEach((coluna) => {
-                const th = document.createElement("th");
-                th.textContent = formatarRotuloFicha(coluna);
-                headerRow.appendChild(th);
-            });
-            thead.appendChild(headerRow);
+            const numCols = colunas.length;
 
-            unidadesComMaterial.forEach((unidade) => {
-                const tr = document.createElement("tr");
-                colunas.forEach((coluna) => {
-                    const td = document.createElement("td");
-                    if (coluna === "material") {
-                        td.textContent = unidade.__material_nome || "";
-                    } else if (coluna === "unidade") {
-                        td.textContent = unidade.unidade ?? "";
-                    } else if (coluna === "resultado") {
-                        td.textContent = unidade.resultado || "";
-                    } else if (coluna === "observacao") {
-                        td.textContent = unidade.observacao || "";
-                    } else if (coluna === "imagem") {
-                        const imagem = unidade?.imagem || {};
-                        const imagemUrl = imagem.url || "";
-                        if (imagemUrl) {
-                            td.innerHTML = `
-                                <a href="${imagemUrl}" target="_blank" rel="noopener noreferrer" class="d-inline-flex flex-column align-items-center gap-1 text-decoration-none">
-                                    <img src="${imagemUrl}" alt="Imagem da inspeção" style="width:72px;height:72px;object-fit:cover;border-radius:0.5rem;border:1px solid #dee2e6;">
-                                    <span class="small">Ampliar</span>
-                                </a>
-                            `;
-                        } else {
-                            td.textContent = "-";
-                        }
-                    } else {
-                        td.textContent = unidade.campos?.[coluna] || "";
-                    }
-                    tr.appendChild(td);
+            const theadCols = colunas.map(c => `<th>${formatarRotuloFicha(c)}</th>`).join("");
+
+            const _renderCell = (col, unidade) => {
+                if (col === "unidade") return `<td>${unidade.unidade ?? "—"}</td>`;
+                if (col === "resultado") {
+                    const v = unidade.resultado || "";
+                    const cls = v.toLowerCase().startsWith("con") ? "result-conf" : (v ? "result-nc" : "");
+                    return `<td class="${cls}">${v || "—"}</td>`;
+                }
+                if (col === "observacao") return `<td>${unidade.observacao || "—"}</td>`;
+                if (col === "imagem") {
+                    const url = unidade?.imagem?.url || "";
+                    return url
+                        ? `<td><a href="${url}" target="_blank" rel="noopener noreferrer"><img src="${url}" style="width:56px;height:56px;object-fit:cover;border-radius:.35rem;border:1px solid #e2e8f0;"></a></td>`
+                        : `<td class="text-muted">—</td>`;
+                }
+                const v = unidade.campos?.[col] || "";
+                const cls = v.toLowerCase() === "conforme" ? "result-conf" : (v.toLowerCase() === "nao_conforme" || v.toLowerCase() === "não conforme" ? "result-nc" : "");
+                return `<td class="${cls}">${v || "—"}</td>`;
+            };
+
+            // agrupa por material (mantendo a ordem original)
+            let tbodyRows = "";
+            if (materiais.length) {
+                materiais.forEach(m => {
+                    const nomeMaterial = m.nome_material || `Material ${m.material || ""}`.trim();
+                    const unidadesDeste = (m.unidades || []);
+                    if (!unidadesDeste.length) return;
+                    tbodyRows += `<tr class="ficha-material-group"><td colspan="${numCols}"><i class="bi bi-box-seam me-2"></i>${nomeMaterial}</td></tr>`;
+                    unidadesDeste.forEach(u => {
+                        tbodyRows += `<tr>${colunas.map(col => _renderCell(col, u)).join("")}</tr>`;
+                    });
                 });
-                tbody.appendChild(tr);
-            });
+            } else {
+                tbodyRows = unidadesComMaterial.map(u =>
+                    `<tr>${colunas.map(col => _renderCell(col, u)).join("")}</tr>`
+                ).join("");
+            }
+
+            unidadesHtml = `
+                <div class="ficha-section">
+                    <div class="ficha-section-title">Dados por unidade inspecionada</div>
+                    <div style="overflow-x:auto;">
+                        <table class="ficha-unidades-table">
+                            <thead><tr>${theadCols}</tr></thead>
+                            <tbody>${tbodyRows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
         }
+
+        container.innerHTML = `
+            <div class="ficha-doc-header">
+                <div>
+                    <div class="ficha-doc-title">Ficha de Inspeção de Recebimento</div>
+                    <div class="ficha-doc-subtitle">Controle de qualidade — material recebido</div>
+                </div>
+                <div class="ficha-doc-id">
+                    <strong>#${registroId || "—"}</strong>
+                    Emitido em ${geradoEm}
+                </div>
+            </div>
+
+            <div class="ficha-section">
+                <div class="ficha-section-title">Dados do recebimento</div>
+                <div class="ficha-fields">${planilhaFields}</div>
+            </div>
+
+            <div class="ficha-section">
+                <div class="ficha-section-title">Resultado da inspeção</div>
+                <div class="ficha-resultado-box ${resultClass}">
+                    <span class="ficha-resultado-pill ${resultClass}">${resultado || "—"}</span>
+                    <div>
+                        ${_field("Data da inspeção", row?.meta?.data_inspecao)}
+                        ${_field("Inspetor", row?.meta?.inspetor)}
+                        ${row?.meta?.observacao
+                            ? `<div class="ficha-resultado-obs mt-1"><i class="bi bi-chat-left-text me-1"></i>${row.meta.observacao}</div>`
+                            : ""}
+                    </div>
+                </div>
+            </div>
+
+            ${unidadesHtml}
+
+            <div class="ficha-doc-footer">
+                <span>Inspeção de Recebimento — sistema de qualidade</span>
+                <span>Registro #${registroId || "—"} · ${geradoEm}</span>
+            </div>
+        `;
 
         const modal = new bootstrap.Modal(document.getElementById("modal-ficha-inspecao-recebimento"));
         modal.show();
@@ -833,85 +1228,108 @@
         document.getElementById("editar-inspecao-resultado").value = row.meta.resultado === "Conforme" ? "conforme" : "nao_conforme";
         document.getElementById("editar-inspecao-observacao").value = row.meta.observacao || "";
 
-        const wrapper = document.getElementById("editar-inspecao-unidades-wrapper");
-        const thead = document.querySelector("#tabela-editar-inspecao-unidades thead");
-        const tbody = document.querySelector("#tabela-editar-inspecao-unidades tbody");
-        thead.innerHTML = "";
-        tbody.innerHTML = "";
+        const wrapper  = document.getElementById("editar-inspecao-unidades-wrapper");
+        const container = document.getElementById("editar-inspecao-unidades-cards");
+        container.innerHTML = "";
 
         const materiais = row?.dados_inspecao?.materiais || [];
-        const unidades = row?.dados_inspecao?.unidades || [];
-        const unidadesComMaterial = materiais.length
-            ? materiais.flatMap((m) => (m.unidades || []).map((u) => ({ ...u, __material_nome: m.nome_material || `Material ${m.material || ""}`.trim(), __material_ref: m })))
-            : unidades.map((u) => ({ ...u, __material_ref: null }));
+        const unidades  = row?.dados_inspecao?.unidades  || [];
 
-        if (!unidadesComMaterial.length) {
+        const todasUnidades = materiais.length
+            ? materiais.flatMap((m) => (m.unidades || []).map((u) => ({ ...u, __material_nome: m.nome_material || `Material ${m.material || ""}`.trim() })))
+            : unidades;
+
+        if (!todasUnidades.length) {
             wrapper.style.display = "none";
         } else {
             wrapper.style.display = "";
-            const camposExtras = [];
-            unidadesComMaterial.forEach((u) => {
-                Object.keys(u.campos || {}).forEach((c) => { if (!camposExtras.includes(c)) camposExtras.push(c); });
-            });
 
             const CONFORMIDADE_VALUES = new Set(["conforme", "nao_conforme"]);
-            const camposConformidade = new Set();
-            camposExtras.forEach((c) => {
-                const temConformidade = unidadesComMaterial.some((u) => CONFORMIDADE_VALUES.has(u.campos?.[c]));
-                if (temConformidade) camposConformidade.add(c);
-            });
 
-            const colunasBase = materiais.length ? ["material", "unidade", "resultado", "observacao"] : ["unidade", "resultado", "observacao"];
-            const colunas = [...colunasBase, ...camposExtras];
+            const _criarInput = (campo, valor, extra = false) => {
+                const wrap = document.createElement("div");
+                wrap.className = "edit-field";
+                const label = document.createElement("label");
+                label.textContent = formatarRotuloFicha(campo);
+                const inp = document.createElement("input");
+                inp.type = "text";
+                inp.className = "form-control form-control-sm";
+                inp.dataset.campo = campo;
+                inp.value = valor || "";
+                if (extra) inp.dataset.extra = "1";
+                wrap.appendChild(label);
+                wrap.appendChild(inp);
+                return wrap;
+            };
 
-            const headerRow = document.createElement("tr");
-            colunas.forEach((col) => {
-                const th = document.createElement("th");
-                th.textContent = formatarRotuloFicha(col);
-                headerRow.appendChild(th);
-            });
-            thead.appendChild(headerRow);
-
-            unidadesComMaterial.forEach((unidade, idx) => {
-                const tr = document.createElement("tr");
-                tr.dataset.unidadeIdx = idx;
-                colunas.forEach((col) => {
-                    const td = document.createElement("td");
-                    if (col === "material") {
-                        td.textContent = unidade.__material_nome || "";
-                    } else if (col === "unidade") {
-                        td.textContent = unidade.unidade ?? "";
-                    } else if (col === "resultado" || camposConformidade.has(col)) {
-                        const sel = document.createElement("select");
-                        sel.className = "form-select form-select-sm";
-                        sel.dataset.campo = col;
-                        if (col !== "resultado") sel.dataset.extra = "1";
-                        const valorAtual = col === "resultado" ? unidade.resultado : (unidade.campos?.[col] || "");
-                        [["conforme", "Conforme"], ["nao_conforme", "Nao conforme"]].forEach(([v, l]) => {
-                            const opt = new Option(l, v, false, valorAtual === v);
-                            sel.appendChild(opt);
-                        });
-                        td.appendChild(sel);
-                    } else if (col === "observacao") {
-                        const inp = document.createElement("input");
-                        inp.type = "text";
-                        inp.className = "form-control form-control-sm";
-                        inp.dataset.campo = "observacao";
-                        inp.value = unidade.observacao || "";
-                        td.appendChild(inp);
-                    } else {
-                        const inp = document.createElement("input");
-                        inp.type = "text";
-                        inp.className = "form-control form-control-sm";
-                        inp.dataset.campo = col;
-                        inp.dataset.extra = "1";
-                        inp.value = unidade.campos?.[col] || "";
-                        td.appendChild(inp);
-                    }
-                    tr.appendChild(td);
+            const _criarSelect = (campo, valorAtual, extra = false) => {
+                const wrap = document.createElement("div");
+                wrap.className = "edit-field";
+                const label = document.createElement("label");
+                label.textContent = formatarRotuloFicha(campo);
+                const sel = document.createElement("select");
+                sel.className = "form-select form-select-sm";
+                sel.dataset.campo = campo;
+                if (extra) sel.dataset.extra = "1";
+                [["conforme", "Conforme"], ["nao_conforme", "Nao conforme"]].forEach(([v, l]) => {
+                    sel.appendChild(new Option(l, v, false, valorAtual === v));
                 });
-                tbody.appendChild(tr);
-            });
+                wrap.appendChild(label);
+                wrap.appendChild(sel);
+                return wrap;
+            };
+
+            const _renderGrupo = (nomeMaterial, unidadesDoGrupo, mIdx) => {
+                const grupo = document.createElement("div");
+                grupo.className = "edit-material-group";
+
+                if (nomeMaterial) {
+                    const header = document.createElement("div");
+                    header.className = "edit-material-header";
+                    header.innerHTML = `<i class="bi bi-box-seam"></i>${nomeMaterial}`;
+                    grupo.appendChild(header);
+                }
+
+                unidadesDoGrupo.forEach((unidade, uIdx) => {
+                    const camposExtras = Object.keys(unidade.campos || {});
+
+                    const card = document.createElement("div");
+                    card.className = "edit-unidade-card";
+                    card.dataset.materialIdx = mIdx;
+                    card.dataset.unidadeIdx = uIdx;
+
+                    const cardHeader = document.createElement("div");
+                    cardHeader.className = "edit-unidade-header";
+                    cardHeader.textContent = `Unidade ${unidade.unidade ?? uIdx + 1}`;
+                    card.appendChild(cardHeader);
+
+                    const body = document.createElement("div");
+                    body.className = "edit-unidade-body";
+
+                    body.appendChild(_criarSelect("resultado", unidade.resultado));
+                    body.appendChild(_criarInput("observacao", unidade.observacao));
+
+                    camposExtras.forEach((c) => {
+                        const val = unidade.campos?.[c] || "";
+                        const isConf = CONFORMIDADE_VALUES.has(val);
+                        body.appendChild(isConf ? _criarSelect(c, val, true) : _criarInput(c, val, true));
+                    });
+
+                    card.appendChild(body);
+                    grupo.appendChild(card);
+                });
+
+                return grupo;
+            };
+
+            if (materiais.length) {
+                materiais.forEach((m, mIdx) => {
+                    const nome = m.nome_material || `Material ${m.material || ""}`.trim();
+                    container.appendChild(_renderGrupo(nome, m.unidades || [], mIdx));
+                });
+            } else {
+                container.appendChild(_renderGrupo("", unidades, 0));
+            }
         }
 
         const modal = new bootstrap.Modal(document.getElementById("modal-editar-inspecao-recebimento"));
@@ -926,18 +1344,20 @@
         const row = _editarRowRef;
         let dadosInspecaoAtualizado = row?.dados_inspecao ? JSON.parse(JSON.stringify(row.dados_inspecao)) : null;
 
-        const tbody = document.querySelector("#tabela-editar-inspecao-unidades tbody");
-        if (dadosInspecaoAtualizado && tbody && tbody.querySelectorAll("tr").length) {
+        const cardsContainer = document.getElementById("editar-inspecao-unidades-cards");
+        if (dadosInspecaoAtualizado && cardsContainer) {
             const materiais = dadosInspecaoAtualizado.materiais || [];
-            const unidades = dadosInspecaoAtualizado.unidades || [];
-            const unidadesComMaterial = materiais.length
-                ? materiais.flatMap((m) => (m.unidades || []))
-                : unidades;
+            const unidades  = dadosInspecaoAtualizado.unidades  || [];
 
-            tbody.querySelectorAll("tr").forEach((tr, idx) => {
-                const unidade = unidadesComMaterial[idx];
+            cardsContainer.querySelectorAll(".edit-unidade-card").forEach((card) => {
+                const mIdx = parseInt(card.dataset.materialIdx ?? "0", 10);
+                const uIdx = parseInt(card.dataset.unidadeIdx  ?? "0", 10);
+                const unidade = materiais.length
+                    ? (materiais[mIdx]?.unidades || [])[uIdx]
+                    : unidades[uIdx];
                 if (!unidade) return;
-                tr.querySelectorAll("[data-campo]").forEach((el) => {
+
+                card.querySelectorAll("[data-campo]").forEach((el) => {
                     const campo = el.dataset.campo;
                     const val = el.value;
                     if (campo === "resultado") unidade.resultado = val;
@@ -1845,6 +2265,13 @@
                 html += selectConformidade(prefix, "camisa_dim_circularidade_tubo", "circularidade do tubo");
                 html += `<div class="fw-semibold small mt-2 mb-2">Visual</div>`;
                 html += selectConformidade(prefix, "camisa_visual_oxidacao", "Oxidação");
+            } else if (tipoComponentesCilindrosAtual === "fechamento_camisa") {
+                html += secao("Fechamento da camisa");
+                html += `<div class="mb-2"><label class="form-label form-label-sm">Diam. do fecham.</label>`
+                      + `<input type="text" name="${prefix}fechamento_camisa_diam_fechamento" class="form-control form-control-sm"></div>`;
+                html += `<div class="mb-2"><label class="form-label form-label-sm">Diam. furo da orel.</label>`
+                      + `<input type="text" name="${prefix}fechamento_camisa_diam_furo_orelha" class="form-control form-control-sm"></div>`;
+                html += selectConformidade(prefix, "fechamento_camisa_teste_mont_grax", "Teste mont. grax.");
             } else if (tipoComponentesCilindrosAtual === "vedacao") {
                 html += secao("Vedação");
                 html += `<div class="fw-semibold small mt-2 mb-2">Dimensional</div>`;

@@ -41,8 +41,12 @@ urlpatterns = [
 urlpatterns += [
     path('', views.planejamento, name='planejamento'),
     path('programar-producao/', views.programar_producao, name='programar_producao'),
-    path('retrabalho', views.retrabalho_pintura, name='retrabalho_pintura')
+    path('retrabalho', views.retrabalho_pintura, name='retrabalho_pintura'),
+    path('historico/', views.historico_pintura, name='historico_pintura'),
+]
 
+urlpatterns += [
+    path('api/historico/', views.api_historico_pintura, name='api_historico_pintura'),
 ]
 
 # Google sheets

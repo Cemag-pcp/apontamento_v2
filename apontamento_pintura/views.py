@@ -2273,7 +2273,8 @@ def verificar_cor_cambao(cor_antes_de_finalizar, cambao_nome):
                 print("Nenhuma peça encontrada para registrar teste.")
             
             return peca_aleatoria
-            
+
+
         
     elif tipo == 'PU':
         if 'manual' in cambao.nome.lower():
@@ -2372,3 +2373,136 @@ def verificar_cor_cambao(cor_antes_de_finalizar, cambao_nome):
     #     # status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
     #     observacao = models.TextField(null=True, blank=True)
     # pass
+
+
+def historico_pintura(request):
+    brasil_tz = timezone("America/Sao_Paulo")
+    operadores = Operador.objects.order_by("nome")
+    camboes = Cambao.objects.filter(ativo=True).order_by("nome")
+    return render(
+        request,
+        "apontamento_pintura/historico.html",
+        {"operadores": operadores, "camboes": camboes},
+    )
+
+
+def api_historico_pintura(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    brasil_tz = timezone("America/Sao_Paulo")
+
+    data_inicio_str = request.GET.get("data_inicio", "")
+    data_fim_str = request.GET.get("data_fim", "")
+    tipo = request.GET.get("tipo", "").strip()
+    operador_id = request.GET.get("operador", "").strip()
+    cambao_id = request.GET.get("cambao", "").strip()
+    status_filtro = request.GET.get("status", "").strip()
+    pesquisar = request.GET.get("pesquisar", "").strip()
+    pagina = int(request.GET.get("pagina", 1))
+    por_pagina = int(request.GET.get("por_pagina", 25))
+
+    qs = (
+        CambaoPecas.objects
+        .select_related(
+            "cambao",
+            "peca_ordem",
+            "peca_ordem__ordem",
+            "operador_inicio",
+            "peca_ordem__operador_fim",
+        )
+        .exclude(peca_ordem__isnull=True)
+    )
+
+    if data_inicio_str:
+        try:
+            di = datetime.strptime(data_inicio_str, "%Y-%m-%d").date()
+            qs = qs.filter(data_pendura__date__gte=di)
+        except ValueError:
+            pass
+
+    if data_fim_str:
+        try:
+            df = datetime.strptime(data_fim_str, "%Y-%m-%d").date()
+            qs = qs.filter(data_pendura__date__lte=df)
+        except ValueError:
+            pass
+
+    if tipo:
+        qs = qs.filter(peca_ordem__tipo=tipo)
+
+    if operador_id:
+        qs = qs.filter(
+            Q(operador_inicio_id=operador_id) | Q(peca_ordem__operador_fim_id=operador_id)
+        )
+
+    if cambao_id:
+        qs = qs.filter(cambao_id=cambao_id)
+
+    if status_filtro:
+        qs = qs.filter(status=status_filtro)
+
+    if pesquisar:
+        qs = qs.filter(
+            Q(peca_ordem__peca__icontains=pesquisar)
+            | Q(peca_ordem__ordem__id__icontains=pesquisar)
+            | Q(cambao__cor__icontains=pesquisar)
+        )
+
+    qs = qs.order_by("-data_pendura")
+
+    total = qs.count()
+    paginator = Paginator(qs, por_pagina)
+    page_obj = paginator.get_page(pagina)
+
+    def fmt_dt(dt):
+        if dt is None:
+            return None
+        return localtime(dt).strftime("%d/%m/%Y %H:%M")
+
+    def duracao_minutos(inicio, fim):
+        if inicio and fim:
+            delta = fim - inicio
+            mins = int(delta.total_seconds() // 60)
+            h, m = divmod(mins, 60)
+            return f"{h}h {m:02d}min"
+        return None
+
+    registros = []
+    for cp in page_obj:
+        po = cp.peca_ordem
+        ordem = po.ordem
+
+        peca_parts = po.peca.split(" - ", maxsplit=1)
+        codigo = peca_parts[0].strip()
+        descricao = peca_parts[1].strip() if len(peca_parts) == 2 else ""
+
+        registros.append({
+            "id": cp.id,
+            "data_pendura": fmt_dt(cp.data_pendura),
+            "data_fim": fmt_dt(cp.data_fim),
+            "duracao": duracao_minutos(cp.data_pendura, cp.data_fim),
+            "cambao": cp.cambao.nome,
+            "cambao_cor": cp.cambao.cor,
+            "tipo": po.tipo,
+            "codigo": codigo,
+            "descricao": descricao,
+            "ordem_id": ordem.id,
+            "data_carga": ordem.data_carga.strftime("%d/%m/%Y") if ordem.data_carga else None,
+            "quantidade_pendurada": cp.quantidade_pendurada,
+            "qtd_planejada": po.qtd_planejada,
+            "qtd_boa": po.qtd_boa,
+            "qtd_morta": po.qtd_morta,
+            "operador_inicio": cp.operador_inicio.nome if cp.operador_inicio else None,
+            "operador_fim": po.operador_fim.nome if po.operador_fim else None,
+            "status": cp.status,
+            "identificador_lote": cp.identificador_lote,
+        })
+
+    return JsonResponse({
+        "registros": registros,
+        "total": total,
+        "pagina_atual": page_obj.number,
+        "total_paginas": paginator.num_pages,
+        "por_pagina": por_pagina,
+    })

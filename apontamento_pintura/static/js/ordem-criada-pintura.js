@@ -1510,7 +1510,11 @@ export function resetarCardsInicial(filtros = {}) {
     const filtroCor = document.getElementById('filtro-cor');
     const filtroConjunto = document.getElementById('filtro-conjunto');
     const filtroDataProgramada = document.getElementById('filtro-data-programada');
-    
+
+    if (!filtroDataCarga.value) {
+        filtroDataCarga.value = new Date().toISOString().slice(0, 10);
+    }
+
     const currentFiltros = {
         data_carga: filtroDataCarga.value,
         cor: filtroCor.value,

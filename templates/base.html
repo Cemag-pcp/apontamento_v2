@@ -356,6 +356,11 @@
                                     <a class="nav-link" href="{% url 'pintura:retrabalho_pintura' %}">Retrabalho</a>
                                 </nav>
                             </div>
+                            <div class="collapse" id="collapsePintura" aria-labelledby="headingPintura" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'pintura:historico_pintura' %}">Histórico</a>
+                                </nav>
+                            </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseMontagem" aria-expanded="false" aria-controls="collapseMontagem">
                                 <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
@@ -550,6 +555,11 @@
                             <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:dashboard-tubos-cilindros' %}">Tubos e Cilindros</a>
+                                </nav>
+                            </div>
+                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'inspecao:dashboard-recebimento' %}">Recebimento</a>
                                 </nav>
                             </div>
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseDashboadProducao" aria-expanded="false" aria-controls="collapseProducao">

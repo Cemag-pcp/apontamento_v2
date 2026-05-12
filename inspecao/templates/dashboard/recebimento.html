@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}<title>Dashboard Recebimento</title>{% endblock %}
+
+{% block links %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/dashboard/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<div class="pintura-header-banner mb-4">
+    Inspeção de Recebimento — Dashboard
+</div>
+
+<!-- Filtro de Período -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header ch-teal">Filtrar por Período</div>
+            <div class="card-body">
+                <form class="row g-3">
+                    <div class="col-md-4">
+                        <label for="startDate" class="form-label form-label-sm">Data Inicial</label>
+                        <input type="date" class="form-control form-control-sm" id="startDate">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="endDate" class="form-label form-label-sm">Data Final</label>
+                        <input type="date" class="form-control form-control-sm" id="endDate">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end gap-2">
+                        <button type="button" class="btn btn-primary btn-sm" id="filterBtn">Aplicar</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="resetBtn">Limpar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center py-3">
+                <div class="kpi-lbl text-uppercase" style="color:var(--db-text-muted);font-size:.65rem;letter-spacing:.08em;">Total Inspecionado</div>
+                <div class="kpi-val" id="kpi-total" style="font-size:2.2rem;font-weight:900;color:var(--db-navy);">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center py-3">
+                <div class="kpi-lbl text-uppercase" style="color:var(--db-text-muted);font-size:.65rem;letter-spacing:.08em;">Conformes</div>
+                <div class="kpi-val" id="kpi-conforme" style="font-size:2.2rem;font-weight:900;color:var(--db-green);">—</div>
+                <div class="text-muted" style="font-size:.72rem;" id="kpi-taxa-conf">—%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center py-3">
+                <div class="kpi-lbl text-uppercase" style="color:var(--db-text-muted);font-size:.65rem;letter-spacing:.08em;">Não Conformes</div>
+                <div class="kpi-val" id="kpi-nc" style="font-size:2.2rem;font-weight:900;color:var(--db-red);">—</div>
+                <div class="text-muted" style="font-size:.72rem;" id="kpi-taxa-nc">—%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center py-3">
+                <div class="kpi-lbl text-uppercase" style="color:var(--db-text-muted);font-size:.65rem;letter-spacing:.08em;">Pendentes</div>
+                <div class="kpi-val" id="kpi-pendentes" style="font-size:2.2rem;font-weight:900;color:var(--db-orange);">—</div>
+                <div class="text-muted" style="font-size:.72rem;">aguardando inspeção</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráfico Temporal + Donut Resultado -->
+<div class="row g-3 mb-4">
+    <div class="col-md-8">
+        <div class="card h-100">
+            <div class="card-header ch-blue">Evolução Mensal</div>
+            <div class="card-body">
+                <canvas id="chartTemporal" style="max-height:280px;"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header">Distribuição de Resultado</div>
+            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                <canvas id="chartResultado" style="max-height:230px;max-width:230px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fornecedores + Classe de Inspeção -->
+<div class="row g-3 mb-4">
+    <div class="col-md-7">
+        <div class="card h-100">
+            <div class="card-header ch-orange">Top Fornecedores</div>
+            <div class="table-responsive" style="max-height:320px;overflow-y:auto;">
+                <table class="table" id="table-fornecedores">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Fornecedor</th>
+                            <th class="col-num">Total</th>
+                            <th class="col-num">Conforme</th>
+                            <th class="col-num">Não Conf.</th>
+                            <th class="col-num">% NC</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-fornecedores">
+                        <tr><td colspan="6" class="text-center text-muted py-4">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card h-100">
+            <div class="card-header ch-teal">Por Classe de Inspeção</div>
+            <div class="card-body">
+                <canvas id="chartClasse" style="max-height:280px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tipo de Material -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">Por Tipo de Material</div>
+            <div class="card-body">
+                <canvas id="chartTipo" style="max-height:200px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/dashboard/dash-recebimento.js' %}"></script>
+{% endblock %}

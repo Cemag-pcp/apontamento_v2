@@ -5,9 +5,11 @@ from datetime import datetime
 
 import gspread
 from django.core.files.storage import default_storage
-from django.db import transaction
+from django.db import connection, transaction
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.utils.timezone import localtime
 
 from core.models import Profile
 from core.utils import get_google_credentials
@@ -363,13 +365,15 @@ def recebimento_inspecionados(request):
         .order_by("-data_inspecao")
     )
 
+    COLUNAS_OCULTAS = {"Situação do frete"}
+
     headers = []
     linhas = []
 
     for registro in registros:
         data = registro.dados or {}
         for key in data.keys():
-            if key not in headers:
+            if key not in headers and key not in COLUNAS_OCULTAS:
                 headers.append(key)
 
         linhas.append(
@@ -377,7 +381,7 @@ def recebimento_inspecionados(request):
                 "data": data,
                 "meta": {
                     "id": registro.id,
-                    "data_inspecao": registro.data_inspecao.strftime("%d/%m/%Y %H:%M"),
+                    "data_inspecao": localtime(registro.data_inspecao).strftime("%d/%m/%Y %H:%M"),
                     "inspetor": (
                         registro.inspetor.user.username
                         if registro.inspetor and registro.inspetor.user
@@ -665,3 +669,201 @@ def excluir_recebimento_item_lote(request):
 
     updated = InspecaoRecebimentoItem.objects.filter(id__in=ids).update(excluido=True)
     return JsonResponse({"success": True, "excluidos": updated}, status=200)
+
+
+# ── Dashboard ────────────────────────────────────────────────────────────────
+
+def dashboard_recebimento(request):
+    return render(request, "dashboard/recebimento.html")
+
+
+def _parse_date(value):
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date() if value else None
+    except ValueError:
+        return None
+
+
+def _filtrar_qs(qs, data_inicio, data_fim):
+    if data_inicio:
+        qs = qs.filter(data_inspecao__date__gte=data_inicio)
+    if data_fim:
+        qs = qs.filter(data_inspecao__date__lte=data_fim)
+    return qs
+
+
+def api_recebimento_resumo(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    di = _parse_date(request.GET.get("data_inicio"))
+    df = _parse_date(request.GET.get("data_fim"))
+
+    qs = _filtrar_qs(InspecaoRecebimento.objects.filter(excluido=False), di, df)
+    total      = qs.count()
+    conforme   = qs.filter(resultado="conforme").count()
+    nc         = qs.filter(resultado="nao_conforme").count()
+    pendentes  = InspecaoRecebimentoItem.objects.filter(inspecionado=False, excluido=False).count()
+
+    return JsonResponse({
+        "total": total,
+        "conforme": conforme,
+        "nao_conforme": nc,
+        "pendentes": pendentes,
+        "taxa_conformidade":    round(conforme / total * 100, 1) if total else 0,
+        "taxa_nao_conformidade": round(nc / total * 100, 1) if total else 0,
+    })
+
+
+def api_recebimento_analise_temporal(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    di = _parse_date(request.GET.get("data_inicio"))
+    df = _parse_date(request.GET.get("data_fim"))
+
+    params = []
+    where  = ["excluido = FALSE"]
+    if di:
+        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
+        params.append(di)
+    if df:
+        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date <= %s")
+        params.append(df)
+
+    sql = f"""
+        SELECT
+            TO_CHAR(DATE_TRUNC('month', data_inspecao AT TIME ZONE 'America/Sao_Paulo'), 'YYYY-MM') AS mes,
+            COUNT(*)                                                                AS total,
+            COUNT(*) FILTER (WHERE resultado = 'conforme')                         AS conforme,
+            COUNT(*) FILTER (WHERE resultado = 'nao_conforme')                     AS nao_conforme
+        FROM inspecao_inspecaorecebimento
+        WHERE {' AND '.join(where)}
+        GROUP BY 1
+        ORDER BY 1
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    return JsonResponse([
+        {
+            "mes": r[0],
+            "total": r[1],
+            "conforme": r[2],
+            "nao_conforme": r[3],
+            "taxa_nc": round(r[3] / r[1] * 100, 1) if r[1] else 0,
+        }
+        for r in rows
+    ], safe=False)
+
+
+def api_recebimento_por_fornecedor(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    di = _parse_date(request.GET.get("data_inicio"))
+    df = _parse_date(request.GET.get("data_fim"))
+
+    params = []
+    where  = ["excluido = FALSE", "dados->>'Fornecedor' IS NOT NULL", "dados->>'Fornecedor' <> ''"]
+    if di:
+        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
+        params.append(di)
+    if df:
+        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date <= %s")
+        params.append(df)
+
+    sql = f"""
+        SELECT
+            dados->>'Fornecedor'                                       AS fornecedor,
+            COUNT(*)                                                    AS total,
+            COUNT(*) FILTER (WHERE resultado = 'conforme')              AS conforme,
+            COUNT(*) FILTER (WHERE resultado = 'nao_conforme')          AS nao_conforme
+        FROM inspecao_inspecaorecebimento
+        WHERE {' AND '.join(where)}
+        GROUP BY 1
+        ORDER BY nao_conforme DESC, total DESC
+        LIMIT 15
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    return JsonResponse([
+        {"fornecedor": r[0], "total": r[1], "conforme": r[2], "nao_conforme": r[3]}
+        for r in rows
+    ], safe=False)
+
+
+def api_recebimento_por_classe(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    di = _parse_date(request.GET.get("data_inicio"))
+    df = _parse_date(request.GET.get("data_fim"))
+
+    params = []
+    where  = ["excluido = FALSE"]
+    if di:
+        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
+        params.append(di)
+    if df:
+        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date <= %s")
+        params.append(df)
+
+    sql = f"""
+        SELECT
+            COALESCE(NULLIF(dados->>'Classe de Inspeção', ''), 'Não informado') AS classe,
+            COUNT(*)                                                              AS total,
+            COUNT(*) FILTER (WHERE resultado = 'nao_conforme')                   AS nao_conforme
+        FROM inspecao_inspecaorecebimento
+        WHERE {' AND '.join(where)}
+        GROUP BY 1
+        ORDER BY total DESC
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    return JsonResponse([
+        {"classe": r[0], "total": r[1], "nao_conforme": r[2]}
+        for r in rows
+    ], safe=False)
+
+
+def api_recebimento_por_tipo_material(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    di = _parse_date(request.GET.get("data_inicio"))
+    df = _parse_date(request.GET.get("data_fim"))
+
+    params = []
+    where  = ["excluido = FALSE"]
+    if di:
+        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
+        params.append(di)
+    if df:
+        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date <= %s")
+        params.append(df)
+
+    sql = f"""
+        SELECT
+            COALESCE(NULLIF(dados->>'Tipo de material', ''), 'Não informado') AS tipo,
+            COUNT(*)                                                            AS total,
+            COUNT(*) FILTER (WHERE resultado = 'conforme')                     AS conforme,
+            COUNT(*) FILTER (WHERE resultado = 'nao_conforme')                 AS nao_conforme
+        FROM inspecao_inspecaorecebimento
+        WHERE {' AND '.join(where)}
+        GROUP BY 1
+        ORDER BY total DESC
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    return JsonResponse([
+        {"tipo": r[0], "total": r[1], "conforme": r[2], "nao_conforme": r[3]}
+        for r in rows
+    ], safe=False)

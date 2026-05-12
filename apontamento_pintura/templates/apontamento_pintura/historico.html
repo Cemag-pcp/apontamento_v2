@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}<title>Histórico de Pintura</title>{% endblock %}
+
+{% block links %}
+<style>
+    .hist-filters { background:#f8f9fa; border:1px solid #dee2e6; border-radius:.5rem; padding:1rem 1.25rem; margin-bottom:1.25rem; }
+    .hist-filters .row { row-gap:.75rem; }
+    .hist-table-wrap { overflow-x:auto; }
+    .hist-table { font-size:.82rem; white-space:nowrap; }
+    .hist-table thead th { background:#212529; color:#fff; position:sticky; top:0; z-index:1; padding:.55rem .75rem; font-weight:500; }
+    .hist-table tbody tr:hover { background:#f1f3f5; }
+    .hist-table td { padding:.45rem .75rem; vertical-align:middle; }
+    .badge-po  { background:#6f42c1; color:#fff; }
+    .badge-pu  { background:#0d6efd; color:#fff; }
+    .badge-finalizada  { background:#198754; color:#fff; }
+    .badge-pendurada   { background:#ffc107; color:#212529; }
+    .badge-programada  { background:#6c757d; color:#fff; }
+    .badge-interrompida{ background:#dc3545; color:#fff; }
+    .badge-status { font-size:.72rem; padding:.25em .55em; border-radius:.3rem; font-weight:600; }
+    .hist-pagination .page-link { font-size:.82rem; }
+    .stats-bar { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .stat-card { background:#fff; border:1px solid #dee2e6; border-radius:.4rem; padding:.4rem .9rem; font-size:.8rem; }
+    .stat-card strong { font-size:1.05rem; }
+    #loading-hist { display:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h4 class="mb-0">Histórico de Pintura</h4>
+            <small class="text-muted">Registros de penduras por cambão</small>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" id="btn-limpar-filtros">
+                <i class="bi bi-x-circle"></i> Limpar filtros
+            </button>
+            <button class="btn btn-sm btn-dark" id="btn-buscar">
+                <i class="bi bi-search"></i> Buscar
+            </button>
+        </div>
+    </div>
+
+    <div class="hist-filters">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label class="form-label form-label-sm mb-1">Data início</label>
+                <input type="date" class="form-control form-control-sm" id="f-data-inicio">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label form-label-sm mb-1">Data fim</label>
+                <input type="date" class="form-control form-control-sm" id="f-data-fim">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label form-label-sm mb-1">Tipo</label>
+                <select class="form-select form-select-sm" id="f-tipo">
+                    <option value="">Todos</option>
+                    <option value="PÓ">PÓ</option>
+                    <option value="PU">PU</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label form-label-sm mb-1">Operador</label>
+                <select class="form-select form-select-sm" id="f-operador">
+                    <option value="">Todos</option>
+                    {% for op in operadores %}
+                    <option value="{{ op.id }}">{{ op.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label form-label-sm mb-1">Cambão</label>
+                <select class="form-select form-select-sm" id="f-cambao">
+                    <option value="">Todos</option>
+                    {% for c in camboes %}
+                    <option value="{{ c.id }}">{{ c.nome }} ({{ c.tipo }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label form-label-sm mb-1">Status</label>
+                <select class="form-select form-select-sm" id="f-status">
+                    <option value="">Todos</option>
+                    <option value="finalizada">Finalizada</option>
+                    <option value="pendurada">Pendurada</option>
+                    <option value="programada">Programada</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label form-label-sm mb-1">Pesquisar</label>
+                <input type="text" class="form-control form-control-sm" id="f-pesquisar"
+                    placeholder="Código, descrição, cor, nº ordem...">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label form-label-sm mb-1">Por página</label>
+                <select class="form-select form-select-sm" id="f-por-pagina">
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-bar" id="stats-bar" style="display:none!important;"></div>
+
+    <div id="loading-hist" class="text-center py-4">
+        <div class="spinner-border text-dark" role="status"></div>
+        <p class="mt-2 text-muted small">Carregando...</p>
+    </div>
+
+    <div id="hist-wrapper" style="display:none;">
+        <div class="hist-table-wrap">
+            <table class="table table-bordered hist-table" id="hist-table">
+                <thead>
+                    <tr>
+                        <th>Início</th>
+                        <th>Fim</th>
+                        <th>Duração</th>
+                        <th>Cambão</th>
+                        <th>Cor</th>
+                        <th>Tipo</th>
+                        <th>Código</th>
+                        <th>Descrição</th>
+                        <th>Ordem</th>
+                        <th>Data Carga</th>
+                        <th class="text-end">Qtd. Pendurada</th>
+                        <th>Op. Início</th>
+                        <th>Op. Fim</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="hist-tbody"></tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+            <small class="text-muted" id="hist-info"></small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0 hist-pagination" id="hist-pagination"></ul>
+            </nav>
+        </div>
+    </div>
+
+    <div id="hist-vazio" class="alert alert-info" style="display:none;">
+        Nenhum registro encontrado para os filtros aplicados.
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+'use strict';
+
+let _paginaAtual = 1;
+let _totalPaginas = 1;
+let _totalRegistros = 0;
+
+const STATUS_BADGE = {
+    finalizada:   'finalizada',
+    pendurada:    'pendurada',
+    programada:   'programada',
+    interrompida: 'interrompida',
+};
+
+function getParams(pagina) {
+    return {
+        data_inicio: document.getElementById('f-data-inicio').value,
+        data_fim:    document.getElementById('f-data-fim').value,
+        tipo:        document.getElementById('f-tipo').value,
+        operador:    document.getElementById('f-operador').value,
+        cambao:      document.getElementById('f-cambao').value,
+        status:      document.getElementById('f-status').value,
+        pesquisar:   document.getElementById('f-pesquisar').value,
+        por_pagina:  document.getElementById('f-por-pagina').value,
+        pagina:      pagina || 1,
+    };
+}
+
+function buildQS(params) {
+    return Object.entries(params)
+        .filter(([, v]) => v !== '' && v !== null && v !== undefined)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join('&');
+}
+
+function buscar(pagina) {
+    pagina = pagina || 1;
+    _paginaAtual = pagina;
+
+    document.getElementById('loading-hist').style.display = 'block';
+    document.getElementById('hist-wrapper').style.display = 'none';
+    document.getElementById('hist-vazio').style.display = 'none';
+
+    const qs = buildQS(getParams(pagina));
+
+    fetch(`/pintura/api/historico/?${qs}`)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('loading-hist').style.display = 'none';
+            _totalRegistros = data.total;
+            _totalPaginas = data.total_paginas;
+
+            if (!data.registros || !data.registros.length) {
+                document.getElementById('hist-vazio').style.display = 'block';
+                renderStats(0, 0, 0);
+                return;
+            }
+
+            renderTabela(data.registros);
+            renderPaginacao(data.pagina_atual, data.total_paginas, data.total);
+            renderStats(data.total, data.registros);
+            document.getElementById('hist-wrapper').style.display = 'block';
+        })
+        .catch(e => {
+            document.getElementById('loading-hist').style.display = 'none';
+            document.getElementById('hist-tbody').innerHTML =
+                `<tr><td colspan="16" class="text-danger text-center">Erro ao carregar: ${e.message}</td></tr>`;
+            document.getElementById('hist-wrapper').style.display = 'block';
+        });
+}
+
+function renderTabela(registros) {
+    const tbody = document.getElementById('hist-tbody');
+    tbody.innerHTML = '';
+
+    registros.forEach(r => {
+        const badgeTipo  = `<span class="badge badge-status badge-${r.tipo === 'PÓ' ? 'po' : 'pu'}">${r.tipo}</span>`;
+        const badgeStatus = `<span class="badge badge-status badge-${STATUS_BADGE[r.status] || 'programada'}">${r.status}</span>`;
+        const duracao = r.duracao || '<span class="text-muted">—</span>';
+        const dataFim = r.data_fim || '<span class="text-muted">—</span>';
+        const opInicio = r.operador_inicio || '<span class="text-muted">—</span>';
+        const opFim    = r.operador_fim    || '<span class="text-muted">—</span>';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${r.data_pendura}</td>
+            <td>${dataFim}</td>
+            <td>${duracao}</td>
+            <td><strong>${r.cambao}</strong></td>
+            <td>${r.cambao_cor || '—'}</td>
+            <td>${badgeTipo}</td>
+            <td style="font-family:monospace;font-size:.78rem;">${r.codigo}</td>
+            <td>${r.descricao || '—'}</td>
+            <td class="text-muted">${r.ordem_id}</td>
+            <td class="text-muted">${r.data_carga || '—'}</td>
+            <td class="text-end">${fmt(r.quantidade_pendurada)}</td>
+            <td>${opInicio}</td>
+            <td>${opFim}</td>
+            <td class="text-center">${badgeStatus}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderPaginacao(atual, total, totalReg) {
+    const ul = document.getElementById('hist-pagination');
+    ul.innerHTML = '';
+
+    const info = document.getElementById('hist-info');
+    const porPag = parseInt(document.getElementById('f-por-pagina').value);
+    const inicio = (atual - 1) * porPag + 1;
+    const fim = Math.min(atual * porPag, totalReg);
+    info.textContent = `Exibindo ${inicio}–${fim} de ${totalReg} registros`;
+
+    if (total <= 1) return;
+
+    const adicionar = (label, pg, desativado, ativo) => {
+        const li = document.createElement('li');
+        li.className = `page-item${desativado ? ' disabled' : ''}${ativo ? ' active' : ''}`;
+        const a = document.createElement('a');
+        a.className = 'page-link';
+        a.href = '#';
+        a.innerHTML = label;
+        if (!desativado) a.addEventListener('click', e => { e.preventDefault(); buscar(pg); });
+        li.appendChild(a);
+        ul.appendChild(li);
+    };
+
+    adicionar('&laquo;', atual - 1, atual === 1, false);
+
+    const delta = 2;
+    let pages = new Set([1, total]);
+    for (let i = Math.max(1, atual - delta); i <= Math.min(total, atual + delta); i++) pages.add(i);
+    const sorted = [...pages].sort((a, b) => a - b);
+
+    let prev = 0;
+    sorted.forEach(pg => {
+        if (pg - prev > 1) {
+            const li = document.createElement('li');
+            li.className = 'page-item disabled';
+            li.innerHTML = '<span class="page-link">…</span>';
+            ul.appendChild(li);
+        }
+        adicionar(pg, pg, false, pg === atual);
+        prev = pg;
+    });
+
+    adicionar('&raquo;', atual + 1, atual === total, false);
+}
+
+function renderStats(total, registros) {
+    const bar = document.getElementById('stats-bar');
+    bar.removeAttribute('style');
+    bar.style.display = 'flex';
+
+    if (!registros || !registros.length) {
+        bar.innerHTML = `<div class="stat-card"><strong>0</strong><br><span class="text-muted">registros</span></div>`;
+        return;
+    }
+
+    const finalizadas  = registros.filter(r => r.status === 'finalizada').length;
+    const emAndamento  = registros.filter(r => r.status === 'pendurada').length;
+    const totalPend = registros.reduce((s, r) => s + (r.quantidade_pendurada || 0), 0);
+
+    bar.innerHTML = `
+        <div class="stat-card"><strong>${total}</strong><br><span class="text-muted">total (filtro)</span></div>
+        <div class="stat-card text-success"><strong>${finalizadas}</strong><br><span class="text-muted">finalizadas (pág)</span></div>
+        <div class="stat-card text-warning"><strong>${emAndamento}</strong><br><span class="text-muted">em andamento (pág)</span></div>
+        <div class="stat-card"><strong>${fmt(totalPend)}</strong><br><span class="text-muted">qtd. pendurada (pág)</span></div>
+    `;
+}
+
+function fmt(n) {
+    if (n === null || n === undefined) return '—';
+    return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    document.getElementById('f-data-inicio').value = hoje;
+    document.getElementById('f-data-fim').value = hoje;
+
+    buscar(1);
+
+    document.getElementById('btn-buscar').addEventListener('click', () => buscar(1));
+    document.getElementById('f-pesquisar').addEventListener('keydown', e => {
+        if (e.key === 'Enter') buscar(1);
+    });
+
+    document.getElementById('btn-limpar-filtros').addEventListener('click', () => {
+        document.getElementById('f-data-inicio').value = '';
+        document.getElementById('f-data-fim').value = '';
+        document.getElementById('f-tipo').value = '';
+        document.getElementById('f-operador').value = '';
+        document.getElementById('f-cambao').value = '';
+        document.getElementById('f-status').value = '';
+        document.getElementById('f-pesquisar').value = '';
+        buscar(1);
+    });
+});
+</script>
+{% endblock %}
