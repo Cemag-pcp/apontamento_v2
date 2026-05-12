@@ -228,10 +228,12 @@ def consultar_carretas_detalhado(data_inicial, data_final):
         errors='coerce'
     )
 
-    # Filtra pelo intervalo de datas
+    # Filtra pelo intervalo de datas e apenas produtos com número de série preenchido
     dados_carga_data_filtrada = dados_carga[
         (dados_carga['PED_PREVISAOEMISSAODOC'] >= data_inicial) &
-        (dados_carga['PED_PREVISAOEMISSAODOC'] <= data_final)
+        (dados_carga['PED_PREVISAOEMISSAODOC'] <= data_final) &
+        (dados_carga['PED_NUMEROSERIE'].notna()) &
+        (dados_carga['PED_NUMEROSERIE'].astype(str).str.strip() != '')
     ]
 
     dados_carga_data_filtrada['PED_QUANTIDADE'] = dados_carga_data_filtrada['PED_QUANTIDADE'].astype(float)
