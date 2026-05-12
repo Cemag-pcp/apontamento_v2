@@ -27,7 +27,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\" -Directory)",
       "Bash(Select-Object Name)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\" -Recurse -Directory)",
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\" -Directory)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\" -Directory)",
+      "Bash(xargs grep -l \"tem_acesso\\\\|rota_acesso\\\\|RotaAcesso\")",
+      "Bash(xargs grep -h \"nome=\")"
     ]
   }
 }
