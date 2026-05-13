@@ -895,7 +895,15 @@ def listar_pecas_disponiveis(request):
     except IndexError:
         return JsonResponse({'erro': 'Formato de "conjunto" inválido. Esperado: "CODIGO - NOME".'}, status=400)
     
-    pecas = CarretasExplodidas.objects.filter(conjunto_peca__contains=codigo_conjunto_param).values('descricao_peca')
+    pecas = (
+        CarretasExplodidas.objects
+        .filter(conjunto_peca__contains=codigo_conjunto_param)
+        .exclude(descricao_peca__isnull=True)
+        .exclude(descricao_peca__exact='')
+        .values('descricao_peca')
+        .distinct()
+        .order_by('descricao_peca')
+    )
 
     if pecas is None:
         return JsonResponse({'erro': 'Dados da base não disponíveis.'}, status=503)
