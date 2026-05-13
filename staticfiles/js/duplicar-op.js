@@ -5,6 +5,7 @@ async function carregarTabela(pagina) {
   const maquinaSelecionada = document.getElementById('filtro-maquina')?.value || '';
   const ordemEscolhida     = document.getElementById('filtro-ordem')?.value || '';
   const dataCriacao        = document.getElementById('filtro-data-criacao')?.value || '';
+  const filtroExcluida     = document.getElementById('filtro-excluida')?.value || 'nao';
   const modoBusca          = document.getElementById('filtro-modo')?.value || 'all';
 
   const pecasSelecionadas  = Array.from(selectElement.selectedOptions).map(option => option.value);
@@ -27,6 +28,7 @@ async function carregarTabela(pagina) {
     maquina: maquinaSelecionada,
     ordem: ordemEscolhida,
     dataCriacao: dataCriacao,
+    excluida: filtroExcluida,
     modo: modoBusca,                               // NEW: 'all' | 'prioritize' | 'qty'
     priorizar: pecaPrioritaria,                    // NEW: peça prioritária (se houver)
     qtymap: qtyMapaStr                             // NEW: JSON de {peca:qtd}
@@ -105,22 +107,31 @@ function atualizarTabela(ordens) {
     tabelaCorpo.innerHTML = "";
 
     if (ordens.length === 0) {
-        tabelaCorpo.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhum dado encontrado.</td></tr>`;
+        tabelaCorpo.innerHTML = `<tr><td colspan="8" class="text-center text-muted">Nenhum dado encontrado.</td></tr>`;
         return;
     }
 
     ordens.forEach(ordem => {
         const linha = document.createElement("tr");
+        const excluidaTexto = ordem.excluida ? 'Sim' : 'Não';
+        const badgeClass = ordem.excluida ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success';
+        const acoes = ordem.excluida
+            ? `<button class="btn-restaurar-op btn btn-sm btn-warning m-1" data-id="${ordem.id}" data-ordem="${ordem.ordem}">Voltar</button>`
+            : `
+                <button class="btn-ver-pecas btn btn-sm btn-primary m-1" data-id="${ordem.id}" data-ordem="${ordem.ordem}">Ver Peças</button>
+                <button class="btn-excluir-op btn btn-sm btn-danger m-1" data-id="${ordem.id}" data-ordem="${ordem.ordem}">Excluir OP</button>
+            `;
 
         linha.innerHTML = `
             <td class="text-center">
-                <input type="checkbox" class="row-select" data-id="${ordem.id}">
+                <input type="checkbox" class="row-select" data-id="${ordem.id}" ${ordem.excluida ? 'disabled' : ''}>
             </td>
             <td>${ordem.ordem}</td>
             <td>${ordem.data_criacao}</td>
             <td>${ordem.grupo_maquina}</td>
             <td>${ordem.propriedade?.descricao_mp || '-'}</td>
             <td>${ordem.propriedade?.aproveitamento || '-'}</td>
+            <td><span class="badge rounded-pill ${badgeClass}">${excluidaTexto}</span></td>
             <td>
                 <button class="btn-ver-pecas btn btn-sm btn-primary m-1" data-id="${ordem.id}">Ver Peças</button>
                 <button class="btn-excluir-op btn btn-sm btn-danger m-1" data-id="${ordem.id}" data-ordem="${ordem.ordem}">Excluir OP</button>
@@ -128,6 +139,16 @@ function atualizarTabela(ordens) {
         `;
 
         tabelaCorpo.appendChild(linha);
+
+        const actionCell = linha.lastElementChild;
+        if (ordem.excluida) {
+            actionCell.innerHTML = acoes;
+        } else {
+            const verPecasBtn = actionCell.querySelector('.btn-ver-pecas');
+            if (verPecasBtn) {
+                verPecasBtn.setAttribute('data-ordem', ordem.ordem);
+            }
+        }
     });
 
     // reset select-all and bulk actions after render
@@ -272,7 +293,7 @@ function setupBulkSelectionHandlers() {
   const selectAll = document.getElementById('select-all');
   if (selectAll) {
     selectAll.addEventListener('change', () => {
-      document.querySelectorAll('.row-select').forEach(cb => { cb.checked = selectAll.checked; });
+      document.querySelectorAll('.row-select:not(:disabled)').forEach(cb => { cb.checked = selectAll.checked; });
       updateBulkActionsState();
     });
   }
@@ -337,6 +358,77 @@ function abrirModalDuplicacao(ordemId) {
 }
 
 //  Configuração do botão "Ver Peças"
+function abrirModalConfirmacao({ ordemId, ordem, acao, titulo, mensagem, textoBotao, classeBotao = 'btn-primary' }) {
+    const modalEl = document.getElementById('modalConfirmarAcaoOrdem');
+    const modal = new bootstrap.Modal(modalEl);
+    const form = document.getElementById('formConfirmarAcaoOrdem');
+    const textModal = modalEl.querySelector('.text-body');
+    const titleModal = document.getElementById('modalConfirmarAcaoOrdemLabel');
+    const submitBtn = document.getElementById('submitConfirmarAcaoOrdem');
+    const statusText = submitBtn.querySelector('[role="status"]');
+
+    form.querySelector('input[name="ordemId"]').value = ordemId;
+    form.querySelector('input[name="acao"]').value = acao;
+    textModal.textContent = mensagem;
+    titleModal.innerHTML = `<i class="bi bi-exclamation-circle me-2"></i>${titulo}`;
+    submitBtn.className = `btn ${classeBotao} d-flex align-items-center gap-2`;
+    statusText.textContent = textoBotao;
+
+    if (ordem) {
+        submitBtn.setAttribute('data-ordem', ordem);
+    } else {
+        submitBtn.removeAttribute('data-ordem');
+    }
+
+    modal.show();
+}
+
+function configurarAcoesTabela() {
+    document.addEventListener('click', function (event) {
+        if (event.target.classList.contains('btn-ver-pecas')) {
+            const ordemId = event.target.getAttribute('data-id');
+            const ordem = event.target.getAttribute('data-ordem');
+            abrirModalConfirmacao({
+                ordemId,
+                ordem,
+                acao: 'ver_pecas',
+                titulo: 'Confirmar visualização',
+                mensagem: `Deseja abrir as peças da ordem ${ordem}?`,
+                textoBotao: 'Ver peças',
+                classeBotao: 'btn-primary'
+            });
+        }
+
+        if (event.target.classList.contains('btn-excluir-op')) {
+            const ordem = event.target.getAttribute('data-ordem');
+            const ordemId = event.target.getAttribute('data-id');
+            abrirModalConfirmacao({
+                ordemId,
+                ordem,
+                acao: 'excluir',
+                titulo: 'Confirmar exclusão',
+                mensagem: `Tem certeza que deseja excluir a ordem ${ordem}?`,
+                textoBotao: 'Excluir OP',
+                classeBotao: 'btn-danger'
+            });
+        }
+
+        if (event.target.classList.contains('btn-restaurar-op')) {
+            const ordem = event.target.getAttribute('data-ordem');
+            const ordemId = event.target.getAttribute('data-id');
+            abrirModalConfirmacao({
+                ordemId,
+                ordem,
+                acao: 'restaurar',
+                titulo: 'Confirmar retorno',
+                mensagem: `Deseja voltar a ordem ${ordem} para não excluída?`,
+                textoBotao: 'Voltar ordem',
+                classeBotao: 'btn-warning'
+            });
+        }
+    });
+}
+
 function configurarBotaoVerPecas() {
     document.addEventListener('click', function (event) {
         if (event.target.classList.contains('btn-ver-pecas')) {
@@ -517,6 +609,85 @@ function atualizarQuantidadePecas(quantidadeOriginalChapas, novaQuantidadeChapas
     }
 }
 
+function configurarConfirmacaoAcao() {
+    document.getElementById('formConfirmarAcaoOrdem').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const submitBtn = document.getElementById('submitConfirmarAcaoOrdem');
+        const spinner = submitBtn.querySelector('.spinner-border-sm');
+        const btnText = submitBtn.querySelector('[role="status"]');
+        const formData = new FormData(this);
+        const ordemId = formData.get('ordemId');
+        const acao = formData.get('acao');
+        const ordem = submitBtn.getAttribute('data-ordem');
+
+        submitBtn.disabled = true;
+        spinner.style.display = 'inline-block';
+
+        const resetarBotao = () => {
+            submitBtn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.textContent = 'Confirmar';
+        };
+
+        if (acao === 'ver_pecas') {
+            btnText.textContent = 'Abrindo...';
+            const bootstrapModal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmarAcaoOrdem'));
+            bootstrapModal.hide();
+            resetarBotao();
+            abrirModalDuplicacao(ordemId);
+            return;
+        }
+
+        const endpoint = acao === 'restaurar'
+            ? '/corte/api/restaurar-op-padrao/'
+            : '/corte/api/excluir-op-padrao/';
+        const textoCarregando = acao === 'restaurar' ? 'Voltando...' : 'Excluindo...';
+        const textoSucesso = acao === 'restaurar'
+            ? `Ordem ${ordem} retornada para não excluída.`
+            : `Ordem ${ordem} excluída com sucesso.`;
+
+        btnText.textContent = textoCarregando;
+
+        fetch(endpoint, {
+            method: 'POST',
+            body: JSON.stringify({ ordem_id: ordemId }),
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            }
+        })
+        .then(async response => {
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || 'Falha ao executar a ação.');
+            }
+            return data;
+        })
+        .then(() => {
+            const bootstrapModal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmarAcaoOrdem'));
+            bootstrapModal.hide();
+            carregarTabela(1);
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso',
+                text: textoSucesso,
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao executar ação da ordem:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro!',
+                text: error.message || String(error),
+            });
+        })
+        .finally(() => {
+            resetarBotao();
+        });
+    });
+}
+
 function excluirOrdem() {
     document.getElementById('formExcluirOrdem').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -673,10 +844,8 @@ function getCSRFToken() {
 //  Configuração inicial ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
     configurarSelect2Pecas();
-    configurarBotaoExcluirOp();
-    excluirOrdem();
-
-    configurarBotaoVerPecas();
+    configurarAcoesTabela();
+    configurarConfirmacaoAcao();
     duplicarOrdem();
     setupBulkSelectionHandlers();
 
