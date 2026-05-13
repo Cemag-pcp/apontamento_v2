@@ -2,69 +2,52 @@
 {% load static %}
 
 {% block title %}
-<title>Cadastro de Pecas</title>
+<title>Cadastro de Peças</title>
 {% endblock %}
 
 {% block links %}
+<link rel="stylesheet" href="{% static 'css/operadores-admin.css' %}">
 <link rel="stylesheet" href="{% static 'css/propriedades_ordem.css' %}">
 {% endblock %}
 
 {% block content %}
 <div id="cadastro-pecas-estamparia-app" data-api-url="{% url 'cadastro:cadastro_pecas_api' %}" data-default-setor-id="{{ default_setor_id }}">
-    <div class="d-flex align-items-center justify-content-between mb-3 page-hero">
-        <div>
-            <div class="title h4 mb-0">Cadastro de Pecas</div>
-            <p class="subtitle small text-muted mb-0">Crie, edite e remova pecas de todos os setores.</p>
-        </div>
-        <div class="d-flex gap-2 align-items-center">
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#cadastro-peca-modal">
-                <i class="bi bi-plus-lg me-1"></i>Nova peca
-            </button>
-            <button id="refresh-pecas-cadastro-btn" class="btn btn-light btn-sm text-dark">
-                <i class="bi bi-arrow-repeat me-1"></i>Atualizar
-            </button>
-        </div>
-    </div>
+    <div class="operators-admin-page">
+        <section class="operators-shell">
+            <header class="operators-topbar">
+                <h1 class="operators-title">Cadastro de Peças</h1>
+                <button class="primary-toolbar-button" data-bs-toggle="modal" data-bs-target="#cadastro-peca-modal">
+                    <i class="bi bi-plus-lg"></i>
+                    <span>Nova peça</span>
+                </button>
+            </header>
 
-    <div class="card card-surface mb-3">
-        <div class="card-body">
-            <div class="row g-3 align-items-end">
-                <div class="col-sm-4 col-12">
-                    <label class="form-label small text-secondary">Busca</label>
-                    <input id="f-search" type="text" class="form-control form-control-sm" placeholder="Codigo, descricao ou apelido">
-                </div>
-                <div class="col-sm-4 col-12">
-                    <label class="form-label small text-secondary">Setor</label>
-                    <select id="f-setor" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-sm-4 col-12 d-flex gap-2">
-                    <button id="apply-filters-cadastro" class="btn btn-primary btn-sm flex-fill">
-                        <i class="bi bi-funnel me-1"></i>Aplicar filtros
-                    </button>
-                    <button id="clear-filters-cadastro" class="btn btn-outline-secondary btn-sm">
-                        Limpar
-                    </button>
+            <div class="card card-surface mb-3">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-sm-4 col-12">
+                            <label class="form-label small text-secondary">Busca</label>
+                            <input id="f-search" type="text" class="form-control form-control-sm" placeholder="Codigo, descricao ou apelido">
+                        </div>
+                        <div class="col-sm-4 col-12">
+                            <label class="form-label small text-secondary">Setor</label>
+                            <select id="f-setor" class="form-select form-select-sm"></select>
+                        </div>
+                        <div class="col-sm-4 col-12 d-flex gap-2">
+                            <button id="apply-filters-cadastro" class="btn btn-primary btn-sm flex-fill">
+                                <i class="bi bi-funnel me-1"></i>Aplicar filtros
+                            </button>
+                            <button id="clear-filters-cadastro" class="btn btn-outline-secondary btn-sm">
+                                Limpar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="card card-surface">
-        <div class="card-body">
-            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <label class="fw-semibold small text-secondary mb-0">Itens por pagina</label>
-                    <select id="page-size-cadastro" class="form-select form-select-sm" style="width: auto;">
-                        <option value="10" selected>10</option>
-                        <option value="25">25</option>
-                        <option value="50">50</option>
-                    </select>
-                </div>
-                <div id="pagination-summary-cadastro" class="small text-muted ms-auto"></div>
-            </div>
-
-            <div class="table-responsive" style="max-height: 65vh; overflow: auto;">
-                <table class="table table-sm table-hover align-middle mb-0">
+            <section class="operators-table-card">
+                <div class="table-responsive" style="max-height: 65vh; overflow: auto;">
+                    <table class="operators-table">
                     <thead>
                         <tr>
                             <th>ID</th>
@@ -76,28 +59,37 @@
                             <th>Setores</th>
                             <th>Conjunto</th>
                             <th>Processo 1</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-center" style="width: 190px;">Acoes</th>
+                            <th>Status</th>
+                            <th class="col-actions">Acoes</th>
                         </tr>
                     </thead>
                     <tbody id="pecas-cadastro-body">
                         <tr id="loading-row-cadastro">
                             <td colspan="11">
-                                <div class="loading-ghost w-100"></div>
+                                <div id="overlayLoading" class="operators-loading">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <span>Carregando peças...</span>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
-                </table>
-            </div>
-
-            <div class="d-flex align-items-center justify-content-between mt-3">
-                <div class="small text-muted" id="total-indicator-cadastro"></div>
-                <div class="btn-group">
-                    <button id="prev-page-cadastro" class="btn btn-outline-secondary btn-sm">Anterior</button>
-                    <button id="next-page-cadastro" class="btn btn-outline-secondary btn-sm">Proxima</button>
+                    </table>
                 </div>
-            </div>
-        </div>
+
+                <footer class="operators-table-footer">
+                    <div class="footer-left">
+                        <label for="page-size-cadastro" class="footer-label">Rows per page</label>
+                        <select id="page-size-cadastro" class="footer-select">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                        <span id="pagination-summary-cadastro" class="footer-summary">0-0 of 0</span>
+                    </div>
+                    <nav class="operators-pagination" id="cadastro-pagination"></nav>
+                </footer>
+            </section>
+        </section>
     </div>
 </div>
 
@@ -105,7 +97,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="cadastro-peca-modal-label">Nova peca</h5>
+                <h5 class="modal-title" id="cadastro-peca-modal-label">Nova peça</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
@@ -147,7 +139,7 @@
             <div class="modal-footer">
                 <button id="clear-form-btn" class="btn btn-outline-secondary btn-sm" type="button">Limpar</button>
                 <button id="create-peca-btn" class="btn btn-primary btn-sm" type="button">
-                    <i class="bi bi-plus-lg me-1"></i>Criar peca
+                    <i class="bi bi-plus-lg me-1"></i>Criar peça
                 </button>
             </div>
         </div>

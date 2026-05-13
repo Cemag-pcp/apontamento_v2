@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+<title>Dashboard Montagem</title>
+{% endblock %}
+
+{% block links %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="{% static 'css/dashboard-montagem.css' %}">
+{% endblock %}
+
+{% block content %}
+<div
+    id="montagem-dashboard-app"
+    class="montagem-dashboard-page"
+    data-dashboard-url="{% url 'montagem:dashboard_data' %}"
+    data-tmf-url="{% url 'montagem:tempo_medio_fabricacao' %}"
+>
+    <section class="montagem-hero">
+        <div>
+            <p class="eyebrow">Montagem</p>
+            <h1>Indicadores do setor em um painel único</h1>
+            <p class="hero-copy">Acompanhe volume planejado, produção real, gargalos por célula e o ritmo diário das ordens.</p>
+        </div>
+        <form id="montagemDashboardFilters" class="dashboard-filter-card">
+            <div class="filter-grid">
+                <label class="filter-field">
+                    <span>Célula</span>
+                    <select id="f-maquina" name="maquina_id">
+                        <option value="">Todas</option>
+                        {% for maquina in maquinas %}
+                        <option value="{{ maquina.id }}">{{ maquina.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="filter-field">
+                    <span>Data inicial</span>
+                    <input id="f-data-inicio" name="data_inicio" type="date">
+                </label>
+                <label class="filter-field">
+                    <span>Data final</span>
+                    <input id="f-data-fim" name="data_fim" type="date">
+                </label>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="dashboard-primary-button">Atualizar painel</button>
+                <button type="button" id="resetDashboardFilters" class="dashboard-secondary-button">Resetar</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="chart-grid">
+        <article class="panel-card">
+            <div class="panel-heading">
+                <div>
+                    <h2>Status das ordens</h2>
+                    <p>Distribuição atual das ordens dentro do período filtrado.</p>
+                </div>
+            </div>
+            <div class="panel-body chart-panel is-donut">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </article>
+
+        <article class="panel-card">
+            <div class="panel-heading">
+                <div>
+                    <h2>Produção por célula</h2>
+                    <p>Comparativo entre volume planejado e realizado.</p>
+                </div>
+            </div>
+            <div class="panel-body chart-panel">
+                <canvas id="machineChart"></canvas>
+            </div>
+        </article>
+
+        <article class="panel-card panel-span-2">
+            <div class="panel-heading">
+                <div>
+                    <h2>Andamento das cargas</h2>
+                    <p>Planejado, produzido e avanço percentual por data de carga.</p>
+                </div>
+                <div id="dashboardPeriodBadge" class="period-badge">Periodo</div>
+            </div>
+            <div class="panel-body chart-panel">
+                <canvas id="cargaChart"></canvas>
+            </div>
+        </article>
+
+        <article class="panel-card panel-span-2">
+            <div class="panel-heading">
+                <div>
+                    <h2>Ritmo diário</h2>
+                    <p>Movimentação das ordens por dia entre início, interrupção e finalização.</p>
+                </div>
+            </div>
+            <div class="panel-body chart-panel">
+                <canvas id="activityChart"></canvas>
+            </div>
+        </article>
+
+        <article class="panel-card">
+            <div class="panel-heading">
+                <div>
+                    <h2>Conjuntos com maior produção</h2>
+                    <p>Ranking das peças ou conjuntos com maior saída no período.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div id="topConjuntosList" class="top-list"></div>
+            </div>
+        </article>
+
+        <article class="panel-card">
+            <div class="panel-heading">
+                <div>
+                    <h2>Ranking de interrupções</h2>
+                    <p>Motivos mais recorrentes com célula e último registro.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div id="interruptionRankingList" class="top-list"></div>
+            </div>
+        </article>
+
+        <article class="panel-card panel-span-2">
+            <div class="panel-heading">
+                <div>
+                    <h2>Peças com motivo "Falta peça"</h2>
+                    <p>Itens selecionados pelos usuários quando a interrupção ocorre por falta de peça.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div id="missingPiecesTable" class="dashboard-table-wrap"></div>
+            </div>
+        </article>
+
+        <article class="panel-card panel-span-2">
+            <div class="panel-heading">
+                <div>
+                    <h2>Tempo médio de fabricação</h2>
+                    <p>Tempo médio de produção por conjunto — apenas ordens finalizadas, excluindo interrupções.</p>
+                </div>
+                <div class="panel-heading-actions">
+                    <label class="filter-field" style="flex-direction:row;align-items:center;gap:8px;">
+                        <span style="white-space:nowrap;font-size:0.78rem;">Mín. ordens</span>
+                        <input id="tmf-min-ordens" type="number" min="1" value="2"
+                               style="width:60px;min-height:34px;border:1px solid #dbe2ea;border-radius:10px;padding:0 8px;font-size:0.82rem;">
+                    </label>
+                    <button id="tmf-reload" class="dashboard-secondary-button" style="white-space:nowrap;">Atualizar</button>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div id="tmfTable" class="dashboard-table-wrap"></div>
+            </div>
+        </article>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/dashboard-montagem.js' %}" defer></script>
+{% endblock %}

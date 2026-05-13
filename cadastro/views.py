@@ -445,6 +445,7 @@ def cadastro_conjuntos_api(request):
     GET: lista conjuntos paginados (com filtro opcional por carreta).
     POST: cria novo conjunto.
     PATCH: atualiza conjunto.
+    PUT: alterna ativo/inativo.
     DELETE: remove conjunto.
     """
 
@@ -516,6 +517,7 @@ def cadastro_conjuntos_api(request):
                 'codigo': conjunto.codigo,
                 'descricao': conjunto.descricao,
                 'quantidade': conjunto.quantidade,
+                'ativo': conjunto.ativo,
                 'carreta_ids': [carreta.id for carreta in carretas],
                 'carreta_labels': [
                     f"{carreta.codigo} - {carreta.descricao}" if carreta.descricao else carreta.codigo
@@ -612,6 +614,25 @@ def cadastro_conjuntos_api(request):
             return JsonResponse({'error': 'Nao foi possivel salvar o conjunto.'}, status=400)
 
         return JsonResponse({'success': 'Conjunto atualizado com sucesso.'})
+
+    if request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        conjunto_id = data.get('id')
+        if not conjunto_id:
+            return JsonResponse({'error': 'ID do conjunto nao informado.'}, status=400)
+
+        conjunto = get_object_or_404(Conjuntos, id=conjunto_id)
+        conjunto.ativo = not conjunto.ativo
+        conjunto.save(update_fields=['ativo'])
+
+        return JsonResponse({
+            'success': f'Conjunto {"ativado" if conjunto.ativo else "inativado"} com sucesso.',
+            'ativo': conjunto.ativo,
+        })
 
     if request.method == 'DELETE':
         try:

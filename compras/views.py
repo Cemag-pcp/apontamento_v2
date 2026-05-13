@@ -9,7 +9,6 @@ from compras.services.data_processing import get_projecao_para_material, process
 from compras.services.dolar import get_cotacao_dolar_atual
 from compras.services.google_sheets import get_pedidos_df, get_simulacao_df, invalidate_cache
 from compras.services.sugestoes import gerar_sugestoes
-from compras.services import estoque as estoque_service
 
 logger = logging.getLogger(__name__)
 
@@ -110,24 +109,3 @@ def api_dolar(request):
         logger.exception('Erro ao consultar cotacao do dolar: %s', e)
         return JsonResponse({'error': str(e)}, status=500)
 
-
-@login_required
-def estoque(request):
-    return render(request, 'compras/estoque.html')
-
-
-@login_required
-@require_GET
-def api_estoque(request):
-    if request.GET.get('refresh') == '1':
-        estoque_service.invalidate_cache()
-
-    busca = request.GET.get('busca', '').strip()
-    grupo = request.GET.get('grupo', '').strip()
-
-    try:
-        dados = estoque_service.get_estoque_data(busca=busca, grupo=grupo)
-        return JsonResponse(dados)
-    except Exception as e:
-        logger.exception('Erro ao carregar estoque: %s', e)
-        return JsonResponse({'error': str(e)}, status=500)

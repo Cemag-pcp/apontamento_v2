@@ -1,11 +1,12 @@
 from django.http import JsonResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
 from django.utils.timezone import now,localtime
 from django.utils.dateparse import parse_date
-from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q, IntegerField, Max, OuterRef, Subquery
+from django.db.models import Sum, F, ExpressionWrapper, FloatField, Value, Avg, Q, IntegerField, Max, OuterRef, Subquery, Count
 from django.db import transaction, models, IntegrityError, connection
 from django.shortcuts import get_object_or_404
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncDate
 from django.shortcuts import render
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -858,6 +859,288 @@ def planejamento(request):
 
     return render(request, 'apontamento_montagem/planejamento.html', {'motivos_maquina_parada': motivos_maquina_parada})
 
+
+@login_required
+def dashboard(request):
+    maquinas = (
+        Maquina.objects
+        .filter(setor__nome='montagem', tipo='maquina')
+        .order_by('nome')
+        .values('id', 'nome')
+    )
+    return render(
+        request,
+        'dashboard/dashboard-montagem.html',
+        {
+            'maquinas': list(maquinas),
+        }
+    )
+
+
+@login_required
+def dashboard_data(request):
+    hoje = localtime(now()).date()
+    data_inicio = parse_date(request.GET.get('data_inicio') or '') or (hoje - timedelta(days=29))
+    data_fim = parse_date(request.GET.get('data_fim') or '') or hoje
+    maquina_id = (request.GET.get('maquina_id') or '').strip()
+
+    if data_inicio > data_fim:
+        return JsonResponse({'error': 'A data inicial nao pode ser maior que a data final.'}, status=400)
+
+    ordens = Ordem.objects.filter(
+        grupo_maquina='montagem',
+        excluida=False,
+        data_carga__isnull=False,
+        data_carga__range=[data_inicio, data_fim],
+    )
+
+    if maquina_id:
+        try:
+            ordens = ordens.filter(maquina_id=int(maquina_id))
+        except ValueError:
+            return JsonResponse({'error': 'Maquina invalida.'}, status=400)
+
+    pecas = PecasOrdem.objects.filter(ordem__in=ordens)
+    processos = OrdemProcesso.objects.filter(
+        ordem__in=ordens,
+        data_inicio__date__range=[data_inicio, data_fim],
+    )
+
+    totais = pecas.aggregate(
+        total_planejada=Coalesce(Sum('qtd_planejada', output_field=FloatField()), Value(0.0)),
+        total_boa=Coalesce(Sum('qtd_boa', output_field=FloatField()), Value(0.0)),
+        total_morta=Coalesce(Sum('qtd_morta', output_field=FloatField()), Value(0.0)),
+    )
+
+    total_planejada = float(totais['total_planejada'] or 0)
+    total_boa = float(totais['total_boa'] or 0)
+    total_morta = float(totais['total_morta'] or 0)
+    eficiencia = round((total_boa / total_planejada) * 100, 1) if total_planejada > 0 else 0.0
+
+    status_map = {
+        'aguardando_iniciar': 'Aguardando',
+        'iniciada': 'Iniciada',
+        'interrompida': 'Interrompida',
+        'finalizada': 'Finalizada',
+        'agua_prox_proc': 'Aguardando prox.',
+    }
+
+    status_rows = (
+        ordens.values('status_atual')
+        .annotate(total=Count('id'))
+        .order_by('status_atual')
+    )
+    status_chart = [
+        {'label': status_map.get(row['status_atual'], row['status_atual']), 'value': row['total']}
+        for row in status_rows
+    ]
+
+    # Agrupa por (maquina, ordem) para evitar multiplicar qtd_planejada
+    # pelo número de aberturas da ordem
+    maquina_rows = (
+        pecas.values(
+            nome=Coalesce(F('ordem__maquina__nome'), Value('Sem celula')),
+            ordem_ref=F('ordem'),
+        )
+        .annotate(
+            planejada=Coalesce(Avg('qtd_planejada', output_field=FloatField()), Value(0.0)),
+            produzida=Coalesce(Sum('qtd_boa', output_field=FloatField()), Value(0.0)),
+        )
+    )
+
+    _maquina_totals = {}
+    for row in maquina_rows:
+        nome = row['nome']
+        if nome not in _maquina_totals:
+            _maquina_totals[nome] = {'planejada': 0.0, 'produzida': 0.0}
+        _maquina_totals[nome]['planejada'] += float(row['planejada'] or 0)
+        _maquina_totals[nome]['produzida'] += float(row['produzida'] or 0)
+
+    producao_por_maquina = sorted(
+        [
+            {'label': nome, 'planejada': v['planejada'], 'produzida': v['produzida']}
+            for nome, v in _maquina_totals.items()
+        ],
+        key=lambda x: (-x['produzida'], -x['planejada'])
+    )[:8]
+
+    # Agrupa por (carga_data, ordem) para evitar multiplicar qtd_planejada
+    # pelo número de aberturas da ordem (cada abertura cria um novo PecasOrdem)
+    carga_rows = (
+        pecas.values(carga_data=F('ordem__data_carga'), ordem_ref=F('ordem'))
+        .annotate(
+            planejada=Coalesce(Avg('qtd_planejada', output_field=FloatField()), Value(0.0)),
+            produzida=Coalesce(Sum('qtd_boa', output_field=FloatField()), Value(0.0)),
+        )
+        .order_by('carga_data')
+    )
+
+    _carga_totals = {}
+    for row in carga_rows:
+        data = row['carga_data']
+        if data not in _carga_totals:
+            _carga_totals[data] = {'planejada': 0.0, 'produzida': 0.0}
+        _carga_totals[data]['planejada'] += float(row['planejada'] or 0)
+        _carga_totals[data]['produzida'] += float(row['produzida'] or 0)
+
+    andamento_cargas = []
+    for data in sorted(_carga_totals):
+        planejada = _carga_totals[data]['planejada']
+        produzida = _carga_totals[data]['produzida']
+        percentual = round((produzida / planejada) * 100, 1) if planejada > 0 else 0.0
+        andamento_cargas.append({
+            'label': data.strftime('%d/%m') if data else '-',
+            'planejada': planejada,
+            'produzida': produzida,
+            'percentual': percentual,
+        })
+
+    atividade_rows = (
+        processos.annotate(dia=TruncDate('data_inicio'))
+        .values('dia', 'status')
+        .annotate(total=Count('id'))
+        .order_by('dia', 'status')
+    )
+    atividade_lookup = {}
+    for row in atividade_rows:
+        atividade_lookup.setdefault(row['dia'], {})[row['status']] = row['total']
+
+    atividade_diaria = []
+    cursor = data_inicio
+    while cursor <= data_fim:
+        dia_data = atividade_lookup.get(cursor, {})
+        atividade_diaria.append({
+            'label': cursor.strftime('%d/%m'),
+            'iniciada': dia_data.get('iniciada', 0),
+            'interrompida': dia_data.get('interrompida', 0),
+            'finalizada': dia_data.get('finalizada', 0),
+        })
+        cursor += timedelta(days=1)
+
+    # Agrupa por (peca, ordem) para evitar multiplicar qtd_planejada pelo nº de aberturas da ordem
+    per_order_rows = (
+        pecas.values('peca', 'ordem')
+        .annotate(
+            produzida=Coalesce(Sum('qtd_boa', output_field=FloatField()), Value(0.0)),
+            morta=Coalesce(Sum('qtd_morta', output_field=FloatField()), Value(0.0)),
+            # Avg porque todos os registros de uma mesma ordem têm o mesmo qtd_planejada
+            planejada=Coalesce(Avg('qtd_planejada', output_field=FloatField()), Value(0.0)),
+        )
+    )
+
+    from collections import defaultdict
+    _peca_totals = defaultdict(lambda: {'produzida': 0.0, 'morta': 0.0, 'planejada': 0.0})
+    for row in per_order_rows:
+        p = row['peca']
+        _peca_totals[p]['produzida'] += float(row['produzida'] or 0)
+        _peca_totals[p]['morta']     += float(row['morta'] or 0)
+        _peca_totals[p]['planejada'] += float(row['planejada'] or 0)
+
+    top_conjuntos = sorted(
+        [
+            {'nome': peca, 'produzida': v['produzida'], 'morta': v['morta'], 'planejada': v['planejada']}
+            for peca, v in _peca_totals.items()
+        ],
+        key=lambda x: (-x['produzida'], -x['planejada'])
+    )[:8]
+
+    interruption_rows = (
+        processos.filter(status='interrompida')
+        .values('motivo_interrupcao__nome', 'ordem__maquina__nome')
+        .annotate(
+            total=Count('id'),
+            ultima=Max('data_inicio'),
+        )
+        .order_by('-total', '-ultima')[:8]
+    )
+    interruption_ranking = [
+        {
+            'motivo': row['motivo_interrupcao__nome'] or 'Sem motivo',
+            'maquina': row['ordem__maquina__nome'] or 'Sem celula',
+            'total': row['total'],
+            'ultima': localtime(row['ultima']).strftime('%d/%m %H:%M') if row['ultima'] else '-',
+        }
+        for row in interruption_rows
+    ]
+
+    falta_peca_queryset = PecasFaltantes.objects.filter(
+        ordem__in=ordens,
+        data_registro__date__range=[data_inicio, data_fim],
+    )
+    falta_peca_rows = (
+        falta_peca_queryset
+        .values('nome_peca')
+        .annotate(
+            ocorrencias=Count('id'),
+            ordens=Count('ordem_id', distinct=True),
+            quantidade_total=Coalesce(Sum('quantidade', output_field=FloatField()), Value(0.0)),
+            ultima=Max('data_registro'),
+        )
+        .order_by('-ocorrencias', '-quantidade_total', 'nome_peca')[:12]
+    )
+    falta_peca_items = []
+    for row in falta_peca_rows:
+        base_qs = falta_peca_queryset.filter(nome_peca=row['nome_peca'])
+
+        celulas = list(
+            base_qs
+            .exclude(ordem__maquina__nome__isnull=True)
+            .exclude(ordem__maquina__nome__exact='')
+            .values_list('ordem__maquina__nome', flat=True)
+            .distinct()
+            .order_by('ordem__maquina__nome')
+        )
+
+        conjuntos = list(
+            base_qs
+            .exclude(ordem__ordem_pecas_montagem__peca__isnull=True)
+            .exclude(ordem__ordem_pecas_montagem__peca__exact='')
+            .values_list('ordem__ordem_pecas_montagem__peca', flat=True)
+            .distinct()
+            .order_by('ordem__ordem_pecas_montagem__peca')
+        )
+
+        falta_peca_items.append({
+            'nome_peca': row['nome_peca'] or 'Sem descricao',
+            'ocorrencias': row['ocorrencias'],
+            'ordens': row['ordens'],
+            'quantidade_total': float(row['quantidade_total'] or 0),
+            'ultima': localtime(row['ultima']).strftime('%d/%m %H:%M') if row['ultima'] else '-',
+            'celulas': celulas,
+            'conjuntos': conjuntos,
+        })
+
+    payload = {
+        'periodo': {
+            'data_inicio': data_inicio.isoformat(),
+            'data_fim': data_fim.isoformat(),
+        },
+        'kpis': {
+            'ordens_total': ordens.count(),
+            'ordens_abertas': ordens.exclude(status_atual='finalizada').count(),
+            'ordens_finalizadas': ordens.filter(status_atual='finalizada').count(),
+            'ordens_interrompidas': ordens.filter(status_atual='interrompida').count(),
+            'maquinas_ativas': ordens.filter(status_atual__in=['iniciada', 'interrompida']).exclude(maquina_id__isnull=True).values('maquina_id').distinct().count(),
+            'cargas_programadas': ordens.values('data_carga').distinct().count(),
+            'conjuntos_produzidos': pecas.filter(qtd_boa__gt=0).values('peca').distinct().count(),
+            'pecas_planejadas': round(total_planejada, 1),
+            'pecas_boas': round(total_boa, 1),
+            'pecas_mortas': round(total_morta, 1),
+            'eficiencia': eficiencia,
+        },
+        'charts': {
+            'status': status_chart,
+            'producao_por_maquina': producao_por_maquina,
+            'andamento_cargas': andamento_cargas,
+            'atividade_diaria': atividade_diaria,
+        },
+        'top_conjuntos': top_conjuntos,
+        'interruption_ranking': interruption_ranking,
+        'falta_peca_items': falta_peca_items,
+    }
+
+    return JsonResponse(payload)
+
 def buscar_maquinas(request):
 
     maquinas = Maquina.objects.filter(setor__nome='montagem', tipo='maquina').values('id','nome')
@@ -1116,6 +1399,13 @@ def api_tempos(request):
     latest_piece_for_order = PecasOrdem.objects.filter(
         ordem_id=OuterRef('ordem_id')
     ).order_by('-processo_ordem__data_inicio', '-id')
+    total_qt_boa_for_order = (
+        PecasOrdem.objects
+        .filter(ordem_id=OuterRef('ordem_id'))
+        .values('ordem_id')
+        .annotate(total_qt_boa=Coalesce(Sum('qtd_boa', output_field=FloatField()), Value(0.0)))
+        .values('total_qt_boa')
+    )
 
     queryset = (
         OrdemProcesso.objects
@@ -1127,13 +1417,11 @@ def api_tempos(request):
         .annotate(
             current_peca=Subquery(current_piece.values('peca')[:1]),
             current_qt_planejada=Subquery(current_piece.values('qtd_planejada')[:1]),
-            current_qt_boa=Subquery(current_piece.values('qtd_boa')[:1]),
             latest_peca=Subquery(latest_piece_for_order.values('peca')[:1]),
             latest_qt_planejada=Subquery(latest_piece_for_order.values('qtd_planejada')[:1]),
-            latest_qt_boa=Subquery(latest_piece_for_order.values('qtd_boa')[:1]),
             descricao=Coalesce(F('current_peca'), F('latest_peca'), Value('')),
             qt_planejada=Coalesce(F('current_qt_planejada'), F('latest_qt_planejada')),
-            qt_boa=Coalesce(F('current_qt_boa'), F('latest_qt_boa')),
+            qt_boa=Coalesce(Subquery(total_qt_boa_for_order[:1]), Value(0.0)),
             celula=F('ordem__maquina__nome'),
             ordem_numero=F('ordem__ordem'),
             ordem_data_carga=F('ordem__data_carga'),
@@ -1275,6 +1563,133 @@ def retornar_processo(request):
             {'status': 'error', 'message': str(e)}, 
             status=500
         )
+
+@login_required
+def tempo_medio_fabricacao(request):
+    """
+    Retorna o tempo médio de fabricação por produto no setor de montagem.
+
+    Calcula somando apenas os períodos com status='iniciada' e data_fim preenchida
+    (tempo efetivo de produção, excluindo interrupções). Agrega por ordem e depois
+    tira a média por produto.
+
+    Parâmetros GET:
+      - data_inicio / data_fim : intervalo de data_inicio do processo (default: últimos 30 dias)
+      - maquina_id             : filtra por célula (opcional)
+      - apenas_finalizadas     : '1' para incluir só ordens finalizadas (default: '1')
+      - min_ordens             : mínimo de ordens para aparecer no resultado (default: 1)
+      - limit                  : máximo de itens retornados (default: 30)
+    """
+    from collections import defaultdict
+
+    hoje = localtime(now()).date()
+    data_inicio = parse_date(request.GET.get('data_inicio') or '') or (hoje - timedelta(days=29))
+    data_fim    = parse_date(request.GET.get('data_fim') or '') or hoje
+    maquina_id  = (request.GET.get('maquina_id') or '').strip()
+    apenas_fin  = request.GET.get('apenas_finalizadas', '1') == '1'
+    min_ordens  = max(1, int(request.GET.get('min_ordens') or 1))
+    limit       = min(int(request.GET.get('limit') or 30), 200)
+
+    if data_inicio > data_fim:
+        return JsonResponse({'error': 'data_inicio não pode ser maior que data_fim.'}, status=400)
+
+    ordens_qs = Ordem.objects.filter(grupo_maquina='montagem', excluida=False)
+    if apenas_fin:
+        ordens_qs = ordens_qs.filter(status_atual='finalizada')
+    if maquina_id:
+        try:
+            ordens_qs = ordens_qs.filter(maquina_id=int(maquina_id))
+        except ValueError:
+            return JsonResponse({'error': 'maquina_id inválido.'}, status=400)
+
+    # Subquery: pega o nome do produto da primeira PecasOrdem da ordem
+    peca_subquery = (
+        PecasOrdem.objects
+        .filter(ordem=OuterRef('ordem'))
+        .order_by('id')
+        .values('peca')[:1]
+    )
+
+    # Processos ativos (status=iniciada) com data_fim preenchida dentro do período
+    processos_qs = (
+        OrdemProcesso.objects
+        .filter(
+            ordem__in=ordens_qs,
+            status='iniciada',
+            data_fim__isnull=False,
+            data_inicio__isnull=False,
+            data_inicio__date__range=[data_inicio, data_fim],
+        )
+        .annotate(peca=Subquery(peca_subquery))
+        .values('ordem_id', 'peca', 'data_inicio', 'data_fim')
+    )
+
+    # qtd_boa total por ordem (soma de todas as PecasOrdem da ordem)
+    qtd_boa_por_ordem = {
+        row['ordem_id']: float(row['total_boa'] or 0)
+        for row in PecasOrdem.objects
+            .filter(ordem__in=ordens_qs)
+            .values('ordem_id')
+            .annotate(total_boa=Sum('qtd_boa', output_field=FloatField()))
+    }
+
+    # Soma duração por ordem
+    ordem_data = defaultdict(lambda: {'duracao_seg': 0.0, 'peca': ''})
+    for p in processos_qs:
+        duracao = (p['data_fim'] - p['data_inicio']).total_seconds()
+        if duracao <= 0:
+            continue
+        ordem_data[p['ordem_id']]['duracao_seg'] += duracao
+        if not ordem_data[p['ordem_id']]['peca']:
+            ordem_data[p['ordem_id']]['peca'] = p['peca'] or ''
+
+    # Agrega por produto — tempo por lote e por unidade
+    peca_stats = defaultdict(lambda: {
+        'total_seg_lote': 0.0,
+        'total_seg_unidade': 0.0,
+        'count_lote': 0,
+        'count_unidade': 0,
+    })
+    for ordem_id, dados in ordem_data.items():
+        peca = dados['peca']
+        if not peca:
+            continue
+        seg = dados['duracao_seg']
+        # tempo por lote (toda ordem conta)
+        peca_stats[peca]['total_seg_lote'] += seg
+        peca_stats[peca]['count_lote']     += 1
+        # tempo por unidade (só ordens com produção registrada)
+        qtd = qtd_boa_por_ordem.get(ordem_id, 0)
+        if qtd > 0:
+            peca_stats[peca]['total_seg_unidade'] += seg / qtd
+            peca_stats[peca]['count_unidade']     += 1
+
+    def seg_para_hm(seg):
+        seg = int(seg)
+        h, m = divmod(seg // 60, 60)
+        return f'{h}h {m:02d}min' if h else f'{m}min'
+
+    items = []
+    for peca, v in peca_stats.items():
+        if v['count_lote'] < min_ordens:
+            continue
+        media_lote_seg     = v['total_seg_lote'] / v['count_lote']
+        media_unidade_seg  = (
+            v['total_seg_unidade'] / v['count_unidade']
+            if v['count_unidade'] > 0 else None
+        )
+        items.append({
+            'peca': peca,
+            'media_lote_formatado':    seg_para_hm(media_lote_seg),
+            'media_unidade_formatado': seg_para_hm(media_unidade_seg) if media_unidade_seg else '-',
+            'media_lote_minutos':      round(media_lote_seg / 60, 1),
+            'ordens': v['count_lote'],
+        })
+
+    items.sort(key=lambda x: (-x['ordens'], x['media_lote_minutos']))
+
+    return JsonResponse({'items': items[:limit], 'total': len(items)})
+
 
 def apontamento_qrcode(request):
     return render(request, 'apontamento_montagem/apontamento_qrcode.html')

@@ -2,33 +2,68 @@
 
 {% load static %}
 
+{% block title %}
+<title>Operadores</title>
+{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/operadores-admin.css' %}">
+{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-    <h2>Operadores</h2>
-    <input id="user-area" type="text" value="{{request.user.area}}" style="display: none;">
-    <span class="badge btn btn-primary mb-3" id="addOperador">Adicionar operador</span>
+<div class="operators-admin-page">
+    <input id="user-area" type="hidden" value="{{ request.user.area }}">
 
+    <section class="operators-shell">
+        <header class="operators-topbar">
+            <h1 class="operators-title">Operadores</h1>
 
-    <div class="table-responsive">
-        <table id="tableOperadores" class="table table-bordered table-striped table-sm">
-            <thead>
-                <tr>
-                    <th>Nome</th>
-                    <th>Matrícula</th>
-                    <th>Setor</th>
-                    <th>Status</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Dados serão gerados dinamicamente -->
-            </tbody>
-        </table>
-    </div>
-    <div id="overlayLoading" style="text-align: center;">
-        <div class="spinner-border text-primary" role="status"></div>
-        <span class="ms-2">Carregando...</span>
-    </div>
+            <button type="button" class="primary-toolbar-button" id="addOperador">
+                <i class="bi bi-plus-lg"></i>
+                <span>Adicionar operador</span>
+            </button>
+        </header>
+
+        <section class="operators-table-card">
+            <div class="table-responsive">
+                <table id="tableOperadores" class="operators-table">
+                    <thead>
+                        <tr>
+                            <th>Operador</th>
+                            <th>Matricula</th>
+                            <th>Setor</th>
+                            <th>Status</th>
+                            <th class="col-actions">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="operatorsTableBody">
+                        <tr>
+                            <td colspan="5">
+                                <div id="overlayLoading" class="operators-loading">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <span>Carregando operadores...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <footer class="operators-table-footer">
+                <div class="footer-left">
+                    <label for="rowsPerPage" class="footer-label">Rows per page</label>
+                    <select id="rowsPerPage" class="footer-select">
+                        <option value="10" selected>10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span class="footer-summary" id="operatorsTableSummary">0-0 of 0</span>
+                </div>
+
+                <nav class="operators-pagination" id="operatorsPagination" aria-label="Paginacao da tabela"></nav>
+            </footer>
+        </section>
+    </section>
 </div>
 
 {% include 'operadores/operador_modals.html' %}
@@ -38,5 +73,4 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script type="module" src="{% static 'js/datatable-list-operador.js' %}"></script>
 <script type="module" src="{% static 'js/operador-crud.js' %}"></script>
-
 {% endblock %}

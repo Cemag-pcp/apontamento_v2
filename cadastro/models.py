@@ -102,6 +102,7 @@ class Conjuntos(models.Model):
     descricao = models.CharField(max_length=200, blank=True, null=True)
     quantidade = models.IntegerField() # quantidade por carreta
     carreta = models.ManyToManyField('Carretas', through='ConjuntoCarreta', blank=True)
+    ativo = models.BooleanField(default=True)
 
     def __str__(self):
         return f'{self.codigo} - {self.descricao}'

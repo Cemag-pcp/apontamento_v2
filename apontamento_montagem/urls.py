@@ -27,6 +27,7 @@ urlpatterns = [
 # templates
 urlpatterns += [
     path('', views.planejamento, name='planejamento'),
+    path('dashboard/', views.dashboard, name='dashboard'),
     path('apontamento-qrcode/', views.apontamento_qrcode, name='apontamento_qrcode'),
 ]
 
@@ -34,5 +35,7 @@ urlpatterns += [
 urlpatterns += [
     path('api/ordem-finalizadas', views.api_ordens_finalizadas, name='api_ordens_finalizadas'),
     path('api/tempos', views.api_tempos, name='api_tempos'),
+    path('api/dashboard/dados/', views.dashboard_data, name='dashboard_data'),
+    path('api/tempo-medio-fabricacao/', views.tempo_medio_fabricacao, name='tempo_medio_fabricacao'),
     
 ]

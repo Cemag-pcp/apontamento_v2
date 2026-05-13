@@ -575,6 +575,7 @@ def get_ordens_criadas_duplicar_ordem(request):
 
     maquina = unquote(request.GET.get('maquina', ''))
     ordem = unquote(request.GET.get('ordem', ''))
+    filtro_excluida = request.GET.get('excluida', 'nao')
 
     codigos = [re.match(r'\d+', p).group() for p in pecas if re.match(r'\d+', p)]
     codigos_unicos = list(set(pecas))
@@ -604,7 +605,7 @@ def get_ordens_criadas_duplicar_ordem(request):
 
     #  Define a Query Base
     ordens_queryset = (
-        Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2','laser_3'], duplicada=False, excluida=False)
+        Ordem.objects.filter(grupo_maquina__in=['plasma', 'laser_1', 'laser_2','laser_3'], duplicada=False)
         .prefetch_related('ordem_pecas_corte')  # Evita queries repetidas para peças
         .select_related('propriedade')          # Carrega a propriedade diretamente
         .order_by('-propriedade__aproveitamento')
@@ -633,6 +634,10 @@ def get_ordens_criadas_duplicar_ordem(request):
         ordens_queryset = ordens_queryset.filter(grupo_maquina=maquina)
     if ordem:
         ordens_queryset = ordens_queryset.filter(ordem=ordem)
+    if filtro_excluida == 'sim':
+        ordens_queryset = ordens_queryset.filter(excluida=True)
+    elif filtro_excluida == 'nao':
+        ordens_queryset = ordens_queryset.filter(excluida=False)
 
     # Filtra Data Criação (existente)
     if dataCriacao:
@@ -706,6 +711,7 @@ def get_ordens_criadas_duplicar_ordem(request):
             'data_criacao': localtime(ordem.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
+            'excluida': ordem.excluida,
             'aproveitamento': round(ordem.propriedade.aproveitamento, 5) if ordem.propriedade else None,
             'propriedade': {
                 'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
@@ -826,6 +832,31 @@ def excluir_op_lote(request):
         return JsonResponse({'success': True, 'atualizadas': updated})
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def restaurar_op_padrao(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'MÃ©todo nÃ£o permitido'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        ordem_id = data.get('ordem_id')
+
+        if not ordem_id:
+            return JsonResponse({'error': 'ordem_id nÃ£o fornecido'}, status=400)
+
+        try:
+            ordem = Ordem.objects.get(pk=ordem_id)
+        except Ordem.DoesNotExist:
+            return JsonResponse({'error': 'Ordem nÃ£o encontrada'}, status=404)
+
+        ordem.excluida = False
+        ordem.save(update_fields=['excluida'])
+
+        return JsonResponse({'success': True, 'message': f'Ordem {ordem_id} restaurada'})
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON invÃ¡lido'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 

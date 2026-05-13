@@ -39,12 +39,15 @@ window.addEventListener('DOMContentLoaded', event => {
         const sidebarState = localStorage.getItem('sb|sidebar-toggle');
         if (sidebarState === 'true') {
             document.body.classList.add('sb-sidenav-toggled');
+            document.documentElement.classList.add('sb-sidenav-toggled');
         } else if (sidebarState === 'false') {
             document.body.classList.remove('sb-sidenav-toggled');
+            document.documentElement.classList.remove('sb-sidenav-toggled');
         }
         sidebarToggle.addEventListener('click', event => {
             event.preventDefault();
             document.body.classList.toggle('sb-sidenav-toggled');
+            document.documentElement.classList.toggle('sb-sidenav-toggled');
             localStorage.setItem('sb|sidebar-toggle', document.body.classList.contains('sb-sidenav-toggled'));
         });
     }

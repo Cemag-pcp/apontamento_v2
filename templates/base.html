@@ -8,6 +8,15 @@
     {% block title %}
     <title></title>
     {% endblock %}
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem('sb|sidebar-toggle') === 'true') {
+                    document.documentElement.classList.add('sb-sidenav-toggled');
+                }
+            } catch (e) {}
+        })();
+    </script>
 
     <link rel="icon" href="{% static 'favicon.ico' %}">
     <link href="{% static 'css/styles.css' %}" rel="stylesheet" />
@@ -39,6 +48,132 @@
             display: inline-flex;
             width: auto;
         }
+
+        /* Sidebar search */
+        .sidebar-search-wrap { position: relative; padding: 0 10px 10px; }
+        .sidebar-search-icon { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 11px; pointer-events: none; }
+        .sidebar-search-input { width: 100%; border: none; background: #f3f4f6; border-radius: 20px; padding: 6px 28px 6px 30px; font-size: 11px; color: #374151; outline: none; transition: background 0.15s; box-sizing: border-box; }
+        .sidebar-search-input:focus { background: #e9ebef; }
+        .sidebar-search-input::placeholder { color: #9ca3af; }
+        .sidebar-search-clear { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 10px; cursor: pointer; background: none; border: none; padding: 0; display: none; line-height: 1; }
+        .search-hidden,
+        #sidenavAccordion .search-hidden,
+        #sidenavAccordion .sb-sidenav-menu .nav-link.search-hidden,
+        #sidenavAccordion .sb-sidenav-menu-nested .nav-link.search-hidden,
+        #sidenavAccordion .sb-sidenav-menu-heading.search-hidden { display: none !important; }
+        @media (min-width: 992px) { .sb-sidenav-toggled .sidebar-search-wrap { display: none !important; } }
+
+        /* ===== SIDEBAR REDESIGN ===== */
+        /* Nav é position:fixed — usa padding-left no content para posicionamento */
+        #layoutSidenav #layoutSidenav_nav { width: 186px !important; transition: width 0.25s ease; }
+        /* Elimina qualquer margin-left no content */
+        #layoutSidenav #layoutSidenav_content,
+        .sb-sidenav-toggled #layoutSidenav #layoutSidenav_content { margin-left: 0 !important; }
+        /* Elimina overlay ::before do SB Admin apenas no desktop */
+        @media (min-width: 992px) {
+            .sb-sidenav-toggled #layoutSidenav #layoutSidenav_content::before { display: none !important; }
+        }
+
+        #layoutSidenav { overflow-x: clip; }
+
+        @media (min-width: 992px) {
+            #layoutSidenav #layoutSidenav_content { padding-left: 186px !important; }
+            /* Desktop: toggled = mini sidebar (icons only) */
+            .sb-sidenav-toggled #layoutSidenav #layoutSidenav_nav { transform: translateX(0) !important; width: 62px !important; }
+            .sb-sidenav-toggled #layoutSidenav #layoutSidenav_content { padding-left: 62px !important; }
+            .sb-sidenav-toggled .sidebar-user-info,
+            .sb-sidenav-toggled .sidebar-user-dot,
+            .sb-sidenav-toggled .sb-sidenav-menu-heading,
+            .sb-sidenav-toggled .sb-sidenav-collapse-arrow { display: none !important; }
+            .sb-sidenav-toggled .sidebar-user-card { justify-content: center !important; padding: 6px !important; }
+            .sb-sidenav-toggled .sb-sidenav-dark .sb-sidenav-menu .nav-link { font-size: 0 !important; justify-content: center !important; padding: 9px 0 !important; gap: 0 !important; margin: 2px 6px !important; border-radius: 8px !important; box-shadow: none !important; }
+            .sb-sidenav-toggled .sb-sidenav-dark .sb-sidenav-menu .nav-link > i { font-size: 16px !important; width: auto !important; min-width: auto !important; }
+            .sb-sidenav-toggled .sb-sidenav-dark .sb-sidenav-menu .nav-link:hover { padding: 9px 0 !important; background: #f3f4f6 !important; }
+            .sb-sidenav-toggled #layoutSidenav #layoutSidenav_nav .collapse { display: none !important; }
+        }
+
+        @media (max-width: 991.98px) {
+            html, body { overflow-x: hidden; }
+            body.sb-sidenav-toggled { overflow: hidden; }
+            #layoutSidenav { display: block !important; }
+            #layoutSidenav #layoutSidenav_nav {
+                position: fixed !important;
+                top: 56px;
+                left: 0;
+                bottom: 0;
+                width: min(82vw, 320px) !important;
+                max-width: 320px;
+                transform: translateX(-100%) !important;
+                transition: transform 0.22s ease !important;
+                z-index: 1051 !important;
+                box-shadow: 10px 0 30px rgba(17, 24, 39, 0.18);
+            }
+            .sb-sidenav-toggled #layoutSidenav #layoutSidenav_nav {
+                transform: translateX(0) !important;
+            }
+            #layoutSidenav #layoutSidenav_content {
+                position: relative !important;
+                z-index: 1 !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                margin-left: 0 !important;
+                padding-left: 0 !important;
+            }
+            .sb-sidenav-toggled #layoutSidenav #layoutSidenav_content::before {
+                content: "" !important;
+                display: block !important;
+                position: fixed !important;
+                top: 56px;
+                left: 0;
+                width: 100vw;
+                height: calc(100vh - 56px);
+                background: rgba(17, 24, 39, 0.35);
+                z-index: 1050 !important;
+                opacity: 1;
+                pointer-events: auto;
+            }
+        }
+
+        .sb-sidenav.sb-sidenav-dark { background-color: #ffffff !important; border-right: 1px solid #e5e7eb !important; box-shadow: none !important; }
+
+        /* Logo */
+        .sidebar-logo-area { display: flex; align-items: center; gap: 10px; padding: 27px 20px 14px; }
+        .sidebar-logo-icon { width: 34px; height: 34px; background: #7c3aed; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .sidebar-brand-text { font-size: 13px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* User card */
+        .sidebar-user-card { margin: 16px 10px 12px; background: #f3f4f6; border-radius: 20px; padding: 7px 10px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .sidebar-user-avatar { width: 28px; height: 28px; border-radius: 50%; background: #7c3aed; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+        .sidebar-user-info { flex: 1; min-width: 0; }
+        .sidebar-user-name { font-size: 11px; font-weight: 600; color: #111827; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-user-email { font-size: 9px; color: #9ca3af; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-user-dot { width: 20px; height: 20px; border-radius: 50%; background: #374151; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+        /* Category headings */
+        .sb-sidenav-dark .sb-sidenav-menu .sb-sidenav-menu-heading { font-size: 9px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.1em !important; color: #9ca3af !important; padding: 14px 20px 4px !important; background: transparent !important; }
+
+        /* Nav links */
+        .sb-sidenav-dark .sb-sidenav-menu .nav-link { color: #374151 !important; padding: 7px 16px !important; display: flex !important; align-items: center !important; gap: 9px !important; font-size: 12px !important; font-weight: 500 !important; border-radius: 0 !important; transition: background 0.15s, color 0.15s, margin 0.15s, padding 0.15s !important; position: relative !important; margin: 1px 0 !important; }
+        .sb-sidenav-dark .sb-sidenav-menu .nav-link:hover { background: #f3f4f6 !important; color: #111827 !important; border-radius: 10px !important; margin: 1px 8px !important; padding: 7px 8px !important; }
+        .sb-sidenav-dark .sb-sidenav-menu .nav-link .sb-nav-link-icon,
+        .sb-sidenav-dark .sb-sidenav-menu .nav-link > i { font-size: 13px; width: 15px; min-width: 15px; text-align: center; margin-right: 0 !important; }
+        .sb-sidenav-dark .sb-sidenav-menu .nav-link.active-sidebar { color: #7c3aed !important; font-weight: 600 !important; background: transparent !important; border-radius: 0 !important; margin: 1px 0 !important; padding: 7px 16px !important; box-shadow: inset -3px 0 0 0 #7c3aed !important; }
+        .sb-sidenav-dark .sb-sidenav-menu .nav-link.active-sidebar > i { color: #7c3aed; }
+
+        /* Collapse arrow */
+        .sb-sidenav-collapse-arrow { margin-left: 4px !important; font-size: 11px !important; transition: transform 0.2s ease !important; color: #111827 !important; line-height: 1; }
+        .sb-sidenav-dark .sb-sidenav-menu .nav-link.collapsed .sb-sidenav-collapse-arrow { transform: rotate(0deg) !important; }
+        .sb-sidenav-dark .sb-sidenav-menu .nav-link:not(.collapsed) .sb-sidenav-collapse-arrow { transform: rotate(90deg) !important; }
+
+        /* Nested nav links */
+        .sb-sidenav-dark .sb-sidenav-menu-nested .nav-link { font-size: 11px !important; color: #6b7280 !important; padding: 5px 16px 5px 40px !important; gap: 0 !important; margin: 1px 0 !important; }
+        .sb-sidenav-dark .sb-sidenav-menu-nested .nav-link:hover { background: #f3f4f6 !important; color: #111827 !important; border-radius: 10px !important; margin: 1px 8px !important; padding: 5px 8px 5px 32px !important; }
+        .sb-sidenav-dark .sb-sidenav-menu-nested .nav-link.active-sidebar { color: #7c3aed !important; font-weight: 600 !important; box-shadow: inset -3px 0 0 0 #7c3aed !important; background: transparent !important; border-radius: 0 !important; margin: 1px 0 !important; padding: 5px 16px 5px 40px !important; }
+
+        /* Footer */
+        .sb-sidenav-dark .sb-sidenav-footer { background: transparent !important; border-top: 1px solid #e5e7eb !important; padding: 12px 16px !important; }
+        .sb-sidenav-dark .sb-sidenav-footer .small { color: #6b7280; font-size: 11px; }
+        .sb-sidenav-dark .sb-sidenav-footer strong { color: #111827; }
     </style>
 
 
@@ -80,533 +215,358 @@
         <div id="layoutSidenav">
             <div id="layoutSidenav_nav">
                 <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+
+                    <!-- User card -->
+                    {% if request.user.is_authenticated %}
+                    <div class="sidebar-user-card">
+                        <div class="sidebar-user-avatar">
+                            {{ request.user.username|slice:":2"|upper }}
+                        </div>
+                        <div class="sidebar-user-info">
+                            <div class="sidebar-user-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+                            <div class="sidebar-user-email">{{ request.user.email }}</div>
+                        </div>
+                        <div class="sidebar-user-dot dropdown" style="position:relative;">
+                            <button data-bs-toggle="dropdown" aria-expanded="false" style="all:unset;cursor:pointer;width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+                                <i class="bi bi-three-dots-vertical" style="color:white;font-size:9px;"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:120px;font-size:12px;">
+                                <li>
+                                    <a class="dropdown-item text-danger" href="{% url 'core:logout' %}">
+                                        <i class="bi bi-box-arrow-right me-2"></i>Sair
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Search -->
+                    <div class="sidebar-search-wrap">
+                        <i class="bi bi-search sidebar-search-icon"></i>
+                        <input type="text" id="sidebarSearch" class="sidebar-search-input" placeholder="Buscar...">
+                        <button class="sidebar-search-clear" id="sidebarSearchClear" tabindex="-1">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+
                     <div class="sb-sidenav-menu">
                         <div class="nav">
                             {% if request.user.profile.tipo_acesso == 'almoxarifado' or not request.user.is_authenticated %}
 
                             <div class="sb-sidenav-menu-heading">Almoxarifado</div>
-
-                                {% if not request.user.is_authenticated %}
-                                    <a class="nav-link" href="{% url 'criar_solicitacoes' %}">Solicitar</a>
-                                {% else %}
-
-                                    <a class="nav-link" href="{% url 'solicitacoes_page' %}">Home</a>
-                                    <a class="nav-link" href="{% url 'dashboard' %}">Dashboard</a>
-                                    <a class="nav-link" href="{% url 'criar_solicitacoes' %}">Solicitar</a>
-                                    <a class="nav-link" href="{% url 'configuracoes_sla' %}">Configuracoes</a>
-                                
-                                    <a class="nav-link collapsed" href="#" data-bs-toggle="collapse"
-                                        data-bs-target="#collapseHistorico" aria-expanded="false" aria-controls="collapseHistorico">
-                                        <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                        Historico
-                                        <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                                    </a>
-                                    <div class="collapse" id="collapseHistorico" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
-                                        <nav class="sb-sidenav-menu-nested nav">
-                                            <a class="nav-link" href="{% url 'historico_requisicao' %}">Requisição</a>
-                                        </nav>
-                                    </div>
-                                    <div class="collapse" id="collapseHistorico" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
-                                        <nav class="sb-sidenav-menu-nested nav">
-                                            <a class="nav-link" href="{% url 'historico_transferencia' %}">Transferência</a>
-                                        </nav>
-                                    </div>
-                                    <div class="collapse" id="collapseHistorico" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
-                                        <nav class="sb-sidenav-menu-nested nav">
-                                            <a class="nav-link" href="{% url 'home_erros' %}">Erros</a>
-                                        </nav>
-                                    </div>
-                                    <a class="nav-link collapsed" href="#" data-bs-toggle="collapse"
-                                        data-bs-target="#collapseGerCadastro" aria-expanded="false" aria-controls="collapseGerCadastro">
-                                        <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                        Gerenciar cadastro
-                                        <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                                    </a>
-                                    <div class="collapse" id="collapseGerCadastro" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
-                                        <nav class="sb-sidenav-menu-nested nav">
-                                            <a class="nav-link" href="{% url 'gerir_solicitacoes' %}">Solicitações</a>
-                                        </nav>
-                                    </div>
-                                {% endif %}
+                            {% if not request.user.is_authenticated %}
+                                <a class="nav-link" href="{% url 'criar_solicitacoes' %}">
+                                    <i class="bi bi-plus-circle"></i> Solicitar
+                                </a>
                             {% else %}
-                            
-                            <div class="sb-sidenav-menu-heading">Inicio</div>
+                                <a class="nav-link" href="{% url 'solicitacoes_page' %}"><i class="bi bi-house"></i> Home</a>
+                                <a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-graph-up"></i> Dashboard</a>
+                                <a class="nav-link" href="{% url 'criar_solicitacoes' %}"><i class="bi bi-plus-circle"></i> Solicitar</a>
+                                <a class="nav-link" href="{% url 'configuracoes_sla' %}"><i class="bi bi-gear"></i> Configurações</a>
+                                <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseHistoricoAlmox" aria-expanded="false" aria-controls="collapseHistoricoAlmox">
+                                    <i class="bi bi-clock-history"></i> Histórico
+                                    <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
+                                </a>
+                                <div class="collapse" id="collapseHistoricoAlmox" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'historico_requisicao' %}">Requisição</a>
+                                        <a class="nav-link" href="{% url 'historico_transferencia' %}">Transferência</a>
+                                        <a class="nav-link" href="{% url 'home_erros' %}">Erros</a>
+                                    </nav>
+                                </div>
+                                <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseGerCadastroAlmox" aria-expanded="false" aria-controls="collapseGerCadastroAlmox">
+                                    <i class="bi bi-person-lines-fill"></i> Gerenciar cadastro
+                                    <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
+                                </a>
+                                <div class="collapse" id="collapseGerCadastroAlmox" data-bs-parent="#sidenavAccordion">
+                                    <nav class="sb-sidenav-menu-nested nav">
+                                        <a class="nav-link" href="{% url 'gerir_solicitacoes' %}">Solicitações</a>
+                                    </nav>
+                                </div>
+                            {% endif %}
+
+                            {% else %}
+
+                            <div class="sb-sidenav-menu-heading">Início</div>
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseHome" aria-expanded="false" aria-controls="collapseHome">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Início
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-house"></i> Início
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseHome" aria-labelledby="headingInicio" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseHome" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:versao' %}">Versões</a>
-                                </nav>
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:consulta_pecas' %}">Consultar peças</a>
-                                </nav>
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:acessos' %}">Acessos</a>
                                 </nav>
                             </div>
 
                             <div class="sb-sidenav-menu-heading">Cadastros</div>
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseCadastro" aria-expanded="false" aria-controls="collapseCadastro">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Cadastros
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-person-vcard"></i> Cadastros
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseCadastro" aria-labelledby="headingCadastro" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseCadastro" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'cadastro:operadores' %}">Operadores</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseCadastro" aria-labelledby="headingCadastro" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'cadastro:cadastro_pecas' %}">Peças</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseCadastro" aria-labelledby="headingCadastro" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'cadastro:cadastro_conjuntos' %}">Conjuntos</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseCadastro" aria-labelledby="headingCadastro" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'cadastro:cadastro_itens_explodidos' %}">Itens Explodidos</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseCadastro" aria-labelledby="headingCadastro" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'cadastro:cadastro_carretas_explodidas' %}">Carretas Explodidas</a>
                                 </nav>
                             </div>
 
                             <div class="sb-sidenav-menu-heading">Cargas</div>
-                            <a class="nav-link" href="{% url 'sucata:sucata' %}"><div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div> Sucata</a>
+                            <a class="nav-link" href="{% url 'sucata:sucata' %}"><i class="bi bi-trash3"></i> Sucata</a>
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseCargas" aria-expanded="false" aria-controls="collapseCargas">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Plano de cargas
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-truck"></i> Plano de cargas
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseCargas" aria-labelledby="headingInicio" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseCargas" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'cargas:liberacao' %}">Liberação</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseCargas" aria-labelledby="headingInicio" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'cargas:home' %}">Planejamento</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseCargas" aria-labelledby="headingInicio" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'cargas:historico_cargas' %}">Histórico</a>
                                 </nav>
                             </div>
 
                             <div class="sb-sidenav-menu-heading">Compras</div>
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseCompras" aria-expanded="false" aria-controls="collapseCompras">
-                                <div class="sb-nav-link-icon"><i class="fas fa-shopping-cart"></i></div>
-                                Compras
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-cart3"></i> Compras
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseCompras" aria-labelledby="headingCompras" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseCompras" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'compras:analise' %}">Análise de Compras</a>
                                 </nav>
                             </div>
 
                             <div class="sb-sidenav-menu-heading">Apontamentos</div>
-
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseERPApontamentos" aria-expanded="false" aria-controls="collapseERPApontamentos">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                ERP
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-database"></i> ERP
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseERPApontamentos" aria-labelledby="headingERPApontamentos" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseERPApontamentos" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'estamparia:erp_apontamentos_estamparia' %}">Estamparia</a>
                                     <a class="nav-link" href="{% url 'usinagem:erp_apontamentos_usinagem' %}">Usinagem</a>
-                                    <a class="nav-link" href="{% url 'compras:estoque' %}">Estoque</a>
                                 </nav>
                             </div>
-                            
+
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseBases" aria-expanded="false" aria-controls="collapseBases">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Bases
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-archive"></i> Bases
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseBases" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:propriedades_ordem' %}">Propriedades da ordem</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:pecas_corte' %}">Histórico Corte</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:pecas_serra' %}">Histórico Serra</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:pecas_usinagem' %}">Histórico Usinagem</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseBases" aria-labelledby="headingBases" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'core:pecas_estamparia' %}">Histórico Estamparia</a>
                                 </nav>
                             </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseUsinagem" aria-expanded="false" aria-controls="collapseUsinagem">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Usinagem
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-gear"></i> Usinagem
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseUsinagem" aria-labelledby="headingUsinagem" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseUsinagem" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'usinagem:planejamento' %}">Ordens</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseUsinagem" aria-labelledby="headingUsinagem" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'usinagem:processos' %}">Processos</a>
                                 </nav>
                             </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseSerra" aria-expanded="false" aria-controls="collapseSerra">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Serra
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-scissors"></i> Serra
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseSerra" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseSerra" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'serra:planejamento' %}">Ordens</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseSerra" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'serra:historico' %}">Histórico</a>
                                 </nav>
                             </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseProdEsp" aria-expanded="false" aria-controls="collapseProdEsp">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Prod especiais
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-star"></i> Prod. Especiais
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseProdEsp" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseProdEsp" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'prod_esp:planejamento' %}">Ordens</a>
                                 </nav>
                             </div>
-                            
+
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseCorte" aria-expanded="false" aria-controls="collapseCorte">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Corte
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-slash-circle"></i> Corte
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseCorte" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseCorte" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'corte:planejamento' %}">Ordens</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseCorte" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'corte:duplicar_op' %}">Duplicar OP</a>
                                 </nav>
                             </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseEstamparia" aria-expanded="false" aria-controls="collapseEstamparia">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Estamparia
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-layers"></i> Estamparia
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseEstamparia" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseEstamparia" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'estamparia:planejamento' %}">Ordens</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseEstamparia" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'estamparia:historico' %}">Histórico</a>
                                 </nav>
                             </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapsePintura" aria-expanded="false" aria-controls="collapsePintura">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Pintura
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-brush"></i> Pintura
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapsePintura" aria-labelledby="headingPintura" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapsePintura" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'pintura:planejamento' %}">Ordens</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapsePintura" aria-labelledby="headingPintura" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'pintura:programar_producao' %}">Planejar</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapsePintura" aria-labelledby="headingPintura" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'pintura:retrabalho_pintura' %}">Retrabalho</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapsePintura" aria-labelledby="headingPintura" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'pintura:historico_pintura' %}">Histórico</a>
                                 </nav>
                             </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseMontagem" aria-expanded="false" aria-controls="collapseMontagem">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Montagem
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-tools"></i> Montagem
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseMontagem" aria-labelledby="headingSerra" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseMontagem" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'montagem:planejamento' %}">Ordens</a>
                                 </nav>
                             </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseSolda" aria-expanded="false" aria-controls="collapseSolda">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Solda
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-lightning"></i> Solda
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseSolda" aria-labelledby="headingSolda" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseSolda" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'solda:planejamento' %}">Ordens</a>
                                 </nav>
                             </div>
 
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseExpedicao" aria-expanded="false" aria-controls="collapseExpedicao">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Expedicao
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-box-arrow-right"></i> Expedição
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseExpedicao" aria-labelledby="headingExpedicao" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseExpedicao" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'expedicao:planejamento' %}">Ordens</a>
-                                </nav>
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'expedicao:relatorios' %}">Relatórios</a>
                                 </nav>
                             </div>
 
                             <div class="sb-sidenav-menu-heading">Almoxarifado</div>
                             {% if not request.user.is_superuser %}
-                            <a class="nav-link" href="{% url 'criar_solicitacoes' %}">Solicitar</a>
+                            <a class="nav-link" href="{% url 'criar_solicitacoes' %}"><i class="bi bi-plus-circle"></i> Solicitar</a>
                             {% else %}
-                            <a class="nav-link" href="{% url 'solicitacoes_page' %}">Home</a>
-                            <a class="nav-link" href="{% url 'dashboard' %}">Dashboard</a>
-                            <a class="nav-link" href="{% url 'criar_solicitacoes' %}">Solicitar</a>
-                            <a class="nav-link" href="{% url 'configuracoes_sla' %}">Configuracoes</a>
-                        
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse"
-                                data-bs-target="#collapseHistorico" aria-expanded="false" aria-controls="collapseHistorico">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Historico
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            <a class="nav-link" href="{% url 'solicitacoes_page' %}"><i class="bi bi-house"></i> Home</a>
+                            <a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-graph-up"></i> Dashboard</a>
+                            <a class="nav-link" href="{% url 'criar_solicitacoes' %}"><i class="bi bi-plus-circle"></i> Solicitar</a>
+                            <a class="nav-link" href="{% url 'configuracoes_sla' %}"><i class="bi bi-gear"></i> Configurações</a>
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseHistoricoSuper" aria-expanded="false" aria-controls="collapseHistoricoSuper">
+                                <i class="bi bi-clock-history"></i> Histórico
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseHistorico" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseHistoricoSuper" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'historico_requisicao' %}">Requisição</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseHistorico" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'historico_transferencia' %}">Transferência</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseHistorico" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'home_erros' %}">Erros</a>
                                 </nav>
                             </div>
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse"
-                                data-bs-target="#collapseGerCadastro" aria-expanded="false" aria-controls="collapseGerCadastro">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Gerenciar cadastro
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseGerCadastroSuper" aria-expanded="false" aria-controls="collapseGerCadastroSuper">
+                                <i class="bi bi-person-lines-fill"></i> Gerenciar cadastro
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseGerCadastro" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseGerCadastroSuper" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'gerir_solicitacoes' %}">Solicitações</a>
                                 </nav>
                             </div>
                             {% endif %}
-                            
-                            <div class="sb-sidenav-menu-heading">Inspeção</div>
 
+                            <div class="sb-sidenav-menu-heading">Inspeção</div>
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseInspecao" aria-expanded="false" aria-controls="collapseInspecao">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Inspeção por setor
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                                <i class="bi bi-search"></i> Inspeção por setor
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseInspecao" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:inspecao-pintura' %}">Pintura</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:inspecao-banhos-ezinger' %}">Banhos EZINGER</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:inspecao-estamparia' %}">Estamparia</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:inspecao-montagem' %}">Montagem</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:inspecao-serra-usinagem' %}">Serra e Usinagem</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:inspecao-corte' %}">Corte</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:inspecao-recebimento' %}">Recebimento</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseInspecao" aria-labelledby="headingInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
-                                    <a class="nav-link" href="{% url 'inspecao:conjuntos-inspecionados-montagem' %}">Conjuntos inpecionados - Montagem</a>
+                                    <a class="nav-link" href="{% url 'inspecao:conjuntos-inspecionados-montagem' %}">Conj. inspecionados</a>
                                 </nav>
                             </div>
 
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseInspecaoEstanqueidade" aria-expanded="false" aria-controls="collapseInspecao">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Inspeção Estanqueidade
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseInspecaoEstanqueidade" aria-expanded="false" aria-controls="collapseInspecaoEstanqueidade">
+                                <i class="bi bi-water"></i> Estanqueidade
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseInspecaoEstanqueidade" aria-labelledby="headingInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:inspecao-tanque' %}">Tanque</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseInspecaoEstanqueidade" aria-labelledby="headingInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:inspecao-tubos-cilindros' %}">Tubos e Cilindros</a>
                                 </nav>
                             </div>
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseVerificacaoFuncionalPintura" aria-expanded="false" aria-controls="collapseVerificacaoFuncionalPintura">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Verificação Funcional
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseVerificacaoFuncional" aria-expanded="false" aria-controls="collapseVerificacaoFuncional">
+                                <i class="bi bi-check-circle"></i> Verificação Funcional
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseVerificacaoFuncionalPintura" aria-labelledby="headingVerificacaoFuncionalPintura" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseVerificacaoFuncional" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:verificacao-funcional-pintura' %}">Pintura</a>
                                 </nav>
                             </div>
 
                             <div class="sb-sidenav-menu-heading">Dashboard</div>
-
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseDashboadInspecao" aria-expanded="false" aria-controls="collapseInspecao">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Dashboard Inspeção
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseDashboardInspecao" aria-expanded="false" aria-controls="collapseDashboardInspecao">
+                                <i class="bi bi-graph-up"></i> Inspeção
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseDashboardInspecao" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:dasdashboard_pinturahboard' %}">Pintura</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:dasdashboard_montagemhboard' %}">Montagem</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:dasdashboard_estampariahboard' %}">Estamparia</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:dasdashboard_serraboard' %}">Serra</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:dasdashboard_usinagemboard' %}">Usinagem</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:dashboard-tanque' %}">Tanque</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:dashboard-tubos-cilindros' %}">Tubos e Cilindros</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseDashboadInspecao" aria-labelledby="headingDashboadInspecao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'inspecao:dashboard-recebimento' %}">Recebimento</a>
                                 </nav>
                             </div>
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseDashboadProducao" aria-expanded="false" aria-controls="collapseProducao">
-                                <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                                Dashboard Produção
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
+
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseDashboardProducao" aria-expanded="false" aria-controls="collapseDashboardProducao">
+                                <i class="bi bi-bar-chart"></i> Produção
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseDashboadProducao" aria-labelledby="headingDashboadProducao" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseDashboardProducao" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'corte:dashboard' %}">Corte</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseDashboadProducao" aria-labelledby="headingDashboadProducao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'estamparia:dashboard' %}">Estamparia</a>
-                                </nav>
-                            </div>
-                            <div class="collapse" id="collapseDashboadProducao" aria-labelledby="headingDashboadProducao" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
                                     <a class="nav-link" href="{% url 'serra:dashboard' %}">Serra</a>
+                                    <a class="nav-link" href="{% url 'montagem:dashboard' %}">Montagem</a>
                                 </nav>
                             </div>
 
                             {% endif %}
                         </div>
-                    </div>
-                    <div class="sb-sidenav-footer">
-                        <div class="small">
-                            <!-- Exibe o tipo de acesso do usuário -->
-                            {% if request.user.username %}
-                                <div class="col">
-                                    Logado: <strong>{{ request.user.username }}</strong> 
-                                </div>
-                                {% if request.user.profile.tipo_acesso == 'almoxarifado' %}
-                                    <a href="/admin/">Administrador</a>
-                                {% endif %}
-                            {% else %}
-                                Usuário nao autenticado
-                            {% endif %}
-                            <br>
-                        </div>
-                            <!-- Botão de Logout -->
-                            {% if request.user.is_authenticated %}
-                                <a href="{% url 'core:logout' %}" class="btn btn-danger btn-sm mt-2 w-100">Sair</a>
-                            {% else %}
-                                <a href="{% url 'core:login' %}" class="btn btn-primary btn-sm mt-2 w-100">Logar</a>
-                            {% endif %}
                     </div>
                 </nav>
             </div>
@@ -649,6 +609,297 @@
         <!-- Script personalizado -->
         <script src="{% static 'js/scripts.js' %}"></script>
         <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.3/dist/dotlottie-wc.js" type="module"></script>
+
+        <style>
+        #sidebar-mini-tooltip {
+            position: fixed;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            padding: 6px 0;
+            min-width: 170px;
+            z-index: 9999;
+            display: none;
+            pointer-events: auto;
+        }
+        #sidebar-mini-tooltip .smt-header {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #9ca3af;
+            padding: 4px 14px 6px;
+            border-bottom: 1px solid #f3f4f6;
+            margin-bottom: 4px;
+        }
+        #sidebar-mini-tooltip a {
+            display: block;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #374151;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 1px 6px;
+            transition: background 0.12s, color 0.12s;
+        }
+        #sidebar-mini-tooltip a:hover {
+            background: #f3f4f6;
+            color: #111827;
+        }
+        </style>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ===== SIDEBAR SEARCH =====
+            var searchInput = document.getElementById('sidebarSearch');
+            var clearBtn    = document.getElementById('sidebarSearchClear');
+            var searchOpenedCollapses = new Set();
+
+            function getNavLinkText(link) {
+                return Array.from(link.childNodes)
+                    .filter(function(n) { return n.nodeType === 3; })
+                    .map(function(n) { return n.textContent.toLowerCase(); })
+                    .join('').trim();
+            }
+
+            function filterSidebar(query) {
+                var nav = document.querySelector('#sidenavAccordion .sb-sidenav-menu .nav');
+                if (!nav) return;
+                var children = Array.from(nav.children);
+
+                if (!query) {
+                    nav.querySelectorAll('.search-hidden').forEach(function(el) { el.classList.remove('search-hidden'); });
+                    searchOpenedCollapses.forEach(function(id) {
+                        var col = document.getElementById(id);
+                        var tog = document.querySelector('[data-bs-target="#' + id + '"]');
+                        if (col) { col.classList.remove('show'); col.style.display = ''; }
+                        if (tog) tog.classList.add('collapsed');
+                    });
+                    searchOpenedCollapses.clear();
+                    return;
+                }
+
+                // Group children by their heading
+                var groups = [];
+                var cur = { heading: null, items: [] };
+                children.forEach(function(el) {
+                    if (el.classList.contains('sb-sidenav-menu-heading')) {
+                        groups.push(cur);
+                        cur = { heading: el, items: [] };
+                    } else {
+                        cur.items.push(el);
+                    }
+                });
+                groups.push(cur);
+
+                groups.forEach(function(group) {
+                    var groupHasMatch = false;
+
+                    group.items.forEach(function(el) {
+                        if (el.classList.contains('collapse')) return;
+
+                        var targetId = el.getAttribute('data-bs-target');
+                        var visible  = false;
+
+                        if (targetId) {
+                            var labelText  = getNavLinkText(el);
+                            var parentMatch = labelText.includes(query);
+
+                            var collapseEl = document.querySelector(targetId);
+                            var childMatchCount = 0;
+
+                            if (collapseEl) {
+                                collapseEl.querySelectorAll('a.nav-link').forEach(function(child) {
+                                    var childMatch = parentMatch || child.textContent.trim().toLowerCase().includes(query);
+                                    if (childMatch) {
+                                        child.classList.remove('search-hidden');
+                                        childMatchCount++;
+                                    } else {
+                                        child.classList.add('search-hidden');
+                                    }
+                                });
+                            }
+
+                            visible = parentMatch || childMatchCount > 0;
+
+                            if (visible) {
+                                el.classList.remove('search-hidden');
+                                groupHasMatch = true;
+                                if (collapseEl) {
+                                    collapseEl.classList.remove('search-hidden');
+                                    if (!collapseEl.classList.contains('show')) {
+                                        collapseEl.classList.add('show');
+                                        searchOpenedCollapses.add(collapseEl.id);
+                                        el.classList.remove('collapsed');
+                                    }
+                                }
+                            } else {
+                                el.classList.add('search-hidden');
+                                if (collapseEl) collapseEl.classList.add('search-hidden');
+                            }
+                        } else {
+                            visible = el.textContent.trim().toLowerCase().includes(query);
+                            if (visible) { el.classList.remove('search-hidden'); groupHasMatch = true; }
+                            else el.classList.add('search-hidden');
+                        }
+                    });
+
+                    if (group.heading) {
+                        if (groupHasMatch) group.heading.classList.remove('search-hidden');
+                        else group.heading.classList.add('search-hidden');
+                    }
+                });
+            }
+
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    var q = this.value.trim().toLowerCase();
+                    clearBtn.style.display = q ? 'block' : 'none';
+                    filterSidebar(q);
+                });
+                clearBtn.addEventListener('click', function() {
+                    searchInput.value = '';
+                    clearBtn.style.display = 'none';
+                    filterSidebar('');
+                    searchInput.focus();
+                });
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // ===== MINI SIDEBAR TOOLTIP =====
+            var tooltip = document.createElement('div');
+            tooltip.id = 'sidebar-mini-tooltip';
+            document.body.appendChild(tooltip);
+
+            var hideTimer;
+
+            function getLabelText(link) {
+                return Array.from(link.childNodes)
+                    .filter(function(n) { return n.nodeType === 3; })
+                    .map(function(n) { return n.textContent.trim(); })
+                    .join('').trim();
+            }
+
+            function showTooltip(link, collapseEl) {
+                clearTimeout(hideTimer);
+                var items = collapseEl.querySelectorAll('a.nav-link');
+                if (!items.length) return;
+
+                var label = getLabelText(link);
+                tooltip.innerHTML = '';
+
+                if (label) {
+                    var header = document.createElement('div');
+                    header.className = 'smt-header';
+                    header.textContent = label;
+                    tooltip.appendChild(header);
+                }
+
+                items.forEach(function(item) {
+                    var a = document.createElement('a');
+                    a.href = item.getAttribute('href') || '#';
+                    a.textContent = item.textContent.trim();
+                    tooltip.appendChild(a);
+                });
+
+                var rect = link.getBoundingClientRect();
+                tooltip.style.display = 'block';
+                var ttHeight = tooltip.offsetHeight;
+                var top = rect.top;
+                if (top + ttHeight > window.innerHeight - 12) top = window.innerHeight - ttHeight - 12;
+                tooltip.style.top = top + 'px';
+                tooltip.style.left = (rect.right + 8) + 'px';
+            }
+
+            function hideTooltip() {
+                hideTimer = setTimeout(function() {
+                    tooltip.style.display = 'none';
+                }, 150);
+            }
+
+            function isMini() {
+                return window.innerWidth >= 992 && document.body.classList.contains('sb-sidenav-toggled');
+            }
+
+            document.querySelectorAll('#sidenavAccordion .nav-link[data-bs-toggle="collapse"]').forEach(function(link) {
+                var targetId = link.getAttribute('data-bs-target');
+                if (!targetId) return;
+                var collapseEl = document.querySelector(targetId);
+                if (!collapseEl) return;
+
+                link.addEventListener('mouseenter', function() {
+                    if (isMini()) showTooltip(link, collapseEl);
+                });
+                link.addEventListener('mouseleave', hideTooltip);
+            });
+
+            tooltip.addEventListener('mouseenter', function() { clearTimeout(hideTimer); });
+            tooltip.addEventListener('mouseleave', hideTooltip);
+        });
+
+        function applySidebarLayout() {
+            var content = document.getElementById('layoutSidenav_content');
+            if (!content) return;
+            if (window.innerWidth >= 992) {
+                var isMini = document.body.classList.contains('sb-sidenav-toggled') || document.documentElement.classList.contains('sb-sidenav-toggled');
+                content.style.setProperty('padding-left', isMini ? '62px' : '186px', 'important');
+                content.style.setProperty('margin-left', '0', 'important');
+            } else {
+                content.style.removeProperty('padding-left');
+                content.style.removeProperty('margin-left');
+            }
+        }
+
+        // Aplica ao carregar (restaura estado do localStorage)
+        document.addEventListener('DOMContentLoaded', applySidebarLayout);
+        window.addEventListener('resize', applySidebarLayout);
+
+        document.addEventListener('click', function(e) {
+            var nav = document.getElementById('layoutSidenav_nav');
+            var toggle = document.getElementById('sidebarToggle');
+            if (!nav || !toggle) return;
+            var clickedOutside = !nav.contains(e.target) && !toggle.contains(e.target);
+
+            var isMobile = window.innerWidth < 992;
+            var isToggled = document.body.classList.contains('sb-sidenav-toggled');
+
+            if (clickedOutside) {
+                if (isMobile && isToggled) {
+                    document.body.classList.remove('sb-sidenav-toggled');
+                    document.documentElement.classList.remove('sb-sidenav-toggled');
+                    localStorage.setItem('sb|sidebar-toggle', false);
+                    applySidebarLayout();
+                } else if (!isMobile && !isToggled) {
+                    document.body.classList.add('sb-sidenav-toggled');
+                    document.documentElement.classList.add('sb-sidenav-toggled');
+                    localStorage.setItem('sb|sidebar-toggle', true);
+                    applySidebarLayout();
+                }
+            } else if (!clickedOutside && toggle.contains(e.target)) {
+                // Botão toggle clicado — scripts.js já alterna a classe, só aplica layout
+                setTimeout(applySidebarLayout, 10);
+            }
+        });
+
+        (function() {
+            var path = window.location.pathname;
+            document.querySelectorAll('#sidenavAccordion .nav-link[href]').forEach(function(link) {
+                var href = link.getAttribute('href');
+                if (href && href !== '#' && href !== '/' && path.startsWith(href)) {
+                    link.classList.add('active-sidebar');
+                    var collapse = link.closest('.collapse');
+                    if (collapse) {
+                        collapse.classList.add('show');
+                        var toggler = document.querySelector('[data-bs-target="#' + collapse.id + '"]');
+                        if (toggler) toggler.classList.remove('collapsed');
+                    }
+                }
+            });
+        })();
+        </script>
 
         {% block scripts %}
         {% endblock %}

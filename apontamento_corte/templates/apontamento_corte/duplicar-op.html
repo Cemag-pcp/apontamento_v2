@@ -83,6 +83,14 @@
                     <input type="date" id="filtro-data-criacao" class="form-control">
                 </div>
                 <div class="col-md-2">
+                    <label for="filtro-excluida" class="form-label small text-muted">Excluida</label>
+                    <select class="form-select bg-light" id="filtro-excluida">
+                        <option value="nao" selected>Nao</option>
+                        <option value="sim">Sim</option>
+                        <option value="todas">Todas</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label d-block" style="visibility: hidden;">Filtrar</label>
                     <button type="submit" class="btn btn-primary w-100 d-flex align-items-center justify-content-center" id="btn-filtrar-duplicador">
                         <i class="bi bi-filter me-2"></i> Filtrar
@@ -109,12 +117,13 @@
                         <th class="text-center">Máquina</th>
                         <th class="text-center">Descrição MP</th>
                         <th class="text-center">Aproveitamento</th>
+                        <th class="text-center">Excluida</th>
                         <th class="text-center">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tabela-corpo">
                     <tr>
-                        <td colspan="7" class="text-center py-4">
+                        <td colspan="8" class="text-center py-4">
                             <div class="d-flex align-items-center justify-content-center">
                                 <div class="spinner-border text-primary me-2" role="status" style="width: 1rem; height: 1rem;"></div>
                                 <span>Carregando dados...</span>
@@ -192,24 +201,26 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalExcluirOrdem" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalExcluirOrdemLabel" aria-hidden="true">
+<div class="modal fade" id="modalConfirmarAcaoOrdem" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalConfirmarAcaoOrdemLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-light">
-                <h5 class="modal-title text-primary" id="modalExcluirOrdemLabel">
-                    <i class="bi bi-files me-2"></i>Excluir Ordem
+                <h5 class="modal-title text-primary" id="modalConfirmarAcaoOrdemLabel">
+                    <i class="bi bi-exclamation-circle me-2"></i>Confirmar Acao
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="formExcluirOrdem">
+            <form id="formConfirmarAcaoOrdem">
                 <input type="hidden" name="ordemId" value="">
+                <input type="hidden" name="acao" value="">
                 <div class="modal-body p-4">
                     <p class="text-body"></p>
                 </div>
                 <div class="modal-footer">
-                    <button id="submitExcluirOrdem" type="submit" class="btn btn-danger d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button id="submitConfirmarAcaoOrdem" type="submit" class="btn btn-primary d-flex align-items-center gap-2">
                         <span class="spinner-border spinner-border-sm" style="display: none;"></span>
-                        <span role="status">Excluir OP</span>
+                        <span role="status">Confirmar</span>
                     </button>
                 </div>
             </form>
