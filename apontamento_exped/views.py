@@ -666,7 +666,7 @@ def atualizar_quantidade_item(request, item_id):
     """
     Atualiza a quantidade de um item dentro do pacote.
     - Somente permitido nos estÃ¡gios planejamento e verificacao.
-    - Se aumentar, verifica se hÃ¡ saldo pendente disponÃ­vel.
+    - Se aumentar, verifica se hÃ¡ saldo pendente disponível.
     - Se diminuir, devolve a diferenÃ§a para a pendÃªncia.
     """
     try:
@@ -701,7 +701,7 @@ def atualizar_quantidade_item(request, item_id):
             if disponivel <= 0:
                 return JsonResponse({'erro': 'Este item não possui saldo pendente para aumentar quantidade.'}, status=400)
             if disponivel < delta:
-                return JsonResponse({'erro': f'Quantidade indisponÃ­vel. Restam {disponivel}.'}, status=400)
+                return JsonResponse({'erro': f'Quantidade indisponível. Restam {disponivel}.'}, status=400)
             pend.qt_necessaria = disponivel - delta
             pend.save(update_fields=['qt_necessaria'])
         elif pend and delta < 0:

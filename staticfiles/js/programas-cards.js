@@ -302,7 +302,7 @@ const atualizarSelectAdicionar = () => {
     itensDisponiveisPrograma.forEach((item) => {
         const option = document.createElement('option');
         option.value = item.peca_ordem_id;
-        option.textContent = `#${item.ordem || ''} - ${item.peca_codigo} (${item.qt_restante} disponÃ­vel)`;
+        option.textContent = `#${item.ordem || ''} - ${item.peca_codigo} (${item.qt_restante} disponível)`;
         option.dataset.ordem = item.ordem || '';
         option.dataset.codigo = item.peca_codigo;
         option.dataset.disponivel = item.qt_restante || 0;

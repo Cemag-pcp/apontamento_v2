@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/gerar-arquivos/', views.gerar_arquivos_sequenciamento, name="gerar_arquivos_sequenciamento"),
     path('api/gerar-dados-ordem/', views.gerar_dados_sequenciamento, name="gerar_dados_sequenciamento"),
     path('api/verificar-planejamento-montagem/', views.verificar_planejamento_montagem, name="verificar_planejamento_montagem"),
+    path('api/preview-gerar-planejamento-montagem/', views.verificar_planejamento_montagem, name="preview_gerar_planejamento_montagem"),
     path('api/andamento-cargas/', views.andamento_cargas, name="andamento_cargas"),
     path('api/remanejar-carga/', views.remanejar_carga, name="remanejar_carga"),
     path('api/atualizar-planejamento/', views.atualizar_ordem_existente_planejamento, name="atualizar_ordem_existente"),

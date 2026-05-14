@@ -132,13 +132,13 @@ def _ajustar_estoque(row, df_pedidos):
 def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd.DataFrame) -> dict:
     grupo_df = pd.read_csv(DATA_DIR / 'agrupamento_chapas.csv', sep=';')
     grupos_df = pd.read_csv(DATA_DIR / 'grupos_atualizados.csv', sep=',')
-    grupos_df = grupos_df.rename(columns={'CÃ³digo': 'codigo'} if 'CÃ³digo' in grupos_df.columns else {})
+    grupos_df = grupos_df.rename(columns={'Código': 'codigo'} if 'Código' in grupos_df.columns else {})
     if 'codigo' not in grupos_df.columns:
-        grupos_df = _rename_columns_by_aliases(grupos_df, {'codigo': ['Código', 'CÃ³digo', 'codigo']})
+        grupos_df = _rename_columns_by_aliases(grupos_df, {'codigo': ['Código', 'Código', 'codigo']})
     grupos_df = grupos_df[['codigo', 'grupo']]
 
     simulacao_aliases = {
-        'codigo': ['Código', 'CÃ³digo', 'codigo'],
+        'codigo': ['Código', 'Código', 'codigo'],
         'descricao': ['Descrição', 'Descrição', 'DescriÃ§Ã£o', 'descricao'],
         'media_3m': ['Média 3M', 'MÃ©dia 3M', 'media 3m'],
         'cons_mes_anterior': ['Cons Mes Anterior', 'Cons Mes\nAnterior'],
@@ -158,7 +158,7 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
         'recurso': ['Recurso'],
         'data_entrega': ['Data Entrega'],
         'qde_ped': ['Qde Ped', 'Qdade Pedido'],
-        'codigo': ['Código', 'CÃ³digo', 'codigo'],
+        'codigo': ['Código', 'Código', 'codigo'],
     }
 
     df = _rename_columns_by_aliases(simulacao_df_raw.copy(), simulacao_aliases)

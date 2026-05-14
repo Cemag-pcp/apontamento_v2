@@ -470,7 +470,7 @@ export async function popularPacotesDaCarga(cargaId) {
                 document.body.removeChild(modal);
               });
 
-              // Atualiza estado do botÃ£o de exclusÃ£o conforme seleÃ§Ã£o
+              // Atualiza estado do botÃ£o de exclusÃ£o conforme seleção
               const syncDeleteBtn = () => {
                 const checados = modal.querySelectorAll('.foto-checkbox:checked');
                 modal.querySelector('#btnExcluirFotosSelecionadas').disabled = checados.length === 0;

@@ -207,8 +207,16 @@ def consultar_carretas(data_inicial, data_final):
     }
 
 
-def consultar_carretas_detalhado(data_inicial, data_final):
+def consultar_carretas_detalhado(
+    data_inicial,
+    data_final,
+    incluir_sheet_rows_sem_numero_serie=None,
+):
     dados_carreta, dados_carga = get_data_from_sheets()
+    incluir_sheet_rows_sem_numero_serie = {
+        int(sheet_row_index)
+        for sheet_row_index in (incluir_sheet_rows_sem_numero_serie or [])
+    }
     dados_carga_crua = dados_carga.copy()
     dados_carreta['Recurso'] = dados_carreta['Recurso'].astype(str)
 
@@ -279,6 +287,16 @@ def consultar_carretas_detalhado(data_inicial, data_final):
         (dados_carga_data['PED_NUMEROSERIE_EFETIVO'].astype(str).str.strip() != '')
     ].copy()
 
+    if incluir_sheet_rows_sem_numero_serie:
+        linhas_sem_numero_serie_selecionadas = linhas_sem_numero_serie[
+            linhas_sem_numero_serie['sheet_row_index'].isin(incluir_sheet_rows_sem_numero_serie)
+        ].copy()
+        if not linhas_sem_numero_serie_selecionadas.empty:
+            dados_carga_data_filtrada = pd.concat(
+                [dados_carga_data_filtrada, linhas_sem_numero_serie_selecionadas],
+                ignore_index=True,
+            )
+
     dados_carga_data_filtrada['PED_QUANTIDADE'] = dados_carga_data_filtrada['PED_QUANTIDADE'].astype(float)
 
     # Agrupa os dados por data e código do recurso
@@ -310,6 +328,10 @@ def consultar_carretas_detalhado(data_inicial, data_final):
         lambda x: '✅' if x in dados_carreta['Recurso'].astype(str).values else '❌'
     )
 
+    linhas_sem_numero_serie['ContÃ©m'] = linhas_sem_numero_serie['PED_RECURSO.CODIGO'].apply(
+        lambda x: 'âœ…' if x in dados_carreta['Recurso'].astype(str).values else 'âŒ'
+    )
+
     buscar_cel = buscar_celulas(
         agrupado['PED_RECURSO.CODIGO'].unique().tolist()
     )
@@ -326,6 +348,21 @@ def consultar_carretas_detalhado(data_inicial, data_final):
             "numero_serie": "" if pd.isna(row['PED_NUMEROSERIE_EFETIVO']) else str(row['PED_NUMEROSERIE_EFETIVO']).strip(),
         }
         for _, row in agrupado.iterrows()
+    ]
+
+    itens_sem_numero_serie = [
+        {
+            "sheet_row_index": int(row["sheet_row_index"]),
+            "data_carga": str(row["PED_PREVISAOEMISSAODOC"].date()),
+            "codigo_recurso": "0" + str(row['PED_RECURSO.CODIGO']) if len(str(row['PED_RECURSO.CODIGO'])) == 5 else str(row['PED_RECURSO.CODIGO']),
+            "quantidade": float(row["PED_QUANTIDADE"] or 0),
+            "presente_no_carreta": row['ContÃ©m'],
+            "carga": "" if pd.isna(row['Carga']) else str(row['Carga']).strip(),
+            "cliente": "" if pd.isna(row['PED_PESSOA.CODIGO']) else str(row['PED_PESSOA.CODIGO']).strip(),
+            "cliente_codigo": "" if pd.isna(row['PED_PESSOA.CODIGO']) else str(row['PED_PESSOA.CODIGO']).strip(),
+            "numero_serie": "",
+        }
+        for _, row in linhas_sem_numero_serie.iterrows()
     ]
 
     celulas = [{"celula": cel} for cel in buscar_cel]
@@ -402,6 +439,7 @@ def consultar_carretas_detalhado(data_inicial, data_final):
 
     return {
         "cargas": resultado,
+        "itens_sem_numero_serie": itens_sem_numero_serie,
         "celulas": celulas,
         "debug": debug,
     }

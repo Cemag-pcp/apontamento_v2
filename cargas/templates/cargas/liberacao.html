@@ -85,6 +85,41 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div id="secaoItensSemNumeroSerie" class="mt-4 d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Itens sem PED_NUMEROSERIE</h6>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="marcarTodosSemNumeroSerie">
+                                Marcar todos
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="desmarcarTodosSemNumeroSerie">
+                                Limpar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning py-2 mb-2">
+                        Selecione quais itens sem PED_NUMEROSERIE também devem entrar na liberação.
+                    </div>
+                    <div class="table-responsive" style="max-height: 260px; overflow-y: auto;">
+                        <table class="table table-bordered table-sm align-middle">
+                            <thead class="table-light text-center">
+                                <tr>
+                                    <th style="width: 70px;">Incluir</th>
+                                    <th>Data</th>
+                                    <th>Carga</th>
+                                    <th>Cliente</th>
+                                    <th>Carreta</th>
+                                    <th>Quantidade</th>
+                                    <th>Base</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaItensSemNumeroSerie">
+                                <tr><td colspan="7">Nenhum item sem PED_NUMEROSERIE no perÃ­odo.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer d-none" id="containerBotaoLiberar">
                 <button class="btn btn-success" id="confirmarLiberacao">

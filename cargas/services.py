@@ -109,11 +109,20 @@ def _calcular_diff(itens_anteriores, itens_atuais):
     return alteracoes
 
 
-def liberar_cargas_periodo(usuario, data_inicio: date, data_fim: date):
+def liberar_cargas_periodo(
+    usuario,
+    data_inicio: date,
+    data_fim: date,
+    incluir_sheet_rows_sem_numero_serie=None,
+):
     if data_inicio > data_fim:
         raise ValueError("A data de início deve ser menor ou igual à data fim.")
 
-    retorno = consultar_carretas_detalhado(pd.to_datetime(data_inicio), pd.to_datetime(data_fim))
+    retorno = consultar_carretas_detalhado(
+        pd.to_datetime(data_inicio),
+        pd.to_datetime(data_fim),
+        incluir_sheet_rows_sem_numero_serie=incluir_sheet_rows_sem_numero_serie,
+    )
     linhas = retorno.get("cargas", [])
 
     grupos = defaultdict(list)
@@ -378,6 +387,7 @@ def montar_preview_planejamento_montagem(
     data_inicio: date,
     data_fim: date,
     sugestoes_datas: dict[date, date | None] | None = None,
+    validar_datas_existentes: bool = True,
 ):
     sugestoes_datas = sugestoes_datas or {}
     cargas_liberadas = listar_cargas_liberadas_para_planejamento(data_inicio, data_fim)
@@ -409,7 +419,7 @@ def montar_preview_planejamento_montagem(
         raise ValueError(f"Conflito de sugestão de datas: {conflitos_texto}")
 
     datas_finais = sorted({data for data in datas_finais_por_carga.values()})
-    if Ordem.objects.filter(
+    if validar_datas_existentes and Ordem.objects.filter(
         grupo_maquina="montagem",
         data_carga__in=datas_finais,
     ).exists():

@@ -4,7 +4,7 @@ from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.db.models.functions import Coalesce, Now
 from django.db import models, transaction
-from django.db.models import Sum,Q,CharField,Count,OuterRef, Subquery, F, Value, Avg, Max
+from django.db.models import Sum,Q,CharField,Count,OuterRef, Subquery, F, Value, Avg, Max, Prefetch
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now, localtime
@@ -198,17 +198,17 @@ def _construir_ordens_planejamento(cargas_liberadas, setor, datas_finais_por_car
             continue
 
         if setor == 'pintura':
-            colunas_grupo = ['CÃ³digo', 'Peca', 'CÃ©lula', 'Datas', 'Recurso_cor', 'cor']
+            colunas_grupo = ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor']
             if 'Carga' in tabela_carga.columns:
                 colunas_grupo.append('Carga')
             tabela_carga = tabela_carga.groupby(colunas_grupo).agg({'Qtde_total': 'sum'}).reset_index()
             tabela_carga.drop_duplicates(
-                subset=['CÃ³digo', 'Datas', 'cor', 'Carga'] if 'Carga' in tabela_carga.columns else ['CÃ³digo', 'Datas', 'cor'],
+                subset=['Código', 'Datas', 'cor', 'Carga'] if 'Carga' in tabela_carga.columns else ['Código', 'Datas', 'cor'],
                 inplace=True,
             )
         else:
             tabela_carga.drop_duplicates(
-                subset=['CÃ³digo', 'Datas', 'CÃ©lula', 'Carga'] if 'Carga' in tabela_carga.columns else ['CÃ³digo', 'Datas', 'CÃ©lula'],
+                subset=['Código', 'Datas', 'Célula', 'Carga'] if 'Carga' in tabela_carga.columns else ['Código', 'Datas', 'Célula'],
                 inplace=True,
             )
 
@@ -217,10 +217,10 @@ def _construir_ordens_planejamento(cargas_liberadas, setor, datas_finais_por_car
                 "grupo_maquina": setor.lower(),
                 "cor": row["cor"] if setor == 'pintura' else '',
                 "obs": "Ordem gerada automaticamente",
-                "peca_nome": str(row["CÃ³digo"]) + " - " + row["Peca"],
+                "peca_nome": str(row["Código"]) + " - " + row["Peca"],
                 "qtd_planejada": int(row["Qtde_total"]),
                 "data_carga": data_carga_planejada.isoformat(),
-                "setor_conjunto": row["CÃ©lula"],
+                "setor_conjunto": row["Célula"],
                 "carga_liberada_id": carga_liberada["carga_liberada_id"],
                 "carga_liberada_versao_id": carga_liberada["carga_liberada_versao_id"],
             })
@@ -383,6 +383,7 @@ def liberar_cargas(request):
 
     data_inicio = data.get("data_inicio")
     data_fim = data.get("data_fim")
+    itens_sem_numero_serie_selecionados = data.get("itens_sem_numero_serie_selecionados", [])
 
     if not data_inicio or not data_fim:
         return JsonResponse(
@@ -407,6 +408,7 @@ def liberar_cargas(request):
             usuario=request.user,
             data_inicio=data_inicio_obj,
             data_fim=data_fim_obj,
+            incluir_sheet_rows_sem_numero_serie=itens_sem_numero_serie_selecionados,
         )
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
@@ -619,6 +621,7 @@ def verificar_planejamento_montagem(request):
             data_inicio_obj,
             data_final_obj,
             sugestoes_datas=sugestoes_datas,
+            validar_datas_existentes=False,
         )
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=400)

@@ -222,6 +222,25 @@ class CargasLiberacaoTests(TestCase):
         self.assertEqual(response.json()["total_cargas_liberadas"], 1)
         kwargs = liberar_mock.call_args.kwargs
         self.assertEqual(kwargs["usuario"], self.user)
+        self.assertEqual(kwargs["incluir_sheet_rows_sem_numero_serie"], [])
+
+    @patch("cargas.views.liberar_cargas_periodo")
+    def test_api_liberacao_envia_itens_sem_numero_serie_selecionados(self, liberar_mock):
+        liberar_mock.return_value = {
+            "total_cargas_liberadas": 1,
+            "total_versoes_criadas": 1,
+            "cargas": [],
+        }
+
+        response = self.client.post(
+            reverse("cargas:liberar_cargas"),
+            data='{"data_inicio":"2026-04-27","data_fim":"2026-04-27","itens_sem_numero_serie_selecionados":[12,18]}',
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        kwargs = liberar_mock.call_args.kwargs
+        self.assertEqual(kwargs["incluir_sheet_rows_sem_numero_serie"], [12, 18])
 
     def test_tela_liberacao_renderiza(self):
         response = self.client.get(reverse("cargas:liberacao"))
@@ -721,9 +740,9 @@ class CargasLiberacaoTests(TestCase):
         gerar_mock.return_value = pd.DataFrame(
             [
                 {
-                    "CÃ³digo": "1001",
+                    "Código": "1001",
                     "Peca": "LONGARINA",
-                    "CÃ©lula": "CHASSI",
+                    "Célula": "CHASSI",
                     "Datas": pd.Timestamp("2026-04-27"),
                     "Qtde_total": 7,
                     "Carga": "Carga 04",
@@ -1084,6 +1103,42 @@ class VerificarPlanejamentoMontagemTests(TestCase):
         self.assertEqual(payload["ordens"][0]["data_carga"], "2026-05-20")
         self.assertEqual(payload["resumo_por_carga_liberada"][str(carga.id)], 2)
 
+    @patch("cargas.services.gerar_sequenciamento")
+    def test_verificacao_ignora_ordens_existentes_por_ser_apenas_preview(self, mock_gerar_sequenciamento):
+        self._criar_carga_liberada_com_versoes()
+        Ordem.objects.create(
+            grupo_maquina="montagem",
+            data_carga=self._date("2026-05-20"),
+            data_programacao=self._date("2026-05-17"),
+            setor_conjunto=self.maquina.nome,
+            obs="Ordem existente",
+        )
+        mock_gerar_sequenciamento.return_value = pd.DataFrame(
+            [
+                {
+                    "Código": "1001",
+                    "Peca": "LONGARINA",
+                    "Célula": "CHASSI",
+                    "Datas": pd.Timestamp("2026-05-20"),
+                    "Carga": "Carga 01",
+                    "Qtde_total": 4,
+                }
+            ]
+        )
+
+        response = self.client.get(
+            reverse("cargas:preview_gerar_planejamento_montagem"),
+            {
+                "data_inicio": "2026-05-20",
+                "data_fim": "2026-05-20",
+                "sugestoes_datas": "{}",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["total_ordens"], 1)
+
 
 class BuscarCarretasBaseTests(TestCase):
     def setUp(self):
@@ -1116,6 +1171,19 @@ class BuscarCarretasBaseTests(TestCase):
                     "numero_serie": "SERIE-02",
                 },
             ],
+            "itens_sem_numero_serie": [
+                {
+                    "sheet_row_index": 9,
+                    "data_carga": "2026-05-20",
+                    "codigo_recurso": "TANQUE FTC4300R M24",
+                    "quantidade": 1.0,
+                    "presente_no_carreta": "âœ…",
+                    "carga": "V ProdPrÃ³pria p Consumo",
+                    "cliente": "SantosPeÃ§as-Canarana-BA",
+                    "cliente_codigo": "SantosPeÃ§as-Canarana-BA",
+                    "numero_serie": "",
+                }
+            ],
             "celulas": [{"celula": "CHASSI"}],
         }
 
@@ -1129,6 +1197,8 @@ class BuscarCarretasBaseTests(TestCase):
         self.assertEqual(len(payload["cargas"]["cargas"]), 2)
         self.assertEqual(payload["cargas"]["cargas"][0]["numero_serie"], "SERIE-01")
         self.assertEqual(payload["cargas"]["cargas"][1]["numero_serie"], "SERIE-02")
+        self.assertEqual(len(payload["cargas"]["itens_sem_numero_serie"]), 1)
+        self.assertEqual(payload["cargas"]["itens_sem_numero_serie"][0]["sheet_row_index"], 9)
 
 
 class SequenciamentoMontagemTests(TestCase):
