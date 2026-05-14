@@ -383,6 +383,34 @@ def listar_cargas_liberadas_para_planejamento(data_inicio: date, data_fim: date)
     return resultado
 
 
+def consolidar_ordens_planejamento(ordens):
+    agrupadas = {}
+
+    for ordem in ordens:
+        chave = (
+            ordem.get("grupo_maquina", ""),
+            str(ordem.get("data_carga", "")),
+            ordem.get("setor_conjunto", "") or "",
+            ordem.get("peca_nome", "") or "",
+            ordem.get("cor", "") or "",
+        )
+        if chave not in agrupadas:
+            agrupadas[chave] = {**ordem}
+            continue
+
+        agrupadas[chave]["qtd_planejada"] = int(agrupadas[chave].get("qtd_planejada", 0)) + int(
+            ordem.get("qtd_planejada", 0)
+        )
+
+        if agrupadas[chave].get("carga_liberada_id") != ordem.get("carga_liberada_id"):
+            agrupadas[chave]["carga_liberada_id"] = None
+
+        if agrupadas[chave].get("carga_liberada_versao_id") != ordem.get("carga_liberada_versao_id"):
+            agrupadas[chave]["carga_liberada_versao_id"] = None
+
+    return list(agrupadas.values())
+
+
 def montar_preview_planejamento_montagem(
     data_inicio: date,
     data_fim: date,
@@ -479,6 +507,8 @@ def montar_preview_planejamento_montagem(
                 "total_itens": total_itens_carga,
             }
         )
+
+    ordens = consolidar_ordens_planejamento(ordens)
 
     if not ordens:
         raise ValueError("Nenhuma ordem foi gerada a partir das cargas liberadas selecionadas.")

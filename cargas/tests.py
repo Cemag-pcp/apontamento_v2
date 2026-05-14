@@ -703,6 +703,79 @@ class CargasLiberacaoTests(TestCase):
 
     @patch("cargas.views.processar_ordens_montagem")
     @patch("cargas.views.gerar_sequenciamento")
+    def test_gerar_planejamento_agrupar_mesmo_item_mesma_data(self, gerar_mock, processar_mock):
+        carga_1 = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 01",
+        )
+        CargaLiberadaVersao.objects.create(
+            carga_liberada=carga_1,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        carga_2 = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 02",
+        )
+        CargaLiberadaVersao.objects.create(
+            carga_liberada=carga_2,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+
+        gerar_mock.side_effect = [
+            pd.DataFrame(
+                [
+                    {
+                        "CÃ³digo": "1001",
+                        "Peca": "LONGARINA",
+                        "CÃ©lula": "CHASSI",
+                        "Datas": pd.Timestamp("2026-04-27"),
+                        "Qtde_total": 2,
+                        "Carga": "Carga 01",
+                    }
+                ]
+            ),
+            pd.DataFrame(
+                [
+                    {
+                        "CÃ³digo": "1001",
+                        "Peca": "LONGARINA",
+                        "CÃ©lula": "CHASSI",
+                        "Datas": pd.Timestamp("2026-04-27"),
+                        "Qtde_total": 3,
+                        "Carga": "Carga 02",
+                    }
+                ]
+            ),
+        ]
+        processar_mock.return_value = {"message": "ok", "ordens": []}
+
+        response = self.client.get(
+            reverse("cargas:gerar_dados_sequenciamento"),
+            {
+                "data_inicio": "2026-04-27",
+                "data_fim": "2026-04-27",
+                "setor": "montagem",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ordens = processar_mock.call_args.args[1]
+        self.assertEqual(len(ordens), 1)
+        self.assertEqual(ordens[0]["peca_nome"], "1001 - LONGARINA")
+        self.assertEqual(ordens[0]["qtd_planejada"], 5)
+        self.assertIsNone(ordens[0]["carga_liberada_id"])
+        self.assertIsNone(ordens[0]["carga_liberada_versao_id"])
+
+    @patch("cargas.views.processar_ordens_montagem")
+    @patch("cargas.views.gerar_sequenciamento")
     def test_atualizar_planejamento_usa_fluxo_de_gerar_e_atualiza_quantidades(self, gerar_mock, processar_mock):
         carga = CargaLiberada.objects.create(
             data_carga=self._date("2026-04-27"),
