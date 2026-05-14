@@ -2649,6 +2649,11 @@ function configurarSelect2(selector, url, parent = null, allowClear = false) {
     const element = document.querySelector(selector);
     if (!element) return; // Evita erros se o elemento não existir
 
+    const parentElement = parent ? $(parent) : null;
+    const dropdownParent = parentElement && parentElement.hasClass('modal')
+        ? parentElement.find('.modal-content').first()
+        : parentElement;
+
     $(selector).select2({
         placeholder: 'Selecione uma opção',
         width: '100%',
@@ -2672,7 +2677,7 @@ function configurarSelect2(selector, url, parent = null, allowClear = false) {
             cache: true
         },
         minimumInputLength: 0,
-        dropdownParent: parent ? $(parent) : undefined
+        dropdownParent: dropdownParent && dropdownParent.length ? dropdownParent : undefined
     });
 }
 

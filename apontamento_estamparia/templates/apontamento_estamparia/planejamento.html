@@ -232,6 +232,40 @@
         .filter-header { background-color: #f8f9fa; padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(0, 0, 0, 0.125); font-weight: 500; }
         .filter-body { padding: 1.25rem; }
         .form-select, .form-control { border-radius: 4px; border: 1px solid #ced4da; }
+        #modalEstamparia .select2-container {
+            width: 100% !important;
+        }
+        #modalEstamparia .select2-container .select2-selection--single {
+            min-height: calc(1.5em + 0.75rem + 2px);
+            display: flex;
+            align-items: center;
+            background: #fff;
+            border: 1px solid #ced4da;
+        }
+        #modalEstamparia .select2-container .select2-selection__rendered,
+        #modalEstamparia .select2-container .select2-selection__placeholder,
+        #modalEstamparia .select2-container .select2-search__field,
+        #modalEstamparia .select2-results__option {
+            color: #212529 !important;
+            -webkit-text-fill-color: #212529 !important;
+        }
+        #modalEstamparia .select2-container .select2-selection__rendered {
+            line-height: 1.5 !important;
+            padding-left: 0.75rem !important;
+            padding-right: 2rem !important;
+        }
+        #modalEstamparia .select2-dropdown,
+        #modalEstamparia .select2-search--dropdown,
+        #modalEstamparia .select2-search__field {
+            background: #fff !important;
+        }
+        #modalEstamparia .modal-content {
+            overflow: visible;
+        }
+        #modalEstamparia .select2-container--open,
+        #modalEstamparia .select2-dropdown {
+            z-index: 2000 !important;
+        }
         .bg-prox-processo { background-color: #b54ef0; color: #000; }
         .btn-proximo-processo { background-color: #b54ef0; color: #000; }
         .btn-proximo-processo:hover { background-color: #a03ddd; color: #fff; }
@@ -465,6 +499,11 @@
         @media (max-width: 992px) { .process-board { grid-template-columns: 1fr; } }
         @media (max-width: 768px) { .estamparia-dashboard { padding: 16px; } .top-grid { grid-template-columns: 1fr; } }
         @media (max-width: 767.98px) {
+            #modalEstamparia .select2-container .select2-selection--single,
+            #modalEstamparia .select2-container .select2-search__field,
+            #modalEstamparia .select2-results__option {
+                font-size: 16px !important;
+            }
             #prioridades-ordens-list {
                 grid-template-columns: 1fr;
             }

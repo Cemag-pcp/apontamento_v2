@@ -2212,6 +2212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     $('#pecaSelect').select2({
+        theme: 'bootstrap-5',
         placeholder: 'Selecione a peça',
         ajax: {
             url: 'api/get-pecas/',
@@ -2259,10 +2260,23 @@ document.addEventListener('DOMContentLoaded', () => {
             cache: true
         },
         minimumInputLength: 0,
-        dropdownParent: $('#modalEstamparia'),
+        width: '100%',
+        dropdownParent: $('#modalEstamparia .modal-content'),
         escapeMarkup: function (markup) {
             return markup;
         },
+    });
+
+    $('#pecaSelect').on('select2:open', function () {
+        const searchField = document.querySelector('#modalEstamparia .select2-container--open .select2-search__field');
+        if (!searchField) {
+            return;
+        }
+
+        searchField.setAttribute('inputmode', 'numeric');
+        searchField.setAttribute('autocomplete', 'off');
+        searchField.style.color = '#212529';
+        searchField.style.webkitTextFillColor = '#212529';
     });
 
     $('#pecaSelect').on('select2:selecting', function (event) {
