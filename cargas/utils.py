@@ -39,6 +39,22 @@ warnings.filterwarnings("ignore")
 
 logger = logging.getLogger(__name__)
 
+CODIGO_SUFIXOS_NORMALIZAR = ("AM", "AN", "VJ", "LC", "CE", "VM", "AV", "CO", "SA")
+
+
+def normalizar_codigo_recurso_serie(valores):
+    padrao = r"(" + "|".join(CODIGO_SUFIXOS_NORMALIZAR) + r")$"
+    return (
+        valores.astype(str)
+        .str.strip()
+        .str.replace(padrao, "", regex=True)
+        .str.strip()
+    )
+
+
+def extrair_numero_serie_efetivo(row):
+    return str(row.get('PED_NUMEROSERIE') or '').strip()
+
 REDIS_URL = "redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"
 QUEUE_NAME = "print-zebra"
 
@@ -193,30 +209,39 @@ def consultar_carretas(data_inicial, data_final):
 
 def consultar_carretas_detalhado(data_inicial, data_final):
     dados_carreta, dados_carga = get_data_from_sheets()
+    dados_carga_crua = dados_carga.copy()
     dados_carreta['Recurso'] = dados_carreta['Recurso'].astype(str)
 
-    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('AM', '')
-    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('AN', '')
-    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('VJ', '')
-    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('LC', '')
-    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('CE', '') # cinza escuro
-    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('VM', '')
-    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('AV', '')
-    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('CO', '')
-    dados_carreta['Recurso'] = dados_carreta['Recurso'].str.replace('SA', '')
+    try:
+        datas_carga_crua = pd.to_datetime(
+            dados_carga_crua['PED_PREVISAOEMISSAODOC'],
+            format="%d/%m/%Y",
+            errors='coerce'
+        )
+        dados_carga_crua = dados_carga_crua.reset_index(drop=True)
+        dados_carga_crua['sheet_row_index'] = dados_carga_crua.index + 2
+        dados_carga_crua_periodo = dados_carga_crua[
+            (datas_carga_crua >= data_inicial) &
+            (datas_carga_crua <= data_final)
+        ].copy()
+        dataframe_cru_texto = dados_carga_crua_periodo.to_string()
+        logger.warning(
+            "buscar-carretas-base | sheet crua apos filtro data |\n%s",
+            dataframe_cru_texto
+        )
+        print(
+            "buscar-carretas-base | sheet crua apos filtro data |\n"
+            f"{dataframe_cru_texto}"
+        )
+    except Exception:
+        logger.exception("Falha ao imprimir sheet crua apos filtro de data")
+
+    dados_carreta['Recurso'] = normalizar_codigo_recurso_serie(dados_carreta['Recurso'])
 
     dados_carreta['Recurso'] = dados_carreta['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
 
-    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('AM', '')
-    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('AN', '')
-    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('VJ', '')
-    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('LC', '')
-    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('CE', '')
-    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('VM', '')
-    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('AV', '')
-    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('CO', '')
-    dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].str.replace('SA', '')
+    dados_carga['PED_RECURSO.CODIGO'] = normalizar_codigo_recurso_serie(dados_carga['PED_RECURSO.CODIGO'])
 
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(
         lambda x: x.rstrip()
@@ -227,14 +252,32 @@ def consultar_carretas_detalhado(data_inicial, data_final):
         format="%d/%m/%Y",
         errors='coerce'
     )
+    dados_carga = dados_carga.reset_index(drop=True)
+    dados_carga['sheet_row_index'] = dados_carga.index + 2
+    dados_carga['PED_NUMEROSERIE_EFETIVO'] = dados_carga.apply(extrair_numero_serie_efetivo, axis=1)
 
     # Filtra pelo intervalo de datas e apenas produtos com número de série preenchido
-    dados_carga_data_filtrada = dados_carga[
+    dados_carga_data = dados_carga[
         (dados_carga['PED_PREVISAOEMISSAODOC'] >= data_inicial) &
-        (dados_carga['PED_PREVISAOEMISSAODOC'] <= data_final) &
-        (dados_carga['PED_NUMEROSERIE'].notna()) &
-        (dados_carga['PED_NUMEROSERIE'].astype(str).str.strip() != '')
-    ]
+        (dados_carga['PED_PREVISAOEMISSAODOC'] <= data_final)
+    ].copy()
+
+    try:
+        logger.warning(
+            "buscar-carretas-base | linhas apos filtro data | %s",
+            dados_carga_data.to_dict(orient='records')
+        )
+        print("buscar-carretas-base | linhas apos filtro data |", dados_carga_data.to_dict(orient='records'))
+    except Exception:
+        logger.exception("Falha ao imprimir leitura da sheet apos filtro de data")
+
+    linhas_sem_numero_serie = dados_carga_data[
+        (dados_carga_data['PED_NUMEROSERIE_EFETIVO'].astype(str).str.strip() == '')
+    ].copy()
+
+    dados_carga_data_filtrada = dados_carga_data[
+        (dados_carga_data['PED_NUMEROSERIE_EFETIVO'].astype(str).str.strip() != '')
+    ].copy()
 
     dados_carga_data_filtrada['PED_QUANTIDADE'] = dados_carga_data_filtrada['PED_QUANTIDADE'].astype(float)
 
@@ -246,7 +289,7 @@ def consultar_carretas_detalhado(data_inicial, data_final):
             'PED_QUANTIDADE',
             'Carga',
             'PED_PESSOA.CODIGO',
-            'PED_NUMEROSERIE',
+            'PED_NUMEROSERIE_EFETIVO',
         ]
     ]
     agrupado = carretas_unica.groupby(
@@ -255,7 +298,7 @@ def consultar_carretas_detalhado(data_inicial, data_final):
             'PED_RECURSO.CODIGO',
             'Carga',
             'PED_PESSOA.CODIGO',
-            'PED_NUMEROSERIE',
+            'PED_NUMEROSERIE_EFETIVO',
         ],
         dropna=False,
     )['PED_QUANTIDADE'].sum().reset_index()
@@ -280,16 +323,87 @@ def consultar_carretas_detalhado(data_inicial, data_final):
             "carga": row['Carga'],
             "cliente": "" if pd.isna(row['PED_PESSOA.CODIGO']) else str(row['PED_PESSOA.CODIGO']).strip(),
             "cliente_codigo": "" if pd.isna(row['PED_PESSOA.CODIGO']) else str(row['PED_PESSOA.CODIGO']).strip(),
-            "numero_serie": "" if pd.isna(row['PED_NUMEROSERIE']) else str(row['PED_NUMEROSERIE']).strip(),
+            "numero_serie": "" if pd.isna(row['PED_NUMEROSERIE_EFETIVO']) else str(row['PED_NUMEROSERIE_EFETIVO']).strip(),
         }
         for _, row in agrupado.iterrows()
     ]
 
     celulas = [{"celula": cel} for cel in buscar_cel]
 
+    colunas_debug = [
+        'sheet_row_index',
+        'PED_CHCRIACAO',
+        'COD_UNICO',
+        'PED_PREVISAOEMISSAODOC',
+        'PED_PROGRAMACA',
+        'Carga',
+        'PED_PESSOA.CODIGO',
+        'PED_RECURSO.CODIGO',
+        'PED_NUMEROSERIE',
+        'PED_NUMEROSERIE_EFETIVO',
+        'PED_QUANTIDADE',
+    ]
+    colunas_debug_existentes = [col for col in colunas_debug if col in dados_carga.columns]
+
+    def _linhas_debug(df, limite=20):
+        linhas = []
+        for _, row in df[colunas_debug_existentes].head(limite).iterrows():
+            linha = {}
+            for coluna in colunas_debug_existentes:
+                valor = row[coluna]
+                if pd.isna(valor):
+                    linha[coluna] = ""
+                elif hasattr(valor, "strftime"):
+                    linha[coluna] = valor.strftime("%Y-%m-%d")
+                else:
+                    linha[coluna] = str(valor).strip()
+            linhas.append(linha)
+        return linhas
+
+    def _linhas_debug_completas(df):
+        linhas = []
+        for _, row in df[colunas_debug_existentes].iterrows():
+            linha = {}
+            for coluna in colunas_debug_existentes:
+                valor = row[coluna]
+                if pd.isna(valor):
+                    linha[coluna] = ""
+                elif hasattr(valor, "strftime"):
+                    linha[coluna] = valor.strftime("%Y-%m-%d")
+                else:
+                    linha[coluna] = str(valor).strip()
+            linhas.append(linha)
+        return linhas
+
+    debug = {
+        "periodo_consultado": {
+            "data_inicio": data_inicial.strftime("%Y-%m-%d") if hasattr(data_inicial, "strftime") else str(data_inicial),
+            "data_fim": data_final.strftime("%Y-%m-%d") if hasattr(data_final, "strftime") else str(data_final),
+        },
+        "totais": {
+            "linhas_planilha_total": int(len(dados_carga)),
+            "linhas_apos_filtro_data": int(len(dados_carga_data)),
+            "linhas_sem_numero_serie_no_periodo": int(len(linhas_sem_numero_serie)),
+            "linhas_apos_filtro_numero_serie": int(len(dados_carga_data_filtrada)),
+            "linhas_apos_groupby": int(len(agrupado)),
+            "linhas_resultado": int(len(resultado)),
+        },
+        "codigos_unicos": {
+            "apos_filtro_data": sorted(dados_carga_data['PED_RECURSO.CODIGO'].dropna().astype(str).str.strip().unique().tolist()),
+            "apos_filtro_numero_serie": sorted(dados_carga_data_filtrada['PED_RECURSO.CODIGO'].dropna().astype(str).str.strip().unique().tolist()),
+            "resultado": sorted({item["codigo_recurso"] for item in resultado}),
+        },
+        "amostras": {
+            "linhas_sem_numero_serie": _linhas_debug(linhas_sem_numero_serie),
+            "linhas_apos_filtro_data": _linhas_debug_completas(dados_carga_data),
+            "linhas_apos_filtro_numero_serie": _linhas_debug(dados_carga_data_filtrada),
+        },
+    }
+
     return {
         "cargas": resultado,
         "celulas": celulas,
+        "debug": debug,
     }
 
 def criar_array_datas(data_inicial, data_final):
@@ -686,15 +800,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             base_carga['Recurso'] = base_carga['Recurso'].astype(str)
 
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('SA', '')
+            base_carga['Recurso'] = normalizar_codigo_recurso_serie(base_carga['Recurso'])
 
             ###### retirando espaco em branco####
             base_carga['Recurso'] = base_carga['Recurso'].str.strip()
@@ -938,15 +1044,7 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             base_carga['Recurso'] = base_carga['Recurso'].astype(str)
 
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('SA', '')
+            base_carga['Recurso'] = normalizar_codigo_recurso_serie(base_carga['Recurso'])
 
             ###### retirando espaco em branco####
 
@@ -1534,15 +1632,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             base_carga['Recurso'] = base_carga['Recurso'].astype(str)
 
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('SA', '')
+            base_carga['Recurso'] = normalizar_codigo_recurso_serie(base_carga['Recurso'])
 
             ###### retirando espaco em branco####
 
@@ -1768,15 +1858,7 @@ def gerar_sequenciamento(data_inicial, data_final, setor, carga: Optional[str] =
 
             base_carga['Recurso'] = base_carga['Recurso'].astype(str)
 
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AN', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VJ', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('LC', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CE', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('VM', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('AV', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('CO', '')
-            base_carga['Recurso'] = base_carga['Recurso'].str.replace('SA', '')
+            base_carga['Recurso'] = normalizar_codigo_recurso_serie(base_carga['Recurso'])
 
             ###### retirando espaco em branco####
 

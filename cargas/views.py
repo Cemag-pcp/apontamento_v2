@@ -27,8 +27,9 @@ from cargas.services import (
     liberar_cargas_periodo,
     listar_cargas_liberadas_para_planejamento,
     listar_cargas_liberadas_periodo,
+    montar_preview_planejamento_montagem,
 )
-from cargas.utils import consultar_carretas, gerar_sequenciamento, gerar_arquivos, criar_array_datas
+from cargas.utils import consultar_carretas, consultar_carretas_detalhado, gerar_sequenciamento, gerar_arquivos, criar_array_datas
 from cadastro.models import Maquina
 from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura, imprimir_ordens_pcp_qualidade
 from apontamento_pintura.models import CambaoPecas, Retrabalho
@@ -204,8 +205,8 @@ def buscar_dados_carreta_planilha(request):
     if pd.isna(data_inicio) or pd.isna(data_final):
         return JsonResponse({'error': 'Datas inválidas'}, status=400)
 
-    # Chama a função corrigida com datas no formato correto
-    cargas = consultar_carretas(data_inicio, data_final)
+    # Retorna o detalhado direto da planilha, sem a agregação final por data/recurso/carga.
+    cargas = consultar_carretas_detalhado(data_inicio, data_final)
 
     return JsonResponse({'cargas': cargas})
 
@@ -460,6 +461,68 @@ def gerar_dados_sequenciamento(request):
 
     atualizar_datas_sugeridas_planejamento(atualizacoes_sugeridas)
     return JsonResponse({"message": "Sequenciamento gerado com sucesso!", "detalhes": "resultado"})
+
+
+@require_GET
+def verificar_planejamento_montagem(request):
+    data_inicio = request.GET.get("data_inicio")
+    data_final = request.GET.get("data_fim")
+    sugestoes_brutas = request.GET.get("sugestoes_datas")
+
+    if not data_inicio or not data_final:
+        return JsonResponse(
+            {"error": "Parâmetros 'data_inicio' e 'data_fim' são obrigatórios."},
+            status=400,
+        )
+
+    try:
+        data_inicio_obj = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+        data_final_obj = datetime.strptime(data_final, "%Y-%m-%d").date()
+        sugestoes_datas = _normalizar_sugestoes_datas(sugestoes_brutas)
+        preview = montar_preview_planejamento_montagem(
+            data_inicio_obj,
+            data_final_obj,
+            sugestoes_datas=sugestoes_datas,
+        )
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    ordens = [
+        {
+            **ordem,
+            "data_carga": ordem["data_carga"].isoformat(),
+        }
+        for ordem in preview["ordens"]
+    ]
+
+    cargas = [
+        {
+            **carga,
+            "data_carga_original": carga["data_carga_original"].isoformat(),
+            "data_carga_planejada": carga["data_carga_planejada"].isoformat(),
+        }
+        for carga in preview["cargas"]
+    ]
+
+    resumo_por_data = defaultdict(int)
+    resumo_por_carga = defaultdict(int)
+    for ordem in ordens:
+        resumo_por_data[ordem["data_carga"]] += 1
+        resumo_por_carga[str(ordem["carga_liberada_id"])] += 1
+
+    return JsonResponse(
+        {
+            "setor": "montagem",
+            "datas_finais": [data.isoformat() for data in preview["datas_finais"]],
+            "maquinas_nao_cadastradas": preview["maquinas_nao_cadastradas"],
+            "total_cargas": len(cargas),
+            "total_ordens": len(ordens),
+            "cargas": cargas,
+            "ordens": ordens,
+            "resumo_por_data": resumo_por_data,
+            "resumo_por_carga_liberada": resumo_por_carga,
+        }
+    )
 
     # Gerar os arquivos e a tabela completa
     tabela_completa = gerar_sequenciamento(data_inicio, data_final, setor)

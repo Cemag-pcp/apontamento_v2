@@ -7,6 +7,7 @@ import pandas as pd
 from django.db import transaction
 from django.db.models import Prefetch
 
+from cadastro.models import Maquina
 from cargas.models import (
     CargaLiberada,
     CargaLiberadaAlteracao,
@@ -14,7 +15,13 @@ from cargas.models import (
     CargaLiberadaVersao,
     LinkAcompanhamento,
 )
-from cargas.utils import buscar_celulas, consultar_carretas, consultar_carretas_detalhado
+from core.models import Ordem
+from cargas.utils import (
+    buscar_celulas,
+    consultar_carretas,
+    consultar_carretas_detalhado,
+    gerar_sequenciamento,
+)
 
 
 def _normalizar_itens(itens):
@@ -335,6 +342,122 @@ def listar_cargas_liberadas_para_planejamento(data_inicio: date, data_fim: date)
         )
 
     return resultado
+
+
+def montar_preview_planejamento_montagem(
+    data_inicio: date,
+    data_fim: date,
+    sugestoes_datas: dict[date, date | None] | None = None,
+):
+    sugestoes_datas = sugestoes_datas or {}
+    cargas_liberadas = listar_cargas_liberadas_para_planejamento(data_inicio, data_fim)
+
+    if not cargas_liberadas:
+        raise ValueError("Não existem cargas liberadas no período selecionado.")
+
+    conflitos_datas = defaultdict(list)
+    datas_finais_por_carga = {}
+
+    for carga_liberada in cargas_liberadas:
+        data_original = carga_liberada["data_carga"]
+        data_sugerida = sugestoes_datas.get(data_original)
+        data_final_carga = data_sugerida or data_original
+
+        conflitos_datas[data_final_carga.isoformat()].append(data_original.isoformat())
+        datas_finais_por_carga[carga_liberada["carga_liberada_id"]] = data_final_carga
+
+    conflitos = {
+        data_final_str: datas_origem
+        for data_final_str, datas_origem in conflitos_datas.items()
+        if len(set(datas_origem)) > 1
+    }
+    if conflitos:
+        conflitos_texto = ", ".join(
+            f"{data_final_str} <= {', '.join(sorted(set(datas_origem)))}"
+            for data_final_str, datas_origem in sorted(conflitos.items())
+        )
+        raise ValueError(f"Conflito de sugestão de datas: {conflitos_texto}")
+
+    datas_finais = sorted({data for data in datas_finais_por_carga.values()})
+    if Ordem.objects.filter(
+        grupo_maquina="montagem",
+        data_carga__in=datas_finais,
+    ).exists():
+        raise ValueError("Já existe uma carga programada para a data sugerida selecionada")
+
+    ordens = []
+    cargas_saida = []
+    maquinas_requisicao = set()
+
+    for carga_liberada in cargas_liberadas:
+        data_carga_original = carga_liberada["data_carga"]
+        data_carga_planejada = datas_finais_por_carga[carga_liberada["carga_liberada_id"]]
+        tabela_carga = gerar_sequenciamento(
+            data_carga_original.isoformat(),
+            data_carga_original.isoformat(),
+            "montagem",
+            carga_liberada["carga"],
+        )
+
+        if tabela_carga.empty:
+            continue
+
+        subset = (
+            ["Código", "Datas", "Célula", "Carga"]
+            if "Carga" in tabela_carga.columns
+            else ["Código", "Datas", "Célula"]
+        )
+        tabela_carga = tabela_carga.drop_duplicates(subset=subset)
+
+        total_itens_carga = 0
+        for _, row in tabela_carga.iterrows():
+            setor_conjunto = row["Célula"]
+            maquinas_requisicao.add(setor_conjunto)
+            total_itens_carga += 1
+
+            ordens.append(
+                {
+                    "grupo_maquina": "montagem",
+                    "obs": "Ordem gerada automaticamente",
+                    "peca_nome": str(row["Código"]) + " - " + row["Peca"],
+                    "qtd_planejada": int(row["Qtde_total"]),
+                    "data_carga": data_carga_planejada,
+                    "setor_conjunto": setor_conjunto,
+                    "carga_liberada_id": carga_liberada["carga_liberada_id"],
+                    "carga_liberada_versao_id": carga_liberada["carga_liberada_versao_id"],
+                }
+            )
+
+        cargas_saida.append(
+            {
+                "carga_liberada_id": carga_liberada["carga_liberada_id"],
+                "carga_liberada_versao_id": carga_liberada["carga_liberada_versao_id"],
+                "carga": carga_liberada["carga"],
+                "versao": carga_liberada["versao"],
+                "data_carga_original": data_carga_original,
+                "data_carga_planejada": data_carga_planejada,
+                "total_itens": total_itens_carga,
+            }
+        )
+
+    if not ordens:
+        raise ValueError("Nenhuma ordem foi gerada a partir das cargas liberadas selecionadas.")
+
+    maquinas_existentes = set(
+        Maquina.objects.filter(
+            nome__in=maquinas_requisicao,
+            setor__nome="montagem",
+        ).values_list("nome", flat=True)
+    )
+    maquinas_nao_cadastradas = sorted(maquinas_requisicao - maquinas_existentes)
+
+    return {
+        "setor": "montagem",
+        "datas_finais": datas_finais,
+        "cargas": cargas_saida,
+        "ordens": ordens,
+        "maquinas_nao_cadastradas": maquinas_nao_cadastradas,
+    }
 
 
 def atualizar_datas_sugeridas_planejamento(mapa_datas_sugeridas: dict[int, date | None]):

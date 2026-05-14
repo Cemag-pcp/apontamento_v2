@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils.timezone import localtime
 from django.utils import timezone
 
+from cadastro.models import Maquina, Setor
 from cargas.models import (
     CargaLiberada,
     CargaLiberadaAlteracao,
@@ -820,6 +821,142 @@ class CargasLiberacaoTests(TestCase):
                 },
             ],
         )
+
+
+class VerificarPlanejamentoMontagemTests(TestCase):
+    @staticmethod
+    def _date(value):
+        from datetime import date
+
+        return date.fromisoformat(value)
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="pcp_preview", password="123456")
+        self.setor_montagem = Setor.objects.create(nome="montagem")
+        self.maquina = Maquina.objects.create(
+            nome="CHASSI",
+            setor=self.setor_montagem,
+            tipo="producao",
+        )
+
+    def _criar_carga_liberada_com_versoes(self):
+        carga = CargaLiberada.objects.create(
+            data_carga=self._date("2026-05-20"),
+            carga_nome="Carga 01",
+        )
+        CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-05-20"),
+            data_fim_pesquisa=self._date("2026-05-20"),
+            liberado_por=self.user,
+            payload_snapshot={"itens": [{"codigo_recurso": "OLD"}]},
+        )
+        versao_atual = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=2,
+            data_inicio_pesquisa=self._date("2026-05-20"),
+            data_fim_pesquisa=self._date("2026-05-20"),
+            liberado_por=self.user,
+            payload_snapshot={"itens": [{"codigo_recurso": "NEW"}]},
+        )
+        return carga, versao_atual
+
+    @patch("cargas.services.gerar_sequenciamento")
+    def test_verificacao_retorna_ordens_previstas_para_montagem(self, mock_gerar_sequenciamento):
+        carga, versao_atual = self._criar_carga_liberada_com_versoes()
+        mock_gerar_sequenciamento.return_value = pd.DataFrame(
+            [
+                {
+                    "Código": "1001",
+                    "Peca": "LONGARINA",
+                    "Célula": "CHASSI",
+                    "Datas": pd.Timestamp("2026-05-20"),
+                    "Carga": "Carga 01",
+                    "Qtde_total": 4,
+                },
+                {
+                    "Código": "1002",
+                    "Peca": "TRAVESSA",
+                    "Célula": "CHASSI",
+                    "Datas": pd.Timestamp("2026-05-20"),
+                    "Carga": "Carga 01",
+                    "Qtde_total": 2,
+                },
+            ]
+        )
+
+        response = self.client.get(
+            reverse("cargas:verificar_planejamento_montagem"),
+            {
+                "data_inicio": "2026-05-20",
+                "data_fim": "2026-05-20",
+                "sugestoes_datas": "{}",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertEqual(payload["setor"], "montagem")
+        self.assertEqual(payload["total_cargas"], 1)
+        self.assertEqual(payload["total_ordens"], 2)
+        self.assertEqual(payload["datas_finais"], ["2026-05-20"])
+        self.assertEqual(payload["maquinas_nao_cadastradas"], [])
+
+        self.assertEqual(payload["cargas"][0]["carga"], carga.carga_nome)
+        self.assertEqual(payload["cargas"][0]["versao"], 2)
+        self.assertEqual(payload["cargas"][0]["carga_liberada_versao_id"], versao_atual.id)
+        self.assertEqual(payload["ordens"][0]["carga_liberada_versao_id"], versao_atual.id)
+        self.assertEqual(payload["ordens"][0]["setor_conjunto"], self.maquina.nome)
+        self.assertEqual(payload["ordens"][0]["data_carga"], "2026-05-20")
+        self.assertEqual(payload["resumo_por_carga_liberada"][str(carga.id)], 2)
+
+
+class BuscarCarretasBaseTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="pcp_busca_base", password="123456")
+        Profile.objects.create(user=self.user, tipo_acesso="pcp")
+        self.client.login(username="pcp_busca_base", password="123456")
+
+    @patch("cargas.views.consultar_carretas_detalhado")
+    def test_endpoint_retorna_detalhado_sem_agregar_linhas(self, consultar_detalhado_mock):
+        consultar_detalhado_mock.return_value = {
+            "cargas": [
+                {
+                    "data_carga": "2026-05-20",
+                    "codigo_recurso": "FTC4300R CS RS/RS M24",
+                    "quantidade": 1.0,
+                    "presente_no_carreta": "✅",
+                    "carga": "V ProdPrópria p Consumo",
+                    "cliente": "SantosPeças-Canarana-BA",
+                    "cliente_codigo": "SantosPeças-Canarana-BA",
+                    "numero_serie": "SERIE-01",
+                },
+                {
+                    "data_carga": "2026-05-20",
+                    "codigo_recurso": "FTC4300R CS RS/RS M24",
+                    "quantidade": 1.0,
+                    "presente_no_carreta": "✅",
+                    "carga": "V ProdPrópria p Consumo",
+                    "cliente": "SantosPeças-Canarana-BA",
+                    "cliente_codigo": "SantosPeças-Canarana-BA",
+                    "numero_serie": "SERIE-02",
+                },
+            ],
+            "celulas": [{"celula": "CHASSI"}],
+        }
+
+        response = self.client.get(
+            reverse("cargas:buscar_dados_carreta_planilha"),
+            {"data_inicio": "2026-05-20", "data_fim": "2026-05-20"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["cargas"]["cargas"]), 2)
+        self.assertEqual(payload["cargas"]["cargas"][0]["numero_serie"], "SERIE-01")
+        self.assertEqual(payload["cargas"]["cargas"][1]["numero_serie"], "SERIE-02")
 
 
 class SequenciamentoMontagemTests(TestCase):
