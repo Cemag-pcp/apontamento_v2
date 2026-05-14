@@ -2,6 +2,27 @@ function getCsrfToken() {
     return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] ?? '';
 }
 
+function abrirModalAposFechar(atual, proximo) {
+    if (!atual || !proximo) {
+        return;
+    }
+
+    const abrirProximo = () => {
+        atual._abrindoProximoModal = false;
+        new bootstrap.Modal(proximo).show();
+    };
+
+    if (atual.classList.contains('show')) {
+        atual._abrindoProximoModal = true;
+        atual.addEventListener('hidden.bs.modal', abrirProximo, { once: true });
+        const instanciaAtual = bootstrap.Modal.getInstance(atual) || new bootstrap.Modal(atual);
+        instanciaAtual.hide();
+        return;
+    }
+
+    abrirProximo();
+}
+
 export function renderCallendar(options = {}) {
     const calendarEl = document.getElementById('calendario');
     if (!calendarEl) {
@@ -117,9 +138,10 @@ export function renderCallendar(options = {}) {
             escolhaModal.show();
 
             document.getElementById('btnExcluirCarga').onclick = function() {
-                escolhaModal.hide();
-                const modalExcluirCarga = new bootstrap.Modal(document.getElementById('modalExcluirCarga'));
-                modalExcluirCarga.show();
+                abrirModalAposFechar(
+                    document.getElementById('modalEscolha'),
+                    document.getElementById('modalExcluirCarga')
+                );
             };
 
             document.getElementById('confirmarExclusao').onclick = function() {

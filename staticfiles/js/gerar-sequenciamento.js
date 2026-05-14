@@ -1,5 +1,9 @@
 import { renderCallendar } from './full-calendar.js';
 
+let ultimoResumoLiberacao = {
+    alertasVersao: [],
+};
+
 const MENSAGEM_SEM_DADOS = "O Comercial ainda não liberou essa carga. Verificar com o responsável.";
 
 function formatarDataIsoParaBr(dataIso) {
@@ -72,6 +76,38 @@ function coletarSugestoesDatas() {
     return sugestoes;
 }
 
+function montarMensagemAlertasVersao(alertasVersao) {
+    if (!Array.isArray(alertasVersao) || alertasVersao.length === 0) {
+        return "";
+    }
+
+    const linhas = alertasVersao.map((alerta) => {
+        const cargasAnteriores = (alerta.cargas_anteriores || [])
+            .map((item) => `${item.carga} v${item.versao}`)
+            .join(", ");
+        const cargasMaiores = (alerta.cargas_maior_versao || [])
+            .map((item) => `${item.carga} v${item.versao}`)
+            .join(", ");
+
+        return `Data ${formatarDataIsoParaBr(alerta.data_carga)}: existem cargas em versão anterior (${cargasAnteriores}). A maior versão do dia é v${alerta.maior_versao} (${cargasMaiores}).`;
+    });
+
+    return [
+        "Existem cargas com versões diferentes no mesmo dia.",
+        ...linhas,
+        "Deseja continuar a geração mesmo assim?",
+    ].join("\n\n");
+}
+
+function confirmarGeracaoComAlertasVersao() {
+    const mensagem = montarMensagemAlertasVersao(ultimoResumoLiberacao.alertasVersao);
+    if (!mensagem) {
+        return true;
+    }
+
+    return window.confirm(mensagem);
+}
+
 function carregarBaseCarretas() {
     const dataInicio = document.getElementById('data-inicio').value;
     const dataFim = document.getElementById('data-fim').value;
@@ -84,6 +120,9 @@ function carregarBaseCarretas() {
     })
     .then(response => response.json())
     .then(data => {
+        ultimoResumoLiberacao = {
+            alertasVersao: data?.cargas?.alertas_versao || [],
+        };
         const cargas = data?.cargas?.cargas || [];
         popularTabelaResumo(cargas);
         renderizarDatasSugeridas(cargas);
@@ -91,6 +130,7 @@ function carregarBaseCarretas() {
     })
     .catch(error => {
         console.error('Erro ao carregar os dados:', error);
+        ultimoResumoLiberacao = { alertasVersao: [] };
         renderizarDatasSugeridas([]);
     });
 }
@@ -154,6 +194,10 @@ function gerarPlanejamento() {
     const dataFim = document.getElementById("data-fim").value;
     const setor = document.getElementById("setorSelect").value;
     const sugestoesDatas = coletarSugestoesDatas();
+
+    if (!confirmarGeracaoComAlertasVersao()) {
+        return;
+    }
 
     btngerarPlanejamento.disabled = true;
     btngerarPlanejamento.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';

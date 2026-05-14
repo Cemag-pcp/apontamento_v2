@@ -16,6 +16,12 @@ window.addEventListener('DOMContentLoaded', event => {
         document.documentElement.classList.remove('sb-sidenav-toggled');
         localStorage.setItem('sb|sidebar-toggle', 'false');
     };
+    const moveModalToBody = modalElement => {
+        if (!(modalElement instanceof HTMLElement) || modalElement.parentElement === document.body) {
+            return;
+        }
+        document.body.appendChild(modalElement);
+    };
 
     window.getAppLoaderHtml = ({ size = 72, inline = false } = {}) => `
         <div class="app-loader-wrap${inline ? ' inline' : ''}">
@@ -42,6 +48,8 @@ window.addEventListener('DOMContentLoaded', event => {
         element.innerHTML = window.getAppLoaderHtml({ size, inline });
     });
 
+    document.querySelectorAll('.modal').forEach(moveModalToBody);
+
     // Toggle the side navigation
     const sidebarToggle = document.body.querySelector('#sidebarToggle');
     if (sidebarToggle) {
@@ -62,10 +70,7 @@ window.addEventListener('DOMContentLoaded', event => {
     }
 
     document.addEventListener('show.bs.modal', event => {
-        const modalElement = event.target;
-        if (modalElement instanceof HTMLElement && modalElement.parentElement !== document.body) {
-            document.body.appendChild(modalElement);
-        }
+        moveModalToBody(event.target);
         closeMobileSidebar();
     });
 
