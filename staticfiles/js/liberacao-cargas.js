@@ -4,9 +4,13 @@ function obterElementos() {
     return {
         btnPesquisar: document.getElementById('pesquisarLiberacao'),
         btnLiberar: document.getElementById('confirmarLiberacao'),
+        btnMarcarTodosSemNumeroSerie: document.getElementById('marcarTodosSemNumeroSerie'),
+        btnDesmarcarTodosSemNumeroSerie: document.getElementById('desmarcarTodosSemNumeroSerie'),
         dataInicio: document.getElementById('liberacao-data-inicio'),
         dataFim: document.getElementById('liberacao-data-fim'),
         tabela: document.getElementById('tabelaLiberacao'),
+        tabelaSemNumeroSerie: document.getElementById('tabelaItensSemNumeroSerie'),
+        secaoSemNumeroSerie: document.getElementById('secaoItensSemNumeroSerie'),
         resumo: document.getElementById('resumoLiberacao'),
         containerLiberar: document.getElementById('containerBotaoLiberar'),
     };
@@ -14,48 +18,97 @@ function obterElementos() {
 
 function validarDatas(dataInicio, dataFim) {
     if (!dataInicio || !dataFim) {
-        return 'Preencha data início e data fim.';
+        return 'Preencha data inÃ­cio e data fim.';
     }
 
     if (dataInicio > dataFim) {
-        return 'A data início deve ser menor ou igual à data fim.';
+        return 'A data inÃ­cio deve ser menor ou igual Ã  data fim.';
     }
 
     return null;
 }
 
 function limparResultados() {
-    const { tabela, resumo, containerLiberar } = obterElementos();
+    const { tabela, tabelaSemNumeroSerie, secaoSemNumeroSerie, resumo, containerLiberar } = obterElementos();
     tabela.innerHTML = "<tr><td colspan='4'>Nenhum dado disponível</td></tr>";
+    tabelaSemNumeroSerie.innerHTML = "<tr><td colspan='7'>Nenhum item sem PED_NUMEROSERIE no perÃ­odo.</td></tr>";
+    secaoSemNumeroSerie.classList.add('d-none');
     resumo.classList.add('d-none');
     resumo.textContent = '';
     containerLiberar.classList.add('d-none');
 }
 
-function renderizarTabela(cargas) {
-    const { tabela, resumo, containerLiberar } = obterElementos();
+function renderizarTabela(cargas, itensSemNumeroSerie = []) {
+    const { tabela, tabelaSemNumeroSerie, secaoSemNumeroSerie, resumo, containerLiberar } = obterElementos();
 
-    if (!Array.isArray(cargas) || cargas.length === 0) {
+    const possuiCargas = Array.isArray(cargas) && cargas.length > 0;
+    const possuiItensSemNumeroSerie = Array.isArray(itensSemNumeroSerie) && itensSemNumeroSerie.length > 0;
+
+    if (!possuiCargas && !possuiItensSemNumeroSerie) {
         limparResultados();
         return;
     }
 
-    tabela.innerHTML = '';
-    cargas.forEach((item) => {
-        const linha = document.createElement('tr');
-        linha.innerHTML = `
-            <td>${item.data_carga}</td>
-            <td>${item.carga}</td>
-            <td>${item.codigo_recurso}</td>
-            <td>${item.quantidade}</td>
-        `;
-        tabela.appendChild(linha);
-    });
+    if (possuiCargas) {
+        tabela.innerHTML = '';
+        cargas.forEach((item) => {
+            const linha = document.createElement('tr');
+            linha.innerHTML = `
+                <td>${item.data_carga}</td>
+                <td>${item.carga}</td>
+                <td>${item.codigo_recurso}</td>
+                <td>${item.quantidade}</td>
+            `;
+            tabela.appendChild(linha);
+        });
+    } else {
+        tabela.innerHTML = "<tr><td colspan='4'>Nenhum item com PED_NUMEROSERIE no perÃ­odo.</td></tr>";
+    }
 
-    const grupos = new Set(cargas.map((item) => `${item.data_carga}|${item.carga}`));
-    resumo.textContent = `${grupos.size} carga(s) encontradas no período.`;
+    if (possuiItensSemNumeroSerie) {
+        tabelaSemNumeroSerie.innerHTML = '';
+        itensSemNumeroSerie.forEach((item) => {
+            const linha = document.createElement('tr');
+            linha.innerHTML = `
+                <td class="text-center">
+                    <input
+                        type="checkbox"
+                        class="form-check-input js-item-sem-numero-serie"
+                        value="${item.sheet_row_index}"
+                    >
+                </td>
+                <td>${item.data_carga}</td>
+                <td>${item.carga}</td>
+                <td>${item.cliente || ''}</td>
+                <td>${item.codigo_recurso}</td>
+                <td>${item.quantidade}</td>
+                <td>${item.presente_no_carreta}</td>
+            `;
+            tabelaSemNumeroSerie.appendChild(linha);
+        });
+        secaoSemNumeroSerie.classList.remove('d-none');
+    } else {
+        tabelaSemNumeroSerie.innerHTML = "<tr><td colspan='7'>Nenhum item sem PED_NUMEROSERIE no perÃ­odo.</td></tr>";
+        secaoSemNumeroSerie.classList.add('d-none');
+    }
+
+    const grupos = new Set((cargas || []).map((item) => `${item.data_carga}|${item.carga}`));
+    const totalSemNumeroSerie = possuiItensSemNumeroSerie ? itensSemNumeroSerie.length : 0;
+    resumo.textContent = `${grupos.size} carga(s) encontradas no perÃ­odo. ${totalSemNumeroSerie} item(ns) sem PED_NUMEROSERIE disponível(is) para seleção.`;
     resumo.classList.remove('d-none');
     containerLiberar.classList.remove('d-none');
+}
+
+function obterItensSemNumeroSerieSelecionados() {
+    return Array.from(document.querySelectorAll('.js-item-sem-numero-serie:checked'))
+        .map((input) => Number.parseInt(input.value, 10))
+        .filter((value) => Number.isInteger(value));
+}
+
+function marcarItensSemNumeroSerie(marcado) {
+    document.querySelectorAll('.js-item-sem-numero-serie').forEach((input) => {
+        input.checked = marcado;
+    });
 }
 
 async function pesquisarLiberacoes() {
@@ -78,7 +131,10 @@ async function pesquisarLiberacoes() {
             throw new Error(payload.error || 'Erro ao pesquisar cargas.');
         }
 
-        renderizarTabela(payload?.cargas?.cargas || []);
+        renderizarTabela(
+            payload?.cargas?.cargas || [],
+            payload?.cargas?.itens_sem_numero_serie || [],
+        );
     } catch (error) {
         console.error(error);
         limparResultados();
@@ -109,6 +165,7 @@ async function liberarCargas() {
             body: JSON.stringify({
                 data_inicio: dataInicio.value,
                 data_fim: dataFim.value,
+                itens_sem_numero_serie_selecionados: obterItensSemNumeroSerieSelecionados(),
             }),
         });
 
@@ -118,7 +175,7 @@ async function liberarCargas() {
         }
 
         alert(
-            `${payload.total_cargas_liberadas} carga(s) liberadas e ${payload.total_versoes_criadas} versão(ões) criadas.`
+            `${payload.total_cargas_liberadas} carga(s) liberadas e ${payload.total_versoes_criadas} versões criadas.`
         );
 
         const modalElement = document.getElementById('modalLiberacao');
@@ -139,8 +196,12 @@ async function liberarCargas() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const btnPesquisar = document.getElementById('pesquisarLiberacao');
-    const btnLiberar = document.getElementById('confirmarLiberacao');
+    const {
+        btnPesquisar,
+        btnLiberar,
+        btnMarcarTodosSemNumeroSerie,
+        btnDesmarcarTodosSemNumeroSerie,
+    } = obterElementos();
     if (!btnPesquisar || !btnLiberar) {
         return;
     }
@@ -148,4 +209,12 @@ document.addEventListener('DOMContentLoaded', () => {
     limparResultados();
     btnPesquisar.addEventListener('click', pesquisarLiberacoes);
     btnLiberar.addEventListener('click', liberarCargas);
+
+    if (btnMarcarTodosSemNumeroSerie) {
+        btnMarcarTodosSemNumeroSerie.addEventListener('click', () => marcarItensSemNumeroSerie(true));
+    }
+
+    if (btnDesmarcarTodosSemNumeroSerie) {
+        btnDesmarcarTodosSemNumeroSerie.addEventListener('click', () => marcarItensSemNumeroSerie(false));
+    }
 });
