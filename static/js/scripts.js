@@ -8,6 +8,15 @@
 // 
 
 window.addEventListener('DOMContentLoaded', event => {
+    const closeMobileSidebar = () => {
+        if (window.innerWidth >= 992) {
+            return;
+        }
+        document.body.classList.remove('sb-sidenav-toggled');
+        document.documentElement.classList.remove('sb-sidenav-toggled');
+        localStorage.setItem('sb|sidebar-toggle', 'false');
+    };
+
     window.getAppLoaderHtml = ({ size = 72, inline = false } = {}) => `
         <div class="app-loader-wrap${inline ? ' inline' : ''}">
             <dotlottie-wc
@@ -51,5 +60,13 @@ window.addEventListener('DOMContentLoaded', event => {
             localStorage.setItem('sb|sidebar-toggle', document.body.classList.contains('sb-sidenav-toggled'));
         });
     }
+
+    document.addEventListener('show.bs.modal', event => {
+        const modalElement = event.target;
+        if (modalElement instanceof HTMLElement && modalElement.parentElement !== document.body) {
+            document.body.appendChild(modalElement);
+        }
+        closeMobileSidebar();
+    });
 
 });

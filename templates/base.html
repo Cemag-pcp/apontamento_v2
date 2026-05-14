@@ -119,6 +119,10 @@
                 margin-left: 0 !important;
                 padding-left: 0 !important;
             }
+            body.modal-open #layoutSidenav #layoutSidenav_content,
+            html.modal-open #layoutSidenav #layoutSidenav_content {
+                z-index: auto !important;
+            }
             .sb-sidenav-toggled #layoutSidenav #layoutSidenav_content::before {
                 content: "" !important;
                 display: block !important;
@@ -132,6 +136,19 @@
                 opacity: 1;
                 pointer-events: auto;
             }
+            body.modal-open #layoutSidenav #layoutSidenav_content::before,
+            html.modal-open #layoutSidenav #layoutSidenav_content::before,
+            body.modal-open.sb-sidenav-toggled #layoutSidenav #layoutSidenav_content::before {
+                display: none !important;
+                pointer-events: none !important;
+            }
+            .modal { z-index: 1060 !important; }
+            .modal-dialog,
+            .modal-content {
+                position: relative;
+                z-index: 1065 !important;
+            }
+            .modal-backdrop { z-index: 1055 !important; }
         }
 
         .sb-sidenav.sb-sidenav-dark { background-color: #ffffff !important; border-right: 1px solid #e5e7eb !important; box-shadow: none !important; }
