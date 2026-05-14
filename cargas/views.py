@@ -180,6 +180,142 @@ def _calcular_data_programacao_por_setor(setor, data_carga):
 
     return data_programacao
 
+
+def _construir_ordens_planejamento(cargas_liberadas, setor, datas_finais_por_carga):
+    ordens = []
+
+    for carga_liberada in cargas_liberadas:
+        data_carga_original = carga_liberada["data_carga"]
+        data_carga_planejada = datas_finais_por_carga[carga_liberada["carga_liberada_id"]]
+        tabela_carga = gerar_sequenciamento(
+            data_carga_original.isoformat(),
+            data_carga_original.isoformat(),
+            setor,
+            carga_liberada["carga"],
+        )
+
+        if tabela_carga.empty:
+            continue
+
+        if setor == 'pintura':
+            colunas_grupo = ['CÃ³digo', 'Peca', 'CÃ©lula', 'Datas', 'Recurso_cor', 'cor']
+            if 'Carga' in tabela_carga.columns:
+                colunas_grupo.append('Carga')
+            tabela_carga = tabela_carga.groupby(colunas_grupo).agg({'Qtde_total': 'sum'}).reset_index()
+            tabela_carga.drop_duplicates(
+                subset=['CÃ³digo', 'Datas', 'cor', 'Carga'] if 'Carga' in tabela_carga.columns else ['CÃ³digo', 'Datas', 'cor'],
+                inplace=True,
+            )
+        else:
+            tabela_carga.drop_duplicates(
+                subset=['CÃ³digo', 'Datas', 'CÃ©lula', 'Carga'] if 'Carga' in tabela_carga.columns else ['CÃ³digo', 'Datas', 'CÃ©lula'],
+                inplace=True,
+            )
+
+        for _, row in tabela_carga.iterrows():
+            ordens.append({
+                "grupo_maquina": setor.lower(),
+                "cor": row["cor"] if setor == 'pintura' else '',
+                "obs": "Ordem gerada automaticamente",
+                "peca_nome": str(row["CÃ³digo"]) + " - " + row["Peca"],
+                "qtd_planejada": int(row["Qtde_total"]),
+                "data_carga": data_carga_planejada.isoformat(),
+                "setor_conjunto": row["CÃ©lula"],
+                "carga_liberada_id": carga_liberada["carga_liberada_id"],
+                "carga_liberada_versao_id": carga_liberada["carga_liberada_versao_id"],
+            })
+
+    return ordens
+
+
+def _listar_cargas_planejamento_para_atualizacao(data_planejada, setor):
+    versoes_prefetch = Prefetch(
+        "versoes",
+        queryset=CargaLiberadaVersao.objects.order_by("-versao"),
+        to_attr="versoes_ordenadas",
+    )
+
+    cargas_ids_existentes = list(
+        Ordem.objects.filter(
+            grupo_maquina=setor,
+            data_carga=data_planejada,
+            carga_liberada_id__isnull=False,
+        )
+        .exclude(carga_liberada_versao_id__isnull=True)
+        .values_list("carga_liberada_id", flat=True)
+        .distinct()
+    )
+
+    if not cargas_ids_existentes:
+        return listar_cargas_liberadas_para_planejamento(data_planejada, data_planejada)
+
+    cargas = (
+        CargaLiberada.objects.filter(id__in=cargas_ids_existentes)
+        .prefetch_related(versoes_prefetch)
+        .order_by("data_carga", "carga_nome")
+    )
+
+    resultado = []
+    for carga in cargas:
+        versoes_ordenadas = getattr(carga, "versoes_ordenadas", [])
+        if not versoes_ordenadas:
+            continue
+
+        ultima_versao = versoes_ordenadas[0]
+        resultado.append(
+            {
+                "carga_liberada_id": carga.id,
+                "carga_liberada_versao_id": ultima_versao.id,
+                "carga_uuid": str(carga.carga_uuid),
+                "versao_uuid": str(ultima_versao.versao_uuid),
+                "data_carga": carga.data_carga,
+                "data_sugerida_planejamento": carga.data_sugerida_planejamento,
+                "carga": carga.carga_nome,
+                "versao": ultima_versao.versao,
+            }
+        )
+
+    return resultado
+
+
+def _chave_ordem_planejada(setor, ordem):
+    base = (
+        ordem["grupo_maquina"],
+        str(ordem["data_carga"]),
+        ordem.get("carga_liberada_id") or 0,
+        ordem["peca_nome"],
+    )
+    if setor == "pintura":
+        return base + (ordem.get("cor", ""),)
+    return base
+
+
+def _chave_ordem_existente(setor, ordem):
+    if setor == "montagem":
+        peca_nome = ordem.ordem_pecas_montagem.values_list("peca", flat=True).first() or ""
+        return (
+            ordem.grupo_maquina,
+            ordem.data_carga.isoformat() if ordem.data_carga else "",
+            ordem.carga_liberada_id or 0,
+            peca_nome,
+        )
+    if setor == "pintura":
+        peca_nome = ordem.ordem_pecas_pintura.values_list("peca", flat=True).first() or ""
+        return (
+            ordem.grupo_maquina,
+            ordem.data_carga.isoformat() if ordem.data_carga else "",
+            ordem.carga_liberada_id or 0,
+            peca_nome,
+            ordem.cor or "",
+        )
+    peca_nome = ordem.ordem_pecas_solda.values_list("peca", flat=True).first() or ""
+    return (
+        ordem.grupo_maquina,
+        ordem.data_carga.isoformat() if ordem.data_carga else "",
+        ordem.carga_liberada_id or 0,
+        peca_nome,
+    )
+
 @login_required
 def home(request):
 
@@ -567,6 +703,142 @@ def verificar_planejamento_montagem(request):
         return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
 
     return JsonResponse({"message": "Sequenciamento gerado com sucesso!", "detalhes": "resultado"})
+
+@csrf_exempt
+def atualizar_ordem_existente_planejamento(request):
+    """
+    Atualiza as ordens de um dia usando o mesmo fluxo do planejamento gerado
+    a partir das cargas liberadas e reconcilia as ordens existentes.
+    """
+
+    data_inicio = request.GET.get('data_inicio')
+    setor = request.GET.get('setor')
+
+    if not data_inicio or not setor:
+        return HttpResponse("Erro: ParÃ¢metros obrigatÃ³rios ausentes.", status=400)
+
+    try:
+        data_planejada = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"error": "Formato de data invÃ¡lido. Use YYYY-MM-DD."}, status=400)
+
+    ordens_existentes_qs = Ordem.objects.filter(
+        data_carga=data_planejada,
+        grupo_maquina=setor,
+    )
+
+    if setor == 'montagem':
+        ordens_com_apontamentos = ordens_existentes_qs.annotate(
+            total_produzido=Sum('ordem_pecas_montagem__qtd_boa')
+        ).filter(total_produzido__gt=0)
+    elif setor == 'pintura':
+        ordens_com_apontamentos = ordens_existentes_qs.annotate(
+            total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
+        ).filter(total_produzido__gt=0)
+    else:
+        ordens_com_apontamentos = ordens_existentes_qs.annotate(
+            total_produzido=Sum('ordem_pecas_solda__qtd_boa')
+        ).filter(total_produzido__gt=0)
+
+    ordens_com_apontamentos_ids = set(ordens_com_apontamentos.values_list('id', flat=True))
+
+    cargas_liberadas = _listar_cargas_planejamento_para_atualizacao(data_planejada, setor)
+    if not cargas_liberadas:
+        return JsonResponse(
+            {"error": "NÃ£o existem cargas liberadas vinculadas a esse planejamento."},
+            status=400,
+        )
+
+    datas_finais_por_carga = {
+        carga_liberada["carga_liberada_id"]: data_planejada
+        for carga_liberada in cargas_liberadas
+    }
+    ordens_planejadas = _construir_ordens_planejamento(
+        cargas_liberadas,
+        setor,
+        datas_finais_por_carga,
+    )
+
+    chaves_planejadas = {
+        _chave_ordem_planejada(setor, ordem_planejada)
+        for ordem_planejada in ordens_planejadas
+    }
+
+    ids_para_excluir = []
+    for ordem_existente in ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids):
+        if _chave_ordem_existente(setor, ordem_existente) not in chaves_planejadas:
+            ids_para_excluir.append(ordem_existente.id)
+
+    if ids_para_excluir:
+        Ordem.objects.filter(id__in=ids_para_excluir).delete()
+
+    ordens_a_criar = []
+    for ordem_planejada in ordens_planejadas:
+        filtros_ordem = {
+            "grupo_maquina": setor,
+            "data_carga": data_planejada,
+            "carga_liberada_id": ordem_planejada.get("carga_liberada_id"),
+        }
+        if setor == 'montagem':
+            filtros_ordem["ordem_pecas_montagem__peca"] = ordem_planejada["peca_nome"]
+        elif setor == 'pintura':
+            filtros_ordem["ordem_pecas_pintura__peca"] = ordem_planejada["peca_nome"]
+            filtros_ordem["cor"] = ordem_planejada.get("cor", "")
+        else:
+            filtros_ordem["ordem_pecas_solda__peca"] = ordem_planejada["peca_nome"]
+
+        ordem_existente = Ordem.objects.filter(**filtros_ordem).first()
+
+        if ordem_existente is None:
+            filtros_fallback = {
+                "grupo_maquina": setor,
+                "data_carga": data_planejada,
+            }
+            if setor == 'montagem':
+                filtros_fallback["ordem_pecas_montagem__peca"] = ordem_planejada["peca_nome"]
+            elif setor == 'pintura':
+                filtros_fallback["ordem_pecas_pintura__peca"] = ordem_planejada["peca_nome"]
+                filtros_fallback["cor"] = ordem_planejada.get("cor", "")
+            else:
+                filtros_fallback["ordem_pecas_solda__peca"] = ordem_planejada["peca_nome"]
+            ordem_existente = Ordem.objects.filter(**filtros_fallback).first()
+
+        if ordem_existente:
+            ordem_existente.carga_liberada_id = ordem_planejada.get("carga_liberada_id")
+            ordem_existente.carga_liberada_versao_id = ordem_planejada.get("carga_liberada_versao_id")
+            ordem_existente.save(update_fields=["carga_liberada_id", "carga_liberada_versao_id"])
+
+            if setor == 'montagem':
+                ordem_existente.ordem_pecas_montagem.filter(peca=ordem_planejada["peca_nome"]).update(
+                    qtd_planejada=int(ordem_planejada["qtd_planejada"])
+                )
+            elif setor == 'pintura':
+                ordem_existente.ordem_pecas_pintura.filter(peca=ordem_planejada["peca_nome"]).update(
+                    qtd_planejada=int(ordem_planejada["qtd_planejada"])
+                )
+            else:
+                ordem_existente.ordem_pecas_solda.filter(peca=ordem_planejada["peca_nome"]).update(
+                    qtd_planejada=int(ordem_planejada["qtd_planejada"])
+                )
+        else:
+            ordens_a_criar.append(ordem_planejada)
+
+    if setor == 'montagem':
+        resultado = processar_ordens_montagem(request, ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
+    elif setor == 'pintura':
+        resultado = processar_ordens_pintura(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
+    else:
+        resultado = processar_ordens_solda(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
+
+    if "error" in resultado:
+        return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
+
+    return JsonResponse({
+        "message": "Ordens atualizadas com sucesso!",
+        "ordens_com_apontamentos": list(ordens_com_apontamentos.values('id', 'data_carga', 'grupo_maquina')),
+        "novas_ordens_criadas": len(ordens_a_criar),
+    })
+
 
 @csrf_exempt
 def atualizar_ordem_existente(request):

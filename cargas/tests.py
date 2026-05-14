@@ -8,6 +8,7 @@ from django.utils.timezone import localtime
 from django.utils import timezone
 
 from cadastro.models import Maquina, Setor
+from apontamento_montagem.models import PecasOrdem as PecasOrdemMontagem
 from cargas.models import (
     CargaLiberada,
     CargaLiberadaAlteracao,
@@ -261,6 +262,46 @@ class CargasLiberacaoTests(TestCase):
             localtime(versao.liberado_em).strftime("%d/%m/%Y %H:%M"),
         )
 
+    def test_api_andamento_liberacoes_mantem_todas_as_cargas_do_dia(self):
+        carga_v2 = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 01",
+        )
+        CargaLiberadaVersao.objects.create(
+            carga_liberada=carga_v2,
+            versao=2,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+
+        carga_v1 = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 04",
+        )
+        CargaLiberadaVersao.objects.create(
+            carga_liberada=carga_v1,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+
+        response = self.client.get(
+            reverse("cargas:andamento_liberacoes"),
+            {"start": "2026-04-01", "end": "2026-05-01"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload), 2)
+        self.assertEqual(
+            {item["title"] for item in payload},
+            {"Carga 01 v2", "Carga 04 v1"},
+        )
+
     def test_api_detalhes_liberacao_retorna_itens_ultima_versao(self):
         carga = CargaLiberada.objects.create(
             data_carga=self._date("2026-04-27"),
@@ -364,6 +405,73 @@ class CargasLiberacaoTests(TestCase):
                     "presente_no_carreta": "",
                     "carga": "Carga 04",
                     "versao": 2,
+                }
+            ],
+        )
+
+    def test_listar_cargas_liberadas_periodo_retorna_alerta_quando_ha_versoes_diferentes_no_mesmo_dia(self):
+        carga_v2 = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 01",
+        )
+        versao_2 = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga_v2,
+            versao=2,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        CargaLiberadaItem.objects.create(
+            carga_versao=versao_2,
+            codigo_recurso="ITEM-V2",
+            quantidade=3,
+        )
+
+        carga_v1 = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 04",
+        )
+        versao_1 = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga_v1,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        CargaLiberadaItem.objects.create(
+            carga_versao=versao_1,
+            codigo_recurso="ITEM-V1",
+            quantidade=9,
+        )
+
+        payload = listar_cargas_liberadas_periodo(
+            self._date("2026-04-27"),
+            self._date("2026-04-27"),
+        )
+
+        self.assertEqual(len(payload["cargas"]), 2)
+        self.assertEqual(
+            payload["alertas_versao"],
+            [
+                {
+                    "data_carga": "2026-04-27",
+                    "maior_versao": 2,
+                    "cargas_maior_versao": [
+                        {
+                            "carga": "Carga 01",
+                            "versao": 2,
+                            "carga_uuid": str(carga_v2.carga_uuid),
+                        }
+                    ],
+                    "cargas_anteriores": [
+                        {
+                            "carga": "Carga 04",
+                            "versao": 1,
+                            "carga_uuid": str(carga_v1.carga_uuid),
+                        }
+                    ],
                 }
             ],
         )
@@ -573,6 +681,70 @@ class CargasLiberacaoTests(TestCase):
         self.assertEqual(carga.data_sugerida_planejamento, self._date("2026-04-29"))
         self.assertEqual(ordens[0]["carga_liberada_id"], carga.id)
         self.assertEqual(ordens[0]["carga_liberada_versao_id"], versao.id)
+
+    @patch("cargas.views.processar_ordens_montagem")
+    @patch("cargas.views.gerar_sequenciamento")
+    def test_atualizar_planejamento_usa_fluxo_de_gerar_e_atualiza_quantidades(self, gerar_mock, processar_mock):
+        carga = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 04",
+        )
+        versao_antiga = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        versao_atual = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=2,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+
+        ordem = Ordem.objects.create(
+            grupo_maquina="montagem",
+            data_carga=self._date("2026-04-27"),
+            carga_liberada=carga,
+            carga_liberada_versao=versao_antiga,
+        )
+        peca_ordem = PecasOrdemMontagem.objects.create(
+            ordem=ordem,
+            peca="1001 - LONGARINA",
+            qtd_planejada=2,
+        )
+
+        gerar_mock.return_value = pd.DataFrame(
+            [
+                {
+                    "CÃ³digo": "1001",
+                    "Peca": "LONGARINA",
+                    "CÃ©lula": "CHASSI",
+                    "Datas": pd.Timestamp("2026-04-27"),
+                    "Qtde_total": 7,
+                    "Carga": "Carga 04",
+                }
+            ]
+        )
+        processar_mock.return_value = {"message": "ok", "ordens": []}
+
+        response = self.client.get(
+            reverse("cargas:atualizar_ordem_existente"),
+            {"data_inicio": "2026-04-27", "setor": "montagem"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        ordem.refresh_from_db()
+        peca_ordem.refresh_from_db()
+        self.assertEqual(ordem.carga_liberada_versao_id, versao_atual.id)
+        self.assertEqual(peca_ordem.qtd_planejada, 7)
+        self.assertEqual(response.json()["novas_ordens_criadas"], 0)
+        processar_mock.assert_called_once()
+        self.assertEqual(processar_mock.call_args.args[1], [])
 
     def test_gerar_planejamento_rejeita_conflito_de_datas_sugeridas(self):
         for data_carga, carga_nome in [

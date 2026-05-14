@@ -259,12 +259,21 @@ def listar_cargas_liberadas_periodo(data_inicio: date, data_fim: date):
 
     itens_saida = []
     codigos_recurso = set()
+    versoes_por_data = defaultdict(list)
     for carga in cargas:
         ultima_versao = (
             carga.versoes_ordenadas[0] if getattr(carga, "versoes_ordenadas", []) else None
         )
         if ultima_versao is None:
             continue
+
+        versoes_por_data[carga.data_carga].append(
+            {
+                "carga": carga.carga_nome,
+                "versao": int(ultima_versao.versao),
+                "carga_uuid": str(carga.carga_uuid),
+            }
+        )
 
         agrupado = {}
         for item in ultima_versao.itens.all():
@@ -299,9 +308,30 @@ def listar_cargas_liberadas_periodo(data_inicio: date, data_fim: date):
             if pd.notna(celula) and str(celula).strip()
         ]
 
+    alertas_versao = []
+    for data_carga, versoes in sorted(versoes_por_data.items(), key=lambda item: item[0]):
+        if len(versoes) < 2:
+            continue
+
+        maior_versao = max(item["versao"] for item in versoes)
+        cargas_maior_versao = [item for item in versoes if item["versao"] == maior_versao]
+        cargas_anteriores = [item for item in versoes if item["versao"] < maior_versao]
+        if not cargas_anteriores:
+            continue
+
+        alertas_versao.append(
+            {
+                "data_carga": data_carga.isoformat(),
+                "maior_versao": maior_versao,
+                "cargas_maior_versao": cargas_maior_versao,
+                "cargas_anteriores": cargas_anteriores,
+            }
+        )
+
     return {
         "cargas": itens_saida,
         "celulas": celulas,
+        "alertas_versao": alertas_versao,
     }
 
 
