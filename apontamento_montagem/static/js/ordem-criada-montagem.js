@@ -664,8 +664,10 @@ function carregarPecasDisponiveis(codigoConjunto) {
     .then(data => {
 
         if (data.pecas.length !== 0) {
-            data.pecas.forEach((peca, index)=> {
-                pecasDisponiveisSelect.append(new Option(`${peca['descricao_peca']}`, false, false));
+            data.pecas.forEach((peca, index) => {
+                const $option = $('<option>', { value: index, text: peca['descricao_peca'] })
+                    .attr('data-descricao', peca['descricao_peca']);
+                pecasDisponiveisSelect.append($option);
             });
         }
 
@@ -783,22 +785,25 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
         return;
     }
 
-    const pecasSelecionadas = pecasDisponiveisSelect.val(); // Array de códigos (ex: ["P001", "P002"])
-
-    console.log(pecasSelecionadas);
-
     // --- 2. Lógica e Coleta para "Falta peça" ---
-    if (motivoTexto === "Falta peça" && Array.isArray(pecasSelecionadas) && pecasSelecionadas.length > 0) {
+    if (motivoTexto === "Falta peça") {
 
-        pecasSelecionadas.forEach(codigoPeca => {
-            const optionElement = pecasDisponiveisSelect.find(`option[value="${codigoPeca}"]`).first();
-            
-            const nomePeca = optionElement.data('descricao') 
-                ? `${codigoPeca} - ${optionElement.data('descricao')}` 
-                : optionElement.text().trim();
+        const pecasSelecionadasOpts = pecasDisponiveisSelect.find(':selected');
 
-            const inputQtd = $(`#qtd-${codigoPeca}`);
-            let quantidade = parseInt(inputQtd.val() || '0');
+        if (pecasSelecionadasOpts.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Selecione ao menos uma peça em falta.'
+            });
+            return;
+        }
+
+        pecasSelecionadasOpts.each(function() {
+            const indicePeca = $(this).val();
+            const nomePeca = $(this).text().trim();
+            const inputQtd = $(`#qtd-${indicePeca}`);
+            const quantidade = parseInt(inputQtd.val() || '0');
 
             if (quantidade > 0) {
                 pecasFaltantesPayload.push({
@@ -807,7 +812,7 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
                 });
             }
         });
-        // Valida se, após a coleta, alguma quantidade > 0 foi informada
+
         if (pecasFaltantesPayload.length === 0) {
             Swal.fire({
                 icon: 'warning',
