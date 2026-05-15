@@ -6,8 +6,8 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 from django.views.decorators.http import require_http_methods
-from django.db.models import Sum, Exists, OuterRef, Count, Q, Prefetch
-from django.db.models.functions import Coalesce
+from django.db.models import Sum, Exists, OuterRef, Count, Q, Prefetch, F, Value
+from django.db.models.functions import Coalesce, Replace, Trim, Upper
 from django.utils.timezone import localtime
 
 from cargas.utils import get_data_from_sheets,tratando_dados
@@ -57,6 +57,19 @@ def strip_color_suffix(code: str) -> str:
         if sufixo2 in SIGLAS_VALIDAS:
             return s[:-2]
     return s
+
+def normalize_carreta_text(value: str) -> str:
+    if not value:
+        return ''
+    s = strip_color_suffix(value)
+    s = _spaces_re.sub(' ', s)
+    return s.strip().upper()
+
+def normalized_spaces_expr(field_name: str):
+    expr = F(field_name)
+    for _ in range(4):
+        expr = Replace(expr, Value('  '), Value(' '))
+    return Upper(Trim(expr))
 
 def clean_description(desc: str) -> str:
     if not desc:
@@ -120,9 +133,9 @@ def _detectar_codigos_especiais_da_carga(carga_id):
 
 def _buscar_componentes_por_carreta(lista_carretas):
     carretas_normalizadas = sorted({
-        strip_color_suffix(carreta).strip().upper()
+        normalize_carreta_text(carreta)
         for carreta in (lista_carretas or [])
-        if strip_color_suffix(carreta).strip()
+        if normalize_carreta_text(carreta)
     })
 
     if not carretas_normalizadas:
@@ -130,27 +143,37 @@ def _buscar_componentes_por_carreta(lista_carretas):
 
     qs = (
         CarretasExplodidas.objects
+        .annotate(
+            carreta_normalizada=normalized_spaces_expr('carreta'),
+        )
         .filter(
-            carreta__in=carretas_normalizadas,
+            carreta_normalizada__in=carretas_normalizadas,
             primeiro_processo__in=_PROCESSOS_PENDENCIA_CARRETA,
         )
-        .order_by('carreta', 'codigo_peca')
-        .distinct('carreta', 'codigo_peca')
+        .order_by('carreta_normalizada', 'codigo_peca')
         .values('carreta', 'codigo_peca', 'descricao_peca', 'total_peca')
     )
-
     grupos_por_carreta = defaultdict(list)
+    chaves_vistas = set()
     for row in qs:
+        chave = (
+            normalize_carreta_text(row.get('carreta') or ''),
+            strip_color_suffix(row.get('codigo_peca') or ''),
+        )
+        if chave in chaves_vistas:
+            continue
+        chaves_vistas.add(chave)
+
         total_peca = parse_total(row.get('total_peca'))
         if total_peca <= 0:
             continue
 
-        carreta_key = strip_color_suffix(row.get('carreta') or '').strip().upper()
+        carreta_key = chave[0]
         if not carreta_key:
             continue
 
         grupos_por_carreta[carreta_key].append({
-            'codigo_base': strip_color_suffix(row.get('codigo_peca') or ''),
+            'codigo_base': chave[1],
             'descricao_limpa': clean_description(row.get('descricao_peca') or ''),
             'total_por_carreta': total_peca,
         })
@@ -186,7 +209,7 @@ def _criar_pendencias_para_carretas_carga(carretas_carga, somente_sem_pendencias
     carretas_sem_componentes = []
 
     for carreta_carga in carretas_sem_pendencias:
-        carreta_limpa = strip_color_suffix(carreta_carga.carreta).strip().upper()
+        carreta_limpa = normalize_carreta_text(carreta_carga.carreta)
         quantidade_carreta = safe_int(carreta_carga.quantidade, default=0)
 
         if not carreta_limpa or quantidade_carreta <= 0:
@@ -219,9 +242,9 @@ def _criar_pendencias_para_carretas_carga(carretas_carga, somente_sem_pendencias
         'pendencias_criadas': total_pendencias,
         'carretas_sem_componentes': sorted(set(carretas_sem_componentes)),
         'carretas_sem_pendencias': sorted({
-            strip_color_suffix(c.carreta).strip().upper()
+            normalize_carreta_text(c.carreta)
             for c in carretas_sem_pendencias
-            if strip_color_suffix(c.carreta).strip()
+            if normalize_carreta_text(c.carreta)
         }),
     }
 
@@ -475,7 +498,7 @@ def criar_caixa(request):
         quantidade_carreta = safe_int(item.get('quantidade'), default=0)
         cor                = item.get('cor')
 
-        carreta_limpa = strip_color_suffix(carreta_raw).strip().upper()
+        carreta_limpa = normalize_carreta_text(carreta_raw)
 
         if not carreta_limpa or quantidade_carreta <= 0:
             continue
@@ -1421,14 +1444,15 @@ def reatualizar_carretas_faltantes(request, carga_id):
     except json.JSONDecodeError:
         return JsonResponse({'erro': 'JSON invalido.'}, status=400)
 
-    carreta_alvo = strip_color_suffix(payload.get('carreta') or '').strip().upper()
+    carreta_alvo = normalize_carreta_text(payload.get('carreta') or '')
     if not carreta_alvo:
         return JsonResponse({'erro': 'Informe a carreta pendente para reprocessar.'}, status=400)
 
     carretas_qs = list(
         CarretaCarga.objects
         .select_for_update()
-        .filter(carga_id=carga_id, carreta__iexact=carreta_alvo)
+        .annotate(carreta_normalizada=normalized_spaces_expr('carreta'))
+        .filter(carga_id=carga_id, carreta_normalizada=carreta_alvo)
         .order_by('id')
     )
 
@@ -1453,9 +1477,9 @@ def reatualizar_carretas_faltantes(request, carga_id):
         .distinct()
     )
     faltando = sorted({
-        strip_color_suffix(carreta).strip().upper()
+        normalize_carreta_text(carreta)
         for carreta in faltando_qs
-        if strip_color_suffix(carreta).strip()
+        if normalize_carreta_text(carreta)
     })
 
     total_pendente = (
@@ -1513,14 +1537,14 @@ def comparar_carretas_geradas(request, carga_id):
                     .filter(carga_id=carga_id)
                     .values_list('carreta', flat=True)
                     .distinct())
-    esperadas = { (c or '').strip().upper() for c in esperadas_qs if c }
+    esperadas = {normalize_carreta_text(c) for c in esperadas_qs if normalize_carreta_text(c)}
 
     # 2) Conjunto de carretas que "têm pendência" (aparecem em PendenciasPacote)
     com_pendencia_qs = (PendenciasPacote.objects
                         .filter(carreta_carga__carga_id=carga_id)
                         .values_list('carreta_carga__carreta', flat=True)
                         .distinct())
-    com_pendencia = { (c or '').strip().upper() for c in com_pendencia_qs if c }
+    com_pendencia = {normalize_carreta_text(c) for c in com_pendencia_qs if normalize_carreta_text(c)}
 
     # 3) Diferenças
     faltando = sorted(esperadas - com_pendencia)   # carretas criadas mas sem nenhuma pendência

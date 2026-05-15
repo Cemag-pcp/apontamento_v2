@@ -4,7 +4,10 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from cadastro.models import CarretasExplodidas
 from cargas.models import CargaLiberada, CargaLiberadaItem, CargaLiberadaVersao
+from apontamento_exped.models import Carga, CarretaCarga, PendenciasPacote
+from apontamento_exped.views import _buscar_componentes_por_carreta, normalize_carreta_text
 
 
 class ExpedicaoLiberacaoTests(TestCase):
@@ -139,3 +142,58 @@ class ExpedicaoLiberacaoTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["cliente"], "Cliente A")
+
+
+class ExpedicaoCarretaNormalizationTests(TestCase):
+    def test_busca_componentes_ignora_espacos_duplicados_no_nome_da_carreta(self):
+        CarretasExplodidas.objects.create(
+            carreta="CBHM4500 SS RD MM M17 [EIXO 5000]",
+            codigo_peca="PEC001",
+            descricao_peca="PEC001 - Componente teste",
+            total_peca="2",
+            primeiro_processo="PINTAR",
+        )
+
+        grupos = _buscar_componentes_por_carreta(
+            ["CBHM4500 SS RD MM M17  [EIXO 5000]"]
+        )
+
+        chave = normalize_carreta_text("CBHM4500 SS RD MM M17  [EIXO 5000]")
+        self.assertEqual(list(grupos.keys()), [chave])
+        self.assertEqual(grupos[chave][0]["codigo_base"], "PEC001")
+        self.assertEqual(grupos[chave][0]["total_por_carreta"], 2)
+
+    def test_reprocessar_carreta_gera_pendencias_mesmo_com_espacos_duplicados(self):
+        carga = Carga.objects.create(
+            nome="Carga teste",
+            carga="Carga 01",
+            data_carga="2026-05-15",
+            cliente="Cliente X",
+            obs_pacote="",
+            stage="verificacao",
+        )
+        CarretaCarga.objects.create(
+            carga=carga,
+            carreta="CBHM4500 SS RD MM M17  [EIXO 5000]",
+            quantidade=3,
+            cor="sem-cor",
+        )
+        CarretasExplodidas.objects.create(
+            carreta="CBHM4500 SS RD MM M17 [EIXO 5000]",
+            codigo_peca="PEC001",
+            descricao_peca="PEC001 - Componente teste",
+            total_peca="2",
+            primeiro_processo="PINTAR",
+        )
+
+        response = self.client.post(
+            reverse("expedicao:reatualizar_carretas_faltantes", args=[carga.id]),
+            data={"carreta": "CBHM4500 SS RD MM M17  [EIXO 5000]"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(PendenciasPacote.objects.count(), 1)
+        pendencia = PendenciasPacote.objects.get()
+        self.assertEqual(pendencia.codigo, "PEC001")
+        self.assertEqual(pendencia.qt_necessaria, 6)
