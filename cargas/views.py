@@ -21,7 +21,7 @@ from django.core.mail import send_mail
 from django.conf import settings as django_settings
 
 from core.models import Ordem
-from cargas.models import CargaLiberada, CargaLiberadaVersao, LinkAcompanhamento, EmailNotificacaoCarga
+from cargas.models import CargaLiberada, CargaLiberadaVersao, CargaLiberadaItem, LinkAcompanhamento, EmailNotificacaoCarga
 from cargas.services import (
     atualizar_datas_sugeridas_planejamento,
     consolidar_ordens_planejamento,
@@ -30,7 +30,7 @@ from cargas.services import (
     listar_cargas_liberadas_periodo,
     montar_preview_planejamento_montagem,
 )
-from cargas.utils import consultar_carretas, consultar_carretas_detalhado, gerar_sequenciamento, gerar_arquivos, criar_array_datas
+from cargas.utils import consultar_carretas, consultar_carretas_detalhado, gerar_sequenciamento, gerar_arquivos, criar_array_datas, get_base_carreta, normalizar_codigo_recurso_serie
 from cadastro.models import Maquina
 from cargas.utils import processar_ordens_montagem, processar_ordens_pintura, processar_ordens_solda, imprimir_ordens_montagem, imprimir_ordens_montagem_unitaria, imprimir_ordens_pintura, imprimir_ordens_pcp_qualidade
 from apontamento_pintura.models import CambaoPecas, Retrabalho
@@ -44,7 +44,7 @@ import os
 import io
 import zipfile
 import threading
-from datetime import datetime
+from datetime import datetime, date
 import requests
 import json
 from datetime import timedelta
@@ -1992,153 +1992,158 @@ def enviar_etiqueta_impressora(request):
 @csrf_exempt
 @require_POST
 def enviar_etiqueta_impressora_montagem(request):
-    data = json.loads(request.body)
+    payload = json.loads(request.body)
+    cargas_payload = payload.get('cargas', [])
 
-    def _debug_montagem(mensagem, **contexto):
-        detalhes = ", ".join(f"{chave}={valor}" for chave, valor in contexto.items())
-        texto = f"[etiquetas_montagem] {mensagem}"
-        if detalhes:
-            texto = f"{texto} | {detalhes}"
-        print(texto)
-        logger.error(texto)
+    if not cargas_payload:
+        return JsonResponse({"error": "Nenhuma carga informada."}, status=400)
 
-    data_carga = data.get('data_inicio')
-    data_fim = data.get('data_fim')
-    cargas = data.get('cargas', [])  # Array de objetos {nome, data_carga, celulas}
-    celulas = data.get('celulas', [])
+    # Filtro de célula por carga: { 'CARGA 04': ['CELULA A', ...] }
+    filtros_celula = {}
+    for item in cargas_payload:
+        nome = str(item.get('nome', '')).strip().upper()
+        if nome:
+            filtros_celula[nome] = [c.strip().upper() for c in (item.get('celulas') or []) if c.strip()]
 
-    _debug_montagem(
-        "payload recebido",
-        data_inicio=data_carga,
-        data_fim=data_fim,
-        total_cargas=len(cargas),
-        celulas_payload=celulas,
-    )
+    # 1. Busca itens do banco para as cargas selecionadas
+    linhas = []
+    for item_carga in cargas_payload:
+        nome_carga = str(item_carga.get('nome', '')).strip()
+        data_carga_str = item_carga.get('data_carga', '')
 
-    # o argumento 'teste' é apenas para rodar com a coluna de carga
-    itens = gerar_sequenciamento(data_carga, data_fim or data_carga, 'montagem', 'teste') 
+        try:
+            data_carga_obj = date.fromisoformat(data_carga_str) if data_carga_str else None
+        except ValueError:
+            data_carga_obj = None
 
-    _debug_montagem(
-        "sequenciamento retornado",
-        linhas=len(itens),
-        colunas=list(itens.columns),
-    )
-
-    if itens.empty:
-        _debug_montagem("sem itens para o período selecionado")
-        return JsonResponse(
-            {
-                "error": "Nenhum item de montagem encontrado para o período selecionado.",
-                "debug": "sequenciamento_vazio",
-            },
-            status=400,
-        )
-    
-    colunas_grupo = [
-        "Código", "Peca", "Célula", "Datas","Carga"
-    ]
-
-    colunas_faltantes = [coluna for coluna in colunas_grupo + ["Qtde_total"] if coluna not in itens.columns]
-    if colunas_faltantes:
-        _debug_montagem(
-            "colunas obrigatórias ausentes",
-            faltantes=colunas_faltantes,
-            colunas_recebidas=list(itens.columns),
-        )
-        return JsonResponse(
-            {
-                "error": "Os dados do sequenciamento de montagem vieram incompletos para impressão.",
-                "debug": "colunas_faltantes",
-                "colunas_faltantes": colunas_faltantes,
-            },
-            status=500,
-        )
-
-    itens_agrupado = (
-        itens.groupby(colunas_grupo, as_index=False)["Qtde_total"]
-        .sum()
-    )
-
-    # Normaliza tipos/strings
-    itens_agrupado["Datas"] = pd.to_datetime(itens_agrupado["Datas"], errors="coerce").dt.date.astype("string")
-    itens_agrupado["Carga"] = itens_agrupado["Carga"].astype("string").str.strip().str.upper()
-    itens_agrupado["Célula"] = itens_agrupado["Célula"].astype("string").str.strip().str.upper()
-
-    # Mapeia filtros vindos do frontend
-    filtros = {}
-    for item in cargas:
-        data = pd.to_datetime(item.get("data_carga"), errors="coerce")
-        if pd.isna(data):
+        if not nome_carga or not data_carga_obj:
             continue
 
-        data_str = data.date().isoformat()
-        carga = str(item.get("nome", "")).strip().upper()
-        celulas = [c.strip().upper() for c in (item.get("celulas") or []) if c.strip()]
+        try:
+            carga_lib = CargaLiberada.objects.prefetch_related('versoes__itens').get(
+                carga_nome=nome_carga,
+                data_carga=data_carga_obj,
+            )
+        except CargaLiberada.DoesNotExist:
+            logger.warning("[etiquetas_montagem] carga não encontrada no banco | nome=%s data=%s", nome_carga, data_carga_str)
+            continue
 
-        filtros[(data_str, carga)] = celulas  # mesmo vazio, é restrição explícita
+        ultima_versao = carga_lib.versoes.order_by('-versao').first()
+        if not ultima_versao:
+            continue
 
-    _debug_montagem(
-        "filtros montados",
-        total_filtros=len(filtros),
-        chaves=list(filtros.keys()),
-    )
+        for item in ultima_versao.itens.all():
+            linhas.append({
+                'Recurso': str(item.codigo_recurso).strip(),
+                'Qtde_pedido': float(item.quantidade),
+                'Carga': carga_lib.carga_nome.strip().upper(),
+                'Datas': carga_lib.data_carga.isoformat(),
+            })
 
-    if not filtros:
-        _debug_montagem("nenhuma carga válida foi enviada no payload")
+    logger.info("[etiquetas_montagem] itens coletados do banco | total=%d", len(linhas))
+    print(f"[etiquetas_montagem] itens coletados do banco | total={len(linhas)}")
+
+    if not linhas:
+        logger.warning("[etiquetas_montagem] nenhum item encontrado no banco para as cargas")
         return JsonResponse(
-            {
-                "error": "Nenhuma carga foi informada para imprimir as etiquetas de montagem.",
-                "debug": "filtros_vazios",
-            },
+            {"error": "Nenhum item encontrado no banco para as cargas selecionadas."},
             status=400,
         )
 
-    def linha_valida(row):
-        chave = (row["Datas"], row["Carga"])
-        if chave not in filtros:
-            return False
+    try:
+        # 2. Carrega aba de referência das carretas (dados estáticos de Código/Peca/Célula/Qtde)
+        base_carretas = get_base_carreta()
+        base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
+        base_carretas['Recurso'] = normalizar_codigo_recurso_serie(base_carretas['Recurso'])
+        base_carretas['Recurso'] = base_carretas['Recurso'].apply(
+            lambda x: '0' + x if len(x) == 5 else x
+        )
+        if 'Etapa' in base_carretas.columns:
+            base_carretas = base_carretas[base_carretas['Etapa'].fillna('') != ''].copy()
+        base_carretas = base_carretas.reset_index(drop=True)
 
-        celulas_permitidas = filtros[chave]
-        if celulas_permitidas:
-            return row["Célula"] in celulas_permitidas
-        else:
-            # se veio lista vazia, aceita todas as células da carga
-            return True
+        # converte Qtde tolerando strings vazias ou inválidas
+        base_carretas['Qtde'] = pd.to_numeric(base_carretas['Qtde'], errors='coerce').fillna(0)
 
-    itens_agrupado = itens_agrupado[itens_agrupado.apply(linha_valida, axis=1)].copy()
+        logger.info("[etiquetas_montagem] base_carretas carregada | linhas=%d", len(base_carretas))
+        print(f"[etiquetas_montagem] base_carretas carregada | linhas={len(base_carretas)}")
 
-    _debug_montagem(
-        "resultado após filtro",
-        linhas_filtradas=len(itens_agrupado),
-        colunas=list(itens_agrupado.columns),
-    )
+        # 3. Normaliza Recurso dos itens do banco e faz merge
+        df_itens = pd.DataFrame(linhas)
+        df_itens['Recurso'] = normalizar_codigo_recurso_serie(df_itens['Recurso'])
+        df_itens['Recurso'] = df_itens['Recurso'].apply(lambda x: '0' + x if len(x) == 5 else x)
 
-    if itens_agrupado.empty:
-        _debug_montagem("filtro de carga/célula não encontrou correspondência")
-        return JsonResponse(
-            {
-                "error": "Nenhum item de montagem corresponde aos filtros de carga e célula informados.",
-                "debug": "filtro_sem_correspondencia",
-            },
-            status=400,
+        logger.info("[etiquetas_montagem] amostra recurso itens | %s", df_itens['Recurso'].head(5).tolist())
+        print(f"[etiquetas_montagem] amostra recurso itens | {df_itens['Recurso'].head(5).tolist()}")
+
+        df_merged = pd.merge(
+            df_itens,
+            base_carretas[['Recurso', 'Código', 'Peca', 'Qtde', 'Célula']],
+            on='Recurso',
+            how='left',
         )
 
-    colunas_ordenacao = [coluna for coluna in ["Célula", "Carga", "Código"] if coluna in itens_agrupado.columns]
-    itens_agrupado = itens_agrupado.sort_values(by=colunas_ordenacao, kind="stable").reset_index(drop=True)
+        total_antes = len(df_merged)
+        df_merged = df_merged.dropna(subset=['Código', 'Peca', 'Célula']).copy()
+        logger.info("[etiquetas_montagem] merge | antes_dropna=%d depois_dropna=%d", total_antes, len(df_merged))
+        print(f"[etiquetas_montagem] merge | antes_dropna={total_antes} depois_dropna={len(df_merged)}")
 
-    imprimir_ordens_montagem(itens_agrupado)
+        if df_merged.empty:
+            return JsonResponse(
+                {"error": "Nenhum item das cargas selecionadas está na base de carretas de montagem."},
+                status=400,
+            )
 
-    #primeiro filtrar o dataframe por uma das cargas enviadas
-    # for carga in cargas:
-    #     nome_carga = carga.get('nome')
-    #     celulas_carga = carga.get('celulas', [])
-    #     itens_agrupado_filtrado = itens_agrupado[itens_agrupado['Carga'] == nome_carga]
+        # 4. Calcula Qtde_total e normaliza Código
+        df_merged['Qtde_pedido'] = pd.to_numeric(df_merged['Qtde_pedido'], errors='coerce').fillna(0)
+        df_merged['Qtde'] = pd.to_numeric(df_merged['Qtde'], errors='coerce').fillna(0)
+        df_merged['Qtde_total'] = (df_merged['Qtde_pedido'].astype(int) * df_merged['Qtde'].astype(int))
+        df_merged = df_merged[df_merged['Qtde_total'] > 0].copy()
 
-    #     itens_agrupado_filtrado = itens_agrupado_filtrado[itens_agrupado_filtrado['Célula'].isin(celulas_carga)]
+        logger.info("[etiquetas_montagem] após filtro qtd>0 | linhas=%d", len(df_merged))
+        print(f"[etiquetas_montagem] após filtro qtd>0 | linhas={len(df_merged)}")
 
-    #     print(itens_agrupado_filtrado)
+        df_merged['Código'] = (
+            df_merged['Código'].fillna('').astype(str).str.strip()
+            .str.replace(r'\.0$', '', regex=True)
+        )
+        df_merged['Código'] = df_merged['Código'].apply(
+            lambda x: '0' + x if len(x) == 5 else (x[:6] if len(x) == 8 else x)
+        )
+        df_merged['Célula'] = df_merged['Célula'].astype(str).str.strip().str.upper()
 
-    return JsonResponse({"payload": f"Processadas {len(cargas)} cargas"})
+        # 5. Aplica filtro de célula por carga (se especificado)
+        def celula_ok(row):
+            filtro = filtros_celula.get(row['Carga'], [])
+            return not filtro or row['Célula'] in filtro
+
+        df_merged = df_merged[df_merged.apply(celula_ok, axis=1)].copy()
+
+        if df_merged.empty:
+            return JsonResponse(
+                {"error": "Nenhum item corresponde aos filtros de célula informados."},
+                status=400,
+            )
+
+        # 6. Agrupa e imprime
+        df_final = (
+            df_merged.groupby(['Código', 'Peca', 'Célula', 'Datas', 'Carga'], as_index=False)['Qtde_total']
+            .sum()
+            .sort_values(['Célula', 'Datas'])
+            .reset_index(drop=True)
+        )
+
+        logger.info("[etiquetas_montagem] df_final para impressão | linhas=%d", len(df_final))
+        print(f"[etiquetas_montagem] df_final para impressão | linhas={len(df_final)}")
+        print(df_final[['Código', 'Peca', 'Célula', 'Carga', 'Qtde_total']].to_string())
+
+        imprimir_ordens_montagem(df_final)
+
+    except Exception as exc:
+        logger.exception("[etiquetas_montagem] erro inesperado")
+        return JsonResponse({"error": f"Erro interno ao processar etiquetas: {exc}"}, status=500)
+
+    return JsonResponse({"payload": f"Processadas {len(cargas_payload)} cargas"})
 
 @csrf_exempt
 @require_POST

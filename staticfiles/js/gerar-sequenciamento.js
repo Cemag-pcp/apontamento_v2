@@ -304,7 +304,10 @@ async function gerarEtiquetaQrCode() {
                         carga: item?.carga ?? "Sem carga",
                         data_carga: item?.data_carga ?? "",
                     });
-                    (acc[key] ||= []).push(item);
+                    if (!acc[key]) {
+                        acc[key] = { itens: [], data_sugerida: item?.data_sugerida_planejamento ?? "" };
+                    }
+                    acc[key].itens.push(item);
                     return acc;
                 }, {});
 
@@ -316,7 +319,9 @@ async function gerarEtiquetaQrCode() {
             wrap.style.display = "grid";
             wrap.style.gap = "14px";
 
-            Object.entries(grupos).forEach(([keyStr, itens]) => {
+            Object.entries(grupos).forEach(([keyStr, grupo]) => {
+                const itens = grupo.itens;
+                const dataSugerida = grupo.data_sugerida ?? "";
                 let meta = { carga: "Sem carga", data_carga: "" };
                 try {
                     meta = JSON.parse(keyStr);
@@ -345,6 +350,7 @@ async function gerarEtiquetaQrCode() {
                 chk.value = keyStr;
                 chk.dataset.carga = cargaNome;
                 chk.dataset.dataCarga = dataCarga;
+                chk.dataset.dataSugerida = dataSugerida;
                 chk.checked = true;
                 chk.onchange = e => {
                     const cardAtual = e.target.closest(".card-carga-montagem");
@@ -447,6 +453,7 @@ async function gerarEtiquetaQrCode() {
                         return {
                             nome: chk.dataset.carga,
                             data_carga: chk.dataset.dataCarga,
+                            data_sugerida: chk.dataset.dataSugerida ?? "",
                             celulas: celulasSelecionadas
                         };
                     });
