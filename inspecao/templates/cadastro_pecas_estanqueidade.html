@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %} <title>Cadastro Pecas Estanqueidade</title> {% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="/static/css/inspecao.css">
+{% endblock %}
+
+{% block content %}
+<form style="display: none;">{% csrf_token %}</form>
+
+<div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2">
+    <h2 class="my-4">Conjuntos Inspecionados</h2>
+    <button class="btn btn-primary" id="btn-abrir-modal-adicionar" type="button">Adicionar item</button>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label for="filtro-codigo" class="form-label">Codigo</label>
+                <input type="text" class="form-control" id="filtro-codigo" placeholder="Filtrar por codigo">
+            </div>
+            <div class="col-md-4">
+                <label for="filtro-descricao" class="form-label">Descricao</label>
+                <input type="text" class="form-control" id="filtro-descricao" placeholder="Filtrar por descricao">
+            </div>
+            <div class="col-md-4">
+                <label for="filtro-tipo" class="form-label">Tipo</label>
+                <select class="form-select" id="filtro-tipo">
+                    <option value="">Todos</option>
+                    {% for valor, label in tipos %}
+                    <option value="{{ valor }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="button" class="btn btn-primary" id="btn-filtrar">Filtrar</button>
+                <button type="button" class="btn btn-secondary" id="btn-limpar-filtros">Limpar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table" id="tabela-pecas-estanqueidade">
+        <thead>
+            <tr>
+                <th>Codigo</th>
+                <th>Descricao</th>
+                <th>Tipo</th>
+                <th>Acao</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for peca in pecas %}
+            <tr data-codigo="{{ peca.codigo }}" data-descricao="{{ peca.descricao|default:'' }}" data-tipo="{{ peca.tipo }}">
+                <td>{{ peca.codigo }}</td>
+                <td>{{ peca.descricao|default:"" }}</td>
+                <td data-tipo-label="{{ peca.get_tipo_display }}">{{ peca.get_tipo_display }}</td>
+                <td>
+                    <button class="btn btn-outline-primary btn-sm abrir-modal-editar" type="button">Editar</button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr id="linha-vazia-inicial">
+                <td colspan="4" class="text-center text-muted">Nenhum item cadastrado.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<nav aria-label="Navegacao da tabela">
+    <ul class="pagination" id="pagination"></ul>
+</nav>
+
+<div class="modal fade" id="modal-form-peca" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="modal-form-peca-label">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modal-form-peca-label">Adicionar item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="codigo-original">
+                <div class="row">
+                    <div class="col-sm-6 mb-3">
+                        <label for="codigo" class="form-label">Codigo</label>
+                        <input class="form-control" type="text" id="codigo">
+                    </div>
+                    <div class="col-sm-6 mb-3">
+                        <label for="tipo" class="form-label">Tipo</label>
+                        <select class="form-select" id="tipo">
+                            <option value="">Selecione</option>
+                            {% for valor, label in tipos %}
+                            <option value="{{ valor }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="descricao" class="form-label">Descricao</label>
+                        <input class="form-control" type="text" id="descricao">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="salvar-peca" type="button">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/estanqueidade/cadastro-pecas-estanqueidade.js' %}"></script>
+{% endblock %}

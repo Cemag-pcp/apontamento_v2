@@ -16,6 +16,8 @@ app_name = "inspecao"
 urlpatterns = [
     path('api/conjuntos-inspecionados/<str:codigo>/', montagem.add_remove_conjuntos_inspecionados, name='remover_conjunto'),
     path('api/conjuntos-inspecionados/', montagem.add_remove_conjuntos_inspecionados, name='adicionar_conjunto'),
+    path('api/cadastro-pecas-estanqueidade/<str:codigo>/', estanqueidade.crud_pecas_estanqueidade, name='cadastro-pecas-estanqueidade-editar-remover'),
+    path('api/cadastro-pecas-estanqueidade/', estanqueidade.crud_pecas_estanqueidade, name='cadastro-pecas-estanqueidade-criar'),
 
     path('api/itens-inspecao-pintura/', pintura.get_itens_inspecao_pintura, name='itens-inspecao-pintura'),
     path('api/itens-inspecionados-pintura/', pintura.get_itens_inspecionados_pintura, name='itens-inspecionados-pintura'),
@@ -114,6 +116,7 @@ urlpatterns = [
 urlpatterns += [
     path('montagem/', montagem.inspecao_montagem, name='inspecao-montagem'),
     path('conjuntos-inspecionados/', montagem.conjuntos_inspecionados_montagem, name='conjuntos-inspecionados-montagem'),
+    path('estanqueidade/conjuntos-inspecionados/', estanqueidade.cadastro_pecas_estanqueidade, name='conjuntos-inspecionados-estanqueidade'),
     path('serra-usinagem/', serra_usinagem.inspecao_serra_usinagem, name='inspecao-serra-usinagem'),
     path('corte/', corte.inspecao_corte, name='inspecao-corte'),
     path('estamparia/', estamparia.inspecao_estamparia, name='inspecao-estamparia'),

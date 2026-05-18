@@ -53,6 +53,120 @@ from collections import defaultdict
 import json
 
 
+def cadastro_pecas_estanqueidade(request):
+    pecas = PecasEstanqueidade.objects.all().order_by("codigo")
+
+    return render(
+        request,
+        "cadastro_pecas_estanqueidade.html",
+        {
+            "pecas": pecas,
+            "tipos": PecasEstanqueidade.TIPO_CHOICES,
+        },
+    )
+
+
+def crud_pecas_estanqueidade(request, codigo=None):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Payload invalido"}, status=400)
+
+        codigo_peca = (data.get("codigo") or "").strip()
+        descricao = (data.get("descricao") or "").strip()
+        tipo = (data.get("tipo") or "").strip()
+
+        if not codigo_peca or not tipo:
+            return JsonResponse({"error": "Codigo e tipo sao obrigatorios"}, status=400)
+
+        tipos_validos = {choice[0] for choice in PecasEstanqueidade.TIPO_CHOICES}
+        if tipo not in tipos_validos:
+            return JsonResponse({"error": "Tipo invalido"}, status=400)
+
+        if PecasEstanqueidade.objects.filter(codigo=codigo_peca).exists():
+            return JsonResponse({"error": "Codigo ja cadastrado"}, status=400)
+
+        peca = PecasEstanqueidade.objects.create(
+            codigo=codigo_peca,
+            descricao=descricao or None,
+            tipo=tipo,
+        )
+
+        return JsonResponse(
+            {
+                "success": "Peca cadastrada com sucesso",
+                "item": {
+                    "codigo": peca.codigo,
+                    "descricao": peca.descricao or "",
+                    "tipo": peca.tipo,
+                    "tipo_label": peca.get_tipo_display(),
+                },
+            },
+            status=201,
+        )
+
+    if request.method == "PUT":
+        if not codigo:
+            return JsonResponse({"error": "Codigo nao informado"}, status=400)
+
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Payload invalido"}, status=400)
+
+        novo_codigo = (data.get("codigo") or "").strip()
+        descricao = (data.get("descricao") or "").strip()
+        tipo = (data.get("tipo") or "").strip()
+
+        if not novo_codigo or not tipo:
+            return JsonResponse({"error": "Codigo e tipo sao obrigatorios"}, status=400)
+
+        tipos_validos = {choice[0] for choice in PecasEstanqueidade.TIPO_CHOICES}
+        if tipo not in tipos_validos:
+            return JsonResponse({"error": "Tipo invalido"}, status=400)
+
+        try:
+            peca = PecasEstanqueidade.objects.get(codigo=codigo)
+        except PecasEstanqueidade.DoesNotExist:
+            return JsonResponse({"error": "Peca nao encontrada"}, status=404)
+
+        if (
+            novo_codigo != codigo
+            and PecasEstanqueidade.objects.filter(codigo=novo_codigo).exists()
+        ):
+            return JsonResponse({"error": "Codigo ja cadastrado"}, status=400)
+
+        peca.codigo = novo_codigo
+        peca.descricao = descricao or None
+        peca.tipo = tipo
+        peca.save(update_fields=["codigo", "descricao", "tipo"])
+
+        return JsonResponse(
+            {
+                "success": "Peca atualizada com sucesso",
+                "item": {
+                    "codigo": peca.codigo,
+                    "descricao": peca.descricao or "",
+                    "tipo": peca.tipo,
+                    "tipo_label": peca.get_tipo_display(),
+                },
+            }
+        )
+
+    if request.method == "DELETE":
+        if not codigo:
+            return JsonResponse({"error": "Codigo nao informado"}, status=400)
+
+        deleted_count, _ = PecasEstanqueidade.objects.filter(codigo=codigo).delete()
+        if not deleted_count:
+            return JsonResponse({"error": "Peca nao encontrada"}, status=404)
+
+        return JsonResponse({"success": "Peca removida com sucesso"})
+
+    return JsonResponse({"error": "Metodo nao permitido"}, status=405)
+
+
 def _get_prefixed_post_list(query_dict, prefix):
     values = query_dict.getlist(prefix)
     if values:
