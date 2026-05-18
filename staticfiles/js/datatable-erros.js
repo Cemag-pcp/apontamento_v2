@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
                 // Adiciona os itens na tabela correta
                 const tableBody = document.getElementById(config.tbodyId);
+                if (!tableBody) return;
                 items.forEach(item => {
                     const row = document.createElement('tr');
                     row.innerHTML = config.columns
@@ -110,11 +111,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Função para inicializar uma tabela específica
     function initializeTable(config) {
         const container = document.getElementById(config.containerId);
+        if (!container) return;
 
-        // Carrega os primeiros itens
         fetchItems(config);
 
-        // Evento de scroll no contêiner específico
         container.addEventListener('scroll', () => {
             if (container.scrollTop + container.clientHeight >= container.scrollHeight - 50) {
                 fetchItems(config);
