@@ -174,7 +174,7 @@ def lista_solicitacoes(request):
         "funcionario", "item", "classe_requisicao", "status"
     )
     transferencias = SolicitacaoTransferencia.objects.filter(entregue_por=None).select_related(
-        "funcionario", "item", "status"
+        "funcionario", "item", "status", "deposito_destino"
     )
     operadores_entrega = OperadorAlmox.objects.filter(status=True)
 
@@ -384,6 +384,7 @@ def lista_solicitacoes(request):
             "prioridade_cor": req.status.cor if req.status else "#6c757d",
             "prioridade_cor_texto": _cor_texto_contraste(req.status.cor) if req.status else "#ffffff",
             "classe_requisicao": req.classe_requisicao.nome,
+            "cc": str(req.cc) if req.cc else "",
             "saldo": req.saldo,
             "data_solicitacao": req.data_solicitacao.isoformat(),
             "acoes": 'acoes'
@@ -422,6 +423,7 @@ def lista_solicitacoes(request):
             "prioridade": trans.status.prioridade if trans.status else "",
             "prioridade_cor": trans.status.cor if trans.status else "#6c757d",
             "prioridade_cor_texto": _cor_texto_contraste(trans.status.cor) if trans.status else "#ffffff",
+            "deposito_destino": str(trans.deposito_destino) if trans.deposito_destino else "",
             "saldo": trans.saldo,
             "data_solicitacao": trans.data_solicitacao.isoformat(),
             "rpa": trans.rpa or "",

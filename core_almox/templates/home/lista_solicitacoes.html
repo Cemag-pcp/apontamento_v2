@@ -27,6 +27,7 @@
             <th>Quantidade</th>
             <th>Prioridade</th>
             <th>Classe de Requisição</th>
+            <th>CC</th>
             <th>Saldo</th>
             <th>Data de Solicitação</th>
             <th>Ações</th>
@@ -53,6 +54,7 @@
             <th>Item</th>
             <th>Quantidade</th>
             <th>Prioridade</th>
+            <th>Depósito Destino</th>
             <th>Saldo</th>
             <th>Data de Solicitação</th>
             <th>Ações</th>
@@ -959,8 +961,9 @@
                     }
                 },
                 { data: 'classe_requisicao'},
+                { data: 'cc'},
                 { data: 'saldo'},
-                { data: 'data_solicitacao', 
+                { data: 'data_solicitacao',
                   render: function(data, type, row) {
                     return new Date(data).toLocaleDateString('pt-BR', {
                         year: 'numeric',
@@ -972,7 +975,7 @@
                     });
                 }
                 },
-                { 
+                {
                     data: 'acoes',
                     render: function(data,type,row){
                         return `<input type="hidden" name="solicitacao_id" value="${row.id}" class="solicitacao_id">
@@ -1039,6 +1042,7 @@
                         return `<span class="badge" style="background-color: ${row.prioridade_cor}; color: ${row.prioridade_cor_texto};">${data}</span>`;
                     }
                 },
+                { data: 'deposito_destino'},
                 { data: 'saldo'},
                 { data: 'data_solicitacao',
                   render: function(data, type, row) {
