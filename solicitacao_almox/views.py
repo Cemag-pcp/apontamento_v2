@@ -22,6 +22,7 @@ from cadastro_almox.models import (
 )
 from core_almox.models import RegistroAcaoSolicitacaoAlmox
 from core.utils import notificar_acao_almox
+from core_almox.views import _chamar_innovaro_transferir
 
 from .forms import (
     SolicitacaoRequisicaoForm,
@@ -101,13 +102,29 @@ def criar_solicitacoes(request):
                     )
                     now = datetime.now()
                     data_entrega = now.strftime("%Y-%m-%dT%H:%M")
-                    solicitacao.entregue_por = operador
-                    solicitacao.data_entrega = data_entrega
-                    solicitacao.save()
+
+                    # Claim atômico antes de chamar o Innovaro
+                    with transaction.atomic():
+                        claimed = SolicitacaoTransferencia.objects.filter(
+                            id=solicitacao.id, chave_innovaro__isnull=True
+                        ).update(chave_innovaro='PROCESSANDO')
+
+                    if claimed:
+                        chave, erro = _chamar_innovaro_transferir(solicitacao)
+                        if erro:
+                            solicitacao.rpa = erro
+                            solicitacao.chave_innovaro = None
+                            solicitacao.save(update_fields=["rpa", "chave_innovaro"])
+                        else:
+                            solicitacao.entregue_por = operador
+                            solicitacao.data_entrega = data_entrega
+                            solicitacao.chave_innovaro = str(chave) if chave else None
+                            solicitacao.save()
+                            notificar_acao_almox("entregar", "transferencia", solicitacao.id)
+
                     return JsonResponse({"status": "sucesso", "operador": True})
                 except Http404:
                     print(f"Operador com matrícula: {matricula} não encontrado!")
-                    # verificar_e_notificar_transferencias_pendentes()
                     return JsonResponse({"status": "sucesso", "operador": False})
             else:
                 return JsonResponse({"status": "erro"})
@@ -1152,14 +1169,6 @@ def edit_solicitacao(request, tipo_solicitacao, requisicao_id):
 
 
 def home_erros(request):
-    querysetTransferenciaErros = SolicitacaoTransferencia.objects.filter(
-        (Q(rpa__isnull=False) & ~Q(rpa="OK")) & Q(data_entrega__isnull=False)
-    )
-
-    querysetTransferenciaNa = SolicitacaoTransferencia.objects.filter(
-        (Q(rpa__isnull=True) & ~Q(rpa="OK")) & Q(data_entrega__isnull=False)
-    )
-
     querysetRequisicaoErros = SolicitacaoRequisicao.objects.filter(
         (Q(rpa__isnull=False) & ~Q(rpa="OK")) & Q(data_entrega__isnull=False)
     )
@@ -1168,8 +1177,6 @@ def home_erros(request):
     )
 
     context = {
-        "qtdTransferenciaErros": len(querysetTransferenciaErros),
-        "qtdTransferenciaNa": len(querysetTransferenciaNa),
         "qtdRequisicaoErros": len(querysetRequisicaoErros),
         "qtdRequisicaoNa": len(querysetRequisicaoNa),
     }
