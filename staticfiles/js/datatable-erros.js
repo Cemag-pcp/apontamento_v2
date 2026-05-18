@@ -1,29 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
     
-    // Configuração para a tabela de transferências
-    const transferenciaConfig = {
-        containerId: 'table-transferencia-container',
-        tbodyId: 'table-body-transferencia',
-        url: '/almox/api/erros/data-transferencia/', // Substitua pela URL correta
-        start: 0,
-        length: 10,
-        isLoading: false,
-        hasMoreItems: true,
-        spinnerId: 'spinner-transferencia',
-        type: 'transferencia',
-        columns: [
-            { key: 'chave', label: 'Chave' },
-            { key: 'item', label: 'Item' },
-            { key: 'qtd', label: 'Quantidade' },
-            { key: 'data_solicitacao', label: 'Data Solicitação' },
-            { key: 'data_entrega', label: 'Data Entrega' },
-            { key: 'dep_destino', label: 'Destino' },
-            { key: 'solicitante', label: 'Solicitante' },
-            { key: 'erro', label: 'Erro' },
-            { key: 'actions', label: 'Ações' },
-        ],
-    };
-
     // Configuração para a tabela de estoque
     const requisicaoConfig = {
         containerId: 'table-requisicao-container',
@@ -163,7 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Inicializa as tabelas
-    initializeTable(transferenciaConfig);
     initializeTable(requisicaoConfig);
 
     document.addEventListener('show.bs.modal', () => {
@@ -209,8 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditar'));
             modal.hide();
 
-            resetTable(transferenciaConfig); // Para tabela de transferências
-            resetTable(requisicaoConfig);   // Para tabela de requisições
+            resetTable(requisicaoConfig);
 
         })
         .catch(error => {
@@ -254,8 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const modal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmar'));
             modal.hide();
 
-            resetTable(transferenciaConfig); // Para tabela de transferências
-            resetTable(requisicaoConfig);   // Para tabela de requisições
+            resetTable(requisicaoConfig);
 
         })
         .catch(error => {
