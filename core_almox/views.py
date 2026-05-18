@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
+from django.db import transaction
 
 
 from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
@@ -72,18 +73,15 @@ def _registrar_acao_solicitacao(request, solicitacao, tipo_solicitacao, acao, mo
         usuario=request.user if request.user.is_authenticated else None,
     )
 
-def _chamar_innovaro_transferir(solicitacao, tipo_solicitacao):
-    if tipo_solicitacao == "requisicao":
-        deposito_destino = solicitacao.cc.nome
-    else:
-        deposito_destino = solicitacao.deposito_destino.nome
-
+def _chamar_innovaro_transferir(solicitacao):
+    """Retorna (chave_str | None, erro_str | None). Apenas para transferências."""
     payload = {
-        "id": f"almox-{tipo_solicitacao}-{solicitacao.id}",
+        "id": f"almox-transferencia-{solicitacao.id}",
         "pessoa": solicitacao.funcionario.matricula,
         "recurso": solicitacao.item.codigo,
+        "quantidade": solicitacao.quantidade,
         "depositoOrigem": "Almox central",
-        "depositoDestino": deposito_destino,
+        "depositoDestino": solicitacao.deposito_destino.nome,
     }
 
     if os.getenv("DJANGO_ENV") == "dev":
@@ -91,19 +89,82 @@ def _chamar_innovaro_transferir(solicitacao, tipo_solicitacao):
     else:
         url = "https://cemag.innovaro.com.br/api/integracao/v1/producao/transferir"
 
+    print(f"[Innovaro] payload enviado: {payload}")
+    print(f"[Innovaro] URL: {url}")
+
     try:
         response = requests.post(url, json=payload, auth=("luan araujo", "luanaraujo7"), timeout=(10, 60))
-        if response.ok:
-            try:
-                resp_json = response.json()
-                chave = resp_json.get("chave") or resp_json.get("id")
-                if chave:
-                    solicitacao.chave_innovaro = str(chave)
-                    solicitacao.save(update_fields=["chave_innovaro"])
-            except ValueError:
-                pass
-    except requests.RequestException:
-        pass
+    except requests.RequestException as exc:
+        print(f"[Innovaro] erro de conexão: {exc}")
+        return None, f"Erro de conexão com o Innovaro: {exc}"
+
+    print(f"[Innovaro] status: {response.status_code}")
+    print(f"[Innovaro] resposta: {response.text}")
+
+    try:
+        resp_json = response.json()
+    except ValueError:
+        resp_json = {}
+
+    if not response.ok or resp_json.get("status") == "Error":
+        detail = resp_json.get("description") or response.text
+        return None, f"Innovaro retornou erro: {detail}"
+
+    chave = resp_json.get("chaveTransferencia")
+    print(f"[Innovaro] chave extraída: {chave}")
+    return chave, None
+
+
+def _chamar_innovaro_transferir_lote(solicitacoes):
+    """Envia lista de transferências ao Innovaro. Retorna lista de (solicitacao, chave, erro)."""
+    payload = [
+        {
+            "id": f"almox-transferencia-{s.id}",
+            "pessoa": s.funcionario.matricula,
+            "recurso": s.item.codigo,
+            "quantidade": s.quantidade,
+            "depositoOrigem": "Almox central",
+            "depositoDestino": s.deposito_destino.nome,
+        }
+        for s in solicitacoes
+    ]
+
+    if os.getenv("DJANGO_ENV") == "dev":
+        url = "https://hcemag.innovaro.com.br/api/integracao/v1/producao/transferir"
+    else:
+        url = "https://cemag.innovaro.com.br/api/integracao/v1/producao/transferir"
+
+    print(f"[Innovaro Lote] payload: {payload}")
+    print(f"[Innovaro Lote] URL: {url}")
+
+    try:
+        response = requests.post(url, json=payload, auth=("luan araujo", "luanaraujo7"), timeout=(10, 60))
+    except requests.RequestException as exc:
+        print(f"[Innovaro Lote] erro de conexão: {exc}")
+        return [(s, None, f"Erro de conexão: {exc}") for s in solicitacoes]
+
+    print(f"[Innovaro Lote] status: {response.status_code}")
+    print(f"[Innovaro Lote] resposta: {response.text}")
+
+    try:
+        resp_list = response.json()
+        if not isinstance(resp_list, list):
+            resp_list = [resp_list]
+    except ValueError:
+        err = f"Resposta inválida do Innovaro: {response.text}"
+        return [(s, None, err) for s in solicitacoes]
+
+    result_map = {item.get("id"): item for item in resp_list}
+
+    results = []
+    for s in solicitacoes:
+        item_resp = result_map.get(f"almox-transferencia-{s.id}", {})
+        if item_resp.get("status") == "Error":
+            results.append((s, None, item_resp.get("description") or "Erro desconhecido"))
+        else:
+            results.append((s, item_resp.get("chaveTransferencia"), None))
+
+    return results
 
 
 @login_required
@@ -125,8 +186,67 @@ def lista_solicitacoes(request):
     if request.method == "POST":
         if "type_sol" in request.POST:
             pass
+        elif "entregar_lote" in request.POST:
+            ids_raw = request.POST.getlist("solicitacao_ids[]")
+            matricula = request.POST.get("matricula")
+            data_entrega = request.POST.get("data_entrega")
+
+            entregue_por = get_object_or_404(OperadorAlmox, matricula=matricula)
+            solicitacoes = list(
+                SolicitacaoTransferencia.objects.filter(id__in=ids_raw)
+                .select_related("funcionario", "item", "deposito_destino")
+            )
+
+            # Claim atômico: marca como PROCESSANDO apenas as que ainda não têm chave
+            with transaction.atomic():
+                claimed_count = SolicitacaoTransferencia.objects.filter(
+                    id__in=[s.id for s in solicitacoes], chave_innovaro__isnull=True
+                ).update(chave_innovaro='PROCESSANDO')
+
+            # Recarrega do banco para saber quais foram claimadas
+            solicitacoes_db = list(
+                SolicitacaoTransferencia.objects.filter(id__in=[s.id for s in solicitacoes])
+                .select_related("funcionario", "item", "deposito_destino")
+            )
+
+            erros = []
+            for s in solicitacoes_db:
+                if s.chave_innovaro != 'PROCESSANDO':
+                    msg = ('Solicitação em processamento por outro usuário.'
+                           if s.chave_innovaro == 'PROCESSANDO'
+                           else f'Solicitação #{s.id} já foi processada no Innovaro (chave: {s.chave_innovaro}).')
+                    erros.append({"id": s.id, "erro": msg})
+
+            solicitacoes = [s for s in solicitacoes_db if s.chave_innovaro == 'PROCESSANDO']
+
+            if not solicitacoes:
+                return JsonResponse({'status': 'Erro', 'mensagem': 'Todas as solicitações selecionadas já foram processadas ou estão em processamento.', 'erros': erros}, status=409)
+
+            resultados = _chamar_innovaro_transferir_lote(solicitacoes)
+
+            sucesso = []
+            for sol, chave, erro in resultados:
+                if erro:
+                    sol.rpa = erro
+                    sol.chave_innovaro = None  # libera o claim
+                    sol.save(update_fields=["rpa", "chave_innovaro"])
+                    erros.append({"id": sol.id, "erro": erro})
+                else:
+                    sol.entregue_por = entregue_por
+                    sol.data_entrega = data_entrega
+                    sol.chave_innovaro = str(chave) if chave else None
+                    sol.save()
+                    notificar_acao_almox("entregar", "transferencia", sol.id)
+                    sucesso.append(sol.id)
+
+            return JsonResponse({
+                'status': 'Parcial' if erros else 'Sucesso',
+                'tipo': 'transferencia',
+                'sucesso': sucesso,
+                'erros': erros,
+            })
+
         elif "entregar" in request.POST:
-            print('entregar')
             solicitacao_id = request.POST.get("solicitacao_id")
             tipo_solicitacao = request.POST.get("tipo_solicitacao")
             if tipo_solicitacao == "requisicao":
@@ -134,18 +254,40 @@ def lista_solicitacoes(request):
             else:
                 solicitacao = get_object_or_404(SolicitacaoTransferencia, id=solicitacao_id)
 
-            # Solicitar matrícula e data
             matricula = request.POST.get("matricula")
             data_entrega = request.POST.get("data_entrega")
 
             entregue_por = get_object_or_404(OperadorAlmox, matricula=matricula)
 
-            # Aqui você poderia adicionar a lógica para salvar esses dados ou marcar como entregue
+            if tipo_solicitacao == "transferencia":
+                # Claim atômico: só avança se chave_innovaro ainda for nula
+                with transaction.atomic():
+                    claimed = SolicitacaoTransferencia.objects.filter(
+                        id=solicitacao.id, chave_innovaro__isnull=True
+                    ).update(chave_innovaro='PROCESSANDO')
+
+                if not claimed:
+                    solicitacao.refresh_from_db()
+                    chave_atual = solicitacao.chave_innovaro or ''
+                    msg = ('Solicitação em processamento por outro usuário. Aguarde.'
+                           if chave_atual == 'PROCESSANDO'
+                           else f'Solicitação #{solicitacao.id} já foi processada no Innovaro (chave: {chave_atual}).')
+                    return JsonResponse({'status': 'Erro', 'mensagem': msg}, status=409)
+
+                chave, erro = _chamar_innovaro_transferir(solicitacao)
+                if erro:
+                    solicitacao.rpa = erro
+                    solicitacao.chave_innovaro = None  # libera o claim
+                    solicitacao.save(update_fields=["rpa", "chave_innovaro"])
+                    return JsonResponse({'status': 'Erro', 'mensagem': erro}, status=502)
+            else:
+                chave = None
+
             solicitacao.entregue_por = entregue_por
             solicitacao.data_entrega = data_entrega
+            if chave:
+                solicitacao.chave_innovaro = str(chave)
             solicitacao.save()
-
-            _chamar_innovaro_transferir(solicitacao, tipo_solicitacao)
 
             notificar_acao_almox("entregar", tipo_solicitacao, solicitacao.id)
 
@@ -282,6 +424,7 @@ def lista_solicitacoes(request):
             "prioridade_cor_texto": _cor_texto_contraste(trans.status.cor) if trans.status else "#ffffff",
             "saldo": trans.saldo,
             "data_solicitacao": trans.data_solicitacao.isoformat(),
+            "rpa": trans.rpa or "",
             "acoes": 'acoes'
         }
         for trans in transferencias_paginadas

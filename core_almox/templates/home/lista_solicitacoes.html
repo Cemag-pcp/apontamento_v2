@@ -37,10 +37,17 @@
     </tbody>
 </table>
 
-<h3 class="mb-3">Transferências</h3>
+<div class="d-flex align-items-center justify-content-between mb-2">
+    <h3 class="mb-0">Transferências</h3>
+    <button type="button" id="btnConfirmarLote" class="btn btn-success btn-sm d-none"
+            data-bs-toggle="modal" data-bs-target="#entregaModal" onclick="abrirModalLote()">
+        Confirmar lote (<span id="contadorLote">0</span> selecionados)
+    </button>
+</div>
 <table id="transferenciasTable" class="table table-bordered table-striped table-sm mb-3" style="width:100%">
     <thead>
         <tr>
+            <th><input type="checkbox" id="checkAllTransferencias" title="Selecionar todos"></th>
             <th>ID</th>
             <th>Funcionário</th>
             <th>Item</th>
@@ -70,6 +77,7 @@
             <input type="hidden" name="solicitacao_id" id="solicitacaoId">
             <input type="hidden" name="tipo_solicitacao" id="tipoSolicitacao">
             <input type="hidden" name="entregar" id="entregar">
+            <div id="loteIdsContainer"></div>
 
             <div class="mb-3">
                 <label for="operador" class="form-label">Operador</label>
@@ -89,6 +97,24 @@
             </div>
             </form>
         </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal erro Innovaro -->
+<div class="modal fade" id="erroInnovaroModal" tabindex="-1" aria-labelledby="erroInnovaroModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title" id="erroInnovaroModalLabel">Erro Innovaro</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="erroInnovaroTexto" class="mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -325,36 +351,51 @@
     $('#formEntregaModal').on('submit',function(event){
         event.preventDefault();
         let buttonEntregaModal = document.getElementById('buttonEntregaModal');
-        let formEntregaData = $(this).serialize();
-        
-        var url = `{% url "lista_solicitacoes" %}`; 
+        var url = `{% url "lista_solicitacoes" %}`;
+
+        // Lote: adiciona campo de ação correto ao serializar
+        if (modoLote) {
+            document.getElementById('entregar').value = '';
+        }
+        let formData = $(this).serialize();
+        if (modoLote) {
+            formData += '&entregar_lote=1';
+        }
 
         $.ajax({
-            url: url,  // A URL para onde os dados serão enviados
+            url: url,
             type: 'POST',
-            data: formEntregaData,  // Dados do formulário
+            data: formData,
             beforeSend: function(){
                 buttonEntregaModal.textContent = 'Carregando...';
                 buttonEntregaModal.disabled = true;
             },
             success: function(response) {
-                // console.log("Dados enviados com sucesso",response);
-
                 var entregaConfirmaModal = bootstrap.Modal.getInstance(document.getElementById('entregaModal'));
                 entregaConfirmaModal.hide();
+                tableTra.ajax.reload();
+                tableReq.ajax.reload();
 
-                if (response.tipo == 'requisicao'){
-                    tableReq.ajax.reload();
-                }else{
-                    tableTra.ajax.reload();
+                if (modoLote && response.erros && response.erros.length > 0) {
+                    let msg = `Lote processado: ${response.sucesso.length} entregue(s).\n\nErros:\n`;
+                    response.erros.forEach(e => { msg += `- ID ${e.id}: ${e.erro}\n`; });
+                    alert(msg);
                 }
 
-                // Aqui você pode exibir uma mensagem ou realizar outra ação com a resposta
+                // Desmarcar checkboxes
+                document.querySelectorAll('.checkTransferencia').forEach(cb => cb.checked = false);
+                document.getElementById('checkAllTransferencias').checked = false;
+                atualizarContadorLote();
             },
-            error: function(xhr, status, error) {
-                console.error("Erro ao enviar dados:", error);
+            error: function(xhr) {
+                var mensagem = 'Erro ao confirmar entrega.';
+                try {
+                    var resp = JSON.parse(xhr.responseText);
+                    if (resp.mensagem) mensagem = resp.mensagem;
+                } catch(e) {}
+                alert(mensagem);
             },
-            complete: function(xhr, status) {
+            complete: function() {
                 buttonEntregaModal.textContent = 'Confirmar Entrega';
                 buttonEntregaModal.disabled = false;
             }
@@ -363,7 +404,65 @@
     });
 </script>
 
-<script>   
+<script>
+
+    function verErroInnovaro(button) {
+        document.getElementById('erroInnovaroTexto').textContent = button.dataset.erro;
+        new bootstrap.Modal(document.getElementById('erroInnovaroModal')).show();
+    }
+
+    // --- Lote de transferências ---
+    let modoLote = false;
+
+    function atualizarContadorLote() {
+        const selecionados = document.querySelectorAll('.checkTransferencia:checked').length;
+        document.getElementById('contadorLote').textContent = selecionados;
+        const btn = document.getElementById('btnConfirmarLote');
+        if (selecionados > 0) {
+            btn.classList.remove('d-none');
+        } else {
+            btn.classList.add('d-none');
+        }
+    }
+
+    $(document).on('change', '.checkTransferencia', function() {
+        atualizarContadorLote();
+        const total = document.querySelectorAll('.checkTransferencia').length;
+        const selecionados = document.querySelectorAll('.checkTransferencia:checked').length;
+        document.getElementById('checkAllTransferencias').indeterminate = selecionados > 0 && selecionados < total;
+        document.getElementById('checkAllTransferencias').checked = selecionados === total && total > 0;
+    });
+
+    document.getElementById('checkAllTransferencias').addEventListener('change', function() {
+        document.querySelectorAll('.checkTransferencia').forEach(cb => cb.checked = this.checked);
+        atualizarContadorLote();
+    });
+
+    function abrirModalLote() {
+        modoLote = true;
+        document.getElementById('entregaModalLabel').textContent = 'Confirmar Entrega em Lote';
+        document.getElementById('solicitacaoId').value = '';
+        document.getElementById('tipoSolicitacao').value = 'transferencia';
+        document.getElementById('entregar').value = '';
+        // Limpar e preencher IDs do lote
+        const container = document.getElementById('loteIdsContainer');
+        container.innerHTML = '';
+        document.querySelectorAll('.checkTransferencia:checked').forEach(cb => {
+            const inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = 'solicitacao_ids[]';
+            inp.value = cb.value;
+            container.appendChild(inp);
+        });
+    }
+
+    // Resetar modal ao fechar
+    document.getElementById('entregaModal').addEventListener('hidden.bs.modal', function() {
+        modoLote = false;
+        document.getElementById('entregaModalLabel').textContent = 'Escolher Operador';
+        document.getElementById('loteIdsContainer').innerHTML = '';
+    });
+    // --- Fim lote ---
 
     function prepararApagar(button) {
         // Pegando os dados do formulario
@@ -903,7 +1002,7 @@
             pageLength: 10,  // Define que a página inicial mostrará 10 registros
             serverSide: true,
             processing: true,
-            order: [[0, 'asc']],
+            order: [[1, 'asc']],
             ajax: {
                 url: url,
                 type: 'POST',
@@ -920,6 +1019,13 @@
                 }
             },
             columns:[
+                {
+                    data: null,
+                    orderable: false,
+                    render: function(data, type, row) {
+                        return `<input type="checkbox" class="checkTransferencia" value="${row.id}">`;
+                    }
+                },
                 { data: 'id' },
                 { data: 'funcionario'},
                 { data: 'item'},
@@ -930,12 +1036,11 @@
                         if (!data) {
                             return '';
                         }
-
                         return `<span class="badge" style="background-color: ${row.prioridade_cor}; color: ${row.prioridade_cor_texto};">${data}</span>`;
                     }
                 },
                 { data: 'saldo'},
-                { data: 'data_solicitacao', 
+                { data: 'data_solicitacao',
                   render: function(data, type, row) {
                     return new Date(data).toLocaleDateString('pt-BR', {
                         year: 'numeric',
@@ -947,9 +1052,12 @@
                     });
                 }
                 },
-                { 
+                {
                     data:'acoes',
                     render: function(data,type,row){
+                        let btnErro = row.rpa
+                            ? `<button type="button" class="badge rounded-pill btn btn-sm btn-secondary" onclick="verErroInnovaro(this)" data-erro="${row.rpa.replace(/"/g,'&quot;')}">Ver erro</button>`
+                            : '';
                         return `<input type="hidden" name="solicitacao_id" value="${row.id}" class="solicitacao_id">
                                 <input type="hidden" name="tipo_solicitacao" value="transferencia" class="tipo_solicitacao">
                                 <button type="button" class="badge rounded-pill btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#entregaModal"
@@ -958,7 +1066,8 @@
                                 <button class="badge rounded-pill btn btn-sm btn-warning" id="buttonEditTransferencia${row.id}" type="button" data-tipo-solicitacao="transferencia" data-solicitacao-id="${row.id}" onclick="prepararEditar(this)">
                                     <span class="spinner-border spinner-border-sm spinnerTransferencia" role="status" aria-hidden="true" style="display: none;"></span>
                                     <span class="editTransferenciaText">Editar</span>
-                                </button>`
+                                </button>
+                                ${btnErro}`
                     }
                 }
                     ],
