@@ -1,0 +1,69 @@
+================================================================================
+    DOCUMENTAÇÃO DAS APIS LEGADO - SISTEMA INNOVARO
+    Projeto: apontamento_usinagem
+    Data: 2026-05-18
+    Escopo: apenas chamadas a cemag.innovaro.com.br / hcemag.innovaro.com.br
+================================================================================
+
+
+================================================================================
+1. APONTAMENTO DE PRODUÇÃO
+================================================================================
+
+URL Produção : https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar
+URL Dev/HML  : https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar
+Método       : POST
+Autenticação : HTTP Basic Auth
+
+Arquivos que fazem essa chamada:
+  - apontamento_usinagem/views.py  (~linha 115 e ~linha 1082)
+  - apontamento_estamparia/views.py (~linha 125 e ~linha 1304)
+
+Payload enviado (JSON):
+  {
+    "pessoa"     : "<nome do operador>",
+    "recurso"    : "<código do recurso/máquina>",
+    "processo"   : "<código do processo>",
+    "produzido"  : <quantidade produzida>,
+    "observacao" : "<observação opcional>"
+  }
+
+Resposta esperada: HTTP 200 com confirmação do apontamento.
+
+Quando é chamada:
+  - Ao salvar/finalizar um apontamento de produção na usinagem ou estamparia.
+  - O ambiente (produção ou homolog) é selecionado pela flag DEBUG no settings.
+
+
+================================================================================
+2. LISTAGEM DE PRODUTOS / CARRETAS
+================================================================================
+
+URL          : https://cemag.innovaro.com.br/api/publica/v1/tabelas/listarProdutos
+Método       : GET
+Autenticação : Nenhuma (API pública)
+
+Arquivo que faz essa chamada:
+  - automacoes/explosao/api.py (~linha 28, função puxando_carretas)
+
+Parâmetros: nenhum (sem query params)
+
+Resposta esperada (JSON):
+  {
+    "produtos": [
+      {
+        "codigo": "<código do produto>",
+        "chave" : "<chave interna Innovaro>"
+      },
+      ...
+    ]
+  }
+
+Quando é chamada:
+  - Processo automatizado de explosão/importação de carretas para popular
+    a tabela CarretasExplodidas no banco de dados local.
+
+
+================================================================================
+FIM DO DOCUMENTO
+================================================================================
