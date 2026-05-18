@@ -21,6 +21,8 @@ from automacoes.conexao_plan import busca_saldo_recurso_central
 from time import time
 import environ
 from zoneinfo import ZoneInfo
+import os
+import requests
 
 
 env=environ.Env()
@@ -70,6 +72,40 @@ def _registrar_acao_solicitacao(request, solicitacao, tipo_solicitacao, acao, mo
         usuario=request.user if request.user.is_authenticated else None,
     )
 
+def _chamar_innovaro_transferir(solicitacao, tipo_solicitacao):
+    if tipo_solicitacao == "requisicao":
+        deposito_destino = solicitacao.cc.nome
+    else:
+        deposito_destino = solicitacao.deposito_destino.nome
+
+    payload = {
+        "id": f"almox-{tipo_solicitacao}-{solicitacao.id}",
+        "pessoa": solicitacao.funcionario.matricula,
+        "recurso": solicitacao.item.codigo,
+        "depositoOrigem": "Almox central",
+        "depositoDestino": deposito_destino,
+    }
+
+    if os.getenv("DJANGO_ENV") == "dev":
+        url = "https://hcemag.innovaro.com.br/api/integracao/v1/producao/transferir"
+    else:
+        url = "https://cemag.innovaro.com.br/api/integracao/v1/producao/transferir"
+
+    try:
+        response = requests.post(url, json=payload, auth=("luan araujo", "luanaraujo7"), timeout=(10, 60))
+        if response.ok:
+            try:
+                resp_json = response.json()
+                chave = resp_json.get("chave") or resp_json.get("id")
+                if chave:
+                    solicitacao.chave_innovaro = str(chave)
+                    solicitacao.save(update_fields=["chave_innovaro"])
+            except ValueError:
+                pass
+    except requests.RequestException:
+        pass
+
+
 @login_required
 def lista_solicitacoes(request):
     tipo_sol = request.POST.get("type_sol")
@@ -107,11 +143,11 @@ def lista_solicitacoes(request):
             # Aqui você poderia adicionar a lógica para salvar esses dados ou marcar como entregue
             solicitacao.entregue_por = entregue_por
             solicitacao.data_entrega = data_entrega
-            
             solicitacao.save()
-            notificar_acao_almox("entregar", tipo_solicitacao, solicitacao.id)
 
-            # return redirect("sol_page")
+            _chamar_innovaro_transferir(solicitacao, tipo_solicitacao)
+
+            notificar_acao_almox("entregar", tipo_solicitacao, solicitacao.id)
 
             return JsonResponse({
                 'status': 'Sucesso',

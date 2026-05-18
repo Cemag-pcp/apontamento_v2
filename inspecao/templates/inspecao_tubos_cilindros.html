@@ -8,6 +8,22 @@
 
     <link rel="stylesheet" href="/static/css/inspecao.css">
     <link rel="stylesheet" href="/static/css/select2.css">
+    <style>
+        #modal-inspecao-tubo .select2-container,
+        #modal-inspecao-cilindro .select2-container,
+        #modal-reteste-estanqueidade .select2-container {
+            width: 100% !important;
+        }
+
+        #modal-inspecao-tubo .select2-container--open,
+        #modal-inspecao-cilindro .select2-container--open,
+        #modal-reteste-estanqueidade .select2-container--open,
+        #modal-inspecao-tubo .select2-dropdown,
+        #modal-inspecao-cilindro .select2-dropdown,
+        #modal-reteste-estanqueidade .select2-dropdown {
+            z-index: 2000 !important;
+        }
+    </style>
 
 {% endblock %}
 

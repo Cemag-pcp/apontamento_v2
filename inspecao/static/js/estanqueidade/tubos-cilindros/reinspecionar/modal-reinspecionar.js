@@ -1,4 +1,66 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const mobileQuery = window.matchMedia("(max-width: 768px), (pointer: coarse)");
+
+    function isMobileLayout() {
+        return mobileQuery.matches;
+    }
+
+    function destroySelect2($select) {
+        if ($select.hasClass("select2-hidden-accessible")) {
+            $select.select2("destroy");
+        }
+    }
+
+    function getSelects(context = document) {
+        const $context = $(context);
+        return $context.find("select.select2").addBack("select.select2");
+    }
+
+    function initModalSelects(context = document) {
+        const $selects = getSelects(context);
+
+        $selects.each(function() {
+            const $select = $(this);
+            destroySelect2($select);
+
+            if (isMobileLayout()) {
+                if (this.multiple) {
+                    this.setAttribute("size", "6");
+                } else {
+                    this.removeAttribute("size");
+                }
+                return;
+            }
+
+            this.removeAttribute("size");
+
+            const $modalContent = $select.closest(".modal-content");
+            $select.select2({
+                dropdownParent: $modalContent,
+                width: "100%"
+            });
+
+            $select.off("select2:open.select2ModalFix");
+            $select.off("select2:close.select2ModalFix");
+
+            $select.on("select2:open.select2ModalFix", function() {
+                const modalBody = this.closest(".modal-content")?.querySelector(".modal-body");
+                if (modalBody) {
+                    modalBody.dataset.previousOverflow = modalBody.style.overflowY || "";
+                    modalBody.style.overflowY = "visible";
+                }
+            });
+
+            $select.on("select2:close.select2ModalFix", function() {
+                const modalBody = this.closest(".modal-content")?.querySelector(".modal-body");
+                if (modalBody) {
+                    modalBody.style.overflowY = modalBody.dataset.previousOverflow || "auto";
+                    delete modalBody.dataset.previousOverflow;
+                }
+            });
+        });
+    }
+
     document.addEventListener("click", function(event) {
         if (event.target.classList.contains('iniciar-reinspecao')) {
 
@@ -47,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const lastContainer = containerInspecao.lastElementChild;
 
-        $(lastContainer).find('select.select2').select2('destroy');
+        destroySelect2($(lastContainer).find("select.select2"));
 
         const newContainer = lastContainer.cloneNode(true);
 
@@ -63,12 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         containerInspecao.appendChild(newContainer);
 
-        $('.select2').each(function() {
-            $(this).select2({
-                dropdownParent: $(this).closest('.modal'),
-                width: '100%'
-            });
-        });
+        initModalSelects(newContainer);
     });
 
 
@@ -77,13 +134,6 @@ document.addEventListener("DOMContentLoaded", () => {
             containerInspecao.removeChild(containerInspecao.lastElementChild);
         }
     });
-})
 
-$(document).ready(function() {
-    $('.select2').each(function() {
-        $(this).select2({
-            dropdownParent: $(this).closest('.modal'),
-            width: '100%'
-        });
-    });
+    initModalSelects(document);
 });
