@@ -1,12 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.db import transaction
 
 
 from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
 from solicitacao_almox.forms import SolicitacaoRequisicaoForm, SolicitacaoTransferenciaForm
-from cadastro_almox.forms import RegraSlaAlmoxForm
+from cadastro_almox.forms import FuncionarioAlmoxForm, RegraSlaAlmoxForm
 from cadastro_almox.models import (
     OperadorAlmox,
     Funcionario,
@@ -14,6 +14,7 @@ from cadastro_almox.models import (
     ItensTransferencia,
     RegraSlaAlmox,
 )
+from core.models import Profile
 from core_almox.models import RegistroAcaoSolicitacaoAlmox
 from core.utils import notificar_acao_almox
 
@@ -27,6 +28,17 @@ import requests
 
 
 env=environ.Env()
+
+
+TIPOS_ACESSO_GERIR_CADASTRO_ALMOX = {"almoxarifado", "supervisor", "admin", "pcp"}
+
+
+def _usuario_pode_gerir_cadastro_almox(request):
+    if not request.user.is_authenticated:
+        return False
+
+    profile = Profile.objects.filter(user=request.user).first()
+    return profile is not None and profile.tipo_acesso in TIPOS_ACESSO_GERIR_CADASTRO_ALMOX
 
 
 def _cor_texto_contraste(cor_hex):
@@ -574,6 +586,9 @@ def processarCodigos(requisicoes,transferencias):
 
 @login_required
 def configuracoes_sla(request):
+    if not _usuario_pode_gerir_cadastro_almox(request):
+        return HttpResponseForbidden("Sem permissao para gerenciar configuracoes do almoxarifado.")
+
     regra_edicao = None
     regra_id = request.GET.get('editar')
 
@@ -607,3 +622,59 @@ def configuracoes_sla(request):
         'regras_sla': RegraSlaAlmox.objects.all(),
     }
     return render(request, 'home/configuracoes_sla.html', context)
+
+
+@login_required
+def gerenciar_funcionarios_almox(request):
+    if not _usuario_pode_gerir_cadastro_almox(request):
+        return HttpResponseForbidden("Sem permissao para gerenciar solicitantes do almoxarifado.")
+
+    funcionario_edicao = None
+    funcionario_id = request.GET.get('editar')
+    search_nome = (request.GET.get('search_nome') or '').strip()
+
+    if funcionario_id:
+        funcionario_edicao = get_object_or_404(
+            Funcionario.objects.prefetch_related('cc'),
+            pk=funcionario_id,
+        )
+
+    if request.method == 'POST':
+        acao = request.POST.get('acao')
+
+        if acao == 'alternar_status':
+            funcionario = get_object_or_404(Funcionario, pk=request.POST.get('funcionario_id'))
+            funcionario.ativo = not funcionario.ativo
+            funcionario.save(update_fields=['ativo'])
+            return redirect('gerenciar_funcionarios_almox')
+
+        funcionario_pk = request.POST.get('funcionario_id')
+        funcionario_instancia = None
+        if funcionario_pk:
+            funcionario_instancia = get_object_or_404(Funcionario, pk=funcionario_pk)
+
+        form = FuncionarioAlmoxForm(request.POST, instance=funcionario_instancia)
+        if form.is_valid():
+            form.save()
+            return redirect('gerenciar_funcionarios_almox')
+        funcionario_edicao = funcionario_instancia
+    else:
+        form = FuncionarioAlmoxForm(instance=funcionario_edicao)
+
+    funcionarios_qs = Funcionario.objects.prefetch_related('cc')
+    if search_nome:
+        funcionarios_qs = funcionarios_qs.filter(nome__icontains=search_nome)
+
+    funcionarios = list(funcionarios_qs.order_by('-ativo', 'nome', 'matricula'))
+    ativos = sum(1 for funcionario in funcionarios if funcionario.ativo)
+
+    context = {
+        'form': form,
+        'funcionario_edicao': funcionario_edicao,
+        'funcionarios': funcionarios,
+        'search_nome': search_nome,
+        'total_funcionarios': len(funcionarios),
+        'total_ativos': ativos,
+        'total_inativos': len(funcionarios) - ativos,
+    }
+    return render(request, 'home/funcionarios_almox.html', context)

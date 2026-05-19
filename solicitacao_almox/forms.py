@@ -12,6 +12,10 @@ class SolicitacaoRequisicaoForm(forms.ModelForm):
         model = SolicitacaoRequisicao
         fields = ['funcionario', 'cc', 'item', 'classe_requisicao', 'quantidade', 'status', 'obs']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['funcionario'].queryset = Funcionario.objects.filter(ativo=True).order_by('nome', 'matricula')
+
 class SolicitacaoTransferenciaForm(forms.ModelForm):
     status = forms.ModelChoiceField(
         queryset=RegraSlaAlmox.objects.filter(ativo=True).order_by('minutos_limite', 'prioridade'),
@@ -21,6 +25,10 @@ class SolicitacaoTransferenciaForm(forms.ModelForm):
     class Meta:
         model = SolicitacaoTransferencia
         fields = ['funcionario', 'deposito_destino', 'item', 'quantidade', 'status', 'obs']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['funcionario'].queryset = Funcionario.objects.filter(ativo=True).order_by('nome', 'matricula')
 
 class SolicitacaoCadastroItemRequisicaoForm(forms.ModelForm):
     class Meta:

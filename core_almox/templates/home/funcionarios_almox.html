@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <h2 class="mb-1">Solicitantes do Almoxarifado</h2>
+            <p class="text-muted mb-0">Gerencie quem pode solicitar requisições e transferências no módulo de almoxarifado.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <span class="badge text-bg-light">{{ total_funcionarios }} cadastro{{ total_funcionarios|pluralize }}</span>
+            <span class="badge text-bg-success">{{ total_ativos }} ativo{{ total_ativos|pluralize }}</span>
+            <span class="badge text-bg-secondary">{{ total_inativos }} inativo{{ total_inativos|pluralize }}</span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
+                <h3 class="h5 mb-0">Solicitantes cadastrados</h3>
+
+                <div class="d-flex flex-column flex-sm-row gap-2">
+                    <form method="get" class="d-flex gap-2">
+                        <input
+                            type="text"
+                            name="search_nome"
+                            class="form-control"
+                            placeholder="Buscar por nome..."
+                            value="{{ search_nome }}"
+                            style="min-width: 260px;"
+                        >
+                        <button type="submit" class="btn btn-outline-secondary">Buscar</button>
+                        {% if search_nome %}
+                            <a href="{% url 'gerenciar_funcionarios_almox' %}" class="btn btn-outline-light border">Limpar</a>
+                        {% endif %}
+                    </form>
+
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSolicitanteAlmox">
+                        Novo solicitante
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Matrícula</th>
+                            <th>Nome</th>
+                            <th>Centros de custo</th>
+                            <th>Status</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for funcionario in funcionarios %}
+                            <tr>
+                                <td class="fw-semibold">{{ funcionario.matricula }}</td>
+                                <td>{{ funcionario.nome }}</td>
+                                <td>
+                                    {% for cc in funcionario.cc.all %}
+                                        <span class="badge text-bg-light border">{{ cc.nome }}</span>
+                                    {% empty %}
+                                        <span class="text-muted">Sem centro de custo</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% if funcionario.ativo %}
+                                        <span class="badge text-bg-success">Ativo</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">Inativo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-2">
+                                        <a href="{% url 'gerenciar_funcionarios_almox' %}?editar={{ funcionario.id }}{% if search_nome %}&search_nome={{ search_nome|urlencode }}{% endif %}" class="btn btn-outline-primary btn-sm">Editar</a>
+                                        <form method="post" onsubmit="return confirm('{% if funcionario.ativo %}Desativar{% else %}Ativar{% endif %} o solicitante {{ funcionario.nome }}?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="acao" value="alternar_status">
+                                            <input type="hidden" name="funcionario_id" value="{{ funcionario.id }}">
+                                            <button type="submit" class="btn {% if funcionario.ativo %}btn-outline-danger{% else %}btn-outline-success{% endif %} btn-sm">
+                                                {% if funcionario.ativo %}
+                                                    Desativar
+                                                {% else %}
+                                                    Ativar
+                                                {% endif %}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    Nenhum solicitante encontrado.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalSolicitanteAlmox" tabindex="-1" aria-labelledby="modalSolicitanteAlmoxLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title h5 mb-0" id="modalSolicitanteAlmoxLabel">
+                    {% if funcionario_edicao %}
+                        Editar solicitante
+                    {% else %}
+                        Novo solicitante
+                    {% endif %}
+                </h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" id="formSolicitanteAlmox" novalidate>
+                    {% csrf_token %}
+                    {% if funcionario_edicao %}
+                        <input type="hidden" name="funcionario_id" value="{{ funcionario_edicao.id }}">
+                    {% endif %}
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="{{ form.matricula.id_for_label }}">{{ form.matricula.label }}</label>
+                            {{ form.matricula }}
+                            {% for error in form.matricula.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-8">
+                            <label class="form-label" for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+                            {{ form.nome }}
+                            {% for error in form.nome.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label d-block">{{ form.cc.label }}</label>
+                            <div class="border rounded p-3" style="max-height: 240px; overflow-y: auto;">
+                                {% for checkbox in form.cc %}
+                                    <div class="form-check mb-2">
+                                        {{ checkbox.tag }}
+                                        <label class="form-check-label" for="{{ checkbox.id_for_label }}">
+                                            {{ checkbox.choice_label }}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% for error in form.cc.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                {{ form.ativo }}
+                                <label class="form-check-label" for="{{ form.ativo.id_for_label }}">{{ form.ativo.label }}</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% for error in form.non_field_errors %}
+                        <div class="alert alert-danger py-2 mt-3 mb-0">{{ error }}</div>
+                    {% endfor %}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formSolicitanteAlmox" class="btn btn-primary">
+                    {% if funcionario_edicao %}
+                        Salvar alterações
+                    {% else %}
+                        Cadastrar solicitante
+                    {% endif %}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const modalElement = document.getElementById("modalSolicitanteAlmox");
+        if (!modalElement) return;
+
+        const limparParametroEdicaoDaUrl = function () {
+            const url = new URL(window.location.href);
+            const tinhaEditar = url.searchParams.has("editar");
+            if (!tinhaEditar) return;
+
+            url.searchParams.delete("editar");
+            const proximaUrl = `${url.pathname}${url.searchParams.toString() ? `?${url.searchParams.toString()}` : ""}${url.hash}`;
+            window.history.replaceState({}, "", proximaUrl);
+        };
+
+        modalElement.addEventListener("hidden.bs.modal", function () {
+            limparParametroEdicaoDaUrl();
+        });
+
+        const deveAbrirModal = {% if funcionario_edicao or form.errors %}true{% else %}false{% endif %};
+        if (!deveAbrirModal) return;
+
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    });
+</script>
+{% endblock %}

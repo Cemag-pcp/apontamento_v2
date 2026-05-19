@@ -49,7 +49,7 @@ import json
 
 
 def criar_solicitacoes(request):
-    funcionarios = Funcionario.objects.all()
+    funcionarios = Funcionario.objects.filter(ativo=True).order_by("nome", "matricula")
     itens_requisicao = ItensSolicitacao.objects.all()
     itens_transferencia = ItensTransferencia.objects.all()
     depositos_destino = DepositoDestino.objects.all()
@@ -146,7 +146,7 @@ def get_cc_by_matricula(request):
     matricula = request.GET.get("matricula")
     if matricula:
         try:
-            funcionario = Funcionario.objects.get(pk=matricula)
+            funcionario = Funcionario.objects.get(pk=matricula, ativo=True)
             cc_list = funcionario.cc.values("id", "nome")
             return JsonResponse({"cc": list(cc_list)})
         except Funcionario.DoesNotExist:

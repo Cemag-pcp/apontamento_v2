@@ -14,6 +14,7 @@ class Funcionario(models.Model):
     nome = models.CharField(max_length=100)
     matricula = models.CharField(max_length=6, unique=True)
     cc = models.ManyToManyField(Cc, related_name='funcionario_cc')
+    ativo = models.BooleanField(default=True)
 
     def __str__(self):
         return f'{self.nome} - {self.matricula}'

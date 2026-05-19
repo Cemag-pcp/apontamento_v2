@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import RegraSlaAlmox
+from .models import Cc, Funcionario, RegraSlaAlmox
 
 
 class RegraSlaAlmoxForm(forms.ModelForm):
@@ -58,3 +58,52 @@ class RegraSlaAlmoxForm(forms.ModelForm):
             raise forms.ValidationError('Informe uma cor hexadecimal valida.')
 
         return cor.lower()
+
+
+class FuncionarioAlmoxForm(forms.ModelForm):
+    cc = forms.ModelMultipleChoiceField(
+        queryset=Cc.objects.order_by('nome'),
+        widget=forms.CheckboxSelectMultiple(),
+        label='Centros de custo',
+    )
+
+    class Meta:
+        model = Funcionario
+        fields = ['matricula', 'nome', 'cc', 'ativo']
+        widgets = {
+            'matricula': forms.TextInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Ex.: 123456',
+                    'maxlength': '6',
+                }
+            ),
+            'nome': forms.TextInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Nome do solicitante',
+                }
+            ),
+            'ativo': forms.CheckboxInput(
+                attrs={
+                    'class': 'form-check-input',
+                }
+            ),
+        }
+        labels = {
+            'matricula': 'Matricula',
+            'nome': 'Nome',
+            'ativo': 'Solicitante ativo',
+        }
+
+    def clean_matricula(self):
+        matricula = (self.cleaned_data.get('matricula') or '').strip()
+        if not matricula:
+            raise forms.ValidationError('Informe a matricula.')
+        return matricula
+
+    def clean_nome(self):
+        nome = (self.cleaned_data.get('nome') or '').strip()
+        if not nome:
+            raise forms.ValidationError('Informe o nome.')
+        return nome
