@@ -55,6 +55,14 @@ import json
 USUARIOS_PERMITIDOS_EXCLUIR_INSPECAO_TANQUE = {"pcp", "admin", "supervisor"}
 
 
+def _pode_excluir_inspecao_tanque(user):
+    if not getattr(user, "is_authenticated", False):
+        return False
+
+    profile = Profile.objects.filter(user=user).first()
+    return profile is not None and profile.tipo_acesso in USUARIOS_PERMITIDOS_EXCLUIR_INSPECAO_TANQUE
+
+
 def cadastro_pecas_estanqueidade(request):
     pecas = PecasEstanqueidade.objects.all().order_by("codigo")
 
@@ -219,7 +227,7 @@ def inspecao_tanque(request):
             "inspetores": lista_inspetores,
             "inspetor_logado": inspetor_logado,
             "causas": list_causas,
-            "pode_excluir_inspecao_tanque": request.user.username in USUARIOS_PERMITIDOS_EXCLUIR_INSPECAO_TANQUE,
+            "pode_excluir_inspecao_tanque": _pode_excluir_inspecao_tanque(request.user),
         },
     )
 
@@ -1487,7 +1495,7 @@ def excluir_inspecao_tanque(request):
     if request.method != "DELETE":
         return JsonResponse({"error": "Metodo nao permitido"}, status=405)
 
-    if request.user.username not in USUARIOS_PERMITIDOS_EXCLUIR_INSPECAO_TANQUE:
+    if not _pode_excluir_inspecao_tanque(request.user):
         return JsonResponse({"error": "Usuario sem permissao para excluir inspeções"}, status=403)
 
     try:
