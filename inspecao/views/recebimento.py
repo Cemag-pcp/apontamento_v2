@@ -24,7 +24,7 @@ SHEET_TAB = os.environ.get(
     "Base controle de entrada",
 )
 
-DEFAULT_CUT_OFF_DATE = "01/02/2026"
+DEFAULT_CUT_OFF_DATE = "2026-05-01"
 COLUNA_STATUS_IDX = 7  # Coluna H (0-based)
 COLUNAS_EXIBIR = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10]  # A,B,C,D,E,F,G,I,J,K
 
@@ -226,15 +226,6 @@ def sincronizar_recebimento(request):
     if request.method != "POST":
         return JsonResponse({"error": "MÃ©todo não permitido"}, status=405)
 
-    try:
-        payload = json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
-        payload = {}
-
-    cutoff_input = (payload.get("cutoff_date") or "").strip() if isinstance(payload, dict) else ""
-    if not cutoff_input:
-        cutoff_input = DEFAULT_CUT_OFF_DATE
-
     values, error = _load_recebimento_sheet()
     if error:
         return JsonResponse({"error": error}, status=500)
@@ -249,7 +240,7 @@ def sincronizar_recebimento(request):
     )
     data_rows = values[header_row_index:]
 
-    cutoff = _parse_br_date(cutoff_input)
+    cutoff = _parse_br_date(DEFAULT_CUT_OFF_DATE)
     if cutoff is None:
         return JsonResponse({"error": "Data de corte invÃ¡lida"}, status=500)
 

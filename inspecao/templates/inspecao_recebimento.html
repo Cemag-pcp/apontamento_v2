@@ -302,8 +302,7 @@
     <div class="d-flex justify-content-between mt-3 flex-wrap gap-2">
         <h4 style="width: 60%;">Pendencias</h4>
         <div class="d-flex gap-2 align-items-center">
-            <input type="date" class="form-control" id="data-sincronizar-recebimento" style="max-width: 170px;">
-            <button type="button" class="btn btn-outline-primary" id="btn-sincronizar-recebimento" disabled>
+            <button type="button" class="btn btn-outline-primary" id="btn-sincronizar-recebimento">
                 Sincronizar
             </button>
             <div class="input-group" style="max-width: 320px;">
@@ -574,13 +573,6 @@
 
     function sincronizarRecebimento() {
         const btn = document.getElementById("btn-sincronizar-recebimento");
-        const dataInput = document.getElementById("data-sincronizar-recebimento");
-        const dataSelecionada = dataInput && dataInput.value ? dataInput.value : "";
-        if (!dataSelecionada) {
-            alert("Preencha a data para sincronizar.");
-            return;
-        }
-
         btn.disabled = true;
         const textoOriginal = btn.textContent;
         btn.textContent = "Sincronizando...";
@@ -591,14 +583,10 @@
             headers["X-CSRFToken"] = csrfInput.value;
         }
 
-        const payload = {
-            cutoff_date: dataSelecionada
-        };
-
         fetch("/inspecao/api/recebimento/sincronizar/", {
             method: "POST",
             headers,
-            body: JSON.stringify(payload),
+            body: JSON.stringify({}),
         })
             .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
             .then((result) => {
@@ -612,16 +600,9 @@
                 alert(error.message || "Erro ao sincronizar.");
             })
             .finally(() => {
-                atualizarEstadoBotaoSincronizarRecebimento();
+                btn.disabled = false;
                 btn.textContent = textoOriginal;
             });
-    }
-
-    function atualizarEstadoBotaoSincronizarRecebimento() {
-        const btn = document.getElementById("btn-sincronizar-recebimento");
-        const dataInput = document.getElementById("data-sincronizar-recebimento");
-        if (!btn || !dataInput) return;
-        btn.disabled = !(dataInput.value && dataInput.value.trim());
     }
 
     function _criarCheckbox(value, onChange) {
@@ -2686,8 +2667,6 @@
         });
         document.getElementById("form-inspecao-recebimento").addEventListener("submit", salvarInspecaoRecebimento);
         document.getElementById("btn-sincronizar-recebimento").addEventListener("click", sincronizarRecebimento);
-        document.getElementById("data-sincronizar-recebimento").addEventListener("input", atualizarEstadoBotaoSincronizarRecebimento);
-        atualizarEstadoBotaoSincronizarRecebimento();
 
         // controles de quantidade de unidades
         document.getElementById("btn-qtd-menos-recebimento").addEventListener("click", () => {
