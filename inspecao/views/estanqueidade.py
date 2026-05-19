@@ -52,6 +52,8 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import json
 
+USUARIOS_PERMITIDOS_EXCLUIR_INSPECAO_TANQUE = {"pcp", "admin", "supervisor"}
+
 
 def cadastro_pecas_estanqueidade(request):
     pecas = PecasEstanqueidade.objects.all().order_by("codigo")
@@ -217,6 +219,7 @@ def inspecao_tanque(request):
             "inspetores": lista_inspetores,
             "inspetor_logado": inspetor_logado,
             "causas": list_causas,
+            "pode_excluir_inspecao_tanque": request.user.username in USUARIOS_PERMITIDOS_EXCLUIR_INSPECAO_TANQUE,
         },
     )
 
@@ -1478,6 +1481,60 @@ def get_itens_inspecionados_tanque(request):
         },
         status=200,
     )
+
+
+def excluir_inspecao_tanque(request):
+    if request.method != "DELETE":
+        return JsonResponse({"error": "Metodo nao permitido"}, status=405)
+
+    if request.user.username not in USUARIOS_PERMITIDOS_EXCLUIR_INSPECAO_TANQUE:
+        return JsonResponse({"error": "Usuario sem permissao para excluir inspeções"}, status=403)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Payload invalido"}, status=400)
+
+    ids = payload.get("ids") or []
+    ids_validos = []
+
+    for item_id in ids:
+        try:
+            ids_validos.append(int(item_id))
+        except (TypeError, ValueError):
+            continue
+
+    ids_validos = list(set(ids_validos))
+
+    if not ids_validos:
+        return JsonResponse({"error": "Nenhuma inspecao informada"}, status=400)
+
+    try:
+        with transaction.atomic():
+            inspecoes = InspecaoEstanqueidade.objects.filter(
+                id__in=ids_validos,
+                peca__tipo="tanque",
+            )
+            quantidade_encontrada = inspecoes.count()
+
+            if quantidade_encontrada != len(ids_validos):
+                return JsonResponse(
+                    {"error": "Uma ou mais inspecoes nao foram encontradas"},
+                    status=404,
+                )
+
+            inspecoes.delete()
+
+        return JsonResponse(
+            {
+                "success": True,
+                "message": "Inspecao(oes) excluida(s) com sucesso",
+                "quantidade_excluida": quantidade_encontrada,
+            },
+            status=200,
+        )
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 def itens_enviados_tanque(request, tanque_id):

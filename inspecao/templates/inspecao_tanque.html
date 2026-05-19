@@ -8,6 +8,19 @@
 
     <link rel="stylesheet" href="/static/css/inspecao.css">
     <link rel="stylesheet" href="/static/css/select2.css">
+    <style>
+        #modal-inspecionar-solda-tanque .select2-container,
+        #modal-inspecionar-solda-tanque-get .select2-container {
+            width: 100% !important;
+        }
+
+        #modal-inspecionar-solda-tanque .select2-container--open,
+        #modal-inspecionar-solda-tanque-get .select2-container--open,
+        #modal-inspecionar-solda-tanque .select2-dropdown,
+        #modal-inspecionar-solda-tanque-get .select2-dropdown {
+            z-index: 2000 !important;
+        }
+    </style>
 
 {% endblock %}
 
@@ -108,6 +121,11 @@
     <div class="d-flex justify-content-between mt-3">
         <h4 style="width: 60%;">Inspeções realizadas</h4>
         <div class="d-flex gap-2">
+            {% if pode_excluir_inspecao_tanque %}
+            <button type="button" class="btn btn-outline-danger" id="btn-abrir-exclusao-tanque" disabled>
+                <i class="bi bi-trash"></i> Excluir selecionadas
+            </button>
+            {% endif %}
             <!-- <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar</button> -->
             <div>
                 <div class="btn-group">
@@ -202,6 +220,29 @@
 
 {% include 'modal_inspecao/modal_inspecao_tanque.html' %}
 {% include 'modal_inspecao/modal_inspecao_solda_estanqueidade.html' %}
+<div class="modal fade" id="modal-excluir-inspecao-tanque" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="modal-excluir-inspecao-tanque-title">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modal-excluir-inspecao-tanque-title">Confirmar exclusão da inspeção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Tem certeza que deseja excluir por completo a(s) inspeção(ões) selecionada(s)?</p>
+                <p class="text-muted mb-3">A operação remove apenas os dados dessas inspeções do banco e não pode ser desfeita.</p>
+                <div class="fw-semibold mb-2">Selecionadas: <span id="qtd-inspecoes-excluir-tanque">0</span></div>
+                <div id="lista-inspecoes-excluir-tanque" class="small text-muted"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger d-flex align-items-center gap-2" id="confirmar-exclusao-inspecao-tanque">
+                    <span class="spinner-border spinner-border-sm" style="display:none"></span>
+                    <span>Excluir inspeção</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
 
@@ -215,6 +256,7 @@
 <script src="{% static 'js/estanqueidade/tanque/reinspecionar/modal-reinspecionar.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/reinspecionar/envio-reinspecao.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/inspecionados-tanque.js' %}"></script>
+<script src="{% static 'js/estanqueidade/tanque/excluir-inspecao-tanque.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/inspecionados/modal-inspecionados.js' %}"></script>
 <script src="{% static 'js/estanqueidade/tanque/inspecionados/modal-solda-tanque.js' %}"></script>
 

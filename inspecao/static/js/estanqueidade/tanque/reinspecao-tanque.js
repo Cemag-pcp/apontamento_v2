@@ -141,6 +141,7 @@ function buscarItensReinspecaoEstanqueidadeTanque(pagina) {
                         <h6 class="card-subtitle mb-2 text-muted">Inspeção #${item.id}</h6>
                         <p class="card-text">
                             <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
+                            <strong>🚚 Data da carga:</strong> ${item.data_carga}<br>
                             <strong>📍 Tipo da Inspeção:</strong> ${item.tipo_inspecao}<br>
                             <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                         </p>
