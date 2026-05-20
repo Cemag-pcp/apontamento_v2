@@ -236,27 +236,90 @@ export function renderCallendar(options = {}) {
                             confirmButtonText: 'OK'
                         });
                     } else {
-                        let ordensTexto = '';
+                        renderCallendar();
 
-                        if (Array.isArray(data.ordens_com_apontamentos)) {
-                            ordensTexto = data.ordens_com_apontamentos.length > 0
-                                ? data.ordens_com_apontamentos.map(ordem =>
-                                    `Chave: ${ordem.id || 'indefinido'} | Data: ${ordem.data_carga || 'indefinida'} | Grupo Máquina: ${ordem.grupo_maquina || 'indefinido'}`
-                                ).join('<br>')
-                                : 'Nenhuma ordem precisa ser atualizada manualmente.';
-                        } else {
-                            ordensTexto = 'Nenhuma ordem precisa ser atualizada manualmente.';
+                        // Tabela de itens planejados
+                        let tabelaItens = '';
+                        if (Array.isArray(data.itens_planejados) && data.itens_planejados.length > 0) {
+                            const linhas = data.itens_planejados.flatMap((item, idx) => {
+                                const badge = item.nova
+                                    ? `<span style="color:#198754;font-weight:bold">NOVA</span>`
+                                    : `<span style="color:#0d6efd">atualizada</span>`;
+                                const extra = item.cor ? ` <em>(${item.cor})</em>` : '';
+                                const celula = item.setor_conjunto || '-';
+                                const temOrigem = Array.isArray(item.origem) && item.origem.length > 0;
+                                const toggleId = `orig-${idx}`;
+
+                                const linhaPrincipal = `<tr>
+                                    <td style="text-align:left;padding:2px 6px">
+                                        ${temOrigem ? `<span style="cursor:pointer;user-select:none" onclick="var el=document.getElementById('${toggleId}');el.style.display=el.style.display==='none'?'table-row':'none'">▶</span> ` : ''}
+                                        ${item.peca}${extra}
+                                    </td>
+                                    <td style="text-align:center;padding:2px 6px">${celula}</td>
+                                    <td style="text-align:center;padding:2px 6px"><strong>${item.qtd_planejada}</strong></td>
+                                    <td style="text-align:center;padding:2px 6px">${badge}</td>
+                                </tr>`;
+
+                                if (!temOrigem) return [linhaPrincipal];
+
+                                const linhasOrigem = item.origem.map(o =>
+                                    `↳ <strong>${o.recurso}</strong> &nbsp;|&nbsp; ` +
+                                    `qtd. liberada: <strong>${o.quantidade_item}</strong> × ` +
+                                    `qtde/unid: <strong>${o.qtde_por_unidade}</strong> = ` +
+                                    `<strong>${o.subtotal}</strong>` +
+                                    (o.carga ? ` &nbsp;<em>(${o.carga})</em>` : '')
+                                ).join('<br>');
+
+                                const subLinha = `<tr id="${toggleId}" style="display:none;background:#f8f9fa;font-size:11px">
+                                    <td colspan="4" style="padding:4px 6px 4px 22px;color:#555;text-align:left">${linhasOrigem}</td>
+                                </tr>`;
+
+                                return [linhaPrincipal, subLinha];
+                            }).join('');
+                            tabelaItens = `
+                                <div style="max-height:400px;overflow-y:auto;margin-top:8px">
+                                    <table style="width:100%;border-collapse:collapse;font-size:13px">
+                                        <thead>
+                                            <tr style="border-bottom:1px solid #dee2e6">
+                                                <th style="text-align:left;padding:4px 6px">Peça</th>
+                                                <th style="padding:4px 6px">Célula</th>
+                                                <th style="padding:4px 6px">Qtd. planejada</th>
+                                                <th style="padding:4px 6px">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${linhas}</tbody>
+                                    </table>
+                                </div>`;
+                        }
+
+                        // Ordens protegidas
+                        let protegidасTexto = '';
+                        if (Array.isArray(data.ordens_com_apontamentos) && data.ordens_com_apontamentos.length > 0) {
+                            const statusLabel = {
+                                'aguardando_iniciar': 'Aguardando',
+                                'iniciada': 'Iniciada',
+                                'finalizada': 'Finalizada',
+                                'interrompida': 'Interrompida'
+                            };
+                            const itens = data.ordens_com_apontamentos.map(o => {
+                                const status = statusLabel[o.status_atual] || o.status_atual;
+                                return `<li style="text-align:left"><strong>${o.peca || 'indefinido'}</strong> — ${status}</li>`;
+                            }).join('');
+                            protegidасTexto = `
+                                <p style="margin-top:10px"><strong>Ordens protegidas</strong> (não alteradas — já iniciadas ou com produção):</p>
+                                <ul style="margin:0;padding-left:20px">${itens}</ul>`;
                         }
 
                         Swal.fire({
                             icon: 'success',
                             title: 'Ordens Atualizadas!',
                             html: `
-                                <p><strong>${data.novas_ordens_criadas}</strong> novas ordens foram criadas com sucesso!</p>
-                                <p><strong>Ordens que precisam ser atualizadas manualmente:</strong></p>
-                                <p>${ordensTexto}</p>
+                                <p><strong>${data.novas_ordens_criadas}</strong> nova(s) ordem(ns) criada(s).</p>
+                                ${tabelaItens}
+                                ${protegidасTexto}
                             `,
-                            confirmButtonText: 'OK'
+                            confirmButtonText: 'OK',
+                            width: 700,
                         });
                     }
                 })

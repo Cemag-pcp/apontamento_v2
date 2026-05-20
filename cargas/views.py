@@ -229,6 +229,228 @@ def _construir_ordens_planejamento(cargas_liberadas, setor, datas_finais_por_car
     return consolidar_ordens_planejamento(ordens)
 
 
+MAPA_CORES_PINTURA = {
+    "AM": "Amarelo", "AN": "Azul", "VJ": "Verde", "LJ": "Laranja Jacto",
+    "LC": "Laranja", "VM": "Vermelho", "AV": "Amarelo", "CO": "Cinza", "CE": "Cinza escuro",
+}
+
+
+def _construir_ordens_planejamento_from_items(cargas_liberadas, setor, datas_finais_por_carga):
+    """
+    Gera ordens planejadas cruzando CargaLiberadaItem (banco) × Base_Carretas (Sheets).
+    Substitui gerar_sequenciamento (que lia de Carga_Vendas no Sheets) para garantir
+    que novos itens liberados no banco sejam incluídos no planejamento.
+    """
+    base_carretas = get_base_carreta()
+    base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
+    base_carretas['Recurso'] = normalizar_codigo_recurso_serie(base_carretas['Recurso'])
+    base_carretas['Recurso'] = base_carretas['Recurso'].apply(
+        lambda x: '0' + x if len(str(x)) == 5 else str(x)
+    )
+    base_carretas['Qtde'] = pd.to_numeric(base_carretas['Qtde'], errors='coerce').fillna(0)
+
+    if setor == 'pintura':
+        if 'Etapa2' in base_carretas.columns:
+            base_carretas = base_carretas[
+                base_carretas['Etapa2'].fillna('') == 'Pintura'
+            ].copy()
+        colunas_carretas = ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula', 'Etapa5']
+    else:
+        if 'Etapa' in base_carretas.columns:
+            base_carretas = base_carretas[base_carretas['Etapa'].fillna('') != ''].copy()
+        colunas_carretas = ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula']
+
+    colunas_carretas = [c for c in colunas_carretas if c in base_carretas.columns]
+
+    # Remove linhas duplicadas de Base_Carretas que tenham o mesmo (Recurso, Célula).
+    # Duplicatas na planilha causam multiplicação errada das quantidades no merge.
+    cols_dedup = [c for c in ['Recurso', 'Célula'] if c in base_carretas.columns]
+    antes_dedup = len(base_carretas)
+    base_carretas = base_carretas.drop_duplicates(subset=cols_dedup).reset_index(drop=True)
+    removidas_carreta = antes_dedup - len(base_carretas)
+    if removidas_carreta:
+        logger.warning(
+            "[from_items] base_carretas | %d linhas duplicadas removidas (mesmo Recurso+Célula)",
+            removidas_carreta,
+        )
+
+    origens = {}  # chave: (peca_nome, celula, cor) → lista de itens que geraram a quantidade
+
+    logger.info(
+        "[from_items] setor=%s | base_carretas carregada | linhas=%d | colunas=%s",
+        setor, len(base_carretas), list(base_carretas.columns),
+    )
+    for row in base_carretas.itertuples(index=False):
+        recurso   = getattr(row, 'Recurso',  '')
+        codigo    = getattr(row, 'C_digo',   getattr(row, 'Código',  ''))  # pandas renomeia acentos em itertuples
+        peca      = getattr(row, 'Peca',     '')
+        qtde      = getattr(row, 'Qtde',     '')
+        celula    = getattr(row, 'C_lula',   getattr(row, 'Célula',  ''))
+        logger.info(
+            "[from_items] carreta | recurso=%s | codigo=%s | peca=%s | qtde_por_unidade=%s | celula=%s",
+            recurso, codigo, peca, qtde, celula,
+        )
+
+    ordens = []
+
+    for carga_liberada in cargas_liberadas:
+        data_carga_planejada = datas_finais_por_carga[carga_liberada["carga_liberada_id"]]
+
+        # Sempre usa a versão mais alta da carga, garantindo que versões
+        # antigas não sejam incluídas mesmo se o dict estiver desatualizado.
+        ultima_versao_id_qs = (
+            CargaLiberadaVersao.objects
+            .filter(carga_liberada_id=carga_liberada["carga_liberada_id"])
+            .order_by('-versao')
+            .values('id')[:1]
+        )
+        itens_qs = CargaLiberadaItem.objects.filter(
+            carga_versao_id__in=ultima_versao_id_qs
+        ).values('codigo_recurso', 'quantidade', 'numero_serie')
+
+        logger.info(
+            "[from_items] carga=%s | carga_liberada_id=%s | versao_id_usado=%s",
+            carga_liberada.get("carga"),
+            carga_liberada.get("carga_liberada_id"),
+            list(ultima_versao_id_qs.values_list('id', flat=True)),
+        )
+
+        if not itens_qs.exists():
+            logger.info("[from_items] carga=%s sem itens no banco", carga_liberada.get("carga"))
+            continue
+
+        df_itens = pd.DataFrame(list(itens_qs))
+
+        # Deduplica por numero_serie para evitar dupla contagem caso múltiplas versões
+        # sejam lidas acidentalmente (mesmo serial na versão 1 e versão 2).
+        tem_serie = df_itens['numero_serie'].astype(str).str.strip().ne('')
+        if tem_serie.any():
+            antes = len(df_itens)
+            df_itens = df_itens.drop_duplicates(subset=['codigo_recurso', 'numero_serie'])
+            removidos = antes - len(df_itens)
+            if removidos:
+                logger.warning(
+                    "[from_items] carga=%s | %d duplicatas removidas por numero_serie",
+                    carga_liberada.get("carga"), removidos,
+                )
+
+        logger.info(
+            "[from_items] carga=%s | itens_banco=%d | recursos únicos=%d",
+            carga_liberada.get("carga"), len(df_itens), df_itens['codigo_recurso'].nunique(),
+        )
+        for _, row in df_itens.iterrows():
+            logger.info(
+                "[from_items] item_banco | recurso=%s | quantidade=%s | numero_serie=%s",
+                row['codigo_recurso'], row['quantidade'], row.get('numero_serie', ''),
+            )
+
+        df_itens['Recurso_original'] = df_itens['codigo_recurso'].astype(str).str.strip()
+
+        if setor == 'pintura':
+            df_itens['Recurso_cor_sigla'] = df_itens['Recurso_original'].str[-2:].str.strip()
+            df_itens['Recurso_cor_sigla'] = df_itens['Recurso_cor_sigla'].where(
+                df_itens['Recurso_cor_sigla'].isin(MAPA_CORES_PINTURA.keys()), 'LC'
+            )
+            df_itens['cor'] = df_itens['Recurso_cor_sigla'].map(MAPA_CORES_PINTURA)
+
+        df_itens['Recurso'] = normalizar_codigo_recurso_serie(df_itens['Recurso_original'])
+        df_itens['Recurso'] = df_itens['Recurso'].apply(lambda x: '0' + x if len(x) == 5 else x)
+
+        df_merged = pd.merge(df_itens, base_carretas[colunas_carretas], on='Recurso', how='left')
+
+        logger.info(
+            "[from_items] carga=%s | linhas_apos_merge=%d (antes dropna)",
+            carga_liberada.get("carga"), len(df_merged),
+        )
+
+        df_merged = df_merged.dropna(subset=['Código', 'Peca', 'Célula']).copy()
+
+        if df_merged.empty:
+            logger.warning("[from_items] carga=%s | merge vazio apos dropna", carga_liberada.get("carga"))
+            continue
+
+        df_merged['Qtde_total'] = (
+            pd.to_numeric(df_merged['quantidade'], errors='coerce').fillna(0).astype(int) *
+            pd.to_numeric(df_merged['Qtde'], errors='coerce').fillna(0).astype(int)
+        )
+
+        logger.info("[from_items] carga=%s | linhas_apos_qtde_total (antes filtro >0)=%d", carga_liberada.get("carga"), len(df_merged))
+        for _, row in df_merged.iterrows():
+            logger.info(
+                "[from_items] merged_row | recurso=%s | qtd_item=%s | qtde_carreta=%s | qtde_total=%s | celula=%s",
+                row.get('Recurso', ''), row.get('quantidade', ''), row.get('Qtde', ''), row.get('Qtde_total', ''), row.get('Célula', ''),
+            )
+
+        df_merged = df_merged[df_merged['Qtde_total'] > 0].copy()
+
+        df_merged['Código'] = (
+            df_merged['Código'].fillna('').astype(str).str.strip()
+            .str.replace(r'\.0$', '', regex=True)
+        )
+        df_merged['Código'] = df_merged['Código'].apply(
+            lambda x: '0' + x if len(x) == 5 else (x[:6] if len(x) == 8 else x)
+        )
+
+        # Coleta origens ANTES do groupby: cada linha do merge mostra
+        # qual recurso do banco (codigo_recurso + quantidade) gerou qual subtotal
+        for _, mrow in df_merged.iterrows():
+            codigo_norm = (
+                mrow['Código'].fillna('') if hasattr(mrow['Código'], 'fillna')
+                else str(mrow.get('Código', '') or '')
+            ).strip().replace(r'\.0$', '')
+            peca_nome_orig = str(mrow.get('Código', '')).strip() + " - " + str(mrow.get('Peca', '')).strip()
+            celula_orig = str(mrow.get('Célula', '')).strip()
+            cor_orig = str(mrow.get('cor', '')).strip() if setor == 'pintura' else ''
+            chave_orig = (peca_nome_orig, celula_orig, cor_orig)
+            if chave_orig not in origens:
+                origens[chave_orig] = []
+            origens[chave_orig].append({
+                "recurso": str(mrow.get('codigo_recurso', mrow.get('Recurso', ''))),
+                "quantidade_item": int(pd.to_numeric(mrow.get('quantidade', 0), errors='coerce') or 0),
+                "qtde_por_unidade": int(pd.to_numeric(mrow.get('Qtde', 0), errors='coerce') or 0),
+                "subtotal": int(mrow.get('Qtde_total', 0)),
+                "carga": carga_liberada.get("carga", ""),
+            })
+
+        if setor == 'pintura':
+            if 'Etapa5' in df_merged.columns:
+                etapa5 = df_merged['Etapa5'].fillna('').str.upper()
+                df_merged.loc[etapa5.str.contains('CINZA'), 'cor'] = 'Cinza'
+                df_merged.loc[etapa5.str.contains('PRETO'), 'cor'] = 'Preto'
+
+            df_final = (
+                df_merged.groupby(['Código', 'Peca', 'Célula', 'cor'], as_index=False)['Qtde_total'].sum()
+            )
+            df_final.drop_duplicates(subset=['Código', 'cor'], inplace=True)
+        else:
+            df_final = (
+                df_merged.groupby(['Código', 'Peca', 'Célula'], as_index=False)['Qtde_total'].sum()
+            )
+            df_final.drop_duplicates(subset=['Código', 'Célula'], inplace=True)
+
+        logger.info("[from_items] carga=%s | itens_finais_apos_groupby=%d", carga_liberada.get("carga"), len(df_final))
+        for _, row in df_final.iterrows():
+            logger.info(
+                "[from_items] item_final | codigo=%s | peca=%s | celula=%s | qtde_total=%s",
+                row.get('Código', ''), row.get('Peca', ''), row.get('Célula', ''), row.get('Qtde_total', ''),
+            )
+
+        for _, row in df_final.iterrows():
+            ordens.append({
+                "grupo_maquina": setor.lower(),
+                "cor": row.get("cor", '') if setor == 'pintura' else '',
+                "obs": "Ordem gerada automaticamente",
+                "peca_nome": str(row["Código"]) + " - " + row["Peca"],
+                "qtd_planejada": int(row["Qtde_total"]),
+                "data_carga": data_carga_planejada.isoformat(),
+                "setor_conjunto": row["Célula"],
+                "carga_liberada_id": carga_liberada["carga_liberada_id"],
+                "carga_liberada_versao_id": carga_liberada["carga_liberada_versao_id"],
+            })
+
+    return consolidar_ordens_planejamento(ordens), origens
+
+
 def _listar_cargas_planejamento_para_atualizacao(data_planejada, setor):
     versoes_prefetch = Prefetch(
         "versoes",
@@ -725,18 +947,23 @@ def atualizar_ordem_existente_planejamento(request):
         grupo_maquina=setor,
     )
 
+    STATUS_PROTEGIDOS = ['iniciada', 'finalizada', 'interrompida']
+
     if setor == 'montagem':
-        ordens_com_apontamentos = ordens_existentes_qs.annotate(
-            total_produzido=Sum('ordem_pecas_montagem__qtd_boa')
-        ).filter(total_produzido__gt=0)
+        ordens_com_apontamentos = ordens_existentes_qs.filter(
+            Q(status_atual__in=STATUS_PROTEGIDOS) |
+            Q(ordem_pecas_montagem__qtd_boa__gt=0)
+        ).distinct()
     elif setor == 'pintura':
-        ordens_com_apontamentos = ordens_existentes_qs.annotate(
-            total_produzido=Sum('ordem_pecas_pintura__qtd_boa')
-        ).filter(total_produzido__gt=0)
+        ordens_com_apontamentos = ordens_existentes_qs.filter(
+            Q(status_atual__in=STATUS_PROTEGIDOS) |
+            Q(ordem_pecas_pintura__qtd_boa__gt=0)
+        ).distinct()
     else:
-        ordens_com_apontamentos = ordens_existentes_qs.annotate(
-            total_produzido=Sum('ordem_pecas_solda__qtd_boa')
-        ).filter(total_produzido__gt=0)
+        ordens_com_apontamentos = ordens_existentes_qs.filter(
+            Q(status_atual__in=STATUS_PROTEGIDOS) |
+            Q(ordem_pecas_solda__qtd_boa__gt=0)
+        ).distinct()
 
     ordens_com_apontamentos_ids = set(ordens_com_apontamentos.values_list('id', flat=True))
 
@@ -751,95 +978,153 @@ def atualizar_ordem_existente_planejamento(request):
         carga_liberada["carga_liberada_id"]: data_planejada
         for carga_liberada in cargas_liberadas
     }
-    ordens_planejadas = _construir_ordens_planejamento(
+    ordens_planejadas, origens_planejamento = _construir_ordens_planejamento_from_items(
         cargas_liberadas,
         setor,
         datas_finais_por_carga,
     )
 
-    chaves_planejadas = {
-        _chave_ordem_planejada(setor, ordem_planejada)
-        for ordem_planejada in ordens_planejadas
-    }
+    logger.info(
+        "[atualizar-planejamento] data=%s setor=%s total_itens_planejados=%d",
+        data_inicio, setor, len(ordens_planejadas),
+    )
+    for op in ordens_planejadas:
+        logger.info(
+            "[atualizar-planejamento] item | peca=%s | qtd_planejada=%s | setor_conjunto=%s | cor=%s",
+            op.get("peca_nome"), op.get("qtd_planejada"), op.get("setor_conjunto", ""), op.get("cor", ""),
+        )
 
-    ids_para_excluir = []
-    for ordem_existente in ordens_existentes_qs.exclude(id__in=ordens_com_apontamentos_ids):
-        if _chave_ordem_existente(setor, ordem_existente) not in chaves_planejadas:
-            ids_para_excluir.append(ordem_existente.id)
+    # Monta dict das ordens existentes indexado por peca_nome (+ cor para pintura).
+    # Isso evita queries por maquina__nome que falham quando o nome da célula no
+    # Sheets não bate exatamente com Maquina.nome no banco.
+    map_existentes = {}
+    for ordem in ordens_existentes_qs.prefetch_related(
+        'ordem_pecas_montagem', 'ordem_pecas_pintura', 'ordem_pecas_solda'
+    ):
+        if setor == 'montagem':
+            peca = ordem.ordem_pecas_montagem.values_list('peca', flat=True).first() or ''
+            chave = peca
+        elif setor == 'pintura':
+            peca = ordem.ordem_pecas_pintura.values_list('peca', flat=True).first() or ''
+            chave = (peca, ordem.cor or '')
+        else:
+            peca = ordem.ordem_pecas_solda.values_list('peca', flat=True).first() or ''
+            chave = peca
+        if chave not in map_existentes:
+            map_existentes[chave] = ordem
 
+    # Monta dict das ordens planejadas indexado pela mesma chave
+    map_planejadas = {}
+    for op in ordens_planejadas:
+        if setor == 'pintura':
+            chave = (op['peca_nome'], op.get('cor', ''))
+        else:
+            chave = op['peca_nome']
+        map_planejadas[chave] = op
+
+    # Exclui ordens que saíram do planejamento (e não são protegidas)
+    ids_para_excluir = [
+        ordem.id
+        for chave, ordem in map_existentes.items()
+        if chave not in map_planejadas and ordem.id not in ordens_com_apontamentos_ids
+    ]
     if ids_para_excluir:
         Ordem.objects.filter(id__in=ids_para_excluir).delete()
 
     ordens_a_criar = []
-    for ordem_planejada in ordens_planejadas:
-        filtros_ordem = {
-            "grupo_maquina": setor,
-            "data_carga": data_planejada,
-        }
-        if ordem_planejada.get("carga_liberada_id") is not None:
-            filtros_ordem["carga_liberada_id"] = ordem_planejada.get("carga_liberada_id")
-        if setor == 'montagem':
-            filtros_ordem["ordem_pecas_montagem__peca"] = ordem_planejada["peca_nome"]
-            filtros_ordem["maquina__nome"] = ordem_planejada.get("setor_conjunto", "")
-        elif setor == 'pintura':
-            filtros_ordem["ordem_pecas_pintura__peca"] = ordem_planejada["peca_nome"]
-            filtros_ordem["cor"] = ordem_planejada.get("cor", "")
-        else:
-            filtros_ordem["ordem_pecas_solda__peca"] = ordem_planejada["peca_nome"]
-            filtros_ordem["maquina__nome"] = ordem_planejada.get("setor_conjunto", "")
-
-        ordem_existente = Ordem.objects.filter(**filtros_ordem).first()
-
-        if ordem_existente is None:
-            filtros_fallback = {
-                "grupo_maquina": setor,
-                "data_carga": data_planejada,
-            }
-            if setor == 'montagem':
-                filtros_fallback["ordem_pecas_montagem__peca"] = ordem_planejada["peca_nome"]
-                filtros_fallback["maquina__nome"] = ordem_planejada.get("setor_conjunto", "")
-            elif setor == 'pintura':
-                filtros_fallback["ordem_pecas_pintura__peca"] = ordem_planejada["peca_nome"]
-                filtros_fallback["cor"] = ordem_planejada.get("cor", "")
-            else:
-                filtros_fallback["ordem_pecas_solda__peca"] = ordem_planejada["peca_nome"]
-                filtros_fallback["maquina__nome"] = ordem_planejada.get("setor_conjunto", "")
-            ordem_existente = Ordem.objects.filter(**filtros_fallback).first()
+    for chave, op in map_planejadas.items():
+        ordem_existente = map_existentes.get(chave)
 
         if ordem_existente:
-            ordem_existente.carga_liberada_id = ordem_planejada.get("carga_liberada_id")
-            ordem_existente.carga_liberada_versao_id = ordem_planejada.get("carga_liberada_versao_id")
-            ordem_existente.save(update_fields=["carga_liberada_id", "carga_liberada_versao_id"])
+            fields_to_update = []
+            if ordem_existente.carga_liberada_id != op.get("carga_liberada_id"):
+                ordem_existente.carga_liberada_id = op.get("carga_liberada_id")
+                fields_to_update.append("carga_liberada_id")
+            if ordem_existente.carga_liberada_versao_id != op.get("carga_liberada_versao_id"):
+                ordem_existente.carga_liberada_versao_id = op.get("carga_liberada_versao_id")
+                fields_to_update.append("carga_liberada_versao_id")
+            if fields_to_update:
+                ordem_existente.save(update_fields=fields_to_update)
 
-            if setor == 'montagem':
-                ordem_existente.ordem_pecas_montagem.filter(peca=ordem_planejada["peca_nome"]).update(
-                    qtd_planejada=int(ordem_planejada["qtd_planejada"])
-                )
-            elif setor == 'pintura':
-                ordem_existente.ordem_pecas_pintura.filter(peca=ordem_planejada["peca_nome"]).update(
-                    qtd_planejada=int(ordem_planejada["qtd_planejada"])
-                )
-            else:
-                ordem_existente.ordem_pecas_solda.filter(peca=ordem_planejada["peca_nome"]).update(
-                    qtd_planejada=int(ordem_planejada["qtd_planejada"])
-                )
+            # Não atualiza quantidade de ordens já iniciadas/finalizadas ou com produção registrada
+            if ordem_existente.id not in ordens_com_apontamentos_ids:
+                nova_qtd = int(op["qtd_planejada"])
+                if setor == 'montagem':
+                    qs = ordem_existente.ordem_pecas_montagem
+                    if not qs.filter(peca=op["peca_nome"]).update(qtd_planejada=nova_qtd):
+                        qs.update(qtd_planejada=nova_qtd)
+                elif setor == 'pintura':
+                    qs = ordem_existente.ordem_pecas_pintura
+                    if not qs.filter(peca=op["peca_nome"]).update(qtd_planejada=nova_qtd):
+                        qs.update(qtd_planejada=nova_qtd)
+                else:
+                    qs = ordem_existente.ordem_pecas_solda
+                    if not qs.filter(peca=op["peca_nome"]).update(qtd_planejada=nova_qtd):
+                        qs.update(qtd_planejada=nova_qtd)
         else:
-            ordens_a_criar.append(ordem_planejada)
+            ordens_a_criar.append(op)
 
-    if setor == 'montagem':
-        resultado = processar_ordens_montagem(request, ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
-    elif setor == 'pintura':
-        resultado = processar_ordens_pintura(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
-    else:
-        resultado = processar_ordens_solda(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
+    resultado = {"message": "Ordens atualizadas com sucesso."}
+    if ordens_a_criar:
+        if setor == 'montagem':
+            resultado = processar_ordens_montagem(request, ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
+        elif setor == 'pintura':
+            resultado = processar_ordens_pintura(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
+        else:
+            resultado = processar_ordens_solda(ordens_a_criar, atualizacao_ordem=True, grupo_maquina=setor.lower())
 
-    if "error" in resultado:
-        return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
+        if "error" in resultado:
+            return JsonResponse({"error": resultado["error"]}, status=resultado.get("status", 400))
+
+    ordens_protegidas = []
+    for ordem in ordens_com_apontamentos.select_related('maquina'):
+        if setor == 'montagem':
+            peca = ordem.ordem_pecas_montagem.values_list('peca', flat=True).first() or ''
+        elif setor == 'pintura':
+            peca = ordem.ordem_pecas_pintura.values_list('peca', flat=True).first() or ''
+        else:
+            peca = ordem.ordem_pecas_solda.values_list('peca', flat=True).first() or ''
+        ordens_protegidas.append({
+            'id': ordem.id,
+            'data_carga': ordem.data_carga.isoformat() if ordem.data_carga else '',
+            'grupo_maquina': ordem.grupo_maquina,
+            'status_atual': ordem.status_atual,
+            'peca': peca,
+        })
+
+    def _agrupar_origens(lista):
+        """Agrupa origens pelo mesmo recurso+qtde_por_unidade+carga, somando quantidade_item."""
+        agrupado = {}
+        for o in lista:
+            chave = (o["recurso"], o["qtde_por_unidade"], o["carga"])
+            if chave not in agrupado:
+                agrupado[chave] = {**o}
+            else:
+                agrupado[chave]["quantidade_item"] += o["quantidade_item"]
+                agrupado[chave]["subtotal"] += o["subtotal"]
+        return list(agrupado.values())
+
+    itens_planejados = [
+        {
+            "peca": op["peca_nome"],
+            "qtd_planejada": int(op["qtd_planejada"]),
+            "setor_conjunto": op.get("setor_conjunto", ""),
+            "cor": op.get("cor", ""),
+            "nova": op in ordens_a_criar,
+            "origem": _agrupar_origens(
+                origens_planejamento.get(
+                    (op["peca_nome"], op.get("setor_conjunto", ""), op.get("cor", "")), []
+                )
+            ),
+        }
+        for op in ordens_planejadas
+    ]
 
     return JsonResponse({
         "message": "Ordens atualizadas com sucesso!",
-        "ordens_com_apontamentos": list(ordens_com_apontamentos.values('id', 'data_carga', 'grupo_maquina')),
+        "ordens_com_apontamentos": ordens_protegidas,
         "novas_ordens_criadas": len(ordens_a_criar),
+        "itens_planejados": itens_planejados,
     })
 
 
