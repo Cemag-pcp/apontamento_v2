@@ -78,6 +78,53 @@
 .pend-badge-classe-default { background:#f1f5f9; color:#475569; }
 .pend-badge-tipo { background:#e0f2fe; color:#0369a1; }
 
+.classe-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: .5rem 0 1rem;
+}
+.classe-filtro-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #334155;
+    border-radius: 999px;
+    padding: .35rem .75rem;
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 1;
+    transition: all .18s ease;
+}
+.classe-filtro-btn:hover {
+    border-color: #93c5fd;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+.classe-filtro-btn.is-active {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #fff;
+}
+.classe-filtro-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    padding: .15rem .45rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #1e293b;
+    font-size: .7rem;
+    font-weight: 700;
+}
+.classe-filtro-btn.is-active .classe-filtro-badge {
+    background: rgba(255,255,255,.18);
+    color: #fff;
+}
+
 /* ── Tabela Inspecionados ────────────────────────── */
 #tabela-inspecionados-recebimento {
     font-size: .82rem;
@@ -319,6 +366,8 @@
         <span id="qtd-filtrada-pendencias-recebimento" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
 
+    <div id="filtros-classe-pendencias-recebimento" class="classe-filtros"></div>
+
     <div id="barra-lote-pendencias" class="d-none align-items-center gap-2 mb-2 p-2 rounded" style="background:#fff3cd; border:1px solid #ffc107;">
         <span id="lote-pendencias-count" class="fw-semibold text-dark" style="font-size:0.875rem;"></span>
         <button type="button" class="btn btn-sm btn-danger" id="btn-excluir-lote-pendencias">
@@ -352,6 +401,8 @@
         </span>
         <span id="qtd-filtrada-inspecionados-recebimento" class="rounded-pill py-1 px-2" style="background-color: #f59e0b; color: #fafafa; font-weight: 600; font-size: 0.75rem; display: none;"></span>
     </div>
+
+    <div id="filtros-classe-inspecionados-recebimento" class="classe-filtros"></div>
 
     <div id="barra-lote-inspecionados" class="d-none align-items-center gap-2 mb-2 p-2 rounded" style="background:#fff3cd; border:1px solid #ffc107;">
         <span id="lote-inspecionados-count" class="fw-semibold text-dark" style="font-size:0.875rem;"></span>
@@ -528,6 +579,8 @@
 <script>
     let pendenciasCache = { columns: [], rows: [], pode_editar: false };
     let inspecionadosCache = { columns: [], rows: [], pode_editar: false };
+    let filtroClassePendencias = "";
+    let filtroClasseInspecionados = "";
     let pendenciaSelecionada = null;
     let materiaisRecebimento = [];
     let materialAtivoIndex = 0;
@@ -636,12 +689,94 @@
         checkAll.checked = todos.length > 0 && marcados.length === todos.length;
     }
 
+    function obterClasseInspecaoRecebimento(row) {
+        const fontes = [row?.data, row?.data_completa];
+        const chaves = ["Classe de Inspeção", "Classe de inspeção", "Classe de InspeÃ§Ã£o"];
+
+        for (const fonte of fontes) {
+            if (!fonte) continue;
+            for (const chave of chaves) {
+                const valor = fonte[chave];
+                if (valor) return String(valor).trim();
+            }
+        }
+
+        return "Sem classe";
+    }
+
+    function montarResumoClassesRecebimento(rows) {
+        const contador = new Map();
+
+        rows.forEach((row) => {
+            const classe = obterClasseInspecaoRecebimento(row);
+            contador.set(classe, (contador.get(classe) || 0) + 1);
+        });
+
+        return Array.from(contador.entries())
+            .sort((a, b) => a[0].localeCompare(b[0], "pt-BR", { sensitivity: "base" }))
+            .map(([classe, total]) => ({ classe, total }));
+    }
+
+    function renderFiltrosClasseRecebimento(containerId, rows, classeAtiva, onSelect) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const classes = montarResumoClassesRecebimento(rows);
+        container.innerHTML = "";
+
+        if (!classes.length) return;
+
+        const criarBotao = (label, total, ativo, onClick) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = `classe-filtro-btn${ativo ? " is-active" : ""}`;
+            btn.addEventListener("click", onClick);
+
+            const texto = document.createElement("span");
+            texto.textContent = label;
+
+            const badge = document.createElement("span");
+            badge.className = "classe-filtro-badge";
+            badge.textContent = total;
+
+            btn.appendChild(texto);
+            btn.appendChild(badge);
+            return btn;
+        };
+
+        container.appendChild(
+            criarBotao("Todas", rows.length, !classeAtiva, () => onSelect(""))
+        );
+
+        classes.forEach(({ classe, total }) => {
+            container.appendChild(
+                criarBotao(classe, total, classe === classeAtiva, () => onSelect(classe === classeAtiva ? "" : classe))
+            );
+        });
+    }
+
     function renderPendencias() {
         const columns = pendenciasCache.columns || [];
         const rows = pendenciasCache.rows || [];
         const podeEditar = pendenciasCache.pode_editar === true;
         const filtro = (document.getElementById("pesquisa-pendencias-recebimento").value || "").toLowerCase();
+        const classesDisponiveis = new Set(rows.map((row) => obterClasseInspecaoRecebimento(row)));
+        if (filtroClassePendencias && !classesDisponiveis.has(filtroClassePendencias)) {
+            filtroClassePendencias = "";
+        }
+        renderFiltrosClasseRecebimento(
+            "filtros-classe-pendencias-recebimento",
+            rows,
+            filtroClassePendencias,
+            (classe) => {
+                filtroClassePendencias = classe;
+                renderPendencias();
+            }
+        );
         const filtradas = rows.filter((row) => {
+            if (filtroClassePendencias && obterClasseInspecaoRecebimento(row) !== filtroClassePendencias) {
+                return false;
+            }
             if (!filtro) return true;
             const texto = Object.values(row.data || {}).join(" ").toLowerCase();
             return texto.includes(filtro);
@@ -790,7 +925,23 @@
         const rows = inspecionadosCache.rows || [];
         const podeEditar = inspecionadosCache.pode_editar === true;
         const filtro = (document.getElementById("pesquisa-inspecionados-recebimento").value || "").toLowerCase();
+        const classesDisponiveis = new Set(rows.map((row) => obterClasseInspecaoRecebimento(row)));
+        if (filtroClasseInspecionados && !classesDisponiveis.has(filtroClasseInspecionados)) {
+            filtroClasseInspecionados = "";
+        }
+        renderFiltrosClasseRecebimento(
+            "filtros-classe-inspecionados-recebimento",
+            rows,
+            filtroClasseInspecionados,
+            (classe) => {
+                filtroClasseInspecionados = classe;
+                renderInspecionados();
+            }
+        );
         const filtradas = rows.filter((row) => {
+            if (filtroClasseInspecionados && obterClasseInspecaoRecebimento(row) !== filtroClasseInspecionados) {
+                return false;
+            }
             if (!filtro) return true;
             const textoBase = Object.values(row.data || {}).join(" ").toLowerCase();
             const textoFicha = JSON.stringify(row.dados_inspecao || {}).toLowerCase();
