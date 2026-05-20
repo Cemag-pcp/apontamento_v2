@@ -2077,6 +2077,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return /^\d{6,}$/.test(termoSemEspacos);
     }
 
+    const modalUsinagem = $('#modalUsinagem');
+    const modalUsinagemDropdownParent = modalUsinagem.find('.modal-content');
+
     $('#pecaSelect').select2({
         placeholder: 'Selecione a peça',
         ajax: {
@@ -2125,7 +2128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cache: true
         },
         minimumInputLength: 0,
-        dropdownParent: $('#modalUsinagem'),
+        dropdownParent: modalUsinagemDropdownParent,
         escapeMarkup: function (markup) {
             return markup;
         },

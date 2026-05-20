@@ -5336,6 +5336,15 @@ textarea.form-control-lg {
   outline: 0;
 }
 
+#modalUsinagem .select2-container {
+  width: 100% !important;
+}
+
+#modalUsinagem .select2-container--open,
+#modalUsinagem .select2-dropdown {
+  z-index: 1070 !important;
+}
+
 .modal-backdrop {
   --bs-backdrop-zindex: 1050;
   --bs-backdrop-bg: #000;
