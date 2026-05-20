@@ -492,6 +492,28 @@
     </div>
 </div>
 
+<div class="modal fade" id="modal-desfazer-inspecao-recebimento" tabindex="-1" aria-labelledby="modalDesfazerInspecaoRecebimentoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDesfazerInspecaoRecebimentoLabel">Desfazer inspeção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="desfazer-inspecao-id">
+                <p class="mb-2">Deseja desfazer esta inspeção?</p>
+                <p class="mb-0 text-muted small">O registro sairá de <strong>Inspecionados</strong> e voltará para <strong>Pendências</strong>.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="btn-confirmar-desfazer-inspecao">
+                    <i class="bi bi-arrow-counterclockwise"></i> Desfazer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modal-inspecao-recebimento" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalInspecaoRecebimentoLabel">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
@@ -1067,11 +1089,19 @@
                 if (podeEditar) {
                     const btnEditar = document.createElement("button");
                     btnEditar.type = "button";
-                    btnEditar.className = "btn btn-sm btn-outline-primary";
+                    btnEditar.className = "btn btn-sm btn-outline-primary me-1";
                     btnEditar.title = "Editar registro";
                     btnEditar.innerHTML = '<i class="bi bi-pencil"></i>';
                     btnEditar.addEventListener("click", () => abrirModalEditarInspecao(row));
                     tdAcao.appendChild(btnEditar);
+
+                    const btnDesfazer = document.createElement("button");
+                    btnDesfazer.type = "button";
+                    btnDesfazer.className = "btn btn-sm btn-outline-warning";
+                    btnDesfazer.title = "Desfazer inspeção";
+                    btnDesfazer.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+                    btnDesfazer.addEventListener("click", () => abrirModalDesfazerInspecao(row));
+                    tdAcao.appendChild(btnDesfazer);
                 }
                 tr.appendChild(tdAcao);
                 tbody.appendChild(tr);
@@ -1466,6 +1496,47 @@
 
         const modal = new bootstrap.Modal(document.getElementById("modal-editar-inspecao-recebimento"));
         modal.show();
+    }
+
+    function abrirModalDesfazerInspecao(row) {
+        document.getElementById("desfazer-inspecao-id").value = row?.meta?.id || "";
+        const modal = new bootstrap.Modal(document.getElementById("modal-desfazer-inspecao-recebimento"));
+        modal.show();
+    }
+
+    function confirmarDesfazerInspecaoRecebimento() {
+        const registroId = Number(document.getElementById("desfazer-inspecao-id").value || 0);
+        if (!registroId) {
+            alert("Registro inválido para desfazer.");
+            return;
+        }
+
+        const btn = document.getElementById("btn-confirmar-desfazer-inspecao");
+        btn.disabled = true;
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = "Desfazendo...";
+
+        fetch("/inspecao/api/recebimento/desfazer-inspecao/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
+            body: JSON.stringify({ id: registroId }),
+        })
+        .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+        .then((result) => {
+            if (!result.ok) throw new Error(result.data.error || "Erro ao desfazer inspeção.");
+            bootstrap.Modal.getInstance(document.getElementById("modal-desfazer-inspecao-recebimento"))?.hide();
+            document.getElementById("desfazer-inspecao-id").value = "";
+            carregarPendencias();
+            carregarInspecionados();
+        })
+        .catch((error) => {
+            console.error(error);
+            alert(error.message || "Erro ao desfazer inspeção.");
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = textoOriginal;
+        });
     }
 
     function salvarEdicaoInspecao() {
@@ -2804,6 +2875,7 @@
         document.getElementById("pesquisa-pendencias-recebimento").addEventListener("input", renderPendencias);
         document.getElementById("pesquisa-inspecionados-recebimento").addEventListener("input", renderInspecionados);
         document.getElementById("btn-salvar-edicao-inspecao").addEventListener("click", salvarEdicaoInspecao);
+        document.getElementById("btn-confirmar-desfazer-inspecao").addEventListener("click", confirmarDesfazerInspecaoRecebimento);
         document.getElementById("btn-excluir-lote-pendencias").addEventListener("click", excluirLotePendencias);
         document.getElementById("btn-excluir-lote-inspecionados").addEventListener("click", excluirLoteInspecionados);
         document.getElementById("btn-desmarcar-pendencias").addEventListener("click", () => {

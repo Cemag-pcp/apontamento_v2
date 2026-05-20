@@ -9,6 +9,7 @@ from django.db import connection, transaction
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
 from django.utils.timezone import localtime
 
 from core.models import Profile
@@ -170,6 +171,33 @@ def _find_recebimento_item_by_identity(dados, data_coluna_a):
     return None
 
 
+BUSINESS_KEY_FIELDS = ("CNPJ", "Ch. de Pedido", "Nº Nota fiscal")
+
+
+def _business_key_payload(dados):
+    payload = {}
+    for key in BUSINESS_KEY_FIELDS:
+        payload[key] = str((dados or {}).get(key) or "").strip()
+    return payload
+
+
+def _find_recebimento_item_by_business_key(dados, data_coluna_a):
+    business_key = _business_key_payload(dados)
+    if not any(business_key.values()):
+        return None
+
+    candidates = InspecaoRecebimentoItem.objects.filter(
+        planilha_id=SHEET_ID,
+        aba_nome=SHEET_TAB,
+        data_referencia=data_coluna_a,
+    ).order_by("id")
+
+    for candidate in candidates:
+        if _business_key_payload(candidate.dados) == business_key:
+            return candidate
+    return None
+
+
 def _reconcile_recebimento_items(items, incoming_dados, row_index, sheet_hash, data_coluna_a):
     unique_items = []
     seen_ids = set()
@@ -279,11 +307,22 @@ def sincronizar_recebimento(request):
         ).first()
         existing_by_hash = InspecaoRecebimentoItem.objects.filter(sheet_hash=sheet_hash).first()
         existing_by_identity = _find_recebimento_item_by_identity(dados, data_coluna_a)
+        existing_by_business_key = _find_recebimento_item_by_business_key(dados, data_coluna_a)
 
-        existing_item = existing_by_line or existing_by_hash or existing_by_identity
+        existing_item = (
+            existing_by_line
+            or existing_by_hash
+            or existing_by_business_key
+            or existing_by_identity
+        )
         if existing_item:
             _reconcile_recebimento_items(
-                items=[existing_by_line, existing_by_hash, existing_by_identity],
+                items=[
+                    existing_by_line,
+                    existing_by_hash,
+                    existing_by_business_key,
+                    existing_by_identity,
+                ],
                 incoming_dados=dados,
                 row_index=row_index,
                 sheet_hash=sheet_hash,
@@ -603,6 +642,85 @@ def editar_recebimento_inspecao(request):
         return JsonResponse({"error": "Registro não encontrado"}, status=404)
 
     return JsonResponse({"success": True}, status=200)
+
+
+def desfazer_recebimento_inspecao(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+    if not _tem_acesso_edicao(request):
+        return JsonResponse({"error": "Sem permissão"}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    registro_id = payload.get("id")
+    if not registro_id:
+        return JsonResponse({"error": "Campo 'id' obrigatório"}, status=400)
+
+    registro = (
+        InspecaoRecebimento.objects.select_related("item")
+        .filter(id=registro_id, excluido=False)
+        .first()
+    )
+    if not registro:
+        return JsonResponse({"error": "Registro não encontrado"}, status=404)
+
+    data_referencia = None
+    if isinstance(registro.dados, dict):
+        data_referencia = _parse_br_date(registro.dados.get("Data"))
+
+    item = registro.item
+    if item is None and registro.sheet_hash:
+        item = InspecaoRecebimentoItem.objects.filter(sheet_hash=registro.sheet_hash).first()
+    if item is None and data_referencia is not None:
+        item = _find_recebimento_item_by_business_key(registro.dados or {}, data_referencia)
+    if item is None and data_referencia is not None:
+        item = _find_recebimento_item_by_identity(registro.dados or {}, data_referencia)
+
+    with transaction.atomic():
+        if item is None:
+            item = InspecaoRecebimentoItem.objects.create(
+                planilha_id=registro.planilha_id,
+                aba_nome=registro.aba_nome,
+                linha_planilha=registro.linha_planilha,
+                sheet_hash=registro.sheet_hash,
+                dados=registro.dados or {},
+                data_referencia=data_referencia or timezone.localdate(),
+                status_h=True,
+                inspecionado=False,
+                excluido=False,
+            )
+        else:
+            item.planilha_id = registro.planilha_id
+            item.aba_nome = registro.aba_nome
+            item.linha_planilha = registro.linha_planilha
+            item.sheet_hash = registro.sheet_hash
+            item.dados = registro.dados or {}
+            if data_referencia is not None:
+                item.data_referencia = data_referencia
+            item.status_h = True
+            item.inspecionado = False
+            item.excluido = False
+            item.save(
+                update_fields=[
+                    "planilha_id",
+                    "aba_nome",
+                    "linha_planilha",
+                    "sheet_hash",
+                    "dados",
+                    "data_referencia",
+                    "status_h",
+                    "inspecionado",
+                    "excluido",
+                ]
+            )
+
+        registro.item = item
+        registro.excluido = True
+        registro.save(update_fields=["item", "excluido"])
+
+    return JsonResponse({"success": True, "item_id": item.id}, status=200)
 
 
 def excluir_recebimento_inspecao_lote(request):
