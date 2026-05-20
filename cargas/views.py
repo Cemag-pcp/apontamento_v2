@@ -262,15 +262,16 @@ def _construir_ordens_planejamento_from_items(cargas_liberadas, setor, datas_fin
 
     colunas_carretas = [c for c in colunas_carretas if c in base_carretas.columns]
 
-    # Remove linhas duplicadas de Base_Carretas que tenham o mesmo (Recurso, Célula).
-    # Duplicatas na planilha causam multiplicação errada das quantidades no merge.
-    cols_dedup = [c for c in ['Recurso', 'Célula'] if c in base_carretas.columns]
+    # Remove apenas linhas EXATAMENTE iguais em (Recurso, Código, Peca, Célula).
+    # Não usar só (Recurso, Célula) pois a mesma máquina pode produzir peças
+    # diferentes na mesma célula — removeria linhas válidas.
+    cols_dedup = [c for c in ['Recurso', 'Código', 'Peca', 'Célula'] if c in base_carretas.columns]
     antes_dedup = len(base_carretas)
     base_carretas = base_carretas.drop_duplicates(subset=cols_dedup).reset_index(drop=True)
     removidas_carreta = antes_dedup - len(base_carretas)
     if removidas_carreta:
         logger.warning(
-            "[from_items] base_carretas | %d linhas duplicadas removidas (mesmo Recurso+Célula)",
+            "[from_items] base_carretas | %d linhas exatamente duplicadas removidas (Recurso+Código+Peca+Célula)",
             removidas_carreta,
         )
 
@@ -997,19 +998,22 @@ def atualizar_ordem_existente_planejamento(request):
     # Monta dict das ordens existentes indexado por peca_nome (+ cor para pintura).
     # Isso evita queries por maquina__nome que falham quando o nome da célula no
     # Sheets não bate exatamente com Maquina.nome no banco.
+    # Chave inclui (peca_nome, celula/maquina) para diferenciar o mesmo item em células distintas.
+    # Ex: "037567G - CILINDRO CAF" em CILINDRO e em QUALIDADE são duas ordens separadas.
     map_existentes = {}
     for ordem in ordens_existentes_qs.prefetch_related(
         'ordem_pecas_montagem', 'ordem_pecas_pintura', 'ordem_pecas_solda'
-    ):
+    ).select_related('maquina'):
+        maquina_nome = ordem.maquina.nome if ordem.maquina else ''
         if setor == 'montagem':
             peca = ordem.ordem_pecas_montagem.values_list('peca', flat=True).first() or ''
-            chave = peca
+            chave = (peca, maquina_nome)
         elif setor == 'pintura':
             peca = ordem.ordem_pecas_pintura.values_list('peca', flat=True).first() or ''
             chave = (peca, ordem.cor or '')
         else:
             peca = ordem.ordem_pecas_solda.values_list('peca', flat=True).first() or ''
-            chave = peca
+            chave = (peca, maquina_nome)
         if chave not in map_existentes:
             map_existentes[chave] = ordem
 
@@ -1019,7 +1023,7 @@ def atualizar_ordem_existente_planejamento(request):
         if setor == 'pintura':
             chave = (op['peca_nome'], op.get('cor', ''))
         else:
-            chave = op['peca_nome']
+            chave = (op['peca_nome'], op.get('setor_conjunto', ''))
         map_planejadas[chave] = op
 
     # Exclui ordens que saíram do planejamento (e não são protegidas)
