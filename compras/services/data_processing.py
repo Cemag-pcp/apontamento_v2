@@ -120,8 +120,11 @@ def _ajustar_estoque(row, df_pedidos):
     if 'qde_ped_corrigido' not in df_pedidos.columns:
         return row['estoque_almox']
 
+    hoje_ts = pd.Timestamp(datetime.now().date())
     pedidos = df_pedidos[
         (df_pedidos['codigo'] == row['codigo']) &
+        pd.notna(df_pedidos['data_entrega']) &
+        (df_pedidos['data_entrega'] >= hoje_ts) &
         (df_pedidos['data_entrega'] <= data_limite_ts)
     ]
     if not pedidos.empty:
@@ -225,6 +228,8 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
             else (x + timedelta(days=1) if pd.notna(x) and x.weekday() == 6 else x)
         )
 
+    hoje_ts = pd.Timestamp(datetime.now().date())
+
     if 'codigo' in df_ped.columns:
         dup_ped = df_ped[df_ped['codigo'].isin(grupo_df['codigo'])].copy()
         dup_ped = dup_ped.merge(grupo_df, on='codigo')
@@ -300,6 +305,15 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
 
     materiais = []
     for _, row in df.iterrows():
+        pedidos_material = df_ped[
+            (df_ped['codigo'] == row['codigo']) &
+            pd.notna(df_ped.get('data_entrega')) &
+            (df_ped.get('qde_ped_corrigido', 0) > 0)
+        ].copy()
+        pedidos_atrasados = pedidos_material[pedidos_material['data_entrega'] < hoje_ts]
+        pedidos_previstos = pedidos_material[pedidos_material['data_entrega'] >= hoje_ts]
+        exibir_data_compra = None if not pedidos_previstos.empty else _valor_escalar(row.get('data_compra'))
+
         materiais.append({
             'codigo': str(_valor_escalar(row.get('codigo'), '')),
             'descricao': str(_valor_escalar(row.get('descricao'), '')),
@@ -312,13 +326,15 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
             'estoque_almox': round(float(_valor_escalar(row.get('estoque_almox'), 0) or 0), 2),
             'estoque_total': round(float(_valor_escalar(row.get('estoque_total'), 0) or 0), 2),
             'ped_compras': round(float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0), 2),
+            'ped_compras_atrasado': round(float(pedidos_atrasados['qde_ped_corrigido'].sum()), 2),
+            'ped_compras_previsto': round(float(pedidos_previstos['qde_ped_corrigido'].sum()), 2),
             'consumo_diario': round(float(_valor_escalar(row.get('consumo_diario'), 0) or 0), 3),
             'dias_ate_zero': round(float(row['dias_ate_estoque_zero']), 1)
             if pd.notna(_valor_escalar(row.get('dias_ate_estoque_zero'))) else 9999,
             'dias_ate_data_compra': int(row['dias_ate_data_compra'])
             if pd.notna(_valor_escalar(row.get('dias_ate_data_compra'))) else None,
-            'data_compra': row['data_compra'].strftime('%d/%m/%Y')
-            if pd.notna(_valor_escalar(row.get('data_compra'))) else None,
+            'data_compra': exibir_data_compra.strftime('%d/%m/%Y')
+            if pd.notna(exibir_data_compra) else None,
             'data_estoque_minimo': row['data_estoque_minimo'].strftime('%d/%m/%Y')
             if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) else None,
             'data_estoque_zero': row['data_estoque_zero'].strftime('%d/%m/%Y')
@@ -327,6 +343,8 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
             'estoque_minimo': round(float(_valor_escalar(row.get('estoque_minimo'), 0) or 0), 2),
             'flag_urgencia': _valor_escalar(row.get('flag_urgencia'), 'SEM_DADOS'),
             'tem_pedido': 'SIM' if float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0) > 0 else 'NÃO',
+            'pedidos_atrasados_count': int(len(pedidos_atrasados)),
+            'pedidos_previstos_count': int(len(pedidos_previstos)),
         })
 
     codigos = sorted(set(m['codigo'] for m in materiais if m['codigo']))
@@ -358,19 +376,22 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
     datas_grafico = []
     estoque_diario = []
     chegadas_previstas = []
+    hoje_ts = pd.Timestamp(datetime.now().date())
     pedidos_pendentes_qs = df_ped[df_ped['codigo'] == codigo].copy()
     pedidos_pendentes_qs = pedidos_pendentes_qs[
         pd.notna(pedidos_pendentes_qs.get('data_entrega')) &
         (pedidos_pendentes_qs.get('qde_ped_corrigido', 0) > 0)
     ]
     pedidos_pendentes_qs = pedidos_pendentes_qs.sort_values(by='data_entrega', ascending=True)
+    pedidos_atrasados_qs = pedidos_pendentes_qs[pedidos_pendentes_qs['data_entrega'] < hoje_ts].copy()
+    pedidos_previstos_qs = pedidos_pendentes_qs[pedidos_pendentes_qs['data_entrega'] >= hoje_ts].copy()
 
     for data in datas:
         estoque_atual_dia -= consumo_diario
         datas_grafico.append(data.strftime('%Y-%m-%d'))
         estoque_diario.append(round(estoque_atual_dia, 2))
 
-        pedidos_do_dia = df_ped[(df_ped['codigo'] == codigo) & (df_ped['data_entrega'] == data)]
+        pedidos_do_dia = pedidos_previstos_qs[pedidos_previstos_qs['data_entrega'] == data]
         if not pedidos_do_dia.empty and 'qde_ped_corrigido' in pedidos_do_dia.columns:
             quantidade_chegada = float(pedidos_do_dia['qde_ped_corrigido'].sum())
             estoque_atual_dia += quantidade_chegada
@@ -419,10 +440,15 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
         'serie_ideal': {'datas': datas_ideal, 'estoques': estoque_ideal_diario},
         'chegadas_previstas': chegadas_previstas,
         'pedidos_pendentes_count': int(len(pedidos_pendentes_qs)),
+        'pedidos_atrasados_count': int(len(pedidos_atrasados_qs)),
+        'pedidos_previstos_count': int(len(pedidos_previstos_qs)),
+        'ped_compras_atrasado': round(float(pedidos_atrasados_qs.get('qde_ped_corrigido', 0).sum()), 2),
+        'ped_compras_previsto': round(float(pedidos_previstos_qs.get('qde_ped_corrigido', 0).sum()), 2),
         'pedidos_pendentes_detalhes': [
             {
                 'data': data.strftime('%Y-%m-%d'),
                 'quantidade': round(float(qtd), 2),
+                'status': 'ATRASADO' if data < hoje_ts else 'A_RECEBER',
             }
             for data, qtd in zip(
                 pedidos_pendentes_qs['data_entrega'].tolist(),

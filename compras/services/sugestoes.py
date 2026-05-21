@@ -36,6 +36,8 @@ def gerar_sugestoes(projecao: dict) -> list:
     ped_compras = float(projecao.get('ped_compras', 0) or 0)
     chegadas_previstas = projecao.get('chegadas_previstas') or []
     pedidos_pendentes_count = int(projecao.get('pedidos_pendentes_count', 0) or 0)
+    pedidos_atrasados_count = int(projecao.get('pedidos_atrasados_count', 0) or 0)
+    pedidos_previstos_count = int(projecao.get('pedidos_previstos_count', 0) or 0)
     pedidos_pendentes_detalhes = projecao.get('pedidos_pendentes_detalhes') or []
     datas_pedidos_pendentes = projecao.get('datas_pedidos_pendentes') or []
     chegada_planejada_compra = projecao.get('chegada_planejada_compra') or {}
@@ -90,6 +92,17 @@ def gerar_sugestoes(projecao: dict) -> list:
             f'Há **{n} pedido{"s" if n > 1 else ""}** de compra pendente{"s" if n > 1 else ""}'
             f' totalizando **{ped_compras:.2f} unidades**.'
         ]
+        if pedidos_atrasados_count > 0:
+            partes.append(
+                f'**{pedidos_atrasados_count} pedido{"s" if pedidos_atrasados_count > 1 else ""}**'
+                f' est{"ao" if pedidos_atrasados_count > 1 else "a"} **atrasado{"s" if pedidos_atrasados_count > 1 else ""}**'
+                f' e nao entra{"m" if pedidos_atrasados_count > 1 else ""} no calculo de **Est. almox**.'
+            )
+        if pedidos_previstos_count > 0:
+            partes.append(
+                f'**{pedidos_previstos_count} pedido{"s" if pedidos_previstos_count > 1 else ""}**'
+                f' ainda est{"ao" if pedidos_previstos_count > 1 else "a"} previsto{"s" if pedidos_previstos_count > 1 else ""} para chegada.'
+            )
 
         if pedidos_pendentes_detalhes:
             partes.append('Pedidos pendentes:')
