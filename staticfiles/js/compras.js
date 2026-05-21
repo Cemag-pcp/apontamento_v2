@@ -2,6 +2,7 @@
 'use strict';
 
 const URGENCY_ROW_CLASS = {
+    PEDIDO_ATRASADO:   'urg-pedido',
     URGENTE:           'urg-critico',
     URGENTE_COM_PEDIDO:'urg-pedido',
     PRAZO_CURTO:       'urg-curto',
@@ -10,6 +11,7 @@ const URGENCY_ROW_CLASS = {
 };
 
 const URGENCY_BADGE = {
+    PEDIDO_ATRASADO:   '<span class="compras-badge pedido-pendente"><i class="fas fa-triangle-exclamation"></i> Ped. Atrasado</span>',
     URGENTE:           '<span class="compras-badge urgente"><i class="fas fa-arrow-down"></i> Urgente</span>',
     URGENTE_COM_PEDIDO:'<span class="compras-badge pedido-pendente"><i class="fas fa-truck"></i> Ped. Pendente</span>',
     PRAZO_CURTO:       '<span class="compras-badge curto"><i class="fas fa-clock"></i> Prazo curto</span>',
@@ -230,15 +232,20 @@ function ordenarPorDataCompra() {
 }
 
 function atualizarContadores(materiais) {
+    const pedidoAtrasado = materiais.filter(m => m.flag_urgencia === 'PEDIDO_ATRASADO').length;
     const urgente = materiais.filter(m => m.flag_urgencia === 'URGENTE').length;
     const urgentePedido = materiais.filter(m => m.flag_urgencia === 'URGENTE_COM_PEDIDO').length;
     const curto = materiais.filter(m => m.flag_urgencia === 'PRAZO_CURTO').length;
     const ok = materiais.filter(m => m.flag_urgencia === 'PRAZO_OK').length;
+    const semDados = materiais.filter(m => m.flag_urgencia === 'SEM_DADOS').length;
 
+    document.getElementById('ctPedidoAtrasado').textContent = `${pedidoAtrasado} pedido atrasado`;
     document.getElementById('ctUrgente').textContent = `${urgente} urgentes`;
+    document.getElementById('ctUrgentePedido').textContent = `${urgentePedido} c/ ped. pendente`;
     document.getElementById('ctPrazoCurto').textContent = `${curto} prazo curto`;
     document.getElementById('ctPrazoOk').textContent = `${ok} OK`;
-    document.getElementById('ctTotal').textContent = `Total: ${materiais.length} materiais | ${urgentePedido} c/ ped. pendente`;
+    document.getElementById('ctSemDados').textContent = `${semDados} sem dados`;
+    document.getElementById('ctTotal').textContent = `Total: ${materiais.length} materiais`;
 
     const el = document.getElementById('contadores');
     el.removeAttribute('style');
@@ -247,6 +254,7 @@ function atualizarContadores(materiais) {
 
 let modalProjecao = null;
 let modalSugestoes = null;
+let codigoAtualProjecao = null;
 
 function getModalProjecao() {
     if (!modalProjecao) {
@@ -268,6 +276,7 @@ function getModalSugestoes() {
 }
 
 async function carregarProjecao(codigo, descricao) {
+    codigoAtualProjecao = codigo;
     document.getElementById('tituloGrafico').textContent = `Projeção - ${codigo}: ${descricao}`;
     document.getElementById('tituloSugestoesCompra').textContent = `Sugestões - ${codigo}`;
     document.getElementById('loadingGrafico').style.display = 'block';
@@ -276,6 +285,7 @@ async function carregarProjecao(codigo, descricao) {
     document.getElementById('conteudoSugestoes').style.display = 'none';
     document.getElementById('plotlyDiv').innerHTML = '';
     document.getElementById('painelSugestoes').innerHTML = '';
+    _resetAnaliseIA();
 
     getModalProjecao().show();
     getModalSugestoes().show();
@@ -305,6 +315,9 @@ async function carregarProjecao(codigo, descricao) {
         renderPlotly(data);
         renderSugestoes(data.sugestoes || []);
     });
+
+    // Verifica silenciosamente se já existe análise em cache
+    _verificarCacheAnaliseIA(codigo);
 }
 
 function renderPlotly(data) {
@@ -509,11 +522,77 @@ function renderSugestoes(sugestoes) {
     }).join('');
 }
 
+function _resetAnaliseIA() {
+    document.getElementById('btnAnaliseIA').innerHTML = '<i class="fas fa-robot me-1"></i> Analisar com IA';
+    document.getElementById('btnAnaliseIA').disabled = true;
+    document.getElementById('textoAnaliseIA').style.display = 'none';
+    document.getElementById('textoAnaliseIA').textContent = '';
+    document.getElementById('dataAnaliseIA').style.display = 'none';
+    document.getElementById('dataAnaliseIA').textContent = '';
+    document.getElementById('loadingAnaliseIA').style.display = 'none';
+}
+
+function _mostrarAnalise(texto, criadoEm, fromCache) {
+    document.getElementById('textoAnaliseIA').textContent = texto;
+    document.getElementById('textoAnaliseIA').style.display = 'block';
+    if (criadoEm) {
+        const label = fromCache ? 'Análise salva em' : 'Análise gerada em';
+        document.getElementById('dataAnaliseIA').textContent = `${label}: ${criadoEm}`;
+        document.getElementById('dataAnaliseIA').style.display = 'block';
+    }
+    document.getElementById('btnAnaliseIA').innerHTML = '<i class="fas fa-rotate-right me-1"></i> Re-analisar com IA';
+    document.getElementById('btnAnaliseIA').disabled = false;
+    document.getElementById('loadingAnaliseIA').style.display = 'none';
+}
+
+async function _verificarCacheAnaliseIA(codigo) {
+    try {
+        const resp = await fetch(`/compras/api/analise-ia/?codigo=${encodeURIComponent(codigo)}&check_only=1`);
+        const data = await resp.json();
+        if (data.analise) {
+            _mostrarAnalise(data.analise, data.criado_em, true);
+        } else {
+            // Sem cache: habilita o botão para o usuário gerar
+            document.getElementById('btnAnaliseIA').disabled = false;
+        }
+    } catch (_) {
+        document.getElementById('btnAnaliseIA').disabled = false;
+    }
+}
+
+async function carregarAnaliseIA(force = false) {
+    if (!codigoAtualProjecao) return;
+    document.getElementById('btnAnaliseIA').disabled = true;
+    document.getElementById('loadingAnaliseIA').style.display = 'block';
+    document.getElementById('textoAnaliseIA').style.display = 'none';
+    document.getElementById('dataAnaliseIA').style.display = 'none';
+
+    const qs = new URLSearchParams({ codigo: codigoAtualProjecao });
+    if (force) qs.set('force', '1');
+
+    try {
+        const resp = await fetch(`/compras/api/analise-ia/?${qs}`);
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        _mostrarAnalise(data.analise, data.criado_em, data.from_cache);
+    } catch (e) {
+        document.getElementById('textoAnaliseIA').textContent = `Erro: ${e.message}`;
+        document.getElementById('textoAnaliseIA').style.display = 'block';
+        document.getElementById('btnAnaliseIA').disabled = false;
+        document.getElementById('loadingAnaliseIA').style.display = 'none';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     inicializarFiltroProduto();
     carregarMateriais();
     carregarCotacaoDolar();
     window.setInterval(() => carregarCotacaoDolar(), DOLAR_REFRESH_INTERVAL_MS);
+
+    document.getElementById('btnAnaliseIA').addEventListener('click', () => {
+        const jaTemAnalise = document.getElementById('textoAnaliseIA').style.display !== 'none';
+        carregarAnaliseIA(jaTemAnalise);
+    });
 
     document.getElementById('btnFiltrar').addEventListener('click', () => {
         carregarMateriais(getParams());
