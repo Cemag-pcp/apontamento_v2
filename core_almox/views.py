@@ -89,7 +89,7 @@ def _chamar_innovaro_transferir(solicitacao):
     """Retorna (chave_str | None, erro_str | None). Apenas para transferências."""
     payload = {
         "id": f"almox-transferencia-{solicitacao.id}",
-        "pessoa": solicitacao.funcionario.matricula,
+        "pessoa": '4395',
         "recurso": solicitacao.item.codigo,
         "quantidade": solicitacao.quantidade,
         "depositoOrigem": "Almox central",
@@ -132,7 +132,7 @@ def _chamar_innovaro_transferir_lote(solicitacoes):
     payload = [
         {
             "id": f"almox-transferencia-{s.id}",
-            "pessoa": s.funcionario.matricula,
+            "pessoa": '4395',
             "recurso": s.item.codigo,
             "quantidade": s.quantidade,
             "depositoOrigem": "Almox central",

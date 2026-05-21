@@ -230,6 +230,37 @@ def _find_recebimento_item_by_business_key(dados, data_coluna_a):
     return None
 
 
+def _sync_recebimento_inspecao_ativa(primary_item, merged_dados, row_index, sheet_hash):
+    registros = list(
+        InspecaoRecebimento.objects.filter(item=primary_item).order_by(
+            "excluido", "-data_inspecao", "-id"
+        )
+    )
+    if not registros:
+        return
+
+    registro_ativo = next((registro for registro in registros if registro.sheet_hash == sheet_hash), None)
+    if registro_ativo is None:
+        registro_ativo = next((registro for registro in registros if not registro.excluido), registros[0])
+
+    update_fields = []
+    if registro_ativo.item_id != primary_item.id:
+        registro_ativo.item = primary_item
+        update_fields.append("item")
+    if registro_ativo.dados != merged_dados:
+        registro_ativo.dados = merged_dados
+        update_fields.append("dados")
+    if registro_ativo.linha_planilha != row_index:
+        registro_ativo.linha_planilha = row_index
+        update_fields.append("linha_planilha")
+    if registro_ativo.sheet_hash != sheet_hash:
+        registro_ativo.sheet_hash = sheet_hash
+        update_fields.append("sheet_hash")
+
+    if update_fields:
+        registro_ativo.save(update_fields=update_fields)
+
+
 def _reconcile_recebimento_items(items, incoming_dados, row_index, sheet_hash, data_coluna_a):
     unique_items = []
     seen_ids = set()
@@ -249,35 +280,37 @@ def _reconcile_recebimento_items(items, incoming_dados, row_index, sheet_hash, d
         any_inspecionado = any_inspecionado or item.inspecionado
     merged_dados = _merge_sheet_data(merged_dados, incoming_dados)
 
-    for duplicate_item in unique_items:
-        if duplicate_item.id == primary_item.id:
-            continue
-        InspecaoRecebimento.objects.filter(item=duplicate_item).update(item=primary_item)
-        duplicate_item.delete()
+    with transaction.atomic():
+        for duplicate_item in unique_items:
+            if duplicate_item.id == primary_item.id:
+                continue
+            InspecaoRecebimento.objects.filter(item=duplicate_item).update(item=primary_item)
+            duplicate_item.delete()
 
-    primary_item.dados = merged_dados
-    primary_item.data_referencia = data_coluna_a
-    primary_item.status_h = True
-    primary_item.sheet_hash = sheet_hash
-    primary_item.linha_planilha = row_index
-    primary_item.inspecionado = any_inspecionado
-    primary_item.save(
-        update_fields=[
-            "dados",
-            "data_referencia",
-            "status_h",
-            "sheet_hash",
-            "linha_planilha",
-            "inspecionado",
-        ]
-    )
-
-    if primary_item.inspecionado:
-        InspecaoRecebimento.objects.filter(item=primary_item).update(
-            dados=primary_item.dados,
-            linha_planilha=row_index,
-            sheet_hash=sheet_hash,
+        primary_item.dados = merged_dados
+        primary_item.data_referencia = data_coluna_a
+        primary_item.status_h = True
+        primary_item.sheet_hash = sheet_hash
+        primary_item.linha_planilha = row_index
+        primary_item.inspecionado = any_inspecionado
+        primary_item.save(
+            update_fields=[
+                "dados",
+                "data_referencia",
+                "status_h",
+                "sheet_hash",
+                "linha_planilha",
+                "inspecionado",
+            ]
         )
+
+        if primary_item.inspecionado:
+            _sync_recebimento_inspecao_ativa(
+                primary_item=primary_item,
+                merged_dados=primary_item.dados,
+                row_index=row_index,
+                sheet_hash=sheet_hash,
+            )
 
     return primary_item
 
