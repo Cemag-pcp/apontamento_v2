@@ -6811,7 +6811,6 @@ textarea.form-control-lg {
 
 .fixed-top, .sb-nav-fixed #layoutSidenav #layoutSidenav_nav, .sb-nav-fixed .sb-topnav {
   position: fixed;
-  top: 0;
   right: 0;
   left: 0;
   z-index: 1030;
@@ -10936,7 +10935,7 @@ body {
   padding-top: 56px;
 }
 .sb-nav-fixed #layoutSidenav #layoutSidenav_nav .sb-sidenav .sb-sidenav-menu {
-  overflow-y: auto;
+  overflow-y: visible;
 }
 .sb-nav-fixed #layoutSidenav #layoutSidenav_content {
   padding-left: 225px;
