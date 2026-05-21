@@ -188,7 +188,7 @@ function renderTabela(materiais) {
             <td class="num">${fmt(m.cons_mes_anterior)}</td>
             <td class="num">${fmt(m.simulado_pend_vendas)}</td>
             <td class="num">${fmt(m.dee_dias_em_est, 1)}</td>
-            <td class="num">${fmt(m.estoque_almox)}</td>
+            <td class="num">${fmt(m.estoque_almox_central ?? m.estoque_almox)}</td>
             <td class="num">${fmt(m.consumo_diario, 3)}</td>
             <td class="num">${m.dias_ate_zero === 9999 ? '∞' : fmt(m.dias_ate_zero, 1)}</td>
             <td class="num">${fmt(m.ped_compras)}</td>
@@ -465,7 +465,9 @@ const SUGESTAO_CONFIG = {
 
 function _formatarMensagemSugestao(mensagem) {
     // Converte **texto** → <strong>texto</strong>
-    return mensagem.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    return mensagem
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
 }
 
 function renderSugestoes(sugestoes) {
