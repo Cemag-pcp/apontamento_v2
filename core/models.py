@@ -256,6 +256,7 @@ class RotaAcesso(models.Model):
         ('inspecao', 'Inspeção'),
         ('almoxarifado', 'Almoxarifado'),
         ('compras', 'Compras'),
+        ('comercial', 'Comercial'),
     ]
 
     nome=models.CharField(max_length=50,unique=True) # exemplo: serra/historico

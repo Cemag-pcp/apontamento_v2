@@ -1805,6 +1805,10 @@
             || normalizado === "bombasmotorescomponentes";
     }
 
+    function classeAtualEhMangueirasHidraulicas() {
+        return normalizarClasseTexto(classeAtual) === "mangueirashidraulicas";
+    }
+
     function getBmcContainerId(prefix) {
         return `bmc-extra-${String(prefix || "").replace(/[^a-zA-Z0-9]/g, "")}`;
     }
@@ -2244,6 +2248,19 @@
             return html;
         },
 
+        "Mangueiras hidráulicas": (prefix) => {
+            let html = "";
+            html += secao("Inspeção");
+            html += selectConformidade(prefix, "teste_rosqueamento", "Teste de rosqueamento");
+            html += selectConformidade(prefix, "teste_estanqueidade", "Teste de estanqueidade");
+            html += selectConformidade(prefix, "dimensional", "Dimensional");
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
         "Arame de Solda": (prefix) => {
             let html = "";
             html += secao("Visual");
@@ -2535,6 +2552,9 @@
         let builder = FORMULARIOS[classeAtual];
         if (!builder && classeAtualEhBombasMotoresComponentes()) {
             builder = FORMULARIOS["Bombas/Motores/Componentes"];
+        }
+        if (!builder && classeAtualEhMangueirasHidraulicas()) {
+            builder = FORMULARIOS["Mangueiras hidráulicas"];
         }
         if (!builder) {
             builder = FORMULARIOS["_generico"];

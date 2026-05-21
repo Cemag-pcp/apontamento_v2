@@ -128,6 +128,38 @@ def _get_classe_inspecao(data):
     ).strip()
 
 
+def _normalizar_classe_inspecao(valor):
+    texto = str(valor or "").strip().lower()
+    substituicoes = str.maketrans(
+        {
+            "á": "a",
+            "à": "a",
+            "â": "a",
+            "ã": "a",
+            "ä": "a",
+            "é": "e",
+            "è": "e",
+            "ê": "e",
+            "ë": "e",
+            "í": "i",
+            "ì": "i",
+            "î": "i",
+            "ï": "i",
+            "ó": "o",
+            "ò": "o",
+            "ô": "o",
+            "õ": "o",
+            "ö": "o",
+            "ú": "u",
+            "ù": "u",
+            "û": "u",
+            "ü": "u",
+            "ç": "c",
+        }
+    )
+    return texto.translate(substituicoes)
+
+
 def _row_hash_from_list(row_values):
     payload = json.dumps(row_values, ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -491,7 +523,9 @@ def inspecionar_recebimento(request):
         if isinstance(materiais_val, list):
             materiais_inspecao = materiais_val
 
-    if classe_inspecao == "Adaptadores e terminais":
+    classe_inspecao_normalizada = _normalizar_classe_inspecao(classe_inspecao)
+
+    if classe_inspecao_normalizada == "adaptadores e terminais":
         if materiais_inspecao:
             conjuntos_unidades = [m.get("unidades") for m in materiais_inspecao if isinstance(m, dict)]
             if not any(isinstance(unidades, list) and unidades for unidades in conjuntos_unidades):
@@ -522,6 +556,41 @@ def inspecionar_recebimento(request):
                     {"error": "Informe o teste de rosqueamento como conforme ou nao conforme."},
                     status=400,
                 )
+
+    if classe_inspecao_normalizada == "mangueiras hidraulicas":
+        campos_obrigatorios = {
+            "teste_rosqueamento": "teste de rosqueamento",
+            "teste_estanqueidade": "teste de estanqueidade",
+            "dimensional": "dimensional",
+        }
+
+        if materiais_inspecao:
+            conjuntos_unidades = [m.get("unidades") for m in materiais_inspecao if isinstance(m, dict)]
+            unidades_iteracao = []
+            for unidades in conjuntos_unidades:
+                if isinstance(unidades, list):
+                    unidades_iteracao.extend(unidades)
+        else:
+            unidades = dados_inspecao.get("unidades") if isinstance(dados_inspecao, dict) else None
+            unidades_iteracao = unidades if isinstance(unidades, list) else []
+
+        if not unidades_iteracao:
+            return JsonResponse(
+                {"error": "Informe os campos de inspeção para as unidades inspecionadas."},
+                status=400,
+            )
+
+        for unidade in unidades_iteracao:
+            campos = unidade.get("campos") if isinstance(unidade, dict) else None
+            campos = campos if isinstance(campos, dict) else {}
+
+            for chave, rotulo in campos_obrigatorios.items():
+                valor = str(campos.get(chave) or "").strip()
+                if valor not in {"conforme", "nao_conforme"}:
+                    return JsonResponse(
+                        {"error": f"Informe {rotulo} como conforme ou nao conforme."},
+                        status=400,
+                    )
 
     item = None
     if item_id:

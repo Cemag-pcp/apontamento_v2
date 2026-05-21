@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'apontamento_exped',
     'cargas',
     'compras',
+    'comercial',
     'storages',
 
     'channels',
@@ -137,6 +138,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'inspecao/static'),
     os.path.join(BASE_DIR, 'cadastro/static'),
     os.path.join(BASE_DIR, 'compras/static'),
+    os.path.join(BASE_DIR, 'comercial/static'),
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
@@ -186,6 +188,8 @@ if GSHEETS_SERVICE_ACCOUNT_INFO.get('private_key') and "\\n" in GSHEETS_SERVICE_
 GSHEETS_COMPRAS_SPREADSHEET_NAME = env('GSHEETS_COMPRAS_SPREADSHEET_NAME', default='Análise Previsão de Consumo (CMM / NTP ) DEE')
 
 GSHEETS_ESTOQUE_SPREADSHEET_ID = env('GSHEETS_ESTOQUE_SPREADSHEET_ID', default='1u2Iza-ocp6ROUBXG9GpfHvEJwLHuW7F2uiO583qqLIE')
+
+PLOOMES_USER_KEY = env('PLOOMES_USER_KEY', default='')
 
 CHANNEL_LAYERS = {
     "default": {
