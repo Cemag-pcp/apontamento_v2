@@ -36,6 +36,7 @@ def gerar_sugestoes(projecao: dict) -> list:
     ped_compras = float(projecao.get('ped_compras', 0) or 0)
     chegadas_previstas = projecao.get('chegadas_previstas') or []
     pedidos_pendentes_count = int(projecao.get('pedidos_pendentes_count', 0) or 0)
+    pedidos_pendentes_detalhes = projecao.get('pedidos_pendentes_detalhes') or []
     datas_pedidos_pendentes = projecao.get('datas_pedidos_pendentes') or []
     chegada_planejada_compra = projecao.get('chegada_planejada_compra') or {}
 
@@ -89,6 +90,17 @@ def gerar_sugestoes(projecao: dict) -> list:
             f'Há **{n} pedido{"s" if n > 1 else ""}** de compra pendente{"s" if n > 1 else ""}'
             f' totalizando **{ped_compras:.2f} unidades**.'
         ]
+
+        if pedidos_pendentes_detalhes:
+            partes.append('Pedidos pendentes:')
+            for idx, pedido in enumerate(pedidos_pendentes_detalhes, start=1):
+                data_str = pedido.get('data')
+                try:
+                    data_fmt = datetime.strptime(data_str, '%Y-%m-%d').strftime('%d/%m/%Y') if data_str else '-'
+                except ValueError:
+                    data_fmt = data_str or '-'
+                quantidade = float(pedido.get('quantidade', 0) or 0)
+                partes.append(f'{idx}. **{data_fmt}** — **{quantidade:.2f} unidades**')
 
         chegadas = projecao.get('chegadas_previstas') or []
         datas_analisadas = set()
@@ -155,7 +167,7 @@ def gerar_sugestoes(projecao: dict) -> list:
         sugestoes.append({
             'tipo': 'info',
             'titulo': titulo,
-            'mensagem': ' '.join(partes),
+            'mensagem': '\n'.join(partes),
             'qtd_sugerida': None,
         })
         return sugestoes

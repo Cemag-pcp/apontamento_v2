@@ -244,6 +244,7 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
         ) / 20,
         axis=1,
     )
+    df['estoque_almox_central'] = df['estoque_almox']
 
     hoje = datetime.now().date()
     df['dias_ate_estoque_minimo'] = df.apply(
@@ -307,6 +308,7 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
             'cons_mes_anterior': round(float(_valor_escalar(row.get('cons_mes_anterior'), 0) or 0), 2),
             'simulado_pend_vendas': round(float(_valor_escalar(row.get('simulado_pend_vendas'), 0) or 0), 2),
             'dee_dias_em_est': round(float(_valor_escalar(row.get('dee_dias_em_est'), 0) or 0), 1),
+            'estoque_almox_central': round(float(_valor_escalar(row.get('estoque_almox_central'), 0) or 0), 2),
             'estoque_almox': round(float(_valor_escalar(row.get('estoque_almox'), 0) or 0), 2),
             'estoque_total': round(float(_valor_escalar(row.get('estoque_total'), 0) or 0), 2),
             'ped_compras': round(float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0), 2),
@@ -361,6 +363,7 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
         pd.notna(pedidos_pendentes_qs.get('data_entrega')) &
         (pedidos_pendentes_qs.get('qde_ped_corrigido', 0) > 0)
     ]
+    pedidos_pendentes_qs = pedidos_pendentes_qs.sort_values(by='data_entrega', ascending=True)
 
     for data in datas:
         estoque_atual_dia -= consumo_diario
@@ -416,6 +419,17 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
         'serie_ideal': {'datas': datas_ideal, 'estoques': estoque_ideal_diario},
         'chegadas_previstas': chegadas_previstas,
         'pedidos_pendentes_count': int(len(pedidos_pendentes_qs)),
+        'pedidos_pendentes_detalhes': [
+            {
+                'data': data.strftime('%Y-%m-%d'),
+                'quantidade': round(float(qtd), 2),
+            }
+            for data, qtd in zip(
+                pedidos_pendentes_qs['data_entrega'].tolist(),
+                pedidos_pendentes_qs['qde_ped_corrigido'].tolist(),
+            )
+            if pd.notna(data)
+        ],
         'datas_pedidos_pendentes': sorted({
             data.strftime('%Y-%m-%d')
             for data in pedidos_pendentes_qs['data_entrega'].tolist()
