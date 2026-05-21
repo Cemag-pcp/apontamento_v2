@@ -13,6 +13,13 @@ def _get_rota(path):
     if rota_map is None:
         rota_map = {r.nome: r for r in RotaAcesso.objects.all()}
         cache.set(_ROTA_CACHE_KEY, rota_map, _ROTA_CACHE_TTL)
+    rota = rota_map.get(path)
+    if rota is not None:
+        return rota
+
+    # Recarrega o cache quando uma rota foi criada recentemente e o mapa atual ficou defasado.
+    rota_map = {r.nome: r for r in RotaAcesso.objects.all()}
+    cache.set(_ROTA_CACHE_KEY, rota_map, _ROTA_CACHE_TTL)
     return rota_map.get(path)
 
 
