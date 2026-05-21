@@ -132,6 +132,74 @@ def _ajustar_estoque(row, df_pedidos):
     return row['estoque_almox']
 
 
+def _calcular_datas_projecao(row, df_pedidos, horizonte_dias_uteis=365):
+    consumo_diario = float(_valor_escalar(row.get('consumo_diario'), 0) or 0)
+    estoque_minimo = float(_valor_escalar(row.get('estoque_minimo'), 0) or 0)
+    dias_ressupr = float(_valor_escalar(row.get('dias_ressupr'), 0) or 0)
+    estoque_base = float(
+        _valor_escalar(row.get('estoque_almox_central'), _valor_escalar(row.get('estoque_almox'), 0)) or 0
+    )
+
+    hoje = datetime.now().date()
+    if consumo_diario <= 0:
+        return {
+            'data_estoque_minimo': None,
+            'data_estoque_zero': None,
+            'data_compra': None,
+            'dias_ate_data_compra': None,
+        }
+
+    pedidos = df_pedidos[
+        (df_pedidos['codigo'] == row['codigo']) &
+        pd.notna(df_pedidos.get('data_entrega')) &
+        (df_pedidos.get('qde_ped_corrigido', 0) > 0)
+    ].copy()
+    pedidos = pedidos[pedidos['data_entrega'] >= pd.Timestamp(hoje)]
+
+    chegadas_por_data = {}
+    ultima_chegada = pd.Timestamp(hoje)
+    if not pedidos.empty:
+        chegadas_agrupadas = pedidos.groupby('data_entrega')['qde_ped_corrigido'].sum()
+        chegadas_por_data = {
+            pd.Timestamp(data): float(qtd)
+            for data, qtd in chegadas_agrupadas.items()
+            if pd.notna(data)
+        }
+        if chegadas_por_data:
+            ultima_chegada = max(chegadas_por_data)
+
+    data_estoque_minimo = None
+    data_estoque_zero = None
+    estoque = estoque_base
+    datas = pd.date_range(start=hoje, periods=horizonte_dias_uteis, freq='B')
+
+    for data in datas:
+        estoque -= consumo_diario
+        estoque += chegadas_por_data.get(data, 0)
+
+        if data_estoque_zero is None and estoque <= 0:
+            data_estoque_zero = data.date()
+
+        if data_estoque_minimo is None and data >= ultima_chegada and estoque <= estoque_minimo:
+            data_estoque_minimo = data.date()
+
+        if data_estoque_minimo is not None and data_estoque_zero is not None:
+            break
+
+    data_compra = None
+    dias_ate_data_compra = None
+    if data_estoque_minimo is not None:
+        data_compra = _adicionar_dias_uteis(data_estoque_minimo, -(dias_ressupr + 1))
+        dias_ate_data_compra = int(np.busday_count(hoje, data_compra)) if pd.notna(data_compra) else None
+
+    return {
+        'data_estoque_minimo': data_estoque_minimo,
+        'data_estoque_zero': data_estoque_zero,
+        'data_compra': data_compra,
+        'dias_ate_data_compra': dias_ate_data_compra,
+    }
+
+
 def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd.DataFrame) -> dict:
     grupo_df = pd.read_csv(DATA_DIR / 'agrupamento_chapas.csv', sep=';')
     grupos_df = pd.read_csv(DATA_DIR / 'grupos_atualizados.csv', sep=',')
@@ -265,24 +333,19 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
     )
 
     df['estoque_almox'] = df.apply(lambda row: _ajustar_estoque(row, df_ped), axis=1)
+    projecoes_datas = df.apply(lambda row: _calcular_datas_projecao(row, df_ped), axis=1)
+    df['data_estoque_minimo'] = projecoes_datas.apply(lambda item: item.get('data_estoque_minimo'))
+    df['data_estoque_zero'] = projecoes_datas.apply(lambda item: item.get('data_estoque_zero'))
+    df['data_compra'] = projecoes_datas.apply(lambda item: item.get('data_compra'))
+    df['dias_ate_data_compra'] = projecoes_datas.apply(lambda item: item.get('dias_ate_data_compra'))
     df['dias_ate_estoque_minimo'] = df.apply(
-        lambda row: (row['estoque_almox'] - row['estoque_minimo']) / row['consumo_diario']
-        if row['consumo_diario'] > 0 else None,
+        lambda row: int(np.busday_count(hoje, row['data_estoque_minimo']))
+        if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) else None,
         axis=1,
     )
-    df['data_estoque_minimo'] = df['dias_ate_estoque_minimo'].apply(lambda dias: _adicionar_dias_uteis(hoje, dias))
     df['dias_ate_estoque_zero'] = df.apply(
-        lambda row: row['estoque_almox'] / row['consumo_diario'] if row['consumo_diario'] > 0 else None,
-        axis=1,
-    )
-    df['data_estoque_zero'] = df['dias_ate_estoque_zero'].apply(lambda dias: _adicionar_dias_uteis(hoje, dias))
-    df['data_compra'] = df.apply(
-        lambda row: _adicionar_dias_uteis(row['data_estoque_minimo'], (_valor_escalar(row.get('dias_ressupr'), 0) + 1) * -1)
-        if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) and pd.notna(_valor_escalar(row.get('dias_ressupr'))) else None,
-        axis=1,
-    )
-    df['dias_ate_data_compra'] = df.apply(
-        lambda row: int(np.busday_count(hoje, row['data_compra'])) if pd.notna(_valor_escalar(row.get('data_compra'))) else None,
+        lambda row: int(np.busday_count(hoje, row['data_estoque_zero']))
+        if pd.notna(_valor_escalar(row.get('data_estoque_zero'))) else None,
         axis=1,
     )
 
@@ -312,7 +375,9 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
         ].copy()
         pedidos_atrasados = pedidos_material[pedidos_material['data_entrega'] < hoje_ts]
         pedidos_previstos = pedidos_material[pedidos_material['data_entrega'] >= hoje_ts]
-        exibir_data_compra = None if not pedidos_previstos.empty else _valor_escalar(row.get('data_compra'))
+        exibir_data_compra = _valor_escalar(row.get('data_compra'))
+
+        flag_status = 'PEDIDO_ATRASADO' if len(pedidos_atrasados) > 0 else _valor_escalar(row.get('flag_urgencia'), 'SEM_DADOS')
 
         materiais.append({
             'codigo': str(_valor_escalar(row.get('codigo'), '')),
@@ -341,7 +406,7 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
             if pd.notna(_valor_escalar(row.get('data_estoque_zero'))) else None,
             'dias_ressupr': round(float(_valor_escalar(row.get('dias_ressupr'), 0) or 0), 0),
             'estoque_minimo': round(float(_valor_escalar(row.get('estoque_minimo'), 0) or 0), 2),
-            'flag_urgencia': _valor_escalar(row.get('flag_urgencia'), 'SEM_DADOS'),
+            'flag_urgencia': flag_status,
             'tem_pedido': 'SIM' if float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0) > 0 else 'NÃO',
             'pedidos_atrasados_count': int(len(pedidos_atrasados)),
             'pedidos_previstos_count': int(len(pedidos_previstos)),
@@ -365,7 +430,9 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
         return {'error': 'Material não encontrado'}
 
     row = linha.iloc[0]
-    estoque_atual = float(_valor_escalar(row.get('estoque_almox'), 0) or 0)
+    estoque_atual = float(
+        _valor_escalar(row.get('estoque_almox_central'), _valor_escalar(row.get('estoque_almox'), 0)) or 0
+    )
     estoque_minimo = float(_valor_escalar(row.get('estoque_minimo'), 0) or 0)
     consumo_diario = float(_valor_escalar(row.get('consumo_diario'), 0) or 0)
     dias_ressupr = float(_valor_escalar(row.get('dias_ressupr'), 0) or 0)
@@ -385,6 +452,10 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
     pedidos_pendentes_qs = pedidos_pendentes_qs.sort_values(by='data_entrega', ascending=True)
     pedidos_atrasados_qs = pedidos_pendentes_qs[pedidos_pendentes_qs['data_entrega'] < hoje_ts].copy()
     pedidos_previstos_qs = pedidos_pendentes_qs[pedidos_pendentes_qs['data_entrega'] >= hoje_ts].copy()
+
+    if len(datas):
+        datas_grafico.append(datas[0].strftime('%Y-%m-%d'))
+        estoque_diario.append(round(estoque_atual_dia, 2))
 
     for data in datas:
         estoque_atual_dia -= consumo_diario
@@ -407,6 +478,10 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
     valor_ideal_compra = dias_ressupr * consumo_diario
     datas_ideal = []
     estoque_ideal_diario = []
+
+    if len(datas):
+        datas_ideal.append(datas[0].strftime('%Y-%m-%d'))
+        estoque_ideal_diario.append(round(estoque_ideal, 2))
 
     for data in datas:
         estoque_ideal -= consumo_diario

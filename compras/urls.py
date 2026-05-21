@@ -8,4 +8,5 @@ urlpatterns = [
     path('api/material-direto/', views.api_material_direto, name='api_material_direto'),
     path('api/projecao/', views.api_projecao, name='api_projecao'),
     path('api/dolar/', views.api_dolar, name='api_dolar'),
+    path('api/analise-ia/', views.api_analise_ia, name='api_analise_ia'),
 ]

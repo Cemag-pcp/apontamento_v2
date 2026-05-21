@@ -42,7 +42,9 @@
       "Bash(grep -n \"def atualizar\\\\|def planejamento\\\\|def gerar_dados\\\\|def editar_planejamento\" \"C:\\\\\\\\Users\\\\\\\\pcp2\\\\\\\\pcp\\\\\\\\apontamento_usinagem/cargas/views.py\")",
       "Bash(find \"C:\\\\\\\\Users\\\\\\\\pcp2\\\\\\\\pcp\\\\\\\\apontamento_usinagem/cargas/templates\" -type f -name \"*.html\")",
       "Bash(grep *)",
-      "Bash(find *)"
+      "Bash(find *)",
+      "Bash(dir -Recurse -Filter \"compras*\" -ErrorAction SilentlyContinue)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\\\\compras\" -Recurse -File)"
     ]
   }
 }

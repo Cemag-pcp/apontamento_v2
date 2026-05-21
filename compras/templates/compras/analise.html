@@ -53,10 +53,12 @@
                     <label class="form-label form-label-sm mb-1">Urgência</label>
                     <select id="filtroUrgencia" class="form-select form-select-sm">
                         <option value="">Todas</option>
+                        <option value="PEDIDO_ATRASADO">🟤 Pedido Atrasado</option>
                         <option value="URGENTE">🔴 Urgente</option>
                         <option value="URGENTE_COM_PEDIDO">🟠 Urgente c/ Ped. Pendente</option>
                         <option value="PRAZO_CURTO">🟡 Prazo Curto</option>
                         <option value="PRAZO_OK">🟢 Prazo OK</option>
+                        <option value="SEM_DADOS">⚪ Sem Dados</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -70,13 +72,22 @@
 
     <div class="row g-2 mb-3" id="contadores" style="display:none!important;">
         <div class="col-auto">
+            <span class="badge text-dark fs-6 px-3 py-2" id="ctPedidoAtrasado" style="background:#fbe9e7;">0 pedido atrasado</span>
+        </div>
+        <div class="col-auto">
             <span class="badge bg-danger fs-6 px-3 py-2" id="ctUrgente">0 urgentes</span>
+        </div>
+        <div class="col-auto">
+            <span class="badge fs-6 px-3 py-2" id="ctUrgentePedido" style="background:#ffe0b2; color:#bf360c;">0 c/ ped. pendente</span>
         </div>
         <div class="col-auto">
             <span class="badge bg-warning text-dark fs-6 px-3 py-2" id="ctPrazoCurto">0 prazo curto</span>
         </div>
         <div class="col-auto">
             <span class="badge bg-success fs-6 px-3 py-2" id="ctPrazoOk">0 OK</span>
+        </div>
+        <div class="col-auto">
+            <span class="badge bg-secondary fs-6 px-3 py-2" id="ctSemDados">0 sem dados</span>
         </div>
         <div class="col-auto ms-auto">
             <span class="text-muted small" id="ctTotal"></span>
@@ -169,6 +180,17 @@
                 </div>
                 <div id="conteudoSugestoes" style="display:none;">
                     <div id="painelSugestoes"></div>
+                    <div id="secaoAnaliseIA" class="mt-3 border-top pt-3">
+                        <button id="btnAnaliseIA" class="btn btn-sm btn-outline-secondary w-100">
+                            <i class="fas fa-robot me-1"></i> Analisar com IA
+                        </button>
+                        <div id="loadingAnaliseIA" class="text-center py-3" style="display:none;">
+                            <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                            <span class="ms-2 text-muted small">Gerando análise...</span>
+                        </div>
+                        <div id="dataAnaliseIA" class="mt-2 text-muted" style="display:none; font-size:11px;"></div>
+                        <div id="textoAnaliseIA" class="mt-1 p-2 rounded small text-muted" style="display:none; background:#f8f9fa; white-space:pre-wrap;"></div>
+                    </div>
                 </div>
             </div>
         </div>
