@@ -8,6 +8,19 @@
 
     <link rel="stylesheet" href="/static/css/inspecao.css">
     <link rel="stylesheet" href="/static/css/select2.css">
+    <style>
+        #modal-inspecionar-montagem .select2-container,
+        #modal-reinspecionar-montagem .select2-container {
+            width: 100% !important;
+        }
+
+        #modal-inspecionar-montagem .select2-container--open,
+        #modal-inspecionar-montagem .select2-dropdown,
+        #modal-reinspecionar-montagem .select2-container--open,
+        #modal-reinspecionar-montagem .select2-dropdown {
+            z-index: 1070 !important;
+        }
+    </style>
 
 {% endblock %}
 

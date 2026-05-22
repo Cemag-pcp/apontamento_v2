@@ -1,9 +1,51 @@
 document.addEventListener("DOMContentLoaded", () => {
+    function destroySelect2($select) {
+        if ($select.hasClass("select2-hidden-accessible")) {
+            $select.select2("destroy");
+        }
+    }
+
+    function initSelect2InModal(context = document) {
+        const $context = $(context);
+        const $selects = $context.find("select.select2").addBack("select.select2");
+
+        $selects.each(function() {
+            const $select = $(this);
+            const $modalContent = $select.closest(".modal-content");
+
+            destroySelect2($select);
+
+            $select.select2({
+                dropdownParent: $modalContent,
+                width: "100%"
+            });
+
+            $select.off("select2:open.select2ModalFix");
+            $select.off("select2:close.select2ModalFix");
+
+            $select.on("select2:open.select2ModalFix", function() {
+                const modalBody = this.closest(".modal-content")?.querySelector(".modal-body");
+                if (modalBody) {
+                    modalBody.dataset.previousOverflow = modalBody.style.overflowY || "";
+                    modalBody.style.overflowY = "visible";
+                }
+            });
+
+            $select.on("select2:close.select2ModalFix", function() {
+                const modalBody = this.closest(".modal-content")?.querySelector(".modal-body");
+                if (modalBody) {
+                    modalBody.style.overflowY = modalBody.dataset.previousOverflow || "auto";
+                    delete modalBody.dataset.previousOverflow;
+                }
+            });
+        });
+    }
+
     document.addEventListener("click", function(event) {
         if (event.target.classList.contains('iniciar-reinspecao')) {
 
             document.getElementById("form-reinspecao").reset();
-            $('.select2').val(null).trigger('change');
+            $("#modal-reinspecionar-montagem .select2").val(null).trigger("change");
 
             const id = event.target.getAttribute("data-id");
             const data = event.target.getAttribute("data-data");
@@ -74,7 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const lastContainer = containerInspecao.lastElementChild;
 
-        $(lastContainer).find('select.select2').select2('destroy');
+        destroySelect2($(lastContainer).find("select.select2"));
 
         const newContainer = lastContainer.cloneNode(true);
 
@@ -89,13 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
         newContainer.querySelector("input[type='file']").name = `imagens_reinspecao_${currentCount}`;
 
         containerInspecao.appendChild(newContainer);
-
-        $('.select2').each(function() {
-            $(this).select2({
-                dropdownParent: $(this).closest('.modal'),
-                width: '100%'
-            });
-        });
+        initSelect2InModal(newContainer);
     });
 
 
@@ -104,13 +140,5 @@ document.addEventListener("DOMContentLoaded", () => {
             containerInspecao.removeChild(containerInspecao.lastElementChild);
         }
     });
-})
-
-$(document).ready(function() {
-    $('.select2').each(function() {
-        $(this).select2({
-            dropdownParent: $(this).closest('.modal'),
-            width: '100%'
-        });
-    });
+    initSelect2InModal(document.getElementById("modal-reinspecionar-montagem"));
 });
