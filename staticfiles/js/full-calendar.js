@@ -23,6 +23,75 @@ function abrirModalAposFechar(atual, proximo) {
     abrirProximo();
 }
 
+function abrirModalExcluirLiberacao({ cargaUuid, cargaNome }) {
+    const modalElement = document.getElementById('modalExcluirLiberacao');
+    const campoUuid = document.getElementById('excluirLiberacaoUuid');
+    const nome = document.getElementById('excluirLiberacaoNome');
+
+    if (!modalElement || !campoUuid || !nome || !cargaUuid) {
+        return;
+    }
+
+    campoUuid.value = cargaUuid;
+    nome.textContent = cargaNome || 'selecionada';
+
+    const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+    modal.show();
+}
+
+async function excluirLiberacaoAtual() {
+    const modalElement = document.getElementById('modalExcluirLiberacao');
+    const campoUuid = document.getElementById('excluirLiberacaoUuid');
+    const botaoConfirmar = document.getElementById('confirmarExcluirLiberacao');
+
+    if (!modalElement || !campoUuid || !botaoConfirmar || !campoUuid.value) {
+        return;
+    }
+
+    const cargaUuid = campoUuid.value;
+    const htmlOriginal = botaoConfirmar.innerHTML;
+    botaoConfirmar.disabled = true;
+    botaoConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Excluindo...';
+
+    try {
+        const response = await fetch(`/cargas/api/liberacoes/${cargaUuid}/excluir/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            },
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+            throw new Error(payload.error || 'Não foi possível excluir a carga.');
+        }
+
+        const modalExcluir = bootstrap.Modal.getInstance(modalElement);
+        if (modalExcluir) {
+            modalExcluir.hide();
+        }
+
+        const modalDetalhesElement = document.getElementById('modalDetalhesLiberacao');
+        const modalDetalhes = modalDetalhesElement
+            ? bootstrap.Modal.getInstance(modalDetalhesElement)
+            : null;
+        if (modalDetalhes) {
+            modalDetalhes.hide();
+        }
+
+        campoUuid.value = '';
+        alert(payload.message || 'Carga inativada com sucesso.');
+        renderCallendar();
+    } catch (error) {
+        console.error(error);
+        alert(error.message || 'Não foi possível excluir a carga.');
+    } finally {
+        botaoConfirmar.disabled = false;
+        botaoConfirmar.innerHTML = htmlOriginal;
+    }
+}
+
 export function renderCallendar(options = {}) {
     const calendarEl = document.getElementById('calendario');
     if (!calendarEl) {
@@ -82,13 +151,43 @@ export function renderCallendar(options = {}) {
             wrapper.style.whiteSpace = 'normal';
             wrapper.style.overflow = 'hidden';
 
+            const header = document.createElement('div');
+            header.style.display = 'flex';
+            header.style.alignItems = 'flex-start';
+            header.style.justifyContent = 'space-between';
+            header.style.gap = '6px';
+
             const title = document.createElement('div');
             title.textContent = arg.event.title || '';
             title.style.fontSize = '0.8rem';
             title.style.fontWeight = '600';
             title.style.color = '#fff';
+            title.style.flex = '1';
 
-            wrapper.appendChild(title);
+            header.appendChild(title);
+
+            if (arg.event.extendedProps?.tipo === 'liberacao') {
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.className = 'btn btn-link btn-sm p-0 border-0';
+                deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                deleteButton.title = `Excluir ${arg.event.title || 'carga'}`;
+                deleteButton.setAttribute('aria-label', deleteButton.title);
+                deleteButton.style.color = '#fff';
+                deleteButton.style.lineHeight = '1';
+                deleteButton.style.flexShrink = '0';
+                deleteButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    abrirModalExcluirLiberacao({
+                        cargaUuid: arg.event.extendedProps.carga_uuid,
+                        cargaNome: arg.event.title || 'carga',
+                    });
+                });
+                header.appendChild(deleteButton);
+            }
+
+            wrapper.appendChild(header);
 
             if (arg.event.extendedProps?.tipo === 'liberacao') {
                 const dataCarga = document.createElement('div');
@@ -450,6 +549,22 @@ async function abrirDetalhesLiberacao(cargaUuid) {
             acoes.appendChild(btnAplicar);
         }
 
+        const btnExcluir = document.createElement('button');
+        btnExcluir.className = 'btn btn-outline-danger btn-sm';
+        btnExcluir.innerHTML = '<i class="fas fa-trash-alt me-1"></i>Excluir carga';
+        if (!payload.pode_excluir) {
+            btnExcluir.disabled = true;
+            btnExcluir.title = `Carga com ${payload.total_ordens_vinculadas || 0} ordem(ns) vinculada(s)`;
+        } else {
+            btnExcluir.addEventListener('click', () => {
+                abrirModalExcluirLiberacao({
+                    cargaUuid: payload.carga_uuid,
+                    cargaNome: `${payload.carga} v${payload.versao}`,
+                });
+            });
+        }
+        acoes.appendChild(btnExcluir);
+
         // Botões de link por cliente
         const linksContainer = document.getElementById('detalhesLiberacaoLinks');
         if (linksContainer) {
@@ -547,6 +662,11 @@ function remanejarCarga(setor, dataAtual, novaData) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const botaoConfirmarExclusao = document.getElementById('confirmarExcluirLiberacao');
+    if (botaoConfirmarExclusao) {
+        botaoConfirmarExclusao.addEventListener('click', excluirLiberacaoAtual);
+    }
+
     const calendarEl = document.getElementById('calendario');
     if (calendarEl && calendarEl.dataset.autoRender === 'true') {
         renderCallendar();
