@@ -161,6 +161,27 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="modalExcluirLiberacao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-trash-alt text-danger me-2"></i>Confirmar exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Deseja realmente excluir a carga <strong id="excluirLiberacaoNome">-</strong>?</p>
+                <p class="text-muted small mb-0">A carga ficará inativa nas telas operacionais, mas o histórico de versões e carretas será preservado para consulta futura.</p>
+                <input type="hidden" id="excluirLiberacaoUuid">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmarExcluirLiberacao">
+                    <i class="fas fa-trash-alt me-1"></i>Excluir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- Modal: Configurar e-mails de notificação -->
 <div class="modal fade" id="modalEmailsNotificacao" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width:480px">

@@ -125,6 +125,147 @@ class CargasLiberacaoTests(TestCase):
         self.assertEqual(carga.versoes.order_by("-versao").first().versao, 2)
 
     @patch("cargas.services.consultar_carretas_detalhado")
+    def test_reliberacao_exclui_carga_que_sumiu_da_consulta(self, consultar_mock):
+        consultar_mock.return_value = self._payload_base()
+        liberar_cargas_periodo(
+            usuario=self.user,
+            data_inicio=self._date("2026-04-27"),
+            data_fim=self._date("2026-04-28"),
+        )
+
+        consultar_mock.return_value = {
+            "cargas": [
+                {
+                    "data_carga": "2026-04-27",
+                    "codigo_recurso": "CBH6-2E",
+                    "quantidade": 1,
+                    "carga": "Carga 04",
+                    "cliente": "CLI001",
+                    "presente_no_carreta": "âœ…",
+                }
+            ],
+            "celulas": [],
+        }
+
+        resultado = liberar_cargas_periodo(
+            usuario=self.user,
+            data_inicio=self._date("2026-04-27"),
+            data_fim=self._date("2026-04-28"),
+        )
+
+        carga_inativada = CargaLiberada.objects.get(
+            data_carga=self._date("2026-04-28"),
+            carga_nome="Carga 01",
+        )
+        self.assertFalse(carga_inativada.ativo)
+        self.assertIsNotNone(carga_inativada.inativada_em)
+        self.assertEqual(resultado["total_cargas_inativadas_automaticamente"], 1)
+        self.assertEqual(
+            resultado["cargas_inativadas_automaticamente"][0]["carga"],
+            "Carga 01",
+        )
+        self.assertTrue(
+            CargaLiberadaAlteracao.objects.filter(
+                carga_liberada=carga_inativada,
+                tipo_alteracao="carga_inativada",
+            ).exists()
+        )
+
+    @patch("cargas.services.consultar_carretas_detalhado")
+    def test_reliberacao_exclui_carga_sumida_mesmo_com_ordem_vinculada(self, consultar_mock):
+        consultar_mock.return_value = self._payload_base()
+        liberar_cargas_periodo(
+            usuario=self.user,
+            data_inicio=self._date("2026-04-27"),
+            data_fim=self._date("2026-04-28"),
+        )
+
+        carga_sumida = CargaLiberada.objects.get(
+            data_carga=self._date("2026-04-28"),
+            carga_nome="Carga 01",
+        )
+        versao = carga_sumida.versoes.order_by("-versao").first()
+        ordem = Ordem.objects.create(
+            grupo_maquina="montagem",
+            data_carga=self._date("2026-04-28"),
+            carga_liberada=carga_sumida,
+            carga_liberada_versao=versao,
+        )
+
+        consultar_mock.return_value = {
+            "cargas": [
+                {
+                    "data_carga": "2026-04-27",
+                    "codigo_recurso": "CBH6-2E",
+                    "quantidade": 1,
+                    "carga": "Carga 04",
+                    "cliente": "CLI001",
+                    "presente_no_carreta": "âœ…",
+                }
+            ],
+            "celulas": [],
+        }
+
+        liberar_cargas_periodo(
+            usuario=self.user,
+            data_inicio=self._date("2026-04-27"),
+            data_fim=self._date("2026-04-28"),
+        )
+
+        ordem.refresh_from_db()
+        carga_sumida.refresh_from_db()
+        self.assertFalse(carga_sumida.ativo)
+        self.assertEqual(ordem.carga_liberada_id, carga_sumida.id)
+        self.assertEqual(ordem.carga_liberada_versao_id, versao.id)
+
+    @patch("cargas.services.consultar_carretas_detalhado")
+    def test_reliberacao_reativa_carga_quando_volta_para_consulta(self, consultar_mock):
+        consultar_mock.return_value = self._payload_base()
+        liberar_cargas_periodo(
+            usuario=self.user,
+            data_inicio=self._date("2026-04-27"),
+            data_fim=self._date("2026-04-28"),
+        )
+
+        carga = CargaLiberada.objects.get(
+            data_carga=self._date("2026-04-28"),
+            carga_nome="Carga 01",
+        )
+        carga.ativo = False
+        carga.inativada_em = timezone.now()
+        carga.save(update_fields=["ativo", "inativada_em", "atualizado_em"])
+
+        consultar_mock.return_value = {
+            "cargas": [
+                {
+                    "data_carga": "2026-04-28",
+                    "codigo_recurso": "CBHM6000",
+                    "quantidade": 4,
+                    "carga": "Carga 01",
+                    "cliente": "CLI002",
+                    "presente_no_carreta": "âœ…",
+                },
+            ],
+            "celulas": [],
+        }
+
+        liberar_cargas_periodo(
+            usuario=self.user,
+            data_inicio=self._date("2026-04-28"),
+            data_fim=self._date("2026-04-28"),
+        )
+
+        carga.refresh_from_db()
+        self.assertTrue(carga.ativo)
+        self.assertIsNone(carga.inativada_em)
+        self.assertTrue(
+            CargaLiberadaAlteracao.objects.filter(
+                carga_liberada=carga,
+                tipo_alteracao="carga_reativada",
+            ).exists()
+        )
+
+    @patch("cargas.services.consultar_carretas_detalhado")
     def test_diff_gera_logs_de_adicao_remocao_e_alteracao(self, consultar_mock):
         consultar_mock.return_value = {
             "cargas": [
@@ -246,6 +387,8 @@ class CargasLiberacaoTests(TestCase):
         response = self.client.get(reverse("cargas:liberacao"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Liberar carga")
+        self.assertContains(response, 'id="modalExcluirLiberacao"', html=False)
+        self.assertContains(response, 'id="confirmarExcluirLiberacao"', html=False)
         self.assertContains(response, 'data-interactive="false"', html=False)
         self.assertContains(response, '/cargas/api/andamento-liberacoes/', html=False)
 
@@ -280,6 +423,30 @@ class CargasLiberacaoTests(TestCase):
             payload[0]["extendedProps"]["liberado_em"],
             localtime(versao.liberado_em).strftime("%d/%m/%Y %H:%M"),
         )
+
+    def test_api_andamento_liberacoes_ignora_cargas_inativas(self):
+        carga = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 04",
+            ativo=False,
+            inativada_em=timezone.now(),
+        )
+        CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+
+        response = self.client.get(
+            reverse("cargas:andamento_liberacoes"),
+            {"start": "2026-04-01", "end": "2026-05-01"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [])
 
     def test_api_andamento_liberacoes_mantem_todas_as_cargas_do_dia(self):
         carga_v2 = CargaLiberada.objects.create(
@@ -366,6 +533,9 @@ class CargasLiberacaoTests(TestCase):
         self.assertEqual(payload["liberado_por"], self.user.username)
         self.assertEqual(payload["data_sugerida_planejamento"], "2026-04-29")
         self.assertTrue(payload["tem_data_sugerida"])
+        self.assertTrue(payload["ativo"])
+        self.assertEqual(payload["total_ordens_vinculadas"], 0)
+        self.assertTrue(payload["pode_excluir"])
         self.assertEqual(
             payload["liberado_em"],
             localtime(versao_2.liberado_em).strftime("%d/%m/%Y %H:%M"),
@@ -374,6 +544,67 @@ class CargasLiberacaoTests(TestCase):
             payload["itens"],
             [{"cliente": "Cliente A", "codigo_recurso": "ITEM-NEW", "quantidade": 3.0, "presente_no_carreta": ""}],
         )
+
+    def test_api_excluir_liberacao_remove_carga_sem_ordens_vinculadas(self):
+        carga = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 04",
+        )
+        CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+
+        response = self.client.post(
+            reverse("cargas:excluir_liberacao", kwargs={"carga_uuid": carga.carga_uuid}),
+            data="{}",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        carga.refresh_from_db()
+        self.assertFalse(carga.ativo)
+        self.assertIsNotNone(carga.inativada_em)
+        self.assertTrue(
+            CargaLiberadaAlteracao.objects.filter(
+                carga_liberada=carga,
+                tipo_alteracao="carga_inativada",
+            ).exists()
+        )
+
+    def test_api_excluir_liberacao_bloqueia_quando_ha_ordens_vinculadas(self):
+        carga = CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga 04",
+        )
+        versao = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-04-27"),
+            data_fim_pesquisa=self._date("2026-04-27"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        Ordem.objects.create(
+            grupo_maquina="montagem",
+            data_carga=self._date("2026-04-27"),
+            carga_liberada=carga,
+            carga_liberada_versao=versao,
+        )
+
+        response = self.client.post(
+            reverse("cargas:excluir_liberacao", kwargs={"carga_uuid": carga.carga_uuid}),
+            data="{}",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(CargaLiberada.objects.filter(pk=carga.pk).exists())
+        self.assertIn("ordem", response.json()["error"])
 
     def test_listar_cargas_liberadas_periodo_usa_ultima_versao(self):
         carga = CargaLiberada.objects.create(

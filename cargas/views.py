@@ -21,7 +21,7 @@ from django.core.mail import send_mail
 from django.conf import settings as django_settings
 
 from core.models import Ordem
-from cargas.models import CargaLiberada, CargaLiberadaVersao, CargaLiberadaItem, LinkAcompanhamento, EmailNotificacaoCarga
+from cargas.models import CargaLiberada, CargaLiberadaVersao, CargaLiberadaItem, CargaLiberadaAlteracao, LinkAcompanhamento, EmailNotificacaoCarga
 from cargas.services import (
     atualizar_datas_sugeridas_planejamento,
     consolidar_ordens_planejamento,
@@ -461,7 +461,8 @@ def _listar_cargas_planejamento_para_atualizacao(data_planejada, setor):
 
     cargas = (
         CargaLiberada.objects.filter(
-            Q(data_carga=data_planejada) | Q(data_sugerida_planejamento=data_planejada)
+            Q(data_carga=data_planejada) | Q(data_sugerida_planejamento=data_planejada),
+            ativo=True,
         )
         .prefetch_related(versoes_prefetch)
         .order_by("data_carga", "carga_nome")
@@ -1359,7 +1360,11 @@ def andamento_liberacoes(request):
         return JsonResponse({"error": "Parâmetros 'start' e 'end' são obrigatórios"}, status=400)
 
     liberacoes = (
-        CargaLiberada.objects.filter(data_carga__gte=start_date, data_carga__lt=end_date)
+        CargaLiberada.objects.filter(
+            data_carga__gte=start_date,
+            data_carga__lt=end_date,
+            ativo=True,
+        )
         .annotate(
             ultima_versao=Max("versoes__versao"),
             ultimo_liberado_em=Subquery(
@@ -1432,6 +1437,14 @@ def detalhes_liberacao(request, carga_uuid):
                 else ""
             ),
             "tem_data_sugerida": bool(carga.data_sugerida_planejamento),
+            "ativo": carga.ativo,
+            "inativada_em": (
+                localtime(carga.inativada_em).strftime("%d/%m/%Y %H:%M")
+                if carga.inativada_em
+                else ""
+            ),
+            "total_ordens_vinculadas": carga.ordens_sequenciadas.count(),
+            "pode_excluir": not carga.ordens_sequenciadas.exists(),
             "versao": ultima_versao.versao,
             "liberado_em": localtime(ultima_versao.liberado_em).strftime("%d/%m/%Y %H:%M"),
             "liberado_por": ultima_versao.liberado_por.username,
@@ -1444,6 +1457,58 @@ def detalhes_liberacao(request, carga_uuid):
                 }
                 for item in ultima_versao.itens.all().order_by("cliente", "cliente_codigo", "codigo_recurso")
             ],
+        }
+    )
+
+
+@csrf_exempt
+@require_POST
+def excluir_liberacao(request, carga_uuid):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Usuário não autenticado."}, status=401)
+
+    with transaction.atomic():
+        carga = (
+            CargaLiberada.objects.select_for_update()
+            .prefetch_related("ordens_sequenciadas")
+            .filter(carga_uuid=carga_uuid)
+            .first()
+        )
+
+        if carga is None:
+            return JsonResponse({"error": "Carga não encontrada."}, status=404)
+
+        total_ordens_vinculadas = carga.ordens_sequenciadas.count()
+        if total_ordens_vinculadas:
+            return JsonResponse(
+                {
+                    "error": (
+                        "Não é possível excluir esta carga porque ela já possui "
+                        f"{total_ordens_vinculadas} ordem(ns) vinculada(s)."
+                    )
+                },
+                status=409,
+            )
+
+        ultima_versao = carga.versoes.order_by("-versao").first()
+        carga_nome = carga.carga_nome
+        data_carga = carga.data_carga.strftime("%d/%m/%Y")
+        carga.ativo = False
+        carga.inativada_em = now()
+        carga.save(update_fields=["ativo", "inativada_em", "atualizado_em"])
+
+        if ultima_versao is not None:
+            CargaLiberadaAlteracao.objects.create(
+                carga_liberada=carga,
+                versao_origem=ultima_versao,
+                versao_destino=ultima_versao,
+                tipo_alteracao="carga_inativada",
+                detalhes={"motivo": "Carga inativada manualmente pelo usuário."},
+            )
+
+    return JsonResponse(
+        {
+            "message": f"Carga {carga_nome} de {data_carga} inativada com sucesso.",
         }
     )
 
@@ -1474,6 +1539,7 @@ def aplicar_data_sugerida_liberacao(request, carga_uuid):
         conflito = CargaLiberada.objects.filter(
             data_carga=data_destino,
             carga_nome=carga.carga_nome,
+            ativo=True,
         ).exclude(pk=carga.pk)
         if conflito.exists():
             return JsonResponse(
@@ -1551,6 +1617,7 @@ def status_carga_por_data(request):
     liberacoes = (
         CargaLiberadaVersao.objects.filter(
             carga_liberada__data_carga=data_carga_obj,
+            carga_liberada__ativo=True,
         ).filter(
             Q(carga_liberada__versoes__itens__cliente=cliente)
             | Q(carga_liberada__versoes__itens__cliente_codigo=cliente)

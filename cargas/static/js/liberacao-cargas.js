@@ -174,8 +174,12 @@ async function liberarCargas() {
             throw new Error(payload.error || 'Erro ao liberar cargas.');
         }
 
+        const totalInativadas = payload.total_cargas_inativadas_automaticamente || 0;
+        const mensagemExclusao = totalInativadas
+            ? ` ${totalInativadas} carga(s) antiga(s) foram inativada(s) automaticamente por não existirem mais na consulta atual.`
+            : '';
         alert(
-            `${payload.total_cargas_liberadas} carga(s) liberadas e ${payload.total_versoes_criadas} versões criadas.`
+            `${payload.total_cargas_liberadas} carga(s) liberadas e ${payload.total_versoes_criadas} versões criadas.${mensagemExclusao}`
         );
 
         const modalElement = document.getElementById('modalLiberacao');

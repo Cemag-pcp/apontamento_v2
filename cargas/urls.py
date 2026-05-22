@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/cargas-liberadas/', views.buscar_cargas_liberadas, name="buscar_cargas_liberadas"),
     path('api/liberacoes/', views.liberar_cargas, name="liberar_cargas"),
     path('api/liberacoes/<uuid:carga_uuid>/', views.detalhes_liberacao, name="detalhes_liberacao"),
+    path('api/liberacoes/<uuid:carga_uuid>/excluir/', views.excluir_liberacao, name="excluir_liberacao"),
     path('api/liberacoes/<uuid:carga_uuid>/aplicar-data-sugerida/', views.aplicar_data_sugerida_liberacao, name="aplicar_data_sugerida_liberacao"),
     path('api/andamento-liberacoes/', views.andamento_liberacoes, name="andamento_liberacoes"),
     path('api/status-carga/', views.status_carga_por_data, name="status_carga_por_data"),

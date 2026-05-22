@@ -6,6 +6,7 @@ from datetime import date
 import pandas as pd
 from django.db import transaction
 from django.db.models import Prefetch
+from django.utils import timezone
 
 from cadastro.models import Maquina
 from cargas.models import (
@@ -109,6 +110,19 @@ def _calcular_diff(itens_anteriores, itens_atuais):
     return alteracoes
 
 
+def _registrar_alteracao_status_carga(carga_liberada, versao, tipo_alteracao, detalhes=None):
+    if versao is None:
+        return
+
+    CargaLiberadaAlteracao.objects.create(
+        carga_liberada=carga_liberada,
+        versao_origem=versao,
+        versao_destino=versao,
+        tipo_alteracao=tipo_alteracao,
+        detalhes=detalhes or {},
+    )
+
+
 def liberar_cargas_periodo(
     usuario,
     data_inicio: date,
@@ -144,13 +158,52 @@ def liberar_cargas_periodo(
         )
 
     resultados = []
+    cargas_inativadas_automaticamente = []
 
     with transaction.atomic():
+        chaves_atuais = {
+            (date.fromisoformat(data_carga_str), carga_nome)
+            for (data_carga_str, carga_nome) in grupos.keys()
+        }
+
+        cargas_existentes_periodo = (
+            CargaLiberada.objects.select_for_update()
+            .prefetch_related("versoes")
+            .filter(data_carga__gte=data_inicio, data_carga__lte=data_fim)
+            .order_by("data_carga", "carga_nome")
+        )
+
+        for carga_existente in cargas_existentes_periodo:
+            chave_existente = (carga_existente.data_carga, carga_existente.carga_nome)
+            if chave_existente in chaves_atuais or not carga_existente.ativo:
+                continue
+
+            cargas_inativadas_automaticamente.append(
+                {
+                    "carga_uuid": str(carga_existente.carga_uuid),
+                    "data_carga": carga_existente.data_carga.isoformat(),
+                    "carga": carga_existente.carga_nome,
+                }
+            )
+            carga_existente.ativo = False
+            carga_existente.inativada_em = timezone.now()
+            carga_existente.save(update_fields=["ativo", "inativada_em", "atualizado_em"])
+            _registrar_alteracao_status_carga(
+                carga_existente,
+                carga_existente.versoes.order_by("-versao").first(),
+                "carga_inativada",
+                detalhes={
+                    "motivo": "Carga não retornada na consulta atual de liberação.",
+                    "data_inicio_pesquisa": data_inicio.isoformat(),
+                    "data_fim_pesquisa": data_fim.isoformat(),
+                },
+            )
+
         for (data_carga_str, carga_nome), itens_brutos in sorted(grupos.items()):
             data_carga = date.fromisoformat(data_carga_str)
             itens = _normalizar_itens(itens_brutos)
 
-            carga_liberada, _ = CargaLiberada.objects.get_or_create(
+            carga_liberada, criada = CargaLiberada.objects.get_or_create(
                 data_carga=data_carga,
                 carga_nome=carga_nome,
             )
@@ -176,6 +229,21 @@ def liberar_cargas_periodo(
                 payload_snapshot=payload_snapshot,
             )
 
+            if not carga_liberada.ativo:
+                carga_liberada.ativo = True
+                carga_liberada.inativada_em = None
+                carga_liberada.save(update_fields=["ativo", "inativada_em", "atualizado_em"])
+                _registrar_alteracao_status_carga(
+                    carga_liberada,
+                    nova_versao,
+                    "carga_reativada",
+                    detalhes={
+                        "motivo": "Carga voltou a constar na consulta de liberação.",
+                        "data_inicio_pesquisa": data_inicio.isoformat(),
+                        "data_fim_pesquisa": data_fim.isoformat(),
+                    },
+                )
+
             CargaLiberadaItem.objects.bulk_create(
                 [
                     CargaLiberadaItem(
@@ -191,7 +259,7 @@ def liberar_cargas_periodo(
                 ]
             )
 
-            if ultima_versao is None:
+            if ultima_versao is None or criada:
                 CargaLiberadaAlteracao.objects.create(
                     carga_liberada=carga_liberada,
                     versao_origem=None,
@@ -246,6 +314,8 @@ def liberar_cargas_periodo(
     return {
         "total_cargas_liberadas": len(resultados),
         "total_versoes_criadas": len(resultados),
+        "total_cargas_inativadas_automaticamente": len(cargas_inativadas_automaticamente),
+        "cargas_inativadas_automaticamente": cargas_inativadas_automaticamente,
         "cargas": resultados,
     }
 
@@ -261,7 +331,11 @@ def listar_cargas_liberadas_periodo(data_inicio: date, data_fim: date):
     )
 
     cargas = (
-        CargaLiberada.objects.filter(data_carga__gte=data_inicio, data_carga__lte=data_fim)
+        CargaLiberada.objects.filter(
+            data_carga__gte=data_inicio,
+            data_carga__lte=data_fim,
+            ativo=True,
+        )
         .prefetch_related(versoes_prefetch)
         .order_by("data_carga", "carga_nome")
     )
@@ -355,7 +429,11 @@ def listar_cargas_liberadas_para_planejamento(data_inicio: date, data_fim: date)
     )
 
     cargas = (
-        CargaLiberada.objects.filter(data_carga__gte=data_inicio, data_carga__lte=data_fim)
+        CargaLiberada.objects.filter(
+            data_carga__gte=data_inicio,
+            data_carga__lte=data_fim,
+            ativo=True,
+        )
         .prefetch_related(versoes_prefetch)
         .order_by("data_carga", "carga_nome")
     )
@@ -549,6 +627,7 @@ def listar_itens_liberados_expedicao(data_carga: date, carga_nome: str | None = 
     )
 
     cargas = CargaLiberada.objects.filter(data_carga=data_carga)
+    cargas = cargas.filter(ativo=True)
     if carga_nome:
         cargas = cargas.filter(carga_nome=carga_nome)
 

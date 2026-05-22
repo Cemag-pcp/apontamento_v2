@@ -39,6 +39,8 @@ class CargaLiberada(models.Model):
     data_carga = models.DateField()
     carga_nome = models.CharField(max_length=100)
     data_sugerida_planejamento = models.DateField(null=True, blank=True)
+    ativo = models.BooleanField(default=True)
+    inativada_em = models.DateTimeField(null=True, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -112,6 +114,8 @@ class CargaLiberadaAlteracao(models.Model):
         ("item_removido", "Item removido"),
         ("quantidade_alterada", "Quantidade alterada"),
         ("liberacao_inicial", "Liberação inicial"),
+        ("carga_inativada", "Carga inativada"),
+        ("carga_reativada", "Carga reativada"),
     ]
 
     carga_liberada = models.ForeignKey(
