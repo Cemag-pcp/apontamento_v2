@@ -1505,21 +1505,24 @@ def listar_operadores(request):
     return JsonResponse({"operadores": list(operadores.values())})
 
 def listar_cores_carga(request):
-    data_carga = request.GET.get(
-        "data_carga", now().date()
-    )  # Garantindo que seja apenas a data
+    data_carga_str = (request.GET.get("data_carga") or "").strip()
 
-    if data_carga == "":
-        data_carga = now().date()
+    try:
+        from datetime import datetime as _dt
+        data_carga = _dt.strptime(data_carga_str, "%Y-%m-%d").date() if data_carga_str else now().date()
+    except ValueError:
+        return JsonResponse({"error": "Formato de data inválido. Use YYYY-MM-DD."}, status=400)
 
-    # Obtém cores únicas
-    cores = (
-        Ordem.objects.filter(data_carga=data_carga, grupo_maquina="pintura")
-        .values_list("cor", flat=True)
-        .distinct()
+    cores = sorted(
+        cor for cor in (
+            Ordem.objects.filter(data_carga=data_carga, grupo_maquina="pintura")
+            .values_list("cor", flat=True)
+            .distinct()
+        )
+        if cor is not None and str(cor).strip() != ""
     )
 
-    return JsonResponse({"cores": list(cores)})  # Retorna lista simples de cores únicas
+    return JsonResponse({"cores": cores})
 
 def percentual_concluido_carga(request):
     data_carga_str = request.GET.get("data_carga", "").strip()

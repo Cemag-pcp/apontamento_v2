@@ -249,6 +249,10 @@ def consultar_carretas_detalhado(
     dados_carreta['Recurso'] = dados_carreta['Recurso'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(lambda x: "0" + str(x) if len(str(x)) == 5 else str(x))
 
+    # Preserva o código original (com sigla de cor, ex: 034567VM) antes de normalizar.
+    # A sigla é usada para identificar a cor na pintura e deve ser armazenada no banco.
+    dados_carga['PED_RECURSO.CODIGO_ORIGINAL'] = dados_carga['PED_RECURSO.CODIGO'].copy()
+
     dados_carga['PED_RECURSO.CODIGO'] = normalizar_codigo_recurso_serie(dados_carga['PED_RECURSO.CODIGO'])
 
     dados_carga['PED_RECURSO.CODIGO'] = dados_carga['PED_RECURSO.CODIGO'].apply(
@@ -300,10 +304,12 @@ def consultar_carretas_detalhado(
     dados_carga_data_filtrada['PED_QUANTIDADE'] = dados_carga_data_filtrada['PED_QUANTIDADE'].astype(float)
 
     # Agrupa os dados por data e código do recurso
+    # Inclui CODIGO_ORIGINAL no groupby para manter siglas de cor separadas (ex: 034567VM ≠ 034567CO)
     carretas_unica = dados_carga_data_filtrada[
         [
             'PED_PREVISAOEMISSAODOC',
             'PED_RECURSO.CODIGO',
+            'PED_RECURSO.CODIGO_ORIGINAL',
             'PED_QUANTIDADE',
             'Carga',
             'PED_PESSOA.CODIGO',
@@ -314,6 +320,7 @@ def consultar_carretas_detalhado(
         [
             'PED_PREVISAOEMISSAODOC',
             'PED_RECURSO.CODIGO',
+            'PED_RECURSO.CODIGO_ORIGINAL',
             'Carga',
             'PED_PESSOA.CODIGO',
             'PED_NUMEROSERIE_EFETIVO',
@@ -328,8 +335,8 @@ def consultar_carretas_detalhado(
         lambda x: '✅' if x in dados_carreta['Recurso'].astype(str).values else '❌'
     )
 
-    linhas_sem_numero_serie['ContÃ©m'] = linhas_sem_numero_serie['PED_RECURSO.CODIGO'].apply(
-        lambda x: 'âœ…' if x in dados_carreta['Recurso'].astype(str).values else 'âŒ'
+    linhas_sem_numero_serie['Contém'] = linhas_sem_numero_serie['PED_RECURSO.CODIGO'].apply(
+        lambda x: '✅' if x in dados_carreta['Recurso'].astype(str).values else '❌'
     )
 
     buscar_cel = buscar_celulas(
@@ -338,8 +345,9 @@ def consultar_carretas_detalhado(
 
     resultado = [
         {
-            "data_carga": str(row['PED_PREVISAOEMISSAODOC'].date()),  # Convertendo para string
-            "codigo_recurso": "0" + str(row['PED_RECURSO.CODIGO']) if len(str(row['PED_RECURSO.CODIGO'])) == 5 else str(row['PED_RECURSO.CODIGO']),
+            "data_carga": str(row['PED_PREVISAOEMISSAODOC'].date()),
+            # Usa o código original (com sigla de cor, ex: 034567VM) para exibição e gravação no banco
+            "codigo_recurso": str(row['PED_RECURSO.CODIGO_ORIGINAL']).strip(),
             "quantidade": float(row['PED_QUANTIDADE']),
             "presente_no_carreta": row['Contém'],
             "carga": row['Carga'],
@@ -354,9 +362,9 @@ def consultar_carretas_detalhado(
         {
             "sheet_row_index": int(row["sheet_row_index"]),
             "data_carga": str(row["PED_PREVISAOEMISSAODOC"].date()),
-            "codigo_recurso": "0" + str(row['PED_RECURSO.CODIGO']) if len(str(row['PED_RECURSO.CODIGO'])) == 5 else str(row['PED_RECURSO.CODIGO']),
+            "codigo_recurso": str(row['PED_RECURSO.CODIGO_ORIGINAL']).strip(),
             "quantidade": float(row["PED_QUANTIDADE"] or 0),
-            "presente_no_carreta": row['ContÃ©m'],
+            "presente_no_carreta": row['Contém'],
             "carga": "" if pd.isna(row['Carga']) else str(row['Carga']).strip(),
             "cliente": "" if pd.isna(row['PED_PESSOA.CODIGO']) else str(row['PED_PESSOA.CODIGO']).strip(),
             "cliente_codigo": "" if pd.isna(row['PED_PESSOA.CODIGO']) else str(row['PED_PESSOA.CODIGO']).strip(),

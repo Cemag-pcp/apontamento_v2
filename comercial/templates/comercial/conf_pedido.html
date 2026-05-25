@@ -16,7 +16,7 @@
         <div>
             <p class="comercial-eyebrow mb-2">Módulo Comercial</p>
             <h2 class="comercial-title mb-1">Conf. de pedido</h2>
-            <p class="comercial-subtitle mb-0">Consulte pedidos ganhos na Ploomes por período e visualize os itens retornados.</p>
+            <p class="comercial-subtitle mb-0">Consulte os itens importados na pendência comercial por período de emissão e faça a conferência por linha.</p>
         </div>
         <div class="comercial-total" id="confPedidoTotal">0 registros</div>
     </div>
@@ -24,18 +24,13 @@
     <div class="card comercial-filter-card mt-4" id="confPedidoFiltros">
         <div class="card-body">
             <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label for="dataInicio" class="form-label">Data início</label>
+                <div class="col-md-6">
+                    <label for="dataInicio" class="form-label">Data emissão início</label>
                     <input type="date" class="form-control" id="dataInicio">
                 </div>
-                <div class="col-md-4">
-                    <label for="dataFim" class="form-label">Data fim</label>
+                <div class="col-md-6">
+                    <label for="dataFim" class="form-label">Data emissão fim</label>
                     <input type="date" class="form-control" id="dataFim">
-                </div>
-                <div class="col-md-4">
-                    <button type="button" class="btn btn-primary comercial-search-btn w-100" id="btnBuscarConfPedido">
-                        <i class="bi bi-search me-1"></i> Buscar
-                    </button>
                 </div>
             </div>
         </div>
@@ -85,19 +80,33 @@
             <table class="table align-middle mb-0 comercial-table">
                 <thead>
                     <tr>
-                        <th>Chave do Pedido</th>
-                        <th>Deal ID</th>
-                        <th>Data Criação</th>
-                        <th>Quote ID</th>
-                        <th>Contato</th>
-                        <th>Itens</th>
-                        <th>Cor</th>
+                        <th>Região</th>
+                        <th>UF</th>
+                        <th>Observação</th>
+                        <th>Localidade</th>
+                        <th>Ch Criação</th>
+                        <th>Emissão</th>
+                        <th>Prev. Emissão Doc</th>
+                        <th>Programação</th>
+                        <th>Classe</th>
+                        <th>Pessoa</th>
+                        <th>Recurso Código</th>
+                        <th>Recurso Nome</th>
+                        <th>Recurso Classe</th>
+                        <th>Número Série</th>
+                        <th>Núcleo</th>
+                        <th>Quantidade</th>
+                        <th>Unitário</th>
+                        <th>Total</th>
+                        <th>Descrição Genérica</th>
+                        <th>Representante</th>
+                        <th>ID Negociação</th>
                         <th>Ação</th>
                     </tr>
                 </thead>
                 <tbody id="confPedidoTableBody">
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">Nenhuma consulta executada.</td>
+                        <td colspan="22" class="text-center text-muted py-4">Nenhuma consulta executada.</td>
                     </tr>
                 </tbody>
             </table>
@@ -110,38 +119,67 @@
         <div class="modal-content comercial-modal">
             <div class="modal-header">
                 <div>
-                    <p class="comercial-modal-eyebrow mb-1">Detalhes do pedido</p>
-                    <h5 class="modal-title mb-0" id="modalConferirPedidoLabel">Conferir pedido</h5>
+                    <p class="comercial-modal-eyebrow mb-1">Detalhes do registro</p>
+                    <h5 class="modal-title mb-0" id="modalConferirPedidoLabel">Conferir item</h5>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
                 <div class="comercial-modal-section">
                     <div class="comercial-modal-section-title">Informações do registro</div>
-                    <div class="comercial-detail-list" id="confPedidoDetalhes"></div>
+                    <div class="comercial-detail-list comercial-detail-list-grid" id="confPedidoDetalhes"></div>
                 </div>
                 <div class="comercial-modal-section mt-3" id="confPedidoConferenciaSection" style="display:none;">
                     <div class="comercial-modal-section-title">Dados da conferência</div>
                     <div class="comercial-detail-list" id="confPedidoConferenciaDetalhes"></div>
                 </div>
                 <div class="comercial-modal-section mt-3">
-                    <div class="comercial-modal-section-title">Itens do pedido</div>
+                    <div class="comercial-modal-section-title">Item Innovaro</div>
                     <div class="table-responsive">
                         <table class="table comercial-items-table mb-0">
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Código do Produto</th>
-                                    <th>Cor</th>
+                                    <th>Recurso Código</th>
+                                    <th>Recurso Nome</th>
+                                    <th>Número Série</th>
                                 </tr>
                             </thead>
                             <tbody id="confPedidoItens"></tbody>
                         </table>
                     </div>
                 </div>
+                <div class="comercial-modal-section mt-3">
+                    <div class="comercial-modal-section-title">Itens da Ploomes</div>
+                    <div class="table-responsive">
+                        <table class="table comercial-items-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Código Produto</th>
+                                    <th>Cor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="confPedidoItensPloomes"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="comercial-modal-section mt-3">
+                    <div class="comercial-modal-section-title">Obs. Ploomes</div>
+                    <div class="comercial-detail-list" id="confPedidoObsPloomes"></div>
+                </div>
+                <div class="comercial-modal-section mt-3" id="confPedidoAgenteSection" style="display:none;">
+                    <div class="comercial-modal-section-title d-flex align-items-center gap-2">
+                        <i class="bi bi-robot"></i> Análise do Agente IA
+                    </div>
+                    <div id="confPedidoAgenteResultado" class="p-3 rounded" style="background:#f8f9fa; white-space:pre-wrap; font-size:0.9rem; line-height:1.6;"></div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-danger" id="btnDesfazerConferencia" style="display:none;">Desfazer conferência</button>
+                <button type="button" class="btn btn-outline-primary" id="btnAnalisarAgente">
+                    <i class="bi bi-robot me-1"></i> Conferir com IA
+                </button>
                 <button type="button" class="btn btn-success" id="btnMarcarConferido">Marcar como conferido</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
             </div>
@@ -161,7 +199,7 @@
             </div>
             <div class="modal-body">
                 <p class="mb-0 text-muted">
-                    Tem certeza que deseja desfazer a conferência deste pedido? Ele voltará para a aba
+                    Tem certeza que deseja desfazer a conferência deste registro? Ele voltará para a aba
                     <strong>Aguardando conferência</strong>.
                 </p>
             </div>
