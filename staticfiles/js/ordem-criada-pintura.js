@@ -2789,49 +2789,66 @@ function retornarCambao(cambaoId) {
     });
 }
 
+let _carregarCoresAbortController = null;
+
 function carregarCores(dataCarga) {
     const filtroCor = document.getElementById('filtro-cor');
-    filtroCor.disabled = true; // Desabilita enquanto carrega
+    if (!filtroCor) return;
 
-    fetch(`/pintura/api/cores-carga/?data_carga=${encodeURIComponent(dataCarga)}`)
+    // Cancela requisição anterior se ainda estiver em andamento
+    if (_carregarCoresAbortController) {
+        _carregarCoresAbortController.abort();
+    }
+    _carregarCoresAbortController = new AbortController();
+
+    filtroCor.disabled = true;
+    filtroCor.innerHTML = `<option value="">Carregando...</option>`;
+
+    fetch(`/pintura/api/cores-carga/?data_carga=${encodeURIComponent(dataCarga)}`, {
+        signal: _carregarCoresAbortController.signal,
+    })
         .then(response => {
-            if (!response.ok) {
-                throw new Error("Erro ao buscar cores da carga.");
-            }
+            if (!response.ok) throw new Error("Erro ao buscar cores da carga.");
             return response.json();
         })
         .then(data => {
-            const selectCor = document.getElementById('filtro-cor');
-            if (!selectCor) {
-                console.error("Elemento 'filtro-cor' não encontrado.");
-                return;
-            }
+            filtroCor.innerHTML = `<option value="">------</option>`;
 
-            // Limpa as opções existentes
-            selectCor.innerHTML = `<option value="">------</option>`;
+            const cores = (data.cores || [])
+                .filter(cor => cor !== null && cor !== undefined && String(cor).trim() !== '')
+                .sort();
 
-            if (data.cores && data.cores.length > 0) {
-                // Adiciona as cores sem duplicação
-                data.cores.forEach(cor => {
-                    const option = document.createElement('option');
-                    option.value = cor; // Agora `cor` é diretamente o valor correto
-                    option.textContent = cor;
-                    selectCor.appendChild(option);
-                });
-                filtroCor.disabled = false; // Habilita o select após o carregamento
-            } else {
-                console.warn("Nenhuma cor encontrada para a data selecionada.");
-            }
+            cores.forEach(cor => {
+                const option = document.createElement('option');
+                option.value = cor;
+                option.textContent = cor;
+                filtroCor.appendChild(option);
+            });
+
+            filtroCor.disabled = false;
         })
-        .catch(error => console.error("Erro no carregamento das cores:", error));
+        .catch(error => {
+            if (error.name === 'AbortError') return; // requisição cancelada intencionalmente
+            console.error("Erro no carregamento das cores:", error);
+            filtroCor.innerHTML = `<option value="">------</option>`;
+            filtroCor.disabled = false;
+        });
 }
 
 // Evento para carregar cores ao mudar a data de carga
 function coresCarga() {
-    document.getElementById('filtro-data-carga').addEventListener('change', (event) => {
-        const dataCarga = event.target.value; // Pega o valor da data selecionada
+    const inputData = document.getElementById('filtro-data-carga');
+    if (!inputData) return;
+    inputData.addEventListener('change', (event) => {
+        const dataCarga = event.target.value;
         if (dataCarga) {
             carregarCores(dataCarga);
+        } else {
+            const filtroCor = document.getElementById('filtro-cor');
+            if (filtroCor) {
+                filtroCor.innerHTML = `<option value="">------</option>`;
+                filtroCor.disabled = true;
+            }
         }
     });
 }

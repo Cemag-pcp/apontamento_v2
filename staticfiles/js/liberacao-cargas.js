@@ -31,7 +31,7 @@ function validarDatas(dataInicio, dataFim) {
 function limparResultados() {
     const { tabela, tabelaSemNumeroSerie, secaoSemNumeroSerie, resumo, containerLiberar } = obterElementos();
     tabela.innerHTML = "<tr><td colspan='4'>Nenhum dado disponível</td></tr>";
-    tabelaSemNumeroSerie.innerHTML = "<tr><td colspan='7'>Nenhum item sem PED_NUMEROSERIE no perÃ­odo.</td></tr>";
+    tabelaSemNumeroSerie.innerHTML = "<tr><td colspan='7'>Nenhum item sem PED_NUMEROSERIE no período.</td></tr>";
     secaoSemNumeroSerie.classList.add('d-none');
     resumo.classList.add('d-none');
     resumo.textContent = '';
@@ -62,7 +62,7 @@ function renderizarTabela(cargas, itensSemNumeroSerie = []) {
             tabela.appendChild(linha);
         });
     } else {
-        tabela.innerHTML = "<tr><td colspan='4'>Nenhum item com PED_NUMEROSERIE no perÃ­odo.</td></tr>";
+        tabela.innerHTML = "<tr><td colspan='4'>Nenhum item com PED_NUMEROSERIE no período.</td></tr>";
     }
 
     if (possuiItensSemNumeroSerie) {
@@ -88,13 +88,13 @@ function renderizarTabela(cargas, itensSemNumeroSerie = []) {
         });
         secaoSemNumeroSerie.classList.remove('d-none');
     } else {
-        tabelaSemNumeroSerie.innerHTML = "<tr><td colspan='7'>Nenhum item sem PED_NUMEROSERIE no perÃ­odo.</td></tr>";
+        tabelaSemNumeroSerie.innerHTML = "<tr><td colspan='7'>Nenhum item sem PED_NUMEROSERIE no período.</td></tr>";
         secaoSemNumeroSerie.classList.add('d-none');
     }
 
     const grupos = new Set((cargas || []).map((item) => `${item.data_carga}|${item.carga}`));
     const totalSemNumeroSerie = possuiItensSemNumeroSerie ? itensSemNumeroSerie.length : 0;
-    resumo.textContent = `${grupos.size} carga(s) encontradas no perÃ­odo. ${totalSemNumeroSerie} item(ns) sem PED_NUMEROSERIE disponível(is) para seleção.`;
+    resumo.textContent = `${grupos.size} carga(s) encontradas no período. ${totalSemNumeroSerie} item(ns) sem PED_NUMEROSERIE disponível(is) para seleção.`;
     resumo.classList.remove('d-none');
     containerLiberar.classList.remove('d-none');
 }
