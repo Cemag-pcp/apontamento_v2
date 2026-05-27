@@ -16,12 +16,13 @@
     class="montagem-dashboard-page"
     data-dashboard-url="{% url 'montagem:dashboard_data' %}"
     data-tmf-url="{% url 'montagem:tempo_medio_fabricacao' %}"
+    data-takt-url="{% url 'montagem:takt_time_data' %}"
 >
     <section class="montagem-hero">
         <div>
             <p class="eyebrow">Montagem</p>
-            <h1>Indicadores do setor em um painel único</h1>
-            <p class="hero-copy">Acompanhe volume planejado, produção real, gargalos por célula e o ritmo diário das ordens.</p>
+            <h1>Dashboard</h1>
+            <!-- <p class="hero-copy">Acompanhe volume planejado, produção real, gargalos por célula e o ritmo diário das ordens.</p> -->
         </div>
         <form id="montagemDashboardFilters" class="dashboard-filter-card">
             <div class="filter-grid">
@@ -136,17 +137,85 @@
             </div>
         </article>
 
+        <article class="panel-card panel-span-2" id="takt-panel">
+            <div class="panel-heading">
+                <div>
+                    <h2 style="display:flex;align-items:center;gap:8px;">
+                        Takt Time por célula
+                        <span class="takt-info-anchor" tabindex="0" aria-label="Explicação do gráfico">?
+                            <span class="takt-info-popover" role="tooltip">
+                                <strong>Como ler este gráfico</strong>
+                                <dl>
+                                    <dt>Linha vermelha: Takt time</dt>
+                                    <dd>Ritmo máximo permitido por unidade:<br><em>Takt = Tempo disponível ÷ Qt. carretas</em></dd>
+                                    <dt>Barras: Tempo de ciclo por célula</dt>
+                                    <dd>Média do tempo real gasto por unidade finalizada em cada célula, medido a partir dos apontamentos do período. As cores representam os diferentes conjuntos produzidos.</dd>
+                                    <dt>Gargalo</dt>
+                                    <dd>Célula cuja barra ultrapassa a linha vermelha e não consegue acompanhar o ritmo de produção exigido.</dd>
+                                    <dt>Operadores e ajuste de ciclo</dt>
+                                    <dd>Alterar o nº de operadores em "Configurar" reescala o ciclo proporcionalmente:<br><em>Ciclo ajustado = Ciclo histórico × (ops padrão ÷ ops atual)</em></dd>
+                                    <dt>Op. necessários</dt>
+                                    <dd>Estimativa de mão-de-obra com os operadores configurados:<br><em>Σ Ciclos ajustados ÷ Takt time</em></dd>
+                                </dl>
+                            </span>
+                        </span>
+                    </h2>
+                    <p>Tempo de ciclo real vs. takt time. Células acima da linha vermelha são gargalos.</p>
+                </div>
+                <div class="panel-heading-actions">
+                    <button id="takt-config-toggle" class="dashboard-secondary-button" style="white-space:nowrap;">Configurar</button>
+                    <button id="takt-reload" class="dashboard-primary-button" style="white-space:nowrap;">Calcular</button>
+                </div>
+            </div>
+
+            <div id="takt-config" class="takt-config-panel" style="display:none;">
+                <div class="takt-param-row">
+                    <label class="filter-field" style="flex:0 0 140px;">
+                        <span>Data inicial</span>
+                        <input id="takt-data-inicio" type="date">
+                    </label>
+                    <label class="filter-field" style="flex:0 0 140px;">
+                        <span>Data final</span>
+                        <input id="takt-data-fim" type="date">
+                    </label>
+                    <label class="filter-field" style="flex:0 0 130px;">
+                        <span>Qt. Carretas</span>
+                        <input id="takt-qt-carretas" type="number" min="1" value="10">
+                    </label>
+                    <label class="filter-field" style="flex:0 0 155px;">
+                        <span>Tempo disp. (min)</span>
+                        <input id="takt-tempo-disp" type="number" min="1" value="540">
+                    </label>
+                </div>
+                <div style="margin-top:14px;">
+                    <p style="font-size:0.78rem;font-weight:700;color:#334155;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.08em;">Operadores por célula</p>
+                    <div id="takt-op-config" class="takt-op-config"></div>
+                </div>
+            </div>
+
+            <div class="panel-body chart-panel" id="takt-chart-wrap" style="height:360px;">
+                <canvas id="taktChart"></canvas>
+            </div>
+
+            <div id="takt-summary" class="takt-summary-bar" style="display:none;"></div>
+        </article>
+
         <article class="panel-card panel-span-2">
             <div class="panel-heading">
                 <div>
                     <h2>Tempo médio de fabricação</h2>
-                    <p>Tempo médio de produção por conjunto — apenas ordens finalizadas, excluindo interrupções.</p>
+                    <p>Tempo médio de produção por conjunto. Apenas ordens finalizadas, excluindo interrupções.</p>
                 </div>
                 <div class="panel-heading-actions">
                     <label class="filter-field" style="flex-direction:row;align-items:center;gap:8px;">
                         <span style="white-space:nowrap;font-size:0.78rem;">Mín. ordens</span>
                         <input id="tmf-min-ordens" type="number" min="1" value="2"
                                style="width:60px;min-height:34px;border:1px solid #dbe2ea;border-radius:10px;padding:0 8px;font-size:0.82rem;">
+                    </label>
+                    <label class="filter-field" style="flex-direction:row;align-items:center;gap:8px;">
+                        <span style="white-space:nowrap;font-size:0.78rem;">Limite</span>
+                        <input id="tmf-limit" type="number" min="1" max="500" value="200"
+                               style="width:70px;min-height:34px;border:1px solid #dbe2ea;border-radius:10px;padding:0 8px;font-size:0.82rem;">
                     </label>
                     <button id="tmf-reload" class="dashboard-secondary-button" style="white-space:nowrap;">Atualizar</button>
                 </div>

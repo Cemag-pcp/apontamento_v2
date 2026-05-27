@@ -1588,7 +1588,7 @@ def tempo_medio_fabricacao(request):
     maquina_id  = (request.GET.get('maquina_id') or '').strip()
     apenas_fin  = request.GET.get('apenas_finalizadas', '1') == '1'
     min_ordens  = max(1, int(request.GET.get('min_ordens') or 1))
-    limit       = min(int(request.GET.get('limit') or 30), 200)
+    limit       = min(int(request.GET.get('limit') or 30), 500)
 
     if data_inicio > data_fim:
         return JsonResponse({'error': 'data_inicio não pode ser maior que data_fim.'}, status=400)
@@ -1689,6 +1689,138 @@ def tempo_medio_fabricacao(request):
     items.sort(key=lambda x: (-x['ordens'], x['media_lote_minutos']))
 
     return JsonResponse({'items': items[:limit], 'total': len(items)})
+
+
+@login_required
+def takt_time_data(request):
+    """
+    Calcula takt time e tempo de ciclo real por célula de montagem.
+
+    Parâmetros GET:
+      - data_inicio / data_fim : período de análise (default: hoje)
+      - qt_carretas            : quantidade de carretas planejadas (default: 1)
+      - tempo_disp_min         : tempo disponível em minutos (default: 540 = 9h)
+    """
+    from collections import defaultdict
+
+    hoje = localtime(now()).date()
+    data_inicio = parse_date(request.GET.get('data_inicio') or '') or hoje
+    data_fim    = parse_date(request.GET.get('data_fim') or '') or hoje
+
+    try:
+        qt_carretas = max(1, int(request.GET.get('qt_carretas') or 1))
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'qt_carretas inválido.'}, status=400)
+
+    try:
+        tempo_disp_min = max(1.0, float(request.GET.get('tempo_disp_min') or 540))
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'tempo_disp_min inválido.'}, status=400)
+
+    if data_inicio > data_fim:
+        return JsonResponse({'error': 'data_inicio não pode ser maior que data_fim.'}, status=400)
+
+    takt_time_min = tempo_disp_min / qt_carretas
+
+    ordens_qs = Ordem.objects.filter(grupo_maquina='montagem', excluida=False)
+
+    peca_subquery = (
+        PecasOrdem.objects
+        .filter(ordem=OuterRef('ordem'))
+        .order_by('id')
+        .values('peca')[:1]
+    )
+
+    processos = list(
+        OrdemProcesso.objects
+        .filter(
+            ordem__in=ordens_qs,
+            status='iniciada',
+            data_fim__isnull=False,
+            data_inicio__isnull=False,
+            data_inicio__date__range=[data_inicio, data_fim],
+        )
+        .annotate(peca=Subquery(peca_subquery))
+        .values(
+            'ordem_id', 'peca', 'data_inicio', 'data_fim',
+            'ordem__maquina__nome',
+        )
+    )
+
+    qtd_boa_por_ordem = {
+        row['ordem_id']: float(row['total_boa'] or 0)
+        for row in (
+            PecasOrdem.objects
+            .filter(ordem__in=ordens_qs)
+            .values('ordem_id')
+            .annotate(total_boa=Sum('qtd_boa', output_field=FloatField()))
+        )
+    }
+
+    # maquina_nome -> ordem_id -> {duracao_seg, peca}
+    maq_ordem = defaultdict(dict)
+    for p in processos:
+        duracao = (p['data_fim'] - p['data_inicio']).total_seconds()
+        if duracao <= 0:
+            continue
+        maq = p['ordem__maquina__nome'] or 'Sem célula'
+        oid = p['ordem_id']
+        if oid not in maq_ordem[maq]:
+            maq_ordem[maq][oid] = {'duracao_seg': 0.0, 'peca': p['peca'] or ''}
+        maq_ordem[maq][oid]['duracao_seg'] += duracao
+        if not maq_ordem[maq][oid]['peca']:
+            maq_ordem[maq][oid]['peca'] = p['peca'] or ''
+
+    cells = []
+    total_cycle_time = 0.0
+
+    for maq_nome, ordens in maq_ordem.items():
+        peca_per_unit = defaultdict(list)
+        all_per_unit = []
+        for oid, dados in ordens.items():
+            peca = dados['peca'] or 'Sem produto'
+            qtd = qtd_boa_por_ordem.get(oid, 0)
+            if qtd > 0:
+                per_unit = dados['duracao_seg'] / qtd / 60
+                peca_per_unit[peca].append(per_unit)
+                all_per_unit.append(per_unit)
+
+        if not all_per_unit:
+            continue
+
+        # Tempo de ciclo da célula = média geral de todas as ordens
+        cell_cycle = sum(all_per_unit) / len(all_per_unit)
+
+        # Breakdown por produto (para empilhamento no gráfico)
+        conjuntos = []
+        for peca_nome, times in peca_per_unit.items():
+            avg = sum(times) / len(times)
+            conjuntos.append({
+                'nome': peca_nome,
+                'cycle_time_min': round(avg, 2),
+                'ordens': len(times),
+            })
+        conjuntos.sort(key=lambda x: -x['cycle_time_min'])
+
+        cells.append({
+            'nome': maq_nome,
+            'cycle_time_min': round(cell_cycle, 2),
+            'conjuntos': conjuntos,
+        })
+        total_cycle_time += cell_cycle
+
+    cells.sort(key=lambda x: x['nome'])
+
+    num_operadores = round(total_cycle_time / takt_time_min, 1) if takt_time_min > 0 else 0
+
+    return JsonResponse({
+        'takt_time_min': round(takt_time_min, 2),
+        'qt_carretas': qt_carretas,
+        'tempo_disp_min': round(tempo_disp_min, 1),
+        'cells': cells,
+        'num_operadores_necessarios': num_operadores,
+        'total_cycle_time_min': round(total_cycle_time, 2),
+    })
 
 
 def apontamento_qrcode(request):

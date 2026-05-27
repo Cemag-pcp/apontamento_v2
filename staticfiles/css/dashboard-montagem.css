@@ -367,6 +367,217 @@
     font-weight: 800;
 }
 
+/* ── Takt Time — info tooltip ─────────────────────────────────────────── */
+
+.takt-info-anchor {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 800;
+    cursor: default;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.takt-info-popover.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.takt-info-popover::-webkit-scrollbar { width: 5px; }
+.takt-info-popover::-webkit-scrollbar-track { background: transparent; }
+.takt-info-popover::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+.takt-info-popover {
+    position: fixed;
+    z-index: 9999;
+    width: 320px;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.28);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+    pointer-events: none;
+    font-size: 0.82rem;
+    font-weight: 400;
+    line-height: 1.5;
+    white-space: normal;
+}
+
+.takt-info-popover strong {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+}
+
+.takt-info-popover dl {
+    margin: 0;
+    display: grid;
+    gap: 10px;
+}
+
+.takt-info-popover dt {
+    font-weight: 700;
+    color: #7dd3fc;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
+}
+
+.takt-info-popover dd {
+    margin: 0;
+    color: #cbd5e1;
+}
+
+.takt-info-popover em {
+    display: block;
+    margin-top: 4px;
+    font-style: normal;
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: #86efac;
+    background: rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 3px 8px;
+}
+
+/* ── Takt Time ────────────────────────────────────────────────────────── */
+
+.takt-config-panel {
+    padding: 16px 18px 20px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.takt-param-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-end;
+}
+
+.takt-param-row .takt-day-btn {
+    font-size: 0.76rem;
+    padding: 0 10px;
+    min-height: 44px;
+    white-space: nowrap;
+}
+
+.takt-op-config {
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 14px;
+    background: #f8fafc;
+}
+
+.takt-op-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px;
+}
+
+.takt-op-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: default;
+}
+
+.takt-op-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.takt-op-input {
+    width: 58px;
+    min-height: 34px;
+    border: 1px solid #dbe2ea;
+    border-radius: 8px;
+    padding: 0 8px;
+    font-size: 0.82rem;
+    text-align: center;
+    color: #0f172a;
+}
+
+.takt-op-item small {
+    font-size: 0.78rem;
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+.takt-summary-bar {
+    padding: 16px 18px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.takt-summary-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px 32px;
+}
+
+.takt-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.takt-kpi > span {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+}
+
+.takt-kpi > strong {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.03em;
+    line-height: 1;
+}
+
+.takt-kpi > strong small {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-left: 2px;
+}
+
+.takt-kpi-highlight > strong {
+    color: #0f766e;
+}
+
 @media (max-width: 1200px) {
     .kpi-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));

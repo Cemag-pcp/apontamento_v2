@@ -37,5 +37,5 @@ urlpatterns += [
     path('api/tempos', views.api_tempos, name='api_tempos'),
     path('api/dashboard/dados/', views.dashboard_data, name='dashboard_data'),
     path('api/tempo-medio-fabricacao/', views.tempo_medio_fabricacao, name='tempo_medio_fabricacao'),
-    
+    path('api/takt-time/', views.takt_time_data, name='takt_time_data'),
 ]
