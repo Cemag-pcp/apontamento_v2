@@ -578,6 +578,41 @@
     color: #0f766e;
 }
 
+/* ── Chips de células no painel de configuração ─────────────── */
+.takt-celulas-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.takt-celula-chip {
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid #0284c7;
+    background: #eff6ff;
+    color: #0284c7;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.takt-celula-chip:hover {
+    background: #dbeafe;
+}
+
+.takt-celula-chip.takt-celula-excluida {
+    border-color: #e2e8f0;
+    background: #f8fafc;
+    color: #94a3b8;
+    text-decoration: line-through;
+}
+
+.takt-celula-chip.takt-celula-excluida:hover {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
 @media (max-width: 1200px) {
     .kpi-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));

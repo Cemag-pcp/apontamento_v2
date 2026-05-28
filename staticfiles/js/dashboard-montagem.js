@@ -59,6 +59,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // track which cells came from the API (for the config table)
     let taktApiCells = [];
 
+    // Tempo disponível por dia (base). O input de tempo exibe dailyDisp × numDays.
+    let taktDailyDisp = 540;
+
+    function getTaktNumDays() {
+        const s = document.getElementById('takt-data-inicio');
+        const e = document.getElementById('takt-data-fim');
+        if (!s?.value || !e?.value) return 1;
+        const diff = Math.round((new Date(e.value) - new Date(s.value)) / 86400000);
+        return Math.max(1, diff + 1);
+    }
+
+    function syncTempoInput() {
+        const el = document.getElementById('takt-tempo-disp');
+        if (el) el.value = taktDailyDisp * getTaktNumDays();
+    }
+
     function formatNumber(value) {
         return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(Number(value || 0));
     }
@@ -462,6 +478,77 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Último estado recebido da API para células e exclusões
+    let taktTodasCelulas = [];
+    let taktCelulasExcluidas = new Set();
+
+    function renderTaktCelulasConfig(data) {
+        const container = document.getElementById('takt-celulas-config');
+        if (!container) return;
+
+        taktTodasCelulas = data.todas_celulas || [];
+        taktCelulasExcluidas = new Set(data.celulas_excluidas || []);
+
+        if (!taktTodasCelulas.length) {
+            container.innerHTML = '<p style="font-size:0.78rem;color:#94a3b8;">Nenhuma célula encontrada.</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="takt-celulas-grid">
+                ${taktTodasCelulas.map(cel => {
+                    const excluida = taktCelulasExcluidas.has(cel.id);
+                    return `
+                        <button class="takt-celula-chip ${excluida ? 'takt-celula-excluida' : ''}"
+                                data-id="${cel.id}" title="${excluida ? 'Excluída — clique para incluir' : 'Incluída — clique para excluir'}">
+                            ${excluida ? '✕ ' : ''}${cel.nome}
+                        </button>`;
+                }).join('')}
+            </div>`;
+
+        container.querySelectorAll('.takt-celula-chip').forEach(btn => {
+            btn.addEventListener('click', () => toggleCelulaExcluida(parseInt(btn.dataset.id)));
+        });
+    }
+
+    async function toggleCelulaExcluida(maquinaId) {
+        const toggleUrl = app.dataset.taktToggleUrl;
+        if (!toggleUrl) return;
+        try {
+            const res = await fetch(toggleUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                body: JSON.stringify({ maquina_id: maquinaId }),
+            });
+            if (!res.ok) throw new Error();
+            const result = await res.json();
+            if (result.status === 'excluida') {
+                taktCelulasExcluidas.add(maquinaId);
+            } else {
+                taktCelulasExcluidas.delete(maquinaId);
+            }
+            // Atualiza visual sem recarregar tudo
+            const container = document.getElementById('takt-celulas-config');
+            if (container) {
+                container.querySelectorAll('.takt-celula-chip').forEach(btn => {
+                    const id = parseInt(btn.dataset.id);
+                    const excluida = taktCelulasExcluidas.has(id);
+                    const cel = taktTodasCelulas.find(c => c.id === id);
+                    btn.className = `takt-celula-chip ${excluida ? 'takt-celula-excluida' : ''}`;
+                    btn.title = excluida ? 'Excluída — clique para incluir' : 'Incluída — clique para excluir';
+                    btn.textContent = (excluida ? '✕ ' : '') + (cel?.nome || '');
+                });
+            }
+        } catch {
+            alert('Erro ao atualizar célula. Tente novamente.');
+        }
+    }
+
+    function getCookie(name) {
+        const v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+        return v ? v[2] : '';
+    }
+
     async function loadTaktTime() {
         const taktUrl = app.dataset.taktUrl;
         if (!taktUrl) return;
@@ -498,6 +585,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
+            // Atualiza o painel de configuração se estiver visível
+            const taktConfigPanel = document.getElementById('takt-config');
+            if (taktConfigPanel && taktConfigPanel.style.display !== 'none') {
+                renderTaktOpConfig();
+                renderTaktCelulasConfig(data);
+            }
+
             buildTaktChart(data);
         } catch (err) {
             if (taktChart) { taktChart.destroy(); taktChart = null; }
@@ -515,7 +609,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function buildTaktChart(data) {
         const wrap = document.getElementById('takt-chart-wrap');
 
-        // Restore canvas if it was replaced by an error div
         if (wrap && !wrap.querySelector('canvas')) {
             wrap.innerHTML = '<canvas id="taktChart"></canvas>';
         }
@@ -524,112 +617,246 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (taktChart) { taktChart.destroy(); taktChart = null; }
 
-        const cells = data.cells || [];
-        if (!cells.length) {
-            if (wrap) wrap.innerHTML = '<div class="dashboard-empty">Sem dados de produção no período selecionado.</div>';
+        const planned = data.planned_production || [];
+        const historicalCells = data.cells || [];
+
+        if (!planned.length && !historicalCells.length) {
+            if (wrap) wrap.innerHTML = '<div class="dashboard-empty">Sem dados no período selecionado.</div>';
             return;
         }
-
-        // Collect all unique conjuntos
-        const seenConj = new Set();
-        const conjuntoList = [];
-        cells.forEach(cell => cell.conjuntos.forEach(c => {
-            if (!seenConj.has(c.nome)) { seenConj.add(c.nome); conjuntoList.push(c.nome); }
-        }));
 
         const palette = [
             '#0f766e', '#0284c7', '#7c3aed', '#d97706', '#16a34a',
             '#db2777', '#2563eb', '#ea580c', '#0891b2', '#65a30d',
         ];
 
-        const barDatasets = conjuntoList.map((nome, i) => ({
-            label: nome.length > 45 ? nome.slice(0, 42) + '…' : nome,
-            type:  'bar',
-            data:  cells.map(cell => {
-                const c = cell.conjuntos.find(j => j.nome === nome);
-                if (!c || !c.cycle_time_min) return 0;
-                // Proporção deste produto no ciclo da célula, ajustada pelos operadores
-                const totalConj = cell.conjuntos.reduce((s, j) => s + j.cycle_time_min, 0);
-                const proporcao = totalConj > 0 ? c.cycle_time_min / totalConj : 0;
-                return cell.cycle_time_min * proporcao * getOpsFactor(cell.nome);
-            }),
-            backgroundColor: palette[i % palette.length],
-            stack: 'cycle',
-        }));
-
-        const taktDataset = {
-            label: `Takt (${data.takt_time_min.toFixed(1)} min)`,
-            type:  'line',
-            data:  cells.map(() => data.takt_time_min),
-            borderColor: '#ef4444',
-            borderWidth: 2.5,
-            borderDash: [7, 4],
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            fill: false,
-            tension: 0,
-            order: 0,
-        };
-
-        const labels = cells.map(cell => {
-            const ops = taktOperators[cell.nome] ?? getDefaultOps(cell.nome);
-            return [cell.nome, `(${ops} op.)`];
+        // Mapa de ciclo por célula: { cellNome: { pecaNome: min, _avg: min } }
+        // Também indexa pelo código numérico (antes de " - ") para resolver
+        // divergências de nome entre planejado ("030493") e histórico ("030493 - CHASSI ...").
+        const cycleMap = {};
+        historicalCells.forEach(cell => {
+            cycleMap[cell.nome] = { _avg: cell.cycle_time_min };
+            cell.conjuntos.forEach(c => {
+                cycleMap[cell.nome][c.nome] = c.cycle_time_min;
+                const codigo = c.nome.split(' - ')[0].trim();
+                if (codigo && codigo !== c.nome && cycleMap[cell.nome][codigo] == null) {
+                    cycleMap[cell.nome][codigo] = c.cycle_time_min;
+                }
+            });
         });
 
-        // Totais ajustados pelos operadores configurados
-        const adjustedTotal  = cells.reduce((s, cell) => s + cell.cycle_time_min * getOpsFactor(cell.nome), 0);
-        const adjustedNumOps = data.takt_time_min > 0 ? adjustedTotal / data.takt_time_min : 0;
+        // Ciclo global por peça (fallback quando a peça não tem histórico na célula)
+        const globalCycleByPeca = data.cycle_by_peca || {};
 
-        taktChart = new Chart(ctx, {
-            type: 'bar',
-            data: { labels, datasets: [...barDatasets, taktDataset] },
-            options: {
-                maintainAspectRatio: false,
-                responsive: true,
-                interaction: { mode: 'index', intersect: false },
-                scales: {
-                    x: {
-                        stacked: true,
-                        grid: { display: false },
-                        ticks: { maxRotation: 45, font: { size: 10 } },
+        if (planned.length) {
+            // ── Modo planejado: barras = horas estimadas (qtd × ciclo histórico) ──
+
+            // Coleta todas as peças únicas do planejado
+            const seenPecas = new Set();
+            const pecaList = [];
+            planned.forEach(cell => cell.pecas.forEach(p => {
+                if (!seenPecas.has(p.peca)) { seenPecas.add(p.peca); pecaList.push(p.peca); }
+            }));
+
+            // Ciclo: 1º célula+peça, 2º global por peça, 3º média da célula
+            function getCycleTime(cellName, pecaName) {
+                const cellCycles = cycleMap[cellName] || {};
+                if (cellCycles[pecaName] != null) return { ct: cellCycles[pecaName], fonte: 'celula' };
+                if (globalCycleByPeca[pecaName] != null) return { ct: globalCycleByPeca[pecaName], fonte: 'global' };
+                if (cellCycles._avg != null) return { ct: cellCycles._avg, fonte: 'media_celula' };
+                return { ct: 0, fonte: 'sem_dado' };
+            }
+
+            const barDatasets = pecaList.map((peca, i) => ({
+                label: peca.length > 45 ? peca.slice(0, 42) + '…' : peca,
+                type:  'bar',
+                data:  planned.map(cell => {
+                    const p = cell.pecas.find(pp => pp.peca === peca);
+                    if (!p || p.qtd_planejada <= 0) return 0;
+                    const { ct } = getCycleTime(cell.cell, peca);
+                    return ct > 0 ? parseFloat(((p.qtd_planejada * ct) / 60).toFixed(2)) : 0;
+                }),
+                backgroundColor: palette[i % palette.length],
+                stack: 'planned',
+            }));
+
+            // Linha de capacidade: tempo_disp_min já vem ajustado pelo nº de dias via input
+            const numDays = getTaktNumDays();
+            const capH = data.tempo_disp_min / 60;
+            const capLabel = numDays > 1
+                ? `Capacidade ${numDays} dias (${capH.toFixed(1)}h)`
+                : `Capacidade/dia (${capH.toFixed(1)}h)`;
+            const capDataset = {
+                label: capLabel,
+                type:  'line',
+                data:  planned.map(() => capH),
+                borderColor: '#ef4444',
+                borderWidth: 2.5,
+                borderDash: [7, 4],
+                pointRadius: 0,
+                pointHoverRadius: 0,
+                fill: false,
+                tension: 0,
+                order: 0,
+            };
+
+            const labels = planned.map(cell => cell.cell);
+
+            taktChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [...barDatasets, capDataset] },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: { display: false },
+                            ticks: { maxRotation: 45, font: { size: 10 } },
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            title: { display: true, text: 'horas estimadas', font: { size: 11 } },
+                        },
                     },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        grid: { color: '#f1f5f9' },
-                        title: { display: true, text: 'min / unidade', font: { size: 11 } },
-                    },
-                },
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { usePointStyle: true, padding: 14, font: { size: 10 }, boxHeight: 8 },
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label(context) {
-                                // Oculta linha do takt e segmentos com valor zero
-                                if (context.dataset.type === 'line') return null;
-                                if (!context.raw || context.raw === 0) return null;
-                                return `${context.dataset.label}: ${Number(context.raw).toFixed(1)} min/un`;
-                            },
-                            footer(items) {
-                                const total = items
-                                    .filter(i => i.dataset.type === 'bar')
-                                    .reduce((s, i) => s + (i.raw || 0), 0);
-                                if (total === 0) return null;
-                                const diff = total - data.takt_time_min;
-                                return diff > 0.01
-                                    ? [`Total: ${total.toFixed(1)} min/un`, `⚠ Acima do takt em ${diff.toFixed(1)} min`]
-                                    : [`Total: ${total.toFixed(1)} min/un`, `✓ ${Math.abs(diff).toFixed(1)} min de folga`];
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { usePointStyle: true, padding: 14, font: { size: 10 }, boxHeight: 8 },
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label(context) {
+                                    if (context.dataset.type === 'line') return null;
+                                    if (!context.raw || context.raw === 0) return null;
+                                    const cellItem = planned[context.dataIndex];
+                                    const pecaNome = cellItem?.pecas.find(pp =>
+                                        pp.peca === context.dataset.label ||
+                                        context.dataset.label.startsWith(pp.peca.slice(0, 42))
+                                    )?.peca ?? context.dataset.label;
+                                    const p = cellItem?.pecas.find(pp => pp.peca === pecaNome);
+                                    const { ct, fonte } = getCycleTime(cellItem?.cell, pecaNome);
+                                    const fonteLabel = fonte === 'celula' ? '' : fonte === 'global' ? ' ~global' : ' ~média célula';
+                                    const qtdStr = p ? ` × ${formatNumber(p.qtd_planejada)} un.` : '';
+                                    const cicloStr = ct > 0 ? ` (${ct.toFixed(1)} min/un${fonteLabel})` : '';
+                                    return `${context.dataset.label}${qtdStr}${cicloStr}: ${Number(context.raw).toFixed(1)}h`;
+                                },
+                                footer(items) {
+                                    const total = items
+                                        .filter(i => i.dataset.type === 'bar')
+                                        .reduce((s, i) => s + (i.raw || 0), 0);
+                                    if (total === 0) return null;
+                                    const diff = total - capH;
+                                    const capLabelTip = numDays > 1 ? `capacidade (${numDays} dias)` : 'capacidade/dia';
+                                    return diff > 0.05
+                                        ? [`Total: ${total.toFixed(1)}h  ⚠ +${diff.toFixed(1)}h acima da ${capLabelTip}`]
+                                        : [`Total: ${total.toFixed(1)}h  ✓ ${Math.abs(diff).toFixed(1)}h de folga`];
+                                },
                             },
                         },
                     },
                 },
-            },
-        });
+            });
 
-        renderTaktSummary(data, adjustedTotal, adjustedNumOps);
+            // KPIs resumo do modo planejado
+            const totalHoras = planned.reduce((s, cell) => {
+                return s + cell.pecas.reduce((ss, p) => {
+                    const cellCycles = cycleMap[cell.cell] || {};
+                    const ct = cellCycles[p.peca] ?? cellCycles._avg ?? 0;
+                    return ss + (ct > 0 ? (p.qtd_planejada * ct) / 60 : 0);
+                }, 0);
+            }, 0);
+            const totalQtd = planned.reduce((s, cell) =>
+                s + cell.pecas.reduce((ss, p) => ss + p.qtd_planejada, 0), 0);
+            renderTaktSummary(data, totalHoras * 60, totalHoras / capH);
+
+        } else {
+            // ── Fallback: modo ciclo histórico (sem ordens planejadas no período) ──
+
+            const seenConj = new Set();
+            const conjuntoList = [];
+            historicalCells.forEach(cell => cell.conjuntos.forEach(c => {
+                if (!seenConj.has(c.nome)) { seenConj.add(c.nome); conjuntoList.push(c.nome); }
+            }));
+
+            const barDatasets = conjuntoList.map((nome, i) => ({
+                label: nome.length > 45 ? nome.slice(0, 42) + '…' : nome,
+                type:  'bar',
+                data:  historicalCells.map(cell => {
+                    const c = cell.conjuntos.find(j => j.nome === nome);
+                    if (!c || !c.cycle_time_min) return 0;
+                    const totalConj = cell.conjuntos.reduce((s, j) => s + j.cycle_time_min, 0);
+                    const proporcao = totalConj > 0 ? c.cycle_time_min / totalConj : 0;
+                    return cell.cycle_time_min * proporcao * getOpsFactor(cell.nome);
+                }),
+                backgroundColor: palette[i % palette.length],
+                stack: 'cycle',
+            }));
+
+            const taktDataset = {
+                label: `Takt (${data.takt_time_min.toFixed(1)} min)`,
+                type:  'line',
+                data:  historicalCells.map(() => data.takt_time_min),
+                borderColor: '#ef4444',
+                borderWidth: 2.5,
+                borderDash: [7, 4],
+                pointRadius: 0,
+                pointHoverRadius: 0,
+                fill: false,
+                tension: 0,
+                order: 0,
+            };
+
+            const labels = historicalCells.map(cell => {
+                const ops = taktOperators[cell.nome] ?? getDefaultOps(cell.nome);
+                return [cell.nome, `(${ops} op.)`];
+            });
+
+            const adjustedTotal  = historicalCells.reduce((s, cell) => s + cell.cycle_time_min * getOpsFactor(cell.nome), 0);
+            const adjustedNumOps = data.takt_time_min > 0 ? adjustedTotal / data.takt_time_min : 0;
+
+            taktChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [...barDatasets, taktDataset] },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+                        y: {
+                            stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' },
+                            title: { display: true, text: 'min / unidade', font: { size: 11 } },
+                        },
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 14, font: { size: 10 }, boxHeight: 8 } },
+                        tooltip: {
+                            callbacks: {
+                                label(context) {
+                                    if (context.dataset.type === 'line') return null;
+                                    if (!context.raw || context.raw === 0) return null;
+                                    return `${context.dataset.label}: ${Number(context.raw).toFixed(1)} min/un`;
+                                },
+                                footer(items) {
+                                    const total = items.filter(i => i.dataset.type === 'bar').reduce((s, i) => s + (i.raw || 0), 0);
+                                    if (total === 0) return null;
+                                    const diff = total - data.takt_time_min;
+                                    return diff > 0.01
+                                        ? [`Total: ${total.toFixed(1)} min/un`, `⚠ Acima do takt em ${diff.toFixed(1)} min`]
+                                        : [`Total: ${total.toFixed(1)} min/un`, `✓ ${Math.abs(diff).toFixed(1)} min de folga`];
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+
+            renderTaktSummary(data, adjustedTotal, adjustedNumOps);
+        }
     }
 
     function renderTaktSummary(data, adjustedTotal, adjustedNumOps) {
@@ -723,7 +950,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const isHidden = taktConfigPanel.style.display === 'none';
             taktConfigPanel.style.display = isHidden ? '' : 'none';
             taktConfigToggle.textContent  = isHidden ? 'Fechar' : 'Configurar';
-            if (isHidden) renderTaktOpConfig();
+            if (isHidden) {
+                renderTaktOpConfig();
+                renderTaktCelulasConfig({ todas_celulas: taktTodasCelulas, celulas_excluidas: [...taktCelulasExcluidas] });
+            }
         });
     }
 
@@ -737,7 +967,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const e = document.getElementById('takt-data-fim');
         if (s) s.value = today;
         if (e) e.value = today;
+        syncTempoInput();
     })();
+
+    // Quando as datas mudam → recalcula o input de tempo (dailyDisp × numDias)
+    ['takt-data-inicio', 'takt-data-fim'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', syncTempoInput);
+    });
+
+    // Quando o usuário edita manualmente o tempo → atualiza o valor diário base
+    const tempoDispEl = document.getElementById('takt-tempo-disp');
+    if (tempoDispEl) {
+        tempoDispEl.addEventListener('change', () => {
+            const total = parseFloat(tempoDispEl.value) || 540;
+            taktDailyDisp = Math.max(1, Math.round(total / getTaktNumDays()));
+            syncTempoInput(); // re-normaliza para evitar frações
+        });
+    }
 
     // ── Main form ────────────────────────────────────────────────────────────
     form.addEventListener('submit', event => {
