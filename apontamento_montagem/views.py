@@ -1816,6 +1816,7 @@ def takt_time_data(request):
             'nome': maq_nome,
             'cycle_time_min': round(cell_cycle, 2),
             'conjuntos': conjuntos,
+            'num_ordens': len(ordens),
         })
         total_cycle_time += cell_cycle
 
@@ -1886,8 +1887,22 @@ def takt_time_data(request):
             'qtd_planejada': float(row['qtd_total'] or 0),
         })
 
+    orders_count_by_cell = dict(
+        Ordem.objects
+        .filter(
+            grupo_maquina='montagem',
+            excluida=False,
+            data_carga__range=[data_inicio, data_fim],
+            maquina__isnull=False,
+        )
+        .exclude(maquina_id__in=excluidas_ids)
+        .values('maquina__nome')
+        .annotate(count=Count('id'))
+        .values_list('maquina__nome', 'count')
+    )
+
     planned_cells = [
-        {'cell': c, 'pecas': sorted(p, key=lambda x: x['peca'])}
+        {'cell': c, 'pecas': sorted(p, key=lambda x: x['peca']), 'num_ordens': orders_count_by_cell.get(c, 0)}
         for c, p in sorted(planned_by_cell.items())
     ]
 
