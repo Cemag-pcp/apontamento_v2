@@ -15,7 +15,7 @@ from datetime import datetime, date, timedelta
 import logging
 import traceback
 
-from .models import PecasOrdem, ConjuntosInspecionados
+from .models import PecasOrdem, ConjuntosInspecionados, TaktCelulaExcluida
 from core.utils import carregar_planilha_base_geral
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile, PecasFaltantes
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos, CarretasExplodidas
@@ -1610,7 +1610,7 @@ def tempo_medio_fabricacao(request):
         .values('peca')[:1]
     )
 
-    # Processos ativos (status=iniciada) com data_fim preenchida dentro do período
+    # Processos finalizados — todo o histórico, sem filtro de data
     processos_qs = (
         OrdemProcesso.objects
         .filter(
@@ -1618,7 +1618,6 @@ def tempo_medio_fabricacao(request):
             status='iniciada',
             data_fim__isnull=False,
             data_inicio__isnull=False,
-            data_inicio__date__range=[data_inicio, data_fim],
         )
         .annotate(peca=Subquery(peca_subquery))
         .values('ordem_id', 'peca', 'data_inicio', 'data_fim')
@@ -1697,9 +1696,11 @@ def takt_time_data(request):
     Calcula takt time e tempo de ciclo real por célula de montagem.
 
     Parâmetros GET:
-      - data_inicio / data_fim : período de análise (default: hoje)
+      - data_inicio / data_fim : período planejado — filtra ordens por data_carga
       - qt_carretas            : quantidade de carretas planejadas (default: 1)
       - tempo_disp_min         : tempo disponível em minutos (default: 540 = 9h)
+
+    O ciclo histórico é calculado sobre todos os apontamentos já realizados (sem filtro de data).
     """
     from collections import defaultdict
 
@@ -1722,6 +1723,11 @@ def takt_time_data(request):
 
     takt_time_min = tempo_disp_min / qt_carretas
 
+    # IDs das máquinas excluídas permanentemente do cálculo
+    excluidas_ids = set(
+        TaktCelulaExcluida.objects.values_list('maquina_id', flat=True)
+    )
+
     ordens_qs = Ordem.objects.filter(grupo_maquina='montagem', excluida=False)
 
     peca_subquery = (
@@ -1731,15 +1737,19 @@ def takt_time_data(request):
         .values('peca')[:1]
     )
 
+    # Ciclo histórico: apenas ordens FINALIZADAS (mesmo critério do Tempo Médio de Fabricação)
+    # Ordens em andamento ou interrompidas distorcem o ciclo (tempo parcial / qty incompleta)
+    ordens_finalizadas_qs = ordens_qs.filter(status_atual='finalizada')
+
     processos = list(
         OrdemProcesso.objects
         .filter(
-            ordem__in=ordens_qs,
+            ordem__in=ordens_finalizadas_qs,
             status='iniciada',
             data_fim__isnull=False,
             data_inicio__isnull=False,
-            data_inicio__date__range=[data_inicio, data_fim],
         )
+        .exclude(ordem__maquina_id__in=excluidas_ids)
         .annotate(peca=Subquery(peca_subquery))
         .values(
             'ordem_id', 'peca', 'data_inicio', 'data_fim',
@@ -1751,7 +1761,7 @@ def takt_time_data(request):
         row['ordem_id']: float(row['total_boa'] or 0)
         for row in (
             PecasOrdem.objects
-            .filter(ordem__in=ordens_qs)
+            .filter(ordem__in=ordens_finalizadas_qs)
             .values('ordem_id')
             .annotate(total_boa=Sum('qtd_boa', output_field=FloatField()))
         )
@@ -1813,6 +1823,83 @@ def takt_time_data(request):
 
     num_operadores = round(total_cycle_time / takt_time_min, 1) if takt_time_min > 0 else 0
 
+    # Ciclo médio global por peça (independe de célula) — usado como fallback.
+    # Indexado também pelo código numérico (antes do " - ") para resolver casos
+    # onde o planejado usa só o código ("030493") mas o histórico tem
+    # o nome completo ("030493 - CHASSI 2 EIXOS RS/RD SS").
+    peca_global = defaultdict(list)
+    for maq_nome, ordens in maq_ordem.items():
+        for oid, dados in ordens.items():
+            peca = dados['peca'] or 'Sem produto'
+            qtd = qtd_boa_por_ordem.get(oid, 0)
+            if qtd > 0:
+                peca_global[peca].append(dados['duracao_seg'] / qtd / 60)
+
+    cycle_by_peca = {}
+    for peca, times in peca_global.items():
+        avg = round(sum(times) / len(times), 2)
+        cycle_by_peca[peca] = avg
+        # alias pelo código (parte antes de " - "), se existir
+        codigo = peca.split(' - ')[0].strip()
+        if codigo and codigo != peca and codigo not in cycle_by_peca:
+            cycle_by_peca[codigo] = avg
+
+    # Produção planejada no período (ordens com data_carga dentro do range).
+    # Buscamos uma linha por ordem (via subquery) para não somar qtd_planejada
+    # de múltiplos registros PecasOrdem da mesma ordem (um por operador/sessão).
+    peca_plan_subq = (
+        PecasOrdem.objects
+        .filter(ordem=OuterRef('pk'))
+        .order_by('id')
+        .values('peca')[:1]
+    )
+    qtd_plan_subq = (
+        PecasOrdem.objects
+        .filter(ordem=OuterRef('pk'))
+        .order_by('id')
+        .values('qtd_planejada')[:1]
+    )
+
+    planned_rows = (
+        Ordem.objects
+        .filter(
+            grupo_maquina='montagem',
+            excluida=False,
+            data_carga__range=[data_inicio, data_fim],
+            maquina__isnull=False,
+        )
+        .exclude(maquina_id__in=excluidas_ids)
+        .annotate(
+            peca_nome=Subquery(peca_plan_subq),
+            qtd_ordem=Subquery(qtd_plan_subq, output_field=FloatField()),
+        )
+        .values('maquina__nome', 'peca_nome')
+        .annotate(qtd_total=Sum('qtd_ordem', output_field=FloatField()))
+        .order_by('maquina__nome', 'peca_nome')
+    )
+
+    planned_by_cell = defaultdict(list)
+    for row in planned_rows:
+        cell_name = row['maquina__nome'] or 'Sem célula'
+        planned_by_cell[cell_name].append({
+            'peca': row['peca_nome'] or '—',
+            'qtd_planejada': float(row['qtd_total'] or 0),
+        })
+
+    planned_cells = [
+        {'cell': c, 'pecas': sorted(p, key=lambda x: x['peca'])}
+        for c, p in sorted(planned_by_cell.items())
+    ]
+
+    # Todas as células de montagem para exibir no painel de configuração
+    from cadastro.models import Maquina
+    todas_celulas = list(
+        Maquina.objects
+        .filter(setor__nome__icontains='montagem')
+        .order_by('nome')
+        .values('id', 'nome')
+    )
+
     return JsonResponse({
         'takt_time_min': round(takt_time_min, 2),
         'qt_carretas': qt_carretas,
@@ -1820,7 +1907,32 @@ def takt_time_data(request):
         'cells': cells,
         'num_operadores_necessarios': num_operadores,
         'total_cycle_time_min': round(total_cycle_time, 2),
+        'planned_production': planned_cells,
+        'planned_period': {'data_inicio': str(data_inicio), 'data_fim': str(data_fim)},
+        'celulas_excluidas': list(excluidas_ids),
+        'todas_celulas': todas_celulas,
+        'cycle_by_peca': cycle_by_peca,
     })
+
+
+@csrf_exempt
+def takt_toggle_celula_excluida(request):
+    """POST {'maquina_id': id} — inclui ou exclui a célula do cálculo de takt time."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+    try:
+        body = json.loads(request.body)
+        maquina_id = int(body.get('maquina_id', 0))
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'maquina_id inválido.'}, status=400)
+
+    from cadastro.models import Maquina
+    maquina = get_object_or_404(Maquina, pk=maquina_id)
+    obj, created = TaktCelulaExcluida.objects.get_or_create(maquina=maquina)
+    if not created:
+        obj.delete()
+        return JsonResponse({'status': 'incluida', 'maquina_id': maquina_id})
+    return JsonResponse({'status': 'excluida', 'maquina_id': maquina_id})
 
 
 def apontamento_qrcode(request):

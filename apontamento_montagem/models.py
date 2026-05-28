@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.timezone import now
 
-from cadastro.models import Pecas,Operador
+from cadastro.models import Pecas, Operador, Maquina
 from core.models import Ordem, OrdemProcesso
 
 class PecasOrdem(models.Model):
@@ -19,3 +19,16 @@ class ConjuntosInspecionados(models.Model):
 
     codigo = models.CharField(max_length=55)
     descricao = models.CharField(max_length=200)
+
+
+class TaktCelulaExcluida(models.Model):
+    """Células excluídas permanentemente do cálculo de Takt Time."""
+    maquina = models.OneToOneField(
+        Maquina,
+        on_delete=models.CASCADE,
+        related_name='takt_excluida',
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Excluída: {self.maquina.nome}'

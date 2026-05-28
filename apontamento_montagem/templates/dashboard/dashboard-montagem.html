@@ -17,6 +17,7 @@
     data-dashboard-url="{% url 'montagem:dashboard_data' %}"
     data-tmf-url="{% url 'montagem:tempo_medio_fabricacao' %}"
     data-takt-url="{% url 'montagem:takt_time_data' %}"
+    data-takt-toggle-url="{% url 'montagem:takt_toggle_celula_excluida' %}"
 >
     <section class="montagem-hero">
         <div>
@@ -179,17 +180,22 @@
                         <input id="takt-data-fim" type="date">
                     </label>
                     <label class="filter-field" style="flex:0 0 130px;">
-                        <span>Qt. Carretas</span>
+                        <span>Qt. Carretas do período</span>
                         <input id="takt-qt-carretas" type="number" min="1" value="10">
                     </label>
                     <label class="filter-field" style="flex:0 0 155px;">
-                        <span>Tempo disp. (min)</span>
+                        <span>Tempo disp. min/dia</span>
                         <input id="takt-tempo-disp" type="number" min="1" value="540">
                     </label>
                 </div>
                 <div style="margin-top:14px;">
                     <p style="font-size:0.78rem;font-weight:700;color:#334155;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.08em;">Operadores por célula</p>
                     <div id="takt-op-config" class="takt-op-config"></div>
+                </div>
+                <div style="margin-top:14px;">
+                    <p style="font-size:0.78rem;font-weight:700;color:#334155;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.08em;">Células no cálculo</p>
+                    <p style="font-size:0.75rem;color:#64748b;margin:0 0 10px;">Clique para excluir/incluir uma célula. Salvo permanentemente.</p>
+                    <div id="takt-celulas-config" class="takt-celulas-config"></div>
                 </div>
             </div>
 
