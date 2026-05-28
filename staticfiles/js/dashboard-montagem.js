@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tmfTable           = document.getElementById('tmfTable');
     const tmfUrl             = app.dataset.tmfUrl;
     const tmfMinOrdens       = document.getElementById('tmf-min-ordens');
+    const tmfLimitInput      = document.getElementById('tmf-limit');
     const tmfReload          = document.getElementById('tmf-reload');
 
     let statusChart;
@@ -384,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
             data_fim:          endInput.value,
             apenas_finalizadas: '1',
             min_ordens:        tmfMinOrdens ? tmfMinOrdens.value : '2',
-            limit:             '50',
+            limit:             tmfLimitInput ? tmfLimitInput.value : '200',
         });
         if (machineInput.value) params.set('maquina_id', machineInput.value);
         try {
