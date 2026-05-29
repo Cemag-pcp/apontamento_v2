@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+import re
 import datetime
 import gspread
 import logging
@@ -11,6 +12,7 @@ from dotenv import load_dotenv
 from datetime import datetime, date
 import time
 import qrcode
+import unicodedata
 from io import BytesIO
 from pathlib import Path
 import environ
@@ -130,11 +132,59 @@ def get_base_carreta(carretas: Optional[list] = None):
     return base_carretas
 
 def buscar_celulas(carretas):
+    if not carretas:
+        return []
 
-    base_carretas = get_base_carreta(carretas)
-    base_carretas[base_carretas['Etapa2'] == 'Pintura']
+    base_carretas = get_base_carreta()
+    if base_carretas.empty:
+        return []
 
-    return base_carretas['Célula'].unique()
+    def _normalizar_nome_coluna(nome):
+        texto = unicodedata.normalize("NFKD", str(nome))
+        texto_ascii = texto.encode("ascii", "ignore").decode("ascii").strip().lower()
+        if texto_ascii:
+            return re.sub(r"[^a-z]", "", texto_ascii)
+        return re.sub(r"[^a-z]", "", str(nome).strip().lower())
+
+    coluna_recurso = next(
+        (col for col in base_carretas.columns if _normalizar_nome_coluna(col) == "recurso"),
+        None,
+    )
+    coluna_celula = next(
+        (
+            col
+            for col in base_carretas.columns
+            if _normalizar_nome_coluna(col) in {"celula", "clula"}
+        ),
+        None,
+    )
+
+    if not coluna_recurso or not coluna_celula:
+        return []
+
+    recursos = pd.Series(carretas, dtype="string").fillna("").astype(str).str.strip()
+    recursos = normalizar_codigo_recurso_serie(recursos)
+    recursos = recursos.apply(lambda x: "0" + x if len(x) == 5 else x)
+    recursos = {recurso for recurso in recursos.tolist() if recurso}
+
+    if not recursos:
+        return []
+
+    base_filtrada = base_carretas.copy()
+    base_filtrada[coluna_recurso] = base_filtrada[coluna_recurso].astype(str).str.strip()
+    base_filtrada[coluna_recurso] = normalizar_codigo_recurso_serie(base_filtrada[coluna_recurso])
+    base_filtrada[coluna_recurso] = base_filtrada[coluna_recurso].apply(
+        lambda x: "0" + x if len(x) == 5 else x
+    )
+
+    return (
+        base_filtrada[base_filtrada[coluna_recurso].isin(recursos)][coluna_celula]
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .loc[lambda serie: serie != ""]
+        .unique()
+    )
 
 def tratando_dados(base_carretas, base_carga, data_carga, cliente=None, carga=None):
 

@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 import pandas as pd
@@ -21,7 +22,7 @@ from cargas.services import (
     listar_cargas_liberadas_para_planejamento,
     listar_cargas_liberadas_periodo,
 )
-from cargas.utils import gerar_sequenciamento
+from cargas.utils import buscar_celulas, gerar_sequenciamento
 from core.models import Ordem, Profile
 from apontamento_exped.models import Carga as CargaExpedicao
 
@@ -766,6 +767,19 @@ class CargasLiberacaoTests(TestCase):
             [{"celula": "CEL-01"}, {"celula": "CEL-02"}],
         )
 
+    @patch("cargas.utils.get_base_carreta")
+    def test_buscar_celulas_normaliza_recurso_com_sufixo_de_serie(self, get_base_carreta_mock):
+        get_base_carreta_mock.return_value = pd.DataFrame(
+            [
+                {"Recurso": "034538", "Célula": "CHASSI"},
+                {"Recurso": "067890", "Célula": "EIXO"},
+            ]
+        )
+
+        celulas = list(buscar_celulas(["34538M21", "067890AN"]))
+
+        self.assertEqual(celulas, ["CHASSI", "EIXO"])
+
     def test_api_cargas_liberadas_retorna_base_do_sequenciamento(self):
         carga = CargaLiberada.objects.create(
             data_carga=self._date("2026-04-27"),
@@ -1503,6 +1517,99 @@ class BuscarCarretasBaseTests(TestCase):
         self.assertEqual(payload["cargas"]["cargas"][1]["numero_serie"], "SERIE-02")
         self.assertEqual(len(payload["cargas"]["itens_sem_numero_serie"]), 1)
         self.assertEqual(payload["cargas"]["itens_sem_numero_serie"][0]["sheet_row_index"], 9)
+
+
+class ImprimirEtiquetasMontagemTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="pcp_impressao_montagem", password="123456")
+        Profile.objects.create(user=self.user, tipo_acesso="pcp")
+        self.client.login(username="pcp_impressao_montagem", password="123456")
+
+    @staticmethod
+    def _date(value):
+        from datetime import date
+
+        return date.fromisoformat(value)
+
+    @patch("cargas.views.imprimir_ordens_montagem")
+    @patch("cargas.views.get_base_carreta")
+    def test_impressao_montagem_considera_apenas_recursos_marcados(
+        self,
+        get_base_carreta_mock,
+        imprimir_ordens_montagem_mock,
+    ):
+        get_base_carreta_mock.return_value = pd.DataFrame(
+            [
+                {
+                    "Recurso": "012345",
+                    "Código": "1001",
+                    "Peca": "LONGARINA",
+                    "Qtde": 2,
+                    "Célula": "CHASSI",
+                    "Etapa": "Montagem",
+                },
+                {
+                    "Recurso": "067890",
+                    "Código": "1002",
+                    "Peca": "EIXO",
+                    "Qtde": 3,
+                    "Célula": "EIXO",
+                    "Etapa": "Montagem",
+                },
+            ]
+        )
+
+        carga = CargaLiberada.objects.create(
+            data_carga=self._date("2026-05-20"),
+            carga_nome="Carga 01",
+        )
+        versao = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=1,
+            data_inicio_pesquisa=self._date("2026-05-20"),
+            data_fim_pesquisa=self._date("2026-05-20"),
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        CargaLiberadaItem.objects.create(
+            carga_versao=versao,
+            codigo_recurso="012345",
+            quantidade=2,
+            presente_no_carreta="✅",
+        )
+        CargaLiberadaItem.objects.create(
+            carga_versao=versao,
+            codigo_recurso="067890",
+            quantidade=1,
+            presente_no_carreta="✅",
+        )
+
+        response = self.client.post(
+            reverse("cargas:enviar_etiqueta_impressora_montagem"),
+            data=json.dumps(
+                {
+                    "cargas": [
+                        {
+                            "nome": "Carga 01",
+                            "data_carga": "2026-05-20",
+                            "celulas": ["CHASSI", "EIXO"],
+                            "recursos": ["012345"],
+                        }
+                    ]
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        imprimir_ordens_montagem_mock.assert_called_once()
+
+        df_final = imprimir_ordens_montagem_mock.call_args[0][0]
+        self.assertEqual(len(df_final), 1)
+        self.assertEqual(df_final.iloc[0]["Código"], "1001")
+        self.assertEqual(df_final.iloc[0]["Peca"], "LONGARINA")
+        self.assertEqual(df_final.iloc[0]["Célula"], "CHASSI")
+        self.assertEqual(int(df_final.iloc[0]["Qtde_total"]), 4)
 
 
 class SequenciamentoMontagemTests(TestCase):

@@ -355,10 +355,16 @@ async function gerarEtiquetaQrCode() {
                 chk.onchange = e => {
                     const cardAtual = e.target.closest(".card-carga-montagem");
                     if (!e.target.checked) {
+                        cardAtual.querySelectorAll('input[name="recursoMontagem"]').forEach(recurso => {
+                            recurso.checked = false;
+                        });
                         cardAtual.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
                             cel.checked = false;
                         });
                     } else {
+                        cardAtual.querySelectorAll('input[name="recursoMontagem"]').forEach(recurso => {
+                            recurso.checked = true;
+                        });
                         cardAtual.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
                             cel.checked = true;
                         });
@@ -388,9 +394,37 @@ async function gerarEtiquetaQrCode() {
 
                 const ul = document.createElement("ul");
                 ul.style.margin = "0 0 0 28px";
+                ul.style.padding = "0";
                 itens.forEach(it => {
                     const li = document.createElement("li");
-                    li.textContent = `${it.codigo_recurso} — ${it.quantidade} un.`;
+                    li.style.listStyle = "none";
+                    li.style.margin = "4px 0";
+
+                    const lbl = document.createElement("label");
+                    lbl.style.display = "flex";
+                    lbl.style.alignItems = "center";
+                    lbl.style.gap = "6px";
+
+                    const recursoChk = document.createElement("input");
+                    recursoChk.type = "checkbox";
+                    recursoChk.name = "recursoMontagem";
+                    recursoChk.classList.add("recurso-montagem-checkbox");
+                    recursoChk.value = it.codigo_recurso;
+                    recursoChk.dataset.codigoRecurso = it.codigo_recurso;
+                    recursoChk.checked = true;
+                    recursoChk.onchange = e => {
+                        if (e.target.checked) {
+                            const cardAtual = e.target.closest(".card-carga-montagem");
+                            const chkCarga = cardAtual.querySelector('input[name="cargaMontagem"]');
+                            if (chkCarga && !chkCarga.checked) {
+                                chkCarga.checked = true;
+                            }
+                        }
+                    };
+
+                    lbl.appendChild(recursoChk);
+                    lbl.appendChild(document.createTextNode(`${it.codigo_recurso} — ${it.quantidade} un.`));
+                    li.appendChild(lbl);
                     ul.appendChild(li);
                 });
                 card.appendChild(ul);
@@ -449,14 +483,30 @@ async function gerarEtiquetaQrCode() {
                         const celulasSelecionadas = Array.from(
                             card.querySelectorAll('input[name="celulaMontagem"]:checked')
                         ).map(cel => cel.value);
+                        const recursosSelecionados = Array.from(
+                            card.querySelectorAll(".recurso-montagem-checkbox")
+                        )
+                            .filter(recurso => recurso.checked)
+                            .map(recurso => recurso.dataset.codigoRecurso || recurso.value);
 
-                        return {
+                        const cargaPayload = {
                             nome: chk.dataset.carga,
                             data_carga: chk.dataset.dataCarga,
                             data_sugerida: chk.dataset.dataSugerida ?? "",
-                            celulas: celulasSelecionadas
+                            celulas: celulasSelecionadas,
                         };
+
+                        if (recursosSelecionados.length > 0) {
+                            cargaPayload.recursos = recursosSelecionados;
+                        }
+
+                        return cargaPayload;
                     });
+
+                    if (!cargasComCelulas.some(carga => (carga.celulas?.length || 0) > 0 || (carga.recursos?.length || 0) > 0)) {
+                        alert("Selecione ao menos uma célula ou item para imprimir.");
+                        return;
+                    }
 
                     const payloadEnvio = {
                         data_inicio: dataInicio,

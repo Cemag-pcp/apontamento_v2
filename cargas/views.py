@@ -2354,12 +2354,29 @@ def enviar_etiqueta_impressora_montagem(request):
     if not cargas_payload:
         return JsonResponse({"error": "Nenhuma carga informada."}, status=400)
 
+    def normalizar_recurso(valor):
+        serie = pd.Series([str(valor).strip()], dtype="string")
+        serie = normalizar_codigo_recurso_serie(serie)
+        recurso = str(serie.iloc[0]).strip()
+        return ('0' + recurso) if len(recurso) == 5 else recurso
+
     # Filtro de célula por carga: { 'CARGA 04': ['CELULA A', ...] }
     filtros_celula = {}
+    filtros_recurso = {}
     for item in cargas_payload:
         nome = str(item.get('nome', '')).strip().upper()
         if nome:
             filtros_celula[nome] = [c.strip().upper() for c in (item.get('celulas') or []) if c.strip()]
+            recursos_item = [
+                str(recurso).strip()
+                for recurso in (item.get('recursos') or [])
+                if str(recurso).strip()
+            ]
+            if recursos_item:
+                filtros_recurso[nome] = {
+                    normalizar_recurso(recurso)
+                    for recurso in recursos_item
+                }
 
     # 1. Busca itens do banco para as cargas selecionadas
     linhas = []
@@ -2389,8 +2406,14 @@ def enviar_etiqueta_impressora_montagem(request):
             continue
 
         for item in ultima_versao.itens.all():
+            recurso = str(item.codigo_recurso).strip()
+            recurso_normalizado = normalizar_recurso(recurso)
+            recursos_selecionados = filtros_recurso.get(carga_lib.carga_nome.strip().upper())
+            if recursos_selecionados is not None and recurso_normalizado not in recursos_selecionados:
+                continue
+
             linhas.append({
-                'Recurso': str(item.codigo_recurso).strip(),
+                'Recurso': recurso,
                 'Qtde_pedido': float(item.quantidade),
                 'Carga': carga_lib.carga_nome.strip().upper(),
                 'Datas': carga_lib.data_carga.isoformat(),
