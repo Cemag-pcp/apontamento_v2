@@ -98,11 +98,11 @@ def _build_query_params(start_date: date, end_date: date, skip: int) -> dict:
 def _build_lookup_query_params(skip: int, deal_id: str | None = None, chave_pedido: str | None = None) -> dict:
     filters = ["Deal/Status/Name eq 'Ganha'"]
     if deal_id:
-        filters.append(f"Deal/Id eq {int(deal_id)}")
+        filters.append(f"Deal/Id eq {int(deal_id.replace('.', '').replace(',', ''))}")
     if chave_pedido:
         filters.append(
             "OtherProperties/any(op: "
-            f"op/FieldKey eq '{ORDER_FIELD_KEY}' and op/IntegerValue eq {int(chave_pedido)})"
+            f"op/FieldKey eq '{ORDER_FIELD_KEY}' and op/IntegerValue eq {int(chave_pedido.replace('.', '').replace(',', ''))})"
         )
 
     expand = (
