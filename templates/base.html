@@ -392,7 +392,7 @@
 
                     <div class="sb-sidenav-menu">
                         <div class="nav">
-                            {% if request.user.profile.tipo_acesso == 'almoxarifado' or not request.user.is_authenticated %}
+                            {% if not request.user.is_authenticated %}
 
                             <div class="sb-sidenav-menu-heading">Almoxarifado</div>
                             {% if not request.user.is_authenticated %}
@@ -618,7 +618,7 @@
                             </div>
 
                             <div class="sb-sidenav-menu-heading">Almoxarifado</div>
-                            {% if not request.user.is_superuser %}
+                            {% if not request.user.is_superuser and request.user.profile.tipo_acesso != 'almoxarifado' %}
                             <a class="nav-link" href="{% url 'criar_solicitacoes' %}"><i class="bi bi-plus-circle"></i> Solicitar</a>
                             {% else %}
                             <a class="nav-link" href="{% url 'solicitacoes_page' %}"><i class="bi bi-house"></i> Home</a>
