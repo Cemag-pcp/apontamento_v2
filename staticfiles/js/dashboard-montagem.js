@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let taktOperators = Object.fromEntries(TAKT_CELL_DEFAULTS.map(c => [c.nome, c.ops]));
     // track which cells came from the API (for the config table)
     let taktApiCells = [];
+    // última resposta da API — reutilizada ao mudar operadores sem nova requisição
+    let lastTaktData = null;
 
     // Tempo disponível por dia (base). O input de tempo exibe dailyDisp × numDays.
     let taktDailyDisp = 540;
@@ -474,6 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.querySelectorAll('.takt-op-input').forEach(inp => {
             inp.addEventListener('change', () => {
                 taktOperators[inp.dataset.cell] = parseFloat(inp.value) || 1;
+                if (lastTaktData) buildTaktChart(lastTaktData);
             });
         });
     }
@@ -553,6 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const taktUrl = app.dataset.taktUrl;
         if (!taktUrl) return;
 
+        const btn      = document.getElementById('takt-reload');
         const startEl  = document.getElementById('takt-data-inicio');
         const endEl    = document.getElementById('takt-data-fim');
         const qtEl     = document.getElementById('takt-qt-carretas');
@@ -560,6 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const wrap     = document.getElementById('takt-chart-wrap');
         const summary  = document.getElementById('takt-summary');
 
+        if (btn) { btn.disabled = true; btn.textContent = 'Calculando…'; }
         if (summary) summary.style.display = 'none';
 
         const params = new URLSearchParams({
@@ -585,7 +590,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Atualiza o painel de configuração se estiver visível
+            // Sempre atualiza o estado de células a partir da API
+            lastTaktData = data;
+            taktTodasCelulas = data.todas_celulas || [];
+            taktCelulasExcluidas = new Set(data.celulas_excluidas || []);
+
+            // Só re-renderiza o painel se estiver visível
             const taktConfigPanel = document.getElementById('takt-config');
             if (taktConfigPanel && taktConfigPanel.style.display !== 'none') {
                 renderTaktOpConfig();
@@ -596,14 +606,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             if (taktChart) { taktChart.destroy(); taktChart = null; }
             if (wrap) wrap.innerHTML = `<div class="dashboard-empty">${err.message}</div>`;
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Calcular'; }
         }
     }
 
-    // Fator de ajuste: ciclo_ajustado = ciclo_histórico × (ops_padrão / ops_atual)
+    // Fator de ajuste: ciclo_ajustado = ciclo_histórico / ops_atual
     function getOpsFactor(cellNome) {
-        const opsDefault  = getDefaultOps(cellNome);
-        const opsCurrent  = taktOperators[cellNome] ?? opsDefault;
-        return (opsDefault > 0 && opsCurrent > 0) ? opsDefault / opsCurrent : 1;
+        const opsCurrent = taktOperators[cellNome] ?? getDefaultOps(cellNome);
+        return opsCurrent > 0 ? 1 / opsCurrent : 1;
     }
 
     function buildTaktChart(data) {
@@ -674,7 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const p = cell.pecas.find(pp => pp.peca === peca);
                     if (!p || p.qtd_planejada <= 0) return 0;
                     const { ct } = getCycleTime(cell.cell, peca);
-                    return ct > 0 ? parseFloat(((p.qtd_planejada * ct) / 60).toFixed(2)) : 0;
+                    return ct > 0 ? parseFloat(((p.qtd_planejada * ct * getOpsFactor(cell.cell)) / 60).toFixed(2)) : 0;
                 }),
                 backgroundColor: palette[i % palette.length],
                 stack: 'planned',
@@ -700,7 +711,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 order: 0,
             };
 
-            const labels = planned.map(cell => cell.cell);
+            const labels = planned.map(cell => {
+                const ops = taktOperators[cell.cell] ?? getDefaultOps(cell.cell);
+                return [cell.cell, `${ops} oper.`];
+            });
 
             taktChart = new Chart(ctx, {
                 type: 'bar',
@@ -723,10 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         },
                     },
                     plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { usePointStyle: true, padding: 14, font: { size: 10 }, boxHeight: 8 },
-                        },
+                        legend: { display: false },
                         tooltip: {
                             callbacks: {
                                 label(context) {
@@ -766,7 +777,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return s + cell.pecas.reduce((ss, p) => {
                     const cellCycles = cycleMap[cell.cell] || {};
                     const ct = cellCycles[p.peca] ?? cellCycles._avg ?? 0;
-                    return ss + (ct > 0 ? (p.qtd_planejada * ct) / 60 : 0);
+                    return ss + (ct > 0 ? (p.qtd_planejada * ct * getOpsFactor(cell.cell)) / 60 : 0);
                 }, 0);
             }, 0);
             const totalQtd = planned.reduce((s, cell) =>
@@ -812,7 +823,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const labels = historicalCells.map(cell => {
                 const ops = taktOperators[cell.nome] ?? getDefaultOps(cell.nome);
-                return [cell.nome, `(${ops} op.)`];
+                return [cell.nome, `${ops} oper.`];
             });
 
             const adjustedTotal  = historicalCells.reduce((s, cell) => s + cell.cycle_time_min * getOpsFactor(cell.nome), 0);
@@ -833,7 +844,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         },
                     },
                     plugins: {
-                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 14, font: { size: 10 }, boxHeight: 8 } },
+                        legend: { display: false },
                         tooltip: {
                             callbacks: {
                                 label(context) {
@@ -951,8 +962,14 @@ document.addEventListener('DOMContentLoaded', () => {
             taktConfigPanel.style.display = isHidden ? '' : 'none';
             taktConfigToggle.textContent  = isHidden ? 'Fechar' : 'Configurar';
             if (isHidden) {
-                renderTaktOpConfig();
-                renderTaktCelulasConfig({ todas_celulas: taktTodasCelulas, celulas_excluidas: [...taktCelulasExcluidas] });
+                if (!taktTodasCelulas.length) {
+                    // Dados ainda não carregados — dispara cálculo; ao retornar, o
+                    // painel já estará visível e renderTaktCelulasConfig será chamado.
+                    loadTaktTime();
+                } else {
+                    renderTaktOpConfig();
+                    renderTaktCelulasConfig({ todas_celulas: taktTodasCelulas, celulas_excluidas: [...taktCelulasExcluidas] });
+                }
             }
         });
     }
