@@ -112,17 +112,20 @@ def api_conf_pedido(request):
     start_raw = (request.GET.get("data_inicio") or "").strip()
     end_raw = (request.GET.get("data_fim") or "").strip()
 
-    if not start_raw or not end_raw:
-        return JsonResponse({"error": "Informe data inicial e data final."}, status=400)
+    start_date = None
+    end_date = None
 
-    try:
-        start_date = datetime.strptime(start_raw, "%Y-%m-%d").date()
-        end_date = datetime.strptime(end_raw, "%Y-%m-%d").date()
-    except ValueError:
-        return JsonResponse({"error": "Datas inválidas. Use o formato YYYY-MM-DD."}, status=400)
+    if start_raw or end_raw:
+        try:
+            if start_raw:
+                start_date = datetime.strptime(start_raw, "%Y-%m-%d").date()
+            if end_raw:
+                end_date = datetime.strptime(end_raw, "%Y-%m-%d").date()
+        except ValueError:
+            return JsonResponse({"error": "Datas inválidas. Use o formato YYYY-MM-DD."}, status=400)
 
-    if start_date > end_date:
-        return JsonResponse({"error": "A data inicial não pode ser maior que a data final."}, status=400)
+        if start_date and end_date and start_date > end_date:
+            return JsonResponse({"error": "A data inicial não pode ser maior que a data final."}, status=400)
 
     filtro_classe = (request.GET.get("classe") or "").strip()
     filtro_pessoa = (request.GET.get("pessoa") or "").strip()
@@ -135,10 +138,7 @@ def api_conf_pedido(request):
     except ValueError:
         page = 1
 
-    qs = PendenciaImportacaoPlanilha.objects.filter(
-        ped_emissao__gte=start_date,
-        ped_emissao__lte=end_date,
-    ).exclude(
+    qs = PendenciaImportacaoPlanilha.objects.exclude(
         Exists(
             ConferenciaPedido.objects.filter(
                 chave_pedido=OuterRef("ped_chcriacao"),
@@ -146,6 +146,11 @@ def api_conf_pedido(request):
             )
         )
     )
+
+    if start_date:
+        qs = qs.filter(ped_emissao__gte=start_date)
+    if end_date:
+        qs = qs.filter(ped_emissao__lte=end_date)
 
     if filtro_classe:
         qs = qs.filter(ped_classe_nome__icontains=filtro_classe)
@@ -166,9 +171,9 @@ def api_conf_pedido(request):
         qs = qs.filter(ped_chcriacao__icontains=filtro_chcriacao)
 
     order_keys = (
-        qs.values("ped_chcriacao", "ped_idnegociacao")
+        qs.values("ped_chcriacao", "ped_idnegociacao", "ped_emissao")
         .distinct()
-        .order_by("ped_chcriacao", "ped_idnegociacao")
+        .order_by("-ped_emissao", "ped_chcriacao", "ped_idnegociacao")
     )
 
     total_orders = order_keys.count()
@@ -260,6 +265,51 @@ def api_conf_pedido_ploomes(request):
         return JsonResponse({"error": f"Erro interno ao consultar Ploomes: {exc}"}, status=500)
 
     return JsonResponse({"results": resultados, "total": len(resultados)})
+
+
+@login_required
+@require_GET
+def api_conf_pedido_ploomes_debug(request):
+    """Retorna o payload bruto da Ploomes — todos os campos de Products sem filtro."""
+    import requests as req
+    from django.conf import settings
+    from comercial.services.ploomes import PLOOMES_ORDERS_URL, ORDER_FIELD_KEY
+
+    id_negociacao = (request.GET.get("id_negociacao") or "").strip()
+
+    if not id_negociacao:
+        return JsonResponse({"error": "Informe id_negociacao."}, status=400)
+
+    api_key = getattr(settings, "PLOOMES_USER_KEY", "")
+    if not api_key:
+        return JsonResponse({"error": "PLOOMES_USER_KEY não configurado."}, status=500)
+
+    params = {
+        "$top": 5,
+        "$skip": 0,
+        "$filter": f"Deal/Id eq {int(id_negociacao.replace('.', ''))}",
+        "$expand": (
+            "Deal("
+            "$select=Id,CreateDate,Quotes;"
+            "$expand=Quotes("
+            "$select=Id,ContactName,Products,Notes;"
+            "$expand=Products("
+            "$expand="
+            "Product($select=Code),"
+            "OtherProperties($select=FieldKey,StringValue,IntegerValue,DecimalValue,ObjectValueName)"
+            ")"
+            ")"
+            ")"
+        ),
+    }
+
+    resp = req.get(
+        PLOOMES_ORDERS_URL,
+        headers={"User-Key": api_key, "Content-Type": "application/json"},
+        params=params,
+        timeout=30,
+    )
+    return JsonResponse(resp.json(), safe=False)
 
 
 @login_required

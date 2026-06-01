@@ -259,12 +259,6 @@ function renderSerieResumo(itens) {
     return `${escapeHtml(series[0])} +${series.length - 1}`;
 }
 
-function setPeriodoPadrao() {
-    const hoje = new Date();
-    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    document.getElementById('dataInicio').value = formatDateInput(primeiroDia);
-    document.getElementById('dataFim').value = formatDateInput(hoje);
-}
 
 function setStatus(message, type = 'info') {
     const status = document.getElementById('confPedidoStatus');
@@ -445,17 +439,22 @@ function renderRows(rows) {
 function renderItensPloomes(rows) {
     const tbody = document.getElementById('confPedidoItensPloomes');
     if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">Nenhum item retornado pela Ploomes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Nenhum item retornado pela Ploomes.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = rows.map((item, index) => `
+    tbody.innerHTML = rows.map((item, index) => {
+        const qtd = item.quantidade != null
+            ? formatDecimal(item.quantidade)
+            : 'N/D';
+        return `
         <tr>
             <td>${index + 1}</td>
             <td>${escapeHtml(item.codigo_produto ?? 'N/D')}</td>
             <td>${escapeHtml(item.cor ?? 'N/D')}</td>
-        </tr>
-    `).join('');
+            <td>${qtd}</td>
+        </tr>`;
+    }).join('');
 }
 
 function renderObsPloomes(rows) {
@@ -634,11 +633,6 @@ async function carregarConferidos({ silent = false } = {}) {
 async function buscarConfPedido(page = 1) {
     const filtros = getAguardandoFiltros();
 
-    if (!filtros.data_inicio || !filtros.data_fim) {
-        setStatus('Preencha a data emissão início e a data emissão fim.', 'warning');
-        return;
-    }
-
     setStatus('Consultando itens da pendência comercial...', 'info');
 
     try {
@@ -706,6 +700,61 @@ async function marcarPedidoComoConferido() {
 
 let currentPloomesRows = [];
 
+const DETALHES_SEP = '===DETALHES===';
+
+function renderMarkdown(text) {
+    if (!text) return '';
+    let html = escapeHtml(text.trim());
+    html = html.replace(/^## (.+)$/gm, '<h6 class="fw-bold mt-2 mb-1">$1</h6>');
+    html = html.replace(/^### (.+)$/gm, '<strong class="d-block mt-2 mb-1">$1</strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/`([^`\n]+)`/g, '<code class="px-1 rounded" style="background:#e9ecef;font-size:.85em">$1</code>');
+    html = html.replace(/^[\-\*] (.+)$/gm, '<li class="mb-1">$1</li>');
+    html = html.replace(/(<li[\s\S]*?<\/li>\n?)+/g, (m) => `<ul class="mb-1 ps-3">${m}</ul>`);
+    html = html.replace(/\n{2,}/g, '</p><p class="mb-1">');
+    html = html.replace(/\n/g, '<br>');
+    return `<p class="mb-1">${html}</p>`;
+}
+
+function renderAgenteResultado(texto) {
+    const resultado = document.getElementById('confPedidoAgenteResultado');
+    const sepIdx = texto.indexOf(DETALHES_SEP);
+
+    if (sepIdx === -1) {
+        resultado.innerHTML = renderMarkdown(texto);
+        return;
+    }
+
+    const conclusao = texto.slice(0, sepIdx).trim();
+    const detalhes = texto.slice(sepIdx + DETALHES_SEP.length).trim();
+
+    resultado.innerHTML = `
+        <div class="agente-conclusao mb-2">${renderMarkdown(conclusao)}</div>
+        ${detalhes ? `
+        <div>
+            <button
+                type="button"
+                class="btn btn-link btn-sm p-0 text-decoration-none agente-ler-mais-btn"
+                aria-expanded="false"
+            >
+                <i class="bi bi-chevron-down me-1"></i>Ler mais
+            </button>
+            <div class="agente-detalhes mt-2" style="display:none;">${renderMarkdown(detalhes)}</div>
+        </div>` : ''}
+    `;
+
+    resultado.querySelector('.agente-ler-mais-btn')?.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        const div = btn.nextElementSibling;
+        const aberto = div.style.display !== 'none';
+        div.style.display = aberto ? 'none' : '';
+        btn.innerHTML = aberto
+            ? '<i class="bi bi-chevron-down me-1"></i>Ler mais'
+            : '<i class="bi bi-chevron-up me-1"></i>Ler menos';
+        btn.setAttribute('aria-expanded', String(!aberto));
+    });
+}
+
 async function analisarComAgente() {
     const btnAnalisar = document.getElementById('btnAnalisarAgente');
     const section = document.getElementById('confPedidoAgenteSection');
@@ -720,10 +769,9 @@ async function analisarComAgente() {
     section.style.display = '';
     resultado.textContent = 'Aguarde, o agente está analisando o pedido...';
 
-    const observacoes = [
-        ...(currentModalPedido.observacao ? [currentModalPedido.observacao] : []),
-        ...currentPloomesRows.map((r) => r.observacao).filter(Boolean),
-    ];
+    const observacoes = [...new Set(
+        currentPloomesRows.map((r) => String(r.observacao ?? '').trim()).filter(Boolean),
+    )];
 
     try {
         const response = await fetch('/comercial/api/conf-pedido/agente/', {
@@ -744,7 +792,7 @@ async function analisarComAgente() {
             throw new Error(data.error || 'Falha ao executar análise.');
         }
 
-        resultado.textContent = data.analise;
+        renderAgenteResultado(data.analise);
     } catch (error) {
         resultado.textContent = `Erro: ${error.message}`;
     } finally {
@@ -800,7 +848,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyColumnVisibility(loadColumnVisibility());
     buildColunasDropdown(loadColumnVisibility());
 
-    setPeriodoPadrao();
     updateTabsUI();
     await carregarConferidos({ silent: true });
     await buscarConfPedido(1);

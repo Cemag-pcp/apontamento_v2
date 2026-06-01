@@ -208,17 +208,18 @@
 }
 
 .comercial-detail-list-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0;
-    padding: 16px;
+    padding: 0;
     background:
         linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
 }
 
 .comercial-detail-list-grid .comercial-detail-row {
     grid-template-columns: 1fr;
-    gap: 8px;
-    min-height: 88px;
+    gap: 2px;
+    min-height: unset;
+    padding: 8px 12px;
     margin: 0;
     padding: 14px 16px;
     border-bottom: 0;
@@ -240,8 +241,9 @@
 }
 
 .comercial-detail-list-grid .comercial-detail-value {
-    font-size: 15px;
-    line-height: 1.35;
+    font-size: 13px;
+    line-height: 1.3;
+    font-weight: 600;
 }
 
 .comercial-detail-row {
@@ -313,8 +315,8 @@
     }
 
     .comercial-detail-list-grid {
-        grid-template-columns: 1fr;
-        padding: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: 0;
     }
 
     .comercial-detail-list-grid .comercial-detail-row,

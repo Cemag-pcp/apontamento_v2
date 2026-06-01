@@ -34,6 +34,7 @@ class ConfPedidoItem:
     codigo_produto: str
     cor: str
     observacao: str
+    quantidade: float | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -45,6 +46,7 @@ class ConfPedidoItem:
             'codigo_produto': self.codigo_produto,
             'cor': self.cor,
             'observacao': self.observacao,
+            'quantidade': self.quantidade,
         }
 
 
@@ -72,13 +74,9 @@ def _build_query_params(start_date: date, end_date: date, skip: int) -> dict:
         "$select=Id,ContactName,Products,Notes;"
         "$filter=ContactName ne 'TESTE - APP CEMAG';"
         "$expand=Products("
-        "$select=Product,OtherProperties;"
         "$expand="
         "Product($select=Code),"
-        "OtherProperties("
-        "$select=ObjectValueName;"
-        f"$filter=FieldKey eq '{COR_FIELD_KEY}'"
-        ")"
+        "OtherProperties($select=FieldKey,ObjectValueName)"
         ")"
         ")"
         ")"
@@ -116,13 +114,9 @@ def _build_lookup_query_params(skip: int, deal_id: str | None = None, chave_pedi
         "$select=Id,ContactName,Products,Notes;"
         "$filter=ContactName ne 'TESTE - APP CEMAG';"
         "$expand=Products("
-        "$select=Product,OtherProperties;"
         "$expand="
         "Product($select=Code),"
-        "OtherProperties("
-        "$select=ObjectValueName;"
-        f"$filter=FieldKey eq '{COR_FIELD_KEY}'"
-        ")"
+        "OtherProperties($select=FieldKey,ObjectValueName)"
         ")"
         ")"
         ")"
@@ -149,9 +143,10 @@ def _extract_chave_pedido(order_item: dict) -> str:
 
 def _extract_cor(product_item: dict) -> str:
     for prop in product_item.get('OtherProperties') or []:
-        color_name = prop.get('ObjectValueName')
-        if color_name:
-            return str(color_name).upper()
+        if prop.get('FieldKey') == COR_FIELD_KEY:
+            color_name = prop.get('ObjectValueName')
+            if color_name:
+                return str(color_name).upper()
     return 'LARANJA'
 
 
@@ -199,6 +194,8 @@ def _parse_order_item(order_item: dict) -> list[ConfPedidoItem]:
 
         for product in products:
             product_data = product.get('Product') or {}
+            raw_qty = product.get('Quantity')
+            quantidade = float(raw_qty) if raw_qty is not None else None
             items.append(
                 ConfPedidoItem(
                     chave_pedido=chave_pedido,
@@ -209,6 +206,7 @@ def _parse_order_item(order_item: dict) -> list[ConfPedidoItem]:
                     codigo_produto=product_data.get('Code') or 'N/D',
                     cor=_extract_cor(product),
                     observacao=observacao,
+                    quantidade=quantidade,
                 )
             )
 

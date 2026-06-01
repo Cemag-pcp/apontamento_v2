@@ -150,7 +150,19 @@ SYSTEM_PROMPT = (
     "(ex: produto laranja mas observação diz vermelho), aponte o código correto APENAS se ele "
     "existir no catálogo. Caso contrário, informe que não encontrou.\n"
     "4. Responda em português brasileiro, de forma objetiva.\n"
-    "5. Se não houver divergências, informe que o pedido está consistente."
+    "5. Se não houver divergências reais, informe APENAS que o pedido está consistente. "
+    "NÃO crie tabelas, listas ou seções de divergências quando tudo estiver correto.\n"
+    "6. TABELA DE CORES — use SEMPRE este mapeamento para interpretar e sugerir códigos:\n"
+    "   AN = Azul | CO = Cinza | VM = Vermelho | VJ = Verde | AV = Amarelo\n"
+    "   Sem sigla de cor no final do código = Laranja (cor padrão).\n"
+    "7. SIGLAS DE MOLA/FREIO em carretas (segunda e terceira posição do código):\n"
+    "   SS = Sem mola e Sem freio | CS = Com mola e Sem freio | "
+    "SC = Sem mola e Com freio | CC = Com mola e Com freio.\n"
+    "8. COMPARE SEMPRE as quantidades: se a Qtd do CRM (Ploomes) for diferente da Qtd do ERP (Innovaro), "
+    "isso é uma DIVERGÊNCIA de quantidade e deve ser reportada.\n"
+    "9. DIVERGÊNCIA é quando o código, a cor, a quantidade ou outra característica do pedido "
+    "difere entre CRM, ERP e observação. "
+    "Itens que confirmam a mesma característica NÃO são divergências e NÃO devem ser listados."
 )
 
 
@@ -163,13 +175,15 @@ def _montar_prompt(
     linhas_innovaro = '\n'.join(
         f"  {i+1}. Código: {item.get('recurso_codigo', 'N/D')} | "
         f"Nome: {item.get('recurso_nome', 'N/D')} | "
+        f"Qtd: {item.get('quantidade', 'N/D')} | "
         f"Série: {item.get('numero_serie', '') or 'sem série'}"
         for i, item in enumerate(itens_innovaro)
     ) or '  Nenhum item Innovaro informado.'
 
     linhas_ploomes = '\n'.join(
-        f"  {i+1}. Código Produto: {item.get('codigo_produto', 'N/D')} | "
-        f"Cor: {item.get('cor', 'N/D')}"
+        f"  {i+1}. Código: {item.get('codigo_produto', 'N/D')} | "
+        f"Cor: {item.get('cor', 'N/D')} | "
+        f"Qtd: {item.get('quantidade') if item.get('quantidade') is not None else 'N/D'}"
         for i, item in enumerate(itens_ploomes)
     ) or '  Nenhum item Ploomes informado.'
 
@@ -187,11 +201,26 @@ def _montar_prompt(
         f"{linhas_ploomes}\n\n"
         f"=== OBSERVAÇÃO DO REPRESENTANTE DE VENDAS ===\n"
         f"{linhas_obs}\n\n"
-        f"Com base no catálogo acima:\n"
-        f"1. Verifique divergências entre os itens selecionados e a observação do representante.\n"
-        f"2. Se houver divergência, aponte o código correto (somente se existir no catálogo).\n"
-        f"3. Explique as siglas relevantes do código.\n"
-        f"4. Estruture a resposta em: Análise, Divergências (se houver) e Sugestão de código correto."
+        f"Com base no catálogo acima, estruture a resposta EXATAMENTE assim:\n\n"
+        f"1. Escreva primeiro a seção ## CONCLUSÃO com EXATAMENTE este bloco — cada campo em sua própria linha, "
+        f"sem texto adicional dentro dos campos:\n\n"
+        f"Código CRM -> [código(s) do CRM/Ploomes  |  Qtd: X]\n"
+        f"Código ERP -> [código(s) do ERP/Innovaro  |  Qtd: X]\n"
+        f"Observação -> [somente o texto da observação do representante, nada mais]\n\n"
+        f"Código corrigido -> [APENAS o código corrigido, ex: 'CBHM5000 CA RD MM P750(I) M17 AN'. "
+        f"Se não houver divergência: 'Nenhuma correção necessária'. "
+        f"Se não encontrar no catálogo: 'Não encontrado no catálogo']\n\n"
+        f"   Depois do bloco, em linha separada, escreva APENAS: "
+        f"✅ PEDIDO CONSISTENTE  —  [motivo curto]\n"
+        f"   OU: ⚠️ DIVERGÊNCIA ENCONTRADA  —  [motivo curto]\n"
+        f"   (use ✅ somente quando NÃO há divergência; use ⚠️ somente quando HÁ divergência real)\n"
+        f"2. Em seguida, escreva o separador exato numa linha só: ===DETALHES===\n"
+        f"3. Depois do separador, escreva a análise técnica detalhada das siglas, catálogo e justificativas.\n\n"
+        f"REGRAS:\n"
+        f"- Uma divergência existe APENAS quando o código e a observação indicam características DIFERENTES.\n"
+        f"- NUNCA liste como divergência algo que está em acordo.\n"
+        f"- O código corrigido só pode ser sugerido se existir no catálogo fornecido.\n"
+        f"- Se não existir no catálogo, escreva 'Não encontrado no catálogo' no campo de código corrigido."
     )
 
 
