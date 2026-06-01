@@ -1,9 +1,39 @@
 'use strict';
 
+const COLUMNS = [
+    { id: 'regiao', label: 'Região' },
+    { id: 'uf', label: 'UF' },
+    { id: 'observacao', label: 'Observação' },
+    { id: 'localidade', label: 'Localidade' },
+    { id: 'chcriacao', label: 'Ch Criação' },
+    { id: 'emissao', label: 'Emissão' },
+    { id: 'prev_emissao', label: 'Prev. Emissão Doc' },
+    { id: 'programacao', label: 'Programação' },
+    { id: 'classe', label: 'Classe' },
+    { id: 'pessoa', label: 'Pessoa' },
+    { id: 'recurso_codigo', label: 'Recurso Código' },
+    { id: 'recurso_nome', label: 'Recurso Nome' },
+    { id: 'recurso_classe', label: 'Recurso Classe' },
+    { id: 'numero_serie', label: 'Número Série' },
+    { id: 'nucleo', label: 'Núcleo' },
+    { id: 'quantidade', label: 'Quantidade' },
+    { id: 'unitario', label: 'Unitário' },
+    { id: 'total', label: 'Total' },
+    { id: 'descricao', label: 'Descrição Genérica' },
+    { id: 'representante', label: 'Representante' },
+    { id: 'id_negociacao', label: 'ID Negociação' },
+    { id: 'acao', label: 'Ação', locked: true },
+];
+
+const COL_STORAGE_KEY = 'confPedidoVisibleColumns';
+
 let aguardandoCache = [];
 let conferidosCache = [];
 let activeTab = 'aguardando';
 let currentModalPedido = null;
+let currentPage = 1;
+let totalAguardando = 0;
+let totalPagesAguardando = 1;
 
 function formatDateInput(date) {
     const year = date.getFullYear();
@@ -51,6 +81,75 @@ function formatDecimal(value) {
     return numeric.toLocaleString('pt-BR', {
         minimumFractionDigits: 0,
         maximumFractionDigits: 4,
+    });
+}
+
+function loadColumnVisibility() {
+    try {
+        const stored = localStorage.getItem(COL_STORAGE_KEY);
+        if (stored) {
+            return JSON.parse(stored);
+        }
+    } catch {}
+    return Object.fromEntries(COLUMNS.map((col) => [col.id, true]));
+}
+
+function saveColumnVisibility(visibility) {
+    localStorage.setItem(COL_STORAGE_KEY, JSON.stringify(visibility));
+}
+
+function getVisibleColCount() {
+    const visibility = loadColumnVisibility();
+    return COLUMNS.filter((col) => visibility[col.id] !== false).length;
+}
+
+function applyColumnVisibility(visibility) {
+    let styleEl = document.getElementById('confPedidoColStyle');
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'confPedidoColStyle';
+        document.head.appendChild(styleEl);
+    }
+    const rules = COLUMNS
+        .filter((col) => visibility[col.id] === false)
+        .map((col) => `[data-col="${col.id}"] { display: none; }`)
+        .join('\n');
+    styleEl.textContent = rules;
+
+    const colCount = COLUMNS.filter((col) => visibility[col.id] !== false).length;
+    document.querySelectorAll('#confPedidoTableBody td[colspan]').forEach((td) => {
+        td.setAttribute('colspan', colCount);
+    });
+}
+
+function buildColunasDropdown(visibility) {
+    const menu = document.getElementById('colunasMenu');
+    if (!menu) return;
+
+    menu.innerHTML = COLUMNS
+        .filter((col) => !col.locked)
+        .map((col) => `
+            <div class="form-check mb-1">
+                <input
+                    class="form-check-input col-toggle-check"
+                    type="checkbox"
+                    id="colCheck_${col.id}"
+                    data-col-id="${col.id}"
+                    ${visibility[col.id] !== false ? 'checked' : ''}
+                >
+                <label class="form-check-label user-select-none" for="colCheck_${col.id}">
+                    ${col.label}
+                </label>
+            </div>
+        `).join('');
+
+    menu.querySelectorAll('.col-toggle-check').forEach((checkbox) => {
+        checkbox.addEventListener('change', () => {
+            const vis = loadColumnVisibility();
+            vis[checkbox.dataset.colId] = checkbox.checked;
+            saveColumnVisibility(vis);
+            applyColumnVisibility(vis);
+        });
     });
 }
 
@@ -172,13 +271,8 @@ function isConferido(row) {
     return Boolean(getConferenciaInfo(row));
 }
 
-function mergeConferenciaInfo(row) {
-    const info = getConferenciaInfo(row);
-    return info ? { ...row, conferencia: info } : row;
-}
-
 function updateTabCounts() {
-    document.getElementById('countAguardando').textContent = aguardandoCache.filter((row) => !isConferido(row)).length;
+    document.getElementById('countAguardando').textContent = totalAguardando;
     document.getElementById('countConferidos').textContent = conferidosCache.length;
 }
 
@@ -209,12 +303,76 @@ function getConferidosFiltros() {
     };
 }
 
-function getResultadosFiltrados() {
-    if (activeTab === 'conferidos') {
-        return conferidosCache;
+function getAguardandoFiltros() {
+    return {
+        data_inicio: document.getElementById('dataInicio')?.value || '',
+        data_fim: document.getElementById('dataFim')?.value || '',
+        classe: document.getElementById('filtroClasse')?.value || '',
+        pessoa: document.getElementById('filtroPessoa')?.value || '',
+        numero_serie: document.getElementById('filtroNumeroSerie')?.value || '',
+        id_negociacao: document.getElementById('filtroIdNegociacao')?.value || '',
+        chcriacao: document.getElementById('filtroChCriacao')?.value || '',
+    };
+}
+
+function renderPaginacao(page, totalPages) {
+    const nav = document.getElementById('confPedidoPaginacao');
+    const lista = document.getElementById('confPedidoPaginacaoLista');
+
+    if (activeTab !== 'aguardando' || totalPages <= 1) {
+        nav.style.display = 'none';
+        return;
     }
 
-    return aguardandoCache.filter((row) => !isConferido(row)).map(mergeConferenciaInfo);
+    nav.style.display = '';
+
+    const maxVisible = 5;
+    let startPage = Math.max(1, page - Math.floor(maxVisible / 2));
+    const endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    const items = [];
+
+    items.push(`<li class="page-item ${page === 1 ? 'disabled' : ''}">
+        <button class="page-link" data-page="${page - 1}" aria-label="Anterior">&laquo;</button>
+    </li>`);
+
+    if (startPage > 1) {
+        items.push(`<li class="page-item"><button class="page-link" data-page="1">1</button></li>`);
+        if (startPage > 2) {
+            items.push(`<li class="page-item disabled"><span class="page-link">&hellip;</span></li>`);
+        }
+    }
+
+    for (let p = startPage; p <= endPage; p++) {
+        items.push(`<li class="page-item ${p === page ? 'active' : ''}">
+            <button class="page-link" data-page="${p}">${p}</button>
+        </li>`);
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            items.push(`<li class="page-item disabled"><span class="page-link">&hellip;</span></li>`);
+        }
+        items.push(`<li class="page-item"><button class="page-link" data-page="${totalPages}">${totalPages}</button></li>`);
+    }
+
+    items.push(`<li class="page-item ${page === totalPages ? 'disabled' : ''}">
+        <button class="page-link" data-page="${page + 1}" aria-label="Próximo">&raquo;</button>
+    </li>`);
+
+    lista.innerHTML = items.join('');
+
+    lista.querySelectorAll('button[data-page]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const p = parseInt(btn.dataset.page, 10);
+            if (p >= 1 && p <= totalPages && p !== currentPage) {
+                buscarConfPedido(p);
+            }
+        });
+    });
 }
 
 function renderRows(rows) {
@@ -224,34 +382,34 @@ function renderRows(rows) {
         const emptyText = activeTab === 'conferidos'
             ? 'Nenhum pedido conferido encontrado.'
             : 'Nenhum pedido aguardando conferência neste período.';
-        tbody.innerHTML = `<tr><td colspan="22" class="text-center text-muted py-4">${emptyText}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${getVisibleColCount()}" class="text-center text-muted py-4">${emptyText}</td></tr>`;
         return;
     }
 
     tbody.innerHTML = rows.map((row) => `
         <tr>
-            <td>${escapeHtml(row.regiao_nome ?? 'N/D')}</td>
-            <td>${escapeHtml(row.uf_codigo ?? 'N/D')}</td>
-            <td>${escapeHtml(row.observacao ?? '')}</td>
-            <td>${escapeHtml(row.localidade_codigo ?? 'N/D')}</td>
-            <td>${escapeHtml(row.chcriacao ?? 'N/D')}</td>
-            <td>${escapeHtml(row.emissao ?? '')}</td>
-            <td>${escapeHtml(row.previsaoemissaodoc ?? '')}</td>
-            <td>${escapeHtml(row.programaca ?? '')}</td>
-            <td>${escapeHtml(row.classe_nome ?? 'N/D')}</td>
-            <td>${escapeHtml(row.pessoa_codigo ?? 'N/D')}</td>
-            <td>${renderItensResumo(row.itens || [])}</td>
-            <td>${escapeHtml(row.itens?.length === 1 ? (row.itens[0].recurso_nome ?? 'N/D') : `${row.itens?.length || 0} itens no pedido`)}</td>
-            <td>${escapeHtml(row.itens?.length === 1 ? (row.itens[0].recurso_classe_nome ?? 'N/D') : 'Múltiplas linhas')}</td>
-            <td>${renderSerieResumo(row.itens || [])}</td>
-            <td>${escapeHtml(row.nucleo_codigo ?? 'N/D')}</td>
-            <td>${formatDecimal(row.quantidade_total)}</td>
-            <td>${escapeHtml(row.itens?.length === 1 ? formatDecimal(row.itens[0].unitario) : 'Múltiplos')}</td>
-            <td>${formatDecimal(row.total_geral)}</td>
-            <td>${escapeHtml(row.itens?.length === 1 ? (row.itens[0].descricaogenerica ?? 'N/D') : 'Múltiplos')}</td>
-            <td>${escapeHtml(row.representa_codigo ?? 'N/D')}</td>
-            <td>${escapeHtml(row.id_negociacao ?? 'N/D')}</td>
-            <td>
+            <td data-col="regiao">${escapeHtml(row.regiao_nome ?? 'N/D')}</td>
+            <td data-col="uf">${escapeHtml(row.uf_codigo ?? 'N/D')}</td>
+            <td data-col="observacao">${escapeHtml(row.observacao ?? '')}</td>
+            <td data-col="localidade">${escapeHtml(row.localidade_codigo ?? 'N/D')}</td>
+            <td data-col="chcriacao">${escapeHtml(row.chcriacao ?? 'N/D')}</td>
+            <td data-col="emissao">${escapeHtml(row.emissao ?? '')}</td>
+            <td data-col="prev_emissao">${escapeHtml(row.previsaoemissaodoc ?? '')}</td>
+            <td data-col="programacao">${escapeHtml(row.programaca ?? '')}</td>
+            <td data-col="classe">${escapeHtml(row.classe_nome ?? 'N/D')}</td>
+            <td data-col="pessoa">${escapeHtml(row.pessoa_codigo ?? 'N/D')}</td>
+            <td data-col="recurso_codigo">${renderItensResumo(row.itens || [])}</td>
+            <td data-col="recurso_nome">${escapeHtml(row.itens?.length === 1 ? (row.itens[0].recurso_nome ?? 'N/D') : `${row.itens?.length || 0} itens no pedido`)}</td>
+            <td data-col="recurso_classe">${escapeHtml(row.itens?.length === 1 ? (row.itens[0].recurso_classe_nome ?? 'N/D') : 'Múltiplas linhas')}</td>
+            <td data-col="numero_serie">${renderSerieResumo(row.itens || [])}</td>
+            <td data-col="nucleo">${escapeHtml(row.nucleo_codigo ?? 'N/D')}</td>
+            <td data-col="quantidade">${formatDecimal(row.quantidade_total)}</td>
+            <td data-col="unitario">${escapeHtml(row.itens?.length === 1 ? formatDecimal(row.itens[0].unitario) : 'Múltiplos')}</td>
+            <td data-col="total">${formatDecimal(row.total_geral)}</td>
+            <td data-col="descricao">${escapeHtml(row.itens?.length === 1 ? (row.itens[0].descricaogenerica ?? 'N/D') : 'Múltiplos')}</td>
+            <td data-col="representante">${escapeHtml(row.representa_codigo ?? 'N/D')}</td>
+            <td data-col="id_negociacao">${escapeHtml(row.id_negociacao ?? 'N/D')}</td>
+            <td data-col="acao">
                 <button
                     type="button"
                     class="btn btn-sm btn-outline-primary btn-conferir-pedido"
@@ -460,11 +618,10 @@ async function carregarConferidos({ silent = false } = {}) {
     }
 }
 
-async function buscarConfPedido() {
-    const dataInicio = document.getElementById('dataInicio').value;
-    const dataFim = document.getElementById('dataFim').value;
+async function buscarConfPedido(page = 1) {
+    const filtros = getAguardandoFiltros();
 
-    if (!dataInicio || !dataFim) {
+    if (!filtros.data_inicio || !filtros.data_fim) {
         setStatus('Preencha a data emissão início e a data emissão fim.', 'warning');
         return;
     }
@@ -472,10 +629,9 @@ async function buscarConfPedido() {
     setStatus('Consultando itens da pendência comercial...', 'info');
 
     try {
-        const params = new URLSearchParams({
-            data_inicio: dataInicio,
-            data_fim: dataFim,
-        });
+        const params = new URLSearchParams(
+            Object.entries({ ...filtros, page: String(page) }).filter(([, value]) => value),
+        );
         const response = await fetch(`/comercial/api/conf-pedido/?${params.toString()}`);
         const data = await response.json();
 
@@ -483,15 +639,31 @@ async function buscarConfPedido() {
             throw new Error(data.error || 'Falha ao consultar registros.');
         }
 
+        currentPage = data.page ?? page;
+        totalAguardando = data.total ?? 0;
+        totalPagesAguardando = data.total_pages ?? 1;
+
         aguardandoCache = agruparPedidos(data.results || []);
         updateTabCounts();
-        renderRows(getResultadosFiltrados());
-        setTotal(getResultadosFiltrados().length);
-        setStatus(`Consulta concluída. ${aguardandoCache.length} pedido(s) encontrado(s).`, 'success');
+
+        if (activeTab === 'aguardando') {
+            renderRows(aguardandoCache);
+            setTotal(totalAguardando);
+            renderPaginacao(currentPage, totalPagesAguardando);
+        }
+
+        setStatus(
+            `Consulta concluída. ${totalAguardando} pedido(s) aguardando conferência.`,
+            'success',
+        );
     } catch (error) {
         aguardandoCache = [];
-        renderRows([]);
+        totalAguardando = 0;
+        totalPagesAguardando = 1;
+        currentPage = 1;
         updateTabCounts();
+        renderRows([]);
+        renderPaginacao(1, 1);
         setTotal(0);
         setStatus(error.message, 'danger');
     }
@@ -601,33 +773,53 @@ async function handleTabChange(tab) {
         await carregarConferidos();
         renderRows(conferidosCache);
         setTotal(conferidosCache.length);
+        renderPaginacao(1, 1);
         return;
     }
 
-    const filtrados = getResultadosFiltrados();
-    renderRows(filtrados);
-    setTotal(filtrados.length);
+    renderRows(aguardandoCache);
+    setTotal(totalAguardando);
+    renderPaginacao(currentPage, totalPagesAguardando);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    const colVisibility = loadColumnVisibility();
+    applyColumnVisibility(colVisibility);
+    buildColunasDropdown(colVisibility);
+
     setPeriodoPadrao();
     updateTabsUI();
     await carregarConferidos({ silent: true });
-    await buscarConfPedido();
+    await buscarConfPedido(1);
+
+    document.getElementById('btnToggleColunas').addEventListener('show.bs.dropdown', () => {
+        buildColunasDropdown(loadColumnVisibility());
+    });
 
     document.getElementById('tabAguardando').addEventListener('click', () => handleTabChange('aguardando'));
     document.getElementById('tabConferidos').addEventListener('click', () => handleTabChange('conferidos'));
     document.getElementById('btnFiltrarConferidos').addEventListener('click', () => handleTabChange('conferidos'));
+    document.getElementById('btnBuscarAguardando').addEventListener('click', () => buscarConfPedido(1));
+
     document.getElementById('dataInicio').addEventListener('change', () => {
         if (activeTab === 'aguardando') {
-            buscarConfPedido();
+            buscarConfPedido(1);
         }
     });
     document.getElementById('dataFim').addEventListener('change', () => {
         if (activeTab === 'aguardando') {
-            buscarConfPedido();
+            buscarConfPedido(1);
         }
     });
+
+    ['filtroClasse', 'filtroPessoa', 'filtroNumeroSerie', 'filtroIdNegociacao', 'filtroChCriacao'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && activeTab === 'aguardando') {
+                buscarConfPedido(1);
+            }
+        });
+    });
+
     document.getElementById('filtroConferidoPor').addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             handleTabChange('conferidos');
@@ -646,12 +838,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnMarcarConferido').addEventListener('click', async () => {
         try {
             await marcarPedidoComoConferido();
-            updateTabCounts();
-            await handleTabChange(activeTab);
 
             const modalEl = document.getElementById('modalConferirPedido');
-            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-            modal.hide();
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+
+            await buscarConfPedido(currentPage);
+            updateTabCounts();
             setStatus('Pedido marcado como conferido.', 'success');
         } catch (error) {
             setStatus(error.message, 'danger');
@@ -672,9 +864,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnConfirmarDesfazerConferencia').addEventListener('click', async () => {
         try {
             await desfazerConferenciaPedido();
-            updateTabCounts();
-            activeTab = 'aguardando';
-            await handleTabChange('aguardando');
 
             const modalEl = document.getElementById('modalConferirPedido');
             bootstrap.Modal.getOrCreateInstance(modalEl).hide();
@@ -682,6 +871,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const confirmModalEl = document.getElementById('modalConfirmarDesfazerConferencia');
             bootstrap.Modal.getOrCreateInstance(confirmModalEl).hide();
 
+            activeTab = 'aguardando';
+            updateTabsUI();
+            await buscarConfPedido(currentPage);
+            updateTabCounts();
             setStatus('Conferência desfeita. O pedido voltou para Aguardando conferência.', 'warning');
         } catch (error) {
             setStatus(error.message, 'danger');

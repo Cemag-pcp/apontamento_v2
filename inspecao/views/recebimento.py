@@ -631,7 +631,7 @@ def inspecionar_recebimento(request):
         if item:
             sheet_hash = item.sheet_hash
 
-    if InspecaoRecebimento.objects.filter(sheet_hash=sheet_hash).exists():
+    if InspecaoRecebimento.objects.filter(sheet_hash=sheet_hash, excluido=False).exists():
         return JsonResponse({"error": "Item ja inspecionado"}, status=409)
 
     inspetor_profile = Profile.objects.filter(user=request.user).first()
@@ -699,9 +699,20 @@ def excluir_recebimento_inspecao(request):
     if not registro_id:
         return JsonResponse({"error": "Campo 'id' obrigatório"}, status=400)
 
-    updated = InspecaoRecebimento.objects.filter(id=registro_id).update(excluido=True)
-    if not updated:
+    registro = InspecaoRecebimento.objects.filter(id=registro_id).first()
+    if not registro:
         return JsonResponse({"error": "Registro não encontrado"}, status=404)
+
+    with transaction.atomic():
+        registro.excluido = True
+        registro.save(update_fields=["excluido"])
+
+        if registro.item_id:
+            ainda_ativo = InspecaoRecebimento.objects.filter(
+                item_id=registro.item_id, excluido=False
+            ).exists()
+            if not ainda_ativo:
+                InspecaoRecebimentoItem.objects.filter(id=registro.item_id).update(inspecionado=False)
 
     return JsonResponse({"success": True}, status=200)
 
@@ -839,7 +850,22 @@ def excluir_recebimento_inspecao_lote(request):
     if not ids or not isinstance(ids, list):
         return JsonResponse({"error": "Campo 'ids' deve ser uma lista"}, status=400)
 
-    updated = InspecaoRecebimento.objects.filter(id__in=ids).update(excluido=True)
+    item_ids = list(
+        InspecaoRecebimento.objects.filter(id__in=ids, item__isnull=False)
+        .values_list("item_id", flat=True)
+        .distinct()
+    )
+
+    with transaction.atomic():
+        updated = InspecaoRecebimento.objects.filter(id__in=ids).update(excluido=True)
+
+        for item_id in item_ids:
+            ainda_ativo = InspecaoRecebimento.objects.filter(
+                item_id=item_id, excluido=False
+            ).exists()
+            if not ainda_ativo:
+                InspecaoRecebimentoItem.objects.filter(id=item_id).update(inspecionado=False)
+
     return JsonResponse({"success": True, "excluidos": updated}, status=200)
 
 

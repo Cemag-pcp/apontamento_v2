@@ -44,7 +44,9 @@
       "Bash(grep *)",
       "Bash(find *)",
       "Bash(dir -Recurse -Filter \"compras*\" -ErrorAction SilentlyContinue)",
-      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\\\\compras\" -Recurse -File)"
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\\\\compras\" -Recurse -File)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\" -Recurse -Filter \"urls.py\")",
+      "Bash(node *)"
     ]
   }
 }

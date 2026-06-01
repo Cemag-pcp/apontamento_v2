@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
@@ -58,12 +58,14 @@ def _serialize_conferencia(conferencia: ConferenciaPedido) -> dict:
     payload = ((conferencia.itens or [None])[0] or {}).copy()
     if not payload:
         payload = {
-            "chcriacao": conferencia.chave_pedido,
-            "id_negociacao": conferencia.deal_id,
             "observacao": conferencia.observacao,
             "emissao": conferencia.data_criacao,
             "pessoa_codigo": conferencia.contato,
         }
+
+    # Sempre garante as chaves de identificação do pedido a partir do banco
+    payload["chcriacao"] = conferencia.chave_pedido
+    payload["id_negociacao"] = conferencia.deal_id
 
     payload["conferencia"] = {
         "conferido_por": conferencia.conferido_por.get_full_name() or conferencia.conferido_por.username,
@@ -75,6 +77,32 @@ def _serialize_conferencia(conferencia: ConferenciaPedido) -> dict:
 @login_required
 def conf_pedido(request):
     return render(request, "comercial/conf_pedido.html")
+
+
+_PAGE_SIZE = 15
+_COLUMNS = [
+    {"key": "regiao_nome", "label": "Região"},
+    {"key": "uf_codigo", "label": "UF"},
+    {"key": "observacao", "label": "Observação"},
+    {"key": "localidade_codigo", "label": "Localidade"},
+    {"key": "chcriacao", "label": "Ch Criação"},
+    {"key": "emissao", "label": "Emissão"},
+    {"key": "previsaoemissaodoc", "label": "Prev. Emissão Doc"},
+    {"key": "programaca", "label": "Programação"},
+    {"key": "classe_nome", "label": "Classe"},
+    {"key": "pessoa_codigo", "label": "Pessoa"},
+    {"key": "recurso_codigo", "label": "Recurso Código"},
+    {"key": "recurso_nome", "label": "Recurso Nome"},
+    {"key": "recurso_classe_nome", "label": "Recurso Classe"},
+    {"key": "numero_serie", "label": "Número Série"},
+    {"key": "nucleo_codigo", "label": "Núcleo"},
+    {"key": "quantidade", "label": "Quantidade"},
+    {"key": "unitario", "label": "Unitário"},
+    {"key": "total", "label": "Total"},
+    {"key": "descricaogenerica", "label": "Descrição Genérica"},
+    {"key": "representa_codigo", "label": "Representante"},
+    {"key": "id_negociacao", "label": "ID Negociação"},
+]
 
 
 @login_required
@@ -95,49 +123,73 @@ def api_conf_pedido(request):
     if start_date > end_date:
         return JsonResponse({"error": "A data inicial não pode ser maior que a data final."}, status=400)
 
-    queryset = (
-        PendenciaImportacaoPlanilha.objects.filter(
-            ped_emissao__gte=start_date,
-            ped_emissao__lte=end_date,
-        )
-        .order_by(
-            "ped_emissao",
-            "ped_idnegociacao",
-            "ped_chcriacao",
-            "ped_recurso_codigo",
-            "ped_numeroserie",
+    filtro_classe = (request.GET.get("classe") or "").strip()
+    filtro_pessoa = (request.GET.get("pessoa") or "").strip()
+    filtro_numero_serie = (request.GET.get("numero_serie") or "").strip()
+    filtro_id_negociacao = (request.GET.get("id_negociacao") or "").strip()
+    filtro_chcriacao = (request.GET.get("chcriacao") or "").strip()
+
+    try:
+        page = max(1, int(request.GET.get("page", 1)))
+    except ValueError:
+        page = 1
+
+    qs = PendenciaImportacaoPlanilha.objects.filter(
+        ped_emissao__gte=start_date,
+        ped_emissao__lte=end_date,
+    ).exclude(
+        Exists(
+            ConferenciaPedido.objects.filter(
+                chave_pedido=OuterRef("ped_chcriacao"),
+                deal_id=OuterRef("ped_idnegociacao"),
+            )
         )
     )
 
-    resultados = [_serialize_pendencia(item) for item in queryset]
+    if filtro_classe:
+        qs = qs.filter(ped_classe_nome__icontains=filtro_classe)
+    if filtro_pessoa:
+        qs = qs.filter(ped_pessoa_codigo__icontains=filtro_pessoa)
+    if filtro_numero_serie:
+        qs = qs.filter(ped_numeroserie__icontains=filtro_numero_serie)
+    if filtro_id_negociacao:
+        qs = qs.filter(ped_idnegociacao__icontains=filtro_id_negociacao)
+    if filtro_chcriacao:
+        qs = qs.filter(ped_chcriacao__icontains=filtro_chcriacao)
+
+    order_keys = (
+        qs.values("ped_chcriacao", "ped_idnegociacao")
+        .distinct()
+        .order_by("ped_chcriacao", "ped_idnegociacao")
+    )
+
+    total_orders = order_keys.count()
+    total_pages = max(1, (total_orders + _PAGE_SIZE - 1) // _PAGE_SIZE)
+    page = min(page, total_pages)
+    start_idx = (page - 1) * _PAGE_SIZE
+    page_keys = list(order_keys[start_idx : start_idx + _PAGE_SIZE])
+
+    resultados = []
+    if page_keys:
+        key_filter = Q()
+        for key in page_keys:
+            key_filter |= Q(
+                ped_chcriacao=key["ped_chcriacao"],
+                ped_idnegociacao=key["ped_idnegociacao"],
+            )
+        items_qs = qs.filter(key_filter).order_by(
+            "ped_chcriacao", "ped_idnegociacao", "ped_recurso_codigo", "ped_numeroserie"
+        )
+        resultados = [_serialize_pendencia(item) for item in items_qs]
 
     return JsonResponse(
         {
             "results": resultados,
-            "total": len(resultados),
-            "columns": [
-                {"key": "regiao_nome", "label": "Região"},
-                {"key": "uf_codigo", "label": "UF"},
-                {"key": "observacao", "label": "Observação"},
-                {"key": "localidade_codigo", "label": "Localidade"},
-                {"key": "chcriacao", "label": "Ch Criação"},
-                {"key": "emissao", "label": "Emissão"},
-                {"key": "previsaoemissaodoc", "label": "Prev. Emissão Doc"},
-                {"key": "programaca", "label": "Programação"},
-                {"key": "classe_nome", "label": "Classe"},
-                {"key": "pessoa_codigo", "label": "Pessoa"},
-                {"key": "recurso_codigo", "label": "Recurso Código"},
-                {"key": "recurso_nome", "label": "Recurso Nome"},
-                {"key": "recurso_classe_nome", "label": "Recurso Classe"},
-                {"key": "numero_serie", "label": "Número Série"},
-                {"key": "nucleo_codigo", "label": "Núcleo"},
-                {"key": "quantidade", "label": "Quantidade"},
-                {"key": "unitario", "label": "Unitário"},
-                {"key": "total", "label": "Total"},
-                {"key": "descricaogenerica", "label": "Descrição Genérica"},
-                {"key": "representa_codigo", "label": "Representante"},
-                {"key": "id_negociacao", "label": "ID Negociação"},
-            ],
+            "total": total_orders,
+            "page": page,
+            "page_size": _PAGE_SIZE,
+            "total_pages": total_pages,
+            "columns": _COLUMNS,
         }
     )
 
