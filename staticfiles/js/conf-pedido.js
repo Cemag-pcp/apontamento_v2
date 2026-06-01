@@ -124,10 +124,17 @@ function applyColumnVisibility(visibility) {
 
 function buildColunasDropdown(visibility) {
     const menu = document.getElementById('colunasMenu');
-    if (!menu) return;
+    if (!menu) { console.error('[colunas] #colunasMenu não encontrado'); return; }
 
-    menu.innerHTML = COLUMNS
-        .filter((col) => !col.locked)
+    const cols = (typeof COLUMNS !== 'undefined' ? COLUMNS : []).filter((col) => !col.locked);
+    console.log('[colunas] populando', cols.length, 'colunas');
+
+    if (!cols.length) {
+        menu.innerHTML = '<p class="px-2 mb-0 text-muted small">Nenhuma coluna disponível.</p>';
+        return;
+    }
+
+    menu.innerHTML = cols
         .map((col) => `
             <div class="form-check mb-1">
                 <input
@@ -783,18 +790,19 @@ async function handleTabChange(tab) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const colVisibility = loadColumnVisibility();
-    applyColumnVisibility(colVisibility);
-    buildColunasDropdown(colVisibility);
+    document.getElementById('btnToggleColunas').addEventListener('show.bs.dropdown', () => {
+        buildColunasDropdown(loadColumnVisibility());
+    });
+
+    try {
+        applyColumnVisibility(loadColumnVisibility());
+        buildColunasDropdown(loadColumnVisibility());
+    } catch (_) { /* populate on first open */ }
 
     setPeriodoPadrao();
     updateTabsUI();
     await carregarConferidos({ silent: true });
     await buscarConfPedido(1);
-
-    document.getElementById('btnToggleColunas').addEventListener('show.bs.dropdown', () => {
-        buildColunasDropdown(loadColumnVisibility());
-    });
 
     document.getElementById('tabAguardando').addEventListener('click', () => handleTabChange('aguardando'));
     document.getElementById('tabConferidos').addEventListener('click', () => handleTabChange('conferidos'));

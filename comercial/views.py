@@ -2,7 +2,8 @@ import json
 from datetime import datetime
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef, Q, Value
+from django.db.models.functions import Replace
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
@@ -153,7 +154,14 @@ def api_conf_pedido(request):
     if filtro_numero_serie:
         qs = qs.filter(ped_numeroserie__icontains=filtro_numero_serie)
     if filtro_id_negociacao:
-        qs = qs.filter(ped_idnegociacao__icontains=filtro_id_negociacao)
+        filtro_id_negociacao_limpo = filtro_id_negociacao.replace(".", "").replace(" ", "")
+        qs = qs.annotate(
+            _id_neg_limpo=Replace(
+                Replace("ped_idnegociacao", Value("."), Value("")),
+                Value(" "),
+                Value(""),
+            )
+        ).filter(_id_neg_limpo__icontains=filtro_id_negociacao_limpo)
     if filtro_chcriacao:
         qs = qs.filter(ped_chcriacao__icontains=filtro_chcriacao)
 

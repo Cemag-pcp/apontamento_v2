@@ -84,14 +84,20 @@ function formatDecimal(value) {
     });
 }
 
+const DEFAULT_VISIBLE_COLUMNS = new Set([
+    'chcriacao', 'emissao', 'prev_emissao', 'pessoa',
+    'recurso_codigo', 'numero_serie', 'total', 'id_negociacao', 'acao',
+]);
+
 function loadColumnVisibility() {
     try {
         const stored = localStorage.getItem(COL_STORAGE_KEY);
-        if (stored) {
-            return JSON.parse(stored);
+        const parsed = stored ? JSON.parse(stored) : null;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return parsed;
         }
     } catch {}
-    return Object.fromEntries(COLUMNS.map((col) => [col.id, true]));
+    return Object.fromEntries(COLUMNS.map((col) => [col.id, DEFAULT_VISIBLE_COLUMNS.has(col.id)]));
 }
 
 function saveColumnVisibility(visibility) {
@@ -124,10 +130,17 @@ function applyColumnVisibility(visibility) {
 
 function buildColunasDropdown(visibility) {
     const menu = document.getElementById('colunasMenu');
-    if (!menu) return;
+    if (!menu) { console.error('[colunas] #colunasMenu não encontrado'); return; }
 
-    menu.innerHTML = COLUMNS
-        .filter((col) => !col.locked)
+    const cols = (typeof COLUMNS !== 'undefined' ? COLUMNS : []).filter((col) => !col.locked);
+    console.log('[colunas] populando', cols.length, 'colunas');
+
+    if (!cols.length) {
+        menu.innerHTML = '<p class="px-2 mb-0 text-muted small">Nenhuma coluna disponível.</p>';
+        return;
+    }
+
+    menu.innerHTML = cols
         .map((col) => `
             <div class="form-check mb-1">
                 <input
@@ -652,10 +665,7 @@ async function buscarConfPedido(page = 1) {
             renderPaginacao(currentPage, totalPagesAguardando);
         }
 
-        setStatus(
-            `Consulta concluída. ${totalAguardando} pedido(s) aguardando conferência.`,
-            'success',
-        );
+        document.getElementById('confPedidoStatus').style.display = 'none';
     } catch (error) {
         aguardandoCache = [];
         totalAguardando = 0;
@@ -783,18 +793,17 @@ async function handleTabChange(tab) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const colVisibility = loadColumnVisibility();
-    applyColumnVisibility(colVisibility);
-    buildColunasDropdown(colVisibility);
+    document.getElementById('btnToggleColunas').addEventListener('show.bs.dropdown', () => {
+        buildColunasDropdown(loadColumnVisibility());
+    });
+
+    applyColumnVisibility(loadColumnVisibility());
+    buildColunasDropdown(loadColumnVisibility());
 
     setPeriodoPadrao();
     updateTabsUI();
     await carregarConferidos({ silent: true });
     await buscarConfPedido(1);
-
-    document.getElementById('btnToggleColunas').addEventListener('show.bs.dropdown', () => {
-        buildColunasDropdown(loadColumnVisibility());
-    });
 
     document.getElementById('tabAguardando').addEventListener('click', () => handleTabChange('aguardando'));
     document.getElementById('tabConferidos').addEventListener('click', () => handleTabChange('conferidos'));
