@@ -1163,8 +1163,7 @@ def indicador_serra_analise_temporal(request):
         )
         .values("mes")
         .annotate(
-            qtd_peca_produzida=Count("id"),
-            qtd_peca_inspecionada=Count("dadosexecucaoinspecao__id"),
+            qtd_peca_produzida=Sum("qtd_boa"),
             soma_conformidade=Sum("conformidade"),
             soma_nao_conformidade=Sum("nao_conformidade"),
         )
@@ -1181,7 +1180,7 @@ def indicador_serra_analise_temporal(request):
             "mes": item["mes"][:7],
             "setor": "serra",
             "qtd_peca_produzida": item["qtd_peca_produzida"] or 0,
-            "qtd_peca_inspecionada": item["qtd_peca_inspecionada"] or 0,
+            "qtd_peca_inspecionada": conformidade + nao_conformidade,
             "taxa_nao_conformidade": round(taxa_nc, 4),
         })
 
@@ -1218,8 +1217,8 @@ def indicador_serra_resumo_analise_temporal(request):
         )
         .values("ano", "mes_num")
         .annotate(
-            total_produzida=Count("id"),
-            total_inspecionada=Count("dadosexecucaoinspecao__id"),
+            total_produzida=Sum("qtd_boa"),
+            total_inspecionada=Sum(F("dadosexecucaoinspecao__conformidade") + F("dadosexecucaoinspecao__nao_conformidade")),
             total_nao_conforme=Sum("dadosexecucaoinspecao__nao_conformidade"),
         )
         .order_by("ano", "mes_num")
