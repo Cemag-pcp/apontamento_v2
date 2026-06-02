@@ -1003,7 +1003,7 @@ def api_recebimento_por_fornecedor(request):
     df = _parse_date(request.GET.get("data_fim"))
 
     params = []
-    where  = ["excluido = FALSE", "dados->>'Fornecedor' IS NOT NULL", "dados->>'Fornecedor' <> ''"]
+    where  = ["excluido = FALSE"]
     if di:
         where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
         params.append(di)
@@ -1013,7 +1013,7 @@ def api_recebimento_por_fornecedor(request):
 
     sql = f"""
         SELECT
-            dados->>'Fornecedor'                                       AS fornecedor,
+            COALESCE(NULLIF(TRIM(dados->>'Fornecedor'), ''), '(Sem fornecedor)') AS fornecedor,
             COUNT(*)                                                    AS total,
             COUNT(*) FILTER (WHERE resultado = 'conforme')              AS conforme,
             COUNT(*) FILTER (WHERE resultado = 'nao_conforme')          AS nao_conforme
