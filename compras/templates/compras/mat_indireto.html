@@ -1,7 +1,7 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% load static %}
 
-{% block title %}<title>Análise de Compras</title>{% endblock %}
+{% block title %}<title>Análise de Compras — Material Indireto</title>{% endblock %}
 
 {% block links %}
 <link rel="stylesheet" href="{% static 'css/compras.css' %}">
@@ -20,7 +20,7 @@
 <div class="container-fluid mt-3">
 
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h4 class="compras-section-title mb-0">Análise de Compras — Material Direto</h4>
+        <h4 class="compras-section-title mb-0">Análise de Compras — Material Indireto</h4>
         <div class="d-flex gap-2 flex-wrap align-items-center">
             <span id="ultimaAtualizacao" class="text-muted small"></span>
             <button class="btn btn-sm btn-outline-secondary" id="btnRefresh">
@@ -200,7 +200,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>window.COMPRAS_API_BASE = '/compras/';</script>
+<script>window.COMPRAS_API_BASE = '/compras/mat_indireto/';</script>
 <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
 <script src="{% static 'js/compras.js' %}"></script>
 {% endblock %}

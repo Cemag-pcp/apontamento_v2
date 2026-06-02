@@ -200,7 +200,7 @@ def _calcular_datas_projecao(row, df_pedidos, horizonte_dias_uteis=365):
     }
 
 
-def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd.DataFrame) -> dict:
+def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd.DataFrame, skip_first_row: bool = True) -> dict:
     grupo_df = pd.read_csv(DATA_DIR / 'agrupamento_chapas.csv', sep=';')
     grupos_df = pd.read_csv(DATA_DIR / 'grupos_atualizados.csv', sep=',')
     grupos_df = grupos_df.rename(columns={'Código': 'codigo'} if 'Código' in grupos_df.columns else {})
@@ -211,17 +211,17 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
     simulacao_aliases = {
         'codigo': ['Código', 'Código', 'codigo'],
         'descricao': ['Descrição', 'Descrição', 'DescriÃ§Ã£o', 'descricao'],
-        'media_3m': ['Média 3M', 'MÃ©dia 3M', 'media 3m'],
-        'cons_mes_anterior': ['Cons Mes Anterior', 'Cons Mes\nAnterior'],
-        'simulado_pend_vendas': ['Simulado Pend Vendas', 'Simulado \nPend Vendas'],
-        'estoque_almox': ['Est.Almox Central'],
+        'media_3m': ['Média 3M', 'MÃ©dia 3M', 'media 3m', 'Média'],
+        'cons_mes_anterior': ['Cons Mes Anterior', 'Cons Mes\nAnterior', 'CMA'],
+        'simulado_pend_vendas': ['Simulado Pend Vendas', 'Simulado \nPend Vendas', 'Simulado'],
+        'estoque_almox': ['Est.Almox Central', 'Qtd.Est.'],
         'est_producao': ['Est. Produção', 'Est. ProduÃ§Ã£o'],
-        'estoque_total': ['Estoque Total'],
-        'ped_compras_pendente': ['Ped.Compras Pendente', 'Ped.Compras\n Pendente'],
+        'estoque_total': ['Estoque Total', 'Est Total'],
+        'ped_compras_pendente': ['Ped.Compras Pendente', 'Ped.Compras\n Pendente', 'Pedidos Pend.'],
         'prev_consumo': ['Prev Con Mov Est(CMM)'],
         'simulacao': ['SIMULAÇÃO / (F.Pend/Fat.MM)', 'SIMULAÃ‡ÃƒO / (F.Pend/Fat.MM)', 'SIMULACAO / (F.Pend/Fat.MM)'],
-        'dee_dias_em_est': ['DEE - Dias Em Est.'],
-        'dias_ressupr': ['Dias Ressupr', 'Dias\nRessupr'],
+        'dee_dias_em_est': ['DEE - Dias Em Est.', 'DEE'],
+        'dias_ressupr': ['Dias Ressupr', 'Dias\nRessupr', 'TRP'],
         'dias_seg': ['Dias de seg.'],
         'estoque_minimo': ['Estoque Mínimo', 'Estoque MÃ­nimo', 'Estoque Minimo'],
     }
@@ -321,7 +321,7 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
 
     hoje = datetime.now().date()
     df['dias_ate_estoque_minimo'] = df.apply(
-        lambda row: (row['estoque_almox'] - row['estoque_minimo']) / row['consumo_diario']
+        lambda row: (row['estoque_almox'] - row.get('estoque_minimo', 0)) / row['consumo_diario']
         if row['consumo_diario'] > 0 else None,
         axis=1,
     )
@@ -363,7 +363,7 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
     mask_pedido = (df['flag_urgencia'] == 'URGENTE') & (df['ped_compras_pendente'] > 0)
     df.loc[mask_pedido, 'flag_urgencia'] = 'URGENTE_COM_PEDIDO'
 
-    if len(df) > 1:
+    if skip_first_row and len(df) > 1:
         df = df.iloc[1:].reset_index(drop=True)
 
     materiais = []

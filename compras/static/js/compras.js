@@ -1,6 +1,8 @@
 /* compras.js - Analise de Compras */
 'use strict';
 
+const API_BASE = window.COMPRAS_API_BASE || '/compras/';
+
 const URGENCY_ROW_CLASS = {
     PEDIDO_ATRASADO:   'urg-pedido',
     URGENTE:           'urg-critico',
@@ -67,7 +69,7 @@ async function carregarCotacaoDolar(forceRefresh = false) {
 
     try {
         const qs = new URLSearchParams(forceRefresh ? { refresh: '1' } : {});
-        const resp = await fetch(`/compras/api/dolar/${qs.toString() ? `?${qs.toString()}` : ''}`);
+        const resp = await fetch(`${API_BASE}api/dolar/${qs.toString() ? `?${qs.toString()}` : ''}`);
         const data = await resp.json();
         if (!resp.ok || data.error) throw new Error(data.error || 'Falha ao consultar cotacao.');
 
@@ -137,7 +139,7 @@ async function carregarMateriais(params = {}, forceRefresh = false) {
 
     let data;
     try {
-        const resp = await fetch(`/compras/api/material-direto/?${qs}`);
+        const resp = await fetch(`${API_BASE}api/material-direto/?${qs}`);
         data = await resp.json();
         if (data.error) throw new Error(data.error);
     } catch (e) {
@@ -292,7 +294,7 @@ async function carregarProjecao(codigo, descricao) {
 
     let data;
     try {
-        const resp = await fetch(`/compras/api/projecao/?codigo=${encodeURIComponent(codigo)}`);
+        const resp = await fetch(`${API_BASE}api/projecao/?codigo=${encodeURIComponent(codigo)}`);
         data = await resp.json();
         if (data.error) throw new Error(data.error);
     } catch (e) {
@@ -547,7 +549,7 @@ function _mostrarAnalise(texto, criadoEm, fromCache) {
 
 async function _verificarCacheAnaliseIA(codigo) {
     try {
-        const resp = await fetch(`/compras/api/analise-ia/?codigo=${encodeURIComponent(codigo)}&check_only=1`);
+        const resp = await fetch(`${API_BASE}api/analise-ia/?codigo=${encodeURIComponent(codigo)}&check_only=1`);
         const data = await resp.json();
         if (data.analise) {
             _mostrarAnalise(data.analise, data.criado_em, true);
@@ -571,7 +573,7 @@ async function carregarAnaliseIA(force = false) {
     if (force) qs.set('force', '1');
 
     try {
-        const resp = await fetch(`/compras/api/analise-ia/?${qs}`);
+        const resp = await fetch(`${API_BASE}api/analise-ia/?${qs}`);
         const data = await resp.json();
         if (data.error) throw new Error(data.error);
         _mostrarAnalise(data.analise, data.criado_em, data.from_cache);
