@@ -431,6 +431,18 @@
     cursor: not-allowed;
 }
 
+.maquinas-table {
+    table-layout: fixed;
+}
+
+.maquinas-table .col-actions {
+    width: 120px;
+}
+
+.maquinas-table tbody td:last-child {
+    text-align: right;
+}
+
 @media (max-width: 991.98px) {
     .operators-topbar,
     .operators-actions-bar,
