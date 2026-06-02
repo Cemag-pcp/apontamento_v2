@@ -25,9 +25,11 @@ function fmtPct(n) {
 }
 
 function getParams() {
+    const tipoData = document.querySelector('input[name="tipoData"]:checked')?.value || 'inspecao';
     return {
         data_inicio: document.getElementById('startDate').value || '',
         data_fim:    document.getElementById('endDate').value   || '',
+        tipo_data:   tipoData,
     };
 }
 
