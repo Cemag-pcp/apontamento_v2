@@ -2574,19 +2574,17 @@ def imprimir_ordens_montagem(itens_agrupado_filtrado):#data_carga_str, ):
 
     impressas = 0
     ultima_celula = None
-    # ultima_carga = None
+    zpl_batch = []
 
     itens_agrupado_filtrado = itens_agrupado_filtrado.sort_values(['Célula','Datas'])
-    
+
     for index, row in itens_agrupado_filtrado.iterrows():
-        
-        # retirando codigos_excluir da coluna peca
-        # precisa ser like pois o codigo contem a descrição
+
         if any(codigo in str(row['Código']) for codigo in CODIGOS_EXCLUIR):
             continue
-        
+
         celula_atual = row['Célula']
-        carga_atual = row['Carga']  # ou pega do peca.ordem se houver campo específico
+        carga_atual = row['Carga']
         data_carga = pd.to_datetime(row["Datas"], errors="coerce")
         data_carga_fmt = data_carga.strftime("%d/%m/%Y") if pd.notna(data_carga) else ""
 
@@ -2594,66 +2592,37 @@ def imprimir_ordens_montagem(itens_agrupado_filtrado):#data_carga_str, ):
         if qtd <= 0:
             continue
 
-        # IMPRIME ETIQUETA DE TROCA DE CÉLULA
         if celula_atual != ultima_celula:
             print(f"indo para celula {celula_atual}")
-
-            zpl_celula = f"""
-^XA
+            zpl_batch.append(f"""^XA
 ^CI28
 ^PW560
 ^LL240
 ^LT0
 ^LH0,0
-
-^FX CÉLULA
 ^FO10,35^A0N,32,32^FB540,1,0,C,0^FD{celula_atual}^FS
-
-^XZ
-
-""".lstrip()
-            chamar_impressora_pecas_montagem(zpl_celula)
+^XZ""")
             ultima_celula = celula_atual
 
         for _ in range(qtd):
-            zpl = f"""
-^XA
+            zpl_batch.append(f"""^XA
 ^MMT
 ^PW560
 ^LL220
 ^LS0
 ^PR1,1,1
 ~SD14
-
-^FO25,10
-^A0N,28,28
-^FB525,2,0,L,0
-^FD{f'{row["Código"]}-{str(row["Peca"])[:80]}-{qtd}un.'}^FS
-
-^FO25,80
-^A0N,24,24
-^FB525,1,0,L,0
-^FDCelula: {celula_atual}^FS
-
-^FO25,130
-^A0N,24,24
-^FB525,1,0,L,0
-^FDCarga: {carga_atual}^FS
-
-^FO25,180
-^A0N,24,24
-^FB525,1,0,L,0
-^FDDt. Carga: {data_carga_fmt}^FS
-
-^PQ1,0,0
-^XZ
-
-""".strip()
-            chamar_impressora_pecas_montagem(zpl)
+^FO25,10^A0N,28,28^FB525,2,0,L,0^FD{row["Código"]}-{str(row["Peca"])[:80]}-{qtd}un.^FS
+^FO25,80^A0N,24,24^FB525,1,0,L,0^FDCelula: {celula_atual}^FS
+^FO25,130^A0N,24,24^FB525,1,0,L,0^FDCarga: {carga_atual}^FS
+^FO25,180^A0N,24,24^FB525,1,0,L,0^FDDt. Carga: {data_carga_fmt}^FS
+^XZ""")
             impressas += 1
 
     if impressas == 0:
         return ({"error": "Nenhuma etiqueta a imprimir (qtd_planejada <= 0)."}, 422)
+
+    chamar_impressora_pecas_montagem("\n".join(zpl_batch))
 
     return ({"message": "Impressão enviada com sucesso.", "total_etiquetas": impressas}, 200)
 
