@@ -24,6 +24,19 @@
             <div class="card-header ch-teal">Filtrar por Período</div>
             <div class="card-body">
                 <form class="row g-3">
+                    <div class="col-12 mb-1">
+                        <label class="form-label form-label-sm mb-1">Filtrar por</label>
+                        <div class="d-flex gap-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipoData" id="tipoInspecao" value="inspecao" checked>
+                                <label class="form-check-label" for="tipoInspecao">Data de Inspeção</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipoData" id="tipoRecebimento" value="recebimento">
+                                <label class="form-check-label" for="tipoRecebimento">Data de Recebimento</label>
+                            </div>
+                        </div>
+                    </div>
                     <div class="col-md-4">
                         <label for="startDate" class="form-label form-label-sm">Data Inicial</label>
                         <input type="date" class="form-control form-control-sm" id="startDate">

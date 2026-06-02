@@ -921,12 +921,40 @@ def _parse_date(value):
         return None
 
 
-def _filtrar_qs(qs, data_inicio, data_fim):
-    if data_inicio:
-        qs = qs.filter(data_inspecao__date__gte=data_inicio)
-    if data_fim:
-        qs = qs.filter(data_inspecao__date__lte=data_fim)
+def _filtrar_qs(qs, data_inicio, data_fim, tipo_data='inspecao'):
+    if tipo_data == 'recebimento':
+        if data_inicio:
+            qs = qs.filter(item__data_referencia__gte=data_inicio)
+        if data_fim:
+            qs = qs.filter(item__data_referencia__lte=data_fim)
+    else:
+        if data_inicio:
+            qs = qs.filter(data_inspecao__date__gte=data_inicio)
+        if data_fim:
+            qs = qs.filter(data_inspecao__date__lte=data_fim)
     return qs
+
+
+def _build_date_filter(tipo_data, di, df, params):
+    """Returns (join_sql, where_conditions) and appends date params to params list."""
+    where = []
+    if tipo_data == 'recebimento':
+        join_sql = "JOIN inspecao_inspecaorecebimentoitem iri ON iri.id = ir.item_id"
+        if di:
+            where.append("iri.data_referencia >= %s")
+            params.append(di)
+        if df:
+            where.append("iri.data_referencia <= %s")
+            params.append(df)
+    else:
+        join_sql = ""
+        if di:
+            where.append("(ir.data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
+            params.append(di)
+        if df:
+            where.append("(ir.data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date <= %s")
+            params.append(df)
+    return join_sql, where
 
 
 def api_recebimento_resumo(request):
@@ -935,12 +963,19 @@ def api_recebimento_resumo(request):
 
     di = _parse_date(request.GET.get("data_inicio"))
     df = _parse_date(request.GET.get("data_fim"))
+    tipo_data = request.GET.get("tipo_data", "inspecao")
 
-    qs = _filtrar_qs(InspecaoRecebimento.objects.filter(excluido=False), di, df)
+    qs = _filtrar_qs(InspecaoRecebimento.objects.filter(excluido=False), di, df, tipo_data)
     total      = qs.count()
     conforme   = qs.filter(resultado="conforme").count()
     nc         = qs.filter(resultado="nao_conforme").count()
-    pendentes  = InspecaoRecebimentoItem.objects.filter(inspecionado=False, excluido=False).count()
+
+    pendentes_qs = InspecaoRecebimentoItem.objects.filter(inspecionado=False, excluido=False)
+    if di:
+        pendentes_qs = pendentes_qs.filter(data_referencia__gte=di)
+    if df:
+        pendentes_qs = pendentes_qs.filter(data_referencia__lte=df)
+    pendentes = pendentes_qs.count()
 
     return JsonResponse({
         "total": total,
@@ -958,23 +993,25 @@ def api_recebimento_analise_temporal(request):
 
     di = _parse_date(request.GET.get("data_inicio"))
     df = _parse_date(request.GET.get("data_fim"))
+    tipo_data = request.GET.get("tipo_data", "inspecao")
 
     params = []
-    where  = ["excluido = FALSE"]
-    if di:
-        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
-        params.append(di)
-    if df:
-        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date <= %s")
-        params.append(df)
+    join_sql, date_where = _build_date_filter(tipo_data, di, df, params)
+    where = ["ir.excluido = FALSE"] + date_where
+
+    if tipo_data == 'recebimento':
+        date_trunc = "DATE_TRUNC('month', iri.data_referencia)"
+    else:
+        date_trunc = "DATE_TRUNC('month', ir.data_inspecao AT TIME ZONE 'America/Sao_Paulo')"
 
     sql = f"""
         SELECT
-            TO_CHAR(DATE_TRUNC('month', data_inspecao AT TIME ZONE 'America/Sao_Paulo'), 'YYYY-MM') AS mes,
+            TO_CHAR({date_trunc}, 'YYYY-MM')                                       AS mes,
             COUNT(*)                                                                AS total,
-            COUNT(*) FILTER (WHERE resultado = 'conforme')                         AS conforme,
-            COUNT(*) FILTER (WHERE resultado = 'nao_conforme')                     AS nao_conforme
-        FROM inspecao_inspecaorecebimento
+            COUNT(*) FILTER (WHERE ir.resultado = 'conforme')                      AS conforme,
+            COUNT(*) FILTER (WHERE ir.resultado = 'nao_conforme')                  AS nao_conforme
+        FROM inspecao_inspecaorecebimento ir
+        {join_sql}
         WHERE {' AND '.join(where)}
         GROUP BY 1
         ORDER BY 1
@@ -1001,23 +1038,20 @@ def api_recebimento_por_fornecedor(request):
 
     di = _parse_date(request.GET.get("data_inicio"))
     df = _parse_date(request.GET.get("data_fim"))
+    tipo_data = request.GET.get("tipo_data", "inspecao")
 
     params = []
-    where  = ["excluido = FALSE"]
-    if di:
-        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
-        params.append(di)
-    if df:
-        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date <= %s")
-        params.append(df)
+    join_sql, date_where = _build_date_filter(tipo_data, di, df, params)
+    where = ["ir.excluido = FALSE"] + date_where
 
     sql = f"""
         SELECT
-            COALESCE(NULLIF(TRIM(dados->>'Fornecedor'), ''), '(Sem fornecedor)') AS fornecedor,
+            COALESCE(NULLIF(TRIM(ir.dados->>'Fornecedor'), ''), '(Sem fornecedor)') AS fornecedor,
             COUNT(*)                                                    AS total,
-            COUNT(*) FILTER (WHERE resultado = 'conforme')              AS conforme,
-            COUNT(*) FILTER (WHERE resultado = 'nao_conforme')          AS nao_conforme
-        FROM inspecao_inspecaorecebimento
+            COUNT(*) FILTER (WHERE ir.resultado = 'conforme')          AS conforme,
+            COUNT(*) FILTER (WHERE ir.resultado = 'nao_conforme')      AS nao_conforme
+        FROM inspecao_inspecaorecebimento ir
+        {join_sql}
         WHERE {' AND '.join(where)}
         GROUP BY 1
         ORDER BY nao_conforme DESC, total DESC
@@ -1039,22 +1073,19 @@ def api_recebimento_por_classe(request):
 
     di = _parse_date(request.GET.get("data_inicio"))
     df = _parse_date(request.GET.get("data_fim"))
+    tipo_data = request.GET.get("tipo_data", "inspecao")
 
     params = []
-    where  = ["excluido = FALSE"]
-    if di:
-        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
-        params.append(di)
-    if df:
-        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date <= %s")
-        params.append(df)
+    join_sql, date_where = _build_date_filter(tipo_data, di, df, params)
+    where = ["ir.excluido = FALSE"] + date_where
 
     sql = f"""
         SELECT
-            COALESCE(NULLIF(dados->>'Classe de Inspeção', ''), 'Não informado') AS classe,
-            COUNT(*)                                                              AS total,
-            COUNT(*) FILTER (WHERE resultado = 'nao_conforme')                   AS nao_conforme
-        FROM inspecao_inspecaorecebimento
+            COALESCE(NULLIF(ir.dados->>'Classe de Inspeção', ''), 'Não informado') AS classe,
+            COUNT(*)                                                                AS total,
+            COUNT(*) FILTER (WHERE ir.resultado = 'nao_conforme')                  AS nao_conforme
+        FROM inspecao_inspecaorecebimento ir
+        {join_sql}
         WHERE {' AND '.join(where)}
         GROUP BY 1
         ORDER BY total DESC
@@ -1075,23 +1106,20 @@ def api_recebimento_por_tipo_material(request):
 
     di = _parse_date(request.GET.get("data_inicio"))
     df = _parse_date(request.GET.get("data_fim"))
+    tipo_data = request.GET.get("tipo_data", "inspecao")
 
     params = []
-    where  = ["excluido = FALSE"]
-    if di:
-        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date >= %s")
-        params.append(di)
-    if df:
-        where.append("(data_inspecao AT TIME ZONE 'America/Sao_Paulo')::date <= %s")
-        params.append(df)
+    join_sql, date_where = _build_date_filter(tipo_data, di, df, params)
+    where = ["ir.excluido = FALSE"] + date_where
 
     sql = f"""
         SELECT
-            COALESCE(NULLIF(dados->>'Tipo de material', ''), 'Não informado') AS tipo,
-            COUNT(*)                                                            AS total,
-            COUNT(*) FILTER (WHERE resultado = 'conforme')                     AS conforme,
-            COUNT(*) FILTER (WHERE resultado = 'nao_conforme')                 AS nao_conforme
-        FROM inspecao_inspecaorecebimento
+            COALESCE(NULLIF(ir.dados->>'Tipo de material', ''), 'Não informado') AS tipo,
+            COUNT(*)                                                               AS total,
+            COUNT(*) FILTER (WHERE ir.resultado = 'conforme')                     AS conforme,
+            COUNT(*) FILTER (WHERE ir.resultado = 'nao_conforme')                 AS nao_conforme
+        FROM inspecao_inspecaorecebimento ir
+        {join_sql}
         WHERE {' AND '.join(where)}
         GROUP BY 1
         ORDER BY total DESC
