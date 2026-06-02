@@ -393,21 +393,9 @@ async function gerarEtiquetaQrCode() {
                 chk.checked = true;
                 chk.onchange = e => {
                     const cardAtual = e.target.closest(".card-carga-montagem");
-                    if (!e.target.checked) {
-                        cardAtual.querySelectorAll('input[name="recursoMontagem"]').forEach(recurso => {
-                            recurso.checked = false;
-                        });
-                        cardAtual.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
-                            cel.checked = false;
-                        });
-                    } else {
-                        cardAtual.querySelectorAll('input[name="recursoMontagem"]').forEach(recurso => {
-                            recurso.checked = true;
-                        });
-                        cardAtual.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
-                            cel.checked = true;
-                        });
-                    }
+                    cardAtual.querySelectorAll('input[name="celulaMontagem"]').forEach(cel => {
+                        cel.checked = e.target.checked;
+                    });
                 };
 
                 header.appendChild(chk);
@@ -431,51 +419,28 @@ async function gerarEtiquetaQrCode() {
                 header.appendChild(titleWrap);
                 card.appendChild(header);
 
-                const ul = document.createElement("ul");
-                ul.style.margin = "0 0 0 28px";
-                ul.style.padding = "0";
-                itens.forEach(it => {
-                    const li = document.createElement("li");
-                    li.style.listStyle = "none";
-                    li.style.margin = "4px 0";
-
-                    const lbl = document.createElement("label");
-                    lbl.style.display = "flex";
-                    lbl.style.alignItems = "center";
-                    lbl.style.gap = "6px";
-
-                    const recursoChk = document.createElement("input");
-                    recursoChk.type = "checkbox";
-                    recursoChk.name = "recursoMontagem";
-                    recursoChk.classList.add("recurso-montagem-checkbox");
-                    recursoChk.value = it.codigo_recurso;
-                    recursoChk.dataset.codigoRecurso = it.codigo_recurso;
-                    recursoChk.checked = true;
-                    recursoChk.onchange = e => {
-                        if (e.target.checked) {
-                            const cardAtual = e.target.closest(".card-carga-montagem");
-                            const chkCarga = cardAtual.querySelector('input[name="cargaMontagem"]');
-                            if (chkCarga && !chkCarga.checked) {
-                                chkCarga.checked = true;
-                            }
-                        }
-                    };
-
-                    lbl.appendChild(recursoChk);
-                    lbl.appendChild(document.createTextNode(`${it.codigo_recurso} — ${it.quantidade} un.`));
-                    li.appendChild(lbl);
-                    ul.appendChild(li);
-                });
-                card.appendChild(ul);
-
                 if (celulas.length) {
                     const celWrap = document.createElement("div");
                     celWrap.style.margin = "8px 0 0 28px";
 
+                    const celTitulo = document.createElement("div");
+                    celTitulo.textContent = "Células:";
+                    celTitulo.style.fontSize = "12px";
+                    celTitulo.style.color = "#6b7280";
+                    celTitulo.style.marginBottom = "4px";
+                    celWrap.appendChild(celTitulo);
+
+                    const celList = document.createElement("div");
+                    celList.style.display = "flex";
+                    celList.style.flexWrap = "wrap";
+                    celList.style.gap = "6px 12px";
+
                     celulas.forEach(obj => {
                         const nome = obj?.celula ?? obj;
                         const lbl = document.createElement("label");
-                        lbl.style.marginRight = "12px";
+                        lbl.style.display = "flex";
+                        lbl.style.alignItems = "center";
+                        lbl.style.gap = "4px";
 
                         const ck = document.createElement("input");
                         ck.type = "checkbox";
@@ -493,10 +458,11 @@ async function gerarEtiquetaQrCode() {
                         };
 
                         lbl.appendChild(ck);
-                        lbl.appendChild(document.createTextNode(" " + nome));
-                        celWrap.appendChild(lbl);
+                        lbl.appendChild(document.createTextNode(nome));
+                        celList.appendChild(lbl);
                     });
 
+                    celWrap.appendChild(celList);
                     card.appendChild(celWrap);
                 }
 
