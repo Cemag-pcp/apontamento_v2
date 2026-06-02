@@ -160,6 +160,144 @@ def api_setores(request):
     return JsonResponse({'setores': setores_data})
 
 @login_required
+def maquinas(request):
+    return render(request, 'maquinas/maquinas.html')
+
+@csrf_exempt
+@login_required
+def api_maquinas(request):
+    if request.method == 'GET':
+        page_number = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        search = (request.GET.get('search') or '').strip()
+        setor_param = request.GET.get('setor', '').strip()
+        tipo_param = request.GET.get('tipo', '').strip()
+        ativo_param = request.GET.get('ativo', 'true').lower()
+
+        queryset = Maquina.objects.select_related('setor').order_by('nome')
+
+        if ativo_param == 'false':
+            queryset = queryset.filter(ativo=False)
+        elif ativo_param != 'all':
+            queryset = queryset.filter(ativo=True)
+
+        if search:
+            queryset = queryset.filter(Q(nome__icontains=search))
+        if setor_param:
+            queryset = queryset.filter(setor_id=setor_param)
+        if tipo_param:
+            queryset = queryset.filter(tipo=tipo_param)
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        results = [
+            {
+                'id': m.id,
+                'nome': m.nome,
+                'setor_id': m.setor_id,
+                'setor_nome': m.setor.nome,
+                'tipo': m.tipo,
+                'ativo': m.ativo,
+            }
+            for m in page_obj.object_list
+        ]
+
+        setores = [{'id': s.id, 'nome': s.nome} for s in Setor.objects.all().order_by('nome')]
+
+        return JsonResponse({
+            'results': results,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+            'meta': {'setores': setores},
+        })
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        nome = (data.get('nome') or '').strip()
+        setor_id = data.get('setor_id')
+        tipo = (data.get('tipo') or '').strip()
+
+        if not nome:
+            return JsonResponse({'error': 'Nome e obrigatorio.'}, status=400)
+        if not setor_id:
+            return JsonResponse({'error': 'Setor e obrigatorio.'}, status=400)
+        if tipo not in ('maquina', 'processo'):
+            return JsonResponse({'error': 'Tipo invalido.'}, status=400)
+
+        setor = get_object_or_404(Setor, id=setor_id)
+
+        try:
+            maquina = Maquina.objects.create(nome=nome, setor=setor, tipo=tipo)
+        except IntegrityError:
+            return JsonResponse({'error': 'Ja existe uma maquina com este nome, setor e tipo.'}, status=400)
+
+        return JsonResponse({'success': 'Maquina criada com sucesso.', 'id': maquina.id}, status=201)
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        maquina_id = data.get('id')
+        if not maquina_id:
+            return JsonResponse({'error': 'ID nao informado.'}, status=400)
+
+        maquina = get_object_or_404(Maquina, id=maquina_id)
+
+        nome = (data.get('nome') or '').strip()
+        setor_id = data.get('setor_id')
+        tipo = (data.get('tipo') or '').strip()
+
+        if not nome:
+            return JsonResponse({'error': 'Nome e obrigatorio.'}, status=400)
+        if not setor_id:
+            return JsonResponse({'error': 'Setor e obrigatorio.'}, status=400)
+        if tipo not in ('maquina', 'processo'):
+            return JsonResponse({'error': 'Tipo invalido.'}, status=400)
+
+        maquina.nome = nome
+        maquina.setor = get_object_or_404(Setor, id=setor_id)
+        maquina.tipo = tipo
+
+        try:
+            maquina.save()
+        except IntegrityError:
+            return JsonResponse({'error': 'Ja existe uma maquina com este nome, setor e tipo.'}, status=400)
+
+        return JsonResponse({'success': 'Maquina atualizada com sucesso.'})
+
+    if request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        maquina_id = data.get('id')
+        if not maquina_id:
+            return JsonResponse({'error': 'ID nao informado.'}, status=400)
+
+        maquina = get_object_or_404(Maquina, id=maquina_id)
+        maquina.ativo = not maquina.ativo
+        maquina.save(update_fields=['ativo'])
+
+        return JsonResponse({
+            'success': f'Maquina {"ativada" if maquina.ativo else "desativada"} com sucesso.',
+            'ativo': maquina.ativo,
+        })
+
+    return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
+
+@login_required
 def cadastro_pecas(request):
     setor_estamparia = Setor.objects.filter(nome__iexact='estamparia').first()
     return render(

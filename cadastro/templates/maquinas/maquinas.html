@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}
+<title>Máquinas</title>
+{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/operadores-admin.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="operators-admin-page">
+    <section class="operators-shell">
+        <header class="operators-topbar">
+            <h1 class="operators-title">Máquinas</h1>
+
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <select id="filtroSetor" class="footer-select" style="min-width:160px;">
+                    <option value="">Todos os setores</option>
+                </select>
+                <select id="filtroTipo" class="footer-select" style="min-width:140px;">
+                    <option value="">Todos os tipos</option>
+                    <option value="maquina">Máquina</option>
+                    <option value="processo">Processo</option>
+                </select>
+                <select id="filtroAtivo" class="footer-select" style="min-width:130px;">
+                    <option value="true">Ativas</option>
+                    <option value="false">Inativas</option>
+                    <option value="all">Todas</option>
+                </select>
+                <button type="button" class="primary-toolbar-button" id="btnAddMaquina">
+                    <i class="bi bi-plus-lg"></i>
+                    <span>Adicionar</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="operators-table-card">
+            <div class="table-responsive">
+                <table class="operators-table maquinas-table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Setor</th>
+                            <th>Tipo</th>
+                            <th>Status</th>
+                            <th class="col-actions">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="maquinasTableBody">
+                        <tr>
+                            <td colspan="5">
+                                <div id="overlayLoading" class="operators-loading">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <span>Carregando máquinas...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <footer class="operators-table-footer">
+                <div class="footer-left">
+                    <label for="rowsPerPage" class="footer-label">Linhas por página</label>
+                    <select id="rowsPerPage" class="footer-select">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span class="footer-summary" id="maquinasSummary">0-0 de 0</span>
+                </div>
+                <nav class="operators-pagination" id="maquinasPagination" aria-label="Paginação"></nav>
+            </footer>
+        </section>
+    </section>
+</div>
+
+{% include 'maquinas/maquina_modals.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script type="module" src="{% static 'js/maquinas.js' %}"></script>
+{% endblock %}

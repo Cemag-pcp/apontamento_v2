@@ -18,6 +18,7 @@ class Maquina(models.Model):
     nome = models.CharField(max_length=100)
     setor = models.ForeignKey(Setor, related_name='maquina_setor', on_delete=models.CASCADE)
     tipo = models.CharField(max_length=20)
+    ativo = models.BooleanField(default=True)
 
     class Meta:
         constraints = [

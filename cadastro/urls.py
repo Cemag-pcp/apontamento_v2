@@ -23,6 +23,10 @@ urlpatterns = [
     path('add/operador/',views.add_operador, name='add_operador'),
     path('edit/operador/<int:pk>/',views.edit_operador, name='edit_operador'),
 
+    # Máquinas
+    path('maquinas/', views.maquinas, name='maquinas'),
+    path('api/maquinas/', views.api_maquinas, name='api_maquinas'),
+
     # Peças
     path('cadastro-pecas/', views.cadastro_pecas, name='cadastro_pecas'),
     path('api/cadastro-pecas/', views.cadastro_pecas_api, name='cadastro_pecas_api'),

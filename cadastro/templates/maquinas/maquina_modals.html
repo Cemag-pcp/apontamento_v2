@@ -1,0 +1,109 @@
+<!-- Modal Adicionar -->
+<div class="modal fade" id="addMaquinaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="formAddMaquina">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5">Adicionar Máquina</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group mb-4">
+                        <label class="form-label" style="font-weight:500;color:#555;">Nome</label>
+                        <input class="form-control" type="text" name="nome" required>
+                    </div>
+                    <div class="form-group mb-4">
+                        <label class="form-label" style="font-weight:500;color:#555;">Setor</label>
+                        <select name="setor_id" class="form-control" id="addMaquinaSetor" required>
+                            <option value="">-----</option>
+                        </select>
+                    </div>
+                    <div class="form-group mb-4">
+                        <label class="form-label" style="font-weight:500;color:#555;">Tipo</label>
+                        <select name="tipo" class="form-control" required>
+                            <option value="">-----</option>
+                            <option value="maquina">Máquina</option>
+                            <option value="processo">Processo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display:none;"></span>Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar -->
+<div class="modal fade" id="editMaquinaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="formEditMaquina">
+                {% csrf_token %}
+                <input type="hidden" name="id" id="editMaquinaId">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5">Editar Máquina</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group mb-4">
+                        <label class="form-label" style="font-weight:500;color:#555;">Nome</label>
+                        <input class="form-control" type="text" name="nome" id="editMaquinaNome" required>
+                    </div>
+                    <div class="form-group mb-4">
+                        <label class="form-label" style="font-weight:500;color:#555;">Setor</label>
+                        <select name="setor_id" class="form-control" id="editMaquinaSetor" required>
+                            <option value="">-----</option>
+                        </select>
+                    </div>
+                    <div class="form-group mb-4">
+                        <label class="form-label" style="font-weight:500;color:#555;">Tipo</label>
+                        <select name="tipo" class="form-control" id="editMaquinaTipo" required>
+                            <option value="">-----</option>
+                            <option value="maquina">Máquina</option>
+                            <option value="processo">Processo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display:none;"></span>Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Desativar/Ativar -->
+<div class="modal fade" id="toggleMaquinaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="formToggleMaquina">
+                {% csrf_token %}
+                <input type="hidden" name="id" id="toggleMaquinaId">
+                <input type="hidden" name="ativo" id="toggleMaquinaAtivo">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="toggleMaquinaTitle">Desativar Máquina</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="toggleMaquinaTexto">Confirma a desativação da máquina <strong id="toggleMaquinaNome"></strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning" id="toggleMaquinaBtn">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display:none;"></span>
+                        <span id="toggleMaquinaBtnLabel">Desativar</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
