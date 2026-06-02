@@ -748,49 +748,11 @@ def gerar_dados_sequenciamento(request):
             status=400,
         )
 
-    ordens = []
-    for carga_liberada in cargas_liberadas:
-        data_carga_original = carga_liberada["data_carga"]
-        data_carga_planejada = datas_finais_por_carga[carga_liberada["carga_liberada_id"]]
-        tabela_carga = gerar_sequenciamento(
-            data_carga_original.isoformat(),
-            data_carga_original.isoformat(),
-            setor,
-            carga_liberada["carga"],
-        )
-
-        if tabela_carga.empty:
-            continue
-
-        if setor == 'pintura':
-            colunas_grupo = ['Código', 'Peca', 'Célula', 'Datas', 'Recurso_cor', 'cor']
-            if 'Carga' in tabela_carga.columns:
-                colunas_grupo.append('Carga')
-            tabela_carga = tabela_carga.groupby(colunas_grupo).agg({'Qtde_total': 'sum'}).reset_index()
-            tabela_carga.drop_duplicates(
-                subset=['Código', 'Datas', 'cor', 'Carga'] if 'Carga' in tabela_carga.columns else ['Código', 'Datas', 'cor'],
-                inplace=True,
-            )
-        else:
-            tabela_carga.drop_duplicates(
-                subset=['Código', 'Datas', 'Célula', 'Carga'] if 'Carga' in tabela_carga.columns else ['Código', 'Datas', 'Célula'],
-                inplace=True,
-            )
-
-        for _, row in tabela_carga.iterrows():
-            ordens.append({
-                "grupo_maquina": setor.lower(),
-                "cor": row["cor"] if setor == 'pintura' else '',
-                "obs": "Ordem gerada automaticamente",
-                "peca_nome": str(row["Código"]) + " - " + row["Peca"],
-                "qtd_planejada": int(row["Qtde_total"]),
-                "data_carga": data_carga_planejada.isoformat(),
-                "setor_conjunto": row["Célula"],
-                "carga_liberada_id": carga_liberada["carga_liberada_id"],
-                "carga_liberada_versao_id": carga_liberada["carga_liberada_versao_id"],
-            })
-
-    ordens = consolidar_ordens_planejamento(ordens)
+    ordens, _ = _construir_ordens_planejamento_from_items(
+        cargas_liberadas,
+        setor,
+        datas_finais_por_carga,
+    )
 
     if not ordens:
         return JsonResponse(
