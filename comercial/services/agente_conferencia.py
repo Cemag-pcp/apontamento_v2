@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import time
@@ -8,8 +9,8 @@ import requests
 _CATALOGO_CACHE = {'data': None, 'ts': 0.0}
 _CATALOGO_TTL = 3600  # 1 hora
 
-MAX_FAMILIA = 300   # máximo de produtos da família enviados ao agente
-MAX_FALLBACK = 100  # se não achar família, envia os primeiros N
+MAX_FAMILIA = 60   # máximo de produtos da família enviados ao agente
+MAX_FALLBACK = 30  # se não achar família, envia os primeiros N
 
 
 def _buscar_catalogo() -> list:
@@ -80,6 +81,49 @@ def _filtrar_familia(catalogo: list, codigos_pedido: list[str]) -> list:
     return familia[:MAX_FAMILIA]
 
 
+_COLOR_SUFFIXES = frozenset({'AN', 'CO', 'VM', 'VJ', 'AV'})
+_SENTINELAS_IA = frozenset({'NÃO ENCONTRADO', 'NÃO ENCONTRADO NO CATÁLOGO', '—', '-'})
+
+
+def _normalizar_codigo(codigo: str) -> str:
+    """Remove separadores e normaliza para comparação: 'AB-123 AN' → 'AB123AN'."""
+    return re.sub(r'[-/_\s]+', '', str(codigo).strip().upper())
+
+
+def _set_codigos_catalogo(catalogo: list) -> set[str]:
+    s = {_normalizar_codigo(_codigo_campo(item)) for item in catalogo if _codigo_campo(item)}
+    s.discard('')
+    return s
+
+
+def _validar_codigo_ia(codigo_ia: str, codigos_catalogo: set[str]) -> str:
+    """
+    Garante que o código sugerido pela IA exista no catálogo.
+    Aceita:
+      - sentinelas conhecidas (NÃO ENCONTRADO, —, etc.)
+      - código normalizado presente no catálogo
+      - código sem sufixo de cor presente no catálogo (variante cromática válida)
+    Qualquer outra coisa → 'NÃO ENCONTRADO'.
+    """
+    if not codigo_ia:
+        return '—'
+    cod = codigo_ia.strip()
+    if cod.upper() in _SENTINELAS_IA:
+        return cod
+    normalizado = _normalizar_codigo(cod)
+    if not normalizado:
+        return '—'
+    if normalizado in codigos_catalogo:
+        return cod
+    # aceita variante cromática: base sem sufixo de cor deve existir no catálogo
+    partes = re.split(r'[-/_\s]+', cod.strip().upper())
+    if len(partes) > 1 and partes[-1] in _COLOR_SUFFIXES:
+        base = _normalizar_codigo(' '.join(partes[:-1]))
+        if base and base in codigos_catalogo:
+            return cod
+    return 'NÃO ENCONTRADO'
+
+
 def _extrair_siglas(catalogo: list) -> dict[str, set]:
     """
     Constrói um dicionário de segmentos únicos por posição a partir de todos os
@@ -99,41 +143,28 @@ def _extrair_siglas(catalogo: list) -> dict[str, set]:
 def _resumir_catalogo(catalogo_completo: list, codigos_pedido: list[str]) -> str:
     """
     Retorna uma representação compacta:
-    1. Produtos da família dos itens do pedido (lista)
-    2. Dicionário de siglas únicas por posição do código (de todo o catálogo)
+    1. Códigos da família (sem descrição para economizar tokens)
+    2. Siglas por posição extraídas apenas da família (≤8 valores únicos por posição)
     """
     familia = _filtrar_familia(catalogo_completo, codigos_pedido)
-    siglas = _extrair_siglas(catalogo_completo)
 
-    # formata a lista de produtos da família
-    linhas_familia = []
-    for item in familia:
-        cod = _codigo_campo(item)
-        desc = ''
-        for campo in ('descricao', 'description', 'nome', 'name', 'recurso_nome'):
-            v = item.get(campo)
-            if v:
-                desc = str(v).strip()
-                break
-        linhas_familia.append(f"  {cod}" + (f" — {desc}" if desc else ''))
-
+    # apenas os códigos, sem descrição
+    linhas_familia = [f"  {_codigo_campo(item)}" for item in familia if _codigo_campo(item)]
     familia_txt = '\n'.join(linhas_familia) or '  (nenhum produto da família encontrado)'
 
-    # formata o dicionário de siglas
-    siglas_linhas = []
-    for pos in sorted(siglas):
-        valores = sorted(siglas[pos])
-        # pula posições com muitos valores (provavelmente números de série / IDs)
-        if len(valores) > 80:
-            continue
-        siglas_linhas.append(f"  Posição {pos}: {', '.join(valores)}")
-
+    # siglas só da família e apenas posições com poucos valores (sufixos de cor/variante)
+    siglas = _extrair_siglas(familia)
+    siglas_linhas = [
+        f"  Posição {pos}: {', '.join(sorted(vals))}"
+        for pos, vals in sorted(siglas.items())
+        if len(vals) <= 8
+    ]
     siglas_txt = '\n'.join(siglas_linhas) or '  (não foi possível extrair siglas)'
 
     return (
-        f"--- Produtos da família do pedido ({len(familia)} de {len(catalogo_completo)} total) ---\n"
+        f"--- Códigos da família ({len(familia)} de {len(catalogo_completo)} total) ---\n"
         f"{familia_txt}\n\n"
-        f"--- Dicionário de segmentos/siglas por posição no código ---\n"
+        f"--- Siglas por posição (apenas sufixos com ≤8 variantes) ---\n"
         f"{siglas_txt}"
     )
 
@@ -141,29 +172,54 @@ def _resumir_catalogo(catalogo_completo: list, codigos_pedido: list[str]) -> str
 SYSTEM_PROMPT = (
     "Você é um assistente especializado em conferência de pedidos industriais da empresa Cemag. "
     "Sua função é analisar os itens de um pedido junto com a observação do representante de vendas "
-    "e identificar possíveis divergências ou correções necessárias nos códigos de produtos.\n\n"
+    "e identificar divergências E correções necessárias nos códigos de produtos.\n\n"
     "REGRAS ABSOLUTAS:\n"
     "1. NUNCA invente, sugira ou mencione códigos que não estejam no catálogo de produtos fornecido.\n"
     "2. Cada segmento do código representa uma característica (cor, modelo, tamanho, etc.). "
     "Use apenas siglas e valores que existem no catálogo.\n"
-    "3. Se a observação mencionar uma característica que conflita com o produto selecionado "
-    "(ex: produto laranja mas observação diz vermelho), aponte o código correto APENAS se ele "
-    "existir no catálogo. Caso contrário, informe que não encontrou.\n"
+    "3. OBSERVAÇÃO É FONTE DE CORREÇÃO: leia atentamente a observação do representante. "
+    "Se ela mencionar uma característica ausente no código ERP/CRM (ex: 'mangueiras maiores', 'MM', "
+    "'cor azul', etc.), isso indica que o código precisa ser corrigido. "
+    "Aplique a correção no campo 'ia' SE o código resultante existir no catálogo. "
+    "Caso contrário, escreva 'NÃO ENCONTRADO'. "
+    "Marque divergencia=true para o item afetado e use status DIVERGÊNCIA.\n"
     "4. Responda em português brasileiro, de forma objetiva.\n"
-    "5. Se não houver divergências reais, informe APENAS que o pedido está consistente. "
-    "NÃO crie tabelas, listas ou seções de divergências quando tudo estiver correto.\n"
-    "6. TABELA DE CORES — use SEMPRE este mapeamento para interpretar e sugerir códigos:\n"
+    "5. Use status CONSISTENTE somente quando ERP e CRM batem E a observação não indica nenhuma "
+    "modificação a ser aplicada nos códigos.\n"
+    "6. TABELA DE CORES — use SEMPRE este mapeamento:\n"
     "   AN = Azul | CO = Cinza | VM = Vermelho | VJ = Verde | AV = Amarelo\n"
     "   Sem sigla de cor no final do código = Laranja (cor padrão).\n"
-    "7. SIGLAS DE MOLA/FREIO em carretas (segunda e terceira posição do código):\n"
-    "   SS = Sem mola e Sem freio | CS = Com mola e Sem freio | "
-    "SC = Sem mola e Com freio | CC = Com mola e Com freio.\n"
-    "8. COMPARE SEMPRE as quantidades: se a Qtd do CRM (Ploomes) for diferente da Qtd do ERP (Innovaro), "
-    "isso é uma DIVERGÊNCIA de quantidade e deve ser reportada.\n"
-    "9. DIVERGÊNCIA é quando o código, a cor, a quantidade ou outra característica do pedido "
-    "difere entre CRM, ERP e observação. "
-    "Itens que confirmam a mesma característica NÃO são divergências e NÃO devem ser listados."
+    "7. SIGLAS TÉCNICAS DE CARRETAS:\n"
+    "   Mola/Freio (posições internas): SS = Sem mola/Sem freio | CS = Com mola/Sem freio | "
+    "SC = Sem mola/Com freio | CC = Com mola/Com freio.\n"
+    "   MM = Mangueiras Maiores (mangueiras de comprimento maior, sigla inserida no código). "
+    "Palavras como 'mangueiras maiores', 'mang. maiores', 'c/ MM' na observação indicam uso de MM.\n"
+    "8. COMPARE as quantidades usando a QUANTIDADE TOTAL por código: "
+    "o ERP já envia a soma de todas as linhas do mesmo produto (campo 'Qtd total'). "
+    "Divergência de quantidade só existe quando a Qtd total do ERP for DIFERENTE da Qtd do CRM.\n"
+    "9. DIVERGÊNCIA existe quando: (a) código, cor ou quantidade diferem entre CRM e ERP; "
+    "OU (b) a observação indica uma modificação (MM, cor, modelo, etc.) ausente no código ERP/CRM. "
+    "Em ambos os casos marque divergencia=true e sugira o código corrigido no campo 'ia'."
 )
+
+
+def _agregar_erp(itens: list) -> list[dict]:
+    """Agrupa itens do ERP pelo código, somando quantidades.
+    O ERP costuma criar uma linha por unidade; o CRM agrupa tudo em uma linha.
+    """
+    agrupado: dict[str, dict] = {}
+    for item in itens:
+        cod = str(item.get('recurso_codigo') or 'N/D').strip()
+        nome = str(item.get('recurso_nome') or 'N/D').strip()
+        try:
+            qtd = float(item.get('quantidade') or 0)
+        except (TypeError, ValueError):
+            qtd = 0.0
+        if cod not in agrupado:
+            agrupado[cod] = {'nome': nome, 'qtd': 0.0}
+        agrupado[cod]['qtd'] += qtd
+    return [{'recurso_codigo': cod, 'recurso_nome': info['nome'], 'quantidade': info['qtd']}
+            for cod, info in agrupado.items()]
 
 
 def _montar_prompt(
@@ -172,12 +228,12 @@ def _montar_prompt(
     observacoes: list,
     catalogo_resumo: str,
 ) -> str:
+    erp_agregado = _agregar_erp(itens_innovaro)
     linhas_innovaro = '\n'.join(
-        f"  {i+1}. Código: {item.get('recurso_codigo', 'N/D')} | "
-        f"Nome: {item.get('recurso_nome', 'N/D')} | "
-        f"Qtd: {item.get('quantidade', 'N/D')} | "
-        f"Série: {item.get('numero_serie', '') or 'sem série'}"
-        for i, item in enumerate(itens_innovaro)
+        f"  {i+1}. Código: {item['recurso_codigo']} | "
+        f"Nome: {item['recurso_nome']} | "
+        f"Qtd total: {item['quantidade']:.0f}"
+        for i, item in enumerate(erp_agregado)
     ) or '  Nenhum item Innovaro informado.'
 
     linhas_ploomes = '\n'.join(
@@ -201,26 +257,26 @@ def _montar_prompt(
         f"{linhas_ploomes}\n\n"
         f"=== OBSERVAÇÃO DO REPRESENTANTE DE VENDAS ===\n"
         f"{linhas_obs}\n\n"
-        f"Com base no catálogo acima, estruture a resposta EXATAMENTE assim:\n\n"
-        f"1. Escreva primeiro a seção ## CONCLUSÃO com EXATAMENTE este bloco — cada campo em sua própria linha, "
-        f"sem texto adicional dentro dos campos:\n\n"
-        f"Código CRM -> [código(s) do CRM/Ploomes  |  Qtd: X]\n"
-        f"Código ERP -> [código(s) do ERP/Innovaro  |  Qtd: X]\n"
-        f"Observação -> [somente o texto da observação do representante, nada mais]\n\n"
-        f"Código corrigido -> [APENAS o código corrigido, ex: 'CBHM5000 CA RD MM P750(I) M17 AN'. "
-        f"Se não houver divergência: 'Nenhuma correção necessária'. "
-        f"Se não encontrar no catálogo: 'Não encontrado no catálogo']\n\n"
-        f"   Depois do bloco, em linha separada, escreva APENAS: "
-        f"✅ PEDIDO CONSISTENTE  —  [motivo curto]\n"
-        f"   OU: ⚠️ DIVERGÊNCIA ENCONTRADA  —  [motivo curto]\n"
-        f"   (use ✅ somente quando NÃO há divergência; use ⚠️ somente quando HÁ divergência real)\n"
-        f"2. Em seguida, escreva o separador exato numa linha só: ===DETALHES===\n"
-        f"3. Depois do separador, escreva a análise técnica detalhada das siglas, catálogo e justificativas.\n\n"
-        f"REGRAS:\n"
-        f"- Uma divergência existe APENAS quando o código e a observação indicam características DIFERENTES.\n"
-        f"- NUNCA liste como divergência algo que está em acordo.\n"
-        f"- O código corrigido só pode ser sugerido se existir no catálogo fornecido.\n"
-        f"- Se não existir no catálogo, escreva 'Não encontrado no catálogo' no campo de código corrigido."
+        f"Retorne APENAS um objeto JSON válido, sem markdown, sem texto antes ou depois:\n"
+        f"{{\n"
+        f"  \"itens\": [\n"
+        f"    {{\n"
+        f"      \"erp\": \"código ERP | Qtd: X  (use '—' se não houver item)\",\n"
+        f"      \"crm\": \"código CRM | COR | Qtd: X  (use '—' se não houver item)\",\n"
+        f"      \"ia\": \"código corrigido com sigla de cor aplicada\",\n"
+        f"      \"divergencia\": false\n"
+        f"    }}\n"
+        f"  ],\n"
+        f"  \"status\": \"CONSISTENTE\",\n"
+        f"  \"resumo\": \"explicação breve em uma linha\"\n"
+        f"}}\n\n"
+        f"Regras obrigatórias para o campo 'ia':\n"
+        f"- SEMPRE escreva um código — se não há divergência, reescreva o código com a cor aplicada.\n"
+        f"- Aplique sigla de cor ao FINAL do código: AZUL→AN, CINZA→CO, VERMELHO→VM, VERDE→VJ, AMARELO→AV, LARANJA→sem sigla.\n"
+        f"- Emparelhe itens ERP e CRM na mesma linha quando correspondem ao mesmo produto.\n"
+        f"- Se código corrigido não existe no catálogo, escreva 'NÃO ENCONTRADO'.\n"
+        f"- Marque divergencia=true somente quando código, quantidade ou cor diferem entre ERP e CRM.\n"
+        f"- status deve ser 'CONSISTENTE' ou 'DIVERGÊNCIA'."
     )
 
 
@@ -251,8 +307,25 @@ def analisar_pedido(
 
     msg = client.messages.create(
         model='claude-haiku-4-5-20251001',
-        max_tokens=1200,
+        max_tokens=600,
         system=SYSTEM_PROMPT,
         messages=[{'role': 'user', 'content': prompt}],
     )
-    return msg.content[0].text
+    text = msg.content[0].text.strip()
+
+    # remove markdown code fences if present
+    text = re.sub(r'^```[a-z]*\n?', '', text)
+    text = re.sub(r'\n?```$', '', text.strip())
+
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict) and isinstance(parsed.get('itens'), list):
+            codigos_set = _set_codigos_catalogo(catalogo)
+            for item in parsed['itens']:
+                if isinstance(item, dict) and item.get('ia'):
+                    item['ia'] = _validar_codigo_ia(str(item['ia']), codigos_set)
+            return parsed
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    return {'analise': text, 'status': 'ERRO'}

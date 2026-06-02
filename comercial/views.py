@@ -367,7 +367,7 @@ def api_agente_conferencia(request):
     except Exception as exc:
         return JsonResponse({"error": f"Erro ao executar análise: {exc}"}, status=500)
 
-    return JsonResponse({"analise": analise})
+    return JsonResponse(analise)
 
 
 @login_required

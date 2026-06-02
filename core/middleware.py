@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.core.cache import cache
+from django.db import OperationalError
 
 from core.models import RotaAcesso
 
@@ -48,7 +49,13 @@ class RotaAccessMiddleware:
             return self.get_response(request)
         
         # Se o usuário não estiver autenticado, redireciona para o login
-        if request.user and not request.user.is_authenticated and path not in PUBLIC_PATHS:
+        try:
+            is_authenticated = request.user and request.user.is_authenticated
+        except OperationalError:
+            login_url = reverse('core:login')
+            return redirect(f"{login_url}?next={request.path}" if path else login_url)
+
+        if not is_authenticated and path not in PUBLIC_PATHS:
             login_url = reverse('core:login')
             if path == "":
                 return redirect(f"{login_url}")
