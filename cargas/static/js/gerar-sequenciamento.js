@@ -6,6 +6,43 @@ let ultimoResumoLiberacao = {
 
 const MENSAGEM_SEM_DADOS = "O Comercial ainda não liberou essa carga. Verificar com o responsável.";
 
+const MAPA_CORES = {
+    COG: { nome: "Cinza",    hex: "#6c757d" },
+    AN:  { nome: "Azul",     hex: "#0d6efd" },
+    VJ:  { nome: "Verde",    hex: "#198754" },
+    LC:  { nome: "Laranja",  hex: "#fd7e14" },
+    CO:  { nome: "Cinza",    hex: "#6c757d" },
+    AV:  { nome: "Amarelo",  hex: "#ffc107" },
+    VM:  { nome: "Vermelho", hex: "#dc3545" },
+};
+const COR_PADRAO = { nome: "Laranja", hex: "#fd7e14" };
+
+function obterCorDoCodigo(codigoRecurso) {
+    if (!codigoRecurso || codigoRecurso.length < 2) return COR_PADRAO;
+    const upper = codigoRecurso.toUpperCase();
+    const sigla3 = upper.slice(-3);
+    const sigla2 = upper.slice(-2);
+    return MAPA_CORES[sigla3] || MAPA_CORES[sigla2] || COR_PADRAO;
+}
+
+function renderizarFlagCor(cor) {
+    return `<span style="
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 10px;
+        border-radius: 12px;
+        background-color: ${cor.hex};
+        color: ${cor.hex === '#ffc107' ? '#333' : '#fff'};
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    ">
+        <span style="width:10px;height:10px;border-radius:50%;background:#fff;opacity:0.7;display:inline-block;"></span>
+        ${cor.nome}
+    </span>`;
+}
+
 function formatarDataIsoParaBr(dataIso) {
     if (!dataIso) {
         return "";
@@ -139,19 +176,21 @@ function popularTabelaResumo(cargas) {
     const tabelaResumo = document.getElementById('tabelaResumo');
 
     if (cargas.length === 0) {
-        tabelaResumo.innerHTML = `<tr><td colspan='4'>${MENSAGEM_SEM_DADOS}</td></tr>`;
+        tabelaResumo.innerHTML = `<tr><td colspan='5'>${MENSAGEM_SEM_DADOS}</td></tr>`;
         return;
     }
 
     tabelaResumo.innerHTML = "";
 
     cargas.forEach(item => {
+        const cor = obterCorDoCodigo(item.codigo_recurso);
         const linha = document.createElement('tr');
         linha.innerHTML = `
             <td>${item.data_carga}</td>
             <td>${item.codigo_recurso}</td>
             <td>${item.quantidade}</td>
             <td>${item.presente_no_carreta ?? ''}</td>
+            <td>${renderizarFlagCor(cor)}</td>
         `;
         tabelaResumo.appendChild(linha);
     });
