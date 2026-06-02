@@ -700,7 +700,6 @@ async function marcarPedidoComoConferido() {
 
 let currentPloomesRows = [];
 
-const DETALHES_SEP = '===DETALHES===';
 
 function renderMarkdown(text) {
     if (!text) return '';
@@ -716,43 +715,60 @@ function renderMarkdown(text) {
     return `<p class="mb-1">${html}</p>`;
 }
 
-function renderAgenteResultado(texto) {
+function renderAgenteResultado(data) {
     const resultado = document.getElementById('confPedidoAgenteResultado');
-    const sepIdx = texto.indexOf(DETALHES_SEP);
 
-    if (sepIdx === -1) {
+    // fallback: raw text (parse error or old format)
+    if (!data || !Array.isArray(data.itens)) {
+        const raw = typeof data === 'string' ? data : (data?.analise ?? JSON.stringify(data));
+        const texto = typeof raw === 'string' ? raw : JSON.stringify(raw);
         resultado.innerHTML = renderMarkdown(texto);
         return;
     }
 
-    const conclusao = texto.slice(0, sepIdx).trim();
-    const detalhes = texto.slice(sepIdx + DETALHES_SEP.length).trim();
+    const statusConsistente = (data.status || '').toUpperCase() === 'CONSISTENTE';
+    const statusIcon = statusConsistente ? '✅' : '⚠️';
+    const statusClass = statusConsistente ? 'text-success' : 'text-warning';
+
+    const rows = data.itens.map((item) => {
+        const rowClass = item.divergencia ? 'table-warning' : '';
+        const iaClass = item.divergencia ? 'fw-bold text-danger' : 'fw-semibold text-success';
+        return `
+            <tr class="${rowClass}">
+                <td class="font-monospace small">${escapeHtml(item.erp || '—')}</td>
+                <td class="font-monospace small">${escapeHtml(item.crm || '—')}</td>
+                <td class="font-monospace small ${iaClass}">${escapeHtml(item.ia || '—')}</td>
+            </tr>`;
+    }).join('');
 
     resultado.innerHTML = `
-        <div class="agente-conclusao mb-2">${renderMarkdown(conclusao)}</div>
-        ${detalhes ? `
-        <div>
-            <button
-                type="button"
-                class="btn btn-link btn-sm p-0 text-decoration-none agente-ler-mais-btn"
-                aria-expanded="false"
-            >
-                <i class="bi bi-chevron-down me-1"></i>Ler mais
-            </button>
-            <div class="agente-detalhes mt-2" style="display:none;">${renderMarkdown(detalhes)}</div>
-        </div>` : ''}
-    `;
+        <div class="table-responsive mb-2">
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ERP</th>
+                        <th>CRM</th>
+                        <th>IA</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+        <div class="small ${statusClass} fw-semibold mt-1">
+            ${statusIcon} ${escapeHtml(data.status || '')}${data.resumo ? ' — ' + escapeHtml(data.resumo) : ''}
+        </div>`;
+}
 
-    resultado.querySelector('.agente-ler-mais-btn')?.addEventListener('click', (e) => {
-        const btn = e.currentTarget;
-        const div = btn.nextElementSibling;
-        const aberto = div.style.display !== 'none';
-        div.style.display = aberto ? 'none' : '';
-        btn.innerHTML = aberto
-            ? '<i class="bi bi-chevron-down me-1"></i>Ler mais'
-            : '<i class="bi bi-chevron-up me-1"></i>Ler menos';
-        btn.setAttribute('aria-expanded', String(!aberto));
-    });
+function agregarItensPorCodigo(itens) {
+    const mapa = new Map();
+    for (const item of itens) {
+        const cod = String(item.recurso_codigo || 'N/D').trim();
+        if (!mapa.has(cod)) {
+            mapa.set(cod, { ...item, quantidade: 0 });
+        }
+        mapa.get(cod).quantidade += parseFloat(item.quantidade ?? 0) || 0;
+    }
+    return [...mapa.values()];
 }
 
 async function analisarComAgente() {
@@ -781,7 +797,7 @@ async function analisarComAgente() {
                 'X-CSRFToken': getCsrfToken(),
             },
             body: JSON.stringify({
-                itens_innovaro: currentModalPedido.itens || [],
+                itens_innovaro: agregarItensPorCodigo(currentModalPedido.itens || []),
                 itens_ploomes: currentPloomesRows,
                 observacoes,
             }),
@@ -792,7 +808,7 @@ async function analisarComAgente() {
             throw new Error(data.error || 'Falha ao executar análise.');
         }
 
-        renderAgenteResultado(data.analise);
+        renderAgenteResultado(data);
     } catch (error) {
         resultado.textContent = `Erro: ${error.message}`;
     } finally {
