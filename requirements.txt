@@ -24,3 +24,4 @@ whitenoise
 xlrd
 django-db-connection-pool
 anthropic>=0.40.0
+django-cors-headers>=4.6.0

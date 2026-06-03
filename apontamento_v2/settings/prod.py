@@ -4,13 +4,16 @@ import os
 
 # Configurações específicas de produção
 DEBUG = False
-ALLOWED_HOSTS = ['apontamentousinagem.onrender.com', 'apontamento-v2-testes.onrender.com', 'www.cmgprod.com.br']
+ALLOWED_HOSTS = ['apontamentousinagem.onrender.com', 'apontamento-v2-testes.onrender.com', 'www.cmgprod.com.br', 'cmgprod.com.br']
 CSRF_TRUSTED_ORIGINS = [
     'https://apontamentousinagem.onrender.com',
     'http://127.0.0.1',
-    'https://apontamento-v2-testes.onrender.com'
-    'https://cmgprod.com.br'
+    'https://apontamento-v2-testes.onrender.com',
+    'https://cmgprod.com.br',
+    'https://www.cmgprod.com.br',
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 # Banco de dados para produção
 DATABASES = {
