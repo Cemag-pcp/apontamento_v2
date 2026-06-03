@@ -998,44 +998,125 @@ def get_pecas(request):
 
     return JsonResponse(data)
 
+def _validar_e_montar_ordem(item, index=None):
+    """Valida um dict de dados de ordem e retorna (dados_prontos, erro)."""
+    prefix = f"Ordem {index}: " if index is not None else ""
+
+    try:
+        prioridade = int(item.get('ordemPrioridade'))
+    except (TypeError, ValueError):
+        return None, f"{prefix}Informe uma prioridade numerica valida."
+
+    if prioridade < 1:
+        return None, f"{prefix}A prioridade deve ser maior ou igual a 1."
+
+    peca = Pecas.objects.filter(codigo=item.get('pecaSelect'), ativo=True).first()
+    if not peca:
+        return None, f"{prefix}Peça '{item.get('pecaSelect')}' não encontrada."
+
+    maquina = Maquina.objects.filter(id=item.get('maquinaPlanejada')).first()
+    if not maquina:
+        return None, f"{prefix}Máquina com id '{item.get('maquinaPlanejada')}' não encontrada."
+
+    obs_raw = item.get('observacoes') or ''
+    obs_final = f"{obs_raw} - Ordem criada por api" if obs_raw else "Ordem criada por api"
+
+    return {
+        'peca': peca,
+        'maquina': maquina,
+        'obs': obs_final,
+        'data_programacao': item.get('dataProgramacao'),
+        'prioridade': prioridade,
+        'qtd_planejada': item.get('qtdPlanejada'),
+    }, None
+
+
+@csrf_exempt
 def planejar_ordem_estamparia(request):
 
     if request.method == 'POST':
-        prioridade_ordem_raw = request.POST.get('ordemPrioridade')
 
-        try:
-            prioridade_ordem = int(prioridade_ordem_raw)
-        except (TypeError, ValueError):
-            return JsonResponse({'error': 'Informe uma prioridade numerica valida.'}, status=400)
+        content_type = request.content_type or ''
 
-        if prioridade_ordem < 1:
-            return JsonResponse({'error': 'A prioridade deve ser maior ou igual a 1.'}, status=400)
+        if 'application/json' in content_type:
+            try:
+                body = json.loads(request.body)
+            except json.JSONDecodeError:
+                return JsonResponse({'error': 'JSON inválido.'}, status=400)
 
-        with transaction.atomic():
+            is_batch = isinstance(body, list)
+            itens = body if is_batch else [body]
+        else:
+            # form-urlencoded — uso atual do frontend (compatibilidade)
+            is_batch = False
+            itens = [request.POST]
 
-            maquina = Maquina.objects.filter(id=request.POST.get("maquinaPlanejada")).first()
+        if not is_batch:
+            # Fluxo único — valida e cria, retorna erro direto se falhar
+            dados, erro = _validar_e_montar_ordem(itens[0])
+            if erro:
+                return JsonResponse({'error': erro}, status=400)
 
-            nova_ordem = Ordem.objects.create(
-                obs=request.POST.get('observacoes'),
-                grupo_maquina='estamparia',
-                data_programacao=request.POST.get("dataProgramacao"),
-                maquina=maquina,
-                ordem_prioridade=prioridade_ordem,
-            )
+            with transaction.atomic():
+                nova_ordem = Ordem.objects.create(
+                    obs=dados['obs'],
+                    grupo_maquina='estamparia',
+                    data_programacao=dados['data_programacao'],
+                    maquina=dados['maquina'],
+                    ordem_prioridade=dados['prioridade'],
+                )
+                PecasOrdem.objects.create(
+                    qtd_planejada=dados['qtd_planejada'],
+                    ordem=nova_ordem,
+                    peca=dados['peca'],
+                )
+                transaction.on_commit(lambda: notificar_ordem(nova_ordem))
 
-            PecasOrdem.objects.create(
-                qtd_planejada=request.POST.get('qtdPlanejada'),
-                ordem=nova_ordem,
-                peca=get_object_or_404(Pecas, codigo=request.POST.get('pecaSelect')),
-            )
+            return JsonResponse({
+                'message': 'Status atualizado com sucesso.',
+                'ordem_id': nova_ordem.pk,
+                'maquina_id': dados['maquina'].id,
+            })
 
-            transaction.on_commit(lambda: notificar_ordem(nova_ordem))
+        # Fluxo batch — cada ordem é independente
+        resultados = []
+        for i, item in enumerate(itens):
+            dados, erro = _validar_e_montar_ordem(item, index=i + 1)
+            if erro:
+                resultados.append({'index': i + 1, 'status': 'erro', 'error': erro})
+                continue
+
+            try:
+                with transaction.atomic():
+                    nova_ordem = Ordem.objects.create(
+                        obs=dados['obs'],
+                        grupo_maquina='estamparia',
+                        data_programacao=dados['data_programacao'],
+                        maquina=dados['maquina'],
+                        ordem_prioridade=dados['prioridade'],
+                    )
+                    PecasOrdem.objects.create(
+                        qtd_planejada=dados['qtd_planejada'],
+                        ordem=nova_ordem,
+                        peca=dados['peca'],
+                    )
+                    transaction.on_commit(lambda o=nova_ordem: notificar_ordem(o))
+
+                resultados.append({'index': i + 1, 'status': 'criada', 'ordem_id': nova_ordem.pk, 'maquina_id': dados['maquina'].id})
+            except Exception as e:
+                resultados.append({'index': i + 1, 'status': 'erro', 'error': str(e)})
+
+        total_criadas = sum(1 for r in resultados if r['status'] == 'criada')
+        total_erros = len(resultados) - total_criadas
 
         return JsonResponse({
-            'message': 'Status atualizado com sucesso.',
-            'ordem_id': nova_ordem.pk,
-            'maquina_id': maquina.id
-        })
+            'message': f'{total_criadas} ordem(ns) criada(s), {total_erros} com erro.',
+            'resultados': resultados,
+        }, status=200)
+
+def api_docs(request):
+    return render(request, 'apontamento_estamparia/api_docs.html')
+
 
 def api_apontamentos_peca(request):
 

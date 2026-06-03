@@ -22,6 +22,7 @@ urlpatterns = [
     
     path('api/get-pecas/', views.get_pecas, name='get_pecas'),
     path('api/criar-ordem-estamparia/', views.planejar_ordem_estamparia, name='planejar_ordem_estamparia'),
+    path('api/docs/', views.api_docs, name='api_docs'),
     
     path('atualizar-pecas/', views.atualizar_pecas_ordem, name='atualizar_pecas_ordem'),
 
