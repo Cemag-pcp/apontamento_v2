@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    <title>Reunião</title>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+
+    <!-- Configuração -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex flex-wrap align-items-end gap-3">
+                <div>
+                    <label class="form-label mb-1 small fw-bold">Setor</label>
+                    <select id="setor-select" class="form-select form-select-sm" style="width:140px;">
+                        <option value="montagem">Montagem</option>
+                        <option value="solda">Solda</option>
+                        <option value="pintura">Pintura</option>
+                    </select>
+                </div>
+                <div id="datas-container" class="d-flex flex-wrap gap-2 align-items-end">
+                    <!-- Date inputs gerados por JS -->
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" id="btn-add-data" title="Adicionar coluna de data">
+                        <i class="bi bi-plus-circle"></i> Data
+                    </button>
+                    <button class="btn btn-sm btn-primary" id="btn-atualizar">
+                        <i class="bi bi-arrow-clockwise"></i> Atualizar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+
+        <!-- Tabela de Produção -->
+        <div class="col-xl-9 col-lg-8" id="tabela-col">
+            <div class="card shadow-sm h-100" id="tabela-card">
+                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold"><i class="bi bi-table"></i> Situação da Produção</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="setor-badge" class="badge bg-secondary fs-6"></span>
+                        <button class="btn btn-sm btn-outline-secondary" id="btn-fullscreen" title="Expandir tela cheia">
+                            <i class="bi bi-fullscreen" id="fullscreen-icon"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="table-container" class="table-responsive" style="overflow:auto;">
+                        <div class="text-center text-muted py-5" id="table-placeholder">
+                            <i class="bi bi-table" style="font-size:3rem; opacity:.4;"></i>
+                            <p class="mt-2">Configure o setor e as datas, depois clique em <strong>Atualizar</strong>.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel de Reports -->
+        <div class="col-xl-3 col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold"><i class="bi bi-journal-text"></i> Reports do Dia</span>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalNovoReport">
+                        <i class="bi bi-plus"></i> Novo
+                    </button>
+                </div>
+                <div class="card-body p-2" style="max-height:65vh; overflow-y:auto;">
+                    <div id="reports-list">
+                        <div class="text-center text-muted py-4 small">
+                            <i class="bi bi-journal" style="font-size:2rem; opacity:.4;"></i>
+                            <p class="mt-2 mb-0">Nenhum report hoje.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Modal Novo Report -->
+<div class="modal fade" id="modalNovoReport" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-journal-plus"></i> Novo Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-1">
+                    <label class="form-label fw-bold">Descrição</label>
+                    <textarea id="report-texto" class="form-control" rows="6"
+                        placeholder="Ex.: Operadores X e Y faltaram hoje.&#10;Máquina Z está parada para manutenção."></textarea>
+                </div>
+                <small class="text-muted">O report será registrado com seu usuário e a data de hoje.</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="btn-salvar-report">
+                    <i class="bi bi-save"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block links %}
+<style>
+    /* Tabela em modo normal */
+    #table-container {
+        max-height: 65vh;
+    }
+
+    /* Card em tela cheia */
+    #tabela-card.fullscreen-card {
+        position: fixed;
+        inset: 0;
+        z-index: 1050;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    #tabela-card.fullscreen-card .card-body {
+        flex: 1;
+        overflow: hidden;
+    }
+    #tabela-card.fullscreen-card #table-container {
+        max-height: 100%;
+        height: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CONFIG_KEY = 'reuniao_config_v1';
+const URL_TABELA   = "{% url 'reuniao:tabela_producao' %}";
+const URL_REPORTS  = "{% url 'reuniao:listar_reports' %}";
+const URL_CRIAR    = "{% url 'reuniao:criar_report' %}";
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function getTodayStr() {
+    return new Date().toISOString().split('T')[0];
+}
+
+function formatDateBR(isoStr) {
+    if (!isoStr) return '';
+    const [y, m, d] = isoStr.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+function getCookie(name) {
+    for (const c of document.cookie.split(';')) {
+        const [k, v] = c.trim().split('=');
+        if (k === name) return decodeURIComponent(v);
+    }
+    return null;
+}
+
+// ── Config persistence ─────────────────────────────────────────────────────
+
+function loadConfig() {
+    try {
+        return JSON.parse(localStorage.getItem(CONFIG_KEY)) || defaultConfig();
+    } catch {
+        return defaultConfig();
+    }
+}
+
+function defaultConfig() {
+    return { setor: 'montagem', datas: [getTodayStr()] };
+}
+
+function saveConfig(cfg) {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
+
+// ── Date pickers ───────────────────────────────────────────────────────────
+
+function renderDatas(datas) {
+    const container = document.getElementById('datas-container');
+    container.innerHTML = '';
+
+    datas.forEach((val, idx) => {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = `
+            <label class="form-label mb-1 small fw-bold">Data ${idx + 1}</label>
+            <div class="input-group input-group-sm">
+                <input type="date" class="form-control data-input" value="${val}" data-idx="${idx}" style="width:145px;">
+                ${datas.length > 1
+                    ? `<button class="btn btn-outline-danger btn-remove-data" data-idx="${idx}" type="button"><i class="bi bi-x"></i></button>`
+                    : ''}
+            </div>
+        `;
+        container.appendChild(wrap);
+    });
+
+    container.querySelectorAll('.data-input').forEach(el => {
+        el.addEventListener('change', () => {
+            const cfg = loadConfig();
+            cfg.datas[+el.dataset.idx] = el.value;
+            saveConfig(cfg);
+        });
+    });
+
+    container.querySelectorAll('.btn-remove-data').forEach(el => {
+        el.addEventListener('click', () => {
+            const cfg = loadConfig();
+            cfg.datas.splice(+el.dataset.idx, 1);
+            saveConfig(cfg);
+            renderDatas(cfg.datas);
+        });
+    });
+}
+
+// ── Production table ───────────────────────────────────────────────────────
+
+function cellStyle(cell) {
+    if (!cell) return { bg: '#6c757d', text: '#fff' };            // grey – no data
+    if (cell.finalizada) return { bg: '#198754', text: '#fff' };  // green – done
+    if (cell.percentual > 0) return { bg: '#0d6efd', text: '#fff' }; // blue – in progress
+    return { bg: '#dc3545', text: '#fff' };                       // red – not started
+}
+
+function buildTable(data) {
+    const { linhas, datas, dados, agrupamento } = data;
+    const colHeader = agrupamento === 'cor' ? 'Cor' : 'Máquina / Célula';
+
+    let html = `
+        <table class="table table-bordered mb-0" style="min-width:${180 + datas.length * 210}px;">
+            <thead class="table-dark" style="position:sticky;top:0;z-index:2;">
+                <tr>
+                    <th style="min-width:160px; vertical-align:middle;">${colHeader}</th>
+                    ${datas.map((d, i) => `
+                        <th class="text-center" style="min-width:210px;">
+                            DATA ${i + 1}<br>
+                            <small class="fw-normal">${formatDateBR(d)}</small>
+                        </th>
+                    `).join('')}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    linhas.forEach(maq => {
+        html += '<tr>';
+        html += `<td class="fw-bold align-middle" style="background:#f8f9fa;">${maq}</td>`;
+
+        datas.forEach(dk => {
+            const cell = dados[maq]?.[dk];
+            const { bg, text } = cellStyle(cell);
+
+            if (!cell) {
+                html += `<td style="background:${bg};color:${text};text-align:center;vertical-align:middle;">—</td>`;
+                return;
+            }
+
+            const itemsHtml = cell.itens_restantes.length
+                ? cell.itens_restantes.map(it =>
+                    `<div style="font-size:0.72rem;line-height:1.3;">${it.peca} | QTD RESTANTE: ${it.qtd_restante}</div>`
+                  ).join('')
+                : '';
+
+            const statusHtml = cell.finalizada
+                ? `<div style="font-size:0.8rem;font-weight:bold;margin-top:2px;">FINALIZADA</div>`
+                : '';
+
+            html += `
+                <td style="background:${bg};color:${text};vertical-align:top;padding:8px 10px;">
+                    <div style="font-weight:bold;font-size:1rem;">${cell.percentual}%</div>
+                    <div style="font-size:0.65rem;letter-spacing:1px;opacity:.7;">~~~~~~~~~~~~~~~~~~~~</div>
+                    ${itemsHtml}
+                    ${statusHtml}
+                </td>
+            `;
+        });
+
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    return html;
+}
+
+async function loadTabela() {
+    const cfg = loadConfig();
+    if (!cfg.setor || !cfg.datas.length) return;
+
+    const container = document.getElementById('table-container');
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted small">Carregando dados...</p>
+        </div>`;
+
+    const params = new URLSearchParams();
+    params.set('setor', cfg.setor);
+    cfg.datas.forEach(d => params.append('datas[]', d));
+
+    try {
+        const res = await fetch(`${URL_TABELA}?${params}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+            container.innerHTML = `<div class="alert alert-danger m-3">${data.error || 'Erro ao carregar dados.'}</div>`;
+            return;
+        }
+
+        if (!data.linhas || data.linhas.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-inbox" style="font-size:2.5rem;opacity:.4;"></i>
+                    <p class="mt-2">Nenhum dado encontrado para os filtros selecionados.</p>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = buildTable(data);
+        document.getElementById('setor-badge').textContent =
+            cfg.setor.charAt(0).toUpperCase() + cfg.setor.slice(1);
+
+    } catch {
+        container.innerHTML = '<div class="alert alert-danger m-3">Erro de conexão com o servidor.</div>';
+    }
+}
+
+// ── Reports ────────────────────────────────────────────────────────────────
+
+function renderReports(reports) {
+    const list = document.getElementById('reports-list');
+    if (!reports.length) {
+        list.innerHTML = `
+            <div class="text-center text-muted py-4 small">
+                <i class="bi bi-journal" style="font-size:2rem;opacity:.4;"></i>
+                <p class="mt-2 mb-0">Nenhum report hoje.</p>
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = reports.map(r => `
+        <div class="border rounded p-2 mb-2 bg-light">
+            <div class="d-flex justify-content-between align-items-start">
+                <span class="fw-bold small">${escHtml(r.usuario)}</span>
+                <span class="text-muted" style="font-size:.7rem;white-space:nowrap;margin-left:6px;">${r.criado_em}</span>
+            </div>
+            <p class="mb-0 mt-1 small" style="white-space:pre-wrap;">${escHtml(r.texto)}</p>
+        </div>
+    `).join('');
+}
+
+async function loadReports() {
+    try {
+        const res = await fetch(`${URL_REPORTS}?data=${getTodayStr()}`);
+        if (res.ok) renderReports(await res.json());
+    } catch {}
+}
+
+function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    const cfg = loadConfig();
+
+    // Apply saved config to UI
+    document.getElementById('setor-select').value = cfg.setor;
+    renderDatas(cfg.datas);
+
+    // Sector change
+    document.getElementById('setor-select').addEventListener('change', function () {
+        const cfg = loadConfig();
+        cfg.setor = this.value;
+        saveConfig(cfg);
+    });
+
+    // Add date column (max 5)
+    document.getElementById('btn-add-data').addEventListener('click', () => {
+        const cfg = loadConfig();
+        if (cfg.datas.length >= 5) return;
+        cfg.datas.push(getTodayStr());
+        saveConfig(cfg);
+        renderDatas(cfg.datas);
+    });
+
+    // Refresh table
+    document.getElementById('btn-atualizar').addEventListener('click', loadTabela);
+
+    // Save report
+    document.getElementById('btn-salvar-report').addEventListener('click', async () => {
+        const texto = document.getElementById('report-texto').value.trim();
+        if (!texto) {
+            alert('Escreva o texto do report antes de salvar.');
+            return;
+        }
+
+        const btn = document.getElementById('btn-salvar-report');
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(URL_CRIAR, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ texto }),
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                document.getElementById('report-texto').value = '';
+                bootstrap.Modal.getInstance(document.getElementById('modalNovoReport')).hide();
+                loadReports();
+            } else {
+                alert(data.error || 'Erro ao salvar report.');
+            }
+        } catch {
+            alert('Erro de conexão com o servidor.');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // Fullscreen toggle
+    document.getElementById('btn-fullscreen').addEventListener('click', () => {
+        const card = document.getElementById('tabela-card');
+        const icon = document.getElementById('fullscreen-icon');
+        const isFullscreen = card.classList.toggle('fullscreen-card');
+        icon.className = isFullscreen ? 'bi bi-fullscreen-exit' : 'bi bi-fullscreen';
+        document.body.style.overflow = isFullscreen ? 'hidden' : '';
+    });
+
+    // ESC fecha o fullscreen
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            const card = document.getElementById('tabela-card');
+            if (card.classList.contains('fullscreen-card')) {
+                card.classList.remove('fullscreen-card');
+                document.getElementById('fullscreen-icon').className = 'bi bi-fullscreen';
+                document.body.style.overflow = '';
+            }
+        }
+    });
+
+    // Initial load
+    loadTabela();
+    loadReports();
+});
+</script>
+{% endblock %}

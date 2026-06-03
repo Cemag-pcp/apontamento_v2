@@ -29,5 +29,6 @@ urlpatterns = [
     path('sucata/', include('sucata.urls')),
     path('compras/', include('compras.urls')),
     path('comercial/', include('comercial.urls')),
+    path('reuniao/', include('reuniao.urls')),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'compras',
     'comercial',
     'storages',
+    'reuniao',
 
     'channels',
 ]

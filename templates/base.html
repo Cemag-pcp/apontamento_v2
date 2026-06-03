@@ -495,6 +495,17 @@
                                 </nav>
                             </div>
 
+                            <div class="sb-sidenav-menu-heading">Reunião</div>
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseReuniao" aria-expanded="false" aria-controls="collapseReuniao">
+                                <i class="bi bi-people"></i> Reunião
+                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
+                            </a>
+                            <div class="collapse" id="collapseReuniao" data-bs-parent="#sidenavAccordion">
+                                <nav class="sb-sidenav-menu-nested nav">
+                                    <a class="nav-link" href="{% url 'reuniao:home' %}">Reunião</a>
+                                </nav>
+                            </div>
+
                             <div class="sb-sidenav-menu-heading">Apontamentos</div>
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseERPApontamentos" aria-expanded="false" aria-controls="collapseERPApontamentos">
                                 <i class="bi bi-database"></i> ERP
