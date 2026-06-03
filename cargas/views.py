@@ -255,7 +255,11 @@ def _construir_ordens_planejamento_from_items(cargas_liberadas, setor, datas_fin
                 base_carretas['Etapa2'].fillna('') == 'Pintura'
             ].copy()
         colunas_carretas = ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula', 'Etapa5']
-    else:
+    elif setor == 'solda':
+        if 'Etapa3' in base_carretas.columns:
+            base_carretas = base_carretas[base_carretas['Etapa3'].fillna('') != ''].copy()
+        colunas_carretas = ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula']
+    else:  # montagem
         if 'Etapa' in base_carretas.columns:
             base_carretas = base_carretas[base_carretas['Etapa'].fillna('') != ''].copy()
         colunas_carretas = ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula']
