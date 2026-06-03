@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let cargaChart;
     let activityChart;
     let taktChart = null;
+    let taktDrag  = null; // { datasetIdx, barIdx, value, label, targetBarIdx }
 
     // ── Takt Time — configurações ────────────────────────────────────────────
     // Nomes exatos conforme cadastro no banco de dados
@@ -718,6 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             taktChart = new Chart(ctx, {
                 type: 'bar',
+                plugins: [taktDragPlugin],
                 data: { labels, datasets: [...barDatasets, capDataset] },
                 options: {
                     maintainAspectRatio: false,
@@ -771,6 +773,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                 },
             });
+
+            initTaktDragDrop();
 
             // KPIs resumo do modo planejado
             const totalHoras = planned.reduce((s, cell) => {
@@ -903,6 +907,123 @@ document.addEventListener('DOMContentLoaded', () => {
                     <strong>${adjustedTotal.toFixed(1)}<small>min</small></strong>
                 </div>
             </div>`;
+    }
+
+    // ── Takt Drag & Drop ─────────────────────────────────────────────────────
+
+    // Plugin que desenha o highlight na coluna-destino durante o arrasto
+    const taktDragPlugin = {
+        id: 'taktDragHighlight',
+        afterDraw(chart) {
+            if (!taktDrag || taktDrag.targetBarIdx === null || taktDrag.targetBarIdx === taktDrag.barIdx) return;
+            const firstBarDs = chart.data.datasets.findIndex(d => d.type === 'bar');
+            if (firstBarDs < 0) return;
+            const meta = chart.getDatasetMeta(firstBarDs);
+            const bar  = meta.data[taktDrag.targetBarIdx];
+            if (!bar) return;
+            const { ctx, chartArea: a } = chart;
+            const bw = bar.width || 20;
+            ctx.save();
+            ctx.fillStyle = 'rgba(99, 102, 241, 0.12)';
+            ctx.fillRect(bar.x - bw / 2 - 4, a.top, bw + 8, a.bottom - a.top);
+            ctx.strokeStyle = 'rgba(99, 102, 241, 0.55)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 3]);
+            ctx.strokeRect(bar.x - bw / 2 - 4, a.top, bw + 8, a.bottom - a.top);
+            ctx.restore();
+        },
+    };
+
+    function getTaktGhost() {
+        let g = document.getElementById('takt-drag-ghost');
+        if (!g) {
+            g = document.createElement('div');
+            g.id = 'takt-drag-ghost';
+            g.className = 'takt-drag-ghost';
+            document.body.appendChild(g);
+        }
+        return g;
+    }
+
+    function onTaktDragStart(e) {
+        if (!taktChart) return;
+        const els = taktChart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+        if (!els.length) return;
+        const el = els[0];
+        const ds = taktChart.data.datasets[el.datasetIndex];
+        if (ds.type !== 'bar') return;
+        const value = ds.data[el.index];
+        if (!value || value <= 0) return;
+
+        taktDrag = { datasetIdx: el.datasetIndex, barIdx: el.index, value, label: ds.label, targetBarIdx: null };
+
+        const ghost = getTaktGhost();
+        ghost.textContent = ds.label.length > 28 ? ds.label.slice(0, 25) + '…' : ds.label;
+        ghost.style.background = ds.backgroundColor;
+        ghost.style.display = 'block';
+        ghost.style.left = (e.clientX + 14) + 'px';
+        ghost.style.top  = (e.clientY - 20) + 'px';
+
+        taktChart.canvas.style.cursor = 'grabbing';
+        e.preventDefault();
+    }
+
+    function onTaktDragMove(e) {
+        if (!taktChart) return;
+        if (!taktDrag) {
+            const els = taktChart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+            if (els.length) {
+                const ds = taktChart.data.datasets[els[0].datasetIndex];
+                taktChart.canvas.style.cursor = (ds.type === 'bar' && (ds.data[els[0].index] || 0) > 0) ? 'grab' : '';
+            } else {
+                taktChart.canvas.style.cursor = '';
+            }
+            return;
+        }
+
+        const ghost = document.getElementById('takt-drag-ghost');
+        if (ghost) { ghost.style.left = (e.clientX + 14) + 'px'; ghost.style.top = (e.clientY - 20) + 'px'; }
+
+        const els = taktChart.getElementsAtEventForMode(e, 'index', { intersect: false }, false);
+        const newTarget = els.length ? els[0].index : null;
+        if (newTarget !== taktDrag.targetBarIdx) {
+            taktDrag.targetBarIdx = newTarget;
+            taktChart.update('none');
+        }
+    }
+
+    function onTaktDragEnd(e) {
+        if (!taktChart || !taktDrag) return;
+        const els = taktChart.getElementsAtEventForMode(e, 'index', { intersect: false }, false);
+        const targetBarIdx = els.length ? els[0].index : null;
+
+        if (targetBarIdx !== null && targetBarIdx !== taktDrag.barIdx) {
+            const ds = taktChart.data.datasets[taktDrag.datasetIdx];
+            ds.data[targetBarIdx] = parseFloat(((ds.data[targetBarIdx] || 0) + taktDrag.value).toFixed(2));
+            ds.data[taktDrag.barIdx] = 0;
+            taktChart.update();
+        }
+        endTaktDrag();
+    }
+
+    function endTaktDrag() {
+        taktDrag = null;
+        const ghost = document.getElementById('takt-drag-ghost');
+        if (ghost) ghost.style.display = 'none';
+        if (taktChart) { taktChart.canvas.style.cursor = ''; taktChart.update('none'); }
+    }
+
+    function initTaktDragDrop() {
+        if (!taktChart) return;
+        const c = taktChart.canvas;
+        c.removeEventListener('mousedown',  onTaktDragStart);
+        c.removeEventListener('mousemove',  onTaktDragMove);
+        c.removeEventListener('mouseup',    onTaktDragEnd);
+        c.removeEventListener('mouseleave', endTaktDrag);
+        c.addEventListener('mousedown',  onTaktDragStart);
+        c.addEventListener('mousemove',  onTaktDragMove);
+        c.addEventListener('mouseup',    onTaktDragEnd);
+        c.addEventListener('mouseleave', endTaktDrag);
     }
 
     // ── Takt info popover (fixed, scrollável) ────────────────────────────────
