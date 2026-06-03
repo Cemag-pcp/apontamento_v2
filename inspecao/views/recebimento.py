@@ -631,7 +631,8 @@ def inspecionar_recebimento(request):
         if item:
             sheet_hash = item.sheet_hash
 
-    if InspecaoRecebimento.objects.filter(sheet_hash=sheet_hash, excluido=False).exists():
+    registro_existente = InspecaoRecebimento.objects.filter(sheet_hash=sheet_hash).first()
+    if registro_existente and not registro_existente.excluido:
         return JsonResponse({"error": "Item ja inspecionado"}, status=409)
 
     inspetor_profile = Profile.objects.filter(user=request.user).first()
@@ -669,18 +670,25 @@ def inspecionar_recebimento(request):
                         unidade_idx,
                     )
 
-        InspecaoRecebimento.objects.create(
+        inspection_fields = dict(
             inspetor=inspetor_profile,
             item=item,
             planilha_id=SHEET_ID,
             aba_nome=SHEET_TAB,
             linha_planilha=row_index if isinstance(row_index, int) else None,
-            sheet_hash=sheet_hash,
             dados=row_data,
             dados_inspecao=dados_inspecao,
             resultado=resultado,
             observacao=observacao,
+            excluido=False,
         )
+
+        if registro_existente:
+            for field, value in inspection_fields.items():
+                setattr(registro_existente, field, value)
+            registro_existente.save(update_fields=list(inspection_fields.keys()))
+        else:
+            InspecaoRecebimento.objects.create(sheet_hash=sheet_hash, **inspection_fields)
 
     return JsonResponse({"success": True}, status=200)
 
