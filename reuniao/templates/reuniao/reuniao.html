@@ -14,10 +14,18 @@
             <div class="d-flex flex-wrap align-items-end gap-3">
                 <div>
                     <label class="form-label mb-1 small fw-bold">Setor</label>
-                    <select id="setor-select" class="form-select form-select-sm" style="width:140px;">
-                        <option value="montagem">Montagem</option>
-                        <option value="solda">Solda</option>
-                        <option value="pintura">Pintura</option>
+                    <select id="setor-select" class="form-select form-select-sm" style="width:150px;">
+                        <optgroup label="Por carga (datas)">
+                            <option value="montagem">Montagem</option>
+                            <option value="solda">Solda</option>
+                            <option value="pintura">Pintura</option>
+                        </optgroup>
+                        <optgroup label="Ao vivo (agora)">
+                            <option value="estamparia">Estamparia</option>
+                            <option value="usinagem">Usinagem</option>
+                            <option value="serra">Serra</option>
+                            <option value="corte">Corte</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div id="datas-container" class="d-flex flex-wrap gap-2 align-items-end">
@@ -63,11 +71,14 @@
         <!-- Painel de Reports -->
         <div class="col-xl-3 col-lg-4">
             <div class="card shadow-sm h-100">
-                <div class="card-header d-flex justify-content-between align-items-center py-2">
-                    <span class="fw-bold"><i class="bi bi-journal-text"></i> Reports do Dia</span>
-                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalNovoReport">
-                        <i class="bi bi-plus"></i> Novo
-                    </button>
+                <div class="card-header py-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold"><i class="bi bi-journal-text"></i> Reports do Dia</span>
+                        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalNovoReport">
+                            <i class="bi bi-plus"></i> Novo
+                        </button>
+                    </div>
+                    <input type="date" id="reports-data" class="form-control form-control-sm">
                 </div>
                 <div class="card-body p-2" style="max-height:65vh; overflow-y:auto;">
                     <div id="reports-list">
@@ -140,10 +151,14 @@
 
 {% block scripts %}
 <script>
-const CONFIG_KEY = 'reuniao_config_v1';
-const URL_TABELA   = "{% url 'reuniao:tabela_producao' %}";
-const URL_REPORTS  = "{% url 'reuniao:listar_reports' %}";
-const URL_CRIAR    = "{% url 'reuniao:criar_report' %}";
+const CONFIG_KEY    = 'reuniao_config_v1';
+const URL_TABELA    = "{% url 'reuniao:tabela_producao' %}";
+const URL_LIVE      = "{% url 'reuniao:andamento_live' %}";
+const URL_REPORTS   = "{% url 'reuniao:listar_reports' %}";
+const URL_CRIAR     = "{% url 'reuniao:criar_report' %}";
+const SETORES_LIVE  = ['estamparia', 'usinagem', 'serra', 'corte'];
+
+let _liveInterval = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -290,7 +305,107 @@ function buildTable(data) {
     return html;
 }
 
+// ── Live sectors ───────────────────────────────────────────────────────────
+
+const STATUS_COLOR = {
+    'Em andamento': '#198754',
+    'Aguardando':   '#ffc107',
+    'Interrompida': '#dc3545',
+    'Finalizada':   '#6c757d',
+};
+
+function buildAndamentoTable(data) {
+    const { ordens } = data;
+
+    if (!ordens || ordens.length === 0) {
+        return `<div class="text-center text-muted py-5">
+            <i class="bi bi-check2-circle" style="font-size:2.5rem;opacity:.4;"></i>
+            <p class="mt-2">Nenhuma ordem em andamento no momento.</p>
+        </div>`;
+    }
+
+    let html = `
+        <table class="table table-bordered table-hover mb-0">
+            <thead class="table-dark" style="position:sticky;top:0;z-index:2;">
+                <tr>
+                    <th>Máquina</th>
+                    <th>Ordem</th>
+                    <th>Peça(s)</th>
+                    <th class="text-center">Planejado</th>
+                    <th>Programação</th>
+                    <th>Iniciado em</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    ordens.forEach(o => {
+        const cor = STATUS_COLOR[o.status] || '#0d6efd';
+        const totalPlan = o.pecas.reduce((s, p) => s + p.qtd_planejada, 0);
+        const totalBoa  = o.pecas.reduce((s, p) => s + p.qtd_boa, 0);
+        const pct = totalPlan > 0 ? Math.round(totalBoa / totalPlan * 100) : 0;
+
+        const pecasHtml = o.pecas.map(p => {
+            const label = p.descricao ? `${p.codigo} — ${p.descricao}` : p.codigo;
+            return `<div class="small">${escHtml(label)}</div>`;
+        }).join('');
+
+        html += `
+            <tr>
+                <td class="fw-bold align-middle">${escHtml(o.maquina)}</td>
+                <td class="align-middle">${o.ordem ?? '—'}</td>
+                <td class="align-middle">${pecasHtml}</td>
+                <td class="text-center align-middle">${totalPlan}</td>
+                <td class="align-middle">${o.data_programacao}</td>
+                <td class="align-middle small text-muted">${o.iniciado_em}</td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table>';
+    return html;
+}
+
+async function loadAndamento(silent = false) {
+    const cfg = loadConfig();
+    const container = document.getElementById('table-container');
+
+    if (!silent) {
+        container.innerHTML = `<div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted small">Carregando andamento...</p>
+        </div>`;
+    }
+
+    document.getElementById('setor-badge').textContent =
+        cfg.setor.charAt(0).toUpperCase() + cfg.setor.slice(1);
+
+    try {
+        const res = await fetch(`${URL_LIVE}?setor=${cfg.setor}`);
+        const data = await res.json();
+        if (res.ok) {
+            container.innerHTML = buildAndamentoTable(data);
+        } else if (!silent) {
+            container.innerHTML = `<div class="alert alert-danger m-3">${data.error || 'Erro.'}</div>`;
+        }
+    } catch {
+        if (!silent) {
+            container.innerHTML = '<div class="alert alert-danger m-3">Erro de conexão.</div>';
+        }
+    }
+}
+
+function isLive() {
+    return SETORES_LIVE.includes(loadConfig().setor);
+}
+
+function atualizarVisibilidadeDatas() {
+    document.getElementById('datas-container').style.display = isLive() ? 'none' : '';
+    document.getElementById('btn-add-data').style.display   = isLive() ? 'none' : '';
+}
+
 async function loadTabela() {
+    if (isLive()) { loadAndamento(); return; }
     const cfg = loadConfig();
     if (!cfg.setor || !cfg.datas.length) return;
 
@@ -357,8 +472,9 @@ function renderReports(reports) {
 }
 
 async function loadReports() {
+    const data = document.getElementById('reports-data').value || getTodayStr();
     try {
-        const res = await fetch(`${URL_REPORTS}?data=${getTodayStr()}`);
+        const res = await fetch(`${URL_REPORTS}?data=${data}`);
         if (res.ok) renderReports(await res.json());
     } catch {}
 }
@@ -381,6 +497,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const cfg = loadConfig();
         cfg.setor = this.value;
         saveConfig(cfg);
+        atualizarVisibilidadeDatas();
+        iniciarAutoRefresh();
+        loadTabela();
     });
 
     // Add date column (max 5)
@@ -393,7 +512,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Refresh table
-    document.getElementById('btn-atualizar').addEventListener('click', loadTabela);
+    document.getElementById('btn-atualizar').addEventListener('click', () => {
+        iniciarAutoRefresh();
+        loadTabela();
+    });
 
     // Save report
     document.getElementById('btn-salvar-report').addEventListener('click', async () => {
@@ -451,6 +573,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // Inicializa o filtro de data dos reports com hoje
+    document.getElementById('reports-data').value = getTodayStr();
+    document.getElementById('reports-data').addEventListener('change', loadReports);
+
+    // Visibilidade inicial dos campos de data
+    atualizarVisibilidadeDatas();
+
+    // Auto-refresh para setores live (30s)
+    function iniciarAutoRefresh() {
+        if (_liveInterval) clearInterval(_liveInterval);
+        if (isLive()) {
+            _liveInterval = setInterval(() => loadAndamento(true), 30000);
+        }
+    }
+    window.iniciarAutoRefresh = iniciarAutoRefresh;
+
+    iniciarAutoRefresh();
 
     // Initial load
     loadTabela();

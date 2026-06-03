@@ -8,11 +8,15 @@ from django.db.models import Avg, Sum, FloatField, Value, F, ExpressionWrapper
 from django.db.models.functions import Coalesce
 
 from .models import Report
-from core.models import Ordem
+from core.models import Ordem, OrdemProcesso
 from cadastro.models import Maquina
 from apontamento_montagem.models import PecasOrdem as POMontagem
 from apontamento_solda.models import PecasOrdem as POSolda
 from apontamento_pintura.models import PecasOrdem as POPintura
+from apontamento_usinagem.models import PecasOrdem as POUsinagem
+from apontamento_estamparia.models import PecasOrdem as POEstamparia
+from apontamento_serra.models import PecasOrdem as POSerra
+from apontamento_corte.models import PecasOrdem as POCorte
 
 import json
 from datetime import datetime, date
@@ -202,3 +206,103 @@ def tabela_producao(request):
         'linhas': linhas,
         'dados': dados,
     })
+
+
+# Setores "ao vivo": sem datas, mostram ordens em andamento agora
+_LIVE_GRUPO_MAQUINA = {
+    'estamparia': ['estamparia'],
+    'usinagem':   ['usinagem'],
+    'serra':      ['serra'],
+    'corte':      ['laser_1', 'laser_2', 'laser_3', 'plasma'],
+}
+
+# PecasOrdem de cada setor live e se peca é FK (True) ou CharField (False)
+_LIVE_PO_MODEL = {
+    'estamparia': (POEstamparia, True),
+    'usinagem':   (POUsinagem,   True),
+    'serra':      (POSerra,      True),
+    'corte':      (POCorte,      False),
+}
+
+STATUS_LABELS = {
+    'aguardando_iniciar': 'Aguardando',
+    'iniciada':           'Em andamento',
+    'interrompida':       'Interrompida',
+    'finalizada':         'Finalizada',
+    'agua_prox_proc':     'Ag. próx. processo',
+}
+
+
+@login_required
+@require_GET
+def andamento_live(request):
+    setor = request.GET.get('setor', '').lower().strip()
+
+    if setor not in _LIVE_GRUPO_MAQUINA:
+        return JsonResponse({'error': 'Setor inválido para andamento live'}, status=400)
+
+    grupos = _LIVE_GRUPO_MAQUINA[setor]
+    POModel, peca_is_fk = _LIVE_PO_MODEL[setor]
+
+    ordens = (
+        Ordem.objects
+        .filter(grupo_maquina__in=grupos, status_atual='iniciada', excluida=False)
+        .select_related('maquina', 'operador_final')
+        .order_by('maquina__nome', 'ultima_atualizacao')
+    )
+
+    resultado = []
+    for ordem in ordens:
+        pecas_qs = POModel.objects.filter(ordem=ordem)
+
+        if peca_is_fk:
+            pecas_raw = list(
+                pecas_qs.values(
+                    'peca__codigo', 'peca__descricao', 'qtd_planejada', 'qtd_boa'
+                )
+            )
+            pecas = [
+                {
+                    'codigo': p['peca__codigo'] or '',
+                    'descricao': p['peca__descricao'] or '',
+                    'qtd_planejada': p['qtd_planejada'],
+                    'qtd_boa': p['qtd_boa'],
+                }
+                for p in pecas_raw
+            ]
+        else:
+            pecas_raw = list(pecas_qs.values('peca', 'qtd_planejada', 'qtd_boa'))
+            pecas = [
+                {
+                    'codigo': p['peca'],
+                    'descricao': '',
+                    'qtd_planejada': p['qtd_planejada'],
+                    'qtd_boa': p['qtd_boa'],
+                }
+                for p in pecas_raw
+            ]
+
+        processo_inicio = (
+            OrdemProcesso.objects
+            .filter(ordem=ordem, status='iniciada')
+            .order_by('-data_inicio')
+            .first()
+        )
+        iniciado_em = (
+            localtime(processo_inicio.data_inicio).strftime('%d/%m/%Y %H:%M')
+            if processo_inicio else '—'
+        )
+
+        numero_ordem = ordem.ordem or ordem.ordem_duplicada or '—'
+
+        resultado.append({
+            'maquina': ordem.maquina.nome if ordem.maquina else '—',
+            'ordem': numero_ordem,
+            'operador': ordem.operador_final.nome if ordem.operador_final else '—',
+            'status': STATUS_LABELS.get(ordem.status_atual, ordem.status_atual),
+            'data_programacao': ordem.data_programacao.strftime('%d/%m/%Y') if ordem.data_programacao else '—',
+            'iniciado_em': iniciado_em,
+            'pecas': pecas,
+        })
+
+    return JsonResponse({'setor': setor, 'ordens': resultado})
