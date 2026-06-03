@@ -631,7 +631,10 @@ class CustomLoginView(LoginView):
         return super().form_invalid(form)
         
 def home(request):
-    return render(request, 'home/home.html')  
+    return render(request, 'home/home.html')
+
+def api_docs(request):
+    return render(request, 'core/api_docs.html')  
 
 def versao(request):
     # Busca todas as versões ordenadas pela data mais recente

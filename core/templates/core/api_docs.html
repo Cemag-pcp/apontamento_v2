@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>API Cemag — Documentação</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+  const spec = {
+    openapi: "3.0.0",
+    info: {
+      title: "API Cemag — Ordens de Produção",
+      version: "1.0.0",
+      description: "Endpoints para criação de ordens de produção. Os endpoints estão organizados por setor."
+    },
+    servers: [
+      { url: "https://cmgprod.com.br", description: "Produção" },
+      { url: "https://apontamento-v2-testes.onrender.com", description: "Testes" }
+    ],
+    paths: {
+      "/estamparia/api/criar-ordem-estamparia/": {
+        post: {
+          tags: ["Estamparia"],
+          summary: "Criar ordem(ns) de produção",
+          description: "Aceita dois formatos:\n\n**Ordem única** — `application/x-www-form-urlencoded` ou JSON com objeto `{}`\n\n**Múltiplas ordens** — JSON com array `[{}, {}]`. Cada ordem é processada de forma independente: erros em uma não afetam as demais.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  oneOf: [
+                    { "$ref": "#/components/schemas/OrdemEstampariaInput" },
+                    { type: "array", items: { "$ref": "#/components/schemas/OrdemEstampariaInput" }, minItems: 1 }
+                  ]
+                },
+                examples: {
+                  unica: {
+                    summary: "Ordem única (JSON)",
+                    value: { maquinaPlanejada: 11, pecaSelect: "010108", qtdPlanejada: 50, dataProgramacao: "2026-06-10", ordemPrioridade: 1, observacoes: "Urgente cliente X" }
+                  },
+                  multiplas: {
+                    summary: "Múltiplas ordens (JSON)",
+                    value: [
+                      { maquinaPlanejada: 11, pecaSelect: "010108", qtdPlanejada: 50, dataProgramacao: "2026-06-10", ordemPrioridade: 1, observacoes: "Lote A" },
+                      { maquinaPlanejada: 18, pecaSelect: "026875", qtdPlanejada: 20, dataProgramacao: "2026-06-11", ordemPrioridade: 2 }
+                    ]
+                  }
+                }
+              },
+              "application/x-www-form-urlencoded": {
+                schema: { "$ref": "#/components/schemas/OrdemEstampariaInput" },
+                examples: {
+                  unica: {
+                    summary: "Ordem única (form)",
+                    value: { maquinaPlanejada: 11, pecaSelect: "010108", qtdPlanejada: 50, dataProgramacao: "2026-06-10", ordemPrioridade: 1, observacoes: "Urgente cliente X" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Ordem(ns) processada(s)",
+              content: {
+                "application/json": {
+                  schema: { oneOf: [{ "$ref": "#/components/schemas/RespostaUnica" }, { "$ref": "#/components/schemas/RespostaBatch" }] },
+                  examples: {
+                    unica: { summary: "Ordem única criada", value: { message: "Status atualizado com sucesso.", ordem_id: 42780, maquina_id: 11 } },
+                    batch_parcial: {
+                      summary: "Batch com erro parcial",
+                      value: {
+                        message: "2 ordem(ns) criada(s), 1 com erro.",
+                        resultados: [
+                          { index: 1, status: "criada", ordem_id: 42782, maquina_id: 11 },
+                          { index: 2, status: "erro", error: "Ordem 2: Peca 'INVALIDA' nao encontrada." },
+                          { index: 3, status: "criada", ordem_id: 42783, maquina_id: 18 }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Erro de validação",
+              content: {
+                "application/json": {
+                  schema: { "$ref": "#/components/schemas/Erro" },
+                  examples: {
+                    peca:       { summary: "Peca nao encontrada",  value: { error: "Peca 'XYZ' nao encontrada." } },
+                    maquina:    { summary: "Maquina nao encontrada", value: { error: "Maquina com id '99' nao encontrada." } },
+                    prioridade: { summary: "Prioridade invalida",  value: { error: "A prioridade deve ser maior ou igual a 1." } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/serra/api/criar-ordem/": {
+        post: {
+          tags: ["Serra"],
+          summary: "Criar ordem(ns) de produção",
+          description: "Aceita dois formatos:\n\n**Ordem única** — JSON com objeto `{}`\n\n**Múltiplas ordens** — JSON com array `[{}, {}]`. Cada ordem é processada de forma independente.\n\nCada ordem aceita múltiplas peças no campo `pecas`. A máquina é atribuída posteriormente pelo operador ao iniciar a ordem.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  oneOf: [
+                    { "$ref": "#/components/schemas/OrdemSerraInput" },
+                    { type: "array", items: { "$ref": "#/components/schemas/OrdemSerraInput" }, minItems: 1 }
+                  ]
+                },
+                examples: {
+                  unica: {
+                    summary: "Ordem única (campos obrigatórios)",
+                    value: { mp: "SAE 1020", dataProgramacao: "2026-06-10", pecas: [{ peca: "010108", quantidade: 50 }] }
+                  },
+                  unica_completa: {
+                    summary: "Ordem única (todos os campos)",
+                    value: { mp: "SAE 1020", descricaoMp: "Barra Redonda SAE 1020", tamanhoVara: 6000, quantidade: 10, dataProgramacao: "2026-06-10", ordemPrioridade: 1, descricao: "Ref. OS 4521", pecas: [{ peca: "010108", quantidade: 50 }, { peca: "026875", quantidade: 20 }] }
+                  },
+                  multiplas: {
+                    summary: "Múltiplas ordens",
+                    value: [
+                      { mp: "SAE 1020", tamanhoVara: 6000, quantidade: 5, dataProgramacao: "2026-06-10", ordemPrioridade: 1, pecas: [{ peca: "010108", quantidade: 30 }] },
+                      { mp: "SAE 1045", tamanhoVara: 3000, quantidade: 8, dataProgramacao: "2026-06-11", ordemPrioridade: 2, pecas: [{ peca: "026875", quantidade: 15 }] }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Ordem(ns) processada(s)",
+              content: {
+                "application/json": {
+                  schema: { oneOf: [{ "$ref": "#/components/schemas/RespostaSerraUnica" }, { "$ref": "#/components/schemas/RespostaBatch" }] },
+                  examples: {
+                    unica: { summary: "Ordem única criada", value: { status: "success", message: "Ordem criada com sucesso!", ordem_id: 500 } },
+                    batch: {
+                      summary: "Batch com erro parcial",
+                      value: {
+                        message: "1 ordem(ns) criada(s), 1 com erro.",
+                        resultados: [
+                          { index: 1, status: "criada", ordem_id: 501 },
+                          { index: 2, status: "erro", error: "Ordem 2: Peca 'INVALIDA' nao encontrada." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Erro de validação",
+              content: { "application/json": { schema: { "$ref": "#/components/schemas/Erro" } } }
+            }
+          }
+        }
+      },
+      "/usinagem/api/criar-ordem-usinagem/": {
+        post: {
+          tags: ["Usinagem"],
+          summary: "Criar ordem(ns) de produção",
+          description: "Aceita dois formatos:\n\n**Ordem única** — `application/x-www-form-urlencoded` ou JSON com objeto `{}`\n\n**Múltiplas ordens** — JSON com array `[{}, {}]`. Cada ordem é processada de forma independente: erros em uma não afetam as demais.\n\n**Obs:** o campo `maquinaPlanejada` é opcional para Usinagem.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  oneOf: [
+                    { "$ref": "#/components/schemas/OrdemUsinagemInput" },
+                    { type: "array", items: { "$ref": "#/components/schemas/OrdemUsinagemInput" }, minItems: 1 }
+                  ]
+                },
+                examples: {
+                  unica: { summary: "Ordem única (JSON)", value: { maquinaPlanejada: 3, pecaSelect: "010108", qtdPlanejada: 10, dataProgramacao: "2026-06-10", ordemPrioridade: 1, observacoes: "Ref. OS 4521" } },
+                  sem_maquina: { summary: "Sem máquina definida", value: { pecaSelect: "010108", qtdPlanejada: 10, dataProgramacao: "2026-06-10", ordemPrioridade: 1 } },
+                  multiplas: {
+                    summary: "Múltiplas ordens",
+                    value: [
+                      { maquinaPlanejada: 3, pecaSelect: "010108", qtdPlanejada: 10, dataProgramacao: "2026-06-10", ordemPrioridade: 1 },
+                      { maquinaPlanejada: 4, pecaSelect: "026875", qtdPlanejada: 5,  dataProgramacao: "2026-06-11", ordemPrioridade: 2 }
+                    ]
+                  }
+                }
+              },
+              "application/x-www-form-urlencoded": {
+                schema: { "$ref": "#/components/schemas/OrdemUsinagemInput" }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "Ordem(ns) processada(s)",
+              content: {
+                "application/json": {
+                  schema: { oneOf: [{ "$ref": "#/components/schemas/RespostaUnica" }, { "$ref": "#/components/schemas/RespostaBatch" }] },
+                  examples: {
+                    unica: { summary: "Ordem única criada", value: { message: "Status atualizado com sucesso.", ordem_id: 1050, maquina_id: 3 } },
+                    sem_maquina: { summary: "Sem máquina", value: { message: "Status atualizado com sucesso.", ordem_id: 1051, maquina_id: null } },
+                    batch: {
+                      summary: "Batch com erro parcial",
+                      value: {
+                        message: "1 ordem(ns) criada(s), 1 com erro.",
+                        resultados: [
+                          { index: 1, status: "criada", ordem_id: 1052, maquina_id: 3 },
+                          { index: 2, status: "erro", error: "Ordem 2: Peca 'INVALIDA' nao encontrada." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              description: "Erro de validação",
+              content: { "application/json": { schema: { "$ref": "#/components/schemas/Erro" } } }
+            }
+          }
+        }
+      }
+    },
+    components: {
+      schemas: {
+        OrdemSerraInput: {
+          type: "object",
+          required: ["mp", "dataProgramacao", "pecas"],
+          properties: {
+            mp:              { type: "string",  description: "**Obrigatório.** Código da matéria-prima. Criada automaticamente se não existir.", example: "SAE 1020" },
+            descricaoMp:     { type: "string",  description: "Opcional. Descrição da MP (usada apenas na criação automática). Padrão: usa o código do mp.", example: "Barra Redonda SAE 1020" },
+            tamanhoVara:     { type: "number",  description: "Opcional. Tamanho da vara em mm. Padrão: 0.", example: 6000 },
+            quantidade:      { type: "integer", description: "Opcional. Quantidade de varas. Padrão: 0.", example: 10 },
+            dataProgramacao: { type: "string",  format: "date", description: "**Obrigatório.** Data programada no formato YYYY-MM-DD.", example: "2026-06-10" },
+            ordemPrioridade: { type: "integer", minimum: 1, description: "Opcional. Prioridade da ordem (mínimo 1). Padrão: null.", example: 1 },
+            descricao:       { type: "string",  description: "Opcional. Observação livre. Sufixada automaticamente com ' - Ordem criada por api'. Padrão: 'Ordem criada por api'.", example: "Ref. OS 4521" },
+            retalho:         { type: "string",  enum: ["on"], description: "Opcional. Envie 'on' para marcar como retalho. Omita para false." },
+            pecas: {
+              type: "array",
+              minItems: 1,
+              description: "Lista de peças associadas à ordem.",
+              items: {
+                type: "object",
+                required: ["peca", "quantidade"],
+                properties: {
+                  peca:       { type: "string",  description: "**Obrigatório.** Código da peça.", example: "010108" },
+                  quantidade: { type: "number",  description: "**Obrigatório.** Quantidade planejada.", example: 50 }
+                }
+              }
+            }
+          }
+        },
+        RespostaSerraUnica: {
+          type: "object",
+          properties: {
+            status:   { type: "string",  example: "success" },
+            message:  { type: "string",  example: "Ordem criada com sucesso!" },
+            ordem_id: { type: "integer", example: 500 }
+          }
+        },
+        OrdemEstampariaInput: {
+          type: "object",
+          required: ["maquinaPlanejada", "pecaSelect", "qtdPlanejada", "dataProgramacao", "ordemPrioridade"],
+          properties: {
+            maquinaPlanejada: { type: "integer", description: "ID da máquina. Opções: 9 Viradeira 1 · 10 Viradeira 2 · 11 Viradeira 3 · 12 Viradeira 4 · 13 Viradeira 5 · 18 Prensa · 69 Rebordeadeira · 70 Calandra · 77 Viradeira Manual", enum: [9, 10, 11, 12, 13, 18, 69, 70, 77], example: 11 },
+            pecaSelect:       { type: "string",  description: "Código da peça cadastrada no sistema.", example: "010108" },
+            qtdPlanejada:     { type: "integer", description: "Quantidade planejada para produção.", example: 50 },
+            dataProgramacao:  { type: "string",  format: "date", description: "Data programada no formato YYYY-MM-DD.", example: "2026-06-10" },
+            ordemPrioridade:  { type: "integer", minimum: 1, description: "Prioridade da ordem (mínimo 1).", example: 1 },
+            observacoes:      { type: "string",  description: "Observação livre. Será sufixada com ' - Ordem criada por api'.", example: "Urgente cliente X" }
+          }
+        },
+        OrdemUsinagemInput: {
+          type: "object",
+          required: ["pecaSelect", "qtdPlanejada", "dataProgramacao", "ordemPrioridade"],
+          properties: {
+            maquinaPlanejada: { type: "integer", description: "ID da máquina (opcional). Opções: 3 Centro de usinagem · 4 Torno 1 · 5 Torno 2 · 22 Furadeira 1 · 23 Furadeira 2 · 24 Furadeira 3 · 25 Furadeira 4 · 26 Furadeira 5 · 27 Furadeira 6 · 28 Furadeira 7 · 53 Chanfradeira · 59 Centur 30 · 60 GL 250m · 71 Torno Convencional 1 · 73 Esmerilhadeira · 74 Trabalho Manual 1 · 75 Trabalho Manual 2 · 76 Viradeira 1", enum: [3, 4, 5, 22, 23, 24, 25, 26, 27, 28, 53, 59, 60, 71, 73, 74, 75, 76], example: 3 },
+            pecaSelect:       { type: "string",  description: "Código da peça cadastrada no sistema.", example: "010108" },
+            qtdPlanejada:     { type: "integer", description: "Quantidade planejada para produção.", example: 10 },
+            dataProgramacao:  { type: "string",  format: "date", description: "Data programada no formato YYYY-MM-DD.", example: "2026-06-10" },
+            ordemPrioridade:  { type: "integer", minimum: 1, description: "Prioridade da ordem (mínimo 1).", example: 1 },
+            observacoes:      { type: "string",  description: "Observação livre. Será sufixada com ' - Ordem criada por api'.", example: "Ref. OS 4521" }
+          }
+        },
+        RespostaUnica: {
+          type: "object",
+          properties: {
+            message:    { type: "string",  example: "Status atualizado com sucesso." },
+            ordem_id:   { type: "integer", example: 42780 },
+            maquina_id: { type: "integer", example: 11 }
+          }
+        },
+        RespostaBatch: {
+          type: "object",
+          properties: {
+            message: { type: "string", example: "2 ordem(ns) criada(s), 1 com erro." },
+            resultados: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  index:      { type: "integer" },
+                  status:     { type: "string", enum: ["criada", "erro"] },
+                  ordem_id:   { type: "integer" },
+                  maquina_id: { type: "integer" },
+                  error:      { type: "string" }
+                }
+              }
+            }
+          }
+        },
+        Erro: {
+          type: "object",
+          properties: {
+            error: { type: "string" }
+          }
+        }
+      }
+    }
+  };
+
+  SwaggerUIBundle({
+    spec: spec,
+    dom_id: "#swagger-ui",
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+    layout: "BaseLayout",
+    deepLinking: true,
+    defaultModelsExpandDepth: -1
+  });
+</script>
+</body>
+</html>

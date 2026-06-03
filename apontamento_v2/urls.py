@@ -2,10 +2,13 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from core import views as core_views 
+from django.views.generic import RedirectView
+from core import views as core_views
 
 urlpatterns = [
-    path('', core_views.home, name='home'), 
+    path('', core_views.home, name='home'),
+    path('api/docs/', core_views.api_docs, name='api_docs'),
+    path('favicon.ico', RedirectView.as_view(url='', permanent=True)),
 
     path('core/', include('core.urls')),
     path('admin/', admin.site.urls),

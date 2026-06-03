@@ -1114,10 +1114,6 @@ def planejar_ordem_estamparia(request):
             'resultados': resultados,
         }, status=200)
 
-def api_docs(request):
-    return render(request, 'apontamento_estamparia/api_docs.html')
-
-
 def api_apontamentos_peca(request):
 
     pecas_ordenadas = (

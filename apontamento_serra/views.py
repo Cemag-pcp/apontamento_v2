@@ -631,57 +631,120 @@ def get_peca(request):
 
     return JsonResponse(data)
 
+def _validar_e_montar_ordem_serra(item, index=None):
+    prefix = f"Ordem {index}: " if index is not None else ""
+
+    mp_codigo = (item.get('mp') or '').strip()
+    if not mp_codigo:
+        return None, f"{prefix}Código de MP é obrigatório."
+
+    if not item.get('dataProgramacao'):
+        return None, f"{prefix}Data de programação é obrigatória."
+
+    pecas_input = item.get('pecas', [])
+    if not pecas_input:
+        return None, f"{prefix}Informe ao menos uma peça."
+
+    pecas_validadas = []
+    for i, p in enumerate(pecas_input):
+        codigo = p.get('peca', '')
+        peca_obj = Pecas.objects.filter(codigo=codigo, ativo=True).first()
+        if not peca_obj:
+            return None, f"{prefix}Peça '{codigo}' não encontrada."
+        if p.get('quantidade') in (None, '', 0):
+            return None, f"{prefix}Quantidade da peça '{codigo}' é obrigatória e deve ser maior que zero."
+        pecas_validadas.append({'peca': peca_obj, 'quantidade': p.get('quantidade')})
+
+    obs_raw = item.get('descricao') or ''
+    obs_final = f"{obs_raw} - Ordem criada por api" if obs_raw else "Ordem criada por api"
+
+    try:
+        prioridade = int(item.get('ordemPrioridade')) if item.get('ordemPrioridade') else None
+    except (TypeError, ValueError):
+        return None, f"{prefix}Informe uma prioridade numerica valida."
+
+    return {
+        'mp_codigo': mp_codigo,
+        'descricao_mp': item.get('descricao_mp') or item.get('descricaoMp'),
+        'obs': obs_final,
+        'data_programacao': item.get('dataProgramacao'),
+        'tamanho': item.get('tamanhoVara', 0),
+        'quantidade': 0 if item.get('quantidade') == '' else item.get('quantidade', 0),
+        'retalho': item.get('retalho') == 'on',
+        'prioridade': prioridade,
+        'pecas': pecas_validadas,
+    }, None
+
+
+def _criar_ordem_serra(dados):
+    with transaction.atomic():
+        nova_ordem = Ordem.objects.create(
+            obs=dados['obs'],
+            grupo_maquina='serra',
+            data_programacao=dados['data_programacao'],
+            ordem_prioridade=dados['prioridade'],
+        )
+        mp = obter_ou_criar_mp_serra(dados['mp_codigo'], dados['descricao_mp'])
+        PropriedadesOrdem.objects.create(
+            ordem=nova_ordem,
+            mp_codigo=mp,
+            tamanho=dados['tamanho'],
+            quantidade=dados['quantidade'],
+            retalho=dados['retalho'],
+        )
+        for p in dados['pecas']:
+            PecasOrdem.objects.create(
+                ordem=nova_ordem,
+                peca=p['peca'],
+                qtd_planejada=p['quantidade'],
+            )
+        transaction.on_commit(lambda o=nova_ordem: notificar_ordem(o))
+    return nova_ordem
+
+
+@csrf_exempt
 def criar_ordem(request):
     if request.method != "POST":
         return JsonResponse({'status': 'error', 'message': 'Método não permitido.'}, status=405)
 
     try:
-        # Carrega o JSON enviado no corpo da requisição
-        data = json.loads(request.body)
-
-        with transaction.atomic():
-
-            # Criação da nova ordem
-            nova_ordem = Ordem.objects.create(
-                obs=data.get('descricao', ''),  # Usa o valor de 'descricao' ou string vazia caso não exista
-                grupo_maquina='serra',
-                data_programacao=data.get('dataProgramacao')
-            )
-
-            # Criação das propriedades da ordem
-            mp = obter_ou_criar_mp_serra(
-                data.get('mp'),
-                data.get('descricao_mp') or data.get('descricaoMp')
-            )
-            if not mp:
-                return JsonResponse({'status': 'error', 'message': 'Código de MP é obrigatório.'}, status=400)
-
-            PropriedadesOrdem.objects.create(
-                ordem=nova_ordem,
-                mp_codigo=mp,
-                tamanho=data.get('tamanhoVara', 0),  # Usa valor padrão caso 'tamanho' não exista
-                quantidade=0 if data.get('quantidade') == '' else data.get('quantidade'),  # Usa valor padrão caso 'qtd' não exista
-                retalho=(data.get('retalho') == 'on')  # Converte "on" para True e ausente para False
-            )
-
-            # Iteração para criar peças associadas à ordem
-            for peca in data.get('pecas', []):  # Garante que 'pecas' seja uma lista, mesmo se não existir
-                PecasOrdem.objects.create(
-                    ordem=nova_ordem,
-                    peca=get_object_or_404(Pecas, codigo=peca.get('peca')),
-                    qtd_planejada=peca.get('quantidade', 0),  # Usa valor padrão caso 'quantidade' não exista
-                )
-
-            # Retorna sucesso se tudo foi processado
-            return JsonResponse({'status': 'success', 'message': 'Ordem criada com sucesso!'})
-
+        body = json.loads(request.body)
     except json.JSONDecodeError as e:
-        # Captura erro ao decodificar JSON
         return JsonResponse({'status': 'error', 'message': 'Erro ao processar JSON', 'details': str(e)}, status=400)
 
-    except Exception as e:
-        # Captura erros genéricos
-        return JsonResponse({'status': 'error', 'message': 'Erro ao criar a ordem', 'details': str(e)}, status=500)
+    is_batch = isinstance(body, list)
+    itens = body if is_batch else [body]
+
+    if not is_batch:
+        dados, erro = _validar_e_montar_ordem_serra(itens[0])
+        if erro:
+            return JsonResponse({'status': 'error', 'message': erro}, status=400)
+
+        try:
+            nova_ordem = _criar_ordem_serra(dados)
+            return JsonResponse({'status': 'success', 'message': 'Ordem criada com sucesso!', 'ordem_id': nova_ordem.pk})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': 'Erro ao criar a ordem', 'details': str(e)}, status=500)
+
+    resultados = []
+    for i, item in enumerate(itens):
+        dados, erro = _validar_e_montar_ordem_serra(item, index=i + 1)
+        if erro:
+            resultados.append({'index': i + 1, 'status': 'erro', 'error': erro})
+            continue
+        try:
+            nova_ordem = _criar_ordem_serra(dados)
+            resultados.append({'index': i + 1, 'status': 'criada', 'ordem_id': nova_ordem.pk})
+        except Exception as e:
+            resultados.append({'index': i + 1, 'status': 'erro', 'error': str(e)})
+
+    total_criadas = sum(1 for r in resultados if r['status'] == 'criada')
+    total_erros = len(resultados) - total_criadas
+
+    return JsonResponse({
+        'message': f'{total_criadas} ordem(ns) criada(s), {total_erros} com erro.',
+        'resultados': resultados,
+    })
 
 def adicionar_pecas_ordem(request):
 
