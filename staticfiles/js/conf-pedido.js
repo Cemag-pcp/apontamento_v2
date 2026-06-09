@@ -731,13 +731,19 @@ function renderAgenteResultado(data) {
     const statusClass = statusConsistente ? 'text-success' : 'text-warning';
 
     const rows = data.itens.map((item) => {
-        const rowClass = item.divergencia ? 'table-warning' : '';
-        const iaClass = item.divergencia ? 'fw-bold text-danger' : 'fw-semibold text-success';
+        // divergencia = ERP está errado; crm_divergencia = CRM está errado (independente)
+        const erpErrado = !!item.divergencia;
+        const crmErrado = !!item.crm_divergencia;
+        const rowClass = erpErrado ? 'table-danger' : (crmErrado ? 'table-warning' : '');
+        const iaClass = erpErrado ? 'fw-bold text-danger' : 'fw-bold text-success';
+        const crmBadge = crmErrado ? ' <span class="badge bg-warning text-dark ms-1" title="CRM precisa ser atualizado">CRM ⚠</span>' : '';
+        const motivo = item.motivo && item.motivo !== '—' ? escapeHtml(item.motivo) : '';
         return `
             <tr class="${rowClass}">
                 <td class="font-monospace small">${escapeHtml(item.erp || '—')}</td>
-                <td class="font-monospace small">${escapeHtml(item.crm || '—')}</td>
+                <td class="font-monospace small">${escapeHtml(item.crm || '—')}${crmBadge}</td>
                 <td class="font-monospace small ${iaClass}">${escapeHtml(item.ia || '—')}</td>
+                <td class="small text-muted fst-italic">${motivo}</td>
             </tr>`;
     }).join('');
 
@@ -748,7 +754,8 @@ function renderAgenteResultado(data) {
                     <tr>
                         <th>ERP</th>
                         <th>CRM</th>
-                        <th>IA</th>
+                        <th>Código sugerido</th>
+                        <th>O que a IA detectou</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
