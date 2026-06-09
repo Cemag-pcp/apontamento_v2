@@ -51,7 +51,9 @@
       "Bash(Select-Object -First 30)",
       "Bash(Format-Table FullName)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\" -Recurse -Directory | Where-Object {$_.Name -match \"inspecao|views|urls|templates\"} | Select-Object -ExpandProperty FullName | Sort-Object)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code} %{redirect_url}\" -X POST \"https://cmgprod.com.br/estamparia/api/criar-ordem-estamparia/\" -H \"Content-Type: application/json\" -d \"{}\" --max-redirs 0)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{redirect_url}\" -X POST \"https://cmgprod.com.br/estamparia/api/criar-ordem-estamparia/\" -H \"Content-Type: application/json\" -d \"{}\" --max-redirs 0)",
+      "Bash(venv/Scripts/python.exe manage.py check solicitacao_almox)",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('solicitacao_almox/views.py'\\).read\\(\\)\\); print\\('OK - sem erros de sintaxe'\\)\")"
     ]
   }
 }

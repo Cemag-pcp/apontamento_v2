@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseRedirect, HttpResponse, Http404, StreamingHttpResponse
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.db import IntegrityError
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
@@ -1417,3 +1418,55 @@ def receber_ajuste_manual(request):
                 return JsonResponse(
                     {"status": "success", "message": "Dados salvos com sucesso!"}
                 )
+
+
+@csrf_exempt
+@require_POST
+def api_criar_requisicao(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"status": "erro", "mensagem": "JSON inválido."}, status=400)
+
+    campos_obrigatorios = ["funcionario_id", "cc_id", "item_id", "classe_requisicao_id", "quantidade", "status_id"]
+    for campo in campos_obrigatorios:
+        if campo not in data or data[campo] in (None, ""):
+            return JsonResponse({"status": "erro", "mensagem": f"Campo obrigatório ausente: {campo}"}, status=400)
+
+    try:
+        funcionario = get_object_or_404(Funcionario, pk=data["funcionario_id"], ativo=True)
+        cc = get_object_or_404(Cc, pk=data["cc_id"])
+        item = get_object_or_404(ItensSolicitacao, pk=data["item_id"])
+        classe_requisicao = get_object_or_404(ClasseRequisicao, pk=data["classe_requisicao_id"])
+        status = get_object_or_404(RegraSlaAlmox, pk=data["status_id"], ativo=True)
+        quantidade = float(data["quantidade"])
+    except (ValueError, TypeError):
+        return JsonResponse({"status": "erro", "mensagem": "Valor inválido para 'quantidade'."}, status=400)
+    except Http404 as e:
+        return JsonResponse({"status": "erro", "mensagem": str(e)}, status=404)
+
+    solicitacao = SolicitacaoRequisicao.objects.create(
+        funcionario=funcionario,
+        cc=cc,
+        item=item,
+        classe_requisicao=classe_requisicao,
+        quantidade=quantidade,
+        status=status,
+        obs=data.get("obs", ""),
+    )
+
+    try:
+        operador = get_object_or_404(OperadorAlmox, matricula=funcionario.matricula, status=True)
+        now = datetime.now()
+        solicitacao.entregue_por = operador
+        solicitacao.data_entrega = now.strftime("%Y-%m-%dT%H:%M")
+        solicitacao.save()
+        operador_encontrado = True
+    except Http404:
+        operador_encontrado = False
+
+    return JsonResponse({
+        "status": "sucesso",
+        "id": solicitacao.id,
+        "operador_encontrado": operador_encontrado,
+    }, status=201)

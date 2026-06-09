@@ -40,6 +40,8 @@ urlpatterns = [
     # teste
     path('api/receber-form-edit/', views.receberFormEdit, name='receberFormEdit'),
 
+    path('api/criar-requisicao/', views.api_criar_requisicao, name='api_criar_requisicao'),
+
 ]
 
 
