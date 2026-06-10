@@ -63,6 +63,7 @@ class ProfileAdmin(admin.ModelAdmin):
     list_display = ("user", "tipo_acesso")
     list_filter = ("tipo_acesso",)
     search_fields = ("user__username",)
+    filter_horizontal = ("setores", "permissoes")
 
     def has_module_permission(self, request):
 

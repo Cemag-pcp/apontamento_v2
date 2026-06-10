@@ -1,0 +1,7 @@
+Performing system checks...
+
+System check identified no issues (0 silenced).
+June 10, 2026 - 11:33:33
+Django version 4.2.16, using settings 'apontamento_v2.settings'
+Starting ASGI/Daphne version 4.2.1 development server at http://127.0.0.1:8001/
+Quit the server with CTRL-BREAK.

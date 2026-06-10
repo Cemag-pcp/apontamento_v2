@@ -78,7 +78,13 @@
                             <i class="bi bi-plus"></i> Novo
                         </button>
                     </div>
-                    <input type="date" id="reports-data" class="form-control form-control-sm">
+                    <select id="reports-setor-filtro" class="form-select form-select-sm">
+                        <option value="">Todos os setores</option>
+                        <option value="sem-setor">Sem setor</option>
+                        {% for setor in setores_filtro %}
+                            <option value="{{ setor.id }}">{{ setor.nome }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="card-body p-2" style="max-height:65vh; overflow-y:auto;">
                     <div id="reports-list">
@@ -103,6 +109,16 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <div class="mb-3" id="report-setor-container">
+                    <label for="report-setor" class="form-label fw-bold">Setor</label>
+                    <select id="report-setor" class="form-select">
+                        <option value="">Selecione...</option>
+                        {% for setor in setores_usuario %}
+                            <option value="{{ setor.id }}">{{ setor.nome }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted" id="report-setor-ajuda"></small>
+                </div>
                 <div class="mb-1">
                     <label class="form-label fw-bold">Descrição</label>
                     <textarea id="report-texto" class="form-control" rows="6"
@@ -114,6 +130,41 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-success" id="btn-salvar-report">
                     <i class="bi bi-save"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Excluir Report -->
+<div class="modal fade" id="modalExcluirReport" tabindex="-1"
+     aria-labelledby="modalExcluirReportLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalExcluirReportLabel">
+                    <i class="bi bi-trash text-danger"></i> Excluir report
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                    aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Confirma a exclusão deste report?</p>
+                <div class="border rounded bg-light p-2 mb-3">
+                    <div class="fw-bold small" id="report-exclusao-autor"></div>
+                    <div class="small text-muted mt-1" id="report-exclusao-texto"></div>
+                </div>
+                <div class="alert alert-danger mb-0" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    <strong>Atenção: esta ação não poderá ser desfeita.</strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="btn-confirmar-exclusao-report">
+                    <i class="bi bi-trash"></i> Excluir definitivamente
                 </button>
             </div>
         </div>
@@ -146,19 +197,44 @@
         max-height: 100%;
         height: 100%;
     }
+
+    .report-card {
+        background-color: #f8f9fa;
+        transition: background-color .2s ease, border-color .2s ease;
+    }
+    .report-card.report-concluido {
+        background-color: #d1e7dd;
+        border-color: #a3cfbb !important;
+    }
+    .report-status-concluido {
+        color: #146c43;
+    }
+    .btn-excluir-report {
+        line-height: 1;
+    }
 </style>
 {% endblock %}
 
 {% block scripts %}
+{{ setores_usuario|json_script:"setores-usuario-data" }}
 <script>
 const CONFIG_KEY    = 'reuniao_config_v1';
 const URL_TABELA    = "{% url 'reuniao:tabela_producao' %}";
 const URL_LIVE      = "{% url 'reuniao:andamento_live' %}";
 const URL_REPORTS   = "{% url 'reuniao:listar_reports' %}";
 const URL_CRIAR     = "{% url 'reuniao:criar_report' %}";
+const URL_CONCLUSAO = "{% url 'reuniao:atualizar_conclusao_report' 0 %}";
+const URL_EXCLUIR   = "{% url 'reuniao:excluir_report' 0 %}";
+const PODE_CONCLUIR_REPORTS = {{ pode_concluir_reports|yesno:"true,false" }};
+const PODE_EXCLUIR_REPORTS = {{ pode_excluir_reports|yesno:"true,false" }};
+const PODE_REPORTAR_QUALQUER_SETOR = {{ pode_reportar_qualquer_setor|yesno:"true,false" }};
+const SETORES_USUARIO = JSON.parse(
+    document.getElementById('setores-usuario-data').textContent
+);
 const SETORES_LIVE  = ['estamparia', 'usinagem', 'serra', 'corte'];
 
 let _liveInterval = null;
+let _reportParaExcluir = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -452,31 +528,217 @@ async function loadTabela() {
 function renderReports(reports) {
     const list = document.getElementById('reports-list');
     if (!reports.length) {
-        list.innerHTML = `
-            <div class="text-center text-muted py-4 small">
-                <i class="bi bi-journal" style="font-size:2rem;opacity:.4;"></i>
-                <p class="mt-2 mb-0">Nenhum report hoje.</p>
-            </div>`;
+        renderReportsVazio();
         return;
     }
 
-    list.innerHTML = reports.map(r => `
-        <div class="border rounded p-2 mb-2 bg-light">
+    list.innerHTML = reports.map(r => {
+        const controle = PODE_CONCLUIR_REPORTS
+            ? `<div class="form-check mb-0">
+                   <input class="form-check-input report-check" type="checkbox"
+                       id="report-check-${r.id}" data-report-id="${r.id}"
+                       ${r.concluido ? 'checked' : ''}>
+                   <label class="form-check-label small" for="report-check-${r.id}">
+                       Concluído
+                   </label>
+               </div>`
+            : (r.concluido
+                ? `<span class="report-status-concluido small fw-bold">
+                       <i class="bi bi-check-circle-fill"></i> Concluído
+                   </span>`
+                : '');
+        const botaoExcluir = PODE_EXCLUIR_REPORTS
+            ? `<button type="button"
+                   class="btn btn-sm btn-outline-danger btn-excluir-report ms-2"
+                   data-report-id="${r.id}"
+                   data-report-autor="${escHtml(r.usuario)}"
+                   data-report-texto="${escHtml(r.texto)}"
+                   title="Excluir report" aria-label="Excluir report">
+                   <i class="bi bi-trash"></i>
+               </button>`
+            : '';
+        const setorBadge = r.setor
+            ? `<span class="badge bg-primary-subtle text-dark border mt-1">
+                   ${escHtml(r.setor.nome)}
+               </span>`
+            : `<span class="badge bg-secondary-subtle text-secondary-emphasis border mt-1">
+                   Sem setor
+               </span>`;
+
+        return `
+        <div class="report-card border rounded p-2 mb-2 ${r.concluido ? 'report-concluido' : ''}"
+             data-report-id="${r.id}">
             <div class="d-flex justify-content-between align-items-start">
                 <span class="fw-bold small">${escHtml(r.usuario)}</span>
                 <span class="text-muted" style="font-size:.7rem;white-space:nowrap;margin-left:6px;">${r.criado_em}</span>
             </div>
+            ${setorBadge}
             <p class="mb-0 mt-1 small" style="white-space:pre-wrap;">${escHtml(r.texto)}</p>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                ${controle}
+                ${botaoExcluir}
+            </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
+
+    list.querySelectorAll('.report-check').forEach(check => {
+        check.addEventListener('change', atualizarConclusaoReport);
+    });
+    list.querySelectorAll('.btn-excluir-report').forEach(button => {
+        button.addEventListener('click', abrirModalExclusaoReport);
+    });
+}
+
+function renderReportsVazio() {
+    document.getElementById('reports-list').innerHTML = `
+        <div class="text-center text-muted py-4 small">
+            <i class="bi bi-journal" style="font-size:2rem;opacity:.4;"></i>
+            <p class="mt-2 mb-0">Nenhum report hoje.</p>
+        </div>`;
 }
 
 async function loadReports() {
-    const data = document.getElementById('reports-data').value || getTodayStr();
+    const setor = document.getElementById('reports-setor-filtro').value;
+    const params = new URLSearchParams();
+    if (setor) params.set('setor', setor);
+    const query = params.toString();
+    const url = query ? `${URL_REPORTS}?${query}` : URL_REPORTS;
+
     try {
-        const res = await fetch(`${URL_REPORTS}?data=${data}`);
-        if (res.ok) renderReports(await res.json());
+        const res = await fetch(url);
+        const data = await res.json();
+        if (res.ok) {
+            renderReports(data);
+        } else {
+            alert(data.error || 'Erro ao carregar reports.');
+        }
     } catch {}
+}
+
+function configurarSetorNovoReport() {
+    const container = document.getElementById('report-setor-container');
+    const select = document.getElementById('report-setor');
+    const ajuda = document.getElementById('report-setor-ajuda');
+
+    if (SETORES_USUARIO.length === 0) {
+        container.classList.add('d-none');
+        select.value = '';
+        return;
+    }
+
+    container.classList.remove('d-none');
+    if (PODE_REPORTAR_QUALQUER_SETOR) {
+        select.disabled = false;
+        select.value = '';
+        ajuda.textContent = 'Escolha para qual setor deseja reportar.';
+    } else if (SETORES_USUARIO.length === 1) {
+        select.value = String(SETORES_USUARIO[0].id);
+        select.disabled = true;
+        ajuda.textContent = 'Setor vinculado ao seu usuário.';
+    } else {
+        select.disabled = false;
+        select.value = '';
+        ajuda.textContent = 'Selecione um dos setores vinculados ao seu usuário.';
+    }
+}
+
+async function atualizarConclusaoReport(event) {
+    const check = event.currentTarget;
+    const reportId = check.dataset.reportId;
+    const concluidoAnterior = !check.checked;
+    const card = check.closest('.report-card');
+
+    check.disabled = true;
+    card.classList.toggle('report-concluido', check.checked);
+
+    try {
+        const url = URL_CONCLUSAO.replace('/0/', `/${reportId}/`);
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ concluido: check.checked }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.error || 'Erro ao atualizar report.');
+        }
+
+        check.checked = data.concluido;
+        card.classList.toggle('report-concluido', data.concluido);
+    } catch (error) {
+        check.checked = concluidoAnterior;
+        card.classList.toggle('report-concluido', concluidoAnterior);
+        alert(error.message || 'Erro de conexão com o servidor.');
+    } finally {
+        check.disabled = false;
+    }
+}
+
+function abrirModalExclusaoReport(event) {
+    const button = event.currentTarget;
+    const texto = button.dataset.reportTexto || '';
+    _reportParaExcluir = {
+        id: button.dataset.reportId,
+        card: button.closest('.report-card'),
+    };
+
+    document.getElementById('report-exclusao-autor').textContent =
+        button.dataset.reportAutor || '';
+    document.getElementById('report-exclusao-texto').textContent =
+        texto.length > 180 ? `${texto.slice(0, 180)}...` : texto;
+
+    bootstrap.Modal.getOrCreateInstance(
+        document.getElementById('modalExcluirReport')
+    ).show();
+}
+
+async function confirmarExclusaoReport() {
+    if (!_reportParaExcluir) return;
+
+    const reportParaExcluir = _reportParaExcluir;
+    const button = document.getElementById('btn-confirmar-exclusao-report');
+    const conteudoOriginal = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = `
+        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+        Excluindo...
+    `;
+
+    try {
+        const url = URL_EXCLUIR.replace('/0/', `/${reportParaExcluir.id}/`);
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            throw new Error(data.error || 'Erro ao excluir report.');
+        }
+
+        const card = reportParaExcluir.card;
+        bootstrap.Modal.getInstance(
+            document.getElementById('modalExcluirReport')
+        ).hide();
+        card.remove();
+        _reportParaExcluir = null;
+
+        if (!document.querySelector('#reports-list .report-card')) {
+            renderReportsVazio();
+        }
+    } catch (error) {
+        alert(error.message || 'Erro de conexão com o servidor.');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = conteudoOriginal;
+    }
 }
 
 function escHtml(str) {
@@ -520,8 +782,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Save report
     document.getElementById('btn-salvar-report').addEventListener('click', async () => {
         const texto = document.getElementById('report-texto').value.trim();
+        const setorId = document.getElementById('report-setor').value || null;
         if (!texto) {
             alert('Escreva o texto do report antes de salvar.');
+            return;
+        }
+        if (SETORES_USUARIO.length > 0 && !setorId) {
+            alert('Selecione o setor do report.');
             return;
         }
 
@@ -535,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken'),
                 },
-                body: JSON.stringify({ texto }),
+                body: JSON.stringify({ texto, setor_id: setorId }),
             });
             const data = await res.json();
 
@@ -574,9 +841,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Inicializa o filtro de data dos reports com hoje
-    document.getElementById('reports-data').value = getTodayStr();
-    document.getElementById('reports-data').addEventListener('change', loadReports);
+    document.getElementById('btn-confirmar-exclusao-report')
+        .addEventListener('click', confirmarExclusaoReport);
+    document.getElementById('reports-setor-filtro')
+        .addEventListener('change', loadReports);
+    document.getElementById('modalExcluirReport')
+        .addEventListener('hidden.bs.modal', () => {
+            _reportParaExcluir = null;
+        });
 
     // Visibilidade inicial dos campos de data
     atualizarVisibilidadeDatas();
@@ -591,6 +863,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.iniciarAutoRefresh = iniciarAutoRefresh;
 
     iniciarAutoRefresh();
+    configurarSetorNovoReport();
 
     // Initial load
     loadTabela();

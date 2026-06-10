@@ -942,8 +942,43 @@ def acessos(request):
         return render(request, 'home/erro-acesso.html', status=403)
     return render(request, 'acessos/acessos.html')
 
+
+def _usuario_e_admin(user):
+    profile = getattr(user, 'profile', None)
+    return profile is not None and profile.tipo_acesso == 'admin'
+
+
+def _setores_por_ids(setor_ids):
+    if setor_ids is None:
+        return []
+    if not isinstance(setor_ids, list):
+        raise ValueError('setor_ids deve ser uma lista.')
+
+    try:
+        ids = [int(setor_id) for setor_id in setor_ids]
+    except (TypeError, ValueError):
+        raise ValueError('Setores inválidos.')
+
+    if len(ids) != len(set(ids)):
+        raise ValueError('Setores duplicados.')
+
+    setores = list(Setor.objects.filter(id__in=ids).order_by('nome'))
+    if len(setores) != len(ids):
+        raise ValueError('Um ou mais setores são inválidos.')
+    return setores
+
+
+@login_required
 def api_listar_usuarios(request):
-    users = Profile.objects.select_related("user").prefetch_related("permissoes").all()
+    if not _usuario_e_admin(request.user):
+        return JsonResponse({"error": "Acesso negado."}, status=403)
+
+    users = (
+        Profile.objects
+        .select_related("user")
+        .prefetch_related("permissoes", "setores")
+        .all()
+    )
 
     usuarios_json = [
         {
@@ -951,12 +986,21 @@ def api_listar_usuarios(request):
             "username": user.user.username,
             "tipo_acesso": user.tipo_acesso,
             "permissoes": list(user.permissoes.values_list("nome", flat=True)),
+            "setores": [
+                {"id": setor.id, "nome": setor.nome}
+                for setor in user.setores.all()
+            ],
         }
         for user in users
     ]
     return JsonResponse(usuarios_json, safe=False)
 
+
+@login_required
 def api_listar_acessos(request, user_id):
+    if not _usuario_e_admin(request.user):
+        return JsonResponse({"error": "Acesso negado."}, status=403)
+
     try:
         # Obtém todas as permissões cadastradas no sistema
         todas_as_rotas = RotaAcesso.objects.all()
@@ -1010,6 +1054,7 @@ def api_criar_usuario(request):
         username = data.get("username", "").strip()
         password = data.get("password", "").strip()
         tipo_acesso = data.get("tipo_acesso", "").strip()
+        setores = _setores_por_ids(data.get("setor_ids", []))
 
         if not username or not password or not tipo_acesso:
             return JsonResponse({"error": "Usuário, senha e tipo de acesso são obrigatórios."}, status=400)
@@ -1023,21 +1068,36 @@ def api_criar_usuario(request):
 
         with transaction.atomic():
             user = User.objects.create_user(username=username, password=password)
-            Profile.objects.create(user=user, tipo_acesso=tipo_acesso)
+            profile = Profile.objects.create(user=user, tipo_acesso=tipo_acesso)
+            profile.setores.set(setores)
 
         return JsonResponse({
             "message": "Usuário criado com sucesso!",
-            "user": {"id": user.id, "username": user.username, "tipo_acesso": tipo_acesso}
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "tipo_acesso": tipo_acesso,
+                "setores": [
+                    {"id": setor.id, "nome": setor.nome}
+                    for setor in setores
+                ],
+            }
         }, status=201)
 
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
 
 @csrf_exempt
+@login_required
 def api_atualizar_acessos(request, user_id):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    if not _usuario_e_admin(request.user):
+        return JsonResponse({"error": "Acesso negado."}, status=403)
 
     try:
         data = json.loads(request.body)
@@ -1045,18 +1105,30 @@ def api_atualizar_acessos(request, user_id):
 
         # Converte os IDs para inteiros
         permissoes_ids = list(map(int, data.get("permissoes", [])))
+        setores = _setores_por_ids(data.get("setor_ids", []))
 
         # Busca as permissões pelo ID corretamente
         permissoes_novas = RotaAcesso.objects.filter(id__in=permissoes_ids)
+        if permissoes_novas.count() != len(set(permissoes_ids)):
+            return JsonResponse({"error": "Uma ou mais permissões são inválidas."}, status=400)
 
         # Atualiza as permissões do perfil
-        profile.permissoes.set(permissoes_novas)
+        with transaction.atomic():
+            profile.permissoes.set(permissoes_novas)
+            profile.setores.set(setores)
 
-        profile.save()
-        return JsonResponse({"message": "Acessos atualizados com sucesso!"})
+        return JsonResponse({
+            "message": "Acessos atualizados com sucesso!",
+            "setores": [
+                {"id": setor.id, "nome": setor.nome}
+                for setor in setores
+            ],
+        })
 
     except Profile.DoesNotExist:
         return JsonResponse({"error": "Perfil não encontrado!"}, status=404)
+    except (TypeError, ValueError) as e:
+        return JsonResponse({"error": str(e)}, status=400)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 

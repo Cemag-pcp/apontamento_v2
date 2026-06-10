@@ -282,6 +282,7 @@ class Profile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     tipo_acesso = models.CharField(max_length=20, choices=ACESSO_CHOICES)
+    setores = models.ManyToManyField(Setor, blank=True, related_name='perfis')
     
     permissoes = models.ManyToManyField(RotaAcesso, blank=True)  # Permissões específicas para rotas
 

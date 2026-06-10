@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_GET
@@ -9,7 +9,7 @@ from django.db.models.functions import Coalesce
 
 from .models import Report
 from core.models import Ordem, OrdemProcesso
-from cadastro.models import Maquina
+from cadastro.models import Maquina, Setor
 from apontamento_montagem.models import PecasOrdem as POMontagem
 from apontamento_solda.models import PecasOrdem as POSolda
 from apontamento_pintura.models import PecasOrdem as POPintura
@@ -41,9 +41,36 @@ PO_MODELS = {
 }
 
 
+def pode_gerenciar_reports(user):
+    profile = getattr(user, 'profile', None)
+    tipo_acesso = getattr(profile, 'tipo_acesso', '').lower()
+    return tipo_acesso in {'pcp', 'admin'}
+
+
+def serializar_setor(setor):
+    if setor is None:
+        return None
+    return {'id': setor.id, 'nome': setor.nome}
+
+
 @login_required
 def reuniao_home(request):
-    return render(request, 'reuniao/reuniao.html')
+    pode_gerenciar = pode_gerenciar_reports(request.user)
+    profile = getattr(request.user, 'profile', None)
+    if pode_gerenciar:
+        setores_usuario = list(Setor.objects.order_by('nome').values('id', 'nome'))
+    elif profile is not None:
+        setores_usuario = list(profile.setores.order_by('nome').values('id', 'nome'))
+    else:
+        setores_usuario = []
+
+    return render(request, 'reuniao/reuniao.html', {
+        'pode_concluir_reports': pode_gerenciar,
+        'pode_excluir_reports': pode_gerenciar,
+        'pode_reportar_qualquer_setor': pode_gerenciar,
+        'setores_usuario': setores_usuario,
+        'setores_filtro': Setor.objects.order_by('nome'),
+    })
 
 
 @login_required
@@ -59,10 +86,47 @@ def criar_report(request):
     if not texto:
         return JsonResponse({'error': 'Texto é obrigatório'}, status=400)
 
+    profile = getattr(request.user, 'profile', None)
+    pode_reportar_qualquer_setor = pode_gerenciar_reports(request.user)
+    setores_disponiveis = (
+        Setor.objects.all()
+        if pode_reportar_qualquer_setor
+        else profile.setores.all() if profile is not None else Setor.objects.none()
+    )
+    setor_id = body.get('setor_id')
+    setor = None
+
+    if pode_reportar_qualquer_setor:
+        if setor_id in (None, ''):
+            return JsonResponse({'error': 'Selecione o setor do report.'}, status=400)
+        try:
+            setor = setores_disponiveis.get(pk=int(setor_id))
+        except (TypeError, ValueError, Setor.DoesNotExist):
+            return JsonResponse(
+                {'error': 'O setor selecionado é inválido.'},
+                status=400,
+            )
+    elif setores_disponiveis.exists():
+        if setor_id in (None, ''):
+            return JsonResponse({'error': 'Selecione o setor do report.'}, status=400)
+        try:
+            setor = setores_disponiveis.get(pk=int(setor_id))
+        except (TypeError, ValueError, Setor.DoesNotExist):
+            return JsonResponse(
+                {'error': 'O setor selecionado não está vinculado ao usuário.'},
+                status=400,
+            )
+    elif setor_id not in (None, ''):
+        return JsonResponse(
+            {'error': 'O usuário não possui setores vinculados.'},
+            status=400,
+        )
+
     report = Report.objects.create(
         usuario=request.user,
         texto=texto,
         data=date.today(),
+        setor=setor,
     )
     return JsonResponse({
         'id': report.id,
@@ -71,22 +135,29 @@ def criar_report(request):
         'texto': report.texto,
         'data': report.data.strftime('%d/%m/%Y'),
         'criado_em': localtime(report.criado_em).strftime('%d/%m/%Y %H:%M'),
+        'concluido': report.concluido,
+        'setor': serializar_setor(report.setor),
     }, status=201)
 
 
 @login_required
 @require_GET
 def listar_reports(request):
-    data_str = request.GET.get('data')
-    if data_str:
-        try:
-            data_filtro = datetime.strptime(data_str, '%Y-%m-%d').date()
-        except ValueError:
-            return JsonResponse({'error': 'Formato de data inválido. Use YYYY-MM-DD'}, status=400)
-    else:
-        data_filtro = date.today()
+    reports = Report.objects.filter(data=date.today())
+    setor_filtro = request.GET.get('setor', '').strip()
 
-    reports = Report.objects.filter(data=data_filtro).select_related('usuario')
+    if setor_filtro == 'sem-setor':
+        reports = reports.filter(setor__isnull=True)
+    elif setor_filtro:
+        try:
+            setor_id = int(setor_filtro)
+        except ValueError:
+            return JsonResponse({'error': 'Filtro de setor inválido.'}, status=400)
+        if not Setor.objects.filter(pk=setor_id).exists():
+            return JsonResponse({'error': 'Setor não encontrado.'}, status=400)
+        reports = reports.filter(setor_id=setor_id)
+
+    reports = reports.select_related('usuario', 'setor')
     return JsonResponse([{
         'id': r.id,
         'usuario': r.usuario.get_full_name() or r.usuario.username,
@@ -94,7 +165,58 @@ def listar_reports(request):
         'texto': r.texto,
         'data': r.data.strftime('%d/%m/%Y'),
         'criado_em': localtime(r.criado_em).strftime('%d/%m/%Y %H:%M'),
+        'concluido': r.concluido,
+        'setor': serializar_setor(r.setor),
     } for r in reports], safe=False)
+
+
+@login_required
+@require_POST
+def atualizar_conclusao_report(request, report_id):
+    if not pode_gerenciar_reports(request.user):
+        return JsonResponse(
+            {'error': 'Apenas usuários PCP ou administradores podem alterar a conclusão dos reports.'},
+            status=403,
+        )
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    concluido = body.get('concluido')
+    if not isinstance(concluido, bool):
+        return JsonResponse(
+            {'error': 'O campo concluido deve ser verdadeiro ou falso.'},
+            status=400,
+        )
+
+    report = get_object_or_404(Report, pk=report_id)
+    report.concluido = concluido
+    report.save(update_fields=['concluido'])
+
+    return JsonResponse({
+        'id': report.id,
+        'concluido': report.concluido,
+    })
+
+
+@login_required
+@require_POST
+def excluir_report(request, report_id):
+    if not pode_gerenciar_reports(request.user):
+        return JsonResponse(
+            {'error': 'Apenas usuários PCP ou administradores podem excluir reports.'},
+            status=403,
+        )
+
+    report = get_object_or_404(Report, pk=report_id)
+    report.delete()
+
+    return JsonResponse({
+        'id': report_id,
+        'excluido': True,
+    })
 
 
 @login_required

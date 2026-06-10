@@ -91,6 +91,7 @@
                 <thead class="table-light">
                     <tr>
                         <th style="width:50px">#</th>
+                        <th>Setores</th>
                         <th>Usuário</th>
                         <th>Tipo de Acesso</th>
                         <th class="text-end">Ações</th>
@@ -98,7 +99,7 @@
                 </thead>
                 <tbody id="userTable">
                     <tr>
-                        <td colspan="4" class="text-center py-4 text-muted">
+                        <td colspan="5" class="text-center py-4 text-muted">
                             <div class="spinner-border spinner-border-sm me-2"></div>Carregando...
                         </td>
                     </tr>
@@ -152,6 +153,14 @@
             <!-- Body -->
             <div class="modal-body p-3">
                 <input type="hidden" id="userId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold mb-1">Setores do usuario</label>
+                    <small class="text-muted d-block mb-2">
+                        Opcional. Selecione todos os setores do usuario.
+                    </small>
+                    <div id="userSectorList" class="border rounded p-2"></div>
+                </div>
+                <hr>
                 <div id="accessList">
                     <!-- Loading state -->
                     <div id="permLoadingState" class="text-center py-4 text-muted">
@@ -214,6 +223,11 @@
                         <option value="admin">Admin</option>
                     </select>
                 </div>
+                <div class="mb-3">
+                    <label for="novoSetores" class="form-label fw-semibold">Setores</label>
+                    <select class="form-select" id="novoSetores" multiple size="4"></select>
+                    <small class="text-muted">Opcional. Use Ctrl para selecionar varios.</small>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -237,6 +251,7 @@
 
 <script>
     let users = [];
+    let setores = [];
 
     const badgeClass = {
         operador:     'badge-operador',
@@ -265,6 +280,17 @@
         }
     }
 
+    async function fetchSetores() {
+        const response = await fetch("/cadastro/api/setores/");
+        if (!response.ok) throw new Error("Erro ao carregar setores");
+
+        const data = await response.json();
+        setores = (data.setores || []).sort((a, b) => a.nome.localeCompare(b.nome));
+        document.getElementById('novoSetores').innerHTML = setores.map(setor =>
+            `<option value="${setor.id}">${setor.nome}</option>`
+        ).join('');
+    }
+
     function renderTable(lista) {
         const tableBody = document.getElementById("userTable");
         tableBody.innerHTML = "";
@@ -279,6 +305,13 @@
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td class="text-muted small">${idx + 1}</td>
+                <td>
+                    ${(user.setores || []).length
+                        ? user.setores.map(setor =>
+                            `<span class="badge bg-light text-dark border me-1">${setor.nome}</span>`
+                          ).join('')
+                        : '<span class="text-muted small">Sem setor</span>'}
+                </td>
                 <td>
                     <i class="bi bi-person-circle me-1 text-secondary"></i>
                     <strong>${user.username}</strong>
@@ -300,7 +333,8 @@
         const q = this.value.toLowerCase();
         const filtrado = users.filter(u =>
             u.username.toLowerCase().includes(q) ||
-            u.tipo_acesso.toLowerCase().includes(q)
+            u.tipo_acesso.toLowerCase().includes(q) ||
+            (u.setores || []).some(setor => setor.nome.toLowerCase().includes(q))
         );
         renderTable(filtrado);
     });
@@ -371,6 +405,21 @@
         badgeEl.innerText = selectedUser.tipo_acesso;
 
         document.getElementById("userId").value = selectedUser.id;
+        const setoresAtivos = new Set(
+            (selectedUser.setores || []).map(setor => Number(setor.id))
+        );
+        document.getElementById('userSectorList').innerHTML = setores.length
+            ? setores.map(setor => `
+                <div class="form-check">
+                    <input class="form-check-input user-sector-check" type="checkbox"
+                           id="user-sector-${setor.id}" value="${setor.id}"
+                           ${setoresAtivos.has(Number(setor.id)) ? 'checked' : ''}>
+                    <label class="form-check-label" for="user-sector-${setor.id}">
+                        ${setor.nome}
+                    </label>
+                </div>
+            `).join('')
+            : '<span class="text-muted small">Nenhum setor cadastrado.</span>';
 
         const accessList = document.getElementById("accessList");
         accessList.innerHTML = `
@@ -465,6 +514,9 @@
         const updatedAccesses = Array.from(
             document.querySelectorAll("#accessList input[type='checkbox']:checked")
         ).map(input => input.id.replace("access-", ""));
+        const setorIds = Array.from(
+            document.querySelectorAll(".user-sector-check:checked")
+        ).map(input => Number(input.value));
 
         const btn = document.getElementById('btnSalvarPerms');
         btn.disabled = true;
@@ -474,7 +526,10 @@
             const response = await fetch(`/core/api/atualizar-acessos/${userId}/update`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ permissoes: updatedAccesses }),
+                body: JSON.stringify({
+                    permissoes: updatedAccesses,
+                    setor_ids: setorIds,
+                }),
             });
 
             if (!response.ok) throw new Error("Erro ao salvar");
@@ -510,6 +565,8 @@
         document.getElementById('novoUsername').value = '';
         document.getElementById('novoPassword').value = '';
         document.getElementById('novoTipoAcesso').value = '';
+        Array.from(document.getElementById('novoSetores').options)
+            .forEach(option => { option.selected = false; });
         document.getElementById('novoUsuarioErro').classList.add('d-none');
         document.getElementById('novoUsuarioErro').innerText = '';
     });
@@ -518,6 +575,9 @@
         const username   = document.getElementById('novoUsername').value.trim();
         const password   = document.getElementById('novoPassword').value.trim();
         const tipoAcesso = document.getElementById('novoTipoAcesso').value;
+        const setorIds = Array.from(
+            document.getElementById('novoSetores').selectedOptions
+        ).map(option => Number(option.value));
         const erroEl     = document.getElementById('novoUsuarioErro');
         const btn        = document.getElementById('btnCriarUsuario');
 
@@ -536,7 +596,12 @@
             const response = await fetch('/core/api/criar-usuario/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, tipo_acesso: tipoAcesso }),
+                body: JSON.stringify({
+                    username,
+                    password,
+                    tipo_acesso: tipoAcesso,
+                    setor_ids: setorIds,
+                }),
             });
 
             const data = await response.json();
@@ -560,6 +625,11 @@
         }
     }
 
-    fetchUsers();
+    fetchSetores()
+        .then(fetchUsers)
+        .catch(error => {
+            console.error(error);
+            showToast("Erro ao carregar setores.", false);
+        });
 </script>
 {% endblock %}
