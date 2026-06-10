@@ -430,21 +430,21 @@ class UsuarioSetorApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(User.objects.filter(username='usuario-setor-invalido').exists())
 
-    def test_editar_setores_do_usuario(self):
+    def test_atualizar_permissoes_nao_altera_setores(self):
         usuario = User.objects.create_user(username='editar-setores', password='senha')
         profile = Profile.objects.create(user=usuario, tipo_acesso='operador')
+        profile.setores.add(self.setor_corte)
 
         response = self.client.post(
             reverse('core:atualizar_acessos', args=[usuario.id]),
             data=json.dumps({
                 'permissoes': [],
-                'setor_ids': [self.setor_solda.id],
             }),
             content_type='application/json',
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(list(profile.setores.all()), [self.setor_solda])
+        self.assertEqual(list(profile.setores.all()), [self.setor_corte])
 
     def test_listagem_de_usuarios_inclui_setores(self):
         usuario = User.objects.create_user(username='listar-setores', password='senha')
@@ -481,3 +481,134 @@ class UsuarioSetorApiTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertFalse(alvo.profile.setores.exists())
+
+
+class UsuarioEdicaoApiTests(TestCase):
+    def setUp(self):
+        self.setor_corte = Setor.objects.create(nome='edicao_setor_corte')
+        self.setor_solda = Setor.objects.create(nome='edicao_setor_solda')
+        self.admin = User.objects.create_user(
+            username='admin-edicao',
+            password='senha-atual',
+        )
+        Profile.objects.create(user=self.admin, tipo_acesso='admin')
+        self.usuario = User.objects.create_user(
+            username='usuario-edicao',
+            password='senha-original',
+        )
+        self.profile = Profile.objects.create(
+            user=self.usuario,
+            tipo_acesso='operador',
+        )
+        self.client.force_login(self.admin)
+        self.url = reverse('core:editar_usuario', args=[self.usuario.id])
+
+    def editar(self, username='usuario-editado', password='', setor_ids=None):
+        return self.client.post(
+            self.url,
+            data=json.dumps({
+                'username': username,
+                'password': password,
+                'setor_ids': setor_ids if setor_ids is not None else [],
+            }),
+            content_type='application/json',
+        )
+
+    def test_apenas_admin_pode_editar(self):
+        operador = User.objects.create_user(username='operador-sem-edicao', password='senha')
+        Profile.objects.create(user=operador, tipo_acesso='operador')
+        self.client.force_login(operador)
+
+        response = self.editar()
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_usuario_nao_autenticado_e_redirecionado(self):
+        self.client.logout()
+
+        response = self.editar()
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_usuario_inexistente_retorna_404(self):
+        self.url = reverse('core:editar_usuario', args=[999999])
+
+        response = self.editar()
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_nome_vazio_nao_altera_usuario(self):
+        response = self.editar(username='   ')
+
+        self.assertEqual(response.status_code, 400)
+        self.usuario.refresh_from_db()
+        self.assertEqual(self.usuario.username, 'usuario-edicao')
+
+    def test_nome_duplicado_nao_altera_usuario_ou_setores(self):
+        User.objects.create_user(username='nome-existente', password='senha')
+
+        response = self.editar(
+            username='nome-existente',
+            setor_ids=[self.setor_corte.id],
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.usuario.refresh_from_db()
+        self.assertEqual(self.usuario.username, 'usuario-edicao')
+        self.assertFalse(self.profile.setores.exists())
+
+    def test_senha_vazia_preserva_senha_atual(self):
+        response = self.editar(password='')
+
+        self.assertEqual(response.status_code, 200)
+        self.usuario.refresh_from_db()
+        self.assertTrue(self.usuario.check_password('senha-original'))
+
+    def test_nova_senha_substitui_anterior(self):
+        response = self.editar(password='senha-nova')
+
+        self.assertEqual(response.status_code, 200)
+        self.usuario.refresh_from_db()
+        self.assertTrue(self.usuario.check_password('senha-nova'))
+        self.assertFalse(self.usuario.check_password('senha-original'))
+
+    def test_admin_permanece_autenticado_ao_alterar_propria_senha(self):
+        self.url = reverse('core:editar_usuario', args=[self.admin.id])
+
+        response = self.editar(
+            username='admin-edicao',
+            password='nova-senha-admin',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        pagina = self.client.get(reverse('core:acessos'))
+        self.assertEqual(pagina.status_code, 200)
+
+    def test_salva_zero_um_ou_varios_setores(self):
+        response = self.editar(setor_ids=[self.setor_corte.id, self.setor_solda.id])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(self.profile.setores.values_list('id', flat=True)),
+            {self.setor_corte.id, self.setor_solda.id},
+        )
+
+        response = self.editar(setor_ids=[])
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(self.profile.setores.exists())
+
+    def test_rejeita_setor_invalido(self):
+        response = self.editar(setor_ids=[999999])
+
+        self.assertEqual(response.status_code, 400)
+        self.usuario.refresh_from_db()
+        self.assertEqual(self.usuario.username, 'usuario-edicao')
+
+    def test_template_exibe_edicao_e_checkboxes_sem_select_multiplo(self):
+        response = self.client.get(reverse('core:acessos'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="editarUsuarioModal"')
+        self.assertContains(response, 'onclick="openEditModal(${user.id})"', html=False)
+        self.assertContains(response, 'id="novoSetoresList"')
+        self.assertNotContains(response, 'id="novoSetores"')
+        self.assertNotContains(response, 'id="userSectorList"')

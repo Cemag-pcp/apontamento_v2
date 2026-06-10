@@ -1,7 +1,7 @@
 from django.shortcuts import render
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import JsonResponse, HttpResponseBadRequest, Http404
 from django.shortcuts import get_object_or_404
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, update_session_auth_hash
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required, permission_required
 from django.views.decorators.csrf import csrf_exempt
@@ -1092,6 +1092,67 @@ def api_criar_usuario(request):
 
 @csrf_exempt
 @login_required
+def api_editar_usuario(request, user_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    if not _usuario_e_admin(request.user):
+        return JsonResponse({"error": "Acesso negado."}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        username = data.get("username", "").strip()
+        password = data.get("password", "").strip()
+        setores = _setores_por_ids(data.get("setor_ids", []))
+
+        if not username:
+            return JsonResponse({"error": "Nome de usuário é obrigatório."}, status=400)
+
+        user = get_object_or_404(User, id=user_id)
+        profile = get_object_or_404(Profile, user=user)
+
+        if User.objects.filter(username=username).exclude(pk=user.id).exists():
+            return JsonResponse(
+                {"error": "Já existe um usuário com esse nome."},
+                status=400,
+            )
+
+        senha_alterada = bool(password)
+        with transaction.atomic():
+            user.username = username
+            if senha_alterada:
+                user.set_password(password)
+            user.save()
+            profile.setores.set(setores)
+
+        if senha_alterada and request.user.id == user.id:
+            update_session_auth_hash(request, user)
+
+        return JsonResponse({
+            "message": "Usuário atualizado com sucesso!",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "tipo_acesso": profile.tipo_acesso,
+                "setores": [
+                    {"id": setor.id, "nome": setor.nome}
+                    for setor in setores
+                ],
+            },
+        })
+
+    except Http404:
+        return JsonResponse({"error": "Usuário não encontrado."}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido."}, status=400)
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+@login_required
 def api_atualizar_acessos(request, user_id):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
@@ -1105,24 +1166,16 @@ def api_atualizar_acessos(request, user_id):
 
         # Converte os IDs para inteiros
         permissoes_ids = list(map(int, data.get("permissoes", [])))
-        setores = _setores_por_ids(data.get("setor_ids", []))
-
         # Busca as permissões pelo ID corretamente
         permissoes_novas = RotaAcesso.objects.filter(id__in=permissoes_ids)
         if permissoes_novas.count() != len(set(permissoes_ids)):
             return JsonResponse({"error": "Uma ou mais permissões são inválidas."}, status=400)
 
         # Atualiza as permissões do perfil
-        with transaction.atomic():
-            profile.permissoes.set(permissoes_novas)
-            profile.setores.set(setores)
+        profile.permissoes.set(permissoes_novas)
 
         return JsonResponse({
             "message": "Acessos atualizados com sucesso!",
-            "setores": [
-                {"id": setor.id, "nome": setor.nome}
-                for setor in setores
-            ],
         })
 
     except Profile.DoesNotExist:

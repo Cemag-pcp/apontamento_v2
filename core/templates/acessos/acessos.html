@@ -153,14 +153,6 @@
             <!-- Body -->
             <div class="modal-body p-3">
                 <input type="hidden" id="userId">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold mb-1">Setores do usuario</label>
-                    <small class="text-muted d-block mb-2">
-                        Opcional. Selecione todos os setores do usuario.
-                    </small>
-                    <div id="userSectorList" class="border rounded p-2"></div>
-                </div>
-                <hr>
                 <div id="accessList">
                     <!-- Loading state -->
                     <div id="permLoadingState" class="text-center py-4 text-muted">
@@ -184,6 +176,43 @@
 <!-- ============================================================
      Modal: Novo Usuário
 ============================================================ -->
+<div class="modal fade" id="editarUsuarioModal" tabindex="-1" aria-labelledby="editarUsuarioModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="editarUsuarioModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Usuario
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editarUserId">
+                <div id="editarUsuarioErro" class="alert alert-danger d-none"></div>
+                <div class="mb-3">
+                    <label for="editarUsername" class="form-label fw-semibold">Nome de usuario <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="editarUsername" autocomplete="off">
+                </div>
+                <div class="mb-3">
+                    <label for="editarPassword" class="form-label fw-semibold">Nova senha</label>
+                    <input type="password" class="form-control" id="editarPassword"
+                           placeholder="Deixe vazio para manter a senha atual" autocomplete="new-password">
+                    <small class="text-muted">Preencha somente para redefinir a senha.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Setores</label>
+                    <div id="editarSetoresList" class="border rounded p-2"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="btnEditarUsuario" onclick="salvarEdicaoUsuario()">
+                    <i class="bi bi-floppy me-1"></i>Salvar alteracoes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="novoUsuarioModal" tabindex="-1" aria-labelledby="novoUsuarioModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -224,9 +253,9 @@
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label for="novoSetores" class="form-label fw-semibold">Setores</label>
-                    <select class="form-select" id="novoSetores" multiple size="4"></select>
-                    <small class="text-muted">Opcional. Use Ctrl para selecionar varios.</small>
+                    <label class="form-label fw-semibold">Setores</label>
+                    <div id="novoSetoresList" class="border rounded p-2"></div>
+                    <small class="text-muted">Campo opcional.</small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -286,9 +315,30 @@
 
         const data = await response.json();
         setores = (data.setores || []).sort((a, b) => a.nome.localeCompare(b.nome));
-        document.getElementById('novoSetores').innerHTML = setores.map(setor =>
-            `<option value="${setor.id}">${setor.nome}</option>`
-        ).join('');
+        renderSectorCheckboxes('novoSetoresList', [], 'novo-setor');
+    }
+
+    function renderSectorCheckboxes(containerId, selectedIds = [], prefix = 'setor') {
+        const selected = new Set(selectedIds.map(Number));
+        const container = document.getElementById(containerId);
+        container.innerHTML = setores.length
+            ? setores.map(setor => `
+                <div class="form-check">
+                    <input class="form-check-input sector-checkbox" type="checkbox"
+                           id="${prefix}-${setor.id}" value="${setor.id}"
+                           ${selected.has(Number(setor.id)) ? 'checked' : ''}>
+                    <label class="form-check-label" for="${prefix}-${setor.id}">
+                        ${setor.nome}
+                    </label>
+                </div>
+            `).join('')
+            : '<span class="text-muted small">Nenhum setor cadastrado.</span>';
+    }
+
+    function getCheckedSectorIds(containerId) {
+        return Array.from(
+            document.querySelectorAll(`#${containerId} .sector-checkbox:checked`)
+        ).map(input => Number(input.value));
     }
 
     function renderTable(lista) {
@@ -296,7 +346,7 @@
         tableBody.innerHTML = "";
 
         if (!lista.length) {
-            tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Nenhum usuário encontrado.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Nenhum usuário encontrado.</td></tr>';
             return;
         }
 
@@ -320,6 +370,9 @@
                     <span class="badge ${cls} text-capitalize">${user.tipo_acesso}</span>
                 </td>
                 <td class="text-end">
+                    <button class="btn btn-outline-warning btn-sm me-1" onclick="openEditModal(${user.id})">
+                        <i class="bi bi-pencil-square me-1"></i>Editar
+                    </button>
                     <button class="btn btn-outline-primary btn-sm" onclick="openModal(${user.id})">
                         <i class="bi bi-shield-lock me-1"></i>Permissões
                     </button>
@@ -405,21 +458,6 @@
         badgeEl.innerText = selectedUser.tipo_acesso;
 
         document.getElementById("userId").value = selectedUser.id;
-        const setoresAtivos = new Set(
-            (selectedUser.setores || []).map(setor => Number(setor.id))
-        );
-        document.getElementById('userSectorList').innerHTML = setores.length
-            ? setores.map(setor => `
-                <div class="form-check">
-                    <input class="form-check-input user-sector-check" type="checkbox"
-                           id="user-sector-${setor.id}" value="${setor.id}"
-                           ${setoresAtivos.has(Number(setor.id)) ? 'checked' : ''}>
-                    <label class="form-check-label" for="user-sector-${setor.id}">
-                        ${setor.nome}
-                    </label>
-                </div>
-            `).join('')
-            : '<span class="text-muted small">Nenhum setor cadastrado.</span>';
 
         const accessList = document.getElementById("accessList");
         accessList.innerHTML = `
@@ -514,9 +552,6 @@
         const updatedAccesses = Array.from(
             document.querySelectorAll("#accessList input[type='checkbox']:checked")
         ).map(input => input.id.replace("access-", ""));
-        const setorIds = Array.from(
-            document.querySelectorAll(".user-sector-check:checked")
-        ).map(input => Number(input.value));
 
         const btn = document.getElementById('btnSalvarPerms');
         btn.disabled = true;
@@ -528,7 +563,6 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     permissoes: updatedAccesses,
-                    setor_ids: setorIds,
                 }),
             });
 
@@ -544,6 +578,78 @@
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Salvar alterações';
+        }
+    }
+
+    function openEditModal(userId) {
+        const selectedUser = users.find(user => user.id === userId);
+        if (!selectedUser) return;
+
+        document.getElementById('editarUserId').value = selectedUser.id;
+        document.getElementById('editarUsername').value = selectedUser.username;
+        document.getElementById('editarPassword').value = '';
+        const erroEl = document.getElementById('editarUsuarioErro');
+        erroEl.classList.add('d-none');
+        erroEl.innerText = '';
+
+        renderSectorCheckboxes(
+            'editarSetoresList',
+            (selectedUser.setores || []).map(setor => setor.id),
+            'editar-setor'
+        );
+
+        bootstrap.Modal.getOrCreateInstance(
+            document.getElementById('editarUsuarioModal')
+        ).show();
+    }
+
+    async function salvarEdicaoUsuario() {
+        const userId = document.getElementById('editarUserId').value;
+        const username = document.getElementById('editarUsername').value.trim();
+        const password = document.getElementById('editarPassword').value.trim();
+        const setorIds = getCheckedSectorIds('editarSetoresList');
+        const erroEl = document.getElementById('editarUsuarioErro');
+        const btn = document.getElementById('btnEditarUsuario');
+
+        erroEl.classList.add('d-none');
+        if (!username) {
+            erroEl.innerText = 'Informe o nome de usuario.';
+            erroEl.classList.remove('d-none');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
+
+        try {
+            const response = await fetch(`/core/api/usuarios/${userId}/editar/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username,
+                    password,
+                    setor_ids: setorIds,
+                }),
+            });
+            const data = await response.json();
+
+            if (!response.ok) {
+                erroEl.innerText = data.error || 'Erro ao editar usuario.';
+                erroEl.classList.remove('d-none');
+                return;
+            }
+
+            bootstrap.Modal.getInstance(
+                document.getElementById('editarUsuarioModal')
+            ).hide();
+            showToast(`Usuario "${data.user.username}" atualizado com sucesso!`);
+            await fetchUsers();
+        } catch (error) {
+            erroEl.innerText = 'Erro de comunicacao com o servidor.';
+            erroEl.classList.remove('d-none');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Salvar alteracoes';
         }
     }
 
@@ -565,8 +671,7 @@
         document.getElementById('novoUsername').value = '';
         document.getElementById('novoPassword').value = '';
         document.getElementById('novoTipoAcesso').value = '';
-        Array.from(document.getElementById('novoSetores').options)
-            .forEach(option => { option.selected = false; });
+        renderSectorCheckboxes('novoSetoresList', [], 'novo-setor');
         document.getElementById('novoUsuarioErro').classList.add('d-none');
         document.getElementById('novoUsuarioErro').innerText = '';
     });
@@ -575,9 +680,7 @@
         const username   = document.getElementById('novoUsername').value.trim();
         const password   = document.getElementById('novoPassword').value.trim();
         const tipoAcesso = document.getElementById('novoTipoAcesso').value;
-        const setorIds = Array.from(
-            document.getElementById('novoSetores').selectedOptions
-        ).map(option => Number(option.value));
+        const setorIds = getCheckedSectorIds('novoSetoresList');
         const erroEl     = document.getElementById('novoUsuarioErro');
         const btn        = document.getElementById('btnCriarUsuario');
 
