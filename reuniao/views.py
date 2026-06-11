@@ -4,7 +4,10 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import localtime
-from django.db.models import Avg, Sum, FloatField, Value, F, ExpressionWrapper
+from django.db.models import (
+    Avg, Sum, FloatField, Value, F, ExpressionWrapper,
+    DateTimeField, OuterRef, Subquery,
+)
 from django.db.models.functions import Coalesce
 
 from .models import Report
@@ -335,7 +338,7 @@ def tabela_producao(request):
     })
 
 
-# Setores "ao vivo": sem datas, mostram ordens em andamento agora
+# Setores consultados pelo período de início da produção
 _LIVE_GRUPO_MAQUINA = {
     'estamparia': ['estamparia'],
     'usinagem':   ['usinagem'],
@@ -364,18 +367,48 @@ STATUS_LABELS = {
 @require_GET
 def andamento_live(request):
     setor = request.GET.get('setor', '').lower().strip()
+    data_inicio_str = request.GET.get('data_inicio', '').strip()
+    data_fim_str = request.GET.get('data_fim', '').strip()
 
     if setor not in _LIVE_GRUPO_MAQUINA:
         return JsonResponse({'error': 'Setor inválido para andamento live'}, status=400)
 
+    try:
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+        data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse(
+            {'error': 'Informe datas inicial e final válidas.'},
+            status=400,
+        )
+
+    if data_inicio > data_fim:
+        return JsonResponse(
+            {'error': 'A data inicial não pode ser posterior à data final.'},
+            status=400,
+        )
+
     grupos = _LIVE_GRUPO_MAQUINA[setor]
     POModel, peca_is_fk = _LIVE_PO_MODEL[setor]
+    ultimo_inicio = (
+        OrdemProcesso.objects
+        .filter(ordem=OuterRef('pk'), status='iniciada')
+        .order_by('-data_inicio', '-id')
+        .values('data_inicio')[:1]
+    )
 
     ordens = (
         Ordem.objects
-        .filter(grupo_maquina__in=grupos, status_atual='iniciada', excluida=False)
+        .filter(grupo_maquina__in=grupos, excluida=False)
+        .annotate(
+            inicio_producao=Subquery(
+                ultimo_inicio,
+                output_field=DateTimeField(),
+            ),
+        )
+        .filter(inicio_producao__date__range=(data_inicio, data_fim))
         .select_related('maquina', 'operador_final')
-        .order_by('maquina__nome', 'ultima_atualizacao')
+        .order_by('maquina__nome', 'inicio_producao')
     )
 
     resultado = []
@@ -409,15 +442,9 @@ def andamento_live(request):
                 for p in pecas_raw
             ]
 
-        processo_inicio = (
-            OrdemProcesso.objects
-            .filter(ordem=ordem, status='iniciada')
-            .order_by('-data_inicio')
-            .first()
-        )
         iniciado_em = (
-            localtime(processo_inicio.data_inicio).strftime('%d/%m/%Y %H:%M')
-            if processo_inicio else '—'
+            localtime(ordem.inicio_producao).strftime('%d/%m/%Y %H:%M')
+            if ordem.inicio_producao else '—'
         )
 
         numero_ordem = ordem.ordem or ordem.ordem_duplicada or '—'
@@ -432,4 +459,9 @@ def andamento_live(request):
             'pecas': pecas,
         })
 
-    return JsonResponse({'setor': setor, 'ordens': resultado})
+    return JsonResponse({
+        'setor': setor,
+        'data_inicio': data_inicio.isoformat(),
+        'data_fim': data_fim.isoformat(),
+        'ordens': resultado,
+    })

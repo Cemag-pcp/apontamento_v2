@@ -1,12 +1,13 @@
 import json
-from datetime import date
+from datetime import date, datetime, time, timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from cadastro.models import Setor
-from core.models import Profile, RotaAcesso
+from cadastro.models import Maquina, Setor
+from core.models import Ordem, OrdemProcesso, Profile, RotaAcesso
 
 from .models import Report
 
@@ -416,6 +417,118 @@ class ReportSetorTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()['setor']['id'], self.setor_solda.id)
+
+
+class AndamentoLivePeriodoTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='admin-periodo-live',
+            password='senha',
+        )
+        Profile.objects.create(user=self.admin, tipo_acesso='admin')
+        self.client.force_login(self.admin)
+        self.url = reverse('reuniao:andamento_live')
+        self.setor = Setor.objects.create(nome='setor_periodo_live')
+        self.maquina = Maquina.objects.create(
+            nome='Máquina período',
+            setor=self.setor,
+            tipo='maquina',
+        )
+        self.data_inicio = date(2026, 6, 1)
+        self.data_fim = date(2026, 6, 5)
+
+    def criar_ordem(self, status, inicio, excluida=False, grupo='estamparia'):
+        ordem = Ordem.objects.create(
+            grupo_maquina=grupo,
+            maquina=self.maquina,
+            status_atual=status,
+            excluida=excluida,
+        )
+        OrdemProcesso.objects.create(
+            ordem=ordem,
+            status='iniciada',
+            data_inicio=timezone.make_aware(datetime.combine(inicio, time(10, 0))),
+        )
+        return ordem
+
+    def consultar(self, setor='estamparia', data_inicio=None, data_fim=None):
+        return self.client.get(self.url, {
+            'setor': setor,
+            'data_inicio': (data_inicio or self.data_inicio).isoformat(),
+            'data_fim': (data_fim or self.data_fim).isoformat(),
+        })
+
+    def test_quatro_setores_aceitam_periodo(self):
+        for setor in ('estamparia', 'usinagem', 'serra', 'corte'):
+            with self.subTest(setor=setor):
+                response = self.consultar(setor=setor)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()['data_inicio'], '2026-06-01')
+                self.assertEqual(response.json()['data_fim'], '2026-06-05')
+
+    def test_periodo_inclusivo_retorna_finalizadas_e_interrompidas(self):
+        inicio = self.criar_ordem('finalizada', self.data_inicio)
+        fim = self.criar_ordem('interrompida', self.data_fim)
+        fora = self.criar_ordem('iniciada', self.data_inicio - timedelta(days=1))
+        excluida = self.criar_ordem('finalizada', self.data_inicio, excluida=True)
+
+        response = self.consultar()
+
+        self.assertEqual(response.status_code, 200)
+        ordens = response.json()['ordens']
+        numeros = {item['ordem'] for item in ordens}
+        self.assertEqual(numeros, {inicio.ordem, fim.ordem})
+        self.assertNotIn(fora.ordem, numeros)
+        self.assertNotIn(excluida.ordem, numeros)
+        self.assertEqual(
+            {item['status'] for item in ordens},
+            {'Finalizada', 'Interrompida'},
+        )
+
+    def test_usa_inicio_mais_recente_da_producao(self):
+        ordem = self.criar_ordem('finalizada', self.data_inicio)
+        OrdemProcesso.objects.create(
+            ordem=ordem,
+            status='iniciada',
+            data_inicio=timezone.make_aware(datetime.combine(
+                self.data_fim + timedelta(days=1),
+                time(8, 0),
+            )),
+        )
+
+        response = self.consultar()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['ordens'], [])
+
+    def test_rejeita_setor_datas_e_intervalo_invalidos(self):
+        setor_invalido = self.consultar(setor='montagem')
+        data_invalida = self.client.get(self.url, {
+            'setor': 'estamparia',
+            'data_inicio': 'invalida',
+            'data_fim': '2026-06-05',
+        })
+        intervalo_invertido = self.consultar(
+            data_inicio=self.data_fim,
+            data_fim=self.data_inicio,
+        )
+
+        self.assertEqual(setor_invalido.status_code, 400)
+        self.assertEqual(data_invalida.status_code, 400)
+        self.assertEqual(intervalo_invertido.status_code, 400)
+
+    def test_template_exibe_e_envia_periodo_live(self):
+        response = self.client.get(reverse('reuniao:home'))
+
+        self.assertContains(response, 'id="periodo-live-container"')
+        self.assertContains(response, 'id="live-data-inicio"')
+        self.assertContains(response, 'id="live-data-fim"')
+        self.assertContains(response, 'data_inicio: cfg.liveDataInicio')
+        self.assertContains(response, 'data_fim: cfg.liveDataFim')
+        self.assertContains(response, 'liveDataInicio: getTodayStr()')
+        self.assertContains(response, 'liveDataFim: getTodayStr()')
+        self.assertContains(response, "datasContainer.classList.toggle('d-none', live)")
+        self.assertContains(response, "datasContainer.classList.toggle('d-flex', !live)")
 
 
 class UsuarioSetorApiTests(TestCase):

@@ -31,6 +31,16 @@
                 <div id="datas-container" class="d-flex flex-wrap gap-2 align-items-end">
                     <!-- Date inputs gerados por JS -->
                 </div>
+                <div id="periodo-live-container" class="d-none flex-wrap gap-2 align-items-end">
+                    <div>
+                        <label for="live-data-inicio" class="form-label mb-1 small fw-bold">Data inicial</label>
+                        <input type="date" id="live-data-inicio" class="form-control form-control-sm" style="width:145px;">
+                    </div>
+                    <div>
+                        <label for="live-data-fim" class="form-label mb-1 small fw-bold">Data final</label>
+                        <input type="date" id="live-data-fim" class="form-control form-control-sm" style="width:145px;">
+                    </div>
+                </div>
                 <div class="d-flex gap-2">
                     <button class="btn btn-sm btn-outline-secondary" id="btn-add-data" title="Adicionar coluna de data">
                         <i class="bi bi-plus-circle"></i> Data
@@ -272,14 +282,23 @@ function getCookie(name) {
 
 function loadConfig() {
     try {
-        return JSON.parse(localStorage.getItem(CONFIG_KEY)) || defaultConfig();
+        const cfg = JSON.parse(localStorage.getItem(CONFIG_KEY)) || defaultConfig();
+        cfg.datas = cfg.datas?.length ? cfg.datas : [getTodayStr()];
+        cfg.liveDataInicio = cfg.liveDataInicio || getTodayStr();
+        cfg.liveDataFim = cfg.liveDataFim || getTodayStr();
+        return cfg;
     } catch {
         return defaultConfig();
     }
 }
 
 function defaultConfig() {
-    return { setor: 'montagem', datas: [getTodayStr()] };
+    return {
+        setor: 'montagem',
+        datas: [getTodayStr()],
+        liveDataInicio: getTodayStr(),
+        liveDataFim: getTodayStr(),
+    };
 }
 
 function saveConfig(cfg) {
@@ -408,7 +427,7 @@ function buildAndamentoTable(data) {
     if (!ordens || ordens.length === 0) {
         return `<div class="text-center text-muted py-5">
             <i class="bi bi-check2-circle" style="font-size:2.5rem;opacity:.4;"></i>
-            <p class="mt-2">Nenhuma ordem em andamento no momento.</p>
+            <p class="mt-2">Nenhuma ordem encontrada no período selecionado.</p>
         </div>`;
     }
 
@@ -420,6 +439,7 @@ function buildAndamentoTable(data) {
                     <th>Ordem</th>
                     <th>Peça(s)</th>
                     <th class="text-center">Planejado</th>
+                    <th>Status</th>
                     <th>Programação</th>
                     <th>Iniciado em</th>
                 </tr>
@@ -444,6 +464,9 @@ function buildAndamentoTable(data) {
                 <td class="align-middle">${o.ordem ?? '—'}</td>
                 <td class="align-middle">${pecasHtml}</td>
                 <td class="text-center align-middle">${totalPlan}</td>
+                <td class="align-middle">
+                    <span class="badge" style="background:${cor};">${escHtml(o.status)}</span>
+                </td>
                 <td class="align-middle">${o.data_programacao}</td>
                 <td class="align-middle small text-muted">${o.iniciado_em}</td>
             </tr>
@@ -458,6 +481,15 @@ async function loadAndamento(silent = false) {
     const cfg = loadConfig();
     const container = document.getElementById('table-container');
 
+    if (!cfg.liveDataInicio || !cfg.liveDataFim) {
+        container.innerHTML = '<div class="alert alert-warning m-3">Informe a data inicial e a data final.</div>';
+        return;
+    }
+    if (cfg.liveDataInicio > cfg.liveDataFim) {
+        container.innerHTML = '<div class="alert alert-warning m-3">A data inicial não pode ser posterior à data final.</div>';
+        return;
+    }
+
     if (!silent) {
         container.innerHTML = `<div class="text-center py-5">
             <div class="spinner-border text-primary" role="status"></div>
@@ -469,7 +501,12 @@ async function loadAndamento(silent = false) {
         cfg.setor.charAt(0).toUpperCase() + cfg.setor.slice(1);
 
     try {
-        const res = await fetch(`${URL_LIVE}?setor=${cfg.setor}`);
+        const params = new URLSearchParams({
+            setor: cfg.setor,
+            data_inicio: cfg.liveDataInicio,
+            data_fim: cfg.liveDataFim,
+        });
+        const res = await fetch(`${URL_LIVE}?${params}`);
         const data = await res.json();
         if (res.ok) {
             container.innerHTML = buildAndamentoTable(data);
@@ -488,8 +525,15 @@ function isLive() {
 }
 
 function atualizarVisibilidadeDatas() {
-    document.getElementById('datas-container').style.display = isLive() ? 'none' : '';
-    document.getElementById('btn-add-data').style.display   = isLive() ? 'none' : '';
+    const live = isLive();
+    const datasContainer = document.getElementById('datas-container');
+    const periodoContainer = document.getElementById('periodo-live-container');
+
+    datasContainer.classList.toggle('d-none', live);
+    datasContainer.classList.toggle('d-flex', !live);
+    periodoContainer.classList.toggle('d-none', !live);
+    periodoContainer.classList.toggle('d-flex', live);
+    document.getElementById('btn-add-data').style.display = live ? 'none' : '';
 }
 
 async function loadTabela() {
@@ -770,10 +814,25 @@ function escHtml(str) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const cfg = loadConfig();
+    saveConfig(cfg);
 
     // Apply saved config to UI
     document.getElementById('setor-select').value = cfg.setor;
     renderDatas(cfg.datas);
+    document.getElementById('live-data-inicio').value = cfg.liveDataInicio;
+    document.getElementById('live-data-fim').value = cfg.liveDataFim;
+
+    ['live-data-inicio', 'live-data-fim'].forEach(id => {
+        document.getElementById(id).addEventListener('change', function () {
+            const config = loadConfig();
+            if (id === 'live-data-inicio') {
+                config.liveDataInicio = this.value;
+            } else {
+                config.liveDataFim = this.value;
+            }
+            saveConfig(config);
+        });
+    });
 
     // Sector change
     document.getElementById('setor-select').addEventListener('change', function () {
