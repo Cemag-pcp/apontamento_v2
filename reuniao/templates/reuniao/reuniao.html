@@ -78,13 +78,25 @@
                             <i class="bi bi-plus"></i> Novo
                         </button>
                     </div>
-                    <select id="reports-setor-filtro" class="form-select form-select-sm">
-                        <option value="">Todos os setores</option>
-                        <option value="sem-setor">Sem setor</option>
-                        {% for setor in setores_filtro %}
-                            <option value="{{ setor.id }}">{{ setor.nome }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label for="reports-setor-filtro" class="form-label small mb-1">Setor</label>
+                            <select id="reports-setor-filtro" class="form-select form-select-sm">
+                                <option value="">Todos</option>
+                                {% for setor in setores_filtro %}
+                                    <option value="{{ setor.id }}">{{ setor.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label for="reports-conclusao-filtro" class="form-label small mb-1">Status</label>
+                            <select id="reports-conclusao-filtro" class="form-select form-select-sm">
+                                <option value="">Todos</option>
+                                <option value="true">Confirmados</option>
+                                <option value="false">Não confirmados</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body p-2" style="max-height:65vh; overflow-y:auto;">
                     <div id="reports-list">
@@ -600,8 +612,10 @@ function renderReportsVazio() {
 
 async function loadReports() {
     const setor = document.getElementById('reports-setor-filtro').value;
+    const concluido = document.getElementById('reports-conclusao-filtro').value;
     const params = new URLSearchParams();
     if (setor) params.set('setor', setor);
+    if (concluido) params.set('concluido', concluido);
     const query = params.toString();
     const url = query ? `${URL_REPORTS}?${query}` : URL_REPORTS;
 
@@ -622,12 +636,18 @@ function configurarSetorNovoReport() {
     const ajuda = document.getElementById('report-setor-ajuda');
 
     if (SETORES_USUARIO.length === 0) {
-        container.classList.add('d-none');
+        container.classList.remove('d-none');
         select.value = '';
+        select.disabled = true;
+        ajuda.className = 'text-danger';
+        ajuda.textContent = 'Seu usuário não possui setor vinculado. Procure um administrador.';
+        document.getElementById('btn-salvar-report').disabled = true;
         return;
     }
 
     container.classList.remove('d-none');
+    ajuda.className = 'text-muted';
+    document.getElementById('btn-salvar-report').disabled = false;
     if (PODE_REPORTAR_QUALQUER_SETOR) {
         select.disabled = false;
         select.value = '';
@@ -670,6 +690,7 @@ async function atualizarConclusaoReport(event) {
 
         check.checked = data.concluido;
         card.classList.toggle('report-concluido', data.concluido);
+        await loadReports();
     } catch (error) {
         check.checked = concluidoAnterior;
         card.classList.toggle('report-concluido', concluidoAnterior);
@@ -787,7 +808,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Escreva o texto do report antes de salvar.');
             return;
         }
-        if (SETORES_USUARIO.length > 0 && !setorId) {
+        if (!setorId) {
             alert('Selecione o setor do report.');
             return;
         }
@@ -844,6 +865,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-confirmar-exclusao-report')
         .addEventListener('click', confirmarExclusaoReport);
     document.getElementById('reports-setor-filtro')
+        .addEventListener('change', loadReports);
+    document.getElementById('reports-conclusao-filtro')
         .addEventListener('change', loadReports);
     document.getElementById('modalExcluirReport')
         .addEventListener('hidden.bs.modal', () => {

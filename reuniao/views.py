@@ -94,11 +94,16 @@ def criar_report(request):
         else profile.setores.all() if profile is not None else Setor.objects.none()
     )
     setor_id = body.get('setor_id')
-    setor = None
+
+    if setor_id in (None, ''):
+        if not pode_reportar_qualquer_setor and not setores_disponiveis.exists():
+            return JsonResponse(
+                {'error': 'Seu usuário não possui setor vinculado. Procure um administrador.'},
+                status=400,
+            )
+        return JsonResponse({'error': 'Selecione o setor do report.'}, status=400)
 
     if pode_reportar_qualquer_setor:
-        if setor_id in (None, ''):
-            return JsonResponse({'error': 'Selecione o setor do report.'}, status=400)
         try:
             setor = setores_disponiveis.get(pk=int(setor_id))
         except (TypeError, ValueError, Setor.DoesNotExist):
@@ -106,9 +111,7 @@ def criar_report(request):
                 {'error': 'O setor selecionado é inválido.'},
                 status=400,
             )
-    elif setores_disponiveis.exists():
-        if setor_id in (None, ''):
-            return JsonResponse({'error': 'Selecione o setor do report.'}, status=400)
+    else:
         try:
             setor = setores_disponiveis.get(pk=int(setor_id))
         except (TypeError, ValueError, Setor.DoesNotExist):
@@ -116,11 +119,6 @@ def criar_report(request):
                 {'error': 'O setor selecionado não está vinculado ao usuário.'},
                 status=400,
             )
-    elif setor_id not in (None, ''):
-        return JsonResponse(
-            {'error': 'O usuário não possui setores vinculados.'},
-            status=400,
-        )
 
     report = Report.objects.create(
         usuario=request.user,
@@ -143,12 +141,11 @@ def criar_report(request):
 @login_required
 @require_GET
 def listar_reports(request):
-    reports = Report.objects.filter(data=date.today())
+    reports = Report.objects.filter(data=date.today(), setor__isnull=False)
     setor_filtro = request.GET.get('setor', '').strip()
+    concluido_filtro = request.GET.get('concluido', '').strip().lower()
 
-    if setor_filtro == 'sem-setor':
-        reports = reports.filter(setor__isnull=True)
-    elif setor_filtro:
+    if setor_filtro:
         try:
             setor_id = int(setor_filtro)
         except ValueError:
@@ -156,6 +153,14 @@ def listar_reports(request):
         if not Setor.objects.filter(pk=setor_id).exists():
             return JsonResponse({'error': 'Setor não encontrado.'}, status=400)
         reports = reports.filter(setor_id=setor_id)
+
+    if concluido_filtro:
+        if concluido_filtro not in {'true', 'false'}:
+            return JsonResponse(
+                {'error': 'Filtro de confirmação inválido.'},
+                status=400,
+            )
+        reports = reports.filter(concluido=concluido_filtro == 'true')
 
     reports = reports.select_related('usuario', 'setor')
     return JsonResponse([{

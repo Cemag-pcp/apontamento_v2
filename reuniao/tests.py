@@ -21,11 +21,13 @@ class ReportConclusaoTests(TestCase):
 
         self.operador = User.objects.create_user(username='operador', password='senha')
         Profile.objects.create(user=self.operador, tipo_acesso='operador')
+        self.setor = Setor.objects.create(nome='setor_conclusao')
 
         self.report = Report.objects.create(
             usuario=self.operador,
             texto='Report de teste',
             data=date.today(),
+            setor=self.setor,
         )
         self.url = reverse(
             'reuniao:atualizar_conclusao_report',
@@ -271,12 +273,12 @@ class ReportSetorTests(TestCase):
         self.profile.setores.add(self.setor_solda)
         self.assertEqual(self.profile.setores.count(), 2)
 
-    def test_usuario_sem_setor_cria_report_sem_setor(self):
+    def test_usuario_sem_setor_nao_pode_criar_report(self):
         response = self.criar_report()
 
-        self.assertEqual(response.status_code, 201)
-        self.assertIsNone(response.json()['setor'])
-        self.assertIsNone(Report.objects.get(pk=response.json()['id']).setor)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('não possui setor vinculado', response.json()['error'])
+        self.assertFalse(Report.objects.filter(usuario=self.usuario).exists())
 
     def test_usuario_com_um_setor_cria_report_no_setor_selecionado(self):
         self.profile.setores.add(self.setor_corte)
@@ -312,12 +314,13 @@ class ReportSetorTests(TestCase):
 
         self.assertEqual(report.setor, self.setor_corte)
 
-    def test_filtros_todos_setor_e_sem_setor(self):
+    def test_filtros_todos_setor_e_confirmacao(self):
         report_corte = Report.objects.create(
             usuario=self.usuario,
             texto='Corte',
             data=date.today(),
             setor=self.setor_corte,
+            concluido=True,
         )
         report_solda = Report.objects.create(
             usuario=self.usuario,
@@ -325,7 +328,7 @@ class ReportSetorTests(TestCase):
             data=date.today(),
             setor=self.setor_solda,
         )
-        report_sem_setor = Report.objects.create(
+        Report.objects.create(
             usuario=self.usuario,
             texto='Sem setor',
             data=date.today(),
@@ -342,17 +345,44 @@ class ReportSetorTests(TestCase):
             self.listar_url,
             {'setor': self.setor_corte.id},
         ).json()
-        sem_setor = self.client.get(
+        confirmados = self.client.get(
             self.listar_url,
-            {'setor': 'sem-setor'},
+            {'concluido': 'true'},
+        ).json()
+        nao_confirmados_solda = self.client.get(
+            self.listar_url,
+            {'setor': self.setor_solda.id, 'concluido': 'false'},
         ).json()
 
         self.assertEqual(
             {item['id'] for item in todos},
-            {report_corte.id, report_solda.id, report_sem_setor.id},
+            {report_corte.id, report_solda.id},
         )
         self.assertEqual([item['id'] for item in corte], [report_corte.id])
-        self.assertEqual([item['id'] for item in sem_setor], [report_sem_setor.id])
+        self.assertEqual([item['id'] for item in confirmados], [report_corte.id])
+        self.assertEqual(
+            [item['id'] for item in nao_confirmados_solda],
+            [report_solda.id],
+        )
+
+    def test_filtro_de_confirmacao_invalido_retorna_400(self):
+        response = self.client.get(
+            self.listar_url,
+            {'concluido': 'talvez'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_template_exibe_filtros_sem_opcao_sem_setor(self):
+        rota_reuniao = RotaAcesso.objects.get(nome='reuniao')
+        self.profile.permissoes.add(rota_reuniao)
+        response = self.client.get(reverse('reuniao:home'))
+
+        self.assertContains(response, 'id="reports-setor-filtro"')
+        self.assertContains(response, 'id="reports-conclusao-filtro"')
+        self.assertContains(response, 'Confirmados')
+        self.assertContains(response, 'Não confirmados')
+        self.assertNotContains(response, '<option value="sem-setor">')
 
     def test_admin_pode_reportar_para_setor_nao_vinculado(self):
         admin = User.objects.create_user(username='admin-report-setor', password='senha')
