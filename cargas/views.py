@@ -547,6 +547,66 @@ def liberacao(request):
 
     return render(request, "cargas/liberacao.html")
 
+
+def _marcar_selecao_versao_anterior(itens_sem_numero_serie):
+    if not itens_sem_numero_serie:
+        return
+
+    cargas_consultadas = {
+        (item.get("data_carga"), item.get("carga"))
+        for item in itens_sem_numero_serie
+        if item.get("data_carga") and item.get("carga")
+    }
+    if not cargas_consultadas:
+        return
+
+    datas = {data_carga for data_carga, _ in cargas_consultadas}
+    nomes = {carga_nome for _, carga_nome in cargas_consultadas}
+    ultima_versao = (
+        CargaLiberadaVersao.objects.filter(carga_liberada=OuterRef("pk"))
+        .order_by("-versao")
+        .values("pk")[:1]
+    )
+    cargas = (
+        CargaLiberada.objects.filter(data_carga__in=datas, carga_nome__in=nomes)
+        .annotate(ultima_versao_id=Subquery(ultima_versao))
+        .exclude(ultima_versao_id__isnull=True)
+    )
+    versoes_por_carga = {
+        (carga.data_carga.isoformat(), carga.carga_nome): carga.ultima_versao_id
+        for carga in cargas
+        if (carga.data_carga.isoformat(), carga.carga_nome) in cargas_consultadas
+    }
+
+    itens_selecionados = defaultdict(set)
+    for item in CargaLiberadaItem.objects.filter(
+        carga_versao_id__in=versoes_por_carga.values(),
+        numero_serie="",
+    ).values(
+        "carga_versao_id",
+        "codigo_recurso",
+        "cliente_codigo",
+    ):
+        itens_selecionados[item["carga_versao_id"]].add(
+            (
+                str(item["codigo_recurso"]).strip(),
+                str(item["cliente_codigo"] or "").strip(),
+            )
+        )
+
+    for item in itens_sem_numero_serie:
+        versao_id = versoes_por_carga.get(
+            (item.get("data_carga"), item.get("carga"))
+        )
+        chave_item = (
+            str(item.get("codigo_recurso", "")).strip(),
+            str(item.get("cliente_codigo", "") or "").strip(),
+        )
+        item["selecionado_versao_anterior"] = (
+            chave_item in itens_selecionados.get(versao_id, set())
+        )
+
+
 def buscar_dados_carreta_planilha(request):
     data_inicio = request.GET.get('data_inicio')
     data_final = request.GET.get('data_fim')
@@ -564,6 +624,9 @@ def buscar_dados_carreta_planilha(request):
 
     # Retorna o detalhado direto da planilha, sem a agregação final por data/recurso/carga.
     cargas = consultar_carretas_detalhado(data_inicio, data_final)
+    _marcar_selecao_versao_anterior(
+        cargas.get("itens_sem_numero_serie", [])
+    )
 
     return JsonResponse({'cargas': cargas})
 

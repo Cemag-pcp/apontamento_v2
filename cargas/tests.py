@@ -395,6 +395,11 @@ class CargasLiberacaoTests(TestCase):
         self.assertContains(response, '/cargas/api/andamento-liberacoes/', html=False)
         self.assertContains(response, 'data-history-dates-url="/cargas/api/liberacoes/historico-datas/"', html=False)
         self.assertContains(response, 'data-history-url="/cargas/api/liberacoes/historico/"', html=False)
+        self.assertContains(
+            response,
+            "js/liberacao-cargas.js?v=20260612-2",
+            html=False,
+        )
 
     def test_api_datas_historico_inclui_cargas_ativas_e_inativas(self):
         CargaLiberada.objects.create(
@@ -1719,6 +1724,144 @@ class BuscarCarretasBaseTests(TestCase):
         self.assertEqual(payload["cargas"]["cargas"][1]["numero_serie"], "SERIE-02")
         self.assertEqual(len(payload["cargas"]["itens_sem_numero_serie"]), 1)
         self.assertEqual(payload["cargas"]["itens_sem_numero_serie"][0]["sheet_row_index"], 9)
+        self.assertFalse(
+            payload["cargas"]["itens_sem_numero_serie"][0][
+                "selecionado_versao_anterior"
+            ]
+        )
+
+    @patch("cargas.views.consultar_carretas_detalhado")
+    def test_marca_item_presente_na_ultima_versao_mesmo_com_nova_quantidade(
+        self,
+        consultar_detalhado_mock,
+    ):
+        carga = CargaLiberada.objects.create(
+            data_carga="2026-05-20",
+            carga_nome="Carga 03",
+        )
+        versao = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=3,
+            data_inicio_pesquisa="2026-05-20",
+            data_fim_pesquisa="2026-05-20",
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        CargaLiberadaItem.objects.create(
+            carga_versao=versao,
+            codigo_recurso="RECURSO-01",
+            quantidade=1,
+            cliente_codigo="CLIENTE-01",
+            numero_serie="",
+        )
+        consultar_detalhado_mock.return_value = {
+            "cargas": [],
+            "itens_sem_numero_serie": [
+                {
+                    "sheet_row_index": 10,
+                    "data_carga": "2026-05-20",
+                    "carga": "Carga 03",
+                    "codigo_recurso": "RECURSO-01",
+                    "cliente_codigo": "CLIENTE-01",
+                    "quantidade": 8,
+                    "numero_serie": "",
+                },
+                {
+                    "sheet_row_index": 11,
+                    "data_carga": "2026-05-20",
+                    "carga": "Carga 03",
+                    "codigo_recurso": "RECURSO-02",
+                    "cliente_codigo": "CLIENTE-01",
+                    "quantidade": 1,
+                    "numero_serie": "",
+                },
+            ],
+            "celulas": [],
+        }
+
+        response = self.client.get(
+            reverse("cargas:buscar_dados_carreta_planilha"),
+            {"data_inicio": "2026-05-20", "data_fim": "2026-05-20"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        itens = response.json()["cargas"]["itens_sem_numero_serie"]
+        self.assertTrue(itens[0]["selecionado_versao_anterior"])
+        self.assertFalse(itens[1]["selecionado_versao_anterior"])
+
+    @patch("cargas.views.consultar_carretas_detalhado")
+    def test_usa_somente_ultima_versao_para_herdar_selecao(
+        self,
+        consultar_detalhado_mock,
+    ):
+        carga = CargaLiberada.objects.create(
+            data_carga="2026-05-20",
+            carga_nome="Carga 04",
+        )
+        versao_3 = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=3,
+            data_inicio_pesquisa="2026-05-20",
+            data_fim_pesquisa="2026-05-20",
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        CargaLiberadaItem.objects.create(
+            carga_versao=versao_3,
+            codigo_recurso="ITEM-DESMARCADO",
+            quantidade=1,
+            cliente_codigo="CLIENTE-01",
+            numero_serie="",
+        )
+        versao_4 = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=4,
+            data_inicio_pesquisa="2026-05-20",
+            data_fim_pesquisa="2026-05-20",
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        CargaLiberadaItem.objects.create(
+            carga_versao=versao_4,
+            codigo_recurso="ITEM-MANTIDO",
+            quantidade=1,
+            cliente_codigo="CLIENTE-01",
+            numero_serie="",
+        )
+        consultar_detalhado_mock.return_value = {
+            "cargas": [],
+            "itens_sem_numero_serie": [
+                {
+                    "sheet_row_index": 12,
+                    "data_carga": "2026-05-20",
+                    "carga": "Carga 04",
+                    "codigo_recurso": "ITEM-DESMARCADO",
+                    "cliente_codigo": "CLIENTE-01",
+                    "quantidade": 1,
+                    "numero_serie": "",
+                },
+                {
+                    "sheet_row_index": 13,
+                    "data_carga": "2026-05-20",
+                    "carga": "Carga 04",
+                    "codigo_recurso": "ITEM-MANTIDO",
+                    "cliente_codigo": "CLIENTE-01",
+                    "quantidade": 1,
+                    "numero_serie": "",
+                },
+            ],
+            "celulas": [],
+        }
+
+        response = self.client.get(
+            reverse("cargas:buscar_dados_carreta_planilha"),
+            {"data_inicio": "2026-05-20", "data_fim": "2026-05-20"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        itens = response.json()["cargas"]["itens_sem_numero_serie"]
+        self.assertFalse(itens[0]["selecionado_versao_anterior"])
+        self.assertTrue(itens[1]["selecionado_versao_anterior"])
 
 
 class ImprimirEtiquetasMontagemTests(TestCase):
