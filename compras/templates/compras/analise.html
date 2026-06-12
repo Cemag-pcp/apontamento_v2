@@ -4,7 +4,7 @@
 {% block title %}<title>Análise de Compras</title>{% endblock %}
 
 {% block links %}
-<link rel="stylesheet" href="{% static 'css/compras.css' %}?v=20260612-1">
+<link rel="stylesheet" href="{% static 'css/compras.css' %}?v=20260612-2">
 {% endblock %}
 
 {% block content %}
@@ -206,7 +206,9 @@
 <script>
 window.COMPRAS_API_BASE = '/compras/';
 window.COMPRAS_URGENTE_COM_PEDIDO_LABEL = 'Aguardando chegar';
+window.COMPRAS_EXIBIR_ENTREGA_ATRASADA = true;
+window.COMPRAS_GRAFICO_ENRIQUECIDO = true;
 </script>
 <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-<script src="{% static 'js/compras.js' %}?v=20260612-2"></script>
+<script src="{% static 'js/compras.js' %}?v=20260612-5"></script>
 {% endblock %}

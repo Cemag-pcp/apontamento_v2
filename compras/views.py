@@ -31,7 +31,11 @@ def api_material_direto(request):
     try:
         simulacao_df = get_simulacao_df()
         pedidos_df = get_pedidos_df()
-        resultado = processar_material_direto(simulacao_df, pedidos_df)
+        resultado = processar_material_direto(
+            simulacao_df,
+            pedidos_df,
+            considerar_pedido_pendente_como_recebido=True,
+        )
 
         materiais_base = resultado['materiais']
         materiais = materiais_base
@@ -88,14 +92,23 @@ def api_projecao(request):
     try:
         simulacao_df = get_simulacao_df()
         pedidos_df = get_pedidos_df()
-        resultado = processar_material_direto(simulacao_df, pedidos_df)
+        resultado = processar_material_direto(
+            simulacao_df,
+            pedidos_df,
+            considerar_pedido_pendente_como_recebido=True,
+        )
 
-        projecao = get_projecao_para_material(codigo, resultado['df'], resultado['df_pedidos'])
+        projecao = get_projecao_para_material(
+            codigo,
+            resultado['df'],
+            resultado['df_pedidos'],
+            considerar_pedido_pendente_como_recebido=True,
+        )
 
         if 'error' in projecao:
             return JsonResponse(projecao, status=404)
 
-        projecao['sugestoes'] = gerar_sugestoes(projecao)
+        projecao['sugestoes'] = gerar_sugestoes(projecao, formato_enriquecido=True)
         return JsonResponse(projecao)
     except Exception as e:
         logger.exception('Erro na projecao de estoque para %s: %s', codigo, e)
@@ -115,8 +128,17 @@ def api_analise_ia(request):
     try:
         simulacao_df = get_simulacao_df()
         pedidos_df = get_pedidos_df()
-        resultado = processar_material_direto(simulacao_df, pedidos_df)
-        projecao = get_projecao_para_material(codigo, resultado['df'], resultado['df_pedidos'])
+        resultado = processar_material_direto(
+            simulacao_df,
+            pedidos_df,
+            considerar_pedido_pendente_como_recebido=True,
+        )
+        projecao = get_projecao_para_material(
+            codigo,
+            resultado['df'],
+            resultado['df_pedidos'],
+            considerar_pedido_pendente_como_recebido=True,
+        )
         if 'error' in projecao:
             return JsonResponse(projecao, status=404)
 

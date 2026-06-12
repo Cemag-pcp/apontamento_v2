@@ -23,11 +23,141 @@ def _adicionar_dias_uteis(data_inicial, num_dias):
     return data_final
 
 
-def gerar_sugestoes(projecao: dict) -> list:
+def _formatar_data(valor):
+    if not valor:
+        return '-'
+    for formato in ('%Y-%m-%d', '%d/%m/%Y'):
+        try:
+            return datetime.strptime(valor, formato).strftime('%d/%m/%Y')
+        except ValueError:
+            continue
+    return valor
+
+
+def _gerar_sugestoes_enriquecidas(projecao: dict) -> list:
+    estoque_fisico = float(projecao.get('estoque_fisico', 0) or 0)
+    estoque_projetado = float(projecao.get('estoque_projetado', estoque_fisico) or 0)
+    estoque_minimo = float(projecao.get('estoque_minimo', 0) or 0)
+    consumo_diario = float(projecao.get('consumo_diario', 0) or 0)
+    ped_compras = float(projecao.get('ped_compras', 0) or 0)
+    pedidos_atrasados = int(projecao.get('pedidos_atrasados_count', 0) or 0)
+    pedidos_previstos = int(projecao.get('pedidos_previstos_count', 0) or 0)
+    pedidos_sem_data = int(projecao.get('pedidos_sem_data_count', 0) or 0)
+    ped_sem_data = float(projecao.get('ped_compras_sem_data', 0) or 0)
+    dias_ate_compra = projecao.get('dias_ate_data_compra')
+    dias_ressupr = float(projecao.get('dias_ressupr', 0) or 0)
+    data_compra = _formatar_data(projecao.get('data_compra'))
+    data_minimo = _formatar_data(projecao.get('data_estoque_minimo'))
+    data_zero = _formatar_data(projecao.get('data_estoque_zero'))
+    cobertura = (
+        estoque_projetado / consumo_diario
+        if consumo_diario > 0
+        else None
+    )
+
+    resumo = {
+        'tipo': 'resumo',
+        'titulo': 'Resumo da projeção',
+        'mensagem': (
+            'O estoque projetado considera pedidos pendentes não atrasados '
+            'como disponíveis e exclui pedidos atrasados.'
+        ),
+        'qtd_sugerida': None,
+        'indicadores': [
+            {'rotulo': 'Estoque físico', 'valor': f'{estoque_fisico:.2f}'},
+            {'rotulo': 'Pedido pendente', 'valor': f'{ped_compras:.2f}'},
+            {'rotulo': 'Estoque projetado', 'valor': f'{estoque_projetado:.2f}'},
+            {'rotulo': 'Consumo diário', 'valor': f'{consumo_diario:.3f}'},
+            {'rotulo': 'Estoque mínimo', 'valor': f'{estoque_minimo:.2f}'},
+            {
+                'rotulo': 'Cobertura projetada',
+                'valor': f'{cobertura:.1f} dias' if cobertura is not None else '-',
+            },
+        ],
+    }
+
+    alertas = []
+    if pedidos_atrasados:
+        alertas.append(
+            f'**{pedidos_atrasados} pedido(s) atrasado(s)** não entram no estoque projetado.'
+        )
+    if pedidos_sem_data:
+        alertas.append(
+            f'**Pedido pendente sem data de entrega:** {ped_sem_data:.2f} unidades.'
+        )
+    if pedidos_previstos:
+        alertas.append(
+            f'**{pedidos_previstos} entrega(s) futura(s)** estão identificadas no gráfico.'
+        )
+    if data_minimo != '-':
+        alertas.append(f'Estoque mínimo projetado para **{data_minimo}**.')
+    if data_zero != '-':
+        alertas.append(f'Ruptura de estoque projetada para **{data_zero}**.')
+
+    tipo_alerta = 'critico' if pedidos_atrasados or (
+        dias_ate_compra is not None and dias_ate_compra <= 0
+    ) else 'alerta'
+    if not alertas:
+        tipo_alerta = 'ok'
+        alertas.append('Nenhum alerta crítico identificado na projeção atual.')
+
+    card_alertas = {
+        'tipo': tipo_alerta,
+        'titulo': 'Alertas e marcos',
+        'mensagem': '\n'.join(alertas),
+        'qtd_sugerida': None,
+    }
+
+    qtd_ressuprimento = round(dias_ressupr * consumo_diario, 2)
+    if pedidos_atrasados:
+        tipo_acao = 'acao'
+        titulo_acao = 'Acompanhar entrega atrasada'
+        mensagem_acao = (
+            'Contate o fornecedor e confirme uma nova previsão. '
+            'O pedido atrasado não foi considerado no estoque projetado.'
+        )
+        qtd_sugerida = None
+    elif ped_compras > 0:
+        tipo_acao = 'acao'
+        titulo_acao = 'Acompanhar pedidos pendentes'
+        mensagem_acao = (
+            f'Confirme as entregas pendentes. A próxima compra está prevista para '
+            f'**{data_compra}**. Pedidos sem data devem receber uma previsão formal.'
+        )
+        qtd_sugerida = None
+    elif dias_ate_compra is not None and dias_ate_compra <= 3:
+        tipo_acao = 'urgente'
+        titulo_acao = 'Preparar nova compra'
+        mensagem_acao = (
+            f'Emita ou prepare o pedido até **{data_compra}** para evitar atingir '
+            f'o estoque mínimo em **{data_minimo}**.'
+        )
+        qtd_sugerida = qtd_ressuprimento
+    else:
+        tipo_acao = 'ok'
+        titulo_acao = 'Nenhuma ação imediata'
+        mensagem_acao = (
+            f'Monitore o consumo. A próxima compra está prevista para **{data_compra}**.'
+        )
+        qtd_sugerida = qtd_ressuprimento
+
+    acao = {
+        'tipo': tipo_acao,
+        'titulo': titulo_acao,
+        'mensagem': mensagem_acao,
+        'qtd_sugerida': qtd_sugerida,
+    }
+    return [resumo, card_alertas, acao]
+
+
+def gerar_sugestoes(projecao: dict, formato_enriquecido: bool = False) -> list:
     """
     Porta de sugestoes.py. Recebe o dict retornado por get_projecao_para_material
     e retorna lista de sugestoes em formato serializavel JSON.
     """
+    if formato_enriquecido:
+        return _gerar_sugestoes_enriquecidas(projecao)
+
     dias_ressupr = float(projecao.get('dias_ressupr', 0) or 0)
     consumo_diario = float(projecao.get('consumo_diario', 0) or 0)
     estoque_atual = float(projecao.get('estoque_atual', 0) or 0)

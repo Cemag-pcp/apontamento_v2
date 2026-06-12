@@ -3,6 +3,7 @@
 
 const API_BASE = window.COMPRAS_API_BASE || '/compras/';
 const URGENTE_COM_PEDIDO_LABEL = window.COMPRAS_URGENTE_COM_PEDIDO_LABEL || 'Ped. Pendente';
+const EXIBIR_ENTREGA_ATRASADA = window.COMPRAS_EXIBIR_ENTREGA_ATRASADA === true;
 
 const URGENCY_ROW_CLASS = {
     PEDIDO_ATRASADO:   'urg-pedido',
@@ -115,6 +116,26 @@ function fmtDolar(n) {
         minimumFractionDigits: 4,
         maximumFractionDigits: 4,
     });
+}
+
+function dataCompraEstaAtrasada(material) {
+    if (!EXIBIR_ENTREGA_ATRASADA) return false;
+    if (material.flag_urgencia === 'PEDIDO_ATRASADO') return true;
+    if (material.flag_urgencia !== 'URGENTE_COM_PEDIDO' || !material.data_compra) {
+        return false;
+    }
+
+    const dataCompra = parseDateBR(material.data_compra);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return Number.isFinite(dataCompra) && dataCompra < hoje.getTime();
+}
+
+function formatarDataProximaCompra(material) {
+    if (dataCompraEstaAtrasada(material)) {
+        return '<span class="compras-entrega-atrasada">Entrega atrasada</span>';
+    }
+    return material.data_compra || '-';
 }
 
 function extrairHoraCotacao(texto) {
@@ -263,7 +284,7 @@ function renderTabela(materiais) {
             <td class="num">${m.dias_ate_zero === 9999 ? '∞' : fmt(m.dias_ate_zero, 1)}</td>
             <td class="num">${fmt(m.ped_compras)}</td>
             <td class="num">${fmt(m.estoque_minimo)}</td>
-            <td style="font-size:12px;">${m.data_compra || '-'}</td>
+            <td style="font-size:12px;">${formatarDataProximaCompra(m)}</td>
             <td class="center">${URGENCY_BADGE[m.flag_urgencia] || ''}</td>
             <td class="center">
                 <button class="btn btn-xs btn-outline-primary btn-grafico"
@@ -289,9 +310,16 @@ function parseDateBR(str) {
     return new Date(`${y}-${m}-${d}`).getTime();
 }
 
+function chaveOrdenacaoDataCompra(material) {
+    if (dataCompraEstaAtrasada(material)) {
+        return -Infinity;
+    }
+    return parseDateBR(material.data_compra);
+}
+
 function ordenarPorDataCompra() {
     const sorted = [...materiaisCache].sort((a, b) => {
-        const diff = parseDateBR(a.data_compra) - parseDateBR(b.data_compra);
+        const diff = chaveOrdenacaoDataCompra(a) - chaveOrdenacaoDataCompra(b);
         return sortDataCompraAsc ? diff : -diff;
     });
     const th = document.getElementById('thDataCompra');
@@ -381,7 +409,11 @@ async function carregarProjecao(codigo, descricao) {
     document.getElementById('conteudoSugestoes').style.display = 'block';
 
     requestAnimationFrame(() => {
-        renderPlotly(data);
+        if (window.COMPRAS_GRAFICO_ENRIQUECIDO === true) {
+            renderPlotlyEnriquecido(data);
+        } else {
+            renderPlotly(data);
+        }
         renderSugestoes(data.sugestoes || []);
     });
 
@@ -494,7 +526,157 @@ function renderPlotly(data) {
     });
 }
 
+function renderPlotlyEnriquecido(data) {
+    const real = data.serie_real || { datas: [], estoques: [] };
+    const ideal = data.serie_ideal || { datas: [], estoques: [] };
+    const min = data.estoque_minimo || 0;
+    const eventos = (data.eventos_grafico || []).filter(evento => evento.data);
+    const configEventos = {
+        hoje: { color: '#2563eb', symbol: 'circle', label: 'Hoje' },
+        entrega_prevista: { color: '#0891b2', symbol: 'diamond', label: 'Entrega prevista' },
+        entrega_atrasada: { color: '#dc2626', symbol: 'x', label: 'Entrega atrasada' },
+        proxima_compra: { color: '#7c3aed', symbol: 'triangle-up', label: 'Próxima compra' },
+        estoque_minimo: { color: '#d97706', symbol: 'triangle-down', label: 'Estoque mínimo' },
+        estoque_zero: { color: '#111827', symbol: 'x-thin', label: 'Estoque zero' },
+    };
+    const todasDatas = [
+        ...new Set([
+            ...real.datas,
+            ...ideal.datas,
+            ...eventos.map(evento => evento.data),
+        ]),
+    ].sort();
+    const xMin = todasDatas[0];
+    const xMax = todasDatas[todasDatas.length - 1];
+    const traces = [
+        {
+            x: real.datas,
+            y: real.estoques,
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Consumo projetado',
+            line: { color: '#0d6efd', width: 2 },
+        },
+        {
+            x: ideal.datas,
+            y: ideal.estoques,
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Consumo ideal',
+            line: { color: '#198754', width: 2, dash: 'dot' },
+        },
+        {
+            x: [xMin, xMax],
+            y: [min, min],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Estoque mínimo',
+            line: { color: '#dc3545', width: 2, dash: 'dash' },
+        },
+        {
+            x: [xMin, xMax],
+            y: [0, 0],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Estoque zero',
+            line: { color: '#6c757d', width: 1 },
+        },
+    ];
+
+    Object.entries(configEventos).forEach(([tipo, config]) => {
+        const itens = eventos.filter(evento => evento.tipo === tipo);
+        if (!itens.length) return;
+        traces.push({
+            x: itens.map(evento => evento.data),
+            y: itens.map(evento => evento.estoque ?? 0),
+            type: 'scatter',
+            mode: 'markers',
+            name: config.label,
+            marker: {
+                color: config.color,
+                size: 13,
+                symbol: config.symbol,
+                line: { color: '#ffffff', width: 1.5 },
+            },
+            text: itens.map(evento => {
+                const quantidade = evento.quantidade !== null && evento.quantidade !== undefined
+                    ? `<br>Quantidade: ${fmt(evento.quantidade)}`
+                    : '';
+                const estoque = evento.estoque !== null && evento.estoque !== undefined
+                    ? `<br>Estoque projetado: ${fmt(evento.estoque)}`
+                    : '';
+                return `<b>${evento.titulo}</b><br>${evento.descricao || ''}${quantidade}${estoque}`;
+            }),
+            hovertemplate: '%{text}<extra></extra>',
+        });
+    });
+
+    Plotly.newPlot('plotlyDiv', traces, {
+        margin: { t: 42, b: 60, l: 60, r: 20 },
+        xaxis: { title: 'Data', type: 'date', tickangle: -45 },
+        yaxis: { title: 'Quantidade em estoque' },
+        legend: { orientation: 'h', y: -0.25 },
+        hovermode: 'closest',
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        shapes: eventos.map(evento => {
+            const config = configEventos[evento.tipo] || configEventos.hoje;
+            return {
+                type: 'line',
+                xref: 'x',
+                yref: 'paper',
+                x0: evento.data,
+                x1: evento.data,
+                y0: 0,
+                y1: 1,
+                line: {
+                    color: config.color,
+                    width: evento.tipo === 'hoje' ? 2 : 1.5,
+                    dash: 'dot',
+                },
+            };
+        }),
+        annotations: eventos.map((evento, index) => {
+            const config = configEventos[evento.tipo] || configEventos.hoje;
+            return {
+                x: evento.data,
+                y: index % 2 === 0 ? 0.98 : 0.86,
+                xref: 'x',
+                yref: 'paper',
+                text: evento.titulo,
+                showarrow: true,
+                arrowhead: 2,
+                ax: 0,
+                ay: -18,
+                bgcolor: config.color,
+                bordercolor: config.color,
+                font: { color: '#ffffff', size: 10 },
+                opacity: 0.95,
+            };
+        }),
+    }, {
+        responsive: true,
+        displayModeBar: false,
+    });
+}
+
 const SUGESTAO_CONFIG = {
+    resumo: {
+        icon: 'fas fa-chart-pie',
+        accentColor: '#2563eb',
+        bgColor: '#eff6ff',
+        borderColor: '#bfdbfe',
+        labelColor: '#1d4ed8',
+        label: 'RESUMO',
+    },
+    acao: {
+        icon: 'fas fa-list-check',
+        accentColor: '#7c3aed',
+        bgColor: '#f5f3ff',
+        borderColor: '#ddd6fe',
+        labelColor: '#6d28d9',
+        label: 'AÇÃO RECOMENDADA',
+    },
     critico: {
         icon: 'fas fa-circle-exclamation',
         accentColor: '#dc3545',
@@ -574,6 +756,16 @@ function renderSugestoes(sugestoes) {
             : '';
 
         const mensagemHtml = _formatarMensagemSugestao(s.mensagem || '');
+        const indicadoresBlock = Array.isArray(s.indicadores) && s.indicadores.length
+            ? `<div class="sugestao-indicadores">
+                ${s.indicadores.map(indicador => `
+                    <div class="sugestao-indicador">
+                        <span>${indicador.rotulo}</span>
+                        <strong>${indicador.valor}</strong>
+                    </div>
+                `).join('')}
+               </div>`
+            : '';
 
         return `
         <div class="sugestao-card" style="background:${cfg.bgColor}; border-color:${cfg.borderColor}; border-left-color:${cfg.accentColor};">
@@ -586,6 +778,7 @@ function renderSugestoes(sugestoes) {
                 ${s.titulo}
             </div>
             <p class="sugestao-mensagem">${mensagemHtml}</p>
+            ${indicadoresBlock}
             ${qtdBlock}
         </div>`;
     }).join('');

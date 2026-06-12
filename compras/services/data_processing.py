@@ -132,7 +132,12 @@ def _ajustar_estoque(row, df_pedidos):
     return row['estoque_almox']
 
 
-def _calcular_datas_projecao(row, df_pedidos, horizonte_dias_uteis=365):
+def _calcular_datas_projecao(
+    row,
+    df_pedidos,
+    horizonte_dias_uteis=365,
+    considerar_pedido_pendente_como_recebido=False,
+):
     consumo_diario = float(_valor_escalar(row.get('consumo_diario'), 0) or 0)
     estoque_minimo = float(_valor_escalar(row.get('estoque_minimo'), 0) or 0)
     dias_ressupr = float(_valor_escalar(row.get('dias_ressupr'), 0) or 0)
@@ -154,7 +159,24 @@ def _calcular_datas_projecao(row, df_pedidos, horizonte_dias_uteis=365):
         pd.notna(df_pedidos.get('data_entrega')) &
         (df_pedidos.get('qde_ped_corrigido', 0) > 0)
     ].copy()
-    pedidos = pedidos[pedidos['data_entrega'] >= pd.Timestamp(hoje)]
+    hoje_ts = pd.Timestamp(hoje)
+    possui_pedido_atrasado = bool(
+        not pedidos.empty
+        and (pedidos['data_entrega'] < hoje_ts).any()
+    )
+    pedido_pendente = float(
+        _valor_escalar(row.get('ped_compras_pendente'), 0) or 0
+    )
+
+    if (
+        considerar_pedido_pendente_como_recebido
+        and pedido_pendente > 0
+        and not possui_pedido_atrasado
+    ):
+        estoque_base += pedido_pendente
+        pedidos = pedidos.iloc[0:0]
+    else:
+        pedidos = pedidos[pedidos['data_entrega'] >= hoje_ts]
 
     chegadas_por_data = {}
     ultima_chegada = pd.Timestamp(hoje)
@@ -200,7 +222,12 @@ def _calcular_datas_projecao(row, df_pedidos, horizonte_dias_uteis=365):
     }
 
 
-def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd.DataFrame, skip_first_row: bool = True) -> dict:
+def processar_material_direto(
+    simulacao_df_raw: pd.DataFrame,
+    pedidos_df_raw: pd.DataFrame,
+    skip_first_row: bool = True,
+    considerar_pedido_pendente_como_recebido: bool = False,
+) -> dict:
     grupo_df = pd.read_csv(DATA_DIR / 'agrupamento_chapas.csv', sep=';')
     grupos_df = pd.read_csv(DATA_DIR / 'grupos_atualizados.csv', sep=',')
     grupos_df = grupos_df.rename(columns={'Código': 'codigo'} if 'Código' in grupos_df.columns else {})
@@ -333,7 +360,16 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
     )
 
     df['estoque_almox'] = df.apply(lambda row: _ajustar_estoque(row, df_ped), axis=1)
-    projecoes_datas = df.apply(lambda row: _calcular_datas_projecao(row, df_ped), axis=1)
+    projecoes_datas = df.apply(
+        lambda row: _calcular_datas_projecao(
+            row,
+            df_ped,
+            considerar_pedido_pendente_como_recebido=(
+                considerar_pedido_pendente_como_recebido
+            ),
+        ),
+        axis=1,
+    )
     df['data_estoque_minimo'] = projecoes_datas.apply(lambda item: item.get('data_estoque_minimo'))
     df['data_estoque_zero'] = projecoes_datas.apply(lambda item: item.get('data_estoque_zero'))
     df['data_compra'] = projecoes_datas.apply(lambda item: item.get('data_compra'))
@@ -424,13 +460,18 @@ def processar_material_direto(simulacao_df_raw: pd.DataFrame, pedidos_df_raw: pd
     }
 
 
-def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFrame) -> dict:
+def get_projecao_para_material(
+    codigo: str,
+    df: pd.DataFrame,
+    df_ped: pd.DataFrame,
+    considerar_pedido_pendente_como_recebido: bool = False,
+) -> dict:
     linha = df[df['codigo'] == codigo]
     if linha.empty:
         return {'error': 'Material não encontrado'}
 
     row = linha.iloc[0]
-    estoque_atual = float(
+    estoque_fisico = float(
         _valor_escalar(row.get('estoque_almox_central'), _valor_escalar(row.get('estoque_almox'), 0)) or 0
     )
     estoque_minimo = float(_valor_escalar(row.get('estoque_minimo'), 0) or 0)
@@ -438,20 +479,35 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
     dias_ressupr = float(_valor_escalar(row.get('dias_ressupr'), 0) or 0)
     data_compra = _valor_escalar(row.get('data_compra'))
 
-    datas = pd.date_range(start=datetime.now().date(), periods=121, freq='B')
-    estoque_atual_dia = estoque_atual
-    datas_grafico = []
-    estoque_diario = []
-    chegadas_previstas = []
     hoje_ts = pd.Timestamp(datetime.now().date())
-    pedidos_pendentes_qs = df_ped[df_ped['codigo'] == codigo].copy()
-    pedidos_pendentes_qs = pedidos_pendentes_qs[
-        pd.notna(pedidos_pendentes_qs.get('data_entrega')) &
-        (pedidos_pendentes_qs.get('qde_ped_corrigido', 0) > 0)
-    ]
+    ped_compras = float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0)
+    pedidos_codigo = df_ped[df_ped['codigo'] == codigo].copy()
+    pedidos_pendentes_qs = pedidos_codigo[
+        pd.notna(pedidos_codigo.get('data_entrega')) &
+        (pedidos_codigo.get('qde_ped_corrigido', 0) > 0)
+    ].copy()
     pedidos_pendentes_qs = pedidos_pendentes_qs.sort_values(by='data_entrega', ascending=True)
     pedidos_atrasados_qs = pedidos_pendentes_qs[pedidos_pendentes_qs['data_entrega'] < hoje_ts].copy()
     pedidos_previstos_qs = pedidos_pendentes_qs[pedidos_pendentes_qs['data_entrega'] >= hoje_ts].copy()
+
+    ped_compras_atrasado = float(pedidos_atrasados_qs.get('qde_ped_corrigido', 0).sum())
+    ped_compras_previsto = float(pedidos_previstos_qs.get('qde_ped_corrigido', 0).sum())
+    ped_compras_sem_data = max(
+        ped_compras - ped_compras_atrasado - ped_compras_previsto,
+        0,
+    )
+    pedido_elegivel_projecao = max(ped_compras - ped_compras_atrasado, 0)
+    estoque_projetado = (
+        estoque_fisico + pedido_elegivel_projecao
+        if considerar_pedido_pendente_como_recebido
+        else estoque_fisico
+    )
+
+    datas = pd.date_range(start=datetime.now().date(), periods=121, freq='B')
+    estoque_atual_dia = estoque_projetado
+    datas_grafico = []
+    estoque_diario = []
+    chegadas_previstas = []
 
     if len(datas):
         datas_grafico.append(datas[0].strftime('%Y-%m-%d'))
@@ -465,7 +521,8 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
         pedidos_do_dia = pedidos_previstos_qs[pedidos_previstos_qs['data_entrega'] == data]
         if not pedidos_do_dia.empty and 'qde_ped_corrigido' in pedidos_do_dia.columns:
             quantidade_chegada = float(pedidos_do_dia['qde_ped_corrigido'].sum())
-            estoque_atual_dia += quantidade_chegada
+            if not considerar_pedido_pendente_como_recebido:
+                estoque_atual_dia += quantidade_chegada
             datas_grafico.append(data.strftime('%Y-%m-%d'))
             estoque_diario.append(round(estoque_atual_dia, 2))
             chegadas_previstas.append({
@@ -474,7 +531,7 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
                 'estoque_apos_chegada': round(estoque_atual_dia, 2),
             })
 
-    estoque_ideal = estoque_atual
+    estoque_ideal = estoque_projetado
     valor_ideal_compra = dias_ressupr * consumo_diario
     datas_ideal = []
     estoque_ideal_diario = []
@@ -501,6 +558,95 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
                 'estoque_referencia': round(estoque_minimo, 2),
             }
 
+    def _iso_data(valor):
+        if valor is None or pd.isna(valor):
+            return None
+        return pd.to_datetime(valor).strftime('%Y-%m-%d')
+
+    def _estoque_na_data(data_iso):
+        if not data_iso:
+            return None
+        indices = [
+            index
+            for index, data in enumerate(datas_grafico)
+            if data <= data_iso
+        ]
+        if not indices:
+            return round(estoque_projetado, 2)
+        return round(float(estoque_diario[indices[-1]]), 2)
+
+    data_compra_iso = _iso_data(data_compra)
+    data_minimo_iso = _iso_data(_valor_escalar(row.get('data_estoque_minimo')))
+    data_zero_iso = _iso_data(_valor_escalar(row.get('data_estoque_zero')))
+    eventos_grafico = [
+        {
+            'tipo': 'hoje',
+            'data': hoje_ts.strftime('%Y-%m-%d'),
+            'titulo': 'Hoje',
+            'descricao': (
+                f'Estoque físico: {estoque_fisico:.2f}. '
+                f'Estoque projetado: {estoque_projetado:.2f}.'
+            ),
+            'quantidade': round(estoque_projetado, 2),
+            'estoque': round(estoque_projetado, 2),
+        }
+    ]
+
+    for _, pedido in pedidos_atrasados_qs.iterrows():
+        data_iso = _iso_data(pedido.get('data_entrega'))
+        quantidade = float(pedido.get('qde_ped_corrigido', 0) or 0)
+        eventos_grafico.append({
+            'tipo': 'entrega_atrasada',
+            'data': data_iso,
+            'titulo': 'Entrega atrasada',
+            'descricao': f'Pedido de {quantidade:.2f} unidades ainda não recebido.',
+            'quantidade': round(quantidade, 2),
+            'estoque': _estoque_na_data(data_iso),
+        })
+
+    for _, pedido in pedidos_previstos_qs.iterrows():
+        data_iso = _iso_data(pedido.get('data_entrega'))
+        quantidade = float(pedido.get('qde_ped_corrigido', 0) or 0)
+        eventos_grafico.append({
+            'tipo': 'entrega_prevista',
+            'data': data_iso,
+            'titulo': 'Entrega prevista',
+            'descricao': f'Pedido de {quantidade:.2f} unidades com entrega programada.',
+            'quantidade': round(quantidade, 2),
+            'estoque': _estoque_na_data(data_iso),
+        })
+
+    marcos = [
+        (
+            'proxima_compra',
+            data_compra_iso,
+            'Próxima compra',
+            'Data recomendada para emitir o próximo pedido.',
+        ),
+        (
+            'estoque_minimo',
+            data_minimo_iso,
+            'Estoque mínimo',
+            f'Estoque projetado atinge o mínimo de {estoque_minimo:.2f} unidades.',
+        ),
+        (
+            'estoque_zero',
+            data_zero_iso,
+            'Estoque zero',
+            'Data projetada para ruptura do estoque.',
+        ),
+    ]
+    for tipo, data_iso, titulo, descricao in marcos:
+        if data_iso:
+            eventos_grafico.append({
+                'tipo': tipo,
+                'data': data_iso,
+                'titulo': titulo,
+                'descricao': descricao,
+                'quantidade': None,
+                'estoque': _estoque_na_data(data_iso),
+            })
+
     return {
         'codigo': codigo,
         'descricao': str(_valor_escalar(row.get('descricao'), '')),
@@ -513,12 +659,15 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
         'flag_urgencia': str(_valor_escalar(row.get('flag_urgencia'), '')),
         'serie_real': {'datas': datas_grafico, 'estoques': estoque_diario},
         'serie_ideal': {'datas': datas_ideal, 'estoques': estoque_ideal_diario},
+        'eventos_grafico': eventos_grafico,
         'chegadas_previstas': chegadas_previstas,
         'pedidos_pendentes_count': int(len(pedidos_pendentes_qs)),
         'pedidos_atrasados_count': int(len(pedidos_atrasados_qs)),
         'pedidos_previstos_count': int(len(pedidos_previstos_qs)),
-        'ped_compras_atrasado': round(float(pedidos_atrasados_qs.get('qde_ped_corrigido', 0).sum()), 2),
-        'ped_compras_previsto': round(float(pedidos_previstos_qs.get('qde_ped_corrigido', 0).sum()), 2),
+        'ped_compras_atrasado': round(ped_compras_atrasado, 2),
+        'ped_compras_previsto': round(ped_compras_previsto, 2),
+        'pedidos_sem_data_count': 1 if ped_compras_sem_data > 0 else 0,
+        'ped_compras_sem_data': round(ped_compras_sem_data, 2),
         'pedidos_pendentes_detalhes': [
             {
                 'data': data.strftime('%Y-%m-%d'),
@@ -537,8 +686,10 @@ def get_projecao_para_material(codigo: str, df: pd.DataFrame, df_ped: pd.DataFra
             if pd.notna(data)
         }),
         'chegada_planejada_compra': chegada_planejada_compra,
-        'estoque_atual': round(estoque_atual, 2),
-        'ped_compras': round(float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0), 2),
+        'estoque_atual': round(estoque_projetado, 2),
+        'estoque_fisico': round(estoque_fisico, 2),
+        'estoque_projetado': round(estoque_projetado, 2),
+        'ped_compras': round(ped_compras, 2),
         'data_estoque_minimo': row['data_estoque_minimo'].strftime('%Y-%m-%d')
             if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) else None,
     }
