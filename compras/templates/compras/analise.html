@@ -4,7 +4,7 @@
 {% block title %}<title>Análise de Compras</title>{% endblock %}
 
 {% block links %}
-<link rel="stylesheet" href="{% static 'css/compras.css' %}">
+<link rel="stylesheet" href="{% static 'css/compras.css' %}?v=20260612-1">
 {% endblock %}
 
 {% block content %}
@@ -101,6 +101,9 @@
 
     <div id="tabelaWrapper" style="display:none;">
         <div class="compras-table-shell">
+            <div class="compras-table-scroll-top" id="comprasTableScrollTop" aria-label="Rolagem horizontal da tabela">
+                <div class="compras-table-scroll-top__content" id="comprasTableScrollTopContent"></div>
+            </div>
             <div class="compras-table-wrap">
                 <table class="compras-table" id="tabelaMateriais">
                     <thead>
@@ -202,5 +205,5 @@
 {% block scripts %}
 <script>window.COMPRAS_API_BASE = '/compras/';</script>
 <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-<script src="{% static 'js/compras.js' %}"></script>
+<script src="{% static 'js/compras.js' %}?v=20260612-1"></script>
 {% endblock %}

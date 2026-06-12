@@ -34,6 +34,69 @@ const DOLAR_REFRESH_INTERVAL_MS = 60 * 1000;
 let produtoSelect2Inicializado = false;
 let materiaisCache = [];
 let sortDataCompraAsc = true;
+let resizeObserverTabela = null;
+let sincronizandoScrollTabela = false;
+
+function obterElementosScrollTabela() {
+    return {
+        scrollTop: document.getElementById('comprasTableScrollTop'),
+        scrollTopContent: document.getElementById('comprasTableScrollTopContent'),
+        tableWrap: document.querySelector('#tabelaWrapper .compras-table-wrap'),
+        table: document.getElementById('tabelaMateriais'),
+    };
+}
+
+function atualizarScrollSuperiorTabela() {
+    const { scrollTop, scrollTopContent, tableWrap, table } = obterElementosScrollTabela();
+    if (!scrollTop || !scrollTopContent || !tableWrap || !table) return;
+
+    const larguraTabela = Math.ceil(table.scrollWidth);
+    const possuiOverflowHorizontal = larguraTabela > tableWrap.clientWidth + 1;
+
+    scrollTopContent.style.width = `${larguraTabela}px`;
+    scrollTop.classList.toggle('is-visible', possuiOverflowHorizontal);
+
+    if (!possuiOverflowHorizontal) {
+        scrollTop.scrollLeft = 0;
+        tableWrap.scrollLeft = 0;
+        return;
+    }
+
+    scrollTop.scrollLeft = tableWrap.scrollLeft;
+}
+
+function agendarAtualizacaoScrollSuperior() {
+    window.requestAnimationFrame(atualizarScrollSuperiorTabela);
+}
+
+function inicializarScrollSuperiorTabela() {
+    const { scrollTop, tableWrap, table } = obterElementosScrollTabela();
+    if (!scrollTop || !tableWrap || !table) return;
+
+    scrollTop.addEventListener('scroll', () => {
+        if (sincronizandoScrollTabela) return;
+        sincronizandoScrollTabela = true;
+        tableWrap.scrollLeft = scrollTop.scrollLeft;
+        sincronizandoScrollTabela = false;
+    });
+
+    tableWrap.addEventListener('scroll', () => {
+        if (sincronizandoScrollTabela) return;
+        sincronizandoScrollTabela = true;
+        scrollTop.scrollLeft = tableWrap.scrollLeft;
+        sincronizandoScrollTabela = false;
+    });
+
+    if ('ResizeObserver' in window) {
+        resizeObserverTabela = new ResizeObserver(agendarAtualizacaoScrollSuperior);
+        resizeObserverTabela.observe(tableWrap);
+        resizeObserverTabela.observe(table);
+    } else {
+        window.addEventListener('resize', agendarAtualizacaoScrollSuperior);
+    }
+
+    agendarAtualizacaoScrollSuperior();
+}
 
 function fmt(n, decimais = 2) {
     if (n === null || n === undefined || n === 9999) return '-';
@@ -147,6 +210,7 @@ async function carregarMateriais(params = {}, forceRefresh = false) {
         document.getElementById('tabelaWrapper').style.display = 'block';
         document.getElementById('bodyMateriais').innerHTML =
             `<tr><td colspan="14" class="text-center text-danger">Erro ao carregar dados: ${e.message}</td></tr>`;
+        agendarAtualizacaoScrollSuperior();
         return;
     }
 
@@ -177,6 +241,7 @@ function renderTabela(materiais) {
 
     if (!materiais.length) {
         document.getElementById('semResultados').style.display = 'block';
+        agendarAtualizacaoScrollSuperior();
         return;
     }
 
@@ -214,6 +279,7 @@ function renderTabela(materiais) {
     tbody.querySelectorAll('.btn-grafico').forEach(btn => {
         btn.addEventListener('click', () => carregarProjecao(btn.dataset.codigo, btn.dataset.descricao));
     });
+    agendarAtualizacaoScrollSuperior();
 }
 
 function parseDateBR(str) {
@@ -587,6 +653,7 @@ async function carregarAnaliseIA(force = false) {
 
 document.addEventListener('DOMContentLoaded', () => {
     inicializarFiltroProduto();
+    inicializarScrollSuperiorTabela();
     carregarMateriais();
     carregarCotacaoDolar();
     window.setInterval(() => carregarCotacaoDolar(), DOLAR_REFRESH_INTERVAL_MS);
