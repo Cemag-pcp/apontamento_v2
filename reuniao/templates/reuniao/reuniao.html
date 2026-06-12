@@ -83,7 +83,7 @@
             <div class="card shadow-sm h-100">
                 <div class="card-header py-2">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="fw-bold"><i class="bi bi-journal-text"></i> Reports do Dia</span>
+                        <span class="fw-bold"><i class="bi bi-journal-text"></i> Reports</span>
                         <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalNovoReport">
                             <i class="bi bi-plus"></i> Novo
                         </button>
@@ -106,15 +106,22 @@
                                 <option value="false">Não confirmados</option>
                             </select>
                         </div>
+                        <div class="col-12">
+                            <label for="reports-data-filtro" class="form-label small mb-1">Data</label>
+                            <input type="date" id="reports-data-filtro" class="form-control form-control-sm">
+                        </div>
                     </div>
                 </div>
                 <div class="card-body p-2" style="max-height:65vh; overflow-y:auto;">
                     <div id="reports-list">
                         <div class="text-center text-muted py-4 small">
                             <i class="bi bi-journal" style="font-size:2rem; opacity:.4;"></i>
-                            <p class="mt-2 mb-0">Nenhum report hoje.</p>
+                            <p class="mt-2 mb-0">Nenhum report encontrado.</p>
                         </div>
                     </div>
+                    <nav id="reports-paginacao-container" class="d-none mt-2" aria-label="Paginação dos reports">
+                        <ul id="reports-paginacao" class="pagination pagination-sm justify-content-center mb-0"></ul>
+                    </nav>
                 </div>
             </div>
         </div>
@@ -257,6 +264,7 @@ const SETORES_LIVE  = ['estamparia', 'usinagem', 'serra', 'corte'];
 
 let _liveInterval = null;
 let _reportParaExcluir = null;
+let _reportsPaginaAtual = 1;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -650,24 +658,70 @@ function renderReportsVazio() {
     document.getElementById('reports-list').innerHTML = `
         <div class="text-center text-muted py-4 small">
             <i class="bi bi-journal" style="font-size:2rem;opacity:.4;"></i>
-            <p class="mt-2 mb-0">Nenhum report hoje.</p>
+            <p class="mt-2 mb-0">Nenhum report encontrado.</p>
         </div>`;
 }
 
-async function loadReports() {
+function renderReportsPaginacao(paginacao) {
+    const container = document.getElementById('reports-paginacao-container');
+    const lista = document.getElementById('reports-paginacao');
+
+    if (!paginacao.total_items || paginacao.total_pages <= 1) {
+        container.classList.add('d-none');
+        lista.innerHTML = '';
+        return;
+    }
+
+    const itens = [];
+    itens.push(`
+        <li class="page-item ${paginacao.has_previous ? '' : 'disabled'}">
+            <button class="page-link" type="button" data-page="${paginacao.page - 1}">Anterior</button>
+        </li>
+    `);
+
+    for (let pagina = 1; pagina <= paginacao.total_pages; pagina += 1) {
+        itens.push(`
+            <li class="page-item ${pagina === paginacao.page ? 'active' : ''}">
+                <button class="page-link" type="button" data-page="${pagina}">${pagina}</button>
+            </li>
+        `);
+    }
+
+    itens.push(`
+        <li class="page-item ${paginacao.has_next ? '' : 'disabled'}">
+            <button class="page-link" type="button" data-page="${paginacao.page + 1}">Próxima</button>
+        </li>
+    `);
+
+    lista.innerHTML = itens.join('');
+    container.classList.remove('d-none');
+    lista.querySelectorAll('button[data-page]').forEach(button => {
+        button.addEventListener('click', () => {
+            const pagina = Number(button.dataset.page);
+            if (!button.closest('.page-item').classList.contains('disabled')) {
+                loadReports(pagina);
+            }
+        });
+    });
+}
+
+async function loadReports(page = _reportsPaginaAtual) {
     const setor = document.getElementById('reports-setor-filtro').value;
     const concluido = document.getElementById('reports-conclusao-filtro').value;
+    const dataReport = document.getElementById('reports-data-filtro').value;
     const params = new URLSearchParams();
+    params.set('page', page);
     if (setor) params.set('setor', setor);
     if (concluido) params.set('concluido', concluido);
-    const query = params.toString();
-    const url = query ? `${URL_REPORTS}?${query}` : URL_REPORTS;
+    if (dataReport) params.set('data', dataReport);
 
     try {
-        const res = await fetch(url);
+        const res = await fetch(`${URL_REPORTS}?${params}`);
         const data = await res.json();
         if (res.ok) {
-            renderReports(data);
+            _reportsPaginaAtual = data.page;
+            renderReports(data.reports);
+            renderReportsPaginacao(data);
         } else {
             alert(data.error || 'Erro ao carregar reports.');
         }
@@ -788,16 +842,11 @@ async function confirmarExclusaoReport() {
             throw new Error(data.error || 'Erro ao excluir report.');
         }
 
-        const card = reportParaExcluir.card;
         bootstrap.Modal.getInstance(
             document.getElementById('modalExcluirReport')
         ).hide();
-        card.remove();
         _reportParaExcluir = null;
-
-        if (!document.querySelector('#reports-list .report-card')) {
-            renderReportsVazio();
-        }
+        await loadReports(_reportsPaginaAtual);
     } catch (error) {
         alert(error.message || 'Erro de conexão com o servidor.');
     } finally {
@@ -889,7 +938,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 document.getElementById('report-texto').value = '';
                 bootstrap.Modal.getInstance(document.getElementById('modalNovoReport')).hide();
-                loadReports();
+                loadReports(1);
             } else {
                 alert(data.error || 'Erro ao salvar report.');
             }
@@ -924,9 +973,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-confirmar-exclusao-report')
         .addEventListener('click', confirmarExclusaoReport);
     document.getElementById('reports-setor-filtro')
-        .addEventListener('change', loadReports);
+        .addEventListener('change', () => loadReports(1));
     document.getElementById('reports-conclusao-filtro')
-        .addEventListener('change', loadReports);
+        .addEventListener('change', () => loadReports(1));
+    document.getElementById('reports-data-filtro')
+        .addEventListener('change', () => loadReports(1));
     document.getElementById('modalExcluirReport')
         .addEventListener('hidden.bs.modal', () => {
             _reportParaExcluir = null;
@@ -949,7 +1000,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial load
     loadTabela();
-    loadReports();
+    loadReports(1);
 });
 </script>
 {% endblock %}

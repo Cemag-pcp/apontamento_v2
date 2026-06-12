@@ -109,21 +109,26 @@ class ReportConclusaoTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()[0]['concluido'])
+        self.assertTrue(response.json()['reports'][0]['concluido'])
 
-    def test_listagem_retorna_apenas_reports_de_hoje(self):
-        Report.objects.create(
+    def test_listagem_retorna_reports_atuais_e_historicos(self):
+        historico = Report.objects.create(
             usuario=self.operador,
             texto='Report histórico',
             data=date(2026, 1, 10),
+            setor=self.setor,
         )
         self.client.force_login(self.operador)
 
         response = self.client.get(reverse('reuniao:listar_reports'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 1)
-        self.assertEqual(response.json()[0]['id'], self.report.id)
+        payload = response.json()
+        self.assertEqual(payload['total_items'], 2)
+        self.assertEqual(
+            {item['id'] for item in payload['reports']},
+            {self.report.id, historico.id},
+        )
 
     def test_payload_exige_booleano(self):
         self.client.force_login(self.pcp)
@@ -341,30 +346,195 @@ class ReportSetorTests(TestCase):
             setor=self.setor_corte,
         )
 
-        todos = self.client.get(self.listar_url).json()
+        todos = self.client.get(self.listar_url).json()['reports']
         corte = self.client.get(
             self.listar_url,
             {'setor': self.setor_corte.id},
-        ).json()
+        ).json()['reports']
         confirmados = self.client.get(
             self.listar_url,
             {'concluido': 'true'},
-        ).json()
+        ).json()['reports']
         nao_confirmados_solda = self.client.get(
             self.listar_url,
             {'setor': self.setor_solda.id, 'concluido': 'false'},
-        ).json()
+        ).json()['reports']
 
         self.assertEqual(
             {item['id'] for item in todos},
-            {report_corte.id, report_solda.id},
+            {
+                report_corte.id,
+                report_solda.id,
+                Report.objects.get(texto='Histórico').id,
+            },
         )
-        self.assertEqual([item['id'] for item in corte], [report_corte.id])
+        self.assertEqual(
+            {item['id'] for item in corte},
+            {report_corte.id, Report.objects.get(texto='Histórico').id},
+        )
         self.assertEqual([item['id'] for item in confirmados], [report_corte.id])
         self.assertEqual(
             [item['id'] for item in nao_confirmados_solda],
             [report_solda.id],
         )
+
+    def test_paginacao_retorna_seis_reports_por_pagina(self):
+        reports = [
+            Report.objects.create(
+                usuario=self.usuario,
+                texto=f'Report paginado {indice}',
+                data=date(2026, 1, indice + 1),
+                setor=self.setor_corte,
+            )
+            for indice in range(7)
+        ]
+
+        pagina_1 = self.client.get(self.listar_url, {'page': 1}).json()
+        pagina_2 = self.client.get(self.listar_url, {'page': 2}).json()
+
+        self.assertEqual(len(pagina_1['reports']), 6)
+        self.assertEqual(len(pagina_2['reports']), 1)
+        self.assertEqual(pagina_1['page'], 1)
+        self.assertEqual(pagina_1['total_pages'], 2)
+        self.assertEqual(pagina_1['total_items'], 7)
+        self.assertFalse(pagina_1['has_previous'])
+        self.assertTrue(pagina_1['has_next'])
+        self.assertTrue(pagina_2['has_previous'])
+        self.assertFalse(pagina_2['has_next'])
+        self.assertEqual(pagina_1['reports'][0]['id'], reports[-1].id)
+
+    def test_pagina_alem_do_fim_retorna_ultima_pagina(self):
+        Report.objects.create(
+            usuario=self.usuario,
+            texto='Único report',
+            data=date.today(),
+            setor=self.setor_corte,
+        )
+
+        response = self.client.get(self.listar_url, {'page': 99})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['page'], 1)
+
+    def test_filtros_sao_aplicados_antes_da_paginacao(self):
+        for indice in range(7):
+            Report.objects.create(
+                usuario=self.usuario,
+                texto=f'Corte confirmado {indice}',
+                data=date(2025, 12, indice + 1),
+                setor=self.setor_corte,
+                concluido=True,
+            )
+        Report.objects.create(
+            usuario=self.usuario,
+            texto='Solda confirmada',
+            data=date.today(),
+            setor=self.setor_solda,
+            concluido=True,
+        )
+
+        pagina_1 = self.client.get(self.listar_url, {
+            'setor': self.setor_corte.id,
+            'concluido': 'true',
+            'page': 1,
+        }).json()
+        pagina_2 = self.client.get(self.listar_url, {
+            'setor': self.setor_corte.id,
+            'concluido': 'true',
+            'page': 2,
+        }).json()
+
+        self.assertEqual(pagina_1['total_items'], 7)
+        self.assertEqual(pagina_1['total_pages'], 2)
+        self.assertEqual(len(pagina_1['reports']), 6)
+        self.assertEqual(len(pagina_2['reports']), 1)
+        self.assertTrue(all(
+            item['setor']['id'] == self.setor_corte.id
+            and item['concluido']
+            for item in pagina_1['reports'] + pagina_2['reports']
+        ))
+
+    def test_filtro_por_data_retorna_somente_o_dia_selecionado(self):
+        data_selecionada = date(2026, 2, 10)
+        report_do_dia = Report.objects.create(
+            usuario=self.usuario,
+            texto='Report da data',
+            data=data_selecionada,
+            setor=self.setor_corte,
+        )
+        Report.objects.create(
+            usuario=self.usuario,
+            texto='Report de outra data',
+            data=date(2026, 2, 11),
+            setor=self.setor_corte,
+        )
+
+        response = self.client.get(
+            self.listar_url,
+            {'data': data_selecionada.isoformat()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['total_items'], 1)
+        self.assertEqual(
+            [item['id'] for item in response.json()['reports']],
+            [report_do_dia.id],
+        )
+
+    def test_filtro_de_data_combina_setor_status_e_paginacao(self):
+        data_selecionada = date(2026, 3, 15)
+        reports_esperados = [
+            Report.objects.create(
+                usuario=self.usuario,
+                texto=f'Corte confirmado na data {indice}',
+                data=data_selecionada,
+                setor=self.setor_corte,
+                concluido=True,
+            )
+            for indice in range(7)
+        ]
+        Report.objects.create(
+            usuario=self.usuario,
+            texto='Corte não confirmado na data',
+            data=data_selecionada,
+            setor=self.setor_corte,
+        )
+        Report.objects.create(
+            usuario=self.usuario,
+            texto='Solda confirmada na data',
+            data=data_selecionada,
+            setor=self.setor_solda,
+            concluido=True,
+        )
+
+        pagina_1 = self.client.get(self.listar_url, {
+            'data': data_selecionada.isoformat(),
+            'setor': self.setor_corte.id,
+            'concluido': 'true',
+            'page': 1,
+        }).json()
+        pagina_2 = self.client.get(self.listar_url, {
+            'data': data_selecionada.isoformat(),
+            'setor': self.setor_corte.id,
+            'concluido': 'true',
+            'page': 2,
+        }).json()
+
+        retornados = pagina_1['reports'] + pagina_2['reports']
+        self.assertEqual(pagina_1['total_items'], 7)
+        self.assertEqual(pagina_1['total_pages'], 2)
+        self.assertEqual(
+            {item['id'] for item in retornados},
+            {report.id for report in reports_esperados},
+        )
+
+    def test_filtro_de_data_invalido_retorna_400(self):
+        response = self.client.get(
+            self.listar_url,
+            {'data': '15-03-2026'},
+        )
+
+        self.assertEqual(response.status_code, 400)
 
     def test_filtro_de_confirmacao_invalido_retorna_400(self):
         response = self.client.get(
@@ -381,8 +551,14 @@ class ReportSetorTests(TestCase):
 
         self.assertContains(response, 'id="reports-setor-filtro"')
         self.assertContains(response, 'id="reports-conclusao-filtro"')
+        self.assertContains(response, 'id="reports-data-filtro"')
         self.assertContains(response, 'Confirmados')
         self.assertContains(response, 'Não confirmados')
+        self.assertContains(response, '> Reports</span>', html=False)
+        self.assertContains(response, 'id="reports-paginacao"')
+        self.assertContains(response, 'Nenhum report encontrado.')
+        self.assertNotContains(response, 'Reports do Dia')
+        self.assertNotContains(response, 'Nenhum report hoje.')
         self.assertNotContains(response, '<option value="sem-setor">')
 
     def test_admin_pode_reportar_para_setor_nao_vinculado(self):

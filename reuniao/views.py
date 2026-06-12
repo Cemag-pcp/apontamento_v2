@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import localtime
@@ -144,9 +145,10 @@ def criar_report(request):
 @login_required
 @require_GET
 def listar_reports(request):
-    reports = Report.objects.filter(data=date.today(), setor__isnull=False)
+    reports = Report.objects.filter(setor__isnull=False)
     setor_filtro = request.GET.get('setor', '').strip()
     concluido_filtro = request.GET.get('concluido', '').strip().lower()
+    data_filtro = request.GET.get('data', '').strip()
 
     if setor_filtro:
         try:
@@ -165,8 +167,25 @@ def listar_reports(request):
             )
         reports = reports.filter(concluido=concluido_filtro == 'true')
 
-    reports = reports.select_related('usuario', 'setor')
-    return JsonResponse([{
+    if data_filtro:
+        try:
+            data_report = datetime.strptime(data_filtro, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse(
+                {'error': 'Filtro de data inválido.'},
+                status=400,
+            )
+        reports = reports.filter(data=data_report)
+
+    reports = (
+        reports
+        .select_related('usuario', 'setor')
+        .order_by('-criado_em', '-id')
+    )
+    paginator = Paginator(reports, 6)
+    pagina = paginator.get_page(request.GET.get('page', 1))
+
+    reports_serializados = [{
         'id': r.id,
         'usuario': r.usuario.get_full_name() or r.usuario.username,
         'usuario_id': r.usuario.id,
@@ -175,7 +194,16 @@ def listar_reports(request):
         'criado_em': localtime(r.criado_em).strftime('%d/%m/%Y %H:%M'),
         'concluido': r.concluido,
         'setor': serializar_setor(r.setor),
-    } for r in reports], safe=False)
+    } for r in pagina.object_list]
+
+    return JsonResponse({
+        'reports': reports_serializados,
+        'page': pagina.number,
+        'total_pages': paginator.num_pages,
+        'total_items': paginator.count,
+        'has_previous': pagina.has_previous(),
+        'has_next': pagina.has_next(),
+    })
 
 
 @login_required
