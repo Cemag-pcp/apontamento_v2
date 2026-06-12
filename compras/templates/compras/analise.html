@@ -203,7 +203,10 @@
 {% endblock %}
 
 {% block scripts %}
-<script>window.COMPRAS_API_BASE = '/compras/';</script>
+<script>
+window.COMPRAS_API_BASE = '/compras/';
+window.COMPRAS_URGENTE_COM_PEDIDO_LABEL = 'Aguardando chegar';
+</script>
 <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-<script src="{% static 'js/compras.js' %}?v=20260612-1"></script>
+<script src="{% static 'js/compras.js' %}?v=20260612-2"></script>
 {% endblock %}

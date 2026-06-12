@@ -32,3 +32,25 @@ class ComprasScrollSuperiorTests(SimpleTestCase):
         self.assertIn("new ResizeObserver", script)
         self.assertIn("possuiOverflowHorizontal", script)
         self.assertIn("agendarAtualizacaoScrollSuperior();", script)
+
+    def test_rotulo_aguardando_chegar_aplica_somente_na_analise_direta(self):
+        analise = (
+            self.compras_dir / "templates" / "compras" / "analise.html"
+        ).read_text(encoding="utf-8")
+        indireto = (
+            self.compras_dir / "templates" / "compras" / "mat_indireto.html"
+        ).read_text(encoding="utf-8")
+        script = (
+            self.compras_dir / "static" / "js" / "compras.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "window.COMPRAS_URGENTE_COM_PEDIDO_LABEL = 'Aguardando chegar'",
+            analise,
+        )
+        self.assertNotIn("COMPRAS_URGENTE_COM_PEDIDO_LABEL", indireto)
+        self.assertIn(
+            "window.COMPRAS_URGENTE_COM_PEDIDO_LABEL || 'Ped. Pendente'",
+            script,
+        )
+        self.assertIn("${URGENTE_COM_PEDIDO_LABEL}", script)

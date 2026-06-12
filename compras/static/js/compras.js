@@ -2,6 +2,7 @@
 'use strict';
 
 const API_BASE = window.COMPRAS_API_BASE || '/compras/';
+const URGENTE_COM_PEDIDO_LABEL = window.COMPRAS_URGENTE_COM_PEDIDO_LABEL || 'Ped. Pendente';
 
 const URGENCY_ROW_CLASS = {
     PEDIDO_ATRASADO:   'urg-pedido',
@@ -15,7 +16,7 @@ const URGENCY_ROW_CLASS = {
 const URGENCY_BADGE = {
     PEDIDO_ATRASADO:   '<span class="compras-badge pedido-pendente"><i class="fas fa-triangle-exclamation"></i> Ped. Atrasado</span>',
     URGENTE:           '<span class="compras-badge urgente"><i class="fas fa-arrow-down"></i> Urgente</span>',
-    URGENTE_COM_PEDIDO:'<span class="compras-badge pedido-pendente"><i class="fas fa-truck"></i> Ped. Pendente</span>',
+    URGENTE_COM_PEDIDO:`<span class="compras-badge pedido-pendente"><i class="fas fa-truck"></i> ${URGENTE_COM_PEDIDO_LABEL}</span>`,
     PRAZO_CURTO:       '<span class="compras-badge curto"><i class="fas fa-clock"></i> Prazo curto</span>',
     PRAZO_OK:          '<span class="compras-badge ok"><i class="fas fa-check"></i> Em dia</span>',
     SEM_DADOS:         '<span class="compras-badge sem-dado">—</span>',
