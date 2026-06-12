@@ -40,6 +40,8 @@
         data-auto-render="true"
         data-interactive="false"
         data-events-url="/cargas/api/andamento-liberacoes/"
+        data-history-dates-url="/cargas/api/liberacoes/historico-datas/"
+        data-history-url="/cargas/api/liberacoes/historico/"
         data-calendar-layout="liberacao"
         data-day-max-event-rows="8"
     ></div>
@@ -125,6 +127,27 @@
                 <button class="btn btn-success" id="confirmarLiberacao">
                     <i class="fas fa-check"></i> Liberar
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalHistoricoLiberacoes" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title">
+                        <i class="fas fa-history me-2"></i>Histórico de alterações
+                    </h5>
+                    <div class="text-muted small" id="historicoLiberacoesData"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body" id="historicoLiberacoesConteudo">
+                <div class="text-center text-muted py-4">
+                    Selecione um dia para consultar o histórico.
+                </div>
             </div>
         </div>
     </div>

@@ -389,9 +389,211 @@ class CargasLiberacaoTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Liberar carga")
         self.assertContains(response, 'id="modalExcluirLiberacao"', html=False)
+        self.assertContains(response, 'id="modalHistoricoLiberacoes"', html=False)
         self.assertContains(response, 'id="confirmarExcluirLiberacao"', html=False)
         self.assertContains(response, 'data-interactive="false"', html=False)
         self.assertContains(response, '/cargas/api/andamento-liberacoes/', html=False)
+        self.assertContains(response, 'data-history-dates-url="/cargas/api/liberacoes/historico-datas/"', html=False)
+        self.assertContains(response, 'data-history-url="/cargas/api/liberacoes/historico/"', html=False)
+
+    def test_api_datas_historico_inclui_cargas_ativas_e_inativas(self):
+        CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-27"),
+            carga_nome="Carga ativa",
+        )
+        CargaLiberada.objects.create(
+            data_carga=self._date("2026-04-28"),
+            carga_nome="Carga inativa",
+            ativo=False,
+            inativada_em=timezone.now(),
+        )
+
+        response = self.client.get(
+            reverse("cargas:datas_historico_liberacoes"),
+            {"start": "2026-04-01", "end": "2026-05-01"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["datas"],
+            ["2026-04-27", "2026-04-28"],
+        )
+
+    def test_api_datas_historico_rejeita_intervalo_invalido(self):
+        sem_datas = self.client.get(reverse("cargas:datas_historico_liberacoes"))
+        invertido = self.client.get(
+            reverse("cargas:datas_historico_liberacoes"),
+            {"start": "2026-05-01", "end": "2026-04-01"},
+        )
+
+        self.assertEqual(sem_datas.status_code, 400)
+        self.assertEqual(invertido.status_code, 400)
+
+    def test_api_historico_diario_retorna_cargas_versoes_e_alteracoes(self):
+        data_carga = self._date("2026-04-27")
+        carga_ativa = CargaLiberada.objects.create(
+            data_carga=data_carga,
+            carga_nome="Carga 01",
+        )
+        versao_1 = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga_ativa,
+            versao=1,
+            data_inicio_pesquisa=data_carga,
+            data_fim_pesquisa=data_carga,
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        versao_2 = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga_ativa,
+            versao=2,
+            data_inicio_pesquisa=data_carga,
+            data_fim_pesquisa=data_carga,
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        CargaLiberadaAlteracao.objects.create(
+            carga_liberada=carga_ativa,
+            versao_origem=None,
+            versao_destino=versao_1,
+            tipo_alteracao="liberacao_inicial",
+            detalhes={"mensagem": "Primeira liberação da carga."},
+        )
+        CargaLiberadaAlteracao.objects.create(
+            carga_liberada=carga_ativa,
+            versao_origem=versao_1,
+            versao_destino=versao_2,
+            tipo_alteracao="item_adicionado",
+            codigo_recurso="ITEM-A",
+            quantidade_nova=3,
+            detalhes={"cliente_codigo": "CLI-1", "numero_serie": "SERIE-1"},
+        )
+        CargaLiberadaAlteracao.objects.create(
+            carga_liberada=carga_ativa,
+            versao_origem=versao_1,
+            versao_destino=versao_2,
+            tipo_alteracao="item_removido",
+            codigo_recurso="ITEM-B",
+            quantidade_anterior=2,
+        )
+        CargaLiberadaAlteracao.objects.create(
+            carga_liberada=carga_ativa,
+            versao_origem=versao_1,
+            versao_destino=versao_2,
+            tipo_alteracao="quantidade_alterada",
+            codigo_recurso="ITEM-C",
+            quantidade_anterior=1,
+            quantidade_nova=5,
+        )
+
+        carga_inativa = CargaLiberada.objects.create(
+            data_carga=data_carga,
+            carga_nome="Carga 02",
+            ativo=False,
+            inativada_em=timezone.now(),
+        )
+        versao_inativa = CargaLiberadaVersao.objects.create(
+            carga_liberada=carga_inativa,
+            versao=1,
+            data_inicio_pesquisa=data_carga,
+            data_fim_pesquisa=data_carga,
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+        for tipo in ("carga_inativada", "carga_reativada"):
+            CargaLiberadaAlteracao.objects.create(
+                carga_liberada=carga_inativa,
+                versao_origem=versao_inativa,
+                versao_destino=versao_inativa,
+                tipo_alteracao=tipo,
+                detalhes={"motivo": f"Motivo {tipo}"},
+            )
+
+        response = self.client.get(
+            reverse("cargas:historico_liberacoes_dia"),
+            {"data": data_carga.isoformat()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["data_formatada"], "27/04/2026")
+        self.assertEqual([carga["carga"] for carga in payload["cargas"]], ["Carga 01", "Carga 02"])
+        self.assertTrue(payload["cargas"][0]["ativo"])
+        self.assertFalse(payload["cargas"][1]["ativo"])
+        self.assertEqual(
+            [versao["versao"] for versao in payload["cargas"][0]["versoes"]],
+            [2, 1],
+        )
+        tipos_versao_2 = {
+            alteracao["tipo"]
+            for alteracao in payload["cargas"][0]["versoes"][0]["alteracoes"]
+        }
+        self.assertEqual(
+            tipos_versao_2,
+            {"item_adicionado", "item_removido", "quantidade_alterada"},
+        )
+        item_adicionado = next(
+            alteracao
+            for alteracao in payload["cargas"][0]["versoes"][0]["alteracoes"]
+            if alteracao["tipo"] == "item_adicionado"
+        )
+        self.assertEqual(item_adicionado["cliente_codigo"], "CLI-1")
+        self.assertEqual(item_adicionado["numero_serie"], "SERIE-1")
+        self.assertEqual(
+            {
+                alteracao["tipo"]
+                for alteracao in payload["cargas"][1]["versoes"][0]["alteracoes"]
+            },
+            {"carga_inativada", "carga_reativada"},
+        )
+
+    def test_api_historico_diario_inclui_versao_sem_alteracoes(self):
+        data_carga = self._date("2026-04-27")
+        carga = CargaLiberada.objects.create(
+            data_carga=data_carga,
+            carga_nome="Carga sem diferenças",
+        )
+        CargaLiberadaVersao.objects.create(
+            carga_liberada=carga,
+            versao=1,
+            data_inicio_pesquisa=data_carga,
+            data_fim_pesquisa=data_carga,
+            liberado_por=self.user,
+            payload_snapshot={},
+        )
+
+        response = self.client.get(
+            reverse("cargas:historico_liberacoes_dia"),
+            {"data": data_carga.isoformat()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["cargas"][0]["versoes"][0]["alteracoes"],
+            [],
+        )
+
+    def test_api_historico_diario_rejeita_data_invalida(self):
+        response = self.client.get(
+            reverse("cargas:historico_liberacoes_dia"),
+            {"data": "27-04-2026"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_apis_historico_exigem_autenticacao(self):
+        self.client.logout()
+
+        datas = self.client.get(
+            reverse("cargas:datas_historico_liberacoes"),
+            {"start": "2026-04-01", "end": "2026-05-01"},
+        )
+        historico = self.client.get(
+            reverse("cargas:historico_liberacoes_dia"),
+            {"data": "2026-04-27"},
+        )
+
+        self.assertEqual(datas.status_code, 302)
+        self.assertEqual(historico.status_code, 302)
 
     def test_api_andamento_liberacoes_retorna_cargas_do_periodo(self):
         carga = CargaLiberada.objects.create(

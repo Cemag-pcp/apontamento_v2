@@ -1315,8 +1315,107 @@ def parse_iso_date(date_str):
     """ Converte datas ISO do FullCalendar ('YYYY-MM-DDTHH:mm:ssZ') para 'YYYY-MM-DD' """
     try:
         return datetime.strptime(date_str[:10], "%Y-%m-%d").date()
-    except ValueError:
+    except (TypeError, ValueError):
         return None
+
+
+@login_required
+@require_GET
+def datas_historico_liberacoes(request):
+    start_date = parse_iso_date(request.GET.get("start"))
+    end_date = parse_iso_date(request.GET.get("end"))
+
+    if not start_date or not end_date:
+        return JsonResponse(
+            {"error": "Parâmetros 'start' e 'end' são obrigatórios e devem ser datas válidas."},
+            status=400,
+        )
+    if start_date >= end_date:
+        return JsonResponse(
+            {"error": "A data inicial deve ser anterior à data final."},
+            status=400,
+        )
+
+    datas = list(
+        CargaLiberada.objects
+        .filter(data_carga__gte=start_date, data_carga__lt=end_date)
+        .order_by("data_carga")
+        .values_list("data_carga", flat=True)
+        .distinct()
+    )
+    return JsonResponse({
+        "datas": [data.isoformat() for data in datas],
+    })
+
+
+@login_required
+@require_GET
+def historico_liberacoes_dia(request):
+    data_carga = parse_date(request.GET.get("data", ""))
+    if data_carga is None:
+        return JsonResponse(
+            {"error": "O parâmetro 'data' é obrigatório e deve estar no formato YYYY-MM-DD."},
+            status=400,
+        )
+
+    cargas = (
+        CargaLiberada.objects
+        .filter(data_carga=data_carga)
+        .prefetch_related(
+            Prefetch(
+                "versoes",
+                queryset=(
+                    CargaLiberadaVersao.objects
+                    .select_related("liberado_por")
+                    .prefetch_related("alteracoes_destino")
+                    .order_by("-versao")
+                ),
+            ),
+        )
+        .order_by("carga_nome")
+    )
+
+    cargas_serializadas = []
+    for carga in cargas:
+        versoes = []
+        for versao in carga.versoes.all():
+            alteracoes = []
+            for alteracao in versao.alteracoes_destino.all():
+                detalhes = alteracao.detalhes or {}
+                alteracoes.append({
+                    "tipo": alteracao.tipo_alteracao,
+                    "tipo_display": alteracao.get_tipo_alteracao_display(),
+                    "codigo_recurso": alteracao.codigo_recurso,
+                    "cliente_codigo": detalhes.get("cliente_codigo", ""),
+                    "numero_serie": detalhes.get("numero_serie", ""),
+                    "quantidade_anterior": alteracao.quantidade_anterior,
+                    "quantidade_nova": alteracao.quantidade_nova,
+                    "motivo": detalhes.get("motivo") or detalhes.get("mensagem", ""),
+                    "criado_em": localtime(alteracao.criado_em).strftime("%d/%m/%Y %H:%M"),
+                })
+
+            versoes.append({
+                "versao": versao.versao,
+                "liberado_em": localtime(versao.liberado_em).strftime("%d/%m/%Y %H:%M"),
+                "liberado_por": versao.liberado_por.username,
+                "data_inicio_pesquisa": versao.data_inicio_pesquisa.strftime("%d/%m/%Y"),
+                "data_fim_pesquisa": versao.data_fim_pesquisa.strftime("%d/%m/%Y"),
+                "alteracoes": alteracoes,
+            })
+
+        cargas_serializadas.append({
+            "carga_uuid": str(carga.carga_uuid),
+            "carga": carga.carga_nome,
+            "ativo": carga.ativo,
+            "versoes": versoes,
+        })
+
+    return JsonResponse({
+        "data": data_carga.isoformat(),
+        "data_formatada": data_carga.strftime("%d/%m/%Y"),
+        "cargas": cargas_serializadas,
+    })
+
 
 def andamento_liberacoes(request):
     start_date = parse_iso_date(request.GET.get("start"))
