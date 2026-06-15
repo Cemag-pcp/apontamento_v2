@@ -92,6 +92,163 @@ async function excluirLiberacaoAtual() {
     }
 }
 
+function formatarQuantidadeHistorico(valor) {
+    if (valor === null || valor === undefined) {
+        return '-';
+    }
+    return Number(valor).toLocaleString('pt-BR');
+}
+
+function escaparHtmlHistorico(valor) {
+    const elemento = document.createElement('div');
+    elemento.textContent = valor ?? '';
+    return elemento.innerHTML;
+}
+
+function renderizarAlteracaoHistorico(alteracao) {
+    const identificadores = [
+        escaparHtmlHistorico(alteracao.codigo_recurso),
+        alteracao.cliente_codigo ? `Cliente: ${escaparHtmlHistorico(alteracao.cliente_codigo)}` : '',
+        alteracao.numero_serie ? `Série: ${escaparHtmlHistorico(alteracao.numero_serie)}` : '',
+    ].filter(Boolean);
+    const quantidade = alteracao.tipo === 'quantidade_alterada'
+        ? `<div class="small">Quantidade: <strong>${formatarQuantidadeHistorico(alteracao.quantidade_anterior)}</strong> → <strong>${formatarQuantidadeHistorico(alteracao.quantidade_nova)}</strong></div>`
+        : alteracao.tipo === 'item_adicionado'
+        ? `<div class="small">Quantidade adicionada: <strong>${formatarQuantidadeHistorico(alteracao.quantidade_nova)}</strong></div>`
+        : alteracao.tipo === 'item_removido'
+        ? `<div class="small">Quantidade removida: <strong>${formatarQuantidadeHistorico(alteracao.quantidade_anterior)}</strong></div>`
+        : '';
+
+    return `
+        <div class="border rounded p-2 mb-2">
+            <div class="d-flex justify-content-between gap-2">
+                <strong class="small">${escaparHtmlHistorico(alteracao.tipo_display)}</strong>
+                <span class="text-muted small">${escaparHtmlHistorico(alteracao.criado_em)}</span>
+            </div>
+            ${identificadores.length ? `<div class="small text-muted">${identificadores.join(' | ')}</div>` : ''}
+            ${quantidade}
+            ${alteracao.motivo ? `<div class="small mt-1">${escaparHtmlHistorico(alteracao.motivo)}</div>` : ''}
+        </div>
+    `;
+}
+
+async function abrirHistoricoLiberacoes(dataIso, historyUrl) {
+    const modalElement = document.getElementById('modalHistoricoLiberacoes');
+    const dataElement = document.getElementById('historicoLiberacoesData');
+    const conteudo = document.getElementById('historicoLiberacoesConteudo');
+    if (!modalElement || !dataElement || !conteudo || !dataIso || !historyUrl) {
+        return;
+    }
+
+    dataElement.textContent = dataIso.split('-').reverse().join('/');
+    conteudo.innerHTML = `
+        <div class="text-center text-muted py-5">
+            <span class="spinner-border spinner-border-sm me-2"></span>Carregando histórico...
+        </div>
+    `;
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+
+    try {
+        const response = await fetch(`${historyUrl}?data=${encodeURIComponent(dataIso)}`);
+        const payload = await response.json();
+        if (!response.ok) {
+            throw new Error(payload.error || 'Não foi possível carregar o histórico.');
+        }
+
+        dataElement.textContent = payload.data_formatada || dataElement.textContent;
+        if (!Array.isArray(payload.cargas) || payload.cargas.length === 0) {
+            conteudo.innerHTML = '<div class="text-center text-muted py-4">Nenhum histórico encontrado para este dia.</div>';
+            return;
+        }
+
+        conteudo.innerHTML = payload.cargas.map((carga, cargaIndex) => `
+            <section class="border rounded mb-3">
+                <div class="d-flex justify-content-between align-items-center bg-light border-bottom p-3">
+                    <h6 class="mb-0">${escaparHtmlHistorico(carga.carga)}</h6>
+                    <span class="badge ${carga.ativo ? 'bg-success' : 'bg-secondary'}">
+                        ${carga.ativo ? 'Ativa' : 'Inativa'}
+                    </span>
+                </div>
+                <div class="accordion accordion-flush" id="historico-carga-${cargaIndex}">
+                    ${carga.versoes.map((versao, versaoIndex) => {
+                        const collapseId = `historico-${cargaIndex}-${versao.versao}`;
+                        const alteracoes = versao.alteracoes.length
+                            ? versao.alteracoes.map(renderizarAlteracaoHistorico).join('')
+                            : '<div class="text-muted small">Nenhuma alteração detectada nesta versão.</div>';
+                        return `
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button ${versaoIndex ? 'collapsed' : ''}" type="button"
+                                            data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                                        <span class="fw-bold me-2">v${versao.versao}</span>
+                                        <span class="small text-muted">${escaparHtmlHistorico(versao.liberado_em)} | ${escaparHtmlHistorico(versao.liberado_por)}</span>
+                                    </button>
+                                </h2>
+                                <div id="${collapseId}" class="accordion-collapse collapse ${versaoIndex ? '' : 'show'}">
+                                    <div class="accordion-body">
+                                        <div class="small text-muted mb-2">
+                                            Pesquisa: ${escaparHtmlHistorico(versao.data_inicio_pesquisa)} a ${escaparHtmlHistorico(versao.data_fim_pesquisa)}
+                                        </div>
+                                        ${alteracoes}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </section>
+        `).join('');
+    } catch (error) {
+        console.error(error);
+        conteudo.innerHTML = `<div class="alert alert-danger mb-0">${error.message || 'Erro ao carregar histórico.'}</div>`;
+    }
+}
+
+async function atualizarIconesHistorico(calendarEl, fetchInfo) {
+    const datesUrl = calendarEl.dataset.historyDatesUrl;
+    const historyUrl = calendarEl.dataset.historyUrl;
+    if (!datesUrl || !historyUrl) {
+        return;
+    }
+
+    calendarEl.querySelectorAll('.calendar-history-button').forEach(button => button.remove());
+
+    try {
+        const params = new URLSearchParams({
+            start: fetchInfo.startStr,
+            end: fetchInfo.endStr,
+        });
+        const response = await fetch(`${datesUrl}?${params}`);
+        const payload = await response.json();
+        if (!response.ok) {
+            throw new Error(payload.error || 'Erro ao consultar datas com histórico.');
+        }
+
+        (payload.datas || []).forEach(dataIso => {
+            const dayCell = calendarEl.querySelector(`.fc-daygrid-day[data-date="${dataIso}"]`);
+            const dayTop = dayCell?.querySelector('.fc-daygrid-day-top');
+            if (!dayTop || dayTop.querySelector('.calendar-history-button')) {
+                return;
+            }
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'calendar-history-button btn btn-link btn-sm p-0 me-1';
+            button.innerHTML = '<i class="fas fa-history"></i>';
+            button.title = `Ver histórico de ${dataIso.split('-').reverse().join('/')}`;
+            button.setAttribute('aria-label', button.title);
+            button.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                abrirHistoricoLiberacoes(dataIso, historyUrl);
+            });
+            dayTop.prepend(button);
+        });
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 export function renderCallendar(options = {}) {
     const calendarEl = document.getElementById('calendario');
     if (!calendarEl) {
@@ -145,6 +302,9 @@ export function renderCallendar(options = {}) {
         dayMaxEventRows: Number.isNaN(dayMaxEventRows) ? true : dayMaxEventRows,
         expandRows: calendarEl.dataset.calendarLayout === 'liberacao',
         eventDisplay: 'block',
+        datesSet: function(fetchInfo) {
+            atualizarIconesHistorico(calendarEl, fetchInfo);
+        },
         eventContent: function(arg) {
             const wrapper = document.createElement('div');
             wrapper.style.lineHeight = '1.15';

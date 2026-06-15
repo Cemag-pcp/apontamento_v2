@@ -75,6 +75,7 @@ function renderizarTabela(cargas, itensSemNumeroSerie = []) {
                         type="checkbox"
                         class="form-check-input js-item-sem-numero-serie"
                         value="${item.sheet_row_index}"
+                        ${item.selecionado_versao_anterior ? 'checked' : ''}
                     >
                 </td>
                 <td>${item.data_carga}</td>
@@ -84,6 +85,8 @@ function renderizarTabela(cargas, itensSemNumeroSerie = []) {
                 <td>${item.quantidade}</td>
                 <td>${item.presente_no_carreta}</td>
             `;
+            const checkbox = linha.querySelector('.js-item-sem-numero-serie');
+            checkbox.checked = item.selecionado_versao_anterior === true;
             tabelaSemNumeroSerie.appendChild(linha);
         });
         secaoSemNumeroSerie.classList.remove('d-none');
