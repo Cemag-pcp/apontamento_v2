@@ -2035,6 +2035,7 @@
         materialAtivoIndex = index;
         renderTabsMateriais();
         carregarEstadoMaterialAtivo();
+        agendarSalvarRascunhoRecebimento();
     }
 
     function adicionarMaterialRecebimento() {
@@ -2045,6 +2046,7 @@
         materialAtivoIndex = materiaisRecebimento.length - 1;
         renderTabsMateriais();
         carregarEstadoMaterialAtivo();
+        agendarSalvarRascunhoRecebimento();
     }
 
     function excluirMaterialRecebimento(index) {
@@ -2065,11 +2067,101 @@
 
         renderTabsMateriais();
         carregarEstadoMaterialAtivo();
+        agendarSalvarRascunhoRecebimento();
     }
 
     function inicializarMateriaisRecebimento(nomeInicial = "") {
         materiaisRecebimento = [criarEstadoMaterial(nomeInicial)];
         materialAtivoIndex = 0;
+        renderTabsMateriais();
+        carregarEstadoMaterialAtivo();
+    }
+
+    // --- rascunho local (evita perda de dados ao fechar/recarregar o modal) ---
+
+    let _rascunhoRecebimentoTimeout = null;
+
+    function getChaveRascunhoRecebimento() {
+        if (!pendenciaSelecionada) return null;
+        return `recebimento_inspecao_rascunho_${pendenciaSelecionada.item_id}`;
+    }
+
+    function salvarRascunhoRecebimento() {
+        const chave = getChaveRascunhoRecebimento();
+        if (!chave) return;
+
+        salvarEstadoMaterialAtivo();
+
+        const dados = {
+            materiais: materiaisRecebimento.map((m) => ({
+                nome: m.nome,
+                qtd: m.qtd,
+                quantidade_lote: m.quantidade_lote,
+                resultado_lote: m.resultado_lote,
+                tipo_tubos_barras: m.tipo_tubos_barras,
+                tipo_componentes_cilindros: m.tipo_componentes_cilindros,
+                valores_form: m.valores_form,
+            })),
+            materialAtivoIndex,
+            classeAtual,
+            tipoTubosBarrasAtual,
+            tipoComponentesCilindrosAtual,
+            salvoEm: Date.now(),
+        };
+
+        try {
+            localStorage.setItem(chave, JSON.stringify(dados));
+        } catch (error) {
+            console.error("Erro ao salvar rascunho da inspeção de recebimento:", error);
+        }
+    }
+
+    function agendarSalvarRascunhoRecebimento() {
+        if (_rascunhoRecebimentoTimeout) clearTimeout(_rascunhoRecebimentoTimeout);
+        _rascunhoRecebimentoTimeout = setTimeout(salvarRascunhoRecebimento, 500);
+    }
+
+    function limparRascunhoRecebimento() {
+        const chave = getChaveRascunhoRecebimento();
+        if (chave) localStorage.removeItem(chave);
+    }
+
+    function carregarRascunhoRecebimento() {
+        const chave = getChaveRascunhoRecebimento();
+        if (!chave) return null;
+        try {
+            const raw = localStorage.getItem(chave);
+            return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function restaurarRascunhoRecebimentoSeExistir() {
+        const rascunho = carregarRascunhoRecebimento();
+        if (!rascunho || !Array.isArray(rascunho.materiais) || !rascunho.materiais.length) return;
+
+        if (!confirm("Encontramos dados não salvos desta inspeção (de uma sessão anterior). Deseja restaurá-los?")) {
+            limparRascunhoRecebimento();
+            return;
+        }
+
+        materiaisRecebimento = rascunho.materiais.map((m) => ({
+            ...criarEstadoMaterial(m.nome),
+            ...m,
+            arquivos_unidades: {},
+        }));
+        materialAtivoIndex = Math.min(Math.max(rascunho.materialAtivoIndex || 0, 0), materiaisRecebimento.length - 1);
+
+        if (rascunho.classeAtual) classeAtual = rascunho.classeAtual;
+        if (rascunho.tipoTubosBarrasAtual) tipoTubosBarrasAtual = rascunho.tipoTubosBarrasAtual;
+        if (rascunho.tipoComponentesCilindrosAtual) tipoComponentesCilindrosAtual = rascunho.tipoComponentesCilindrosAtual;
+
+        const selectTipoTubosBarras = document.getElementById("tipo-tubos-barras");
+        if (selectTipoTubosBarras) selectTipoTubosBarras.value = tipoTubosBarrasAtual;
+        const selectTipoComponentesCilindros = document.getElementById("tipo-componentes-cilindros");
+        if (selectTipoComponentesCilindros) selectTipoComponentesCilindros.value = tipoComponentesCilindrosAtual;
+
         renderTabsMateriais();
         carregarEstadoMaterialAtivo();
     }
@@ -2643,6 +2735,8 @@
         selectTipoComponentesCilindros.value = tipoComponentesCilindrosAtual;
         inicializarMateriaisRecebimento("");
 
+        restaurarRascunhoRecebimentoSeExistir();
+
         const modalElement = document.getElementById("modal-inspecao-recebimento");
         const modal = new bootstrap.Modal(modalElement);
         modal.show();
@@ -2812,6 +2906,7 @@
             .then((result) => {
                 if (!result.ok) throw new Error(result.data.error || "Erro ao salvar.");
                 const modal = bootstrap.Modal.getInstance(document.getElementById("modal-inspecao-recebimento"));
+                limparRascunhoRecebimento();
                 limparFormularioRecebimento();
                 if (modal) modal.hide();
                 pendenciaSelecionada = null;
@@ -2954,6 +3049,11 @@
             limparFormularioRecebimento();
             pendenciaSelecionada = null;
         });
+
+        // rascunho automático (recupera dados em caso de queda de internet ou fechamento acidental)
+        const modalInspecaoEl = document.getElementById("modal-inspecao-recebimento");
+        modalInspecaoEl.addEventListener("input", agendarSalvarRascunhoRecebimento);
+        modalInspecaoEl.addEventListener("change", agendarSalvarRascunhoRecebimento);
     });
 </script>
 {% endblock %}
