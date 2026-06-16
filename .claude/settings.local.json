@@ -53,7 +53,9 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\pcp2\\\\pcp\\\\apontamento_usinagem\" -Recurse -Directory | Where-Object {$_.Name -match \"inspecao|views|urls|templates\"} | Select-Object -ExpandProperty FullName | Sort-Object)",
       "Bash(curl -s -o /dev/null -w \"%{http_code} %{redirect_url}\" -X POST \"https://cmgprod.com.br/estamparia/api/criar-ordem-estamparia/\" -H \"Content-Type: application/json\" -d \"{}\" --max-redirs 0)",
       "Bash(venv/Scripts/python.exe manage.py check solicitacao_almox)",
-      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('solicitacao_almox/views.py'\\).read\\(\\)\\); print\\('OK - sem erros de sintaxe'\\)\")"
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('solicitacao_almox/views.py'\\).read\\(\\)\\); print\\('OK - sem erros de sintaxe'\\)\")",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/almox/api/criar-requisicao/\" -Method POST -ContentType \"application/json\" -Body '{\"funcionario_id\": 3, \"cc_id\": 1, \"codigo_produto\": \"MP-001\", \"classe_requisicao_id\": 3, \"quantidade\": 2.0, \"status_id\": 1, \"obs\": \"Requisicao automatica SESMT\"}')",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/almox/api/criar-requisicao/\" -Method POST -ContentType \"application/json\" -Body '{\"funcionario_id\": 3, \"cc_id\": 7, \"status_id\": 1, \"itens\": [{\"codigo_produto\": \"TESTE-002\", \"classe_requisicao_id\": 3, \"quantidade\": 1.0}]}')"
     ]
   }
 }

@@ -44,6 +44,7 @@ def _gerar_sugestoes_enriquecidas(projecao: dict) -> list:
     pedidos_previstos = int(projecao.get('pedidos_previstos_count', 0) or 0)
     pedidos_sem_data = int(projecao.get('pedidos_sem_data_count', 0) or 0)
     ped_sem_data = float(projecao.get('ped_compras_sem_data', 0) or 0)
+    pedidos_pendentes_detalhes = projecao.get('pedidos_pendentes_detalhes') or []
     dias_ate_compra = projecao.get('dias_ate_data_compra')
     dias_ressupr = float(projecao.get('dias_ressupr', 0) or 0)
     data_compra = _formatar_data(projecao.get('data_compra'))
@@ -80,9 +81,15 @@ def _gerar_sugestoes_enriquecidas(projecao: dict) -> list:
     data_minimo_usada = False
 
     if pedidos_atrasados:
-        alertas.append(
-            f'**{pedidos_atrasados} pedido(s) atrasado(s)** não entram no estoque projetado.'
-        )
+        partes_atr = [f'**{pedidos_atrasados} pedido(s) atrasado(s)** não entram no estoque projetado.']
+        for p in [p for p in pedidos_pendentes_detalhes if p.get('status') == 'ATRASADO']:
+            data_raw = p.get('data', '')
+            try:
+                data_fmt = datetime.strptime(data_raw, '%Y-%m-%d').strftime('%d/%m/%Y') if data_raw else '-'
+            except ValueError:
+                data_fmt = data_raw or '-'
+            partes_atr.append(f'• **{data_fmt}** — {float(p.get("quantidade", 0) or 0):.2f} unidades')
+        alertas.append('\n'.join(partes_atr))
     if pedidos_sem_data:
         msg_sem_data = f'**Entrega pendente sem data de entrega:** {ped_sem_data:.2f} unidades.'
         if data_minimo != '-':
@@ -93,9 +100,15 @@ def _gerar_sugestoes_enriquecidas(projecao: dict) -> list:
             data_minimo_usada = True
         alertas.append(msg_sem_data)
     if pedidos_previstos:
-        alertas.append(
-            f'**{pedidos_previstos} entrega(s) futura(s)** estão identificadas no gráfico.'
-        )
+        partes_prev = [f'**{pedidos_previstos} entrega(s) futura(s)** prevista(s):']
+        for p in [p for p in pedidos_pendentes_detalhes if p.get('status') == 'A_RECEBER']:
+            data_raw = p.get('data', '')
+            try:
+                data_fmt = datetime.strptime(data_raw, '%Y-%m-%d').strftime('%d/%m/%Y') if data_raw else '-'
+            except ValueError:
+                data_fmt = data_raw or '-'
+            partes_prev.append(f'• **{data_fmt}** — {float(p.get("quantidade", 0) or 0):.2f} unidades')
+        alertas.append('\n'.join(partes_prev))
     if data_minimo != '-' and not data_minimo_usada:
         alertas.append(f'Estoque mínimo projetado para **{data_minimo}**.')
     if data_zero != '-':
@@ -119,18 +132,42 @@ def _gerar_sugestoes_enriquecidas(projecao: dict) -> list:
     if pedidos_atrasados:
         tipo_acao = 'acao'
         titulo_acao = 'Acompanhar entrega atrasada'
-        mensagem_acao = (
+        partes_acao = [
             'Contate o fornecedor e confirme uma nova previsão. '
             'O pedido atrasado não foi considerado no estoque projetado.'
-        )
+        ]
+        atrasados = [p for p in pedidos_pendentes_detalhes if p.get('status') == 'ATRASADO']
+        if atrasados:
+            partes_acao.append('Entregas atrasadas:')
+            for p in atrasados:
+                data_raw = p.get('data', '')
+                try:
+                    data_fmt = datetime.strptime(data_raw, '%Y-%m-%d').strftime('%d/%m/%Y') if data_raw else '-'
+                except ValueError:
+                    data_fmt = data_raw or '-'
+                qtd_p = float(p.get('quantidade', 0) or 0)
+                partes_acao.append(f'• **{data_fmt}** — {qtd_p:.2f} unidades')
+        mensagem_acao = '\n'.join(partes_acao)
         qtd_sugerida = None
     elif ped_compras > 0:
         tipo_acao = 'acao'
         titulo_acao = 'Acompanhar pedidos pendentes'
-        mensagem_acao = (
+        partes_acao = [
             f'Confirme as entregas pendentes. A próxima compra está prevista para '
             f'**{data_compra}**. Pedidos sem data devem receber uma previsão formal.'
-        )
+        ]
+        a_receber = [p for p in pedidos_pendentes_detalhes if p.get('status') == 'A_RECEBER']
+        if a_receber:
+            partes_acao.append('Entregas previstas:')
+            for p in a_receber:
+                data_raw = p.get('data', '')
+                try:
+                    data_fmt = datetime.strptime(data_raw, '%Y-%m-%d').strftime('%d/%m/%Y') if data_raw else '-'
+                except ValueError:
+                    data_fmt = data_raw or '-'
+                qtd_p = float(p.get('quantidade', 0) or 0)
+                partes_acao.append(f'• **{data_fmt}** — {qtd_p:.2f} unidades')
+        mensagem_acao = '\n'.join(partes_acao)
         qtd_sugerida = None
     elif dias_ate_compra is not None and dias_ate_compra <= 3:
         tipo_acao = 'urgente'
