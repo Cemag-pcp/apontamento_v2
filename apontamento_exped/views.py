@@ -1369,17 +1369,7 @@ def excluir_foto(request, foto_id):
 def excluir_pendencia(request, pendencia_id):
     pendencia = get_object_or_404(PendenciasPacote, id=pendencia_id)
 
-    itens_vinculados = ItemPacote.objects.filter(codigo=pendencia).select_related('pacote')
-    if itens_vinculados.exists():
-        nomes = ', '.join(
-            i.pacote.nome for i in itens_vinculados[:5]
-        )
-        return JsonResponse({
-            'erro': (
-                f'Esta pendência está vinculada a itens nos pacotes: {nomes}. '
-                'Remova os itens dos pacotes antes de excluir a pendência.'
-            )
-        }, status=400)
+    ItemPacote.objects.filter(codigo=pendencia).delete()
 
     pendencia.delete()
     return JsonResponse({'mensagem': 'Pendência removida com sucesso.'})

@@ -77,19 +77,26 @@ def _gerar_sugestoes_enriquecidas(projecao: dict) -> list:
     }
 
     alertas = []
+    data_minimo_usada = False
+
     if pedidos_atrasados:
         alertas.append(
             f'**{pedidos_atrasados} pedido(s) atrasado(s)** não entram no estoque projetado.'
         )
     if pedidos_sem_data:
-        alertas.append(
-            f'**Pedido pendente sem data de entrega:** {ped_sem_data:.2f} unidades.'
-        )
+        msg_sem_data = f'**Entrega pendente sem data de entrega:** {ped_sem_data:.2f} unidades.'
+        if data_minimo != '-':
+            msg_sem_data += (
+                f' Essa entrega deveria ter chegado até **{data_minimo}**,'
+                f' data em que o estoque mínimo é atingido.'
+            )
+            data_minimo_usada = True
+        alertas.append(msg_sem_data)
     if pedidos_previstos:
         alertas.append(
             f'**{pedidos_previstos} entrega(s) futura(s)** estão identificadas no gráfico.'
         )
-    if data_minimo != '-':
+    if data_minimo != '-' and not data_minimo_usada:
         alertas.append(f'Estoque mínimo projetado para **{data_minimo}**.')
     if data_zero != '-':
         alertas.append(f'Ruptura de estoque projetada para **{data_zero}**.')
@@ -103,7 +110,7 @@ def _gerar_sugestoes_enriquecidas(projecao: dict) -> list:
 
     card_alertas = {
         'tipo': tipo_alerta,
-        'titulo': 'Alertas e marcos',
+        'titulo': 'Alertas',
         'mensagem': '\n'.join(alertas),
         'qtd_sugerida': None,
     }
