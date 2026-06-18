@@ -4,7 +4,7 @@
 {% block title %}<title>Análise de Compras</title>{% endblock %}
 
 {% block links %}
-<link rel="stylesheet" href="{% static 'css/compras.css' %}?v=20260612-2">
+<link rel="stylesheet" href="{% static 'css/compras.css' %}?v=20260618-2">
 {% endblock %}
 
 {% block content %}
@@ -54,7 +54,7 @@
                     <select id="filtroUrgencia" class="form-select form-select-sm">
                         <option value="">Todas</option>
                         <option value="URGENTE">🔴 Urgente</option>
-                        <option value="URGENTE_COM_PEDIDO">🟠 Aguardando chegar</option>
+                        <option value="URGENTE_COM_PEDIDO">🔴 Ped. Atrasado</option>
                         <option value="PRAZO_CURTO">🟡 Prazo Curto</option>
                         <option value="PRAZO_OK">🟢 Prazo OK</option>
                         <option value="SEM_DADOS">⚪ Sem Dados</option>
@@ -204,10 +204,9 @@
 {% block scripts %}
 <script>
 window.COMPRAS_API_BASE = '/compras/';
-window.COMPRAS_URGENTE_COM_PEDIDO_LABEL = 'Aguardando chegar';
 window.COMPRAS_EXIBIR_ENTREGA_ATRASADA = true;
 window.COMPRAS_GRAFICO_ENRIQUECIDO = true;
 </script>
 <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-<script src="{% static 'js/compras.js' %}?v=20260612-5"></script>
+<script src="{% static 'js/compras.js' %}?v=20260618-2"></script>
 {% endblock %}

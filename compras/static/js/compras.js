@@ -2,7 +2,6 @@
 'use strict';
 
 const API_BASE = window.COMPRAS_API_BASE || '/compras/';
-const URGENTE_COM_PEDIDO_LABEL = window.COMPRAS_URGENTE_COM_PEDIDO_LABEL || 'Ped. Pendente';
 const EXIBIR_ENTREGA_ATRASADA = window.COMPRAS_EXIBIR_ENTREGA_ATRASADA === true;
 
 const URGENCY_ROW_CLASS = {
@@ -15,9 +14,9 @@ const URGENCY_ROW_CLASS = {
 };
 
 const URGENCY_BADGE = {
-    PEDIDO_ATRASADO:   '<span class="compras-badge pedido-pendente"><i class="fas fa-triangle-exclamation"></i> Ped. Atrasado</span>',
-    URGENTE:           '<span class="compras-badge urgente"><i class="fas fa-arrow-down"></i> Urgente</span>',
-    URGENTE_COM_PEDIDO:`<span class="compras-badge pedido-pendente"><i class="fas fa-truck"></i> ${URGENTE_COM_PEDIDO_LABEL}</span>`,
+    PEDIDO_ATRASADO:   '<span class="compras-badge urgente"><i class="fas fa-triangle-exclamation"></i> Ped. Atrasado</span>',
+    URGENTE:           '<span class="compras-badge urgente"><i class="fas fa-triangle-exclamation"></i> Ped. Atrasado</span>',
+    URGENTE_COM_PEDIDO:'<span class="compras-badge urgente"><i class="fas fa-triangle-exclamation"></i> Ped. Atrasado</span>',
     PRAZO_CURTO:       '<span class="compras-badge curto"><i class="fas fa-clock"></i> Prazo curto</span>',
     PRAZO_OK:          '<span class="compras-badge ok"><i class="fas fa-check"></i> Em dia</span>',
     SEM_DADOS:         '<span class="compras-badge sem-dado">—</span>',
@@ -120,11 +119,14 @@ function fmtDolar(n) {
 
 function dataCompraEstaAtrasada(material) {
     if (!EXIBIR_ENTREGA_ATRASADA) return false;
-    if (material.flag_urgencia === 'PEDIDO_ATRASADO') return true;
-    if (material.flag_urgencia !== 'URGENTE_COM_PEDIDO' || !material.data_compra) {
+    if (!['PEDIDO_ATRASADO', 'URGENTE', 'URGENTE_COM_PEDIDO'].includes(material.flag_urgencia) || !material.data_compra) {
         return false;
     }
+    return proximaCompraEstaAtrasada(material);
+}
 
+function proximaCompraEstaAtrasada(material) {
+    if (!material.data_compra) return false;
     const dataCompra = parseDateBR(material.data_compra);
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
@@ -133,9 +135,33 @@ function dataCompraEstaAtrasada(material) {
 
 function formatarDataProximaCompra(material) {
     if (dataCompraEstaAtrasada(material)) {
-        return '<span class="compras-entrega-atrasada">Entrega atrasada</span>';
+        return `<span class="compras-entrega-atrasada">${material.data_compra}</span>`;
+    }
+    if (material.flag_urgencia === 'PRAZO_CURTO' && material.data_compra) {
+        return `<span class="compras-proxima-compra-curta">${material.data_compra}</span>`;
     }
     return material.data_compra || '-';
+}
+
+function entregaPedidoEstaAtrasada(material) {
+    return EXIBIR_ENTREGA_ATRASADA && Number(material.pedidos_atrasados_count || 0) > 0;
+}
+
+function formatarSituacao(material) {
+    const badges = [];
+    const badgePrincipal = URGENCY_BADGE[material.flag_urgencia];
+    const entregaAtrasada = entregaPedidoEstaAtrasada(material);
+    const compraAtrasada = proximaCompraEstaAtrasada(material);
+    if (entregaAtrasada && !compraAtrasada) {
+        return '<span class="compras-badge urgente"><i class="fas fa-calendar-xmark"></i> Entrega atrasada</span>';
+    }
+    if (badgePrincipal && (material.flag_urgencia !== 'PEDIDO_ATRASADO' || compraAtrasada)) {
+        badges.push(badgePrincipal);
+    }
+    if (entregaAtrasada) {
+        badges.push('<span class="compras-badge urgente"><i class="fas fa-calendar-xmark"></i> Entrega atrasada</span>');
+    }
+    return badges.join('');
 }
 
 function extrairHoraCotacao(texto) {
@@ -285,7 +311,7 @@ function renderTabela(materiais) {
             <td class="num">${fmt(m.ped_compras)}</td>
             <td class="num">${fmt(m.estoque_minimo)}</td>
             <td style="font-size:12px;">${formatarDataProximaCompra(m)}</td>
-            <td class="center">${URGENCY_BADGE[m.flag_urgencia] || ''}</td>
+            <td class="center"><div class="situacao-badges">${formatarSituacao(m)}</div></td>
             <td class="center">
                 <button class="btn btn-xs btn-outline-primary btn-grafico"
                     data-codigo="${m.codigo}" data-descricao="${m.descricao}" title="Ver gráfico">

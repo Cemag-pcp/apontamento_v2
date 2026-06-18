@@ -30,6 +30,35 @@ def _valor_escalar(valor, default=None):
     return default if valor is None else valor
 
 
+def _normalizar_codigo_material(valor):
+    if valor is None or pd.isna(valor):
+        return ''
+    codigo = str(valor).strip()
+    if codigo.endswith('.0'):
+        codigo = codigo[:-2]
+    return codigo
+
+
+def _parse_data_entrega(valor):
+    return pd.to_datetime(valor, dayfirst=True, errors='coerce')
+
+
+def _rotulo_ordem_entrega(posicao):
+    rotulos = {
+        1: 'Primeira Entrega',
+        2: 'Segunda Entrega',
+        3: 'Terceira Entrega',
+        4: 'Quarta Entrega',
+        5: 'Quinta Entrega',
+        6: 'Sexta Entrega',
+        7: 'Sétima Entrega',
+        8: 'Oitava Entrega',
+        9: 'Nona Entrega',
+        10: 'Décima Entrega',
+    }
+    return rotulos.get(posicao, f'{posicao}ª Entrega')
+
+
 def _repair_text(text):
     if not isinstance(text, str):
         return '' if text is None else str(text)
@@ -261,6 +290,8 @@ def processar_material_direto(
 
     df = _rename_columns_by_aliases(simulacao_df_raw.copy(), simulacao_aliases)
     df_ped = _rename_columns_by_aliases(pedidos_df_raw.copy(), pedidos_aliases)
+    if 'codigo' in df.columns:
+        df['codigo'] = df['codigo'].apply(_normalizar_codigo_material)
 
     duplicated = df[df['codigo'].isin(grupo_df['codigo'])].copy()
     duplicated = duplicated.merge(grupo_df, left_on='codigo', right_on='codigo')
@@ -304,7 +335,15 @@ def processar_material_direto(
         df_ped.columns = renomear_col
 
     if 'recurso' in df_ped.columns:
-        df_ped['codigo'] = df_ped['recurso'].astype(str).str.split(' - ').str[0]
+        df_ped['codigo'] = (
+            df_ped['recurso']
+            .astype(str)
+            .str.split(' - ')
+            .str[0]
+            .apply(_normalizar_codigo_material)
+        )
+    elif 'codigo' in df_ped.columns:
+        df_ped['codigo'] = df_ped['codigo'].apply(_normalizar_codigo_material)
 
     if 'qde_ped' in df_ped.columns:
         qde_raw = df_ped.loc[:, df_ped.columns == 'qde_ped']
@@ -317,7 +356,7 @@ def processar_material_direto(
         df_ped['qde_ped_corrigido'] = 0
 
     if 'data_entrega' in df_ped.columns:
-        df_ped['data_entrega'] = pd.to_datetime(df_ped['data_entrega'], dayfirst=True, errors='coerce')
+        df_ped['data_entrega'] = df_ped['data_entrega'].apply(_parse_data_entrega)
         df_ped['data_entrega'] = df_ped['data_entrega'].apply(
             lambda x: x - timedelta(days=1) if pd.notna(x) and x.weekday() == 5
             else (x + timedelta(days=1) if pd.notna(x) and x.weekday() == 6 else x)
@@ -413,7 +452,7 @@ def processar_material_direto(
         pedidos_previstos = pedidos_material[pedidos_material['data_entrega'] >= hoje_ts]
         exibir_data_compra = _valor_escalar(row.get('data_compra'))
 
-        flag_status = 'PEDIDO_ATRASADO' if len(pedidos_atrasados) > 0 else _valor_escalar(row.get('flag_urgencia'), 'SEM_DADOS')
+        flag_status = _valor_escalar(row.get('flag_urgencia'), 'SEM_DADOS')
 
         materiais.append({
             'codigo': str(_valor_escalar(row.get('codigo'), '')),
@@ -466,7 +505,8 @@ def get_projecao_para_material(
     df_ped: pd.DataFrame,
     considerar_pedido_pendente_como_recebido: bool = False,
 ) -> dict:
-    linha = df[df['codigo'] == codigo]
+    codigo = _normalizar_codigo_material(codigo)
+    linha = df[df['codigo'].apply(_normalizar_codigo_material) == codigo]
     if linha.empty:
         return {'error': 'Material não encontrado'}
 
@@ -481,7 +521,9 @@ def get_projecao_para_material(
 
     hoje_ts = pd.Timestamp(datetime.now().date())
     ped_compras = float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0)
-    pedidos_codigo = df_ped[df_ped['codigo'] == codigo].copy()
+    pedidos_codigo = df_ped[
+        df_ped['codigo'].apply(_normalizar_codigo_material) == codigo
+    ].copy()
     pedidos_com_data_qs = pedidos_codigo[
         pd.notna(pedidos_codigo.get('data_entrega')) &
         (pedidos_codigo.get('qde_ped_corrigido', 0) > 0)
@@ -497,6 +539,8 @@ def get_projecao_para_material(
     ped_compras_atrasado = float(pedidos_atrasados_qs.get('qde_ped_corrigido', 0).sum())
     ped_compras_previsto = float(pedidos_previstos_qs.get('qde_ped_corrigido', 0).sum())
     ped_compras_sem_data = float(pedidos_sem_data_qs.get('qde_ped_corrigido', 0).sum())
+    if pedidos_codigo.empty and ped_compras > 0:
+        ped_compras_sem_data = ped_compras
     pedido_elegivel_projecao = max(ped_compras - ped_compras_atrasado, 0)
     estoque_projetado = (
         estoque_fisico + pedido_elegivel_projecao
@@ -564,6 +608,11 @@ def get_projecao_para_material(
             return None
         return pd.to_datetime(valor).strftime('%Y-%m-%d')
 
+    def _data_tooltip(valor):
+        if valor is None or pd.isna(valor):
+            return '-'
+        return pd.to_datetime(valor).strftime('%d/%m/%Y')
+
     def _estoque_na_data(data_iso):
         if not data_iso:
             return None
@@ -595,24 +644,35 @@ def get_projecao_para_material(
 
     for _, pedido in pedidos_atrasados_qs.iterrows():
         data_iso = _iso_data(pedido.get('data_entrega'))
+        data_entrega_fmt = _data_tooltip(pedido.get('data_entrega'))
         quantidade = float(pedido.get('qde_ped_corrigido', 0) or 0)
         eventos_grafico.append({
             'tipo': 'entrega_atrasada',
             'data': data_iso,
             'titulo': 'Entrega atrasada',
-            'descricao': f'Pedido de {quantidade:.2f} unidades ainda não recebido.',
+            'descricao': (
+                f'Data prevista da entrega: {data_entrega_fmt}. '
+                f'Pedido de {quantidade:.2f} unidades ainda não recebido.'
+            ),
             'quantidade': round(quantidade, 2),
             'estoque': _estoque_na_data(data_iso),
         })
 
-    for _, pedido in pedidos_previstos_qs.iterrows():
+    for ordem_entrega, (_, pedido) in enumerate(pedidos_previstos_qs.iterrows(), start=1):
         data_iso = _iso_data(pedido.get('data_entrega'))
+        data_entrega_fmt = (
+            pd.to_datetime(pedido.get('data_entrega')).strftime('%d/%m/%Y')
+            if data_iso else '-'
+        )
         quantidade = float(pedido.get('qde_ped_corrigido', 0) or 0)
         eventos_grafico.append({
             'tipo': 'entrega_prevista',
             'data': data_iso,
-            'titulo': 'Entrega prevista',
-            'descricao': f'Pedido de {quantidade:.2f} unidades com entrega programada.',
+            'titulo': _rotulo_ordem_entrega(ordem_entrega),
+            'descricao': (
+                f'Data da entrega: {data_entrega_fmt}. '
+                f'Pedido de {quantidade:.2f} unidades com entrega programada.'
+            ),
             'quantidade': round(quantidade, 2),
             'estoque': _estoque_na_data(data_iso),
         })
@@ -622,19 +682,22 @@ def get_projecao_para_material(
             'proxima_compra',
             data_compra_iso,
             'Próxima compra',
-            'Data recomendada para emitir o próximo pedido.',
+            f'Data para próxima compra: {_data_tooltip(data_compra)}. Data recomendada para emitir o próximo pedido.',
         ),
         (
             'estoque_minimo',
             data_minimo_iso,
             'Estoque mínimo',
-            f'Estoque projetado atinge o mínimo de {estoque_minimo:.2f} unidades.',
+            (
+                f'Data do estoque mínimo: {_data_tooltip(_valor_escalar(row.get("data_estoque_minimo")))}. '
+                f'Estoque projetado atinge o mínimo de {estoque_minimo:.2f} unidades.'
+            ),
         ),
         (
             'estoque_zero',
             data_zero_iso,
             'Estoque zero',
-            'Data projetada para ruptura do estoque.',
+            f'Data da ruptura de estoque: {_data_tooltip(_valor_escalar(row.get("data_estoque_zero")))}.',
         ),
     ]
     for tipo, data_iso, titulo, descricao in marcos:
@@ -667,7 +730,11 @@ def get_projecao_para_material(
         'pedidos_previstos_count': int(len(pedidos_previstos_qs)),
         'ped_compras_atrasado': round(ped_compras_atrasado, 2),
         'ped_compras_previsto': round(ped_compras_previsto, 2),
-        'pedidos_sem_data_count': 1 if ped_compras_sem_data > 0 else 0,
+        'pedidos_sem_data_count': (
+            int(len(pedidos_sem_data_qs))
+            if not pedidos_sem_data_qs.empty
+            else (1 if ped_compras_sem_data > 0 else 0)
+        ),
         'ped_compras_sem_data': round(ped_compras_sem_data, 2),
         'pedidos_pendentes_detalhes': [
             {
