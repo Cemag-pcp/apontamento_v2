@@ -1423,50 +1423,76 @@ def receber_ajuste_manual(request):
 @csrf_exempt
 @require_POST
 def api_criar_requisicao(request):
+    from cadastro.models import Pecas
+
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
         return JsonResponse({"status": "erro", "mensagem": "JSON inválido."}, status=400)
 
-    campos_obrigatorios = ["funcionario_id", "cc_id", "item_id", "classe_requisicao_id", "quantidade", "status_id"]
-    for campo in campos_obrigatorios:
+    for campo in ["funcionario_id", "cc_id", "status_id", "itens"]:
         if campo not in data or data[campo] in (None, ""):
             return JsonResponse({"status": "erro", "mensagem": f"Campo obrigatório ausente: {campo}"}, status=400)
+
+    if not isinstance(data["itens"], list) or len(data["itens"]) == 0:
+        return JsonResponse({"status": "erro", "mensagem": "O campo 'itens' deve ser uma lista não vazia."}, status=400)
 
     try:
         funcionario = get_object_or_404(Funcionario, pk=data["funcionario_id"], ativo=True)
         cc = get_object_or_404(Cc, pk=data["cc_id"])
-        item = get_object_or_404(ItensSolicitacao, pk=data["item_id"])
-        classe_requisicao = get_object_or_404(ClasseRequisicao, pk=data["classe_requisicao_id"])
-        status = get_object_or_404(RegraSlaAlmox, pk=data["status_id"], ativo=True)
-        quantidade = float(data["quantidade"])
-    except (ValueError, TypeError):
-        return JsonResponse({"status": "erro", "mensagem": "Valor inválido para 'quantidade'."}, status=400)
+        status_sla = get_object_or_404(RegraSlaAlmox, pk=data["status_id"], ativo=True)
     except Http404 as e:
         return JsonResponse({"status": "erro", "mensagem": str(e)}, status=404)
 
-    solicitacao = SolicitacaoRequisicao.objects.create(
-        funcionario=funcionario,
-        cc=cc,
-        item=item,
-        classe_requisicao=classe_requisicao,
-        quantidade=quantidade,
-        status=status,
-        obs=data.get("obs", ""),
-    )
+    operador_sesmt = OperadorAlmox.objects.filter(nome__iexact="sesmt", status=True).first()
 
-    try:
-        operador = get_object_or_404(OperadorAlmox, matricula=funcionario.matricula, status=True)
-        now = datetime.now()
-        solicitacao.entregue_por = operador
-        solicitacao.data_entrega = now.strftime("%Y-%m-%dT%H:%M")
-        solicitacao.save()
-        operador_encontrado = True
-    except Http404:
-        operador_encontrado = False
+    resultados = []
+    for idx, item_data in enumerate(data["itens"]):
+        for campo in ["codigo_produto", "classe_requisicao_id", "quantidade"]:
+            if campo not in item_data or item_data[campo] in (None, ""):
+                return JsonResponse({"status": "erro", "mensagem": f"Item {idx}: campo obrigatório ausente: {campo}"}, status=400)
+
+        try:
+            classe_requisicao = get_object_or_404(ClasseRequisicao, pk=item_data["classe_requisicao_id"])
+            quantidade = float(item_data["quantidade"])
+        except (ValueError, TypeError):
+            return JsonResponse({"status": "erro", "mensagem": f"Item {idx}: valor inválido para 'quantidade'."}, status=400)
+        except Http404 as e:
+            return JsonResponse({"status": "erro", "mensagem": f"Item {idx}: {e}"}, status=404)
+
+        codigo_produto = item_data["codigo_produto"]
+        item = ItensSolicitacao.objects.filter(codigo=codigo_produto).first()
+        item_criado = False
+        if item is None:
+            peca = Pecas.objects.filter(codigo=codigo_produto).first()
+            nome = peca.descricao if peca and peca.descricao else codigo_produto
+            item = ItensSolicitacao.objects.create(codigo=codigo_produto, nome=nome)
+            item.classe_requisicao.add(classe_requisicao)
+            item_criado = True
+
+        solicitacao = SolicitacaoRequisicao.objects.create(
+            funcionario=funcionario,
+            cc=cc,
+            item=item,
+            classe_requisicao=classe_requisicao,
+            quantidade=quantidade,
+            status=status_sla,
+            obs=data.get("obs", ""),
+        )
+
+        if operador_sesmt:
+            solicitacao.entregue_por = operador_sesmt
+            solicitacao.data_entrega = datetime.now()
+            solicitacao.save()
+
+        resultados.append({
+            "codigo_produto": codigo_produto,
+            "id": solicitacao.id,
+            "item_criado": item_criado,
+        })
 
     return JsonResponse({
         "status": "sucesso",
-        "id": solicitacao.id,
-        "operador_encontrado": operador_encontrado,
+        "operador_encontrado": operador_sesmt is not None,
+        "requisicoes": resultados,
     }, status=201)

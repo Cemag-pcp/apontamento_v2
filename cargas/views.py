@@ -2926,7 +2926,7 @@ def obter_skip_limit(request, default_limit=200, max_limit=500):
 
 
 def ordens_status_montagem(request):
-    """"
+    """
         traz as ordens aguardando inicio, em andamento e finalizadas na montagem
     """
 

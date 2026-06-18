@@ -317,7 +317,7 @@ def processar_material_direto(
         df_ped['qde_ped_corrigido'] = 0
 
     if 'data_entrega' in df_ped.columns:
-        df_ped['data_entrega'] = pd.to_datetime(df_ped['data_entrega'], format='%d/%m/%Y', errors='coerce')
+        df_ped['data_entrega'] = pd.to_datetime(df_ped['data_entrega'], dayfirst=True, errors='coerce')
         df_ped['data_entrega'] = df_ped['data_entrega'].apply(
             lambda x: x - timedelta(days=1) if pd.notna(x) and x.weekday() == 5
             else (x + timedelta(days=1) if pd.notna(x) and x.weekday() == 6 else x)
@@ -482,20 +482,21 @@ def get_projecao_para_material(
     hoje_ts = pd.Timestamp(datetime.now().date())
     ped_compras = float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0)
     pedidos_codigo = df_ped[df_ped['codigo'] == codigo].copy()
-    pedidos_pendentes_qs = pedidos_codigo[
+    pedidos_com_data_qs = pedidos_codigo[
         pd.notna(pedidos_codigo.get('data_entrega')) &
         (pedidos_codigo.get('qde_ped_corrigido', 0) > 0)
     ].copy()
-    pedidos_pendentes_qs = pedidos_pendentes_qs.sort_values(by='data_entrega', ascending=True)
+    pedidos_sem_data_qs = pedidos_codigo[
+        pd.isna(pedidos_codigo.get('data_entrega')) &
+        (pedidos_codigo.get('qde_ped_corrigido', 0) > 0)
+    ].copy()
+    pedidos_pendentes_qs = pedidos_com_data_qs.sort_values(by='data_entrega', ascending=True)
     pedidos_atrasados_qs = pedidos_pendentes_qs[pedidos_pendentes_qs['data_entrega'] < hoje_ts].copy()
     pedidos_previstos_qs = pedidos_pendentes_qs[pedidos_pendentes_qs['data_entrega'] >= hoje_ts].copy()
 
     ped_compras_atrasado = float(pedidos_atrasados_qs.get('qde_ped_corrigido', 0).sum())
     ped_compras_previsto = float(pedidos_previstos_qs.get('qde_ped_corrigido', 0).sum())
-    ped_compras_sem_data = max(
-        ped_compras - ped_compras_atrasado - ped_compras_previsto,
-        0,
-    )
+    ped_compras_sem_data = float(pedidos_sem_data_qs.get('qde_ped_corrigido', 0).sum())
     pedido_elegivel_projecao = max(ped_compras - ped_compras_atrasado, 0)
     estoque_projetado = (
         estoque_fisico + pedido_elegivel_projecao
