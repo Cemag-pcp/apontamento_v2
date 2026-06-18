@@ -413,6 +413,7 @@ COLUNAS_PENDENCIAS = [
     "Data",
     "CNPJ",
     "Fornecedor",
+    "Ch. de Pedido",
     "Nº Nota fiscal",
     "Tipo de material",
     "Classe de Inspeção",
