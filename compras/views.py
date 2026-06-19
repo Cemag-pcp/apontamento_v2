@@ -29,12 +29,13 @@ def api_material_direto(request):
         invalidate_cache()
 
     try:
+        considerar_pedidos = request.GET.get('considerar_pedidos') == '1'
         simulacao_df = get_simulacao_df()
         pedidos_df = get_pedidos_df()
         resultado = processar_material_direto(
             simulacao_df,
             pedidos_df,
-            considerar_pedido_pendente_como_recebido=True,
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
         )
 
         materiais_base = resultado['materiais']
@@ -90,19 +91,20 @@ def api_projecao(request):
         return JsonResponse({'error': 'Parametro codigo obrigatorio'}, status=400)
 
     try:
+        considerar_pedidos = request.GET.get('considerar_pedidos') == '1'
         simulacao_df = get_simulacao_df()
         pedidos_df = get_pedidos_df()
         resultado = processar_material_direto(
             simulacao_df,
             pedidos_df,
-            considerar_pedido_pendente_como_recebido=True,
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
         )
 
         projecao = get_projecao_para_material(
             codigo,
             resultado['df'],
             resultado['df_pedidos'],
-            considerar_pedido_pendente_como_recebido=True,
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
         )
 
         if 'error' in projecao:
@@ -126,18 +128,19 @@ def api_analise_ia(request):
     force = request.GET.get('force') == '1'
 
     try:
+        considerar_pedidos = request.GET.get('considerar_pedidos') == '1'
         simulacao_df = get_simulacao_df()
         pedidos_df = get_pedidos_df()
         resultado = processar_material_direto(
             simulacao_df,
             pedidos_df,
-            considerar_pedido_pendente_como_recebido=True,
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
         )
         projecao = get_projecao_para_material(
             codigo,
             resultado['df'],
             resultado['df_pedidos'],
-            considerar_pedido_pendente_como_recebido=True,
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
         )
         if 'error' in projecao:
             return JsonResponse(projecao, status=404)
@@ -230,9 +233,15 @@ def api_material_indireto(request):
         invalidate_mat_indireto_cache()
 
     try:
+        considerar_pedidos = request.GET.get('considerar_pedidos') == '1'
         simulacao_df = get_mat_indireto_simulacao_df()
         pedidos_df = get_mat_indireto_pedidos_df()
-        resultado = processar_material_direto(simulacao_df, pedidos_df, skip_first_row=False)
+        resultado = processar_material_direto(
+            simulacao_df,
+            pedidos_df,
+            skip_first_row=False,
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
+        )
 
         materiais_base = resultado['materiais']
         materiais = materiais_base
@@ -287,11 +296,22 @@ def api_projecao_indireto(request):
         return JsonResponse({'error': 'Parametro codigo obrigatorio'}, status=400)
 
     try:
+        considerar_pedidos = request.GET.get('considerar_pedidos') == '1'
         simulacao_df = get_mat_indireto_simulacao_df()
         pedidos_df = get_mat_indireto_pedidos_df()
-        resultado = processar_material_direto(simulacao_df, pedidos_df, skip_first_row=False)
+        resultado = processar_material_direto(
+            simulacao_df,
+            pedidos_df,
+            skip_first_row=False,
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
+        )
 
-        projecao = get_projecao_para_material(codigo, resultado['df'], resultado['df_pedidos'])
+        projecao = get_projecao_para_material(
+            codigo,
+            resultado['df'],
+            resultado['df_pedidos'],
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
+        )
 
         if 'error' in projecao:
             return JsonResponse(projecao, status=404)
@@ -314,10 +334,21 @@ def api_analise_ia_indireto(request):
     force = request.GET.get('force') == '1'
 
     try:
+        considerar_pedidos = request.GET.get('considerar_pedidos') == '1'
         simulacao_df = get_mat_indireto_simulacao_df()
         pedidos_df = get_mat_indireto_pedidos_df()
-        resultado = processar_material_direto(simulacao_df, pedidos_df, skip_first_row=False)
-        projecao = get_projecao_para_material(codigo, resultado['df'], resultado['df_pedidos'])
+        resultado = processar_material_direto(
+            simulacao_df,
+            pedidos_df,
+            skip_first_row=False,
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
+        )
+        projecao = get_projecao_para_material(
+            codigo,
+            resultado['df'],
+            resultado['df_pedidos'],
+            considerar_pedido_pendente_como_recebido=considerar_pedidos,
+        )
         if 'error' in projecao:
             return JsonResponse(projecao, status=404)
 

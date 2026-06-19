@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 from django.conf import settings
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
+from unittest.mock import Mock, patch
 
 from compras.services.data_processing import (
     _calcular_datas_projecao,
@@ -11,6 +12,7 @@ from compras.services.data_processing import (
     processar_material_direto,
 )
 from compras.services.sugestoes import gerar_sugestoes
+from compras import views as compras_views
 
 
 class ComprasScrollSuperiorTests(SimpleTestCase):
@@ -57,15 +59,15 @@ class ComprasScrollSuperiorTests(SimpleTestCase):
         self.assertIn('<option value="URGENTE_COM_PEDIDO">🔴 Ped. Atrasado</option>', indireto)
         self.assertNotIn("Aguardando chegar", analise)
         self.assertNotIn("Aguardando chegar", indireto)
-        self.assertIn("?v=20260618-2", analise)
-        self.assertIn("?v=20260618-2", indireto)
+        self.assertIn("?v=20260618-5", analise)
+        self.assertIn("?v=20260618-5", indireto)
         self.assertNotIn("COMPRAS_URGENTE_COM_PEDIDO_LABEL", analise)
         self.assertNotIn("COMPRAS_URGENTE_COM_PEDIDO_LABEL", indireto)
         self.assertNotIn("URGENTE_COM_PEDIDO_LABEL", script)
         self.assertIn("URGENTE_COM_PEDIDO:'<span class=\"compras-badge urgente\"><i class=\"fas fa-triangle-exclamation\"></i> Ped. Atrasado</span>'", script)
         self.assertNotIn("fa-truck", script)
 
-    def test_entrega_atrasada_aplica_somente_na_analise_direta(self):
+    def test_entrega_atrasada_aplica_nas_duas_telas(self):
         analise = (
             self.compras_dir / "templates" / "compras" / "analise.html"
         ).read_text(encoding="utf-8")
@@ -77,7 +79,7 @@ class ComprasScrollSuperiorTests(SimpleTestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("window.COMPRAS_EXIBIR_ENTREGA_ATRASADA = true", analise)
-        self.assertNotIn("COMPRAS_EXIBIR_ENTREGA_ATRASADA", indireto)
+        self.assertIn("window.COMPRAS_EXIBIR_ENTREGA_ATRASADA = true", indireto)
         self.assertIn("formatarDataProximaCompra(m)", script)
         self.assertIn("formatarSituacao(m)", script)
         self.assertIn("dataCompraEstaAtrasada(material)", script)
@@ -103,6 +105,34 @@ class ComprasScrollSuperiorTests(SimpleTestCase):
             script,
         )
 
+    def test_filtro_considerar_pedidos_existe_nas_duas_telas(self):
+        analise = (
+            self.compras_dir / "templates" / "compras" / "analise.html"
+        ).read_text(encoding="utf-8")
+        indireto = (
+            self.compras_dir / "templates" / "compras" / "mat_indireto.html"
+        ).read_text(encoding="utf-8")
+        script = (
+            self.compras_dir / "static" / "js" / "compras.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("Considerar Pedidos", analise)
+        self.assertIn('id="filtroConsiderarPedidos"', analise)
+        self.assertIn('<option value="0" selected>Não</option>', analise)
+        self.assertIn('<option value="1">Sim</option>', analise)
+        self.assertIn("Considerar Pedidos", indireto)
+        self.assertIn('id="filtroConsiderarPedidos"', indireto)
+        self.assertIn('<option value="0" selected>Não</option>', indireto)
+        self.assertIn('<option value="1">Sim</option>', indireto)
+        self.assertIn("considerar_pedidos", script)
+        self.assertIn("considerarPedidos ? considerarPedidos.value : '0'", script)
+        self.assertIn("filtroConsiderarPedidos.addEventListener('change'", script)
+        self.assertIn("descricaoAtualProjecao", script)
+        self.assertIn("modalAberto && codigoAtualProjecao", script)
+        self.assertIn("carregarProjecao(codigoAtualProjecao, descricaoAtualProjecao)", script)
+        self.assertIn("check_only: '1'", script)
+        self.assertIn("considerar_pedidos: getParams().considerar_pedidos", script)
+
     def test_grafico_enriquecido_tem_todas_as_bandeiras(self):
         analise = (
             self.compras_dir / "templates" / "compras" / "analise.html"
@@ -115,7 +145,7 @@ class ComprasScrollSuperiorTests(SimpleTestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("window.COMPRAS_GRAFICO_ENRIQUECIDO = true", analise)
-        self.assertNotIn("COMPRAS_GRAFICO_ENRIQUECIDO", indireto)
+        self.assertIn("window.COMPRAS_GRAFICO_ENRIQUECIDO = true", indireto)
         for tipo in (
             "hoje",
             "entrega_prevista",
@@ -127,6 +157,177 @@ class ComprasScrollSuperiorTests(SimpleTestCase):
             self.assertIn(f"{tipo}:", script)
         self.assertIn("renderPlotlyEnriquecido(data)", script)
         self.assertIn("sugestao-indicadores", script)
+
+
+class ComprasConsiderarPedidosApiTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.user = Mock(is_authenticated=True)
+        self.resultado = {
+            "materiais": [
+                {
+                    "codigo": "292254",
+                    "descricao": "Material teste",
+                    "grupo": "Grupo",
+                    "flag_urgencia": "PRAZO_OK",
+                }
+            ],
+            "codigos": ["292254"],
+            "grupos": ["Grupo"],
+            "df": pd.DataFrame([{"codigo": "292254"}]),
+            "df_pedidos": pd.DataFrame(columns=["codigo", "data_entrega", "qde_ped_corrigido"]),
+        }
+
+    def _request(self, path):
+        request = self.factory.get(path)
+        request.user = self.user
+        return request
+
+    @patch("compras.views.get_pedidos_df")
+    @patch("compras.views.get_simulacao_df")
+    @patch("compras.views.processar_material_direto")
+    def test_material_direto_nao_considera_pedidos_por_padrao(
+        self,
+        mock_processar,
+        mock_simulacao,
+        mock_pedidos,
+    ):
+        mock_simulacao.return_value = pd.DataFrame()
+        mock_pedidos.return_value = pd.DataFrame()
+        mock_processar.return_value = self.resultado
+
+        response = compras_views.api_material_direto(self._request("/compras/api/material-direto/"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(mock_processar.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
+
+    @patch("compras.views.gerar_sugestoes")
+    @patch("compras.views.get_projecao_para_material")
+    @patch("compras.views.get_pedidos_df")
+    @patch("compras.views.get_simulacao_df")
+    @patch("compras.views.processar_material_direto")
+    def test_projecao_considera_pedidos_quando_parametro_igual_um(
+        self,
+        mock_processar,
+        mock_simulacao,
+        mock_pedidos,
+        mock_projecao,
+        mock_sugestoes,
+    ):
+        mock_simulacao.return_value = pd.DataFrame()
+        mock_pedidos.return_value = pd.DataFrame()
+        mock_processar.return_value = self.resultado
+        mock_projecao.return_value = {"codigo": "292254"}
+        mock_sugestoes.return_value = []
+
+        response = compras_views.api_projecao(
+            self._request("/compras/api/projecao/?codigo=292254&considerar_pedidos=1")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mock_processar.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
+        self.assertTrue(mock_projecao.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
+
+    @patch("compras.views.check_cache")
+    @patch("compras.views.get_projecao_para_material")
+    @patch("compras.views.get_pedidos_df")
+    @patch("compras.views.get_simulacao_df")
+    @patch("compras.views.processar_material_direto")
+    def test_analise_ia_direta_considera_pedidos_quando_parametro_igual_um(
+        self,
+        mock_processar,
+        mock_simulacao,
+        mock_pedidos,
+        mock_projecao,
+        mock_check_cache,
+    ):
+        mock_simulacao.return_value = pd.DataFrame()
+        mock_pedidos.return_value = pd.DataFrame()
+        mock_processar.return_value = self.resultado
+        mock_projecao.return_value = {"codigo": "292254"}
+        mock_check_cache.return_value = None
+
+        response = compras_views.api_analise_ia(
+            self._request("/compras/api/analise-ia/?codigo=292254&considerar_pedidos=1&check_only=1")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mock_processar.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
+        self.assertTrue(mock_projecao.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
+
+    @patch("compras.views.get_mat_indireto_pedidos_df")
+    @patch("compras.views.get_mat_indireto_simulacao_df")
+    @patch("compras.views.processar_material_direto")
+    def test_material_indireto_nao_considera_pedidos_por_padrao(
+        self,
+        mock_processar,
+        mock_simulacao,
+        mock_pedidos,
+    ):
+        mock_simulacao.return_value = pd.DataFrame()
+        mock_pedidos.return_value = pd.DataFrame()
+        mock_processar.return_value = self.resultado
+
+        response = compras_views.api_material_indireto(
+            self._request("/compras/mat_indireto/api/material-direto/")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(mock_processar.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
+
+    @patch("compras.views.gerar_sugestoes")
+    @patch("compras.views.get_projecao_para_material")
+    @patch("compras.views.get_mat_indireto_pedidos_df")
+    @patch("compras.views.get_mat_indireto_simulacao_df")
+    @patch("compras.views.processar_material_direto")
+    def test_projecao_indireta_considera_pedidos_quando_parametro_igual_um(
+        self,
+        mock_processar,
+        mock_simulacao,
+        mock_pedidos,
+        mock_projecao,
+        mock_sugestoes,
+    ):
+        mock_simulacao.return_value = pd.DataFrame()
+        mock_pedidos.return_value = pd.DataFrame()
+        mock_processar.return_value = self.resultado
+        mock_projecao.return_value = {"codigo": "292254"}
+        mock_sugestoes.return_value = []
+
+        response = compras_views.api_projecao_indireto(
+            self._request("/compras/mat_indireto/api/projecao/?codigo=292254&considerar_pedidos=1")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mock_processar.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
+        self.assertTrue(mock_projecao.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
+
+    @patch("compras.views.check_cache")
+    @patch("compras.views.get_projecao_para_material")
+    @patch("compras.views.get_mat_indireto_pedidos_df")
+    @patch("compras.views.get_mat_indireto_simulacao_df")
+    @patch("compras.views.processar_material_direto")
+    def test_analise_ia_indireta_considera_pedidos_quando_parametro_igual_um(
+        self,
+        mock_processar,
+        mock_simulacao,
+        mock_pedidos,
+        mock_projecao,
+        mock_check_cache,
+    ):
+        mock_simulacao.return_value = pd.DataFrame()
+        mock_pedidos.return_value = pd.DataFrame()
+        mock_processar.return_value = self.resultado
+        mock_projecao.return_value = {"codigo": "292254"}
+        mock_check_cache.return_value = None
+
+        response = compras_views.api_analise_ia_indireto(
+            self._request("/compras/mat_indireto/api/analise-ia/?codigo=292254&considerar_pedidos=1&check_only=1")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mock_processar.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
+        self.assertTrue(mock_projecao.call_args.kwargs["considerar_pedido_pendente_como_recebido"])
 
 
 class ComprasCalculoPedidoPendenteTests(SimpleTestCase):
@@ -204,6 +405,41 @@ class ComprasCalculoPedidoPendenteTests(SimpleTestCase):
 
         self.assertLess(resultado["dias_ate_data_compra"], 0)
 
+    def test_estoque_minimo_nao_espera_entrega_futura_para_ser_marcado(self):
+        row = pd.Series(
+            {
+                "codigo": "112203",
+                "estoque_almox_central": 527,
+                "estoque_almox": 527,
+                "estoque_minimo": 684.84,
+                "consumo_diario": 68.484,
+                "dias_ressupr": 20,
+                "ped_compras_pendente": 2160,
+            }
+        )
+        pedidos = pd.DataFrame(
+            [
+                {
+                    "codigo": "112203",
+                    "data_entrega": pd.Timestamp.now().normalize()
+                    + pd.Timedelta(days=34),
+                    "qde_ped_corrigido": 2160,
+                }
+            ]
+        )
+
+        resultado = _calcular_datas_projecao(
+            row,
+            pedidos,
+            considerar_pedido_pendente_como_recebido=False,
+        )
+
+        self.assertLessEqual(
+            resultado["data_estoque_minimo"],
+            resultado["data_estoque_zero"],
+        )
+        self.assertLess(resultado["dias_ate_data_compra"], 0)
+
 
 class ComprasParseDataEntregaTests(SimpleTestCase):
     def test_parse_aceita_datas_mistas_da_planilha(self):
@@ -261,6 +497,37 @@ class ComprasProjecaoEnriquecidaTests(SimpleTestCase):
         self.assertIn("proxima_compra", tipos)
         self.assertIn("estoque_minimo", tipos)
         self.assertIn("estoque_zero", tipos)
+
+    def test_datas_do_grafico_sao_recalculadas_pelo_parametro_considerar_pedidos(self):
+        pedidos = pd.DataFrame(
+            columns=["codigo", "data_entrega", "qde_ped_corrigido"]
+        )
+        self.df.loc[0, "data_compra"] = pd.Timestamp("2000-01-03").date()
+        self.df.loc[0, "data_estoque_minimo"] = pd.Timestamp("2000-02-01").date()
+        self.df.loc[0, "data_estoque_zero"] = pd.Timestamp("2000-03-01").date()
+
+        projecao = get_projecao_para_material(
+            "292254",
+            self.df,
+            pedidos,
+            considerar_pedido_pendente_como_recebido=True,
+        )
+        esperado = _calcular_datas_projecao(
+            self.df.iloc[0],
+            pedidos,
+            considerar_pedido_pendente_como_recebido=True,
+        )
+        eventos = {
+            evento["tipo"]: evento
+            for evento in projecao["eventos_grafico"]
+        }
+
+        self.assertEqual(projecao["data_compra"], esperado["data_compra"].strftime("%d/%m/%Y"))
+        self.assertEqual(projecao["data_estoque_minimo"], esperado["data_estoque_minimo"].strftime("%Y-%m-%d"))
+        self.assertEqual(projecao["data_estoque_zero"], esperado["data_estoque_zero"].strftime("%d/%m/%Y"))
+        self.assertEqual(eventos["proxima_compra"]["data"], esperado["data_compra"].strftime("%Y-%m-%d"))
+        self.assertEqual(eventos["estoque_minimo"]["data"], esperado["data_estoque_minimo"].strftime("%Y-%m-%d"))
+        self.assertEqual(eventos["estoque_zero"]["data"], esperado["data_estoque_zero"].strftime("%Y-%m-%d"))
 
     def test_pedido_futuro_gera_bandeira_sem_duplicar_estoque(self):
         pedidos = pd.DataFrame(
@@ -485,3 +752,25 @@ class ComprasProjecaoEnriquecidaTests(SimpleTestCase):
         self.assertEqual(len(sugestoes[0]["indicadores"]), 6)
         self.assertIn("sem data de entrega", sugestoes[1]["mensagem"])
         self.assertEqual(sugestoes[2]["tipo"], "acao")
+
+    def test_sugestao_informa_quando_pedidos_nao_sao_considerados(self):
+        projecao = {
+            "estoque_fisico": 527,
+            "estoque_projetado": 527,
+            "estoque_minimo": 684.84,
+            "consumo_diario": 68.484,
+            "ped_compras": 2160,
+            "considerar_pedidos": False,
+            "pedidos_atrasados_count": 0,
+            "pedidos_previstos_count": 1,
+            "pedidos_sem_data_count": 0,
+            "dias_ate_data_compra": -15,
+            "dias_ressupr": 20,
+            "data_compra": "20/05/2026",
+            "data_estoque_minimo": "2026-06-18",
+            "data_estoque_zero": "29/06/2026",
+        }
+
+        sugestoes = gerar_sugestoes(projecao, formato_enriquecido=True)
+
+        self.assertIn("apenas o estoque físico", sugestoes[0]["mensagem"])

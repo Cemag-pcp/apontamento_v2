@@ -45,6 +45,7 @@ def _gerar_sugestoes_enriquecidas(projecao: dict) -> list:
     pedidos_sem_data = int(projecao.get('pedidos_sem_data_count', 0) or 0)
     ped_sem_data = float(projecao.get('ped_compras_sem_data', 0) or 0)
     pedidos_pendentes_detalhes = projecao.get('pedidos_pendentes_detalhes') or []
+    considerar_pedidos = bool(projecao.get('considerar_pedidos'))
     dias_ate_compra = projecao.get('dias_ate_data_compra')
     dias_ressupr = float(projecao.get('dias_ressupr', 0) or 0)
     data_compra = _formatar_data(projecao.get('data_compra'))
@@ -62,6 +63,8 @@ def _gerar_sugestoes_enriquecidas(projecao: dict) -> list:
         'mensagem': (
             'O estoque projetado considera pedidos pendentes não atrasados '
             'como disponíveis e exclui pedidos atrasados.'
+            if considerar_pedidos
+            else 'O estoque projetado considera apenas o estoque físico, sem somar pedidos pendentes.'
         ),
         'qtd_sugerida': None,
         'indicadores': [

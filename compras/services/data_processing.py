@@ -208,7 +208,6 @@ def _calcular_datas_projecao(
         pedidos = pedidos[pedidos['data_entrega'] >= hoje_ts]
 
     chegadas_por_data = {}
-    ultima_chegada = pd.Timestamp(hoje)
     if not pedidos.empty:
         chegadas_agrupadas = pedidos.groupby('data_entrega')['qde_ped_corrigido'].sum()
         chegadas_por_data = {
@@ -216,8 +215,6 @@ def _calcular_datas_projecao(
             for data, qtd in chegadas_agrupadas.items()
             if pd.notna(data)
         }
-        if chegadas_por_data:
-            ultima_chegada = max(chegadas_por_data)
 
     data_estoque_minimo = None
     data_estoque_zero = None
@@ -231,7 +228,7 @@ def _calcular_datas_projecao(
         if data_estoque_zero is None and estoque <= 0:
             data_estoque_zero = data.date()
 
-        if data_estoque_minimo is None and data >= ultima_chegada and estoque <= estoque_minimo:
+        if data_estoque_minimo is None and estoque <= estoque_minimo:
             data_estoque_minimo = data.date()
 
         if data_estoque_minimo is not None and data_estoque_zero is not None:
@@ -517,7 +514,15 @@ def get_projecao_para_material(
     estoque_minimo = float(_valor_escalar(row.get('estoque_minimo'), 0) or 0)
     consumo_diario = float(_valor_escalar(row.get('consumo_diario'), 0) or 0)
     dias_ressupr = float(_valor_escalar(row.get('dias_ressupr'), 0) or 0)
-    data_compra = _valor_escalar(row.get('data_compra'))
+    datas_recalculadas = _calcular_datas_projecao(
+        row,
+        df_ped,
+        considerar_pedido_pendente_como_recebido=considerar_pedido_pendente_como_recebido,
+    )
+    data_compra = datas_recalculadas.get('data_compra')
+    data_estoque_minimo = datas_recalculadas.get('data_estoque_minimo')
+    data_estoque_zero = datas_recalculadas.get('data_estoque_zero')
+    dias_ate_data_compra = datas_recalculadas.get('dias_ate_data_compra')
 
     hoje_ts = pd.Timestamp(datetime.now().date())
     ped_compras = float(_valor_escalar(row.get('ped_compras_pendente'), 0) or 0)
@@ -626,8 +631,8 @@ def get_projecao_para_material(
         return round(float(estoque_diario[indices[-1]]), 2)
 
     data_compra_iso = _iso_data(data_compra)
-    data_minimo_iso = _iso_data(_valor_escalar(row.get('data_estoque_minimo')))
-    data_zero_iso = _iso_data(_valor_escalar(row.get('data_estoque_zero')))
+    data_minimo_iso = _iso_data(data_estoque_minimo)
+    data_zero_iso = _iso_data(data_estoque_zero)
     eventos_grafico = [
         {
             'tipo': 'hoje',
@@ -689,7 +694,7 @@ def get_projecao_para_material(
             data_minimo_iso,
             'Estoque mínimo',
             (
-                f'Data do estoque mínimo: {_data_tooltip(_valor_escalar(row.get("data_estoque_minimo")))}. '
+                f'Data do estoque mínimo: {_data_tooltip(data_estoque_minimo)}. '
                 f'Estoque projetado atinge o mínimo de {estoque_minimo:.2f} unidades.'
             ),
         ),
@@ -697,7 +702,7 @@ def get_projecao_para_material(
             'estoque_zero',
             data_zero_iso,
             'Estoque zero',
-            f'Data da ruptura de estoque: {_data_tooltip(_valor_escalar(row.get("data_estoque_zero")))}.',
+            f'Data da ruptura de estoque: {_data_tooltip(data_estoque_zero)}.',
         ),
     ]
     for tipo, data_iso, titulo, descricao in marcos:
@@ -717,9 +722,9 @@ def get_projecao_para_material(
         'estoque_minimo': estoque_minimo,
         'consumo_diario': round(consumo_diario, 3),
         'dias_ressupr': dias_ressupr,
-        'dias_ate_data_compra': int(row['dias_ate_data_compra']) if pd.notna(_valor_escalar(row.get('dias_ate_data_compra'))) else None,
-        'data_compra': row['data_compra'].strftime('%d/%m/%Y') if pd.notna(_valor_escalar(row.get('data_compra'))) else None,
-        'data_estoque_zero': row['data_estoque_zero'].strftime('%d/%m/%Y') if pd.notna(_valor_escalar(row.get('data_estoque_zero'))) else None,
+        'dias_ate_data_compra': int(dias_ate_data_compra) if pd.notna(dias_ate_data_compra) else None,
+        'data_compra': data_compra.strftime('%d/%m/%Y') if pd.notna(data_compra) else None,
+        'data_estoque_zero': data_estoque_zero.strftime('%d/%m/%Y') if pd.notna(data_estoque_zero) else None,
         'flag_urgencia': str(_valor_escalar(row.get('flag_urgencia'), '')),
         'serie_real': {'datas': datas_grafico, 'estoques': estoque_diario},
         'serie_ideal': {'datas': datas_ideal, 'estoques': estoque_ideal_diario},
@@ -757,7 +762,8 @@ def get_projecao_para_material(
         'estoque_atual': round(estoque_projetado, 2),
         'estoque_fisico': round(estoque_fisico, 2),
         'estoque_projetado': round(estoque_projetado, 2),
+        'considerar_pedidos': bool(considerar_pedido_pendente_como_recebido),
         'ped_compras': round(ped_compras, 2),
-        'data_estoque_minimo': row['data_estoque_minimo'].strftime('%Y-%m-%d')
-            if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) else None,
+        'data_estoque_minimo': data_estoque_minimo.strftime('%Y-%m-%d')
+            if pd.notna(data_estoque_minimo) else None,
     }

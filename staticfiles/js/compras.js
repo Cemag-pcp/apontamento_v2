@@ -195,11 +195,13 @@ async function carregarCotacaoDolar(forceRefresh = false) {
 }
 
 function getParams() {
+    const considerarPedidos = document.getElementById('filtroConsiderarPedidos');
     return {
         codigo: document.getElementById('filtroCodigo').value,
         grupo: document.getElementById('filtroGrupo').value,
         urgencia: document.getElementById('filtroUrgencia').value,
         busca: document.getElementById('campoBusca').value,
+        considerar_pedidos: considerarPedidos ? considerarPedidos.value : '0',
     };
 }
 
@@ -378,6 +380,7 @@ function atualizarContadores(materiais) {
 let modalProjecao = null;
 let modalSugestoes = null;
 let codigoAtualProjecao = null;
+let descricaoAtualProjecao = '';
 
 function getModalProjecao() {
     if (!modalProjecao) {
@@ -400,6 +403,7 @@ function getModalSugestoes() {
 
 async function carregarProjecao(codigo, descricao) {
     codigoAtualProjecao = codigo;
+    descricaoAtualProjecao = descricao || '';
     document.getElementById('tituloGrafico').textContent = `Projeção - ${codigo}: ${descricao}`;
     document.getElementById('tituloSugestoesCompra').textContent = `Sugestões - ${codigo}`;
     document.getElementById('loadingGrafico').style.display = 'block';
@@ -415,7 +419,11 @@ async function carregarProjecao(codigo, descricao) {
 
     let data;
     try {
-        const resp = await fetch(`${API_BASE}api/projecao/?codigo=${encodeURIComponent(codigo)}`);
+        const qs = new URLSearchParams({
+            codigo,
+            considerar_pedidos: getParams().considerar_pedidos,
+        });
+        const resp = await fetch(`${API_BASE}api/projecao/?${qs}`);
         data = await resp.json();
         if (data.error) throw new Error(data.error);
     } catch (e) {
@@ -835,7 +843,12 @@ function _mostrarAnalise(texto, criadoEm, fromCache) {
 
 async function _verificarCacheAnaliseIA(codigo) {
     try {
-        const resp = await fetch(`${API_BASE}api/analise-ia/?codigo=${encodeURIComponent(codigo)}&check_only=1`);
+        const qs = new URLSearchParams({
+            codigo,
+            check_only: '1',
+            considerar_pedidos: getParams().considerar_pedidos,
+        });
+        const resp = await fetch(`${API_BASE}api/analise-ia/?${qs}`);
         const data = await resp.json();
         if (data.analise) {
             _mostrarAnalise(data.analise, data.criado_em, true);
@@ -855,7 +868,10 @@ async function carregarAnaliseIA(force = false) {
     document.getElementById('textoAnaliseIA').style.display = 'none';
     document.getElementById('dataAnaliseIA').style.display = 'none';
 
-    const qs = new URLSearchParams({ codigo: codigoAtualProjecao });
+    const qs = new URLSearchParams({
+        codigo: codigoAtualProjecao,
+        considerar_pedidos: getParams().considerar_pedidos,
+    });
     if (force) qs.set('force', '1');
 
     try {
@@ -887,6 +903,17 @@ document.addEventListener('DOMContentLoaded', () => {
         carregarMateriais(getParams());
     });
 
+    const filtroConsiderarPedidos = document.getElementById('filtroConsiderarPedidos');
+    if (filtroConsiderarPedidos) {
+        filtroConsiderarPedidos.addEventListener('change', () => {
+            carregarMateriais(getParams());
+            const modalAberto = document.getElementById('modalProjecao')?.classList.contains('show');
+            if (modalAberto && codigoAtualProjecao) {
+                carregarProjecao(codigoAtualProjecao, descricaoAtualProjecao);
+            }
+        });
+    }
+
     document.getElementById('campoBusca').addEventListener('keydown', e => {
         if (e.key === 'Enter') carregarMateriais(getParams());
     });
@@ -898,6 +925,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('modalProjecao').addEventListener('hidden.bs.modal', () => {
         Plotly.purge('plotlyDiv');
+        codigoAtualProjecao = null;
+        descricaoAtualProjecao = '';
         if (modalSugestoes) modalSugestoes.hide();
     });
 });

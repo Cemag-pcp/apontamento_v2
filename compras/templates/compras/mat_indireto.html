@@ -4,7 +4,7 @@
 {% block title %}<title>Análise de Compras — Material Indireto</title>{% endblock %}
 
 {% block links %}
-<link rel="stylesheet" href="{% static 'css/compras.css' %}?v=20260618-2">
+<link rel="stylesheet" href="{% static 'css/compras.css' %}?v=20260618-4">
 {% endblock %}
 
 {% block content %}
@@ -58,6 +58,13 @@
                         <option value="PRAZO_CURTO">🟡 Prazo Curto</option>
                         <option value="PRAZO_OK">🟢 Prazo OK</option>
                         <option value="SEM_DADOS">⚪ Sem Dados</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label form-label-sm mb-1">Considerar Pedidos</label>
+                    <select id="filtroConsiderarPedidos" class="form-select form-select-sm">
+                        <option value="0" selected>Não</option>
+                        <option value="1">Sim</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -199,7 +206,11 @@
 {% endblock %}
 
 {% block scripts %}
-<script>window.COMPRAS_API_BASE = '/compras/mat_indireto/';</script>
+<script>
+window.COMPRAS_API_BASE = '/compras/mat_indireto/';
+window.COMPRAS_EXIBIR_ENTREGA_ATRASADA = true;
+window.COMPRAS_GRAFICO_ENRIQUECIDO = true;
+</script>
 <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-<script src="{% static 'js/compras.js' %}?v=20260618-2"></script>
+<script src="{% static 'js/compras.js' %}?v=20260618-5"></script>
 {% endblock %}
