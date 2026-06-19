@@ -22,6 +22,17 @@ class PecasAdmin(ProfilePermissionMixin, admin.ModelAdmin):
 class MpAdmin(ProfilePermissionMixin, admin.ModelAdmin):
     search_fields = ['codigo', 'descricao', 'setor__nome']
 
+class EspessuraAdmin(ProfilePermissionMixin, admin.ModelAdmin):
+    list_display = ('nome', 'codigo', 'como_aparece_planilha')
+    search_fields = ('nome', 'codigo', 'como_aparece_planilha')
+    ordering = ('nome',)
+
+class EspessuraChapaAdmin(ProfilePermissionMixin, admin.ModelAdmin):
+    list_display = ('como_aparece_planilha', 'espessura', 'codigo', 'ativo')
+    list_filter = ('ativo',)
+    search_fields = ('como_aparece_planilha', 'codigo')
+    ordering = ('espessura', 'como_aparece_planilha')
+
 class OperadorAdmin(ProfilePermissionMixin, admin.ModelAdmin):
     list_display = ('matricula', 'nome', 'setor')
     search_fields = ('matricula', 'nome', 'setor__nome')
@@ -38,7 +49,8 @@ admin.site.register(Operador, OperadorAdmin)
 admin.site.register(Pecas, PecasAdmin)
 admin.site.register(Setor, RestrictedAdmin)
 admin.site.register(Mp, MpAdmin)
-admin.site.register(Espessura, RestrictedAdmin)
+admin.site.register(Espessura, EspessuraAdmin)
+admin.site.register(EspessuraChapa, EspessuraChapaAdmin)
 admin.site.register(Conjuntos, RestrictedAdmin)
 admin.site.register(MotivoMaquinaParada, RestrictedAdmin)
 admin.site.register(MotivoExclusao, RestrictedAdmin)

@@ -4,17 +4,18 @@ from django.conf import settings
 from django.db import transaction, connection
 from django.shortcuts import get_object_or_404, render
 from django.core.paginator import Paginator, EmptyPage
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now,localtime
+from django.utils.dateparse import parse_date
 from django.db.models import Q, Count, Sum, F, Max, Value, IntegerField, Prefetch
 from django.db.models.functions import Coalesce
 from django.forms.models import model_to_dict
 from django.contrib.auth.decorators import login_required
 
-from .models import Ordem,PecasOrdem
+from .models import Ordem, PecasOrdem, TransferenciaChapaCorte
 from core.models import OrdemProcesso,PropriedadesOrdem,MaquinaParada, Profile
-from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, MotivoMaquinaParada, MotivoExclusao
+from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, MotivoMaquinaParada, MotivoExclusao, EspessuraChapa
 from .utils import *
 from .utils_dashboard import *
 from apontamento_serra.utils import formatar_timedelta
@@ -26,6 +27,7 @@ import tempfile
 import re
 import json
 import math
+import requests
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 from datetime import datetime, time, timedelta
@@ -42,6 +44,521 @@ TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
 
 # Certifique-se de que a pasta existe
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+def _parse_decimal_br(valor):
+    if valor in (None, ''):
+        return None
+    try:
+        return float(str(valor).strip().replace(',', '.'))
+    except (TypeError, ValueError):
+        return None
+
+def _extrair_chave_retorno_erp(retorno):
+    if not isinstance(retorno, dict):
+        return ''
+
+    for campo in ('chaveProducao', 'chave', 'productionKey'):
+        valor = retorno.get(campo)
+        if valor not in (None, ''):
+            return str(valor).strip()
+
+    for valor in retorno.values():
+        if isinstance(valor, dict):
+            chave = _extrair_chave_retorno_erp(valor)
+            if chave:
+                return chave
+
+    return ''
+
+def _normalizar_chave_apontamento_erp(retorno_api, payload_integracao):
+    chave = _extrair_chave_retorno_erp(retorno_api)
+    if chave:
+        return chave, None
+
+    retorno_serializado = json.dumps(retorno_api, ensure_ascii=False, default=str)[:1200]
+    chave_fallback = f"sem-chave:{payload_integracao.get('id')}"
+    aviso = (
+        'ERP confirmou o apontamento, mas nao retornou chave explicita. '
+        f'Retorno bruto: {retorno_serializado}'
+    )
+    return chave_fallback, aviso
+
+def _extrair_codigo_peca_corte(peca):
+    texto = str(peca or '').strip()
+    if not texto:
+        return ''
+    match = re.match(r'^\s*([A-Za-z0-9]+)', texto)
+    codigo = match.group(1).strip() if match else texto
+    if codigo.isdigit() and len(codigo) == 5:
+        return f"0{codigo}"
+    return codigo
+
+def _extrair_dados_chapa(descricao_mp):
+    """
+    Extrai dados de textos como "11 - 1200 x 2000 mm".
+    Retorna a espessura como aparece na planilha, largura e comprimento em mm.
+    """
+    texto = str(descricao_mp or '').strip()
+    match = re.search(
+        r'^\s*(?P<espessura>.+?)\s*-\s*(?P<largura>\d+(?:[,.]\d+)?)\s*[x×]\s*(?P<comprimento>\d+(?:[,.]\d+)?)',
+        texto,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+
+    largura = _parse_decimal_br(match.group('largura'))
+    comprimento = _parse_decimal_br(match.group('comprimento'))
+    if largura is None or comprimento is None:
+        return None
+
+    return {
+        'espessura_planilha': match.group('espessura').strip(),
+        'largura': largura,
+        'comprimento': comprimento,
+    }
+
+def _calcular_peso_chapas_corte(propriedade, qtd_chapas):
+    dados_chapa = _extrair_dados_chapa(propriedade.descricao_mp if propriedade else None)
+    if not dados_chapa:
+        return None
+
+    espessura_chapa = EspessuraChapa.objects.filter(
+        como_aparece_planilha__iexact=dados_chapa['espessura_planilha'],
+        ativo=True,
+    ).first()
+    if not espessura_chapa:
+        return {
+            'encontrou_chapa': False,
+            'espessura_planilha': dados_chapa['espessura_planilha'],
+            'descricao_mp': propriedade.descricao_mp if propriedade else None,
+        }
+
+    quantidade = _parse_decimal_br(qtd_chapas)
+    if quantidade is None:
+        quantidade = _parse_decimal_br(propriedade.quantidade if propriedade else None) or 0
+
+    espessura = float(espessura_chapa.espessura)
+    peso_total = (
+        dados_chapa['largura']
+        * dados_chapa['comprimento']
+        * espessura
+        * 7.85
+        * 10 ** -6
+        * quantidade
+    )
+
+    return {
+        'encontrou_chapa': True,
+        'espessura_planilha': dados_chapa['espessura_planilha'],
+        'espessura_mm': str(espessura_chapa.espessura).replace('.', ',').rstrip('0').rstrip(','),
+        'codigo': espessura_chapa.codigo,
+        'largura': dados_chapa['largura'],
+        'comprimento': dados_chapa['comprimento'],
+        'quantidade_chapas': quantidade,
+        'peso_total': round(peso_total, 3),
+    }
+
+def _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa):
+    registro_existente = TransferenciaChapaCorte.objects.filter(ordem=ordem, status='sucesso').first()
+    if registro_existente:
+        return {
+            'enviado': False,
+            'ja_transferida': True,
+            'registro_id': registro_existente.id,
+            'status': registro_existente.status,
+            'transferido_em': localtime(registro_existente.transferido_em).strftime('%d/%m/%Y %H:%M') if registro_existente.transferido_em else '',
+            'chave_transferencia': registro_existente.chave_transferencia,
+        }
+
+    propriedade = getattr(ordem, 'propriedade', None)
+    pessoa = "luan araujo soares"
+    deposito_origem = "Almox Central"
+    deposito_destino = "Almox Corte e Estamparia"
+
+    if not dados_chapa or not dados_chapa.get('encontrou_chapa'):
+        registro, _ = TransferenciaChapaCorte.objects.update_or_create(
+            ordem=ordem,
+            defaults={
+                'descricao_chapa': propriedade.descricao_mp if propriedade else None,
+                'espessura_planilha': dados_chapa.get('espessura_planilha') if dados_chapa else None,
+                'codigo_chapa': None,
+                'quantidade_chapas': 0,
+                'peso_total': 0,
+                'deposito_origem': deposito_origem,
+                'deposito_destino': deposito_destino,
+                'pessoa': pessoa,
+                'payload': None,
+                'resposta_api': None,
+                'chave_transferencia': None,
+                'status': 'ignorada',
+                'erro': 'Chapa nao encontrada no cadastro.',
+                'transferido_em': None,
+            },
+        )
+        return {
+            'enviado': False,
+            'registro_id': registro.id,
+            'status': registro.status,
+            'erro': 'Chapa nao encontrada no cadastro.',
+        }
+    if not dados_chapa.get('codigo'):
+        registro, _ = TransferenciaChapaCorte.objects.update_or_create(
+            ordem=ordem,
+            defaults={
+                'descricao_chapa': propriedade.descricao_mp if propriedade else None,
+                'espessura_planilha': dados_chapa.get('espessura_planilha'),
+                'espessura_mm': dados_chapa.get('espessura_mm'),
+                'codigo_chapa': None,
+                'quantidade_chapas': dados_chapa.get('quantidade_chapas') or 0,
+                'peso_total': dados_chapa.get('peso_total') or 0,
+                'deposito_origem': deposito_origem,
+                'deposito_destino': deposito_destino,
+                'pessoa': pessoa,
+                'payload': None,
+                'resposta_api': None,
+                'chave_transferencia': None,
+                'status': 'ignorada',
+                'erro': 'Chapa cadastrada sem codigo.',
+                'transferido_em': None,
+            },
+        )
+        return {
+            'enviado': False,
+            'registro_id': registro.id,
+            'status': registro.status,
+            'erro': 'Chapa cadastrada sem codigo.',
+        }
+
+    identificacao_ordem = ordem.ordem or ordem.ordem_duplicada or ordem.id
+    payload = [
+        {
+            "id": f"corte-chapa-{ordem.id}",
+            "pessoa": pessoa,
+            "recurso": str(dados_chapa['codigo']),
+            "quantidade": dados_chapa['peso_total'],
+            "depositoOrigem": deposito_origem,
+            "depositoDestino": deposito_destino,
+        }
+    ]
+
+    registro, _ = TransferenciaChapaCorte.objects.update_or_create(
+        ordem=ordem,
+        defaults={
+            'descricao_chapa': propriedade.descricao_mp if propriedade else None,
+            'espessura_planilha': dados_chapa.get('espessura_planilha'),
+            'espessura_mm': dados_chapa.get('espessura_mm'),
+            'codigo_chapa': str(dados_chapa['codigo']),
+            'quantidade_chapas': dados_chapa.get('quantidade_chapas') or 0,
+            'peso_total': dados_chapa.get('peso_total') or 0,
+            'deposito_origem': deposito_origem,
+            'deposito_destino': deposito_destino,
+            'pessoa': pessoa,
+            'payload': payload,
+            'resposta_api': None,
+            'chave_transferencia': None,
+            'status': 'pendente',
+            'erro': None,
+            'transferido_em': None,
+        },
+    )
+
+    if os.getenv("DJANGO_ENV") == "dev":
+        url = "https://hcemag.innovaro.com.br/api/integracao/v1/producao/transferir"
+    else:
+        url = "https://cemag.innovaro.com.br/api/integracao/v1/producao/transferir"
+
+    print(f"[CHAPAS_CORTE][INNOVARO] ordem={identificacao_ordem} payload={payload}")
+    print(f"[CHAPAS_CORTE][INNOVARO] URL: {url}")
+
+    try:
+        response = requests.post(
+            url,
+            json=payload,
+            auth=("luan araujo", "luanaraujo7"),
+            timeout=(10, 60),
+        )
+    except requests.RequestException as exc:
+        erro = f"Erro de conexao com o Innovaro: {exc}"
+        print(f"[CHAPAS_CORTE][INNOVARO] {erro}")
+        registro.status = 'erro'
+        registro.erro = erro
+        registro.payload = payload
+        registro.save(update_fields=['status', 'erro', 'payload', 'atualizado_em'])
+        return {
+            'enviado': False,
+            'registro_id': registro.id,
+            'status': registro.status,
+            'erro': erro,
+            'payload': payload,
+        }
+
+    print(f"[CHAPAS_CORTE][INNOVARO] status: {response.status_code}")
+    print(f"[CHAPAS_CORTE][INNOVARO] resposta: {response.text}")
+
+    try:
+        resp_json = response.json()
+    except ValueError:
+        resp_json = {}
+
+    resp_item = resp_json[0] if isinstance(resp_json, list) and resp_json else resp_json
+    resp_status = resp_item.get("status") if isinstance(resp_item, dict) else None
+    if not response.ok or resp_status == "Error":
+        erro = resp_item.get("description") if isinstance(resp_item, dict) else None
+        erro = erro or response.text or "Erro desconhecido no Innovaro."
+        registro.status = 'erro'
+        registro.erro = erro
+        registro.resposta_api = resp_json or response.text
+        registro.save(update_fields=['status', 'erro', 'resposta_api', 'atualizado_em'])
+        return {
+            'enviado': False,
+            'registro_id': registro.id,
+            'status': registro.status,
+            'erro': erro,
+            'payload': payload,
+            'status_code': response.status_code,
+        }
+
+    chave_transferencia = resp_item.get("chaveTransferencia") if isinstance(resp_item, dict) else None
+    registro.status = 'sucesso'
+    registro.erro = None
+    registro.resposta_api = resp_json
+    registro.chave_transferencia = chave_transferencia
+    registro.transferido_em = now()
+    registro.save(update_fields=[
+        'status',
+        'erro',
+        'resposta_api',
+        'chave_transferencia',
+        'transferido_em',
+        'atualizado_em',
+    ])
+
+    return {
+        'enviado': True,
+        'registro_id': registro.id,
+        'status': registro.status,
+        'payload': payload,
+        'status_code': response.status_code,
+        'resposta': resp_json,
+        'chave_transferencia': chave_transferencia,
+        'transferido_em': localtime(registro.transferido_em).strftime('%d/%m/%Y %H:%M') if registro.transferido_em else '',
+    }
+
+def _registrar_transferencia_chapa_corte_manual(ordem, dados_chapa, user):
+    registro_existente = TransferenciaChapaCorte.objects.filter(ordem=ordem, status='sucesso').first()
+    if registro_existente:
+        return {
+            'enviado': False,
+            'manual': True,
+            'ja_transferida': True,
+            'registro_id': registro_existente.id,
+            'status': registro_existente.status,
+            'transferido_em': localtime(registro_existente.transferido_em).strftime('%d/%m/%Y %H:%M') if registro_existente.transferido_em else '',
+            'chave_transferencia': registro_existente.chave_transferencia,
+        }
+
+    propriedade = getattr(ordem, 'propriedade', None)
+    pessoa = "luan araujo soares"
+    deposito_origem = "Almox Central"
+    deposito_destino = "Almox Corte e Estamparia"
+
+    if not dados_chapa or not dados_chapa.get('encontrou_chapa') or not dados_chapa.get('codigo'):
+        return {
+            'enviado': False,
+            'manual': True,
+            'erro': 'Nao foi possivel registrar manualmente: chapa nao encontrada ou sem codigo.',
+        }
+
+    payload = [
+        {
+            "id": f"corte-chapa-{ordem.id}",
+            "pessoa": pessoa,
+            "recurso": str(dados_chapa['codigo']),
+            "quantidade": dados_chapa['peso_total'],
+            "depositoOrigem": deposito_origem,
+            "depositoDestino": deposito_destino,
+            "tipo": "manual",
+            "usuario": getattr(user, 'username', '') or '',
+        }
+    ]
+
+    registro, _ = TransferenciaChapaCorte.objects.update_or_create(
+        ordem=ordem,
+        defaults={
+            'descricao_chapa': propriedade.descricao_mp if propriedade else None,
+            'espessura_planilha': dados_chapa.get('espessura_planilha'),
+            'espessura_mm': dados_chapa.get('espessura_mm'),
+            'codigo_chapa': str(dados_chapa['codigo']),
+            'quantidade_chapas': dados_chapa.get('quantidade_chapas') or 0,
+            'peso_total': dados_chapa.get('peso_total') or 0,
+            'deposito_origem': deposito_origem,
+            'deposito_destino': deposito_destino,
+            'pessoa': pessoa,
+            'payload': payload,
+            'resposta_api': {'tipo': 'manual', 'usuario': getattr(user, 'username', '') or ''},
+            'chave_transferencia': 'MANUAL',
+            'status': 'sucesso',
+            'erro': None,
+            'transferido_em': now(),
+        },
+    )
+
+    return {
+        'enviado': False,
+        'manual': True,
+        'registro_id': registro.id,
+        'status': registro.status,
+        'payload': payload,
+        'chave_transferencia': registro.chave_transferencia,
+        'transferido_em': localtime(registro.transferido_em).strftime('%d/%m/%Y %H:%M') if registro.transferido_em else '',
+    }
+
+def _apontar_itens_corte_via_api_bloco(itens, user):
+    itens_validos = []
+    erros = []
+
+    for item in itens:
+        if item.apontado:
+            continue
+
+        transferencia = (
+            TransferenciaChapaCorte.objects
+            .filter(ordem_id=item.ordem_id, status='sucesso')
+            .order_by('-transferido_em', '-id')
+            .first()
+        )
+        if not transferencia:
+            erros.append({'id': item.id, 'erro': 'Transfira a chapa antes de apontar este item.'})
+            continue
+
+        if (item.qtd_morta or 0) > 0:
+            msg_qtd_morta = (
+                'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
+                'A funcionalidade de desvio precisa ser ajustada na API.'
+            )
+            item.erro_apontamento = msg_qtd_morta
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            erros.append({'id': item.id, 'erro': msg_qtd_morta})
+            continue
+
+        itens_validos.append(item)
+
+    if not itens_validos:
+        return {
+            'enviado': False,
+            'sucessos': [],
+            'erros': erros,
+            'message': 'Nenhum item valido para apontar.',
+        }
+
+    payload_integracao = [
+        {
+            "id": f"corte-item-{item.id}",
+            "data": localtime(now()).strftime('%d/%m/%Y'),
+            "pessoa": "4357",
+            "recurso": _extrair_codigo_peca_corte(item.peca),
+            "processo": "S C Plasma",
+            "produzido": item.qtd_boa,
+            "observacao": str(item.ordem_id),
+        }
+        for item in itens_validos
+    ]
+    print(
+        "[CORTE][INNOVARO][APONTAMENTO_AUTO][BODY]",
+        json.dumps(payload_integracao, ensure_ascii=False, indent=2),
+    )
+
+    try:
+        url = (
+            "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar"
+            if os.getenv("DJANGO_ENV") == "dev"
+            else "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar"
+        )
+        response_integracao = requests.post(
+            url,
+            json=payload_integracao,
+            auth=("luan araujo", "luanaraujo7"),
+            timeout=(10, 60),
+        )
+    except requests.RequestException as exc:
+        erro = f'Falha de comunicacao com API ERP: {exc}'
+        for item in itens_validos:
+            item.erro_apontamento = erro
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+        return {
+            'enviado': False,
+            'sucessos': [],
+            'erros': erros + [{'erro': erro}],
+            'payload_enviado': payload_integracao,
+        }
+
+    try:
+        resposta_api_json = response_integracao.json()
+    except ValueError:
+        resposta_api_json = None
+
+    if not response_integracao.ok:
+        retorno_texto = response_integracao.text[:500] if response_integracao.text else 'Sem detalhes'
+        for item in itens_validos:
+            item.erro_apontamento = retorno_texto
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+        return {
+            'enviado': False,
+            'sucessos': [],
+            'erros': erros + [{'erro': retorno_texto}],
+            'payload_enviado': payload_integracao,
+            'retorno_api': resposta_api_json or retorno_texto,
+            'status_code': response_integracao.status_code,
+        }
+
+    respostas = resposta_api_json if isinstance(resposta_api_json, list) else [resposta_api_json]
+    sucessos = []
+
+    for index, item in enumerate(itens_validos):
+        retorno_item = respostas[index] if index < len(respostas) else resposta_api_json
+        if isinstance(retorno_item, dict) and str(retorno_item.get('status') or '').lower() == 'error':
+            descricao_erro = str(retorno_item.get('description') or 'Erro retornado pela API ERP.')
+            item.erro_apontamento = descricao_erro
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            erros.append({'id': item.id, 'erro': descricao_erro, 'retorno_api': retorno_item})
+            continue
+
+        item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+            retorno_item if isinstance(retorno_item, dict) else {},
+            payload_integracao[index],
+        )
+        item.erro_apontamento = aviso_chave
+        item.apontado = True
+        item.tipo_apontamento = 'api'
+        item.resp_apontamento = user
+        item.data_apontamento = now()
+        item.save(update_fields=[
+            'apontado',
+            'tipo_apontamento',
+            'resp_apontamento',
+            'data_apontamento',
+            'chave_apontamento',
+            'erro_apontamento',
+        ])
+        sucessos.append({'id': item.id, 'chave_apontamento': item.chave_apontamento})
+
+    return {
+        'enviado': True,
+        'sucessos': sucessos,
+        'erros': erros,
+        'payload_enviado': payload_integracao,
+        'retorno_api': resposta_api_json,
+        'status_code': response_integracao.status_code,
+    }
 
 def extrair_numeracao(nome_arquivo):
     match = re.search(r"(?i)OP\s*(\d+)", nome_arquivo)  # Permite espaços opcionais entre OP e o número
@@ -305,6 +822,8 @@ def atualizar_status_ordem(request):
                     propriedade_atual = ordem.propriedade
                     quantidade_chapas_original = propriedade_atual.quantidade if propriedade_atual else 0
                     tipo_chapa_original = propriedade_atual.tipo_chapa if propriedade_atual else None
+                    peso_chapas = None
+                    transferencia_chapa = None
 
                     # Verifica se a quantidade de chapas mudaram
                     if int(qtd_chapas) != ordem.propriedade.quantidade:
@@ -313,6 +832,8 @@ def atualizar_status_ordem(request):
                     if tipo_chapa is not None and tipo_chapa != ordem.propriedade.tipo_chapa:
                         ordem.propriedade.tipo_chapa = tipo_chapa
                         ordem.propriedade.save()
+
+                    peso_chapas = _calcular_peso_chapas_corte(ordem.propriedade, qtd_chapas)
 
                     pecas_restantes = []
                     for peca in pecas_geral:
@@ -388,6 +909,34 @@ def atualizar_status_ordem(request):
                     ordem.status_prioridade = 2
 
                 ordem.save()
+                if status == 'finalizada':
+                    try:
+                        if peso_chapas and peso_chapas.get('encontrou_chapa') and peso_chapas.get('codigo'):
+                            transferencia_chapa = _chamar_innovaro_transferir_chapa_corte(ordem, peso_chapas)
+                        else:
+                            transferencia_chapa = {
+                                'enviado': False,
+                                'status': 'ignorada',
+                                'erro': 'Chapa nao encontrada ou sem codigo.',
+                            }
+                    except Exception as exc:
+                        transferencia_chapa = {
+                            'enviado': False,
+                            'status': 'erro',
+                            'erro': str(exc),
+                        }
+
+                    try:
+                        apontamento_erp = _apontar_itens_corte_via_api_bloco(
+                            list(PecasOrdem.objects.filter(ordem=ordem, qtd_boa__gt=0).order_by('id')),
+                            request.user,
+                        )
+                    except Exception as exc:
+                        apontamento_erp = {
+                            'enviado': False,
+                            'erros': [{'erro': str(exc)}],
+                        }
+
                 notificar_ordem(ordem)
 
                 response_payload = {
@@ -400,6 +949,12 @@ def atualizar_status_ordem(request):
                 if status == 'finalizada' and 'nova_ordem' in locals() and nova_ordem:
                     response_payload['nova_ordem_id'] = nova_ordem.id
                     response_payload['nova_ordem_numero'] = nova_ordem.ordem or nova_ordem.ordem_duplicada
+                if status == 'finalizada' and 'peso_chapas' in locals() and peso_chapas:
+                    response_payload['peso_chapas'] = peso_chapas
+                if status == 'finalizada' and 'transferencia_chapa' in locals() and transferencia_chapa:
+                    response_payload['transferencia_chapa'] = transferencia_chapa
+                if status == 'finalizada' and 'apontamento_erp' in locals() and apontamento_erp:
+                    response_payload['apontamento_erp'] = apontamento_erp
 
                 return JsonResponse(response_payload)
 
@@ -1179,6 +1734,629 @@ def api_ordens_criadas(request):
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     return JsonResponse(results, safe=False)
+
+
+@login_required
+def erp_apontamentos_corte(request):
+    return render(request, "apontamento_corte/erp_apontamentos_corte.html")
+
+
+@login_required
+@require_GET
+def api_erp_apontamentos_corte(request):
+    page = max(int(request.GET.get('page', 1) or 1), 1)
+    limit = int(request.GET.get('limit', 50) or 50)
+    limit = min(max(limit, 10), 200)
+
+    filtros = {
+        'ordem': request.GET.get('ordem', '').strip(),
+        'peca': request.GET.get('peca', '').strip(),
+        'chapa': request.GET.get('chapa', '').strip(),
+        'data_producao_inicio': request.GET.get('data_producao_inicio', '').strip(),
+        'data_producao_fim': request.GET.get('data_producao_fim', '').strip(),
+        'apontado': request.GET.get('apontado', 'nao').strip().lower(),
+    }
+
+    queryset = (
+        PecasOrdem.objects
+        .filter(
+            qtd_boa__gt=0,
+            ordem__status_atual='finalizada',
+            ordem__grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3'],
+        )
+        .select_related('ordem', 'ordem__maquina', 'ordem__operador_final', 'ordem__propriedade', 'resp_apontamento')
+        .prefetch_related('ordem__transferencias_chapa_corte')
+        .order_by('-ordem__ultima_atualizacao', '-id')
+    )
+
+    if filtros['ordem']:
+        queryset = queryset.filter(
+            Q(ordem__ordem__icontains=filtros['ordem']) |
+            Q(ordem__ordem_duplicada__icontains=filtros['ordem'])
+        )
+
+    if filtros['peca']:
+        queryset = queryset.filter(peca__icontains=filtros['peca'])
+
+    if filtros['chapa']:
+        queryset = queryset.filter(
+            Q(ordem__propriedade__descricao_mp__icontains=filtros['chapa']) |
+            Q(ordem__propriedade__espessura__icontains=filtros['chapa'])
+        )
+
+    data_producao_inicio = parse_date(filtros['data_producao_inicio']) if filtros['data_producao_inicio'] else None
+    data_producao_fim = parse_date(filtros['data_producao_fim']) if filtros['data_producao_fim'] else None
+
+    if data_producao_inicio:
+        queryset = queryset.filter(ordem__ultima_atualizacao__date__gte=data_producao_inicio)
+    if data_producao_fim:
+        queryset = queryset.filter(ordem__ultima_atualizacao__date__lte=data_producao_fim)
+
+    if filtros['apontado'] == 'sim':
+        queryset = queryset.filter(
+            Q(apontado=True) |
+            Q(data_apontamento__isnull=False) |
+            Q(chave_apontamento__isnull=False)
+        ).exclude(chave_apontamento='')
+    elif filtros['apontado'] == 'nao':
+        queryset = queryset.filter(apontado=False, data_apontamento__isnull=True).filter(
+            Q(chave_apontamento__isnull=True) | Q(chave_apontamento='')
+        )
+
+    paginator = Paginator(queryset, limit)
+    pagina = paginator.get_page(page)
+
+    itens = []
+    for item in pagina.object_list:
+        ordem = item.ordem
+        propriedade = getattr(ordem, 'propriedade', None)
+        dados_chapa = _calcular_peso_chapas_corte(propriedade, propriedade.quantidade if propriedade else None)
+        operador = ordem.operador_final
+        ordem_display = ordem.ordem or ordem.ordem_duplicada or ''
+        transferencia = next(iter(ordem.transferencias_chapa_corte.all()), None)
+
+        itens.append({
+            'id': item.id,
+            'ordem_id': item.ordem_id,
+            'ordem': ordem_display,
+            'peca': item.peca,
+            'qtd_boa': item.qtd_boa,
+            'qtd_morta': item.qtd_morta,
+            'qtd_planejada': item.qtd_planejada,
+            'maquina': ordem.maquina.nome if ordem.maquina else '',
+            'operador': f"{operador.matricula} - {operador.nome}" if operador else '',
+            'obs_operador': ordem.obs_operador or '',
+            'descricao_chapa': propriedade.descricao_mp if propriedade else '',
+            'espessura_planilha': dados_chapa.get('espessura_planilha', '') if dados_chapa else '',
+            'codigo_chapa': dados_chapa.get('codigo', '') if dados_chapa and dados_chapa.get('encontrou_chapa') else '',
+            'espessura_mm': dados_chapa.get('espessura_mm', '') if dados_chapa and dados_chapa.get('encontrou_chapa') else '',
+            'quantidade_chapas': dados_chapa.get('quantidade_chapas', propriedade.quantidade if propriedade else '') if dados_chapa else '',
+            'peso_total': dados_chapa.get('peso_total', '') if dados_chapa and dados_chapa.get('encontrou_chapa') else '',
+            'chapa_encontrada': bool(dados_chapa and dados_chapa.get('encontrou_chapa')),
+            'transferencia_status': transferencia.status if transferencia else '',
+            'transferido_em': localtime(transferencia.transferido_em).strftime('%d/%m/%Y %H:%M') if transferencia and transferencia.transferido_em else '',
+            'chave_transferencia': transferencia.chave_transferencia if transferencia else '',
+            'transferencia_erro': transferencia.erro if transferencia else '',
+            'transferencia_registro_id': transferencia.id if transferencia else None,
+            'apontado': item.apontado,
+            'tipo_apontamento': item.tipo_apontamento or '',
+            'chave_apontamento': item.chave_apontamento or '',
+            'erro_apontamento': item.erro_apontamento or '',
+            'resp_apontamento': (item.resp_apontamento.get_full_name() or item.resp_apontamento.username) if item.resp_apontamento else '',
+            'data_apontamento': localtime(item.data_apontamento).strftime('%d/%m/%Y %H:%M') if item.data_apontamento else '',
+            'data_producao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M') if ordem.ultima_atualizacao else '',
+        })
+
+    return JsonResponse({
+        'results': itens,
+        'pagination': {
+            'page': pagina.number,
+            'page_size': limit,
+            'total_items': paginator.count,
+            'total_pages': paginator.num_pages,
+            'has_next': pagina.has_next(),
+            'has_previous': pagina.has_previous(),
+        }
+    })
+
+
+@login_required
+@require_POST
+def api_erp_transferir_chapa_corte(request, pk):
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        body = {}
+
+    tipo_apontamento = (body.get('tipo_apontamento') or 'api').strip().lower()
+    if tipo_apontamento not in ('manual', 'api'):
+        return JsonResponse({'status': 'error', 'message': 'tipo_apontamento invalido.'}, status=400)
+
+    item = get_object_or_404(
+        PecasOrdem.objects.select_related('ordem', 'ordem__propriedade'),
+        pk=pk,
+        ordem__status_atual='finalizada',
+        ordem__grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3'],
+    )
+    ordem = item.ordem
+    propriedade = getattr(ordem, 'propriedade', None)
+    if not propriedade:
+        return JsonResponse({'status': 'error', 'message': 'Propriedades da ordem nao encontradas.'}, status=404)
+
+    dados_chapa = _calcular_peso_chapas_corte(propriedade, propriedade.quantidade)
+    if not dados_chapa or not dados_chapa.get('encontrou_chapa') or not dados_chapa.get('codigo'):
+        transferencia = _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa)
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': transferencia.get('erro') or 'Chapa nao encontrada ou sem codigo.',
+                'transferencia': transferencia,
+            },
+            status=422,
+        )
+
+    if tipo_apontamento == 'manual':
+        transferencia = _registrar_transferencia_chapa_corte_manual(ordem, dados_chapa, request.user)
+    else:
+        transferencia = _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa)
+
+    if transferencia.get('erro'):
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': transferencia.get('erro'),
+                'transferencia': transferencia,
+            },
+            status=502 if tipo_apontamento == 'api' else 422,
+        )
+
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Transferencia registrada com sucesso.',
+        'transferencia': transferencia,
+    })
+
+
+@login_required
+@require_POST
+def api_erp_apontar_item_corte(request, pk):
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        body = {}
+
+    tipo_apontamento = (body.get('tipo_apontamento') or 'manual').strip().lower()
+    if tipo_apontamento not in ('manual', 'api'):
+        return JsonResponse({'status': 'error', 'message': 'tipo_apontamento invalido.'}, status=400)
+
+    item = get_object_or_404(
+        PecasOrdem.objects.select_related('ordem', 'resp_apontamento'),
+        pk=pk,
+        ordem__status_atual='finalizada',
+        ordem__grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3'],
+    )
+
+    transferencia = (
+        TransferenciaChapaCorte.objects
+        .filter(ordem_id=item.ordem_id, status='sucesso')
+        .order_by('-transferido_em', '-id')
+        .first()
+    )
+    if not transferencia:
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': 'Transfira a chapa antes de apontar este item.',
+            },
+            status=409
+        )
+
+    if item.apontado:
+        resp_ref = getattr(item, 'resp_apontamento', None)
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': 'Este item ja foi apontado e nao pode ser apontado novamente.',
+                'already_apontado': True,
+                'detalhes': {
+                    'item_id': item.id,
+                    'ordem_id': item.ordem_id,
+                    'tipo_apontamento': item.tipo_apontamento or '',
+                    'data_apontamento': localtime(item.data_apontamento).strftime('%d/%m/%Y %H:%M') if item.data_apontamento else '',
+                    'resp_apontamento': (resp_ref.get_full_name() or resp_ref.username) if resp_ref else '',
+                    'chave_apontamento': item.chave_apontamento or '',
+                },
+            },
+            status=409
+        )
+
+    if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
+        msg_qtd_morta = (
+            'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
+            'A funcionalidade de desvio precisa ser ajustada na API.'
+        )
+        item.erro_apontamento = msg_qtd_morta
+        item.tipo_apontamento = 'api'
+        item.resp_apontamento = request.user
+        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': 'Apontamento via API bloqueado para item com qtd_morta.',
+                'description': msg_qtd_morta,
+            },
+            status=422
+        )
+
+    payload_integracao = None
+    if tipo_apontamento == 'api':
+        payload_integracao = {
+            "id": f"corte-item-{item.id}",
+            "data": localtime(now()).strftime('%d/%m/%Y'),
+            "pessoa": "4357",
+            "recurso": _extrair_codigo_peca_corte(item.peca),
+            "processo": "S C Plasma",
+            "produzido": item.qtd_boa,
+            "observacao": str(item.ordem_id),
+        }
+        print(
+            "[CORTE][INNOVARO][APONTAMENTO][BODY]",
+            json.dumps(payload_integracao, ensure_ascii=False, indent=2),
+        )
+
+        try:
+            url = (
+                "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar"
+                if os.getenv("DJANGO_ENV") == "dev"
+                else "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar"
+            )
+            response_integracao = requests.post(
+                url,
+                json=payload_integracao,
+                auth=("luan araujo", "luanaraujo7"),
+                timeout=(10, 60),
+            )
+        except requests.RequestException as exc:
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': f'Falha de comunicacao com API ERP: {exc}',
+                    'payload_enviado': payload_integracao,
+                },
+                status=502
+            )
+
+        try:
+            resposta_api_json = response_integracao.json()
+        except ValueError:
+            resposta_api_json = None
+
+        if not response_integracao.ok:
+            descricao_erro = ''
+            if isinstance(resposta_api_json, dict):
+                descricao_erro = str(resposta_api_json.get('description') or '')
+
+            try:
+                retorno_texto = response_integracao.text[:500]
+            except Exception:
+                retorno_texto = 'Sem detalhes'
+
+            item.erro_apontamento = descricao_erro or retorno_texto
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = request.user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': f'API ERP retornou status {response_integracao.status_code}.',
+                    'payload_enviado': payload_integracao,
+                    'description': descricao_erro,
+                    'retorno_api': retorno_texto,
+                },
+                status=502
+            )
+
+        if isinstance(resposta_api_json, dict):
+            status_erp = str(resposta_api_json.get('status') or '').strip()
+            if status_erp.lower() == 'error':
+                descricao_erro = str(resposta_api_json.get('description') or 'Erro retornado pela API ERP.')
+                item.erro_apontamento = descricao_erro
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = request.user
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return JsonResponse(
+                    {
+                        'status': 'error',
+                        'message': 'API ERP retornou erro de negocio.',
+                        'description': descricao_erro,
+                        'payload_enviado': payload_integracao,
+                        'retorno_api': resposta_api_json,
+                    },
+                    status=422
+                )
+
+            if status_erp.lower() == 'success':
+                item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+                    resposta_api_json,
+                    payload_integracao,
+                )
+                item.erro_apontamento = aviso_chave
+            else:
+                item.erro_apontamento = str(resposta_api_json)
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = request.user
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return JsonResponse(
+                    {
+                        'status': 'error',
+                        'message': 'Resposta da API ERP em formato inesperado.',
+                        'payload_enviado': payload_integracao,
+                        'retorno_api': resposta_api_json,
+                    },
+                    status=502
+                )
+        else:
+            item.erro_apontamento = (response_integracao.text or '')[:2000]
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = request.user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': 'API ERP nao retornou JSON valido.',
+                    'payload_enviado': payload_integracao,
+                    'retorno_api': item.erro_apontamento,
+                },
+                status=502
+            )
+
+    item.apontado = True
+    item.tipo_apontamento = tipo_apontamento
+    item.resp_apontamento = request.user
+    item.data_apontamento = now()
+    if tipo_apontamento == 'manual':
+        item.chave_apontamento = f"MANUAL-CORTE-ITEM-{item.id}"
+        item.erro_apontamento = None
+    item.save(update_fields=[
+        'apontado',
+        'tipo_apontamento',
+        'resp_apontamento',
+        'data_apontamento',
+        'chave_apontamento',
+        'erro_apontamento',
+    ])
+
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Apontamento registrado com sucesso.',
+        'tipo_apontamento': tipo_apontamento,
+        'chave_apontamento': item.chave_apontamento or '',
+        'data_apontamento': localtime(item.data_apontamento).strftime('%d/%m/%Y %H:%M') if item.data_apontamento else '',
+        'payload_enviado': payload_integracao,
+    })
+
+
+@login_required
+@require_POST
+def api_erp_apontar_itens_corte_bloco(request):
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        body = {}
+
+    tipo_apontamento = (body.get('tipo_apontamento') or 'manual').strip().lower()
+    if tipo_apontamento not in ('manual', 'api'):
+        return JsonResponse({'status': 'error', 'message': 'tipo_apontamento invalido.'}, status=400)
+
+    ids = body.get('ids') or []
+    if not isinstance(ids, list):
+        return JsonResponse({'status': 'error', 'message': 'ids deve ser uma lista.'}, status=400)
+
+    ids = [int(item_id) for item_id in ids if str(item_id).isdigit()]
+    if not ids:
+        return JsonResponse({'status': 'error', 'message': 'Selecione ao menos um item.'}, status=400)
+
+    itens = list(
+        PecasOrdem.objects
+        .select_related('ordem', 'resp_apontamento')
+        .filter(
+            pk__in=ids,
+            ordem__status_atual='finalizada',
+            ordem__grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3'],
+        )
+        .order_by('id')
+    )
+
+    itens_por_id = {item.id: item for item in itens}
+    erros = []
+    itens_validos = []
+
+    for item_id in ids:
+        item = itens_por_id.get(item_id)
+        if not item:
+            erros.append({'id': item_id, 'erro': 'Item nao encontrado.'})
+            continue
+
+        if item.apontado:
+            erros.append({'id': item.id, 'erro': 'Item ja apontado.'})
+            continue
+
+        transferencia = (
+            TransferenciaChapaCorte.objects
+            .filter(ordem_id=item.ordem_id, status='sucesso')
+            .order_by('-transferido_em', '-id')
+            .first()
+        )
+        if not transferencia:
+            erros.append({'id': item.id, 'erro': 'Transfira a chapa antes de apontar este item.'})
+            continue
+
+        if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
+            msg_qtd_morta = (
+                'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
+                'A funcionalidade de desvio precisa ser ajustada na API.'
+            )
+            item.erro_apontamento = msg_qtd_morta
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = request.user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            erros.append({'id': item.id, 'erro': msg_qtd_morta})
+            continue
+
+        itens_validos.append(item)
+
+    if not itens_validos:
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': 'Nenhum item valido para apontar.',
+                'erros': erros,
+            },
+            status=422
+        )
+
+    if tipo_apontamento == 'manual':
+        sucessos = []
+        for item in itens_validos:
+            item.apontado = True
+            item.tipo_apontamento = 'manual'
+            item.resp_apontamento = request.user
+            item.data_apontamento = now()
+            item.chave_apontamento = f"MANUAL-CORTE-ITEM-{item.id}"
+            item.erro_apontamento = None
+            item.save(update_fields=[
+                'apontado',
+                'tipo_apontamento',
+                'resp_apontamento',
+                'data_apontamento',
+                'chave_apontamento',
+                'erro_apontamento',
+            ])
+            sucessos.append({
+                'id': item.id,
+                'chave_apontamento': item.chave_apontamento,
+            })
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Apontamento manual em bloco registrado com sucesso.',
+            'tipo_apontamento': tipo_apontamento,
+            'sucessos': sucessos,
+            'erros': erros,
+        })
+
+    payload_integracao = [
+        {
+            "id": f"corte-item-{item.id}",
+            "data": localtime(now()).strftime('%d/%m/%Y'),
+            "pessoa": "4357",
+            "recurso": _extrair_codigo_peca_corte(item.peca),
+            "processo": "S C Plasma",
+            "produzido": item.qtd_boa,
+            "observacao": str(item.ordem_id),
+        }
+        for item in itens_validos
+    ]
+    print(
+        "[CORTE][INNOVARO][APONTAMENTO_BLOCO][BODY]",
+        json.dumps(payload_integracao, ensure_ascii=False, indent=2),
+    )
+
+    try:
+        url = (
+            "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar"
+            if os.getenv("DJANGO_ENV") == "dev"
+            else "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar"
+        )
+        response_integracao = requests.post(
+            url,
+            json=payload_integracao,
+            auth=("luan araujo", "luanaraujo7"),
+            timeout=(10, 60),
+        )
+    except requests.RequestException as exc:
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': f'Falha de comunicacao com API ERP: {exc}',
+                'payload_enviado': payload_integracao,
+                'erros': erros,
+            },
+            status=502
+        )
+
+    try:
+        resposta_api_json = response_integracao.json()
+    except ValueError:
+        resposta_api_json = None
+
+    if not response_integracao.ok:
+        retorno_texto = response_integracao.text[:500] if response_integracao.text else 'Sem detalhes'
+        for item in itens_validos:
+            item.erro_apontamento = retorno_texto
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = request.user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+
+        return JsonResponse(
+            {
+                'status': 'error',
+                'message': f'API ERP retornou status {response_integracao.status_code}.',
+                'payload_enviado': payload_integracao,
+                'retorno_api': retorno_texto,
+                'erros': erros,
+            },
+            status=502
+        )
+
+    respostas = resposta_api_json if isinstance(resposta_api_json, list) else [resposta_api_json]
+    sucessos = []
+    erro_negocio = False
+
+    for index, item in enumerate(itens_validos):
+        retorno_item = respostas[index] if index < len(respostas) else resposta_api_json
+        if isinstance(retorno_item, dict) and str(retorno_item.get('status') or '').lower() == 'error':
+            descricao_erro = str(retorno_item.get('description') or 'Erro retornado pela API ERP.')
+            item.erro_apontamento = descricao_erro
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = request.user
+            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+            erros.append({'id': item.id, 'erro': descricao_erro, 'retorno_api': retorno_item})
+            erro_negocio = True
+            continue
+
+        item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+            retorno_item if isinstance(retorno_item, dict) else {},
+            payload_integracao[index],
+        )
+        item.erro_apontamento = aviso_chave
+        item.apontado = True
+        item.tipo_apontamento = 'api'
+        item.resp_apontamento = request.user
+        item.data_apontamento = now()
+        item.save(update_fields=[
+            'apontado',
+            'tipo_apontamento',
+            'resp_apontamento',
+            'data_apontamento',
+            'chave_apontamento',
+            'erro_apontamento',
+        ])
+        sucessos.append({
+            'id': item.id,
+            'chave_apontamento': item.chave_apontamento,
+        })
+
+    return JsonResponse({
+        'status': 'success' if sucessos else 'error',
+        'message': 'Apontamento em bloco enviado para o ERP.' if sucessos else 'Nenhum item foi apontado.',
+        'tipo_apontamento': tipo_apontamento,
+        'sucessos': sucessos,
+        'erros': erros,
+        'payload_enviado': payload_integracao,
+        'retorno_api': resposta_api_json,
+    }, status=207 if erro_negocio and sucessos else (422 if not sucessos else 200))
 
 def excluir_ordem(request):
     """

@@ -10,11 +10,12 @@ from django.db.models import Prefetch, Count, Q
 from django.views.decorators.csrf import csrf_exempt
 
 from .forms import UploadCSVForm
-from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas, ItensExplodidos, CarretasExplodidas
+from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas, ItensExplodidos, CarretasExplodidas, EspessuraChapa
 from . import views
 
 import csv
 import json
+from decimal import Decimal, InvalidOperation
 
 def crud(request):
 
@@ -905,6 +906,137 @@ def cadastro_itens_explodidos(request):
 @login_required
 def cadastro_carretas_explodidas(request):
     return render(request, 'cadastro_carretas_explodidas.html')
+
+
+@login_required
+def chapas_corte(request):
+    return render(request, 'chapas_corte.html')
+
+
+@csrf_exempt
+@login_required
+def chapas_corte_api(request):
+
+    def parse_decimal(value):
+        if value in (None, ''):
+            raise ValueError('Espessura e obrigatoria.')
+        try:
+            return Decimal(str(value).strip().replace(',', '.'))
+        except (InvalidOperation, ValueError):
+            raise ValueError('Espessura invalida.')
+
+    def serialize(obj):
+        return {
+            'id': obj.id,
+            'como_aparece_planilha': obj.como_aparece_planilha,
+            'espessura': str(obj.espessura).replace('.', ',').rstrip('0').rstrip(','),
+            'codigo': obj.codigo or '',
+            'ativo': obj.ativo,
+        }
+
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 50)
+        ativo_param = request.GET.get('ativo', 'true').lower()
+        search = (request.GET.get('search') or '').strip()
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parametros de paginacao invalidos.'}, status=400)
+
+        queryset = EspessuraChapa.objects.all().order_by('espessura', 'como_aparece_planilha')
+
+        if ativo_param == 'false':
+            queryset = queryset.filter(ativo=False)
+        elif ativo_param != 'all':
+            queryset = queryset.filter(ativo=True)
+
+        if search:
+            queryset = queryset.filter(
+                Q(como_aparece_planilha__icontains=search) |
+                Q(codigo__icontains=search)
+            )
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        return JsonResponse({
+            'results': [serialize(item) for item in page_obj.object_list],
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        })
+
+    if request.method in ('POST', 'PATCH'):
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        como_aparece = (data.get('como_aparece_planilha') or '').strip()
+        codigo = (data.get('codigo') or '').strip() or None
+
+        if not como_aparece:
+            return JsonResponse({'error': 'Como aparece na planilha e obrigatorio.'}, status=400)
+
+        try:
+            espessura = parse_decimal(data.get('espessura'))
+        except ValueError as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+
+        if request.method == 'POST':
+            try:
+                item = EspessuraChapa.objects.create(
+                    como_aparece_planilha=como_aparece,
+                    espessura=espessura,
+                    codigo=codigo,
+                )
+            except IntegrityError:
+                return JsonResponse({'error': 'Ja existe uma chapa cadastrada com este texto da planilha.'}, status=400)
+
+            return JsonResponse({'success': 'Chapa de corte criada com sucesso.', 'id': item.id}, status=201)
+
+        item_id = data.get('id')
+        if not item_id:
+            return JsonResponse({'error': 'ID nao informado.'}, status=400)
+
+        item = get_object_or_404(EspessuraChapa, id=item_id)
+        item.como_aparece_planilha = como_aparece
+        item.espessura = espessura
+        item.codigo = codigo
+
+        try:
+            item.save()
+        except IntegrityError:
+            return JsonResponse({'error': 'Ja existe uma chapa cadastrada com este texto da planilha.'}, status=400)
+
+        return JsonResponse({'success': 'Chapa de corte atualizada com sucesso.'})
+
+    if request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        item_id = data.get('id')
+        if not item_id:
+            return JsonResponse({'error': 'ID nao informado.'}, status=400)
+
+        item = get_object_or_404(EspessuraChapa, id=item_id)
+        item.ativo = not item.ativo
+        item.save(update_fields=['ativo'])
+
+        return JsonResponse({
+            'success': f'Chapa de corte {"ativada" if item.ativo else "inativada"} com sucesso.',
+            'ativo': item.ativo,
+        })
+
+    return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
 
 
 @csrf_exempt

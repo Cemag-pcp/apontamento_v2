@@ -65,5 +65,67 @@ Quando é chamada:
 
 
 ================================================================================
+3. TRANSFERENCIA DE PRODUCAO ENTRE DEPOSITOS
+================================================================================
+
+URL Dev/HML  : https://hcemag.innovaro.com.br/api/integracao/v1/producao/transferir
+Metodo       : POST
+Autenticacao : HTTP Basic Auth
+
+Observacao:
+  - A API recebe uma lista JSON.
+  - E possivel enviar mais de uma transacao na mesma chamada.
+  - Cada item da lista representa uma transferencia independente.
+
+Payload enviado (JSON):
+  [
+    {
+      "id"              : "<identificador unico da transacao>",
+      "pessoa"          : "<nome da pessoa responsavel>",
+      "recurso"         : "<codigo do recurso/produto>",
+      "quantidade"      : <quantidade transferida / peso total calculado>,
+      "depositoOrigem"  : "<nome do deposito de origem>",
+      "depositoDestino" : "<nome do deposito de destino>"
+    },
+    ...
+  ]
+
+Exemplo de chamada:
+  [
+    {
+      "id": "transf1",
+      "pessoa": "Fernando Sergio Aquino Ar",
+      "recurso": "313210",
+      "quantidade": 1,
+      "depositoOrigem": "Almox Central",
+      "depositoDestino": "Almox Corte e Estamparia"
+    },
+    {
+      "id": "transf2",
+      "pessoa": "Fernando Sergio Aquino Ar",
+      "recurso": "313210",
+      "quantidade": 1,
+      "depositoOrigem": "Almox Central",
+      "depositoDestino": "Almox Corte e Estamparia"
+    }
+  ]
+
+Resposta esperada: HTTP 200 com confirmacao das transferencias enviadas.
+
+Quando sera chamada:
+  - Para transferir saldo de recursos/produtos entre depositos no Innovaro.
+  - Usar quando houver uma ou mais movimentacoes de transferencia a registrar.
+  - Nas ordens do corte, a transferencia e disparada pelo botao da tela
+    /corte/erp/apontamentos/.
+  - No corte, o campo "quantidade" deve ser o peso total calculado da chapa,
+    nao a quantidade de chapas.
+
+Registro local:
+  - As transferencias de chapas do corte ficam salvas na tabela
+    apontamento_corte_transferenciachapacorte, vinculadas a OP finalizada.
+  - O usuario pode registrar a transferencia via API ou manualmente pela tela.
+
+
+================================================================================
 FIM DO DOCUMENTO
 ================================================================================

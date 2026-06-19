@@ -40,4 +40,8 @@ urlpatterns = [
     path('carretas-explodidas/', views.cadastro_carretas_explodidas, name='cadastro_carretas_explodidas'),
     path('api/carretas-explodidas/', views.cadastro_carretas_explodidas_api, name='cadastro_carretas_explodidas_api'),
 
+    # Chapas de corte
+    path('chapas-corte/', views.chapas_corte, name='chapas_corte'),
+    path('api/chapas-corte/', views.chapas_corte_api, name='chapas_corte_api'),
+
 ]

@@ -85,10 +85,30 @@ class Mp(models.Model):
 class Espessura(models.Model):
 
     nome=models.CharField(max_length=10, unique=True)
+    codigo = models.CharField(max_length=20, blank=True, null=True)
+    como_aparece_planilha = models.CharField(max_length=80, blank=True, null=True)
 
     def __str__(self):
 
+        if self.codigo:
+            return f'{self.nome} - {self.codigo}'
         return self.nome
+
+class EspessuraChapa(models.Model):
+    como_aparece_planilha = models.CharField(max_length=80, unique=True)
+    espessura = models.DecimalField(max_digits=7, decimal_places=3)
+    codigo = models.CharField(max_length=20, blank=True, null=True)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Espessura de chapa'
+        verbose_name_plural = 'Espessuras de chapas'
+        ordering = ['espessura', 'como_aparece_planilha']
+
+    def __str__(self):
+        if self.codigo:
+            return f'{self.como_aparece_planilha} -> {self.espessura} ({self.codigo})'
+        return f'{self.como_aparece_planilha} -> {self.espessura}'
 
 class Carretas(models.Model):
 

@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+<title>Chapas de corte</title>
+{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/operadores-admin.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="chapas-corte-app" data-api-url="{% url 'cadastro:chapas_corte_api' %}">
+    <div class="operators-admin-page">
+        <section class="operators-shell">
+            <header class="operators-topbar">
+                <h1 class="operators-title">Chapas de corte</h1>
+                <button class="primary-toolbar-button" id="btn-add-chapa" type="button">
+                    <i class="bi bi-plus-lg"></i>
+                    <span>Nova chapa</span>
+                </button>
+            </header>
+
+            <div class="card card-surface mb-3">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-6 col-12">
+                            <label class="form-label small text-secondary">Busca</label>
+                            <input id="f-search-chapa" type="text" class="form-control form-control-sm" placeholder="Texto da planilha ou codigo">
+                        </div>
+                        <div class="col-md-3 col-12">
+                            <label class="form-label small text-secondary">Status</label>
+                            <select id="f-ativo-chapa" class="form-select form-select-sm">
+                                <option value="true">Ativas</option>
+                                <option value="false">Inativas</option>
+                                <option value="all">Todas</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 col-12 d-flex gap-2">
+                            <button id="apply-filters-chapa" class="btn btn-primary btn-sm flex-fill" type="button">
+                                <i class="bi bi-funnel me-1"></i>Aplicar
+                            </button>
+                            <button id="clear-filters-chapa" class="btn btn-outline-secondary btn-sm" type="button">
+                                Limpar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <section class="operators-table-card">
+                <div class="table-responsive" style="max-height: 65vh; overflow: auto;">
+                    <table class="operators-table">
+                        <thead>
+                            <tr>
+                                <th>Como aparece na planilha</th>
+                                <th class="text-end">Espessura</th>
+                                <th>Codigo</th>
+                                <th>Status</th>
+                                <th class="col-actions text-end">Acoes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chapas-corte-body">
+                            <tr>
+                                <td colspan="5">
+                                    <div id="overlayLoading" class="operators-loading">
+                                        <div class="spinner-border text-primary" role="status"></div>
+                                        <span>Carregando chapas...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <footer class="operators-table-footer">
+                    <div class="footer-left">
+                        <label for="page-size-chapa" class="footer-label">Linhas por pagina</label>
+                        <select id="page-size-chapa" class="footer-select">
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <span id="pagination-summary-chapa" class="footer-summary">0-0 de 0</span>
+                    </div>
+                    <nav class="operators-pagination" id="chapas-corte-pagination"></nav>
+                </footer>
+            </section>
+        </section>
+    </div>
+</div>
+
+<div class="modal fade" id="chapa-modal" tabindex="-1" aria-labelledby="chapa-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form id="chapa-form">
+                {% csrf_token %}
+                <input type="hidden" id="chapa-id" name="id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="chapa-modal-label">Nova chapa de corte</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-5 col-12">
+                            <label class="form-label small text-secondary">Como aparece na planilha</label>
+                            <input id="chapa-como-aparece" name="como_aparece_planilha" type="text" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-md-3 col-12">
+                            <label class="form-label small text-secondary">Espessura</label>
+                            <input id="chapa-espessura" name="espessura" type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="Ex.: 6,35" required>
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <label class="form-label small text-secondary">Codigo</label>
+                            <input id="chapa-codigo" name="codigo" type="text" class="form-control form-control-sm">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn btn-primary btn-sm" type="submit" id="save-chapa-btn">
+                        <i class="bi bi-check-lg me-1"></i>Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="toggle-chapa-modal" tabindex="-1" aria-labelledby="toggle-chapa-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="toggle-chapa-form">
+                {% csrf_token %}
+                <input type="hidden" id="toggle-chapa-id" name="id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="toggle-chapa-modal-label">Alterar status</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" id="toggle-chapa-texto">Confirma a alteracao de status desta chapa?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn btn-primary btn-sm" type="submit" id="toggle-chapa-btn">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/chapas-corte.js' %}"></script>
+{% endblock %}

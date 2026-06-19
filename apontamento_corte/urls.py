@@ -9,6 +9,7 @@ urlpatterns = [
     #templates
     path('', views.planejamento, name='planejamento'),
     path('duplicar-op/', views.duplicar_op, name='duplicar_op'),
+    path('erp/apontamentos/', views.erp_apontamentos_corte, name='erp_apontamentos_corte'),
 
     #apis
     path('api/salvar-arquivo/', SalvarArquivoView.as_view(), name='salvar_arquivo'),
@@ -41,6 +42,10 @@ urlpatterns = [
     path('api/apontamentos/corte', views.api_ordens_finalizadas, name='api_ordens_finalizadas'),
     path('api/apontamentos/mp', views.api_ordens_finalizadas_mp, name='api_ordens_finalizadas_mp'),
     path('api/apontamentos/criadas', views.api_ordens_criadas, name='api_ordens_criadas'),
+    path('api/erp/apontamentos/', views.api_erp_apontamentos_corte, name='api_erp_apontamentos_corte'),
+    path('api/erp/apontamentos/apontar-bloco/', views.api_erp_apontar_itens_corte_bloco, name='api_erp_apontar_itens_corte_bloco'),
+    path('api/erp/apontamentos/<int:pk>/transferir/', views.api_erp_transferir_chapa_corte, name='api_erp_transferir_chapa_corte'),
+    path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_corte, name='api_erp_apontar_item_corte'),
 ]
 
 # dashboard
