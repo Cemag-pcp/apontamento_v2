@@ -85,7 +85,7 @@ function renderRows(rows) {
     updateBulkButton();
 
     if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="18" class="text-center text-muted py-4">Nenhuma transferencia encontrada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="19" class="text-center text-muted py-4">Nenhuma transferencia encontrada.</td></tr>';
         updateMasterCheckbox();
         return;
     }
@@ -97,6 +97,7 @@ function renderRows(rows) {
             <td><span class="col-peca-truncada" title="${escapeHtml(formatPecaCodigo(row.peca || ''))}">${escapeHtml(formatPecaCodigo(row.peca || ''))}</span></td>
             <td><span class="col-chapa-descricao" title="${escapeHtml(row.descricao_chapa || '-')}">${escapeHtml(row.descricao_chapa || '-')}</span></td>
             <td>${renderCodigoChapa(row)}</td>
+            <td>${escapeHtml(row.tipo_chapa_display || '-')}</td>
             <td class="text-end">${formatNumber(row.peso_total)}</td>
             <td class="text-end">${formatNumber(row.quantidade_chapas)}</td>
             <td>${escapeHtml(row.maquina || '-')}</td>
@@ -444,7 +445,7 @@ async function loadPage(page = 1) {
         });
     } catch (error) {
         if (error.name === 'AbortError') return;
-        tbody.innerHTML = '<tr><td colspan="18" class="text-center text-danger py-4">Falha ao carregar as transferencias.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="19" class="text-center text-danger py-4">Falha ao carregar as transferencias.</td></tr>';
         paginationControlsEl.innerHTML = '';
         paginationInfoEl.textContent = '-';
         resumoEl.textContent = 'Erro ao consultar dados';
@@ -642,7 +643,7 @@ async function confirmarApontamentoSelecionado(tipoApontamento = 'api') {
 
         const payload = await response.json();
         if (!response.ok || payload.status !== 'success') {
-            throw new Error(payload.message || 'Falha ao confirmar apontamento.');
+            throw new Error(payload.description || payload.message || 'Falha ao confirmar apontamento.');
         }
 
         modalConfirmarApontamentoCorteInstance?.hide();

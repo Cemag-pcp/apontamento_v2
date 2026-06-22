@@ -28,7 +28,7 @@ class EspessuraAdmin(ProfilePermissionMixin, admin.ModelAdmin):
     ordering = ('nome',)
 
 class EspessuraChapaAdmin(ProfilePermissionMixin, admin.ModelAdmin):
-    list_display = ('como_aparece_planilha', 'espessura', 'codigo', 'ativo')
+    list_display = ('como_aparece_planilha', 'espessura', 'codigo', 'largura', 'largura_maxima', 'ativo')
     list_filter = ('ativo',)
     search_fields = ('como_aparece_planilha', 'codigo')
     ordering = ('espessura', 'como_aparece_planilha')

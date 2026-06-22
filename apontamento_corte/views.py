@@ -15,7 +15,7 @@ from django.contrib.auth.decorators import login_required
 
 from .models import Ordem, PecasOrdem, TransferenciaChapaCorte
 from core.models import OrdemProcesso,PropriedadesOrdem,MaquinaParada, Profile
-from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, MotivoMaquinaParada, MotivoExclusao, EspessuraChapa
+from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, MotivoMaquinaParada, MotivoExclusao, EspessuraChapa, CarretasExplodidas
 from .utils import *
 from .utils_dashboard import *
 from apontamento_serra.utils import formatar_timedelta
@@ -33,6 +33,7 @@ from urllib.parse import unquote
 from datetime import datetime, time, timedelta
 from functools import reduce
 from collections import defaultdict
+from decimal import Decimal, InvalidOperation
 
 from datetime import date
 from functools import reduce
@@ -93,10 +94,278 @@ def _extrair_codigo_peca_corte(peca):
         return f"0{codigo}"
     return codigo
 
+def _normalizar_texto_validacao_chapa(valor):
+    texto = str(valor or '').strip().lower()
+    texto = re.sub(r'\s+', ' ', texto)
+    texto = texto.replace('×', 'x')
+    texto = texto.replace(',', '.')
+    return texto
+
+def _parse_decimal_texto_corte(valor):
+    texto = str(valor or '').strip()
+    if not texto:
+        return None
+    match = re.search(r'-?[\d.,]+', texto)
+    if not match:
+        return None
+    numero = match.group(0)
+    if ',' in numero and '.' in numero:
+        numero = numero.replace('.', '').replace(',', '.')
+    elif ',' in numero:
+        numero = numero.replace(',', '.')
+    return _to_decimal_or_none(numero)
+
+def _dados_carreta_explodida_peca_corte(codigo_peca):
+    codigo_peca = str(codigo_peca or '').strip()
+    if not codigo_peca:
+        return None
+
+    queryset = (
+        CarretasExplodidas.objects
+        .filter(codigo_peca__iexact=codigo_peca)
+        .exclude(mp_peca__isnull=True)
+        .exclude(mp_peca='')
+        .order_by('id')
+    )
+    primeiro_registro = None
+    for dados_carreta in queryset:
+        if primeiro_registro is None:
+            primeiro_registro = dados_carreta
+        if _parse_decimal_texto_corte(getattr(dados_carreta, 'peso', None)) is not None:
+            return dados_carreta
+    return primeiro_registro
+
+def _espessura_chapa_por_codigo(codigo_chapa):
+    codigo_chapa = str(codigo_chapa or '').strip()
+    if not codigo_chapa:
+        return None
+    chapa = (
+        EspessuraChapa.objects
+        .filter(codigo=codigo_chapa, ativo=True)
+        .order_by('id')
+        .first()
+    )
+    if not chapa:
+        return None
+    return _to_decimal_or_none(chapa.espessura)
+
+def _espessura_chapa_por_materia_prima(materia_prima):
+    dados_chapa = _extrair_dados_chapa(materia_prima)
+    if dados_chapa:
+        chapa = _selecionar_espessura_chapa(dados_chapa, None)
+        if chapa:
+            return _to_decimal_or_none(chapa.espessura)
+
+    codigo_chapa = _extrair_codigo_peca_corte(materia_prima)
+    return _espessura_chapa_por_codigo(codigo_chapa)
+
+def _calcular_quantidade_ficha_tecnica_chapa(peso_total, espessura_antiga, espessura_nova):
+    peso_total = _to_decimal_or_none(peso_total)
+    espessura_antiga = _to_decimal_or_none(espessura_antiga)
+    espessura_nova = _to_decimal_or_none(espessura_nova)
+    if peso_total is None or espessura_antiga is None or espessura_nova is None:
+        return None
+    if espessura_antiga == 0:
+        return None
+    quantidade = (peso_total / espessura_antiga) * espessura_nova
+    return float((quantidade * Decimal('-1')).quantize(Decimal('0.0001')))
+
+def _resolver_ficha_tecnica_chapa_corte(item, transferencia):
+    propriedade = getattr(item.ordem, 'propriedade', None)
+    descricao_chapa = getattr(propriedade, 'descricao_mp', None)
+    codigo_peca = _extrair_codigo_peca_corte(item.peca)
+    dados_carreta = _dados_carreta_explodida_peca_corte(codigo_peca)
+    materia_peca = str(getattr(dados_carreta, 'mp_peca', '') or '').strip() if dados_carreta else ''
+    peso_peca = _parse_decimal_texto_corte(getattr(dados_carreta, 'peso', None)) if dados_carreta else None
+
+    if not descricao_chapa:
+        return False, 'Nao foi possivel identificar a chapa da ordem.', None
+    if not codigo_peca:
+        return False, 'Nao foi possivel identificar o codigo da peca.', None
+    if not materia_peca:
+        return False, f'Peca {codigo_peca} nao possui materia-prima cadastrada em CarretasExplodidas.', None
+    if peso_peca is None:
+        return False, f'Peca {codigo_peca} nao possui peso cadastrado em CarretasExplodidas.', None
+
+    chapa_norm = _normalizar_texto_validacao_chapa(descricao_chapa)
+    materia_norm = _normalizar_texto_validacao_chapa(materia_peca)
+    if materia_norm and (materia_norm == chapa_norm or materia_norm in chapa_norm or chapa_norm in materia_norm):
+        return True, '', None
+
+    codigo_chapa_novo = str(getattr(transferencia, 'codigo_chapa', '') or '').strip()
+    if not codigo_chapa_novo:
+        return False, 'Nao foi possivel identificar o codigo da chapa transferida para montar a ficha tecnica.', None
+
+    codigo_chapa_antigo = _extrair_codigo_peca_corte(materia_peca)
+    if not codigo_chapa_antigo:
+        return False, f'Nao foi possivel identificar o codigo antigo da materia-prima da peca {codigo_peca}.', None
+
+    espessura_antiga = _espessura_chapa_por_materia_prima(materia_peca)
+    if espessura_antiga is None:
+        return False, f'Nao foi possivel identificar a espessura do codigo antigo {codigo_chapa_antigo}.', None
+
+    espessura_nova = _espessura_chapa_por_codigo(codigo_chapa_novo)
+    if espessura_nova is None:
+        return False, f'Nao foi possivel identificar a espessura do codigo novo {codigo_chapa_novo}.', None
+
+    quantidade_pecas = _to_decimal_or_none(getattr(item, 'qtd_boa', None))
+    if quantidade_pecas is None:
+        return False, f'Nao foi possivel identificar a quantidade de pecas boas do item {item.id}.', None
+
+    peso_total_pecas = peso_peca * quantidade_pecas
+    quantidade_ficha = _calcular_quantidade_ficha_tecnica_chapa(peso_total_pecas, espessura_antiga, espessura_nova)
+    if quantidade_ficha is None:
+        return False, 'Nao foi possivel calcular a quantidade da ficha tecnica.', None
+
+    return True, (
+        f'Peca {codigo_peca} usa materia-prima diferente da chapa da ordem; '
+        'fichaTecnica de substituicao sera enviada ao ERP.'
+    ), [
+        {
+            "insumo": codigo_chapa_novo,
+            "quantidade": quantidade_ficha,
+            "insumoSubstituido": codigo_chapa_antigo,
+        }
+    ]
+
+def _payload_apontamento_item_corte(item, ficha_tecnica=None):
+    payload = {
+        "id": f"corte-item-{item.id}",
+        "data": localtime(now()).strftime('%d/%m/%Y'),
+        "pessoa": "4357",
+        "recurso": _extrair_codigo_peca_corte(item.peca),
+        "processo": "S C Plasma",
+        "produzido": item.qtd_boa,
+        "observacao": str(item.ordem_id),
+    }
+    if ficha_tecnica:
+        payload["fichaTecnica"] = ficha_tecnica
+    return payload
+
+def _registrar_erro_apontamento_api_corte(item, erro, user):
+    item.erro_apontamento = erro
+    item.tipo_apontamento = 'api'
+    item.resp_apontamento = user
+    item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+
+def _mensagem_ficha_tecnica_apontamento(ficha_tecnica):
+    if not ficha_tecnica:
+        return ''
+    itens = [
+        f"{item.get('insumoSubstituido')} -> {item.get('insumo')}"
+        for item in ficha_tecnica
+    ]
+    return (
+        'Ficha tecnica enviada para substituir insumo: '
+        + ', '.join(itens)
+    )
+
+def _normalizar_tipo_chapa_display(tipo_chapa_display):
+    if not tipo_chapa_display:
+        return ''
+    if str(tipo_chapa_display).strip().lower() == 'inox':
+        return 'Aço inox'
+    return str(tipo_chapa_display).strip()
+
+def _normalizar_tipo_chapa_cadastro(tipo_chapa):
+    tipo = str(tipo_chapa or '').strip()
+    if tipo == 'inox':
+        return 'aco_inox'
+    return tipo
+
+def _to_decimal_or_none(valor):
+    if valor in (None, ''):
+        return None
+    try:
+        return Decimal(str(valor).strip().replace(',', '.'))
+    except (InvalidOperation, ValueError):
+        return None
+
+def _mesma_largura_chapa(largura_cadastro, largura_descricao):
+    largura_cadastro = _to_decimal_or_none(largura_cadastro)
+    largura_descricao = _to_decimal_or_none(largura_descricao)
+    if largura_cadastro is None or largura_descricao is None:
+        return False
+    return abs(largura_cadastro - largura_descricao) <= Decimal('0.001')
+
+def _intervalo_largura_chapa(chapa):
+    return _to_decimal_or_none(chapa.largura), _to_decimal_or_none(getattr(chapa, 'largura_maxima', None))
+
+def _largura_dentro_intervalo_chapa(chapa, largura_descricao):
+    largura_descricao = _to_decimal_or_none(largura_descricao)
+    if largura_descricao is None:
+        return False
+
+    largura_minima, largura_maxima = _intervalo_largura_chapa(chapa)
+    if largura_minima is not None and largura_descricao < largura_minima:
+        return False
+    if largura_maxima is not None and largura_descricao > largura_maxima:
+        return False
+    return True
+
+def _score_intervalo_largura_chapa(chapa, largura_descricao):
+    largura_descricao = _to_decimal_or_none(largura_descricao)
+    if largura_descricao is None:
+        return 0
+
+    largura_minima, largura_maxima = _intervalo_largura_chapa(chapa)
+    if largura_minima is None and largura_maxima is None:
+        return 0
+    if (
+        largura_minima is not None
+        and largura_maxima is not None
+        and _mesma_largura_chapa(largura_minima, largura_descricao)
+        and _mesma_largura_chapa(largura_maxima, largura_descricao)
+    ):
+        return 5
+    if largura_minima is not None and largura_maxima is not None:
+        intervalo = largura_maxima - largura_minima
+        if intervalo <= Decimal('100'):
+            return 4
+        if intervalo <= Decimal('500'):
+            return 3
+        return 2
+    return 1
+
+def _selecionar_espessura_chapa(dados_chapa, propriedade):
+    candidatos = list(EspessuraChapa.objects.filter(
+        como_aparece_planilha__iexact=dados_chapa['espessura_planilha'],
+        ativo=True,
+    ))
+    if not candidatos:
+        return None
+
+    tipo_ordem = _normalizar_tipo_chapa_cadastro(getattr(propriedade, 'tipo_chapa', None))
+    largura_ordem = dados_chapa.get('largura')
+    candidatos_validos = []
+
+    for chapa in candidatos:
+        tipos_chapa = chapa.tipos_chapa or []
+        if not tipos_chapa and chapa.tipo_chapa:
+            tipos_chapa = [chapa.tipo_chapa]
+
+        if tipos_chapa and tipo_ordem and tipo_ordem not in tipos_chapa:
+            continue
+        if not _largura_dentro_intervalo_chapa(chapa, largura_ordem):
+            continue
+
+        score = 0
+        if tipos_chapa and tipo_ordem and tipo_ordem in tipos_chapa:
+            score += 2
+        score += _score_intervalo_largura_chapa(chapa, largura_ordem)
+        candidatos_validos.append((score, chapa.id, chapa))
+
+    if not candidatos_validos:
+        return None
+
+    candidatos_validos.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return candidatos_validos[0][2]
+
 def _extrair_dados_chapa(descricao_mp):
     """
     Extrai dados de textos como "11 - 1200 x 2000 mm".
-    Retorna a espessura como aparece na planilha, largura e comprimento em mm.
+    Retorna a espessura como aparece na planilha, menor dimensao como largura,
+    e maior dimensao como comprimento.
     """
     texto = str(descricao_mp or '').strip()
     match = re.search(
@@ -107,10 +376,13 @@ def _extrair_dados_chapa(descricao_mp):
     if not match:
         return None
 
-    largura = _parse_decimal_br(match.group('largura'))
-    comprimento = _parse_decimal_br(match.group('comprimento'))
-    if largura is None or comprimento is None:
+    dimensao_a = _parse_decimal_br(match.group('largura'))
+    dimensao_b = _parse_decimal_br(match.group('comprimento'))
+    if dimensao_a is None or dimensao_b is None:
         return None
+
+    largura = min(dimensao_a, dimensao_b)
+    comprimento = max(dimensao_a, dimensao_b)
 
     return {
         'espessura_planilha': match.group('espessura').strip(),
@@ -123,14 +395,13 @@ def _calcular_peso_chapas_corte(propriedade, qtd_chapas):
     if not dados_chapa:
         return None
 
-    espessura_chapa = EspessuraChapa.objects.filter(
-        como_aparece_planilha__iexact=dados_chapa['espessura_planilha'],
-        ativo=True,
-    ).first()
+    espessura_chapa = _selecionar_espessura_chapa(dados_chapa, propriedade)
     if not espessura_chapa:
         return {
             'encontrou_chapa': False,
             'espessura_planilha': dados_chapa['espessura_planilha'],
+            'largura': dados_chapa.get('largura'),
+            'tipo_chapa': _normalizar_tipo_chapa_cadastro(getattr(propriedade, 'tipo_chapa', None)),
             'descricao_mp': propriedade.descricao_mp if propriedade else None,
         }
 
@@ -148,11 +419,16 @@ def _calcular_peso_chapas_corte(propriedade, qtd_chapas):
         * quantidade
     )
 
+    tipos_chapa = espessura_chapa.tipos_chapa or []
+    tipo_chapa = tipos_chapa[0] if tipos_chapa else (espessura_chapa.tipo_chapa or '')
+
     return {
         'encontrou_chapa': True,
         'espessura_planilha': dados_chapa['espessura_planilha'],
         'espessura_mm': str(espessura_chapa.espessura).replace('.', ',').rstrip('0').rstrip(','),
         'codigo': espessura_chapa.codigo,
+        'tipo_chapa': tipo_chapa,
+        'tipo_chapa_display': espessura_chapa.get_tipo_chapa_display() if tipo_chapa and tipo_chapa == espessura_chapa.tipo_chapa else '',
         'largura': dados_chapa['largura'],
         'comprimento': dados_chapa['comprimento'],
         'quantidade_chapas': quantidade,
@@ -417,6 +693,7 @@ def _registrar_transferencia_chapa_corte_manual(ordem, dados_chapa, user):
 def _apontar_itens_corte_via_api_bloco(itens, user):
     itens_validos = []
     erros = []
+    fichas_tecnicas = {}
 
     for item in itens:
         if item.apontado:
@@ -431,6 +708,14 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
         if not transferencia:
             erros.append({'id': item.id, 'erro': 'Transfira a chapa antes de apontar este item.'})
             continue
+
+        peca_valida, aviso_peca, ficha_tecnica = _resolver_ficha_tecnica_chapa_corte(item, transferencia)
+        if not peca_valida:
+            _registrar_erro_apontamento_api_corte(item, aviso_peca, user)
+            erros.append({'id': item.id, 'erro': aviso_peca})
+            continue
+        if ficha_tecnica:
+            fichas_tecnicas[item.id] = ficha_tecnica
 
         if (item.qtd_morta or 0) > 0:
             msg_qtd_morta = (
@@ -455,15 +740,7 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
         }
 
     payload_integracao = [
-        {
-            "id": f"corte-item-{item.id}",
-            "data": localtime(now()).strftime('%d/%m/%Y'),
-            "pessoa": "4357",
-            "recurso": _extrair_codigo_peca_corte(item.peca),
-            "processo": "S C Plasma",
-            "produzido": item.qtd_boa,
-            "observacao": str(item.ordem_id),
-        }
+        _payload_apontamento_item_corte(item, fichas_tecnicas.get(item.id))
         for item in itens_validos
     ]
     print(
@@ -536,7 +813,8 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
             retorno_item if isinstance(retorno_item, dict) else {},
             payload_integracao[index],
         )
-        item.erro_apontamento = aviso_chave
+        aviso_ficha = _mensagem_ficha_tecnica_apontamento(payload_integracao[index].get('fichaTecnica'))
+        item.erro_apontamento = aviso_chave or aviso_ficha
         item.apontado = True
         item.tipo_apontamento = 'api'
         item.resp_apontamento = user
@@ -1814,6 +2092,11 @@ def api_erp_apontamentos_corte(request):
         operador = ordem.operador_final
         ordem_display = ordem.ordem or ordem.ordem_duplicada or ''
         transferencia = next(iter(ordem.transferencias_chapa_corte.all()), None)
+        tipo_chapa_display = ''
+        if propriedade and propriedade.tipo_chapa:
+            tipo_chapa_display = _normalizar_tipo_chapa_display(propriedade.get_tipo_chapa_display())
+        elif dados_chapa and dados_chapa.get('tipo_chapa_display'):
+            tipo_chapa_display = _normalizar_tipo_chapa_display(dados_chapa.get('tipo_chapa_display'))
 
         itens.append({
             'id': item.id,
@@ -1829,6 +2112,8 @@ def api_erp_apontamentos_corte(request):
             'descricao_chapa': propriedade.descricao_mp if propriedade else '',
             'espessura_planilha': dados_chapa.get('espessura_planilha', '') if dados_chapa else '',
             'codigo_chapa': dados_chapa.get('codigo', '') if dados_chapa and dados_chapa.get('encontrou_chapa') else '',
+            'tipo_chapa': propriedade.tipo_chapa if propriedade and propriedade.tipo_chapa else dados_chapa.get('tipo_chapa', '') if dados_chapa and dados_chapa.get('encontrou_chapa') else '',
+            'tipo_chapa_display': tipo_chapa_display,
             'espessura_mm': dados_chapa.get('espessura_mm', '') if dados_chapa and dados_chapa.get('encontrou_chapa') else '',
             'quantidade_chapas': dados_chapa.get('quantidade_chapas', propriedade.quantidade if propriedade else '') if dados_chapa else '',
             'peso_total': dados_chapa.get('peso_total', '') if dados_chapa and dados_chapa.get('encontrou_chapa') else '',
@@ -1990,15 +2275,19 @@ def api_erp_apontar_item_corte(request, pk):
 
     payload_integracao = None
     if tipo_apontamento == 'api':
-        payload_integracao = {
-            "id": f"corte-item-{item.id}",
-            "data": localtime(now()).strftime('%d/%m/%Y'),
-            "pessoa": "4357",
-            "recurso": _extrair_codigo_peca_corte(item.peca),
-            "processo": "S C Plasma",
-            "produzido": item.qtd_boa,
-            "observacao": str(item.ordem_id),
-        }
+        peca_valida, erro_peca, ficha_tecnica = _resolver_ficha_tecnica_chapa_corte(item, transferencia)
+        if not peca_valida:
+            _registrar_erro_apontamento_api_corte(item, erro_peca, request.user)
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': 'Nao foi possivel montar a ficha tecnica para validar a chapa da peca.',
+                    'description': erro_peca,
+                },
+                status=422
+            )
+
+        payload_integracao = _payload_apontamento_item_corte(item, ficha_tecnica)
         print(
             "[CORTE][INNOVARO][APONTAMENTO][BODY]",
             json.dumps(payload_integracao, ensure_ascii=False, indent=2),
@@ -2081,7 +2370,9 @@ def api_erp_apontar_item_corte(request, pk):
                     resposta_api_json,
                     payload_integracao,
                 )
-                item.erro_apontamento = aviso_chave
+                item.erro_apontamento = aviso_chave or _mensagem_ficha_tecnica_apontamento(
+                    payload_integracao.get('fichaTecnica')
+                )
             else:
                 item.erro_apontamento = str(resposta_api_json)
                 item.tipo_apontamento = 'api'
@@ -2171,6 +2462,7 @@ def api_erp_apontar_itens_corte_bloco(request):
     itens_por_id = {item.id: item for item in itens}
     erros = []
     itens_validos = []
+    fichas_tecnicas = {}
 
     for item_id in ids:
         item = itens_por_id.get(item_id)
@@ -2191,6 +2483,15 @@ def api_erp_apontar_itens_corte_bloco(request):
         if not transferencia:
             erros.append({'id': item.id, 'erro': 'Transfira a chapa antes de apontar este item.'})
             continue
+
+        if tipo_apontamento == 'api':
+            peca_valida, erro_peca, ficha_tecnica = _resolver_ficha_tecnica_chapa_corte(item, transferencia)
+            if not peca_valida:
+                _registrar_erro_apontamento_api_corte(item, erro_peca, request.user)
+                erros.append({'id': item.id, 'erro': erro_peca})
+                continue
+            if ficha_tecnica:
+                fichas_tecnicas[item.id] = ficha_tecnica
 
         if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
             msg_qtd_morta = (
@@ -2247,15 +2548,7 @@ def api_erp_apontar_itens_corte_bloco(request):
         })
 
     payload_integracao = [
-        {
-            "id": f"corte-item-{item.id}",
-            "data": localtime(now()).strftime('%d/%m/%Y'),
-            "pessoa": "4357",
-            "recurso": _extrair_codigo_peca_corte(item.peca),
-            "processo": "S C Plasma",
-            "produzido": item.qtd_boa,
-            "observacao": str(item.ordem_id),
-        }
+        _payload_apontamento_item_corte(item, fichas_tecnicas.get(item.id))
         for item in itens_validos
     ]
     print(
@@ -2330,7 +2623,8 @@ def api_erp_apontar_itens_corte_bloco(request):
             retorno_item if isinstance(retorno_item, dict) else {},
             payload_integracao[index],
         )
-        item.erro_apontamento = aviso_chave
+        aviso_ficha = _mensagem_ficha_tecnica_apontamento(payload_integracao[index].get('fichaTecnica'))
+        item.erro_apontamento = aviso_chave or aviso_ficha
         item.apontado = True
         item.tipo_apontamento = 'api'
         item.resp_apontamento = request.user

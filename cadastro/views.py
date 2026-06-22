@@ -925,12 +925,82 @@ def chapas_corte_api(request):
         except (InvalidOperation, ValueError):
             raise ValueError('Espessura invalida.')
 
+    def parse_decimal_optional(value, field):
+        if value in (None, ''):
+            return None
+        try:
+            return Decimal(str(value).strip().replace(',', '.'))
+        except (InvalidOperation, ValueError):
+            raise ValueError(f'{field} invalida.')
+
+    def format_decimal_optional(value):
+        if value in (None, ''):
+            return ''
+        return str(value).replace('.', ',').rstrip('0').rstrip(',')
+
+    def format_intervalo_largura(largura_minima, largura_maxima):
+        minima = format_decimal_optional(largura_minima)
+        maxima = format_decimal_optional(largura_maxima)
+        if minima and maxima and minima == maxima:
+            return minima
+        if minima and maxima:
+            return f'{minima} ate {maxima}'
+        if minima:
+            return f'{minima}+'
+        if maxima:
+            return f'ate {maxima}'
+        return ''
+
+    def get_tipos_chapa(obj):
+        tipos = obj.tipos_chapa or []
+        if not tipos and obj.tipo_chapa:
+            tipos = [obj.tipo_chapa]
+        return tipos
+
+    def get_tipos_chapa_display(obj):
+        labels = dict(EspessuraChapa.TIPO_CHAPA_CHOICES)
+        return ', '.join(labels.get(tipo, tipo) for tipo in get_tipos_chapa(obj))
+
+    def tipos_chapa_conflitam(tipos_a, tipos_b):
+        if not tipos_a or not tipos_b:
+            return True
+        return bool(set(tipos_a) & set(tipos_b))
+
+    def intervalos_largura_sobrepostos(min_a, max_a, min_b, max_b):
+        if max_a is not None and min_b is not None and max_a < min_b:
+            return False
+        if max_b is not None and min_a is not None and max_b < min_a:
+            return False
+        return True
+
+    def buscar_conflito_intervalo_largura(como_aparece, espessura, largura_minima, largura_maxima, tipos_chapa, item_id=None):
+        queryset = EspessuraChapa.objects.filter(
+            como_aparece_planilha__iexact=como_aparece,
+            espessura=espessura,
+            ativo=True,
+        )
+        if item_id:
+            queryset = queryset.exclude(id=item_id)
+
+        for chapa in queryset:
+            if not tipos_chapa_conflitam(get_tipos_chapa(chapa), tipos_chapa):
+                continue
+            if intervalos_largura_sobrepostos(chapa.largura, chapa.largura_maxima, largura_minima, largura_maxima):
+                return chapa
+        return None
+
     def serialize(obj):
         return {
             'id': obj.id,
             'como_aparece_planilha': obj.como_aparece_planilha,
             'espessura': str(obj.espessura).replace('.', ',').rstrip('0').rstrip(','),
             'codigo': obj.codigo or '',
+            'largura': format_decimal_optional(obj.largura),
+            'largura_maxima': format_decimal_optional(obj.largura_maxima),
+            'largura_intervalo': format_intervalo_largura(obj.largura, obj.largura_maxima),
+            'tipo_chapa': obj.tipo_chapa or '',
+            'tipos_chapa': get_tipos_chapa(obj),
+            'tipo_chapa_display': get_tipos_chapa_display(obj),
             'ativo': obj.ativo,
         }
 
@@ -980,14 +1050,51 @@ def chapas_corte_api(request):
 
         como_aparece = (data.get('como_aparece_planilha') or '').strip()
         codigo = (data.get('codigo') or '').strip() or None
+        tipos_chapa = data.get('tipos_chapa')
 
         if not como_aparece:
             return JsonResponse({'error': 'Como aparece na planilha e obrigatorio.'}, status=400)
 
         try:
             espessura = parse_decimal(data.get('espessura'))
+            largura = parse_decimal_optional(data.get('largura'), 'Largura minima')
+            largura_maxima = parse_decimal_optional(data.get('largura_maxima'), 'Largura maxima')
         except ValueError as exc:
             return JsonResponse({'error': str(exc)}, status=400)
+
+        if largura is not None and largura_maxima is not None and largura_maxima < largura:
+            return JsonResponse({'error': 'Largura maxima deve ser maior ou igual a largura minima.'}, status=400)
+
+        tipos_validos = {choice[0] for choice in EspessuraChapa.TIPO_CHAPA_CHOICES}
+        if tipos_chapa in (None, ''):
+            tipos_chapa = []
+        elif isinstance(tipos_chapa, str):
+            tipos_chapa = [tipos_chapa] if tipos_chapa else []
+        elif not isinstance(tipos_chapa, list):
+            return JsonResponse({'error': 'Tipos de chapa invalidos.'}, status=400)
+
+        tipos_chapa = [str(tipo).strip() for tipo in tipos_chapa if str(tipo).strip()]
+        if any(tipo not in tipos_validos for tipo in tipos_chapa):
+            return JsonResponse({'error': 'Tipo de chapa invalido.'}, status=400)
+        tipo_chapa = tipos_chapa[0] if tipos_chapa else None
+        item_id = data.get('id') if request.method == 'PATCH' else None
+
+        conflito = buscar_conflito_intervalo_largura(
+            como_aparece,
+            espessura,
+            largura,
+            largura_maxima,
+            tipos_chapa,
+            item_id=item_id,
+        )
+        if conflito:
+            intervalo = format_intervalo_largura(conflito.largura, conflito.largura_maxima) or 'sem limite'
+            return JsonResponse({
+                'error': (
+                    'Ja existe uma chapa ativa com esta espessura, tipo e intervalo de largura '
+                    f'sobreposto: {conflito.como_aparece_planilha} | codigo {conflito.codigo or "-"} | largura {intervalo}.'
+                )
+            }, status=400)
 
         if request.method == 'POST':
             try:
@@ -995,13 +1102,16 @@ def chapas_corte_api(request):
                     como_aparece_planilha=como_aparece,
                     espessura=espessura,
                     codigo=codigo,
+                    largura=largura,
+                    largura_maxima=largura_maxima,
+                    tipo_chapa=tipo_chapa,
+                    tipos_chapa=tipos_chapa,
                 )
             except IntegrityError:
-                return JsonResponse({'error': 'Ja existe uma chapa cadastrada com este texto da planilha.'}, status=400)
+                return JsonResponse({'error': 'Nao foi possivel criar a chapa de corte.'}, status=400)
 
             return JsonResponse({'success': 'Chapa de corte criada com sucesso.', 'id': item.id}, status=201)
 
-        item_id = data.get('id')
         if not item_id:
             return JsonResponse({'error': 'ID nao informado.'}, status=400)
 
@@ -1009,11 +1119,15 @@ def chapas_corte_api(request):
         item.como_aparece_planilha = como_aparece
         item.espessura = espessura
         item.codigo = codigo
+        item.largura = largura
+        item.largura_maxima = largura_maxima
+        item.tipo_chapa = tipo_chapa
+        item.tipos_chapa = tipos_chapa
 
         try:
             item.save()
         except IntegrityError:
-            return JsonResponse({'error': 'Ja existe uma chapa cadastrada com este texto da planilha.'}, status=400)
+            return JsonResponse({'error': 'Nao foi possivel atualizar a chapa de corte.'}, status=400)
 
         return JsonResponse({'success': 'Chapa de corte atualizada com sucesso.'})
 

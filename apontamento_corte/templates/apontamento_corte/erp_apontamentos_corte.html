@@ -125,6 +125,7 @@
                             <th>Peca</th>
                             <th>Chapa</th>
                             <th>Codigo chapa</th>
+                            <th>Tipo chapa</th>
                             <th class="text-end">Peso total</th>
                             <th class="text-end">Qt. chapas</th>
                             <th>Maquina</th>
@@ -142,7 +143,7 @@
                     </thead>
                     <tbody id="erpTabelaApontamentos">
                         <tr>
-                            <td colspan="18" class="text-center text-muted py-4">Carregando...</td>
+                            <td colspan="19" class="text-center text-muted py-4">Carregando...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -305,5 +306,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script type="module" src="{% static 'js/erp-apontamentos-corte.js' %}"></script>
+<script type="module" src="{% static 'js/erp-apontamentos-corte.js' %}?v=tipo-chapa-20260622"></script>
 {% endblock %}

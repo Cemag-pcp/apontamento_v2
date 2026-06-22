@@ -95,9 +95,20 @@ class Espessura(models.Model):
         return self.nome
 
 class EspessuraChapa(models.Model):
-    como_aparece_planilha = models.CharField(max_length=80, unique=True)
+    TIPO_CHAPA_CHOICES = (
+        ('aco_carbono', 'Aço carbono'),
+        ('alta_resistencia', 'Alta resistência'),
+        ('anti_derrapante', 'Anti derrapante'),
+        ('aco_inox', 'Aço inox'),
+    )
+
+    como_aparece_planilha = models.CharField(max_length=80)
     espessura = models.DecimalField(max_digits=7, decimal_places=3)
     codigo = models.CharField(max_length=20, blank=True, null=True)
+    largura = models.DecimalField(max_digits=10, decimal_places=3, blank=True, null=True)
+    largura_maxima = models.DecimalField(max_digits=10, decimal_places=3, blank=True, null=True)
+    tipo_chapa = models.CharField(max_length=30, choices=TIPO_CHAPA_CHOICES, blank=True, null=True)
+    tipos_chapa = models.JSONField(default=list, blank=True)
     ativo = models.BooleanField(default=True)
 
     class Meta:

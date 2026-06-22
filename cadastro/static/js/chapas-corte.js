@@ -73,7 +73,7 @@ function renderTable(results) {
     const tbody = document.getElementById('chapas-corte-body');
 
     if (!results.length) {
-        tbody.innerHTML = '<tr><td colspan="5"><div class="operators-empty-state">Nenhuma chapa encontrada.</div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7"><div class="operators-empty-state">Nenhuma chapa encontrada.</div></td></tr>';
         return;
     }
 
@@ -87,6 +87,8 @@ function renderTable(results) {
                 <td class="mono-text">${escapeHtml(item.como_aparece_planilha)}</td>
                 <td class="text-end">${escapeHtml(item.espessura)}</td>
                 <td>${escapeHtml(item.codigo || '-')}</td>
+                <td class="text-end">${escapeHtml(item.largura_intervalo || '-')}</td>
+                <td>${escapeHtml(item.tipo_chapa_display || '-')}</td>
                 <td>
                     <span class="status-pill ${item.ativo ? 'is-active' : 'is-inactive'}">
                         <span class="status-dot"></span>${statusLabel}
@@ -99,6 +101,9 @@ function renderTable(results) {
                             data-como-aparece="${escapeHtml(item.como_aparece_planilha)}"
                             data-espessura="${escapeHtml(item.espessura)}"
                             data-codigo="${escapeHtml(item.codigo || '')}"
+                            data-largura="${escapeHtml(item.largura || '')}"
+                            data-largura-maxima="${escapeHtml(item.largura_maxima || '')}"
+                            data-tipos-chapa="${escapeHtml(JSON.stringify(item.tipos_chapa || []))}"
                             title="Editar">
                             <i class="bi bi-pencil-square"></i>
                         </button>
@@ -120,7 +125,7 @@ async function carregarTabela() {
     const tbody = document.getElementById('chapas-corte-body');
     tbody.innerHTML = `
         <tr>
-            <td colspan="5">
+            <td colspan="7">
                 <div class="operators-loading">
                     <div class="spinner-border text-primary" role="status"></div>
                     <span>Carregando chapas...</span>
@@ -165,8 +170,30 @@ function abrirModalEdicao(btn) {
     document.getElementById('chapa-como-aparece').value = btn.dataset.comoAparece || '';
     document.getElementById('chapa-espessura').value = btn.dataset.espessura || '';
     document.getElementById('chapa-codigo').value = btn.dataset.codigo || '';
+    document.getElementById('chapa-largura').value = btn.dataset.largura || '';
+    document.getElementById('chapa-largura-maxima').value = btn.dataset.larguraMaxima || '';
+    const tiposChapa = parseTiposChapa(btn.dataset.tiposChapa);
+    document.querySelectorAll('.chapa-tipo-checkbox').forEach(checkbox => {
+        checkbox.checked = tiposChapa.includes(checkbox.value);
+    });
     document.getElementById('chapa-modal-label').textContent = 'Editar chapa de corte';
     chapaModal.show();
+}
+
+function parseTiposChapa(value) {
+    if (!value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function getTiposChapaSelecionados() {
+    return Array.from(document.querySelectorAll('.chapa-tipo-checkbox:checked'))
+        .map(checkbox => checkbox.value)
+        .filter(Boolean);
 }
 
 function abrirModalStatus(btn) {
@@ -198,6 +225,14 @@ function bindEvents() {
     document.getElementById('btn-add-chapa').addEventListener('click', abrirModalCriacao);
 
     document.getElementById('chapa-espessura').addEventListener('input', event => {
+        normalizarEspessuraInput(event.target);
+    });
+
+    document.getElementById('chapa-largura').addEventListener('input', event => {
+        normalizarEspessuraInput(event.target);
+    });
+
+    document.getElementById('chapa-largura-maxima').addEventListener('input', event => {
         normalizarEspessuraInput(event.target);
     });
 
@@ -250,6 +285,7 @@ function bindForms() {
         event.preventDefault();
         const form = event.target;
         const formData = Object.fromEntries(new FormData(form).entries());
+        formData.tipos_chapa = getTiposChapaSelecionados();
         const isEdit = Boolean(formData.id);
         const btn = document.getElementById('save-chapa-btn');
         btn.disabled = true;
