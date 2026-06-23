@@ -28,6 +28,8 @@ urlpatterns = [
     path('api/deletar-programa/', views.deletar_programa, name='deletar_programa'),
     path('api/editar-programa/', views.editar_programa, name='editar_programa'),
     path('api/remover-peca-programa/', views.remover_peca_programa, name='remover_peca_programa'),
+    path('api/controle-pintura/criar/', views.criar_controle_pintura, name='criar_controle_pintura'),
+    path('api/controle-pintura/<int:pk>/editar/', views.editar_controle_pintura, name='editar_controle_pintura'),
 
     path('api/itens-retrabalho-pintura/', views.get_itens_retrabalho_pintura, name='itens_retrabalho_pintura'),
     path('api/itens-em-processo-pintura/', views.get_itens_em_processo_pintura, name='itens_em_processo_pintura'),
@@ -40,6 +42,7 @@ urlpatterns = [
 # templates
 urlpatterns += [
     path('', views.planejamento, name='planejamento'),
+    path('controle/', views.controle_pintura, name='controle_pintura'),
     path('programar-producao/', views.programar_producao, name='programar_producao'),
     path('retrabalho', views.retrabalho_pintura, name='retrabalho_pintura'),
     path('historico/', views.historico_pintura, name='historico_pintura'),

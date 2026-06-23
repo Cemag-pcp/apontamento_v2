@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import PecasOrdem, CambaoPecas, Retrabalho, Cambao, CambaoInterrupcao
+from .models import PecasOrdem, CambaoPecas, Retrabalho, Cambao, CambaoInterrupcao, ControlePintura
 from core.admin import RestrictedAdmin
 
 @admin.register(CambaoInterrupcao)
@@ -26,3 +26,10 @@ admin.site.register(PecasOrdem, RestrictedAdmin)
 admin.site.register(CambaoPecas, RestrictedAdmin)
 admin.site.register(Retrabalho, RestrictedAdmin)
 admin.site.register(Cambao, RestrictedAdmin)
+
+@admin.register(ControlePintura)
+class ControlePinturaAdmin(RestrictedAdmin):
+    list_display = ("data", "fornecedor", "cor", "lote", "pintor", "data_criacao")
+    list_filter = ("data", "cor", "data_criacao")
+    search_fields = ("fornecedor", "cor", "lote", "pintor", "pistola")
+    readonly_fields = ("data_criacao", "data_atualizacao")

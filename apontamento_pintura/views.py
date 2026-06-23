@@ -19,7 +19,7 @@ from uuid import uuid4
 from core.models import Profile
 from apontamento_pintura.models import Retrabalho
 from inspecao.models import Reinspecao, DadosExecucaoInspecao, Inspecao
-from .models import PecasOrdem, CambaoPecas, Cambao, CambaoInterrupcao, TesteFuncional, Programa, Programacao
+from .models import PecasOrdem, CambaoPecas, Cambao, CambaoInterrupcao, TesteFuncional, Programa, Programacao, ControlePintura
 from core.models import Ordem
 from cadastro.models import Operador, Conjuntos
 from inspecao.models import Inspecao
@@ -27,6 +27,88 @@ from core.utils import notificar_ordem
 
 def planejamento(request):
     return render(request, "apontamento_pintura/planejamento.html")
+
+def controle_pintura(request):
+    registros = ControlePintura.objects.all()
+    return render(request, "apontamento_pintura/controle_pintura.html", {"registros": registros})
+
+def _controle_pintura_payload(registro):
+    return {
+        "id": registro.id,
+        "data_iso": registro.data.strftime("%Y-%m-%d") if registro.data else "",
+        "data": registro.data.strftime("%d/%m/%Y") if registro.data else "",
+        "fornecedor": registro.fornecedor,
+        "cor": registro.cor,
+        "lote": registro.lote,
+        "quantidade_tinta": registro.quantidade_tinta,
+        "catalizador": registro.catalizador,
+        "diluente": registro.diluente,
+        "viscosidade": registro.viscosidade,
+        "pintor": registro.pintor,
+        "pistola": registro.pistola,
+        "qnt_demaos": registro.qnt_demaos,
+        "pressao_ar_1": registro.pressao_ar_1,
+        "pressao_ar_2": registro.pressao_ar_2,
+        "pressao_ar_3": registro.pressao_ar_3,
+    }
+
+def _dados_controle_pintura_request(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return None, JsonResponse({"error": "JSON inválido"}, status=400)
+
+    data_registro = None
+    data_informada = (data.get("data") or "").strip()
+    if data_informada:
+        try:
+            data_registro = datetime.strptime(data_informada, "%Y-%m-%d").date()
+        except ValueError:
+            return None, JsonResponse({"error": "Data inválida. Use YYYY-MM-DD."}, status=400)
+
+    return {
+        "data": data_registro,
+        "fornecedor": (data.get("fornecedor") or "").strip(),
+        "cor": (data.get("cor") or "").strip(),
+        "lote": (data.get("lote") or "").strip(),
+        "quantidade_tinta": (data.get("quantidade_tinta") or "").strip(),
+        "catalizador": (data.get("catalizador") or "").strip(),
+        "diluente": (data.get("diluente") or "").strip(),
+        "viscosidade": (data.get("viscosidade") or "").strip(),
+        "pintor": (data.get("pintor") or "").strip(),
+        "pistola": (data.get("pistola") or "").strip(),
+        "qnt_demaos": (data.get("qnt_demaos") or "").strip(),
+        "pressao_ar_1": (data.get("pressao_ar_1") or "").strip(),
+        "pressao_ar_2": (data.get("pressao_ar_2") or "").strip(),
+        "pressao_ar_3": (data.get("pressao_ar_3") or "").strip(),
+    }, None
+
+def criar_controle_pintura(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    dados, erro = _dados_controle_pintura_request(request)
+    if erro:
+        return erro
+
+    registro = ControlePintura.objects.create(**dados)
+
+    return JsonResponse({"success": True, "registro": _controle_pintura_payload(registro)})
+
+def editar_controle_pintura(request, pk):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    dados, erro = _dados_controle_pintura_request(request)
+    if erro:
+        return erro
+
+    registro = get_object_or_404(ControlePintura, pk=pk)
+    for campo, valor in dados.items():
+        setattr(registro, campo, valor)
+    registro.save()
+
+    return JsonResponse({"success": True, "registro": _controle_pintura_payload(registro)})
 
 def listar_programas(request):
     """

@@ -1,0 +1,669 @@
+{% extends "base.html" %}
+
+{% block title %}
+    <title>Controle de Pintura</title>
+{% endblock %}
+
+{% block links %}
+<style>
+    .controle-pintura-page {
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
+    }
+
+    .controle-pintura-toolbar {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .controle-pintura-sheet {
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .controle-pintura-title {
+        margin-bottom: .25rem;
+    }
+
+    .controle-pintura-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .controle-pintura-table {
+        min-width: 1660px;
+        table-layout: fixed;
+        font-size: .82rem;
+    }
+
+    .controle-pintura-table th,
+    .controle-pintura-table td {
+        vertical-align: middle;
+    }
+
+    .controle-pintura-table th {
+        font-weight: 600;
+        line-height: 1.15;
+        text-align: center;
+        white-space: normal;
+        word-break: normal;
+    }
+
+    .controle-pintura-table td {
+        height: 52px;
+    }
+
+    .controle-pintura-table td {
+        padding: .35rem .5rem;
+    }
+
+    .controle-pintura-cell-text {
+        display: block;
+        min-height: 1.25rem;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .controle-pintura-aplicacao {
+        display: grid;
+        grid-template-rows: repeat(3, 1fr);
+        height: 100%;
+        min-width: 0;
+    }
+
+    .controle-pintura-aplicacao-row {
+        display: grid;
+        grid-template-columns: 118px minmax(0, 1fr);
+        min-height: 22px;
+        border-bottom: 1px solid #dee2e6;
+        min-width: 0;
+    }
+
+    .controle-pintura-aplicacao-row:last-child {
+        border-bottom: 0;
+    }
+
+    .controle-pintura-aplicacao-label {
+        display: flex;
+        align-items: center;
+        padding: .2rem .35rem;
+        border-right: 1px solid #dee2e6;
+        font-weight: 600;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: rgba(0, 0, 0, .03);
+        color: #495057;
+        font-size: .76rem;
+    }
+
+    .controle-pintura-aplicacao-value {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        padding: .2rem .35rem;
+        word-break: break-word;
+    }
+
+    .col-data { width: 92px; }
+    .col-fornecedor { width: 140px; }
+    .col-cor { width: 96px; }
+    .col-lote { width: 100px; }
+    .col-qtd-tinta { width: 128px; }
+    .col-catalizador { width: 116px; }
+    .col-diluente { width: 116px; }
+    .col-viscosidade { width: 110px; }
+    .col-aplicacao { width: 320px; }
+    .col-pressao { width: 135px; }
+    .col-acoes { width: 74px; }
+
+    .controle-pintura-empty td {
+        text-align: center;
+    }
+
+    @page {
+        size: A4 landscape;
+        margin: 8mm;
+    }
+
+    @media print {
+        html,
+        body {
+            width: 297mm;
+            min-height: 210mm;
+            background: #fff !important;
+        }
+
+        .sb-topnav,
+        #layoutSidenav_nav,
+        footer,
+        .controle-pintura-toolbar {
+            display: none !important;
+        }
+
+        #layoutSidenav,
+        #layoutSidenav_content,
+        main,
+        .container-fluid,
+        .controle-pintura-page,
+        .controle-pintura-sheet,
+        .controle-pintura-panel,
+        .card,
+        .card-body {
+            display: block !important;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            background: #fff !important;
+        }
+
+        .controle-pintura-panel,
+        .card {
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .card-header {
+            display: none !important;
+        }
+
+        #layoutSidenav_content {
+            padding-left: 0 !important;
+        }
+
+        .controle-pintura-title {
+            text-align: center;
+            font-size: 15px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .controle-pintura-table-wrap {
+            overflow: visible !important;
+        }
+
+        .controle-pintura-table {
+            border-color: #000;
+            min-width: 0;
+            width: 100%;
+            font-size: 8px;
+            page-break-inside: avoid;
+        }
+
+        .controle-pintura-table th,
+        .controle-pintura-table td {
+            border-color: #000;
+        }
+
+        .controle-pintura-table th {
+            height: 24px;
+            padding: 2px;
+            background: #fff !important;
+            color: #000 !important;
+        }
+
+        .controle-pintura-table td {
+            height: 43px;
+        }
+
+        .controle-pintura-empty {
+            display: none !important;
+        }
+
+        .controle-pintura-aplicacao-row {
+            border-color: #000;
+            grid-template-columns: 58px minmax(0, 1fr);
+            min-height: 14px;
+        }
+
+        .controle-pintura-aplicacao-label {
+            border-color: #000;
+            background: #fff !important;
+            padding: 1px 2px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="controle-pintura-page">
+    <div class="controle-pintura-sheet">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+            <div>
+                <h1 class="h3 controle-pintura-title">Controle Pintura</h1>
+                <p class="text-muted mb-0">Registro de parametros de preparacao e aplicacao de tinta.</p>
+            </div>
+            <div class="controle-pintura-toolbar">
+                <button type="button" class="btn btn-sm btn-primary" id="btnNovoControlePintura" data-bs-toggle="modal" data-bs-target="#modalControlePintura">
+                    <i class="bi bi-plus-circle"></i> Novo Registro
+                </button>
+            </div>
+        </div>
+
+        <div class="card controle-pintura-panel">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-table me-1"></i> Registros de Pintura</span>
+            </div>
+            <div class="card-body">
+                <div class="controle-pintura-table-wrap table-responsive">
+                    <table class="controle-pintura-table table table-sm table-striped table-hover align-middle mb-0" aria-label="Controle de Pintura">
+                        <thead>
+                            <tr>
+                                <th class="col-data">DATA</th>
+                                <th class="col-fornecedor">FORNECEDOR</th>
+                                <th class="col-cor">COR</th>
+                                <th class="col-lote">LOTE</th>
+                                <th class="col-qtd-tinta">QUANTIDADE DE TINTA</th>
+                                <th class="col-catalizador">CATALIZADOR</th>
+                                <th class="col-diluente">DILUENTE</th>
+                                <th class="col-viscosidade">VISCOSIDADE (s)</th>
+                                <th class="col-aplicacao">INFORMACOES DE APLICACAO</th>
+                                <th class="col-pressao">PRESSAO DO AR 1 (bar)</th>
+                                <th class="col-pressao">PRESSAO DO AR 2 (bar)</th>
+                                <th class="col-pressao">PRESSAO DO AR 3 (bar)</th>
+                                <th class="col-acoes text-center">AÇÃO</th>
+                            </tr>
+                        </thead>
+                        <tbody id="controlePinturaTableBody">
+                            <tr class="controle-pintura-empty" id="controlePinturaEmptyRow"{% if registros %} style="display:none;"{% endif %}>
+                                <td colspan="13" class="text-center text-muted py-4">Clique em Novo Registro para adicionar dados ao controle.</td>
+                            </tr>
+                            {% for registro in registros %}
+                            <tr data-registro-id="{{ registro.id }}"
+                                data-data="{{ registro.data|date:'Y-m-d' }}"
+                                data-fornecedor="{{ registro.fornecedor }}"
+                                data-cor="{{ registro.cor }}"
+                                data-lote="{{ registro.lote }}"
+                                data-quantidade-tinta="{{ registro.quantidade_tinta }}"
+                                data-catalizador="{{ registro.catalizador }}"
+                                data-diluente="{{ registro.diluente }}"
+                                data-viscosidade="{{ registro.viscosidade }}"
+                                data-pintor="{{ registro.pintor }}"
+                                data-pistola="{{ registro.pistola }}"
+                                data-qnt-demaos="{{ registro.qnt_demaos }}"
+                                data-pressao-ar-1="{{ registro.pressao_ar_1 }}"
+                                data-pressao-ar-2="{{ registro.pressao_ar_2 }}"
+                                data-pressao-ar-3="{{ registro.pressao_ar_3 }}">
+                                <td><span class="controle-pintura-cell-text">{{ registro.data|date:'d/m/Y' }}</span></td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.fornecedor }}</span></td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.cor }}</span></td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.lote }}</span></td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.quantidade_tinta }}</span></td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.catalizador }}</span></td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.diluente }}</span></td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.viscosidade }}</span></td>
+                                <td>
+                                    <div class="controle-pintura-aplicacao">
+                                        <div class="controle-pintura-aplicacao-row">
+                                            <span class="controle-pintura-aplicacao-label">PINTOR</span>
+                                            <span class="controle-pintura-aplicacao-value">{{ registro.pintor }}</span>
+                                        </div>
+                                        <div class="controle-pintura-aplicacao-row">
+                                            <span class="controle-pintura-aplicacao-label">PISTOLA</span>
+                                            <span class="controle-pintura-aplicacao-value">{{ registro.pistola }}</span>
+                                        </div>
+                                        <div class="controle-pintura-aplicacao-row">
+                                            <span class="controle-pintura-aplicacao-label">QNT DE DEMAOS</span>
+                                            <span class="controle-pintura-aplicacao-value">{{ registro.qnt_demaos }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.pressao_ar_1 }}</span></td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.pressao_ar_2 }}</span></td>
+                                <td><span class="controle-pintura-cell-text">{{ registro.pressao_ar_3 }}</span></td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-editar-controle-pintura" title="Editar" aria-label="Editar">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalControlePintura" tabindex="-1" aria-labelledby="modalControlePinturaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalControlePinturaLabel">Controle Pintura</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="controlePinturaForm">
+                    <input type="hidden" id="controleRegistroId">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label for="controleData" class="form-label">Data</label>
+                            <input type="date" class="form-control" id="controleData">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="controleFornecedor" class="form-label">Fornecedor</label>
+                            <input type="text" class="form-control" id="controleFornecedor">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="controleCor" class="form-label">Cor</label>
+                            <input type="text" class="form-control" id="controleCor">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="controleLote" class="form-label">Lote</label>
+                            <input type="text" class="form-control" id="controleLote">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="controleQuantidadeTinta" class="form-label">Quantidade de tinta</label>
+                            <input type="text" class="form-control" id="controleQuantidadeTinta">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="controleCatalizador" class="form-label">Catalizador</label>
+                            <input type="text" class="form-control" id="controleCatalizador">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="controleDiluente" class="form-label">Diluente</label>
+                            <input type="text" class="form-control" id="controleDiluente">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="controleViscosidade" class="form-label">Viscosidade (s)</label>
+                            <input type="text" class="form-control" id="controleViscosidade" inputmode="decimal">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="controlePintor" class="form-label">Pintor</label>
+                            <input type="text" class="form-control" id="controlePintor">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="controlePistola" class="form-label">Pistola</label>
+                            <input type="text" class="form-control" id="controlePistola">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="controleDemaos" class="form-label">Qnt de demaos</label>
+                            <input type="number" class="form-control" id="controleDemaos" min="0" step="1">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="controlePressao1" class="form-label">Pressao do ar 1 (bar)</label>
+                            <input type="number" class="form-control" id="controlePressao1" min="0" step="0.01">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="controlePressao2" class="form-label">Pressao do ar 2 (bar)</label>
+                            <input type="number" class="form-control" id="controlePressao2" min="0" step="0.01">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="controlePressao3" class="form-label">Pressao do ar 3 (bar)</label>
+                            <input type="number" class="form-control" id="controlePressao3" min="0" step="0.01">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSalvarControlePintura">Adicionar na tabela</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var tableBody = document.getElementById('controlePinturaTableBody');
+    var emptyRow = document.getElementById('controlePinturaEmptyRow');
+    var form = document.getElementById('controlePinturaForm');
+    var registroIdInput = document.getElementById('controleRegistroId');
+    var saveButton = document.getElementById('btnSalvarControlePintura');
+    var novoButton = document.getElementById('btnNovoControlePintura');
+    var modalElement = document.getElementById('modalControlePintura');
+    var modalTitle = document.getElementById('modalControlePinturaLabel');
+    var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+
+    function getValue(id) {
+        return document.getElementById(id).value.trim();
+    }
+
+    function getCsrfToken() {
+        var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return input ? input.value : '';
+    }
+
+    function setValue(id, value) {
+        document.getElementById(id).value = value || '';
+    }
+
+    function formatDateFromIso(value) {
+        if (!value) return '';
+        var parts = value.split('-');
+        if (parts.length !== 3) return value;
+        return parts[2] + '/' + parts[1] + '/' + parts[0];
+    }
+
+    function appendCell(row, value) {
+        var cell = document.createElement('td');
+        var text = document.createElement('span');
+        text.className = 'controle-pintura-cell-text';
+        text.textContent = value || '';
+        cell.appendChild(text);
+        row.appendChild(cell);
+    }
+
+    function appendApplicationCell(row, values) {
+        var cell = document.createElement('td');
+        var wrapper = document.createElement('div');
+        wrapper.className = 'controle-pintura-aplicacao';
+
+        [
+            ['PINTOR', values.pintor],
+            ['PISTOLA', values.pistola],
+            ['QNT DE DEMAOS', values.demaos]
+        ].forEach(function(item) {
+            var applicationRow = document.createElement('div');
+            applicationRow.className = 'controle-pintura-aplicacao-row';
+
+            var label = document.createElement('span');
+            label.className = 'controle-pintura-aplicacao-label';
+            label.textContent = item[0];
+
+            var value = document.createElement('span');
+            value.className = 'controle-pintura-aplicacao-value';
+            value.textContent = item[1] || '';
+
+            applicationRow.appendChild(label);
+            applicationRow.appendChild(value);
+            wrapper.appendChild(applicationRow);
+        });
+
+        cell.appendChild(wrapper);
+        row.appendChild(cell);
+    }
+
+    function setRowData(row, registro) {
+        row.dataset.registroId = registro.id;
+        row.dataset.data = registro.data_iso || '';
+        row.dataset.fornecedor = registro.fornecedor || '';
+        row.dataset.cor = registro.cor || '';
+        row.dataset.lote = registro.lote || '';
+        row.dataset.quantidadeTinta = registro.quantidade_tinta || '';
+        row.dataset.catalizador = registro.catalizador || '';
+        row.dataset.diluente = registro.diluente || '';
+        row.dataset.viscosidade = registro.viscosidade || '';
+        row.dataset.pintor = registro.pintor || '';
+        row.dataset.pistola = registro.pistola || '';
+        row.dataset.qntDemaos = registro.qnt_demaos || '';
+        row.dataset.pressaoAr1 = registro.pressao_ar_1 || '';
+        row.dataset.pressaoAr2 = registro.pressao_ar_2 || '';
+        row.dataset.pressaoAr3 = registro.pressao_ar_3 || '';
+    }
+
+    function appendActionCell(row) {
+        var cell = document.createElement('td');
+        cell.className = 'text-center';
+        cell.innerHTML = [
+            '<button type="button" class="btn btn-sm btn-outline-primary btn-editar-controle-pintura" title="Editar" aria-label="Editar">',
+            '<i class="fas fa-pen"></i>',
+            '</button>'
+        ].join('');
+        row.appendChild(cell);
+    }
+
+    function fillRow(row, registro) {
+        setRowData(row, registro);
+        row.innerHTML = '';
+
+        appendCell(row, registro.data);
+        appendCell(row, registro.fornecedor);
+        appendCell(row, registro.cor);
+        appendCell(row, registro.lote);
+        appendCell(row, registro.quantidade_tinta);
+        appendCell(row, registro.catalizador);
+        appendCell(row, registro.diluente);
+        appendCell(row, registro.viscosidade);
+        appendApplicationCell(row, {
+            pintor: registro.pintor,
+            pistola: registro.pistola,
+            demaos: registro.qnt_demaos
+        });
+        appendCell(row, registro.pressao_ar_1);
+        appendCell(row, registro.pressao_ar_2);
+        appendCell(row, registro.pressao_ar_3);
+        appendActionCell(row);
+    }
+
+    function appendControleRow(registro) {
+        var row = document.createElement('tr');
+        fillRow(row, registro);
+
+        emptyRow.style.display = 'none';
+        tableBody.appendChild(row);
+    }
+
+    function buildPayload() {
+        return {
+            data: getValue('controleData'),
+            fornecedor: getValue('controleFornecedor'),
+            cor: getValue('controleCor'),
+            lote: getValue('controleLote'),
+            quantidade_tinta: getValue('controleQuantidadeTinta'),
+            catalizador: getValue('controleCatalizador'),
+            diluente: getValue('controleDiluente'),
+            viscosidade: getValue('controleViscosidade'),
+            pintor: getValue('controlePintor'),
+            pistola: getValue('controlePistola'),
+            qnt_demaos: getValue('controleDemaos'),
+            pressao_ar_1: getValue('controlePressao1'),
+            pressao_ar_2: getValue('controlePressao2'),
+            pressao_ar_3: getValue('controlePressao3')
+        };
+    }
+
+    function resetModalForCreate() {
+        form.reset();
+        registroIdInput.value = '';
+        modalTitle.textContent = 'Controle Pintura';
+        saveButton.textContent = 'Adicionar na tabela';
+    }
+
+    function fillModalForEdit(row) {
+        registroIdInput.value = row.dataset.registroId || '';
+        setValue('controleData', row.dataset.data);
+        setValue('controleFornecedor', row.dataset.fornecedor);
+        setValue('controleCor', row.dataset.cor);
+        setValue('controleLote', row.dataset.lote);
+        setValue('controleQuantidadeTinta', row.dataset.quantidadeTinta);
+        setValue('controleCatalizador', row.dataset.catalizador);
+        setValue('controleDiluente', row.dataset.diluente);
+        setValue('controleViscosidade', row.dataset.viscosidade);
+        setValue('controlePintor', row.dataset.pintor);
+        setValue('controlePistola', row.dataset.pistola);
+        setValue('controleDemaos', row.dataset.qntDemaos);
+        setValue('controlePressao1', row.dataset.pressaoAr1);
+        setValue('controlePressao2', row.dataset.pressaoAr2);
+        setValue('controlePressao3', row.dataset.pressaoAr3);
+        modalTitle.textContent = 'Editar Controle Pintura';
+        saveButton.textContent = 'Salvar alterações';
+    }
+
+    function syncInitialRows() {
+        tableBody.querySelectorAll('tr[data-registro-id]').forEach(function(row) {
+            if (!row.dataset.data && row.querySelector('.btn-editar-controle-pintura')) {
+                row.dataset.data = '';
+            }
+        });
+    }
+
+    novoButton.addEventListener('click', resetModalForCreate);
+
+    tableBody.addEventListener('click', function(event) {
+        var button = event.target.closest('.btn-editar-controle-pintura');
+        if (!button) return;
+
+        var row = button.closest('tr[data-registro-id]');
+        if (!row) return;
+
+        fillModalForEdit(row);
+        modal.show();
+    });
+
+    saveButton.addEventListener('click', function() {
+        var payload = buildPayload();
+        var registroId = registroIdInput.value;
+        var url = registroId
+            ? "{% url 'pintura:editar_controle_pintura' 0 %}".replace('/0/', '/' + registroId + '/')
+            : "{% url 'pintura:criar_controle_pintura' %}";
+
+        saveButton.disabled = true;
+        saveButton.textContent = 'Salvando...';
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(function(response) {
+            return response.json().then(function(data) {
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao salvar registro.');
+                }
+                return data;
+            });
+        })
+        .then(function(data) {
+            if (registroId) {
+                var row = tableBody.querySelector('tr[data-registro-id="' + registroId + '"]');
+                if (row) {
+                    fillRow(row, data.registro);
+                }
+            } else {
+                appendControleRow(data.registro);
+            }
+            form.reset();
+            registroIdInput.value = '';
+            modal.hide();
+        })
+        .catch(function(error) {
+            alert(error.message);
+        })
+        .finally(function() {
+            saveButton.disabled = false;
+            saveButton.textContent = registroIdInput.value ? 'Salvar alterações' : 'Adicionar na tabela';
+        });
+    });
+
+    modalElement.addEventListener('shown.bs.modal', function() {
+        document.getElementById('controleData').focus();
+    });
+
+    modalElement.addEventListener('hidden.bs.modal', resetModalForCreate);
+
+    syncInitialRows();
+});
+</script>
+{% endblock %}
