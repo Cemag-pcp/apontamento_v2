@@ -1085,7 +1085,8 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         }
         carregarOrdensIniciadas(filtros, true);
         resetarCardsInicial(filtros);
-        mostrarToast('Ordem finalizada com sucesso!', 'success');
+        const chave = data.chave_apontamento ? ` Chave ERP: ${data.chave_apontamento}` : '';
+        mostrarToast(`Ordem finalizada com sucesso!${chave}`, 'success');
     })
     .catch(error => {
         // Rollback: restaura o card
@@ -1212,7 +1213,8 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
     .then(data => {
         carregarOrdensIniciadas(filtros, true);
         resetarCardsInicial(filtros);
-        mostrarToast('Apontamento registrado com sucesso!', 'success');
+        const chave = data.chave_apontamento ? ` Chave ERP: ${data.chave_apontamento}` : '';
+        mostrarToast(`Apontamento registrado com sucesso!${chave}`, 'success');
     })
     .catch(error => {
         // Rollback: restaura o card

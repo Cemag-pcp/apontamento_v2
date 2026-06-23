@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
 
@@ -14,6 +15,18 @@ class PecasOrdem(models.Model):
     operador=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_produzido_montagem', blank=True, null=True)
     data = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     processo_ordem = models.ForeignKey(OrdemProcesso, on_delete=models.CASCADE, related_name='processo_ordem_montagem', blank=True, null=True)
+    data_apontamento = models.DateTimeField(null=True, blank=True)
+    resp_apontamento = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='apontamentos_montagem_responsavel',
+    )
+    chave_apontamento = models.TextField(null=True, blank=True)
+    apontado = models.BooleanField(default=False)
+    tipo_apontamento = models.CharField(max_length=20, null=True, blank=True)
+    erro_apontamento = models.TextField(null=True, blank=True)
 
 class ConjuntosInspecionados(models.Model):
 

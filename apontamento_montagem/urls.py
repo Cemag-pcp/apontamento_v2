@@ -22,6 +22,8 @@ urlpatterns = [
     path('api/criar-ordem-fora-sequenciamento/', views.criar_ordem_fora_sequenciamento, name='criar_ordem_fora_sequenciamento'),
     path('api/retornar-processo/', views.retornar_processo, name='retornar_processo'),
     path('api/apontamento-qrcode/', views.api_apontamento_qrcode, name='api_apontamento_qrcode'),
+    path('api/erp/apontamentos/', views.api_erp_apontamentos_montagem, name='api_erp_apontamentos_montagem'),
+    path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_montagem, name='api_erp_apontar_item_montagem'),
 ]
 
 # templates
@@ -29,6 +31,7 @@ urlpatterns += [
     path('', views.planejamento, name='planejamento'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('apontamento-qrcode/', views.apontamento_qrcode, name='apontamento_qrcode'),
+    path('erp/apontamentos/', views.erp_apontamentos_montagem, name='erp_apontamentos_montagem'),
 ]
 
 # Google sheets
