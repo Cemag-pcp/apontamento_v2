@@ -8,9 +8,13 @@ class FuncionarioAdmin(admin.ModelAdmin):
 
 class ItensSolicitacaoAdmin(admin.ModelAdmin):
     search_fields = ['codigo', 'nome', 'classe_requisicao__nome']
+    list_display = ['codigo', 'nome', 'unidade', 'ativo']
+    list_filter = ['ativo', 'classe_requisicao']
 
 class ItensTransferenciaAdmin(admin.ModelAdmin):
     search_fields = ['codigo', 'nome']
+    list_display = ['codigo', 'nome', 'unidade', 'ativo']
+    list_filter = ['ativo']
 
 class DepositoDestinoAdmin(admin.ModelAdmin):
     search_fields = ['nome']

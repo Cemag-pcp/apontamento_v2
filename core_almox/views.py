@@ -2,12 +2,15 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.db import transaction
+from django.db.models import Q
+from django.core.paginator import Paginator
 
 
 from solicitacao_almox.models import SolicitacaoRequisicao, SolicitacaoTransferencia
 from solicitacao_almox.forms import SolicitacaoRequisicaoForm, SolicitacaoTransferenciaForm
 from cadastro_almox.forms import FuncionarioAlmoxForm, RegraSlaAlmoxForm
 from cadastro_almox.models import (
+    ClasseRequisicao,
     OperadorAlmox,
     Funcionario,
     ItensSolicitacao,
@@ -19,6 +22,7 @@ from core_almox.models import RegistroAcaoSolicitacaoAlmox
 from core.utils import notificar_acao_almox
 
 from datetime import datetime
+from urllib.parse import urlencode
 from automacoes.conexao_plan import busca_saldo_recurso_central
 from time import time
 import environ
@@ -529,12 +533,12 @@ def processar_edicao(request):
         if tipo_solicitacao == "requisicao":
             # Extraia o código do item da string recebida
             item_codigo = item_str.split(" - ")[0].strip()  # Supondo que o primeiro item seja o código do item
-            item = get_object_or_404(ItensSolicitacao, codigo=item_codigo)
+            item = get_object_or_404(ItensSolicitacao, codigo=item_codigo, ativo=True)
             solicitacao = get_object_or_404(SolicitacaoRequisicao, id=solicitacao_id)
         elif tipo_solicitacao == "transferencia":
             # Extraia o código do item da string recebida
             item_codigo = item_str.split(" - ")[0].strip()  # Supondo que o primeiro item seja o código do item
-            item = get_object_or_404(ItensTransferencia, codigo=item_codigo)
+            item = get_object_or_404(ItensTransferencia, codigo=item_codigo, ativo=True)
             solicitacao = get_object_or_404(SolicitacaoTransferencia, id=solicitacao_id)
 
         # Atualiza os campos da solicitação com os novos valores
@@ -678,3 +682,204 @@ def gerenciar_funcionarios_almox(request):
         'total_inativos': len(funcionarios) - ativos,
     }
     return render(request, 'home/funcionarios_almox.html', context)
+
+
+@login_required
+def gerenciar_requisicoes_almox(request):
+    if not _usuario_pode_gerir_cadastro_almox(request):
+        return HttpResponseForbidden("Sem permissao para gerenciar produtos requisitaveis do almoxarifado.")
+
+    search = (request.GET.get("search") or request.POST.get("search") or "").strip()
+    status = (request.GET.get("status") or request.POST.get("status") or "").strip()
+    page = request.GET.get("page") or request.POST.get("page") or 1
+    erro_cadastro = ""
+    novo_item_form = {
+        "codigo": "",
+        "nome": "",
+        "unidade": "",
+        "ativo": True,
+        "classes": [],
+    }
+
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+
+        if acao == "criar":
+            codigo = (request.POST.get("codigo") or "").strip()
+            nome = (request.POST.get("nome") or "").strip()
+            unidade = (request.POST.get("unidade") or "").strip()
+            classe_ids = request.POST.getlist("classes")
+            ativo = request.POST.get("ativo") == "on"
+
+            novo_item_form = {
+                "codigo": codigo,
+                "nome": nome,
+                "unidade": unidade,
+                "ativo": ativo,
+                "classes": classe_ids,
+            }
+
+            if not codigo or not nome:
+                erro_cadastro = "Informe código e nome do produto."
+            elif not classe_ids:
+                erro_cadastro = "Selecione ao menos uma classe de requisição."
+            elif ItensSolicitacao.objects.filter(codigo=codigo).exists():
+                erro_cadastro = "Já existe um produto com este código."
+            else:
+                item = ItensSolicitacao.objects.create(
+                    codigo=codigo,
+                    nome=nome,
+                    unidade=unidade or None,
+                    ativo=ativo,
+                )
+                item.classe_requisicao.set(classe_ids)
+                return redirect(f"{request.path}?search={codigo}")
+
+        else:
+            item = get_object_or_404(ItensSolicitacao, pk=request.POST.get("item_id"))
+            item.ativo = not item.ativo
+            item.save(update_fields=["ativo"])
+            params = {}
+            if search:
+                params["search"] = search
+            if status:
+                params["status"] = status
+            if page:
+                params["page"] = page
+            if params:
+                return redirect(f"{request.path}?{urlencode(params)}")
+            return redirect("gerenciar_requisicoes_almox")
+
+    itens_qs = ItensSolicitacao.objects.prefetch_related("classe_requisicao")
+    if search:
+        itens_qs = itens_qs.filter(Q(codigo__icontains=search) | Q(nome__icontains=search))
+    if status == "ativos":
+        itens_qs = itens_qs.filter(ativo=True)
+    elif status == "inativos":
+        itens_qs = itens_qs.filter(ativo=False)
+
+    itens_qs = itens_qs.order_by("-ativo", "codigo", "nome")
+    total_itens = itens_qs.count()
+    total_ativos = itens_qs.filter(ativo=True).count()
+    total_inativos = total_itens - total_ativos
+    paginator = Paginator(itens_qs, 20)
+    page_obj = paginator.get_page(page)
+
+    query_base = {}
+    if search:
+        query_base["search"] = search
+    if status:
+        query_base["status"] = status
+    query_string = urlencode(query_base)
+
+    context = {
+        "itens": page_obj,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "search": search,
+        "status": status,
+        "total_itens": total_itens,
+        "total_ativos": total_ativos,
+        "total_inativos": total_inativos,
+        "classes_requisicao": ClasseRequisicao.objects.order_by("nome"),
+        "erro_cadastro": erro_cadastro,
+        "novo_item_form": novo_item_form,
+    }
+    return render(request, "home/requisicoes_almox.html", context)
+
+
+@login_required
+def gerenciar_transferencias_almox(request):
+    if not _usuario_pode_gerir_cadastro_almox(request):
+        return HttpResponseForbidden("Sem permissao para gerenciar produtos transferiveis do almoxarifado.")
+
+    search = (request.GET.get("search") or request.POST.get("search") or "").strip()
+    status = (request.GET.get("status") or request.POST.get("status") or "").strip()
+    page = request.GET.get("page") or request.POST.get("page") or 1
+    erro_cadastro = ""
+    novo_item_form = {
+        "codigo": "",
+        "nome": "",
+        "unidade": "",
+        "ativo": True,
+    }
+
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+
+        if acao == "criar":
+            codigo = (request.POST.get("codigo") or "").strip()
+            nome = (request.POST.get("nome") or "").strip()
+            unidade = (request.POST.get("unidade") or "").strip()
+            ativo = request.POST.get("ativo") == "on"
+
+            novo_item_form = {
+                "codigo": codigo,
+                "nome": nome,
+                "unidade": unidade,
+                "ativo": ativo,
+            }
+
+            if not codigo or not nome:
+                erro_cadastro = "Informe código e nome do produto."
+            elif ItensTransferencia.objects.filter(codigo=codigo).exists():
+                erro_cadastro = "Já existe um produto com este código."
+            else:
+                ItensTransferencia.objects.create(
+                    codigo=codigo,
+                    nome=nome,
+                    unidade=unidade or None,
+                    ativo=ativo,
+                )
+                return redirect(f"{request.path}?search={codigo}")
+
+        else:
+            item = get_object_or_404(ItensTransferencia, pk=request.POST.get("item_id"))
+            item.ativo = not item.ativo
+            item.save(update_fields=["ativo"])
+            params = {}
+            if search:
+                params["search"] = search
+            if status:
+                params["status"] = status
+            if page:
+                params["page"] = page
+            if params:
+                return redirect(f"{request.path}?{urlencode(params)}")
+            return redirect("gerenciar_transferencias_almox")
+
+    itens_qs = ItensTransferencia.objects.all()
+    if search:
+        itens_qs = itens_qs.filter(Q(codigo__icontains=search) | Q(nome__icontains=search))
+    if status == "ativos":
+        itens_qs = itens_qs.filter(ativo=True)
+    elif status == "inativos":
+        itens_qs = itens_qs.filter(ativo=False)
+
+    itens_qs = itens_qs.order_by("-ativo", "codigo", "nome")
+    total_itens = itens_qs.count()
+    total_ativos = itens_qs.filter(ativo=True).count()
+    total_inativos = total_itens - total_ativos
+    paginator = Paginator(itens_qs, 20)
+    page_obj = paginator.get_page(page)
+
+    query_base = {}
+    if search:
+        query_base["search"] = search
+    if status:
+        query_base["status"] = status
+    query_string = urlencode(query_base)
+
+    context = {
+        "itens": page_obj,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "search": search,
+        "status": status,
+        "total_itens": total_itens,
+        "total_ativos": total_ativos,
+        "total_inativos": total_inativos,
+        "erro_cadastro": erro_cadastro,
+        "novo_item_form": novo_item_form,
+    }
+    return render(request, "home/transferencias_almox.html", context)

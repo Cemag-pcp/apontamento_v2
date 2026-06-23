@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <h2 class="mb-1">Transferências do Almoxarifado</h2>
+            <p class="text-muted mb-0">Controle quais produtos podem ser usados em transferências pelos colaboradores.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <span class="badge text-bg-light">{{ total_itens }} produto{{ total_itens|pluralize }}</span>
+            <span class="badge text-bg-success">{{ total_ativos }} ativo{{ total_ativos|pluralize }}</span>
+            <span class="badge text-bg-secondary">{{ total_inativos }} inativo{{ total_inativos|pluralize }}</span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
+                <h3 class="h5 mb-0">Produtos transferíveis</h3>
+
+                <div class="d-flex flex-column flex-sm-row gap-2">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoProdutoTransferencia">
+                        Novo produto
+                    </button>
+
+                    <div class="btn-group" role="group" aria-label="Filtro de status">
+                        <a href="{% url 'gerenciar_transferencias_almox' %}{% if search %}?search={{ search|urlencode }}{% endif %}" class="btn btn-outline-secondary {% if not status %}active{% endif %}">
+                            Todos
+                        </a>
+                        <a href="{% url 'gerenciar_transferencias_almox' %}?status=inativos{% if search %}&search={{ search|urlencode }}{% endif %}" class="btn btn-outline-secondary {% if status == 'inativos' %}active{% endif %}">
+                            Apenas inativos
+                        </a>
+                    </div>
+
+                    <form method="get" class="d-flex gap-2">
+                        {% if status %}
+                            <input type="hidden" name="status" value="{{ status }}">
+                        {% endif %}
+                        <input
+                            type="text"
+                            name="search"
+                            class="form-control"
+                            placeholder="Buscar por código ou nome..."
+                            value="{{ search }}"
+                            style="min-width: 280px;"
+                        >
+                        <button type="submit" class="btn btn-outline-secondary">Buscar</button>
+                        {% if search or status %}
+                            <a href="{% url 'gerenciar_transferencias_almox' %}" class="btn btn-outline-light border">Limpar</a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Nome</th>
+                            <th>Unidade</th>
+                            <th>Status</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in itens %}
+                            <tr>
+                                <td class="fw-semibold">{{ item.codigo }}</td>
+                                <td>{{ item.nome }}</td>
+                                <td>{{ item.unidade|default:"-" }}</td>
+                                <td>
+                                    {% if item.ativo %}
+                                        <span class="badge text-bg-success">Ativo</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">Inativo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <form method="post" onsubmit="return confirm('{% if item.ativo %}Desativar{% else %}Ativar{% endif %} o produto {{ item.codigo }} - {{ item.nome }}?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="item_id" value="{{ item.id }}">
+                                        {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+                                        {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+                                        <input type="hidden" name="page" value="{{ page_obj.number }}">
+                                        <button type="submit" class="btn {% if item.ativo %}btn-outline-danger{% else %}btn-outline-success{% endif %} btn-sm">
+                                            {% if item.ativo %}
+                                                Desativar
+                                            {% else %}
+                                                Ativar
+                                            {% endif %}
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    Nenhum produto encontrado.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
+                <div class="small text-muted">
+                    Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }} | {{ total_itens }} produto{{ total_itens|pluralize }}
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    {% if page_obj.has_previous %}
+                        <a class="btn btn-sm btn-outline-secondary" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
+                    {% else %}
+                        <button class="btn btn-sm btn-outline-secondary" disabled>Anterior</button>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if num == page_obj.number %}
+                            <span class="btn btn-sm btn-primary disabled">{{ num }}</span>
+                        {% elif num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                            <a class="btn btn-sm btn-outline-secondary" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ num }}">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <a class="btn btn-sm btn-outline-secondary" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}">Próxima</a>
+                    {% else %}
+                        <button class="btn btn-sm btn-outline-secondary" disabled>Próxima</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalNovoProdutoTransferencia" tabindex="-1" aria-labelledby="modalNovoProdutoTransferenciaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title h5 mb-0" id="modalNovoProdutoTransferenciaLabel">Novo produto transferível</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                {% if erro_cadastro %}
+                    <div class="alert alert-danger" role="alert">{{ erro_cadastro }}</div>
+                {% endif %}
+
+                <form method="post" id="formNovoProdutoTransferencia">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="criar">
+                    {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+                    {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+                    <input type="hidden" name="page" value="{{ page_obj.number }}">
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="novoProdutoTransferenciaCodigo" class="form-label">Código</label>
+                            <input type="text" class="form-control" id="novoProdutoTransferenciaCodigo" name="codigo" value="{{ novo_item_form.codigo }}" maxlength="20" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="novoProdutoTransferenciaNome" class="form-label">Nome</label>
+                            <input type="text" class="form-control" id="novoProdutoTransferenciaNome" name="nome" value="{{ novo_item_form.nome }}" maxlength="160" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="novoProdutoTransferenciaUnidade" class="form-label">Unidade</label>
+                            <input type="text" class="form-control" id="novoProdutoTransferenciaUnidade" name="unidade" value="{{ novo_item_form.unidade }}" maxlength="10">
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="novoProdutoTransferenciaAtivo" name="ativo" {% if novo_item_form.ativo %}checked{% endif %}>
+                                <label class="form-check-label" for="novoProdutoTransferenciaAtivo">Produto ativo para transferência</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" form="formNovoProdutoTransferencia" class="btn btn-primary">Adicionar produto</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if erro_cadastro %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNovoProdutoTransferencia'));
+    modal.show();
+});
+</script>
+{% endif %}
+{% endblock %}

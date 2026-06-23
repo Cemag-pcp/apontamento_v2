@@ -30,6 +30,7 @@ class ItensSolicitacao(models.Model):
     nome = models.CharField(max_length=120)
     classe_requisicao = models.ManyToManyField(ClasseRequisicao)
     unidade = models.CharField(max_length=10, blank=True, null=True)
+    ativo = models.BooleanField(default=True)
 
     def __str__(self):
         return f'{self.codigo} - {self.nome}'
@@ -39,6 +40,7 @@ class ItensTransferencia(models.Model):
     codigo = models.CharField(max_length=20, unique=True)
     nome = models.CharField(max_length=160)
     unidade = models.CharField(max_length=10, blank=True, null=True)
+    ativo = models.BooleanField(default=True)
 
     def __str__(self):
 

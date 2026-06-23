@@ -1,6 +1,6 @@
 from django import forms
 from .models import *
-from cadastro_almox.models import RegraSlaAlmox
+from cadastro_almox.models import ItensSolicitacao, ItensTransferencia, RegraSlaAlmox
 
 class SolicitacaoRequisicaoForm(forms.ModelForm):
     status = forms.ModelChoiceField(
@@ -15,6 +15,8 @@ class SolicitacaoRequisicaoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['funcionario'].queryset = Funcionario.objects.filter(ativo=True).order_by('nome', 'matricula')
+        self.fields['item'].queryset = ItensTransferencia.objects.filter(ativo=True).order_by('codigo')
+        self.fields['item'].queryset = ItensSolicitacao.objects.filter(ativo=True).order_by('codigo')
 
 class SolicitacaoTransferenciaForm(forms.ModelForm):
     status = forms.ModelChoiceField(

@@ -51,8 +51,8 @@ import json
 
 def criar_solicitacoes(request):
     funcionarios = Funcionario.objects.filter(ativo=True).order_by("nome", "matricula")
-    itens_requisicao = ItensSolicitacao.objects.all()
-    itens_transferencia = ItensTransferencia.objects.all()
+    itens_requisicao = ItensSolicitacao.objects.filter(ativo=True).order_by("codigo")
+    itens_transferencia = ItensTransferencia.objects.filter(ativo=True).order_by("codigo")
     depositos_destino = DepositoDestino.objects.all()
     form_requisicao = SolicitacaoRequisicaoForm(request.POST, prefix="requisicao")
     centro_custo = Cc.objects.all()
@@ -158,7 +158,7 @@ def get_cc_by_matricula(request):
 
 def get_unidade_by_item(request):
     item_id = request.GET.get("item_id")
-    item = ItensSolicitacao.objects.filter(id=item_id).first()
+    item = ItensSolicitacao.objects.filter(id=item_id, ativo=True).first()
     if item:
         unidade = item.unidade
         return JsonResponse({"unidade": unidade})
@@ -169,7 +169,7 @@ def carregar_classes(request):
     item_id = request.GET.get("item_id")
     id_solicitacao = request.GET.get("solicitacao_id")
 
-    classes = ClasseRequisicao.objects.filter(itenssolicitacao=item_id).values(
+    classes = ClasseRequisicao.objects.filter(itenssolicitacao=item_id, itenssolicitacao__ativo=True).values(
         "id", "nome"
     )
     if id_solicitacao:
@@ -1022,7 +1022,7 @@ def edit_solicitacao(request, tipo_solicitacao, requisicao_id):
             quantidade = request.POST.get("requisicao-quantidade")
             cc = request.POST.get("requisicao-cc")
 
-            item_object = get_object_or_404(ItensSolicitacao, pk=item)
+            item_object = get_object_or_404(ItensSolicitacao, pk=item, ativo=True)
             classe_object = get_object_or_404(ClasseRequisicao, pk=classe_req)
             print(classe_object)
             cc_object = get_object_or_404(Cc, pk=cc)
@@ -1046,7 +1046,7 @@ def edit_solicitacao(request, tipo_solicitacao, requisicao_id):
                 request.POST.get("transferencia-quantidade").replace(",", ".")
             )
 
-            item_object = get_object_or_404(ItensTransferencia, pk=item)
+            item_object = get_object_or_404(ItensTransferencia, pk=item, ativo=True)
             deposito_destino_object = get_object_or_404(
                 DepositoDestino, pk=deposito_destino
             )
@@ -1090,7 +1090,7 @@ def edit_solicitacao(request, tipo_solicitacao, requisicao_id):
             solicitacao = get_object_or_404(SolicitacaoRequisicao, pk=requisicao_id)
 
             # Obtém os itens relacionados a esta solicitação, filtrando pelo ID da solicitação
-            itens_requisicao = ItensSolicitacao.objects.all()
+            itens_requisicao = ItensSolicitacao.objects.filter(ativo=True)
 
             # Obtém o funcionário relacionado à solicitação
             solicitante = solicitacao.funcionario
@@ -1136,7 +1136,7 @@ def edit_solicitacao(request, tipo_solicitacao, requisicao_id):
             solicitacao = get_object_or_404(SolicitacaoTransferencia, pk=requisicao_id)
 
             # Obtém os itens relacionados a esta solicitação, filtrando pelo ID da solicitação
-            itens_requisicao = ItensTransferencia.objects.all()
+            itens_requisicao = ItensTransferencia.objects.filter(ativo=True)
 
             # Obtém o funcionário relacionado à solicitação
             solicitante = solicitacao.funcionario
@@ -1324,6 +1324,8 @@ def get_recursos(request):
     # Define a query base e o mapeamento de resultados
     if tipo_solicitacao == "requisicao":
         recursos = ItensSolicitacao.objects.filter(
+            ativo=True
+        ).filter(
             Q(codigo__icontains=search) | Q(nome__icontains=search)
         ).order_by("codigo")
         format_result = lambda recurso: {
@@ -1332,6 +1334,8 @@ def get_recursos(request):
         }
     else:
         recursos = ItensTransferencia.objects.filter(
+            ativo=True
+        ).filter(
             Q(codigo__icontains=search) | Q(nome__icontains=search)
         ).order_by("codigo")
         format_result = lambda recurso: {
@@ -1369,7 +1373,7 @@ def receber_edicao(request):
                 edicao_transferencia = SolicitacaoTransferencia.objects.get(pk=chave)
                 edicao_transferencia.quantidade = quantidade
                 edicao_transferencia.item = get_object_or_404(
-                    ItensTransferencia, pk=recurso
+                    ItensTransferencia, pk=recurso, ativo=True
                 )
                 edicao_transferencia.save()
                 return JsonResponse(
@@ -1379,7 +1383,7 @@ def receber_edicao(request):
             else:
                 edicao_requisicao = SolicitacaoRequisicao.objects.get(pk=chave)
                 edicao_requisicao.quantidade = quantidade
-                edicao_requisicao.item = get_object_or_404(ItensSolicitacao, pk=recurso)
+                edicao_requisicao.item = get_object_or_404(ItensSolicitacao, pk=recurso, ativo=True)
                 edicao_requisicao.classe_requisicao = get_object_or_404(
                     ClasseRequisicao, pk=classe
                 )
@@ -1463,6 +1467,12 @@ def api_criar_requisicao(request):
         codigo_produto = item_data["codigo_produto"]
         item = ItensSolicitacao.objects.filter(codigo=codigo_produto).first()
         item_criado = False
+        if item is not None and not item.ativo:
+            return JsonResponse(
+                {"status": "erro", "mensagem": f"Item {idx}: produto {codigo_produto} está desabilitado para requisição."},
+                status=400,
+            )
+
         if item is None:
             peca = Pecas.objects.filter(codigo=codigo_produto).first()
             nome = peca.descricao if peca and peca.descricao else codigo_produto
