@@ -1198,6 +1198,14 @@ function mostrarModalFinalizar(ordemId, grupoMaquina, maquinaPreferidaId = null)
             return data;
         })
         .then((data) => {
+            if (data.transferencia_chapa) {
+                if (data.transferencia_chapa.enviado) {
+                    console.log('Transferencia de chapa enviada ao Innovaro:', data.transferencia_chapa);
+                } else {
+                    console.warn('Transferencia de chapa nao enviada ao Innovaro:', data.transferencia_chapa);
+                }
+            }
+
             const numeroNovaOrdem = data.nova_ordem_numero || data.nova_ordem_id;
             const mensagemParcial = data.nova_ordem_id
                 ? `Ordem finalizada parcialmente. Nova ordem #${numeroNovaOrdem} criada.`
