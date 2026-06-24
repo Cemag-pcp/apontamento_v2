@@ -143,6 +143,22 @@ def _mensagem_processo_alternativo_depositodest(payload_original, payload_final)
         f'alterando processo de {processo_original} para {processo_final}.'
     )
 
+def _transferencia_chapa_corte_confirmada(transferencia_chapa):
+    if not isinstance(transferencia_chapa, dict):
+        return False
+    return (
+        str(transferencia_chapa.get('status') or '').lower() == 'sucesso'
+        or bool(transferencia_chapa.get('ja_transferida'))
+    )
+
+def _ordem_precisa_transferencia_chapa_corte(itens, dados_chapa):
+    return bool(
+        itens
+        and dados_chapa
+        and dados_chapa.get('encontrou_chapa')
+        and dados_chapa.get('codigo')
+    )
+
 def _parse_decimal_br(valor):
     if valor in (None, ''):
         return None
@@ -1379,15 +1395,11 @@ def atualizar_status_ordem(request):
                         .filter(ordem=ordem, qtd_boa__gt=0)
                         .order_by('id')
                     )
+                    precisa_transferencia_chapa = False
                     try:
-                        precisa_transferencia_chapa = (
-                            peso_chapas
-                            and peso_chapas.get('encontrou_chapa')
-                            and peso_chapas.get('codigo')
-                            and any(
-                                _item_precisa_transferencia_chapa_corte(item, peso_chapas.get('codigo'))
-                                for item in itens_para_apontamento_erp
-                            )
+                        precisa_transferencia_chapa = _ordem_precisa_transferencia_chapa_corte(
+                            itens_para_apontamento_erp,
+                            peso_chapas,
                         )
 
                         if precisa_transferencia_chapa:
@@ -1406,16 +1418,33 @@ def atualizar_status_ordem(request):
                             'erro': str(exc),
                         }
 
-                    try:
-                        apontamento_erp = _apontar_itens_corte_via_api_bloco(
-                            itens_para_apontamento_erp,
-                            request.user,
-                        )
-                    except Exception as exc:
+                    if (
+                        precisa_transferencia_chapa
+                        and not _transferencia_chapa_corte_confirmada(transferencia_chapa)
+                    ):
                         apontamento_erp = {
                             'enviado': False,
-                            'erros': [{'erro': str(exc)}],
+                            'sucessos': [],
+                            'erros': [{
+                                'erro': (
+                                    'Apontamento bloqueado: a transferencia de chapa era '
+                                    'obrigatoria e nao foi confirmada no ERP.'
+                                ),
+                                'transferencia_chapa': transferencia_chapa,
+                            }],
+                            'message': 'Apontamento bloqueado aguardando transferencia de chapa.',
                         }
+                    else:
+                        try:
+                            apontamento_erp = _apontar_itens_corte_via_api_bloco(
+                                itens_para_apontamento_erp,
+                                request.user,
+                            )
+                        except Exception as exc:
+                            apontamento_erp = {
+                                'enviado': False,
+                                'erros': [{'erro': str(exc)}],
+                            }
 
                 notificar_ordem(ordem)
 

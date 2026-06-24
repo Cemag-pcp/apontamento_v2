@@ -10,7 +10,9 @@ from .views import (
     _erro_depositodest_indefinido_corte,
     _item_precisa_transferencia_chapa_corte,
     _resolver_ficha_tecnica_chapa_corte,
+    _ordem_precisa_transferencia_chapa_corte,
     _tentar_apontamento_depositodest_processos_alternativos_corte,
+    _transferencia_chapa_corte_confirmada,
 )
 
 
@@ -101,6 +103,23 @@ class FallbackProcessoDepositoDestCorteTests(SimpleTestCase):
         self.assertEqual(payload_final['processo'], 'S C Laser')
         self.assertEqual(retorno_final['status'], 'success')
         self.assertTrue(tentativas)
+
+
+class TransferenciaChapaConfirmadaCorteTests(SimpleTestCase):
+    def test_confirma_apenas_transferencia_com_sucesso_ou_ja_transferida(self):
+        self.assertTrue(_transferencia_chapa_corte_confirmada({'status': 'sucesso'}))
+        self.assertTrue(_transferencia_chapa_corte_confirmada({'status': 'erro', 'ja_transferida': True}))
+        self.assertFalse(_transferencia_chapa_corte_confirmada({'status': 'erro'}))
+        self.assertFalse(_transferencia_chapa_corte_confirmada({'status': 'ignorada'}))
+        self.assertFalse(_transferencia_chapa_corte_confirmada(None))
+
+    def test_ordem_precisa_transferencia_quando_tem_item_e_chapa_valida(self):
+        dados_chapa = {'encontrou_chapa': True, 'codigo': '120203'}
+
+        self.assertTrue(_ordem_precisa_transferencia_chapa_corte([object()], dados_chapa))
+        self.assertFalse(_ordem_precisa_transferencia_chapa_corte([], dados_chapa))
+        self.assertFalse(_ordem_precisa_transferencia_chapa_corte([object()], {'encontrou_chapa': False, 'codigo': '120203'}))
+        self.assertFalse(_ordem_precisa_transferencia_chapa_corte([object()], {'encontrou_chapa': True, 'codigo': ''}))
 
 
 class RegraTransferenciaChapaCorteTests(TestCase):
