@@ -209,6 +209,29 @@ function badgeTransferencia(status) {
     return '<span class="badge text-bg-light text-dark">Nao enviada</span>';
 }
 
+function updateRowTransferencia(itemId, transferencia) {
+    const tr = tbody?.querySelector(`tr[data-item-id="${Number(itemId)}"]`);
+    if (!tr || !transferencia) return;
+
+    const cells = tr.querySelectorAll('td');
+    if (cells.length < 18) return;
+
+    const status = transferencia.status || '';
+    const chave = transferencia.chave_transferencia || '';
+    cells[12].innerHTML = badgeTransferencia(status);
+    cells[13].textContent = chave || '-';
+    cells[16].textContent = transferencia.transferido_em || '-';
+
+    const transferido = String(status).toLowerCase() === 'sucesso';
+    if (transferido && apontamentoSelecionado) {
+        apontamentoSelecionado.transferencia_status = status;
+        apontamentoSelecionado.chave_transferencia = chave;
+        apontamentoSelecionado.transferido_em = transferencia.transferido_em || '';
+        cells[18].innerHTML = renderActionButtons(apontamentoSelecionado);
+        bindRowActionButtons();
+    }
+}
+
 function renderPagination(pagination) {
     state.lastPagination = pagination;
 
@@ -583,12 +606,20 @@ async function confirmarTransferenciaSelecionada(tipoApontamento = 'api') {
         }
 
         modalConfirmarApontamentoInstance?.hide();
+        const transferencia = payload.transferencia || {};
+        const transferenciaIgnorada = String(transferencia.status || '').toLowerCase() === 'ignorada';
+        const chaveTransferencia = transferencia.chave_transferencia || '';
+        updateRowTransferencia(apontamentoSelecionado.id, transferencia);
         if (window.Swal) {
             Swal.fire({
-                icon: 'success',
-                title: 'Transferido',
-                text: tipoApontamento === 'api' ? 'Transferencia enviada via API.' : 'Transferencia registrada manualmente.',
-                timer: 1600,
+                icon: transferenciaIgnorada ? 'info' : 'success',
+                title: transferenciaIgnorada ? 'Sem alteracao de ficha tecnica' : 'Transferido',
+                text: transferenciaIgnorada
+                    ? (payload.message || transferencia.motivo || 'Sem divergencia entre a chapa cadastrada e a chapa usada na ordem.')
+                    : (chaveTransferencia
+                        ? `Chave gerada: ${chaveTransferencia}`
+                        : (tipoApontamento === 'api' ? 'Transferencia enviada via API.' : 'Transferencia registrada manualmente.')),
+                timer: chaveTransferencia ? 2200 : 1600,
                 showConfirmButton: false,
             });
         }
