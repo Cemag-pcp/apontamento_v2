@@ -11,6 +11,7 @@ from django.db import transaction, models, IntegrityError, connection
 
 import json
 from datetime import date, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from pytz import timezone
 import random
 from collections import defaultdict
@@ -52,6 +53,26 @@ def _controle_pintura_payload(registro):
         "pressao_ar_3": registro.pressao_ar_3,
     }
 
+def _campo_numerico_controle_pintura(data, campo, rotulo, inteiro=False):
+    valor = (data.get(campo) or "").strip()
+    if not valor:
+        return "", None
+
+    valor_normalizado = valor.replace(",", ".")
+    try:
+        numero = Decimal(valor_normalizado)
+    except (InvalidOperation, ValueError):
+        return None, JsonResponse({"error": f"{rotulo} deve ser numerico."}, status=400)
+
+    if numero < 0:
+        return None, JsonResponse({"error": f"{rotulo} deve ser maior ou igual a zero."}, status=400)
+    if inteiro and numero != numero.to_integral_value():
+        return None, JsonResponse({"error": f"{rotulo} deve ser um numero inteiro."}, status=400)
+
+    if inteiro:
+        return str(numero.quantize(Decimal("1"))), None
+    return format(numero.normalize(), "f"), None
+
 def _dados_controle_pintura_request(request):
     try:
         data = json.loads(request.body)
@@ -66,21 +87,36 @@ def _dados_controle_pintura_request(request):
         except ValueError:
             return None, JsonResponse({"error": "Data inválida. Use YYYY-MM-DD."}, status=400)
 
+    campos_numericos = {
+        "lote": ("Lote", True),
+        "quantidade_tinta": ("Quantidade de tinta", False),
+        "viscosidade": ("Viscosidade", False),
+        "pressao_ar_1": ("Pressao do ar", False),
+        "pressao_ar_2": ("Pressao da tinta", False),
+        "pressao_ar_3": ("Pressao da pistola", False),
+    }
+    valores_numericos = {}
+    for campo, (rotulo, inteiro) in campos_numericos.items():
+        valor, erro = _campo_numerico_controle_pintura(data, campo, rotulo, inteiro=inteiro)
+        if erro:
+            return None, erro
+        valores_numericos[campo] = valor
+
     return {
         "data": data_registro,
         "fornecedor": (data.get("fornecedor") or "").strip(),
         "cor": (data.get("cor") or "").strip(),
-        "lote": (data.get("lote") or "").strip(),
-        "quantidade_tinta": (data.get("quantidade_tinta") or "").strip(),
+        "lote": valores_numericos["lote"],
+        "quantidade_tinta": valores_numericos["quantidade_tinta"],
         "catalizador": (data.get("catalizador") or "").strip(),
         "diluente": (data.get("diluente") or "").strip(),
-        "viscosidade": (data.get("viscosidade") or "").strip(),
+        "viscosidade": valores_numericos["viscosidade"],
         "pintor": (data.get("pintor") or "").strip(),
         "pistola": (data.get("pistola") or "").strip(),
         "qnt_demaos": (data.get("qnt_demaos") or "").strip(),
-        "pressao_ar_1": (data.get("pressao_ar_1") or "").strip(),
-        "pressao_ar_2": (data.get("pressao_ar_2") or "").strip(),
-        "pressao_ar_3": (data.get("pressao_ar_3") or "").strip(),
+        "pressao_ar_1": valores_numericos["pressao_ar_1"],
+        "pressao_ar_2": valores_numericos["pressao_ar_2"],
+        "pressao_ar_3": valores_numericos["pressao_ar_3"],
     }, None
 
 def criar_controle_pintura(request):

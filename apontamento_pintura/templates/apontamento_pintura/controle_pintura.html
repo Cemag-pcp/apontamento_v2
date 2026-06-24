@@ -263,9 +263,9 @@
                                 <th class="col-diluente">DILUENTE</th>
                                 <th class="col-viscosidade">VISCOSIDADE (s)</th>
                                 <th class="col-aplicacao">INFORMACOES DE APLICACAO</th>
-                                <th class="col-pressao">PRESSAO DO AR 1 (bar)</th>
-                                <th class="col-pressao">PRESSAO DO AR 2 (bar)</th>
-                                <th class="col-pressao">PRESSAO DO AR 3 (bar)</th>
+                                <th class="col-pressao">PRESSAO DO AR (bar)</th>
+                                <th class="col-pressao">PRESSAO DA TINTA (bar)</th>
+                                <th class="col-pressao">PRESSAO DA PISTOLA (bar)</th>
                                 <th class="col-acoes text-center">AÇÃO</th>
                             </tr>
                         </thead>
@@ -356,11 +356,11 @@
                         </div>
                         <div class="col-md-3">
                             <label for="controleLote" class="form-label">Lote</label>
-                            <input type="text" class="form-control" id="controleLote">
+                            <input type="number" class="form-control" id="controleLote" min="0" step="1">
                         </div>
                         <div class="col-md-3">
                             <label for="controleQuantidadeTinta" class="form-label">Quantidade de tinta</label>
-                            <input type="text" class="form-control" id="controleQuantidadeTinta">
+                            <input type="number" class="form-control" id="controleQuantidadeTinta" min="0" step="0.01">
                         </div>
                         <div class="col-md-3">
                             <label for="controleCatalizador" class="form-label">Catalizador</label>
@@ -372,7 +372,7 @@
                         </div>
                         <div class="col-md-3">
                             <label for="controleViscosidade" class="form-label">Viscosidade (s)</label>
-                            <input type="text" class="form-control" id="controleViscosidade" inputmode="decimal">
+                            <input type="number" class="form-control" id="controleViscosidade" min="0" step="0.01">
                         </div>
                         <div class="col-md-4">
                             <label for="controlePintor" class="form-label">Pintor</label>
@@ -387,15 +387,15 @@
                             <input type="number" class="form-control" id="controleDemaos" min="0" step="1">
                         </div>
                         <div class="col-md-4">
-                            <label for="controlePressao1" class="form-label">Pressao do ar 1 (bar)</label>
+                            <label for="controlePressao1" class="form-label">Pressao do ar (bar)</label>
                             <input type="number" class="form-control" id="controlePressao1" min="0" step="0.01">
                         </div>
                         <div class="col-md-4">
-                            <label for="controlePressao2" class="form-label">Pressao do ar 2 (bar)</label>
+                            <label for="controlePressao2" class="form-label">Pressao da tinta (bar)</label>
                             <input type="number" class="form-control" id="controlePressao2" min="0" step="0.01">
                         </div>
                         <div class="col-md-4">
-                            <label for="controlePressao3" class="form-label">Pressao do ar 3 (bar)</label>
+                            <label for="controlePressao3" class="form-label">Pressao da pistola (bar)</label>
                             <input type="number" class="form-control" id="controlePressao3" min="0" step="0.01">
                         </div>
                     </div>
