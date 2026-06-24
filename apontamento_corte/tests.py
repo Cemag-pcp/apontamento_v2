@@ -1,4 +1,5 @@
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
+from unittest.mock import patch
 
 from cadastro.models import CarretasExplodidas
 from core.models import Ordem, PropriedadesOrdem
@@ -6,9 +7,22 @@ from apontamento_corte.models import PecasOrdem
 
 from .views import (
     _dados_carreta_explodida_peca_corte,
+    _erro_depositodest_indefinido_corte,
     _item_precisa_transferencia_chapa_corte,
     _resolver_ficha_tecnica_chapa_corte,
+    _tentar_apontamento_depositodest_processos_alternativos_corte,
 )
+
+
+class FakeERPResponse:
+    def __init__(self, payload, ok=True, status_code=200, text=''):
+        self.payload = payload
+        self.ok = ok
+        self.status_code = status_code
+        self.text = text
+
+    def json(self):
+        return self.payload
 
 
 class DadosCarretaExplodidaPecaCorteTests(TestCase):
@@ -47,6 +61,46 @@ class DadosCarretaExplodidaPecaCorteTests(TestCase):
         dados_carreta = _dados_carreta_explodida_peca_corte('030341')
 
         self.assertEqual(dados_carreta, primeiro_registro)
+
+
+class FallbackProcessoDepositoDestCorteTests(SimpleTestCase):
+    def test_detecta_erro_depositodest_undefined(self):
+        erro = (
+            'Error: Não é possível atribuir valor undefined a um campo do DataSet. '
+            'Fieldname: "DEPOSITODEST"'
+        )
+
+        self.assertTrue(_erro_depositodest_indefinido_corte(erro))
+
+    @patch('apontamento_corte.views._post_apontamento_erp_corte')
+    def test_tenta_processos_alternativos_sem_repetir_processo_original(self, mock_post):
+        payload = {
+            'id': 'corte-item-117896',
+            'processo': 'S C Plasma',
+            'produzido': 4,
+        }
+
+        def responder(payload_enviado):
+            if payload_enviado['processo'] == 'S C Laser':
+                return FakeERPResponse({'status': 'success', 'chaveProducao': 'CHAVE-LASER'})
+            return FakeERPResponse({
+                'status': 'error',
+                'description': 'DEPOSITODEST undefined',
+            })
+
+        mock_post.side_effect = responder
+
+        payload_final, retorno_final, tentativas = (
+            _tentar_apontamento_depositodest_processos_alternativos_corte(payload)
+        )
+
+        processos_tentados = [call.args[0]['processo'] for call in mock_post.call_args_list]
+        self.assertNotIn('S C Plasma', processos_tentados)
+        self.assertIn('S C Laser', processos_tentados)
+        self.assertEqual(payload['processo'], 'S C Plasma')
+        self.assertEqual(payload_final['processo'], 'S C Laser')
+        self.assertEqual(retorno_final['status'], 'success')
+        self.assertTrue(tentativas)
 
 
 class RegraTransferenciaChapaCorteTests(TestCase):
