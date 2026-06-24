@@ -1642,6 +1642,14 @@
                 }
             }
 
+            if (!campo) {
+                const matchDevolucaoPeca = name.match(/^(u\d+_)devolucao_peca_(\d+)_(codigo|quantidade)$/);
+                if (matchDevolucaoPeca) {
+                    adicionarLinhaPecaDevolucao(matchDevolucaoPeca[1], {}, parseInt(matchDevolucaoPeca[2], 10));
+                    campo = document.querySelector(`#form-inspecao-recebimento [name="${CSS.escape(name)}"]`);
+                }
+            }
+
             if (campo) campo.value = value;
         });
     }
@@ -1808,6 +1816,154 @@
 
     function classeAtualEhMangueirasHidraulicas() {
         return normalizarClasseTexto(classeAtual) === "mangueirashidraulicas";
+    }
+
+    function classeAtualEhDevolucao() {
+        return normalizarClasseTexto(classeAtual) === "devolucao";
+    }
+
+    const MATERIAIS_DEVOLUCAO = {
+        "034550": {
+            nome: "034550 - CILINDRO HIDRÁULICO [CBH5/CBHM5000]",
+            pecas: [
+                { codigo: "034546", descricao: "FECHAMENTO GUIA DO CILINDRO [CBH/CBHM]" },
+                { codigo: "034547", descricao: "CAMISA DO CILINDRO [CBH5/CBHM5000]" },
+                { codigo: "034881", descricao: "CABEÇA DO PISTÃO [CBHM5000/6000]" },
+                { codigo: "034899", descricao: "PISTÃO DO CILINDRO [CBHM5000/6000]" },
+                { codigo: "210013", descricao: "ANEL GUIA MOLYGARD W2-2250-500 (REF. PARKER)" },
+                { codigo: "210026", descricao: "ANEL O'RING 2-045 (USAR PARKER)" },
+                { codigo: "210027", descricao: "ANEL O'RING 2-026" },
+                { codigo: "210158", descricao: "ANEL O-RING 2-342" },
+                { codigo: "210160", descricao: "ANEL RASPADOR REF D-2000" },
+                { codigo: "234205", descricao: "GRAXEIRO 1/4 UNF RETO" },
+                { codigo: "274151", descricao: 'PORCA SEXTAVADA 1.1/4" UNF 8.8' },
+                { codigo: "292291", descricao: "GAX MOLYTH REF 25002000375" },
+                { codigo: "292448", descricao: "GAX MOLYTH REF 37503250 MAI" },
+            ],
+        },
+        "034630": {
+            nome: "034630 - CILINDRO HIDRÁULICO [CBHM6000 CA]",
+            pecas: [
+                { codigo: "034753", descricao: "FECHAMENTO GUIA [CILINDRO HIDRÁULICO - CBHM6000 CA]" },
+                { codigo: "034758", descricao: "CAMISA DO CILINDRO [CILINDRO HIDRÁULICO - CBHM6000 CA]" },
+                { codigo: "034757", descricao: "CABEÇA DO PISTÃO [CILINDRO HIDRÁULICO - CBHM6000 CA]" },
+                { codigo: "034759", descricao: "PISTÃO [CILINDRO HIDRÁULICO - CBHM6000 CA]" },
+                { codigo: "210011", descricao: "ANEL O'RING 2-244" },
+                { codigo: "210019", descricao: "ANEL GUIA MOLYGARD 6W2-2612-500" },
+                { codigo: "210028", descricao: "ANEL O'RING 2-029" },
+                { codigo: "210029", descricao: "ANEL O'RING 2-047 (USAR PARKER)" },
+                { codigo: "210161", descricao: "ANEL RASPADOR D-2375" },
+                { codigo: "234205", descricao: "GRAXEIRO 1/4 UNF RETO" },
+                { codigo: "274964", descricao: 'PORCA SEXTAVADA G5 1.1/2" UNF CH. 2"' },
+                { codigo: "292048", descricao: "GAXETA MOLYTHANE POLYPAK STD 37503750" },
+                { codigo: "292292", descricao: "GAXETA MOLYTHANE POLYPAK TIPO B 25002375-375 B" },
+            ],
+        },
+        "034830": {
+            nome: "034830 - CILINDRO HIDRÁULICO [CBH7/CBHM6000]",
+            pecas: [
+                { codigo: "034546", descricao: "FECHAMENTO GUIA DO CILINDRO [CBH/CBHM]" },
+                { codigo: "034828", descricao: "CAMISA DO CILINDRO [CBH7/CBHM6000]" },
+                { codigo: "034881", descricao: "CABEÇA DO PISTÃO [CBHM5000/6000]" },
+                { codigo: "034899", descricao: "PISTÃO DO CILINDRO [CBHM5000/6000]" },
+                { codigo: "210013", descricao: "ANEL GUIA MOLYGARD W2-2250-500 (REF. PARKER)" },
+                { codigo: "210026", descricao: "ANEL O'RING 2-045 (USAR PARKER)" },
+                { codigo: "210027", descricao: "ANEL O'RING 2-026" },
+                { codigo: "210158", descricao: "ANEL O-RING 2-342" },
+                { codigo: "210160", descricao: "ANEL RASPADOR REF D-2000" },
+                { codigo: "234205", descricao: "GRAXEIRO 1/4 UNF RETO" },
+                { codigo: "274151", descricao: 'PORCA SEXTAVADA 1.1/4" UNF 8.8' },
+                { codigo: "292291", descricao: "GAX MOLYTH REF 25002000375" },
+                { codigo: "292448", descricao: "GAX MOLYTH REF 37503250 MAI" },
+            ],
+        },
+    };
+
+    function getDevolucaoContainerId(prefix) {
+        return `devolucao-pecas-${String(prefix || "").replace(/[^a-zA-Z0-9]/g, "")}`;
+    }
+
+    function getDevolucaoProximoIndice(prefix) {
+        const container = document.getElementById(getDevolucaoContainerId(prefix));
+        if (!container) return 1;
+
+        const indices = Array.from(container.querySelectorAll(".devolucao-linha-peca"))
+            .map((bloco) => parseInt(bloco.dataset.devolucaoIndex || "0", 10))
+            .filter((n) => Number.isFinite(n) && n > 0);
+
+        return indices.length ? Math.max(...indices) + 1 : 1;
+    }
+
+    function obterPecasMaterialDevolucao(prefix) {
+        const select = document.querySelector(`#form-inspecao-recebimento [name="${CSS.escape(prefix)}devolucao_material"]`);
+        const codigo = select ? select.value : "";
+        return MATERIAIS_DEVOLUCAO[codigo]?.pecas || [];
+    }
+
+    function adicionarLinhaPecaDevolucao(prefix, dados = {}, indiceForcado = null) {
+        const container = document.getElementById(getDevolucaoContainerId(prefix));
+        if (!container) return null;
+
+        const indice = Number.isFinite(indiceForcado) && indiceForcado > 0
+            ? indiceForcado
+            : getDevolucaoProximoIndice(prefix);
+
+        const blocoExistente = container.querySelector(`.devolucao-linha-peca[data-devolucao-index="${indice}"]`);
+        const codigoCampo = `${prefix}devolucao_peca_${indice}_codigo`;
+        const qtdCampo = `${prefix}devolucao_peca_${indice}_quantidade`;
+
+        if (blocoExistente) {
+            const selectExistente = blocoExistente.querySelector(`select[name="${CSS.escape(codigoCampo)}"]`);
+            const qtdExistente = blocoExistente.querySelector(`input[name="${CSS.escape(qtdCampo)}"]`);
+            if (selectExistente && dados.codigo !== undefined) selectExistente.value = dados.codigo;
+            if (qtdExistente && dados.quantidade !== undefined) qtdExistente.value = dados.quantidade;
+            return blocoExistente;
+        }
+
+        const pecasDisponiveis = obterPecasMaterialDevolucao(prefix);
+        const opcoesHtml = pecasDisponiveis
+            .map((peca) => `<option value="${peca.codigo}">${peca.codigo} - ${peca.descricao}</option>`)
+            .join("");
+
+        const bloco = document.createElement("div");
+        bloco.className = "d-flex gap-2 align-items-end mb-2 devolucao-linha-peca";
+        bloco.dataset.devolucaoIndex = String(indice);
+        bloco.innerHTML = `
+            <div class="flex-fill">
+                <select name="${codigoCampo}" class="form-select form-select-sm" required>
+                    <option value="" selected disabled>Selecione a peça</option>
+                    ${opcoesHtml}
+                </select>
+            </div>
+            <div style="width:110px;">
+                <input type="number" name="${qtdCampo}" class="form-control form-control-sm" placeholder="Qtd." min="1" step="1" required>
+            </div>
+            <div>
+                <button type="button" class="btn btn-outline-danger btn-sm btn-remover-devolucao-peca" title="Remover peça">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(bloco);
+
+        const selectPeca = bloco.querySelector(`select[name="${CSS.escape(codigoCampo)}"]`);
+        const inputQtd = bloco.querySelector(`input[name="${CSS.escape(qtdCampo)}"]`);
+        if (selectPeca && dados.codigo !== undefined) selectPeca.value = dados.codigo;
+        if (inputQtd && dados.quantidade !== undefined) inputQtd.value = dados.quantidade;
+
+        const btnRemover = bloco.querySelector(".btn-remover-devolucao-peca");
+        if (btnRemover) {
+            btnRemover.addEventListener("click", () => bloco.remove());
+        }
+
+        return bloco;
+    }
+
+    function atualizarPecasDevolucaoAoTrocarMaterial(prefix) {
+        const container = document.getElementById(getDevolucaoContainerId(prefix));
+        if (!container) return;
+        container.innerHTML = "";
+        adicionarLinhaPecaDevolucao(prefix);
     }
 
     function getBmcContainerId(prefix) {
@@ -2627,6 +2783,34 @@
             return html;
         },
 
+        "Devolução": (prefix) => {
+            const opcoesMateriais = Object.entries(MATERIAIS_DEVOLUCAO)
+                .map(([codigo, info]) => `<option value="${codigo}">${info.nome}</option>`)
+                .join("");
+
+            let html = "";
+            html += secao("Garantia");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">Número de chamado da garantia</label>`
+                  + `<input type="text" name="${prefix}chamado_garantia" class="form-control form-control-sm"></div>`;
+            html += secao("Material");
+            html += `<div class="mb-2"><label class="form-label form-label-sm">Nome do material</label>`
+                  + `<select name="${prefix}devolucao_material" class="form-select form-select-sm devolucao-select-material" data-prefix="${prefix}" required>`
+                  + `<option value="" selected disabled></option>`
+                  + opcoesMateriais
+                  + `</select></div>`;
+            html += secao("Peças usadas na devolução");
+            html += `<div class="d-flex justify-content-between align-items-center mb-2">`
+                  + `<label class="form-label form-label-sm mb-0">Peças</label>`
+                  + `<button type="button" class="btn btn-outline-primary btn-sm btn-add-devolucao-peca" data-prefix="${prefix}">Adicionar peça</button>`
+                  + `</div>`;
+            html += `<div id="${getDevolucaoContainerId(prefix)}" class="devolucao-extra-fields"></div>`;
+            html += secao("Resultado");
+            html += selectConformidade(prefix, "resultado", "Resultado da inspeção");
+            html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
+                  + `<textarea name="${prefix}observacao" class="form-control form-control-sm" rows="2" maxlength="255"></textarea></div>`;
+            return html;
+        },
+
         "_generico": (prefix) => {
             let html = selectConformidade(prefix, "resultado", "Resultado da inspeção");
             html += `<div class="mb-2 mt-2"><label class="form-label form-label-sm">Observações</label>`
@@ -2648,6 +2832,9 @@
         }
         if (!builder && classeAtualEhMangueirasHidraulicas()) {
             builder = FORMULARIOS["Mangueiras hidráulicas"];
+        }
+        if (!builder && classeAtualEhDevolucao()) {
+            builder = FORMULARIOS["Devolução"];
         }
         if (!builder) {
             builder = FORMULARIOS["_generico"];
@@ -2683,6 +2870,10 @@
                 } else {
                     adicionarBlocoBmc(prefix);
                 }
+            }
+
+            if (classeAtualEhDevolucao()) {
+                adicionarLinhaPecaDevolucao(prefix);
             }
         }
 
@@ -2818,6 +3009,51 @@
                         const valorMedida = String(unitData[`bmc_medida_${indice}_valor`] || "").trim();
                         if (!nomeMedida || !valorMedida) {
                             alert(`Preencha nome e medida em todos os campos da Unidade ${u} em "${nomeMaterial}".`);
+                            trocarMaterialAtivo(m);
+                            const tabBtn = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="#unit-tab-${u}"]`);
+                            if (tabBtn) tabBtn.click();
+                            return;
+                        }
+                    }
+                }
+
+                if (classeAtualEhDevolucao()) {
+                    const chamadoGarantia = String(unitData["chamado_garantia"] || "").trim();
+                    if (!chamadoGarantia) {
+                        alert(`Informe o número de chamado da garantia para a Unidade ${u} em "${nomeMaterial}".`);
+                        trocarMaterialAtivo(m);
+                        const tabBtn = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="#unit-tab-${u}"]`);
+                        if (tabBtn) tabBtn.click();
+                        return;
+                    }
+
+                    if (!String(unitData["devolucao_material"] || "").trim()) {
+                        alert(`Selecione o material da devolução para a Unidade ${u} em "${nomeMaterial}".`);
+                        trocarMaterialAtivo(m);
+                        const tabBtn = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="#unit-tab-${u}"]`);
+                        if (tabBtn) tabBtn.click();
+                        return;
+                    }
+
+                    const indicesPecas = new Set();
+                    Object.keys(unitData).forEach((field) => {
+                        const match = field.match(/^devolucao_peca_(\d+)_(codigo|quantidade)$/);
+                        if (match) indicesPecas.add(match[1]);
+                    });
+
+                    if (!indicesPecas.size) {
+                        alert(`Adicione ao menos uma peça usada na devolução para a Unidade ${u} em "${nomeMaterial}".`);
+                        trocarMaterialAtivo(m);
+                        const tabBtn = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="#unit-tab-${u}"]`);
+                        if (tabBtn) tabBtn.click();
+                        return;
+                    }
+
+                    for (const indice of indicesPecas) {
+                        const codigoPeca = String(unitData[`devolucao_peca_${indice}_codigo`] || "").trim();
+                        const quantidadePeca = String(unitData[`devolucao_peca_${indice}_quantidade`] || "").trim();
+                        if (!codigoPeca || !quantidadePeca || Number(quantidadePeca) <= 0) {
+                            alert(`Preencha a peça e a quantidade em todas as linhas da Unidade ${u} em "${nomeMaterial}".`);
                             trocarMaterialAtivo(m);
                             const tabBtn = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="#unit-tab-${u}"]`);
                             if (tabBtn) tabBtn.click();
@@ -2969,6 +3205,22 @@
             const prefix = btnAdicionarCampo.dataset.prefix || "";
             if (!prefix) return;
             adicionarBlocoBmc(prefix);
+        });
+
+        document.addEventListener("click", (event) => {
+            const btnAdicionarPeca = event.target.closest(".btn-add-devolucao-peca");
+            if (!btnAdicionarPeca) return;
+            const prefix = btnAdicionarPeca.dataset.prefix || "";
+            if (!prefix) return;
+            adicionarLinhaPecaDevolucao(prefix);
+        });
+
+        document.addEventListener("change", (event) => {
+            const selectMaterial = event.target.closest(".devolucao-select-material");
+            if (!selectMaterial) return;
+            const prefix = selectMaterial.dataset.prefix || "";
+            if (!prefix) return;
+            atualizarPecasDevolucaoAoTrocarMaterial(prefix);
         });
 
         document.addEventListener("change", (event) => {

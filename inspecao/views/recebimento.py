@@ -1,6 +1,8 @@
 import hashlib
 import json
+import logging
 import os
+import re
 from datetime import datetime
 
 import gspread
@@ -24,6 +26,8 @@ SHEET_TAB = os.environ.get(
     "RECEBIMENTO_SHEET_TAB",
     "Base controle de entrada",
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_CUT_OFF_DATE = "2026-05-01"
 COLUNA_STATUS_IDX = 7  # Coluna H (0-based)
@@ -365,46 +369,54 @@ def sincronizar_recebimento(request):
             for idx, col_idx in enumerate(COLUNAS_EXIBIR)
         }
 
-        existing_by_line = InspecaoRecebimentoItem.objects.filter(
-            planilha_id=SHEET_ID,
-            aba_nome=SHEET_TAB,
-            linha_planilha=row_index,
-        ).first()
-        existing_by_hash = InspecaoRecebimentoItem.objects.filter(sheet_hash=sheet_hash).first()
-        existing_by_identity = _find_recebimento_item_by_identity(dados, data_coluna_a)
-        existing_by_business_key = _find_recebimento_item_by_business_key(dados, data_coluna_a)
+        try:
+            existing_by_line = InspecaoRecebimentoItem.objects.filter(
+                planilha_id=SHEET_ID,
+                aba_nome=SHEET_TAB,
+                linha_planilha=row_index,
+            ).first()
+            existing_by_hash = InspecaoRecebimentoItem.objects.filter(sheet_hash=sheet_hash).first()
+            existing_by_identity = _find_recebimento_item_by_identity(dados, data_coluna_a)
+            existing_by_business_key = _find_recebimento_item_by_business_key(dados, data_coluna_a)
 
-        existing_item = (
-            existing_by_line
-            or existing_by_hash
-            or existing_by_business_key
-            or existing_by_identity
-        )
-        if existing_item:
-            _reconcile_recebimento_items(
-                items=[
-                    existing_by_line,
-                    existing_by_hash,
-                    existing_by_business_key,
-                    existing_by_identity,
-                ],
-                incoming_dados=dados,
-                row_index=row_index,
+            existing_item = (
+                existing_by_line
+                or existing_by_hash
+                or existing_by_business_key
+                or existing_by_identity
+            )
+            if existing_item:
+                _reconcile_recebimento_items(
+                    items=[
+                        existing_by_line,
+                        existing_by_hash,
+                        existing_by_business_key,
+                        existing_by_identity,
+                    ],
+                    incoming_dados=dados,
+                    row_index=row_index,
+                    sheet_hash=sheet_hash,
+                    data_coluna_a=data_coluna_a,
+                )
+                continue
+
+            InspecaoRecebimentoItem.objects.create(
+                planilha_id=SHEET_ID,
+                aba_nome=SHEET_TAB,
+                linha_planilha=row_index,
                 sheet_hash=sheet_hash,
-                data_coluna_a=data_coluna_a,
+                dados=dados,
+                data_referencia=data_coluna_a,
+                status_h=True,
+            )
+            novos += 1
+        except Exception:
+            logger.exception(
+                "Falha ao sincronizar linha %s da planilha de recebimento (sheet_hash=%s). Linha ignorada.",
+                row_index,
+                sheet_hash,
             )
             continue
-
-        InspecaoRecebimentoItem.objects.create(
-            planilha_id=SHEET_ID,
-            aba_nome=SHEET_TAB,
-            linha_planilha=row_index,
-            sheet_hash=sheet_hash,
-            dados=dados,
-            data_referencia=data_coluna_a,
-            status_h=True,
-        )
-        novos += 1
 
     return JsonResponse({"novos": novos, "total": total}, status=200)
 
@@ -623,6 +635,64 @@ def inspecionar_recebimento(request):
                 if valor not in {"conforme", "nao_conforme"}:
                     return JsonResponse(
                         {"error": f"Informe {rotulo} como conforme ou nao conforme."},
+                        status=400,
+                    )
+
+    if classe_inspecao_normalizada == "devolucao":
+        if materiais_inspecao:
+            conjuntos_unidades = [m.get("unidades") for m in materiais_inspecao if isinstance(m, dict)]
+            unidades_iteracao = []
+            for unidades in conjuntos_unidades:
+                if isinstance(unidades, list):
+                    unidades_iteracao.extend(unidades)
+        else:
+            unidades = dados_inspecao.get("unidades") if isinstance(dados_inspecao, dict) else None
+            unidades_iteracao = unidades if isinstance(unidades, list) else []
+
+        if not unidades_iteracao:
+            return JsonResponse(
+                {"error": "Informe o chamado de garantia e as peças usadas na devolução."},
+                status=400,
+            )
+
+        for unidade in unidades_iteracao:
+            campos = unidade.get("campos") if isinstance(unidade, dict) else None
+            campos = campos if isinstance(campos, dict) else {}
+
+            if not str(campos.get("chamado_garantia") or "").strip():
+                return JsonResponse(
+                    {"error": "Informe o numero de chamado da garantia."},
+                    status=400,
+                )
+
+            if not str(campos.get("devolucao_material") or "").strip():
+                return JsonResponse(
+                    {"error": "Selecione o material da devolução."},
+                    status=400,
+                )
+
+            indices_pecas = set()
+            for chave in campos:
+                match = re.match(r"^devolucao_peca_(\d+)_(codigo|quantidade)$", chave)
+                if match:
+                    indices_pecas.add(match.group(1))
+
+            if not indices_pecas:
+                return JsonResponse(
+                    {"error": "Adicione ao menos uma peça usada na devolução."},
+                    status=400,
+                )
+
+            for indice in indices_pecas:
+                codigo_peca = str(campos.get(f"devolucao_peca_{indice}_codigo") or "").strip()
+                quantidade_peca = str(campos.get(f"devolucao_peca_{indice}_quantidade") or "").strip()
+                try:
+                    quantidade_valida = codigo_peca and float(quantidade_peca) > 0
+                except ValueError:
+                    quantidade_valida = False
+                if not quantidade_valida:
+                    return JsonResponse(
+                        {"error": "Preencha a peça e a quantidade em todas as linhas de peças usadas."},
                         status=400,
                     )
 
