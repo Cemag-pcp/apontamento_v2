@@ -58,7 +58,7 @@ def _extrair_chave_retorno_erp(retorno):
     if not isinstance(retorno, dict):
         return ''
 
-    for campo in ('chaveProducao', 'chave', 'productionKey'):
+    for campo in ('chaveTransferencia', 'chaveProducao', 'chave', 'productionKey'):
         valor = retorno.get(campo)
         if valor not in (None, ''):
             return str(valor).strip()
@@ -159,6 +159,41 @@ def _espessura_chapa_por_materia_prima(materia_prima):
     codigo_chapa = _extrair_codigo_peca_corte(materia_prima)
     return _espessura_chapa_por_codigo(codigo_chapa)
 
+def _normalizar_codigo_chapa_corte(codigo):
+    codigo = _extrair_codigo_peca_corte(codigo)
+    return str(codigo or '').strip().upper()
+
+def _parece_codigo_chapa_corte(codigo):
+    codigo = _normalizar_codigo_chapa_corte(codigo)
+    return bool(codigo and re.search(r'\d', codigo))
+
+def _codigos_chapa_diferentes_corte(codigo_chapa_ordem, materia_peca):
+    codigo_ordem = _normalizar_codigo_chapa_corte(codigo_chapa_ordem)
+    codigo_peca = _normalizar_codigo_chapa_corte(materia_peca)
+    if (
+        not codigo_ordem
+        or not codigo_peca
+        or not _parece_codigo_chapa_corte(codigo_ordem)
+        or not _parece_codigo_chapa_corte(codigo_peca)
+    ):
+        return False
+    return codigo_ordem != codigo_peca
+
+def _item_precisa_transferencia_chapa_corte(item, codigo_chapa_ordem):
+    codigo_peca = _extrair_codigo_peca_corte(item.peca)
+    dados_carreta = _dados_carreta_explodida_peca_corte(codigo_peca)
+    materia_peca = str(getattr(dados_carreta, 'mp_peca', '') or '').strip() if dados_carreta else ''
+    descricao_chapa = getattr(getattr(item.ordem, 'propriedade', None), 'descricao_mp', None)
+
+    chapa_norm = _normalizar_texto_validacao_chapa(descricao_chapa)
+    materia_norm = _normalizar_texto_validacao_chapa(materia_peca)
+    if materia_norm and chapa_norm and (
+        materia_norm == chapa_norm or materia_norm in chapa_norm or chapa_norm in materia_norm
+    ):
+        return False
+
+    return _codigos_chapa_diferentes_corte(codigo_chapa_ordem, materia_peca)
+
 def _calcular_quantidade_ficha_tecnica_chapa(peso_total, espessura_antiga, espessura_nova):
     peso_total = _to_decimal_or_none(peso_total)
     espessura_antiga = _to_decimal_or_none(espessura_antiga)
@@ -170,7 +205,7 @@ def _calcular_quantidade_ficha_tecnica_chapa(peso_total, espessura_antiga, espes
     quantidade = (peso_total / espessura_antiga) * espessura_nova
     return float((quantidade * Decimal('-1')).quantize(Decimal('0.0001')))
 
-def _resolver_ficha_tecnica_chapa_corte(item, transferencia):
+def _resolver_ficha_tecnica_chapa_corte(item, transferencia=None, codigo_chapa_ordem=None):
     propriedade = getattr(item.ordem, 'propriedade', None)
     descricao_chapa = getattr(propriedade, 'descricao_mp', None)
     codigo_peca = _extrair_codigo_peca_corte(item.peca)
@@ -192,13 +227,24 @@ def _resolver_ficha_tecnica_chapa_corte(item, transferencia):
     if materia_norm and (materia_norm == chapa_norm or materia_norm in chapa_norm or chapa_norm in materia_norm):
         return True, '', None
 
-    codigo_chapa_novo = str(getattr(transferencia, 'codigo_chapa', '') or '').strip()
+    codigo_chapa_novo = str(
+        codigo_chapa_ordem or getattr(transferencia, 'codigo_chapa', '') or ''
+    ).strip()
     if not codigo_chapa_novo:
         return False, 'Nao foi possivel identificar o codigo da chapa transferida para montar a ficha tecnica.', None
 
     codigo_chapa_antigo = _extrair_codigo_peca_corte(materia_peca)
     if not codigo_chapa_antigo:
         return False, f'Nao foi possivel identificar o codigo antigo da materia-prima da peca {codigo_peca}.', None
+    if (
+        not _parece_codigo_chapa_corte(codigo_chapa_novo)
+        or not _parece_codigo_chapa_corte(codigo_chapa_antigo)
+    ):
+        return True, '', None
+    if not _codigos_chapa_diferentes_corte(codigo_chapa_novo, materia_peca):
+        return True, '', None
+    if not transferencia:
+        return False, 'Transfira a chapa antes de apontar este item, pois os codigos da chapa e da materia-prima da peca sao diferentes.', None
 
     espessura_antiga = _espessura_chapa_por_materia_prima(materia_peca)
     if espessura_antiga is None:
@@ -595,7 +641,7 @@ def _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa):
             'status_code': response.status_code,
         }
 
-    chave_transferencia = resp_item.get("chaveTransferencia") if isinstance(resp_item, dict) else None
+    chave_transferencia = _extrair_chave_retorno_erp(resp_item if isinstance(resp_item, dict) else {})
     registro.status = 'sucesso'
     registro.erro = None
     registro.resposta_api = resp_json
@@ -694,10 +740,20 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
     itens_validos = []
     erros = []
     fichas_tecnicas = {}
+    dados_chapa_por_ordem = {}
 
     for item in itens:
         if item.apontado:
             continue
+
+        if item.ordem_id not in dados_chapa_por_ordem:
+            propriedade = getattr(item.ordem, 'propriedade', None)
+            dados_chapa_por_ordem[item.ordem_id] = _calcular_peso_chapas_corte(
+                propriedade,
+                propriedade.quantidade if propriedade else None,
+            )
+        dados_chapa = dados_chapa_por_ordem.get(item.ordem_id) or {}
+        codigo_chapa_ordem = dados_chapa.get('codigo')
 
         transferencia = (
             TransferenciaChapaCorte.objects
@@ -705,11 +761,15 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
             .order_by('-transferido_em', '-id')
             .first()
         )
-        if not transferencia:
+        if not transferencia and _item_precisa_transferencia_chapa_corte(item, codigo_chapa_ordem):
             erros.append({'id': item.id, 'erro': 'Transfira a chapa antes de apontar este item.'})
             continue
 
-        peca_valida, aviso_peca, ficha_tecnica = _resolver_ficha_tecnica_chapa_corte(item, transferencia)
+        peca_valida, aviso_peca, ficha_tecnica = _resolver_ficha_tecnica_chapa_corte(
+            item,
+            transferencia,
+            codigo_chapa_ordem,
+        )
         if not peca_valida:
             _registrar_erro_apontamento_api_corte(item, aviso_peca, user)
             erros.append({'id': item.id, 'erro': aviso_peca})
@@ -1188,14 +1248,31 @@ def atualizar_status_ordem(request):
 
                 ordem.save()
                 if status == 'finalizada':
+                    itens_para_apontamento_erp = list(
+                        PecasOrdem.objects
+                        .select_related('ordem', 'ordem__propriedade')
+                        .filter(ordem=ordem, qtd_boa__gt=0)
+                        .order_by('id')
+                    )
                     try:
-                        if peso_chapas and peso_chapas.get('encontrou_chapa') and peso_chapas.get('codigo'):
+                        precisa_transferencia_chapa = (
+                            peso_chapas
+                            and peso_chapas.get('encontrou_chapa')
+                            and peso_chapas.get('codigo')
+                            and any(
+                                _item_precisa_transferencia_chapa_corte(item, peso_chapas.get('codigo'))
+                                for item in itens_para_apontamento_erp
+                            )
+                        )
+
+                        if precisa_transferencia_chapa:
                             transferencia_chapa = _chamar_innovaro_transferir_chapa_corte(ordem, peso_chapas)
                         else:
                             transferencia_chapa = {
                                 'enviado': False,
                                 'status': 'ignorada',
-                                'erro': 'Chapa nao encontrada ou sem codigo.',
+                                'erro': None if peso_chapas and peso_chapas.get('codigo') else 'Chapa nao encontrada ou sem codigo.',
+                                'motivo': 'Alteracao de ficha tecnica nao necessaria: sem divergencia entre a chapa cadastrada e a chapa usada na ordem.',
                             }
                     except Exception as exc:
                         transferencia_chapa = {
@@ -1206,7 +1283,7 @@ def atualizar_status_ordem(request):
 
                     try:
                         apontamento_erp = _apontar_itens_corte_via_api_bloco(
-                            list(PecasOrdem.objects.filter(ordem=ordem, qtd_boa__gt=0).order_by('id')),
+                            itens_para_apontamento_erp,
                             request.user,
                         )
                     except Exception as exc:
@@ -2215,26 +2292,11 @@ def api_erp_apontar_item_corte(request, pk):
         return JsonResponse({'status': 'error', 'message': 'tipo_apontamento invalido.'}, status=400)
 
     item = get_object_or_404(
-        PecasOrdem.objects.select_related('ordem', 'resp_apontamento'),
+        PecasOrdem.objects.select_related('ordem', 'ordem__propriedade', 'resp_apontamento'),
         pk=pk,
         ordem__status_atual='finalizada',
         ordem__grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3'],
     )
-
-    transferencia = (
-        TransferenciaChapaCorte.objects
-        .filter(ordem_id=item.ordem_id, status='sucesso')
-        .order_by('-transferido_em', '-id')
-        .first()
-    )
-    if not transferencia:
-        return JsonResponse(
-            {
-                'status': 'error',
-                'message': 'Transfira a chapa antes de apontar este item.',
-            },
-            status=409
-        )
 
     if item.apontado:
         resp_ref = getattr(item, 'resp_apontamento', None)
@@ -2275,7 +2337,32 @@ def api_erp_apontar_item_corte(request, pk):
 
     payload_integracao = None
     if tipo_apontamento == 'api':
-        peca_valida, erro_peca, ficha_tecnica = _resolver_ficha_tecnica_chapa_corte(item, transferencia)
+        propriedade = getattr(item.ordem, 'propriedade', None)
+        dados_chapa = _calcular_peso_chapas_corte(
+            propriedade,
+            propriedade.quantidade if propriedade else None,
+        ) or {}
+        codigo_chapa_ordem = dados_chapa.get('codigo')
+        transferencia = (
+            TransferenciaChapaCorte.objects
+            .filter(ordem_id=item.ordem_id, status='sucesso')
+            .order_by('-transferido_em', '-id')
+            .first()
+        )
+        if not transferencia and _item_precisa_transferencia_chapa_corte(item, codigo_chapa_ordem):
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': 'Transfira a chapa antes de apontar este item.',
+                },
+                status=409
+            )
+
+        peca_valida, erro_peca, ficha_tecnica = _resolver_ficha_tecnica_chapa_corte(
+            item,
+            transferencia,
+            codigo_chapa_ordem,
+        )
         if not peca_valida:
             _registrar_erro_apontamento_api_corte(item, erro_peca, request.user)
             return JsonResponse(
@@ -2450,7 +2537,7 @@ def api_erp_apontar_itens_corte_bloco(request):
 
     itens = list(
         PecasOrdem.objects
-        .select_related('ordem', 'resp_apontamento')
+        .select_related('ordem', 'ordem__propriedade', 'resp_apontamento')
         .filter(
             pk__in=ids,
             ordem__status_atual='finalizada',
@@ -2463,6 +2550,7 @@ def api_erp_apontar_itens_corte_bloco(request):
     erros = []
     itens_validos = []
     fichas_tecnicas = {}
+    dados_chapa_por_ordem = {}
 
     for item_id in ids:
         item = itens_por_id.get(item_id)
@@ -2474,18 +2562,31 @@ def api_erp_apontar_itens_corte_bloco(request):
             erros.append({'id': item.id, 'erro': 'Item ja apontado.'})
             continue
 
-        transferencia = (
-            TransferenciaChapaCorte.objects
-            .filter(ordem_id=item.ordem_id, status='sucesso')
-            .order_by('-transferido_em', '-id')
-            .first()
-        )
-        if not transferencia:
-            erros.append({'id': item.id, 'erro': 'Transfira a chapa antes de apontar este item.'})
-            continue
-
         if tipo_apontamento == 'api':
-            peca_valida, erro_peca, ficha_tecnica = _resolver_ficha_tecnica_chapa_corte(item, transferencia)
+            if item.ordem_id not in dados_chapa_por_ordem:
+                propriedade = getattr(item.ordem, 'propriedade', None)
+                dados_chapa_por_ordem[item.ordem_id] = _calcular_peso_chapas_corte(
+                    propriedade,
+                    propriedade.quantidade if propriedade else None,
+                )
+            dados_chapa = dados_chapa_por_ordem.get(item.ordem_id) or {}
+            codigo_chapa_ordem = dados_chapa.get('codigo')
+
+            transferencia = (
+                TransferenciaChapaCorte.objects
+                .filter(ordem_id=item.ordem_id, status='sucesso')
+                .order_by('-transferido_em', '-id')
+                .first()
+            )
+            if not transferencia and _item_precisa_transferencia_chapa_corte(item, codigo_chapa_ordem):
+                erros.append({'id': item.id, 'erro': 'Transfira a chapa antes de apontar este item.'})
+                continue
+
+            peca_valida, erro_peca, ficha_tecnica = _resolver_ficha_tecnica_chapa_corte(
+                item,
+                transferencia,
+                codigo_chapa_ordem,
+            )
             if not peca_valida:
                 _registrar_erro_apontamento_api_corte(item, erro_peca, request.user)
                 erros.append({'id': item.id, 'erro': erro_peca})
