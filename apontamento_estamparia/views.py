@@ -105,9 +105,10 @@ def _apontar_item_via_api_erp_estamparia(item, user):
             description=msg_qtd_morta,
         )
 
+    data_producao = localtime(item.data) if item.data else localtime(now())
     payload_integracao = {
         "id": f"estamparia-item-{item.id}",
-        "data": localtime(now()).strftime('%d/%m/%Y'),
+        "data": data_producao.strftime('%d/%m/%Y'),
         "pessoa": "4357",
         "recurso": str(item.peca.codigo if item.peca else ""),
         "processo": "S Estamparia",
@@ -1336,9 +1337,10 @@ def api_erp_apontar_item_estamparia(request, pk):
         )
 
     if tipo_apontamento == 'api':
+        data_producao = localtime(item.data) if item.data else localtime(now())
         payload_integracao = {
             "id": f"estamparia-item-{item.id}",
-            "data": localtime(now()).strftime('%d/%m/%Y'),
+            "data": data_producao.strftime('%d/%m/%Y'),
             "pessoa": "4357",
             "recurso": str(item.peca.codigo if item.peca else ""),
             "processo": "S Estamparia",

@@ -98,9 +98,10 @@ def _nome_responsavel_apontamento(user):
 
 
 def _payload_apontamento_erp_montagem(item):
+    data_producao = localtime(item.data) if item.data else localtime(now())
     return {
         "id": f"montagem-item-{item.id}",
-        "data": localtime(now()).strftime('%d/%m/%Y'),
+        "data": data_producao.strftime('%d/%m/%Y'),
         "pessoa": "4357",
         "recurso": _extrair_codigo_peca(item.peca),
         "processo": "S Mont Conjuntos Carretas",
@@ -2325,15 +2326,7 @@ def api_erp_apontar_item_montagem(request, pk):
 
     payload_integracao = None
     if tipo_apontamento == 'api':
-        payload_integracao = {
-            "id": f"montagem-item-{item.id}",
-            "data": localtime(now()).strftime('%d/%m/%Y'),
-            "pessoa": "4357",
-            "recurso": _extrair_codigo_peca(item.peca),
-            "processo": "S Mont Conjuntos Carretas",
-            "produzido": item.qtd_boa,
-            "observacao": str(item.ordem_id),
-        }
+        payload_integracao = _payload_apontamento_erp_montagem(item)
 
         if settings.DEBUG:
             print(
