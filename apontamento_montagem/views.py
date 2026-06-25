@@ -2303,7 +2303,7 @@ def api_erp_apontar_item_montagem(request, pk):
         .first()
     )
 
-    if item.apontado or item_ja_apontado_ordem:
+    if item.apontado or (item_ja_apontado_ordem and not item.erro_apontamento):
         item_referencia = item if item.apontado else item_ja_apontado_ordem
         resp_ref = getattr(item_referencia, 'resp_apontamento', None)
         return JsonResponse(
