@@ -29,6 +29,7 @@ import json
 import math
 import requests
 import xml.etree.ElementTree as ET
+from copy import deepcopy
 from urllib.parse import unquote
 from datetime import datetime, time, timedelta
 from functools import reduce
@@ -45,6 +46,118 @@ TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
 
 # Certifique-se de que a pasta existe
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+PROCESSOS_APONTAMENTO_DEPOSITODEST_FALLBACK_CORTE = [
+    "S Mont Prod Especiais",
+    "S Mont Conjuntos Carretas",
+    "S Pintura",
+    "S Expedição",
+    "S C Serras",
+    "S C Plasma",
+    "S C Guilhotina",
+    "S Corte Manual",
+    "S C Prensas",
+    "S C Laser",
+    "S Usinagem",
+]
+
+def _url_apontamento_erp_corte():
+    return (
+        "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar"
+        if os.getenv("DJANGO_ENV") == "dev"
+        else "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar"
+    )
+
+def _post_apontamento_erp_corte(payload):
+    return requests.post(
+        _url_apontamento_erp_corte(),
+        json=payload,
+        auth=("luan araujo", "luanaraujo7"),
+        timeout=(10, 60),
+    )
+
+def _erro_depositodest_indefinido_corte(descricao):
+    texto = str(descricao or '').lower()
+    return 'depositodest' in texto and 'undefined' in texto
+
+def _processos_fallback_depositodest_corte(processo_atual):
+    processo_atual = str(processo_atual or '').strip()
+    return [
+        processo
+        for processo in PROCESSOS_APONTAMENTO_DEPOSITODEST_FALLBACK_CORTE
+        if processo != processo_atual
+    ]
+
+def _tentar_apontamento_depositodest_processos_alternativos_corte(payload_integracao):
+    tentativas = []
+
+    for processo in _processos_fallback_depositodest_corte(payload_integracao.get('processo')):
+        payload_tentativa = deepcopy(payload_integracao)
+        payload_tentativa['processo'] = processo
+
+        try:
+            response_integracao = _post_apontamento_erp_corte(payload_tentativa)
+        except requests.RequestException as exc:
+            tentativas.append({'processo': processo, 'erro': f'Falha de comunicacao com API ERP: {exc}'})
+            continue
+
+        try:
+            resposta_api_json = response_integracao.json()
+        except ValueError:
+            resposta_api_json = None
+
+        if not response_integracao.ok:
+            retorno_texto = response_integracao.text[:500] if response_integracao.text else 'Sem detalhes'
+            tentativas.append({
+                'processo': processo,
+                'erro': retorno_texto,
+                'status_code': response_integracao.status_code,
+                'retorno_api': resposta_api_json or retorno_texto,
+            })
+            continue
+
+        if isinstance(resposta_api_json, dict):
+            status_erp = str(resposta_api_json.get('status') or '').strip().lower()
+            if status_erp == 'success':
+                return payload_tentativa, resposta_api_json, tentativas
+
+            descricao_erro = str(resposta_api_json.get('description') or 'Erro retornado pela API ERP.')
+            tentativas.append({'processo': processo, 'erro': descricao_erro, 'retorno_api': resposta_api_json})
+            continue
+
+        tentativas.append({
+            'processo': processo,
+            'erro': 'API ERP nao retornou JSON valido.',
+            'retorno_api': (response_integracao.text or '')[:500],
+        })
+
+    return None, None, tentativas
+
+def _mensagem_processo_alternativo_depositodest(payload_original, payload_final):
+    processo_original = payload_original.get('processo')
+    processo_final = payload_final.get('processo')
+    if processo_original == processo_final:
+        return ''
+    return (
+        'Apontamento reenviado automaticamente por erro DEPOSITODEST '
+        f'alterando processo de {processo_original} para {processo_final}.'
+    )
+
+def _transferencia_chapa_corte_confirmada(transferencia_chapa):
+    if not isinstance(transferencia_chapa, dict):
+        return False
+    return (
+        str(transferencia_chapa.get('status') or '').lower() == 'sucesso'
+        or bool(transferencia_chapa.get('ja_transferida'))
+    )
+
+def _ordem_precisa_transferencia_chapa_corte(itens, dados_chapa):
+    return bool(
+        itens
+        and dados_chapa
+        and dados_chapa.get('encontrou_chapa')
+        and dados_chapa.get('codigo')
+    )
 
 def _parse_decimal_br(valor):
     if valor in (None, ''):
@@ -810,17 +923,7 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
     )
 
     try:
-        url = (
-            "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar"
-            if os.getenv("DJANGO_ENV") == "dev"
-            else "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar"
-        )
-        response_integracao = requests.post(
-            url,
-            json=payload_integracao,
-            auth=("luan araujo", "luanaraujo7"),
-            timeout=(10, 60),
-        )
+        response_integracao = _post_apontamento_erp_corte(payload_integracao)
     except requests.RequestException as exc:
         erro = f'Falha de comunicacao com API ERP: {exc}'
         for item in itens_validos:
@@ -863,6 +966,44 @@ def _apontar_itens_corte_via_api_bloco(itens, user):
         retorno_item = respostas[index] if index < len(respostas) else resposta_api_json
         if isinstance(retorno_item, dict) and str(retorno_item.get('status') or '').lower() == 'error':
             descricao_erro = str(retorno_item.get('description') or 'Erro retornado pela API ERP.')
+            if _erro_depositodest_indefinido_corte(descricao_erro):
+                payload_tentativa, retorno_tentativa, tentativas = (
+                    _tentar_apontamento_depositodest_processos_alternativos_corte(payload_integracao[index])
+                )
+                if payload_tentativa and retorno_tentativa:
+                    item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+                        retorno_tentativa,
+                        payload_tentativa,
+                    )
+                    avisos = [
+                        aviso_chave,
+                        _mensagem_ficha_tecnica_apontamento(payload_tentativa.get('fichaTecnica')),
+                        _mensagem_processo_alternativo_depositodest(
+                            payload_integracao[index],
+                            payload_tentativa,
+                        ),
+                    ]
+                    item.erro_apontamento = ' '.join(aviso for aviso in avisos if aviso) or None
+                    item.apontado = True
+                    item.tipo_apontamento = 'api'
+                    item.resp_apontamento = user
+                    item.data_apontamento = now()
+                    item.save(update_fields=[
+                        'apontado',
+                        'tipo_apontamento',
+                        'resp_apontamento',
+                        'data_apontamento',
+                        'chave_apontamento',
+                        'erro_apontamento',
+                    ])
+                    payload_integracao[index] = payload_tentativa
+                    sucessos.append({
+                        'id': item.id,
+                        'chave_apontamento': item.chave_apontamento,
+                        'processo': payload_tentativa.get('processo'),
+                    })
+                    continue
+                retorno_item['tentativas_processos_alternativos'] = tentativas
             item.erro_apontamento = descricao_erro
             item.tipo_apontamento = 'api'
             item.resp_apontamento = user
@@ -1255,15 +1396,11 @@ def atualizar_status_ordem(request):
                         .filter(ordem=ordem, qtd_boa__gt=0)
                         .order_by('id')
                     )
+                    precisa_transferencia_chapa = False
                     try:
-                        precisa_transferencia_chapa = (
-                            peso_chapas
-                            and peso_chapas.get('encontrou_chapa')
-                            and peso_chapas.get('codigo')
-                            and any(
-                                _item_precisa_transferencia_chapa_corte(item, peso_chapas.get('codigo'))
-                                for item in itens_para_apontamento_erp
-                            )
+                        precisa_transferencia_chapa = _ordem_precisa_transferencia_chapa_corte(
+                            itens_para_apontamento_erp,
+                            peso_chapas,
                         )
 
                         if precisa_transferencia_chapa:
@@ -1282,16 +1419,33 @@ def atualizar_status_ordem(request):
                             'erro': str(exc),
                         }
 
-                    try:
-                        apontamento_erp = _apontar_itens_corte_via_api_bloco(
-                            itens_para_apontamento_erp,
-                            request.user,
-                        )
-                    except Exception as exc:
+                    if (
+                        precisa_transferencia_chapa
+                        and not _transferencia_chapa_corte_confirmada(transferencia_chapa)
+                    ):
                         apontamento_erp = {
                             'enviado': False,
-                            'erros': [{'erro': str(exc)}],
+                            'sucessos': [],
+                            'erros': [{
+                                'erro': (
+                                    'Apontamento bloqueado: a transferencia de chapa era '
+                                    'obrigatoria e nao foi confirmada no ERP.'
+                                ),
+                                'transferencia_chapa': transferencia_chapa,
+                            }],
+                            'message': 'Apontamento bloqueado aguardando transferencia de chapa.',
                         }
+                    else:
+                        try:
+                            apontamento_erp = _apontar_itens_corte_via_api_bloco(
+                                itens_para_apontamento_erp,
+                                request.user,
+                            )
+                        except Exception as exc:
+                            apontamento_erp = {
+                                'enviado': False,
+                                'erros': [{'erro': str(exc)}],
+                            }
 
                 notificar_ordem(ordem)
 
@@ -2382,17 +2536,7 @@ def api_erp_apontar_item_corte(request, pk):
         )
 
         try:
-            url = (
-                "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar"
-                if os.getenv("DJANGO_ENV") == "dev"
-                else "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar"
-            )
-            response_integracao = requests.post(
-                url,
-                json=payload_integracao,
-                auth=("luan araujo", "luanaraujo7"),
-                timeout=(10, 60),
-            )
+            response_integracao = _post_apontamento_erp_corte(payload_integracao)
         except requests.RequestException as exc:
             return JsonResponse(
                 {
@@ -2438,22 +2582,59 @@ def api_erp_apontar_item_corte(request, pk):
             status_erp = str(resposta_api_json.get('status') or '').strip()
             if status_erp.lower() == 'error':
                 descricao_erro = str(resposta_api_json.get('description') or 'Erro retornado pela API ERP.')
-                item.erro_apontamento = descricao_erro
-                item.tipo_apontamento = 'api'
-                item.resp_apontamento = request.user
-                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-                return JsonResponse(
-                    {
-                        'status': 'error',
-                        'message': 'API ERP retornou erro de negocio.',
-                        'description': descricao_erro,
-                        'payload_enviado': payload_integracao,
-                        'retorno_api': resposta_api_json,
-                    },
-                    status=422
-                )
-
-            if status_erp.lower() == 'success':
+                if _erro_depositodest_indefinido_corte(descricao_erro):
+                    payload_tentativa, retorno_tentativa, tentativas = (
+                        _tentar_apontamento_depositodest_processos_alternativos_corte(payload_integracao)
+                    )
+                    if payload_tentativa and retorno_tentativa:
+                        payload_original = payload_integracao
+                        payload_integracao = payload_tentativa
+                        resposta_api_json = retorno_tentativa
+                        item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+                            resposta_api_json,
+                            payload_integracao,
+                        )
+                        avisos = [
+                            aviso_chave,
+                            _mensagem_ficha_tecnica_apontamento(payload_integracao.get('fichaTecnica')),
+                            _mensagem_processo_alternativo_depositodest(
+                                payload_original,
+                                payload_integracao,
+                            ),
+                        ]
+                        item.erro_apontamento = ' '.join(aviso for aviso in avisos if aviso) or None
+                    else:
+                        item.erro_apontamento = descricao_erro
+                        item.tipo_apontamento = 'api'
+                        item.resp_apontamento = request.user
+                        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                        return JsonResponse(
+                            {
+                                'status': 'error',
+                                'message': 'API ERP retornou erro de negocio.',
+                                'description': descricao_erro,
+                                'payload_enviado': payload_integracao,
+                                'retorno_api': resposta_api_json,
+                                'tentativas_processos_alternativos': tentativas,
+                            },
+                            status=422
+                        )
+                else:
+                    item.erro_apontamento = descricao_erro
+                    item.tipo_apontamento = 'api'
+                    item.resp_apontamento = request.user
+                    item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                    return JsonResponse(
+                        {
+                            'status': 'error',
+                            'message': 'API ERP retornou erro de negocio.',
+                            'description': descricao_erro,
+                            'payload_enviado': payload_integracao,
+                            'retorno_api': resposta_api_json,
+                        },
+                        status=422
+                    )
+            elif status_erp.lower() == 'success':
                 item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
                     resposta_api_json,
                     payload_integracao,
@@ -2659,17 +2840,7 @@ def api_erp_apontar_itens_corte_bloco(request):
     )
 
     try:
-        url = (
-            "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar"
-            if os.getenv("DJANGO_ENV") == "dev"
-            else "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar"
-        )
-        response_integracao = requests.post(
-            url,
-            json=payload_integracao,
-            auth=("luan araujo", "luanaraujo7"),
-            timeout=(10, 60),
-        )
+        response_integracao = _post_apontamento_erp_corte(payload_integracao)
     except requests.RequestException as exc:
         return JsonResponse(
             {
@@ -2713,6 +2884,44 @@ def api_erp_apontar_itens_corte_bloco(request):
         retorno_item = respostas[index] if index < len(respostas) else resposta_api_json
         if isinstance(retorno_item, dict) and str(retorno_item.get('status') or '').lower() == 'error':
             descricao_erro = str(retorno_item.get('description') or 'Erro retornado pela API ERP.')
+            if _erro_depositodest_indefinido_corte(descricao_erro):
+                payload_tentativa, retorno_tentativa, tentativas = (
+                    _tentar_apontamento_depositodest_processos_alternativos_corte(payload_integracao[index])
+                )
+                if payload_tentativa and retorno_tentativa:
+                    item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+                        retorno_tentativa,
+                        payload_tentativa,
+                    )
+                    avisos = [
+                        aviso_chave,
+                        _mensagem_ficha_tecnica_apontamento(payload_tentativa.get('fichaTecnica')),
+                        _mensagem_processo_alternativo_depositodest(
+                            payload_integracao[index],
+                            payload_tentativa,
+                        ),
+                    ]
+                    item.erro_apontamento = ' '.join(aviso for aviso in avisos if aviso) or None
+                    item.apontado = True
+                    item.tipo_apontamento = 'api'
+                    item.resp_apontamento = request.user
+                    item.data_apontamento = now()
+                    item.save(update_fields=[
+                        'apontado',
+                        'tipo_apontamento',
+                        'resp_apontamento',
+                        'data_apontamento',
+                        'chave_apontamento',
+                        'erro_apontamento',
+                    ])
+                    payload_integracao[index] = payload_tentativa
+                    sucessos.append({
+                        'id': item.id,
+                        'chave_apontamento': item.chave_apontamento,
+                        'processo': payload_tentativa.get('processo'),
+                    })
+                    continue
+                retorno_item['tentativas_processos_alternativos'] = tentativas
             item.erro_apontamento = descricao_erro
             item.tipo_apontamento = 'api'
             item.resp_apontamento = request.user

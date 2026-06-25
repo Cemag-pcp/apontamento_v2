@@ -37,6 +37,10 @@
         vertical-align: middle;
         white-space: nowrap;
     }
+
+    #erpFiltrosFeedback {
+        min-height: 1.5rem;
+    }
 </style>
 
 <div class="container-fluid px-4">
@@ -96,8 +100,16 @@
                     </select>
                 </div>
                 <div class="col-md-3 d-flex align-items-end gap-2">
-                    <button type="submit" class="btn btn-primary w-100">Aplicar</button>
+                    <button type="submit" id="btnAplicarFiltros" class="btn btn-primary w-100">
+                        <span class="btn-label">Aplicar</span>
+                    </button>
                     <button type="button" id="btnLimparFiltros" class="btn btn-outline-secondary w-100">Limpar</button>
+                </div>
+                <div class="col-12">
+                    <div id="erpFiltrosFeedback" class="small text-muted d-none" role="status" aria-live="polite">
+                        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                        Consultando apontamentos com os filtros informados...
+                    </div>
                 </div>
             </form>
         </div>

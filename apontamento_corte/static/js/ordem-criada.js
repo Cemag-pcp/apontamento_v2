@@ -162,7 +162,7 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
                         // Adiciona evento ao botão "Finalizar", se existir
                         if (buttonFinalizar) {
                             buttonFinalizar.addEventListener('click', () => {
-                                mostrarModalFinalizar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
+                                mostrarModalFinalizar(ordem.id, ordem.grupo_maquina, ordem.maquina_id, card);
                             });
                         }
 
@@ -213,6 +213,25 @@ export const loadOrdens = (container, page = 1, limit = 10, filtros = {}) => {
     });
 };
 
+function mostrarToastCorte(message, icon = 'info') {
+    Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: icon === 'error' ? 5000 : 3000,
+        timerProgressBar: true,
+    }).fire({ icon, title: message });
+}
+
+function setCardFinalizacaoPendente(cardElements, isPending) {
+    const cards = Array.isArray(cardElements) ? cardElements : [cardElements];
+    cards.filter(Boolean).forEach((cardEl) => {
+        cardEl.style.transition = 'opacity 0.2s';
+        cardEl.style.opacity = isPending ? '0.35' : '1';
+        cardEl.style.pointerEvents = isPending ? 'none' : '';
+    });
+}
+
 function iniciarContador(ordemId, dataCriacao) {
     const contador = document.getElementById(`contador-${ordemId}`);
     const dataInicial = new Date(dataCriacao); // Converte a data de criação para objeto Date
@@ -249,6 +268,7 @@ export function carregarOrdensIniciadas(container) {
 
                 const card = document.createElement('div');
                 card.dataset.ordemId = ordem.ordem;
+                card.dataset.ordemPk = ordem.id;
 
                 // Defina os botões dinamicamente com base no status
                 let botaoAcao = '';
@@ -340,7 +360,7 @@ export function carregarOrdensIniciadas(container) {
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        mostrarModalFinalizar(ordem.id, ordem.grupo_maquina, ordem.maquina_id);
+                        mostrarModalFinalizar(ordem.id, ordem.grupo_maquina, ordem.maquina_id, card);
                     });
                 }
 
@@ -970,7 +990,7 @@ function mostrarModalRetornarOrdemIniciada(ordemId) {
 }
 
 // Modal para "Finalizar"
-function mostrarModalFinalizar(ordemId, grupoMaquina, maquinaPreferidaId = null) {
+function mostrarModalFinalizar(ordemId, grupoMaquina, maquinaPreferidaId = null, cardFinalizacao = null) {
     const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     const modalTitle = document.getElementById('modalFinalizarLabel');
     const formFinalizar = document.getElementById('formFinalizarOrdemCorte');
@@ -1172,15 +1192,15 @@ function mostrarModalFinalizar(ordemId, grupoMaquina, maquinaPreferidaId = null)
         if (modalConfirmFinalizar) {
             modalConfirmFinalizar.hide();
         }
+        modal.hide();
 
-        Swal.fire({
-            title: 'Finalizando...',
-            text: 'Por favor, aguarde...',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        const cardProcesso = document.querySelector(`.containerProcesso [data-ordem-pk="${ordemId}"]`);
+        const cardsPendentes = [cardFinalizacao, cardProcesso].filter(
+            (card, index, cards) => card && cards.indexOf(card) === index
+        );
+
+        setCardFinalizacaoPendente(cardsPendentes, true);
+        mostrarToastCorte('Finalizando ordem e enviando apontamento...', 'info');
 
         fetch(`api/ordens/atualizar-status/`, {
             method: 'PATCH',
@@ -1211,46 +1231,36 @@ function mostrarModalFinalizar(ordemId, grupoMaquina, maquinaPreferidaId = null)
                 ? `Ordem finalizada parcialmente. Nova ordem #${numeroNovaOrdem} criada.`
                 : 'Ordem finalizada com sucesso.';
 
-            Swal.fire({
-                icon: 'success',
-                title: 'Sucesso',
-                text: mensagemParcial,
-            }).then(() => {
-                if (data.nova_ordem_id) {
-                    Swal.fire({
-                        icon: 'question',
-                        title: 'Deseja iniciar a ordem?',
-                        text: `Nova ordem #${numeroNovaOrdem} pronta para iniciar.`,
-                        showCancelButton: true,
-                        confirmButtonText: 'Iniciar agora',
-                        cancelButtonText: 'Depois',
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            const maquinaId = data.maquina_id || maquinaPreferidaId;
-                            mostrarModalIniciar(data.nova_ordem_id, grupoMaquina, maquinaId);
-                        }
-                    });
-                }
-            });
+            mostrarToastCorte(mensagemParcial, 'success');
+            if (data.nova_ordem_id) {
+                Swal.fire({
+                    icon: 'question',
+                    title: 'Deseja iniciar a ordem?',
+                    text: `Nova ordem #${numeroNovaOrdem} pronta para iniciar.`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Iniciar agora',
+                    cancelButtonText: 'Depois',
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        const maquinaId = data.maquina_id || maquinaPreferidaId;
+                        mostrarModalIniciar(data.nova_ordem_id, grupoMaquina, maquinaId);
+                    }
+                });
+            }
             
             const containerIniciado = document.querySelector('.containerProcesso');
             carregarOrdensIniciadas(containerIniciado);
             
             resetarCardsInicial();
                         
-            modal.hide();
-
             fetchStatusMaquinas();
             fetchOrdensSequenciadasPlasma();
             fetchOrdensSequenciadasLaser();
 
         })
         .catch((error) => {
-            Swal.fire({
-                icon: 'error',
-                title: 'Erro',
-                text: error.message,
-            });
+            setCardFinalizacaoPendente(cardsPendentes, false);
+            mostrarToastCorte(error.message || 'Erro ao finalizar a ordem.', 'error');
         });
     };
 

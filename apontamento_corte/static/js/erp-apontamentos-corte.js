@@ -11,6 +11,8 @@ const loadingState = document.getElementById('erpLoadingState');
 const resumoEl = document.getElementById('erpResumoTabela');
 const paginationInfoEl = document.getElementById('erpPaginationInfo');
 const paginationControlsEl = document.getElementById('erpPaginationControls');
+const filtrosFeedbackEl = document.getElementById('erpFiltrosFeedback');
+const btnAplicarFiltros = document.getElementById('btnAplicarFiltros');
 const btnLimparFiltros = document.getElementById('btnLimparFiltros');
 const btnAtualizarTabela = document.getElementById('btnAtualizarTabela');
 const btnApontarEmBloco = document.getElementById('btnApontarEmBloco');
@@ -65,6 +67,24 @@ const state = {
 
 function setLoading(isLoading) {
     loadingState?.classList.toggle('d-none', !isLoading);
+    filtrosFeedbackEl?.classList.toggle('d-none', !isLoading);
+
+    form?.querySelectorAll('input, select, button').forEach((control) => {
+        control.disabled = isLoading;
+    });
+    if (btnAtualizarTabela) {
+        btnAtualizarTabela.disabled = isLoading;
+    }
+    if (paginationControlsEl) {
+        paginationControlsEl.querySelectorAll('button').forEach((button) => {
+            button.disabled = isLoading;
+        });
+    }
+    if (btnAplicarFiltros) {
+        btnAplicarFiltros.innerHTML = isLoading
+            ? '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Aplicando...'
+            : '<span class="btn-label">Aplicar</span>';
+    }
 }
 
 function readFilters() {
@@ -451,12 +471,22 @@ async function loadPage(page = 1) {
     });
 
     if (activeController) activeController.abort();
-    activeController = new AbortController();
+    const requestController = new AbortController();
+    activeController = requestController;
 
     setLoading(true);
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="19" class="text-center text-muted py-4">
+                <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                Consultando apontamentos...
+            </td>
+        </tr>
+    `;
+    resumoEl.textContent = 'Aplicando filtros...';
     try {
         const response = await fetch(`${apiUrl}?${params.toString()}`, {
-            signal: activeController.signal,
+            signal: requestController.signal,
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -474,7 +504,10 @@ async function loadPage(page = 1) {
         resumoEl.textContent = 'Erro ao consultar dados';
         console.error(error);
     } finally {
-        setLoading(false);
+        if (activeController === requestController) {
+            setLoading(false);
+            activeController = null;
+        }
     }
 }
 
