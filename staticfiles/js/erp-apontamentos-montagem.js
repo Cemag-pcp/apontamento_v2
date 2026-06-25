@@ -86,8 +86,18 @@ function badgeApontado(value) {
         : '<span class="badge text-bg-secondary">Nao</span>';
 }
 
+function chaveApontamentoExibida(row) {
+    if (row.apontado) return row.chave_apontamento || '';
+    if (!row.erro_apontamento && row.ordem_ja_apontada) return row.ordem_chave_apontamento || '';
+    return '';
+}
+
 function renderActionButton(row) {
-    const primaryButton = (row.ordem_ja_apontada || row.apontado) ? `
+    const apontadoComSucesso = Boolean(row.apontado);
+    const temErro = Boolean(row.erro_apontamento);
+    const mostrarDetalhes = apontadoComSucesso || (Boolean(row.ordem_ja_apontada) && !temErro);
+
+    const primaryButton = mostrarDetalhes ? `
         <button type="button"
                 class="btn btn-sm btn-outline-secondary btn-erp-detalhes"
                 title="Ver detalhes do apontamento"
@@ -169,7 +179,7 @@ function renderRows(rows) {
             <td class="text-end">${formatNumber(row.qtd_boa)}</td>
             <td class="text-end">${formatNumber(row.qtd_morta)}</td>
             <td>${badgeApontado(row.apontado)}</td>
-            <td>${escapeHtml(row.chave_apontamento || '-')}</td>
+            <td>${escapeHtml(chaveApontamentoExibida(row) || '-')}</td>
             <td>${escapeHtml(row.resp_apontamento || row.resp_apontamento_username || '-')}</td>
             <td>${escapeHtml(row.data_producao || '-')}</td>
             <td>${escapeHtml(row.data_apontamento || '-')}</td>
