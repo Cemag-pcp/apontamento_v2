@@ -2173,7 +2173,7 @@ def api_erp_apontamentos_montagem(request):
 
     queryset = (
         PecasOrdem.objects
-        .filter(qtd_boa__gt=0, ordem__grupo_maquina='montagem')
+        .filter(qtd_boa__gt=0, ordem__grupo_maquina='montagem', data__date__gte=date(2026, 6, 24))
         .select_related('ordem', 'ordem__maquina', 'ordem__operador_final', 'operador', 'resp_apontamento')
         .annotate(
             ordem_ja_apontada=Exists(subquery_ordem_apontada),
