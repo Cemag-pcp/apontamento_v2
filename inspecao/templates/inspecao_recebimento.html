@@ -1236,6 +1236,23 @@
             .replace(/\b\w/g, (letra) => letra.toUpperCase());
     }
 
+    function extrairPecasDevolucao(campos) {
+        campos = campos || {};
+        const indices = new Set();
+        Object.keys(campos).forEach((chave) => {
+            const match = chave.match(/^devolucao_peca_(\d+)_(codigo|quantidade)$/);
+            if (match) indices.add(parseInt(match[1], 10));
+        });
+
+        return Array.from(indices)
+            .sort((a, b) => a - b)
+            .map((indice) => ({
+                codigo: campos[`devolucao_peca_${indice}_codigo`] || "",
+                quantidade: campos[`devolucao_peca_${indice}_quantidade`] || "",
+            }))
+            .filter((peca) => peca.codigo);
+    }
+
     function abrirFichaInspecaoRecebimento(row) {
         const container = document.getElementById("ficha-doc-container");
         container.innerHTML = "";
@@ -1274,10 +1291,14 @@
         // ── tabela de unidades
         let unidadesHtml = "";
         if (unidadesComMaterial.length) {
+            const CAMPOS_DEVOLUCAO_OCULTOS = /^devolucao_peca_\d+_(codigo|quantidade)$/;
             const camposExtras = [];
             const possuiImagem = unidadesComMaterial.some(u => Boolean(u?.imagem?.url || u?.imagem?.arquivo));
             unidadesComMaterial.forEach(u => {
-                Object.keys(u.campos || {}).forEach(c => { if (!camposExtras.includes(c)) camposExtras.push(c); });
+                Object.keys(u.campos || {}).forEach(c => {
+                    if (CAMPOS_DEVOLUCAO_OCULTOS.test(c)) return;
+                    if (!camposExtras.includes(c)) camposExtras.push(c);
+                });
             });
 
             // "material" sai das colunas — vira linha de agrupamento
@@ -1296,6 +1317,10 @@
                     return `<td class="${cls}">${v || "—"}</td>`;
                 }
                 if (col === "observacao") return `<td>${unidade.observacao || "—"}</td>`;
+                if (col === "devolucao_material") {
+                    const codigo = unidade.campos?.[col] || "";
+                    return `<td>${MATERIAIS_DEVOLUCAO[codigo]?.nome || codigo || "—"}</td>`;
+                }
                 if (col === "imagem") {
                     const url = unidade?.imagem?.url || "";
                     return url
@@ -1337,6 +1362,39 @@
                 </div>`;
         }
 
+        // ── peças utilizadas na devolução
+        let pecasDevolucaoHtml = "";
+        const unidadesComPecasDevolucao = unidadesComMaterial
+            .map(u => ({ unidade: u, pecas: extrairPecasDevolucao(u.campos) }))
+            .filter(item => item.pecas.length);
+
+        if (unidadesComPecasDevolucao.length) {
+            const linhasPecas = unidadesComPecasDevolucao.flatMap(({ unidade, pecas }) => {
+                const codigoMaterial = unidade.campos?.devolucao_material || "";
+                const mapaPecas = new Map((MATERIAIS_DEVOLUCAO[codigoMaterial]?.pecas || []).map(p => [p.codigo, p.descricao]));
+                const chamado = unidade.campos?.chamado_garantia || "";
+
+                return pecas.map((peca, idx) => `
+                    <tr>
+                        ${idx === 0 ? `<td rowspan="${pecas.length}">${unidade.unidade ?? "—"}</td>` : ""}
+                        ${idx === 0 ? `<td rowspan="${pecas.length}">${chamado || "—"}</td>` : ""}
+                        <td>${peca.codigo}${mapaPecas.has(peca.codigo) ? ` - ${mapaPecas.get(peca.codigo)}` : ""}</td>
+                        <td class="text-center">${peca.quantidade || "—"}</td>
+                    </tr>`);
+            }).join("");
+
+            pecasDevolucaoHtml = `
+                <div class="ficha-section">
+                    <div class="ficha-section-title">Peças utilizadas na devolução</div>
+                    <div style="overflow-x:auto;">
+                        <table class="ficha-unidades-table">
+                            <thead><tr><th>Unidade</th><th>Chamado de garantia</th><th>Peça</th><th>Quantidade</th></tr></thead>
+                            <tbody>${linhasPecas}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+        }
+
         container.innerHTML = `
             <div class="ficha-doc-header">
                 <div>
@@ -1369,6 +1427,8 @@
             </div>
 
             ${unidadesHtml}
+
+            ${pecasDevolucaoHtml}
 
             <div class="ficha-doc-footer">
                 <span>Inspeção de Recebimento — sistema de qualidade</span>
