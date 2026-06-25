@@ -152,6 +152,11 @@ AWS_S3_REGION_NAME = env('AWS_S3_REGION_NAME')
 
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
+# Desativa o upload multipart concorrente (boto3 usa threads lendo o mesmo
+# file-like object do Django em offsets diferentes, corrompendo arquivos
+# acima do limite de multipart quando varias threads leem simultaneamente).
+AWS_S3_USE_THREADS = False
+
 AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
 
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'

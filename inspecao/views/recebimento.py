@@ -54,6 +54,26 @@ def _salvar_imagem_inspecao_recebimento(uploaded_file, sheet_hash, material_idx,
     }
 
 
+def _salvar_video_inspecao_recebimento(uploaded_file, sheet_hash, material_idx, unidade_idx):
+    extensao = os.path.splitext(getattr(uploaded_file, "name", "") or "")[1].lower() or ".mp4"
+    caminho = (
+        f"inspecao_recebimento/{datetime.now().strftime('%Y/%m')}/"
+        f"{sheet_hash}_m{material_idx}_u{unidade_idx}_video{extensao}"
+    )
+    caminho_salvo = default_storage.save(caminho, uploaded_file)
+
+    try:
+        url = default_storage.url(caminho_salvo)
+    except Exception:
+        url = ""
+
+    return {
+        "arquivo": caminho_salvo,
+        "url": url,
+        "nome": getattr(uploaded_file, "name", ""),
+    }
+
+
 def inspecao_recebimento(request):
     user_profile = Profile.objects.filter(user=request.user).first()
     if (
@@ -727,19 +747,24 @@ def inspecionar_recebimento(request):
                         continue
 
                     campo_imagem = str(unidade.get("imagem_campo") or "").strip()
-                    if not campo_imagem:
-                        continue
+                    imagem = request.FILES.get(campo_imagem) if campo_imagem else None
+                    if imagem:
+                        unidade["imagem"] = _salvar_imagem_inspecao_recebimento(
+                            imagem,
+                            sheet_hash,
+                            material_idx,
+                            unidade_idx,
+                        )
 
-                    imagem = request.FILES.get(campo_imagem)
-                    if not imagem:
-                        continue
-
-                    unidade["imagem"] = _salvar_imagem_inspecao_recebimento(
-                        imagem,
-                        sheet_hash,
-                        material_idx,
-                        unidade_idx,
-                    )
+                    campo_video = str(unidade.get("video_campo") or "").strip()
+                    video = request.FILES.get(campo_video) if campo_video else None
+                    if video:
+                        unidade["video"] = _salvar_video_inspecao_recebimento(
+                            video,
+                            sheet_hash,
+                            material_idx,
+                            unidade_idx,
+                        )
 
         inspection_fields = dict(
             inspetor=inspetor_profile,
