@@ -97,8 +97,17 @@ def _nome_responsavel_apontamento(user):
     return (user.get_full_name() or user.username).strip()
 
 
+def _data_finalizacao_item_montagem(item):
+    """
+    Data em que o item foi de fato finalizado/produzido (nao a data em que o
+    registro PecasOrdem foi criado, que reflete quando a ordem foi iniciada).
+    """
+    data_finalizacao = item.processo_ordem.data_inicio if item.processo_ordem_id else None
+    return data_finalizacao or item.data_apontamento or item.data or now()
+
+
 def _payload_apontamento_erp_montagem(item):
-    data_producao = localtime(item.data) if item.data else localtime(now())
+    data_producao = localtime(_data_finalizacao_item_montagem(item))
     return {
         "id": f"montagem-item-{item.id}",
         "data": data_producao.strftime('%d/%m/%Y'),
@@ -2174,9 +2183,17 @@ def api_erp_apontamentos_montagem(request):
 
     queryset = (
         PecasOrdem.objects
-        .filter(qtd_boa__gt=0, ordem__grupo_maquina='montagem', data__date__gte=date(2026, 6, 24))
+        .filter(
+            qtd_boa__gt=0,
+            ordem__grupo_maquina='montagem',
+        )
         .select_related('ordem', 'ordem__maquina', 'ordem__operador_final', 'operador', 'resp_apontamento')
         .annotate(
+            # Data real de finalizacao/producao: prioriza a data da transicao
+            # para "finalizada" (processo_ordem.data_inicio), depois a data em
+            # que o apontamento foi confirmado, e so por ultimo a data de
+            # criacao do registro (que reflete quando a ordem foi iniciada).
+            data_producao_real=Coalesce('processo_ordem__data_inicio', 'data_apontamento', 'data'),
             ordem_ja_apontada=Exists(subquery_ordem_apontada),
             ordem_item_apontado_id=Subquery(subquery_ordem_apontada.values('id')[:1]),
             ordem_tipo_apontamento=Subquery(subquery_ordem_apontada.values('tipo_apontamento')[:1]),
@@ -2184,7 +2201,8 @@ def api_erp_apontamentos_montagem(request):
             ordem_chave_apontamento_ref=Subquery(subquery_ordem_apontada.values('chave_apontamento')[:1]),
             ordem_resp_username_ref=Subquery(subquery_ordem_apontada.values('resp_apontamento__username')[:1]),
         )
-        .order_by('-data_apontamento', '-id')
+        .filter(data_producao_real__date__gte=date(2026, 6, 24))
+        .order_by('data_producao_real', 'id')
     )
 
     if filtros['ordem']:
@@ -2218,9 +2236,9 @@ def api_erp_apontamentos_montagem(request):
     if data_apontamento_fim:
         queryset = queryset.filter(data_apontamento__date__lte=data_apontamento_fim)
     if data_producao_inicio:
-        queryset = queryset.filter(data__date__gte=data_producao_inicio)
+        queryset = queryset.filter(data_producao_real__date__gte=data_producao_inicio)
     if data_producao_fim:
-        queryset = queryset.filter(data__date__lte=data_producao_fim)
+        queryset = queryset.filter(data_producao_real__date__lte=data_producao_fim)
 
     paginator = Paginator(queryset, limit)
     pagina = paginator.get_page(page)
@@ -2250,7 +2268,7 @@ def api_erp_apontamentos_montagem(request):
             'erro_apontamento': item.erro_apontamento or '',
             'resp_apontamento': _nome_responsavel_apontamento(resp),
             'resp_apontamento_username': resp.username if resp else '',
-            'data_producao': localtime(item.data).strftime('%d/%m/%Y %H:%M') if item.data else '',
+            'data_producao': localtime(item.data_producao_real).strftime('%d/%m/%Y %H:%M') if item.data_producao_real else '',
             'data_apontamento': localtime(item.data_apontamento).strftime('%d/%m/%Y %H:%M') if item.data_apontamento else '',
             'ordem_ja_apontada': bool(getattr(item, 'ordem_ja_apontada', False)),
             'ordem_item_apontado_id': getattr(item, 'ordem_item_apontado_id', None),
