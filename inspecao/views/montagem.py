@@ -45,7 +45,7 @@ def inspecao_montagem(request):
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
     ]
 
-    user_profile = Profile.objects.filter(user=request.user).first()
+    user_profile = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     if (
         user_profile
         and user_profile.tipo_acesso == "inspetor"

@@ -572,7 +572,10 @@ def ordens_iniciadas(request):
     # if not request.user.is_authenticated:
     #     return JsonResponse({"detail": "Unauthorized"}, status=401)
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
 
     maquina_param = request.GET.get('setor', '')
 
@@ -713,7 +716,10 @@ def ordens_interrompidas(request):
     if not request.user.is_authenticated:
         return JsonResponse({"detail": "Unauthorized"}, status=401)
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
 
     maquina_param = request.GET.get('setor', '')
 

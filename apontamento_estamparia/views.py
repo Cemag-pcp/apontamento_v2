@@ -447,7 +447,10 @@ def get_ordens_criadas(request):
 
 @require_GET
 def get_painel_prioridades(request):
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
     ordens = (
         Ordem.objects.filter(
             grupo_maquina='estamparia',
@@ -502,7 +505,10 @@ def get_indicador_planejado_concluido_hoje(request):
 
 @require_POST
 def editar_ordem_prioridade(request):
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
     if usuario_tipo != 'pcp':
         return JsonResponse({'error': 'Apenas usuarios PCP podem editar prioridade.'}, status=403)
 
@@ -536,7 +542,10 @@ def editar_ordem_prioridade(request):
 
 @require_POST
 def retirar_ordem_prioridade(request):
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
     if usuario_tipo != 'pcp':
         return JsonResponse({'error': 'Apenas usuarios PCP podem retirar prioridade.'}, status=403)
 
@@ -755,7 +764,10 @@ def atualizar_status_ordem(request):
 @require_GET
 def get_ordens_iniciadas(request):
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
 
     # Filtra as ordens baseadas no status e no grupo da máquina
     ordens_queryset = Ordem.objects.filter(
@@ -835,7 +847,10 @@ def get_ordens_iniciadas(request):
 @require_GET
 def get_ordens_interrompidas(request):
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
 
     # Filtra as ordens com base no status 'interrompida'
     ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_estamparia').filter(status_atual='interrompida', grupo_maquina='estamparia')
@@ -897,7 +912,10 @@ def get_ordens_interrompidas(request):
 @require_GET
 def get_ordens_ag_prox_proc(request):
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
 
     # Filtra as ordens com base no status 'agua_prox_proc' e prefetch da peça relacionada
     ordens_queryset = Ordem.objects.prefetch_related(

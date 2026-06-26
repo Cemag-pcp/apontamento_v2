@@ -75,7 +75,7 @@ def _salvar_video_inspecao_recebimento(uploaded_file, sheet_hash, material_idx, 
 
 
 def inspecao_recebimento(request):
-    user_profile = Profile.objects.filter(user=request.user).first()
+    user_profile = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     if (
         user_profile
         and user_profile.tipo_acesso == "inspetor"
@@ -726,7 +726,7 @@ def inspecionar_recebimento(request):
     if registro_existente and not registro_existente.excluido:
         return JsonResponse({"error": "Item ja inspecionado"}, status=409)
 
-    inspetor_profile = Profile.objects.filter(user=request.user).first()
+    inspetor_profile = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
 
     with transaction.atomic():
         if item and not item.inspecionado:
@@ -825,6 +825,8 @@ TIPOS_ACESSO_EDICAO = {"supervisor", "admin", "pcp"}
 
 
 def _tem_acesso_edicao(request):
+    if not request.user.is_authenticated:
+        return False
     profile = Profile.objects.filter(user=request.user).first()
     return profile is not None and profile.tipo_acesso in TIPOS_ACESSO_EDICAO
 

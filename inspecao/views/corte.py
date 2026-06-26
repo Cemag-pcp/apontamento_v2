@@ -322,7 +322,7 @@ def envio_inspecao_corte(request):
         if not inspecao:
             inspecao = Inspecao.objects.create(pecas_ordem_corte=peca)
 
-        inspetor = Profile.objects.filter(user=request.user).first()
+        inspetor = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
         dados_execucao = DadosExecucaoInspecao.objects.create(
             inspecao=inspecao,
             inspetor=inspetor,

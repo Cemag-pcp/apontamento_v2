@@ -264,7 +264,10 @@ def get_ordens_criadas(request):
     page = int(request.GET.get('page', 1))
     limit = int(request.GET.get('limit', 10))
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
 
     # obter a primeira peça associada à ordem
     primeira_peca = PecasOrdem.objects.filter(
@@ -330,7 +333,10 @@ def get_ordens_criadas(request):
 
 @require_GET
 def get_painel_prioridades(request):
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
     ordens = (
         Ordem.objects.filter(
             grupo_maquina='usinagem',
@@ -385,7 +391,10 @@ def get_indicador_planejado_concluido_hoje(request):
 
 @require_POST
 def retirar_ordem_prioridade(request):
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
     if usuario_tipo != 'pcp':
         return JsonResponse({'error': 'Apenas usuarios PCP podem retirar prioridade.'}, status=403)
 
@@ -632,7 +641,10 @@ def get_ordens_interrompidas(request):
     # Filtra as ordens com base no status 'interrompida'
     ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_usinagem').filter(status_atual='interrompida', grupo_maquina='usinagem', excluida=False)
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
     # Paginação (opcional)
     page = request.GET.get('page', 1)  # Obtém o número da página
     limit = request.GET.get('limit', 10)  # Define o limite padrão por página
@@ -705,7 +717,10 @@ def get_ordens_ag_prox_proc(request):
         'ordem_pecas_usinagem','processos'
     ).filter(grupo_maquina='usinagem', status_atual='agua_prox_proc', excluida=False)
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
     # Paginação
     page = int(request.GET.get('page', 1))  # Obtém o número da página
     limit = int(request.GET.get('limit', 10))  # Define o limite padrão por página

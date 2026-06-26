@@ -209,7 +209,7 @@ def inspecao_tanque(request):
         {"peca": f"{tanque.codigo} - {tanque.descricao}"} for tanque in tanques
     ]
 
-    user_profile = Profile.objects.filter(user=request.user).first()
+    user_profile = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     if (
         user_profile
         and user_profile.tipo_acesso == "inspetor"
@@ -259,7 +259,7 @@ def inspecao_tubos_cilindros(request):
         if peca.tipo == "cilindro"
     ]
 
-    user_profile = Profile.objects.filter(user=request.user).first()
+    user_profile = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     if (
         user_profile
         and user_profile.tipo_acesso == "inspetor"

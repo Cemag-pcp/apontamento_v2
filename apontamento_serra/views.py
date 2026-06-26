@@ -399,7 +399,10 @@ def get_ordens_criadas(request):
 @require_GET
 def get_ordens_iniciadas(request):
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
 
     # Filtra as ordens com base no status 'iniciada'
     ordens_queryset = Ordem.objects.prefetch_related('ordem_pecas_serra', 'propriedade') \
@@ -478,7 +481,10 @@ def get_ordens_iniciadas(request):
 @require_GET
 def get_ordens_interrompidas(request):
 
-    usuario_tipo = Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+    usuario_tipo = (
+        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
+        if request.user.is_authenticated else None
+    )
 
     # Filtra as ordens com base no status 'interrompida'
     ordens_queryset = Ordem.objects.prefetch_related('processos', 'ordem_pecas_serra', 'propriedade') \

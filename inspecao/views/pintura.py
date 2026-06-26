@@ -118,7 +118,7 @@ def inspecao_pintura(request):
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
     ]
 
-    user_profile = Profile.objects.filter(user=request.user).first()
+    user_profile = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     if (
         user_profile
         and user_profile.tipo_acesso == "inspetor"
@@ -244,7 +244,7 @@ def salvar_analise_banho_ezinger(request):
         amostras_fosfatizante=amostras_fosfatizante,
     )
 
-    perfil = Profile.objects.filter(user=request.user).first()
+    perfil = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     observacao = request.POST.get("observacao", "").strip()
     defaults = {
         "registrado_em": data_registro,
@@ -300,7 +300,7 @@ def registrar_adicao_banho_ezinger(request):
             {"error": "A adiÃ§Ã£o deste registro jÃ¡ foi confirmada."}, status=400
         )
 
-    perfil = Profile.objects.filter(user=request.user).first()
+    perfil = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     registro.adicao_registrada_em = timezone.now()
     registro.adicao_registrada_por = perfil
     registro.save(update_fields=["adicao_registrada_em", "adicao_registrada_por"])

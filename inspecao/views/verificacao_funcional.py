@@ -22,7 +22,10 @@ def verificacao_funcional_pintura(request):
 def api_testes_funcionais_pintura(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
-    
+
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Não autenticado"}, status=401)
+
     status_url = request.GET.get("status", None)
 
     if status_url == 'finalizado':

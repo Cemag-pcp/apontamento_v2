@@ -69,7 +69,7 @@ def inspecao_serra_usinagem(request):
         for maquina in maquinas
     ]
 
-    user_profile = Profile.objects.filter(user=request.user).first()
+    user_profile = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
     if (
         user_profile
         and user_profile.tipo_acesso == "inspetor"
