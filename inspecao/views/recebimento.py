@@ -6,17 +6,26 @@ import re
 from datetime import datetime
 
 import gspread
-from django.core.files.storage import default_storage
+from boto3.s3.transfer import TransferConfig
 from django.db import connection, transaction
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.timezone import localtime
+from storages.backends.s3boto3 import S3Boto3Storage
 
 from core.models import Profile
 from core.utils import get_google_credentials
 from ..models import InspecaoRecebimento, InspecaoRecebimentoItem
+
+# Uploads de imagem/video da inspecao de recebimento usam upload sequencial
+# (sem threads). O upload multipart concorrente padrao do boto3 le o mesmo
+# file-like object do Django em offsets diferentes a partir de varias
+# threads, corrompendo o arquivo quando ele excede o limite de multipart.
+# Isolado nesta storage especifica para nao afetar os demais uploads do
+# sistema (que nao tem esse problema e se beneficiam do upload paralelo).
+_storage_midia_recebimento = S3Boto3Storage(transfer_config=TransferConfig(use_threads=False))
 
 SHEET_ID = os.environ.get(
     "RECEBIMENTO_SHEET_ID",
@@ -40,10 +49,10 @@ def _salvar_imagem_inspecao_recebimento(uploaded_file, sheet_hash, material_idx,
         f"inspecao_recebimento/{datetime.now().strftime('%Y/%m')}/"
         f"{sheet_hash}_m{material_idx}_u{unidade_idx}{extensao}"
     )
-    caminho_salvo = default_storage.save(caminho, uploaded_file)
+    caminho_salvo = _storage_midia_recebimento.save(caminho, uploaded_file)
 
     try:
-        url = default_storage.url(caminho_salvo)
+        url = _storage_midia_recebimento.url(caminho_salvo)
     except Exception:
         url = ""
 
@@ -60,10 +69,10 @@ def _salvar_video_inspecao_recebimento(uploaded_file, sheet_hash, material_idx, 
         f"inspecao_recebimento/{datetime.now().strftime('%Y/%m')}/"
         f"{sheet_hash}_m{material_idx}_u{unidade_idx}_video{extensao}"
     )
-    caminho_salvo = default_storage.save(caminho, uploaded_file)
+    caminho_salvo = _storage_midia_recebimento.save(caminho, uploaded_file)
 
     try:
-        url = default_storage.url(caminho_salvo)
+        url = _storage_midia_recebimento.url(caminho_salvo)
     except Exception:
         url = ""
 
