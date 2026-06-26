@@ -7,8 +7,11 @@ from datetime import datetime
 
 import gspread
 from boto3.s3.transfer import TransferConfig
+from django.core.paginator import Paginator
 from django.db import connection, transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, TextField, Value
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast, Coalesce
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -492,70 +495,116 @@ def recebimento_pendencias(request):
     )
 
 
+COLUNAS_OCULTAS_INSPECIONADOS = {"Situação do frete"}
+
+
+def _classe_inspecao_annotation():
+    return Coalesce(
+        KeyTextTransform("Classe de Inspeção", "dados"),
+        KeyTextTransform("Classe de inspeção", "dados"),
+        Value("", output_field=TextField()),
+        output_field=TextField(),
+    )
+
+
+def _aplicar_busca_inspecionados(queryset, busca):
+    if not busca:
+        return queryset
+    return queryset.annotate(
+        busca_dados=Cast("dados", output_field=TextField()),
+        busca_dados_inspecao=Cast("dados_inspecao", output_field=TextField()),
+    ).filter(
+        Q(busca_dados__icontains=busca)
+        | Q(busca_dados_inspecao__icontains=busca)
+        | Q(observacao__icontains=busca)
+        | Q(inspetor__user__username__icontains=busca)
+        | Q(inspetor__user__first_name__icontains=busca)
+        | Q(inspetor__user__last_name__icontains=busca)
+    )
+
+
 def recebimento_inspecionados(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    registros = (
-        InspecaoRecebimento.objects.select_related("inspetor__user")
-        .filter(excluido=False)
-        .order_by("-data_inspecao")
-    )
+    page = max(int(request.GET.get("page", 1) or 1), 1)
+    limit = min(max(int(request.GET.get("limit", 50) or 50), 10), 200)
+    busca = request.GET.get("q", "").strip()
+    classe_filtro = request.GET.get("classe", "").strip()
 
-    COLUNAS_OCULTAS = {"Situação do frete"}
+    base_queryset = (
+        InspecaoRecebimento.objects.filter(excluido=False)
+        .annotate(classe_inspecao=_classe_inspecao_annotation())
+    )
+    base_queryset = _aplicar_busca_inspecionados(base_queryset, busca)
+
+    classes_resumo = [
+        {"classe": item["classe_inspecao"] or "Sem classe", "total": item["total"]}
+        for item in (
+            base_queryset.values("classe_inspecao")
+            .annotate(total=Count("id"))
+            .order_by("classe_inspecao")
+        )
+    ]
+
+    registros = base_queryset.select_related("inspetor__user").order_by("-data_inspecao")
+    if classe_filtro:
+        if classe_filtro == "Sem classe":
+            registros = registros.filter(Q(classe_inspecao="") | Q(classe_inspecao__isnull=True))
+        else:
+            registros = registros.filter(classe_inspecao=classe_filtro)
+
+    paginator = Paginator(registros, limit)
+    pagina = paginator.get_page(page)
 
     headers = []
-    linhas = []
-
-    for registro in registros:
+    rows = []
+    for registro in pagina.object_list:
         data = registro.dados or {}
         for key in data.keys():
-            if key not in headers and key not in COLUNAS_OCULTAS:
+            if key not in headers and key not in COLUNAS_OCULTAS_INSPECIONADOS:
                 headers.append(key)
 
-        linhas.append(
+        meta = {
+            "id": registro.id,
+            "data_inspecao": localtime(registro.data_inspecao).strftime("%d/%m/%Y %H:%M"),
+            "inspetor": (
+                registro.inspetor.user.username
+                if registro.inspetor and registro.inspetor.user
+                else ""
+            ),
+            "resultado": registro.get_resultado_display(),
+            "observacao": registro.observacao or "",
+        }
+        display = {
+            "Data inspeção": meta["data_inspecao"],
+            "Inspetor": meta["inspetor"],
+            "Resultado": meta["resultado"],
+            "Observação": meta["observacao"],
+        }
+        for header in headers:
+            display[header] = data.get(header, "")
+        rows.append(
             {
-                "data": data,
-                "meta": {
-                    "id": registro.id,
-                    "data_inspecao": localtime(registro.data_inspecao).strftime("%d/%m/%Y %H:%M"),
-                    "inspetor": (
-                        registro.inspetor.user.username
-                        if registro.inspetor and registro.inspetor.user
-                        else ""
-                    ),
-                    "resultado": registro.get_resultado_display(),
-                    "observacao": registro.observacao or "",
-                },
+                "data": display,
+                "meta": meta,
                 "dados_inspecao": registro.dados_inspecao or {},
             }
         )
 
     columns = ["Data inspeção", "Inspetor", "Resultado", "Observação"] + headers
 
-    rows = []
-    for linha in linhas:
-        display = {
-            "Data inspeção": linha["meta"]["data_inspecao"],
-            "Inspetor": linha["meta"]["inspetor"],
-            "Resultado": linha["meta"]["resultado"],
-            "Observação": linha["meta"]["observacao"],
-        }
-        for header in headers:
-            display[header] = linha["data"].get(header, "")
-        rows.append(
-            {
-                "data": display,
-                "meta": linha["meta"],
-                "dados_inspecao": linha["dados_inspecao"],
-            }
-        )
-
     return JsonResponse(
         {
             "columns": columns,
             "rows": rows,
-            "total": len(rows),
+            "total": paginator.count,
+            "total_geral": InspecaoRecebimento.objects.filter(excluido=False).count(),
+            "page": pagina.number,
+            "total_pages": paginator.num_pages,
+            "has_next": pagina.has_next(),
+            "has_previous": pagina.has_previous(),
+            "classes_resumo": classes_resumo,
             "pode_editar": _tem_acesso_edicao(request),
         },
         status=200,
