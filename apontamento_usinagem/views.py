@@ -98,9 +98,10 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
             item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
             return
 
+        data_producao = localtime(item.data) if item.data else localtime(now())
         payload_integracao = {
             "id": f"usinagem-item-{item.id}",
-            "data": localtime(now()).strftime('%d/%m/%Y'),
+            "data": data_producao.strftime('%d/%m/%Y'),
             "pessoa": "4357",
             "recurso": str(item.peca.codigo if item.peca else ""),
             "processo": "S Usinagem",
@@ -1155,9 +1156,10 @@ def api_erp_apontar_item_usinagem(request, pk):
 
     payload_integracao = None
     if tipo_apontamento == 'api':
+        data_producao = localtime(item.data) if item.data else localtime(now())
         payload_integracao = {
             "id": f"usinagem-item-{item.id}",
-            "data": localtime(now()).strftime('%d/%m/%Y'),
+            "data": data_producao.strftime('%d/%m/%Y'),
             "pessoa": "4357",
             "recurso": str(item.peca.codigo if item.peca else ""),
             "processo": "S Usinagem",

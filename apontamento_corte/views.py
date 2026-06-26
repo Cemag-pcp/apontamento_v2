@@ -388,9 +388,10 @@ def _resolver_ficha_tecnica_chapa_corte(item, transferencia=None, codigo_chapa_o
     ]
 
 def _payload_apontamento_item_corte(item, ficha_tecnica=None):
+    data_producao = localtime(item.data) if item.data else localtime(now())
     payload = {
         "id": f"corte-item-{item.id}",
-        "data": localtime(now()).strftime('%d/%m/%Y'),
+        "data": data_producao.strftime('%d/%m/%Y'),
         "pessoa": "4357",
         "recurso": _extrair_codigo_peca_corte(item.peca),
         "processo": "S C Plasma",

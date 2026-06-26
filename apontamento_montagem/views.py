@@ -97,20 +97,11 @@ def _nome_responsavel_apontamento(user):
     return (user.get_full_name() or user.username).strip()
 
 
-class IntegracaoERPMontagemError(Exception):
-    def __init__(self, message, *, http_status=502, description='', payload_enviado=None, retorno_api=None):
-        super().__init__(message)
-        self.message = message
-        self.http_status = http_status
-        self.description = description
-        self.payload_enviado = payload_enviado
-        self.retorno_api = retorno_api
-
-
 def _payload_apontamento_erp_montagem(item):
+    data_producao = localtime(item.data) if item.data else localtime(now())
     return {
         "id": f"montagem-item-{item.id}",
-        "data": localtime(now()).strftime('%d/%m/%Y'),
+        "data": data_producao.strftime('%d/%m/%Y'),
         "pessoa": "4357",
         "recurso": _extrair_codigo_peca(item.peca),
         "processo": "S Mont Conjuntos Carretas",
@@ -120,6 +111,12 @@ def _payload_apontamento_erp_montagem(item):
 
 
 def _apontar_item_via_api_erp_montagem(item, user):
+    """
+    Tenta apontar o item no ERP. Falhas de qualquer natureza (rede, HTTP,
+    erro de negocio do ERP, etc.) nunca bloqueiam a finalizacao da ordem:
+    o erro e apenas registrado em item.erro_apontamento para conferencia
+    posterior em /montagem/erp-apontamentos/.
+    """
     payload_integracao = _payload_apontamento_erp_montagem(item)
 
     if settings.DEBUG:
@@ -128,20 +125,22 @@ def _apontar_item_via_api_erp_montagem(item, user):
             json.dumps(payload_integracao, ensure_ascii=False, indent=2)
         )
 
-    if (item.qtd_morta or 0) > 0:
-        msg_qtd_morta = (
-            'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
-            'A funcionalidade de desvio precisa ser ajustada na API.'
-        )
-        item.erro_apontamento = msg_qtd_morta
+    def _registrar_erro(mensagem, retorno_api=None):
+        item.erro_apontamento = mensagem
         item.tipo_apontamento = 'api'
         item.resp_apontamento = user if getattr(user, 'is_authenticated', False) else None
         item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-        raise IntegracaoERPMontagemError(
-            'Apontamento via API bloqueado para item com qtd_morta.',
-            http_status=422,
-            description=msg_qtd_morta,
-            payload_enviado=payload_integracao,
+        return {
+            'payload_enviado': payload_integracao,
+            'retorno_api': retorno_api,
+            'chave_apontamento': '',
+            'erro_apontamento': mensagem,
+        }
+
+    if (item.qtd_morta or 0) > 0:
+        return _registrar_erro(
+            'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
+            'A funcionalidade de desvio precisa ser ajustada na API.'
         )
 
     try:
@@ -160,10 +159,7 @@ def _apontar_item_via_api_erp_montagem(item, user):
                 timeout=(10, 60),
             )
     except requests.RequestException as exc:
-        raise IntegracaoERPMontagemError(
-            f'Falha de comunicacao com API ERP: {exc}',
-            payload_enviado=payload_integracao,
-        )
+        return _registrar_erro(f'Falha de comunicacao com API ERP: {exc}')
 
     try:
         resposta_api_json = response_integracao.json()
@@ -175,60 +171,28 @@ def _apontar_item_via_api_erp_montagem(item, user):
         if isinstance(resposta_api_json, dict):
             descricao_erro = str(resposta_api_json.get('description') or '')
 
-        retorno_texto = ''
-        try:
-            retorno_texto = response_integracao.text[:500]
-        except Exception:
-            retorno_texto = 'Sem detalhes'
+        if not descricao_erro:
+            try:
+                descricao_erro = response_integracao.text[:500]
+            except Exception:
+                descricao_erro = 'Sem detalhes'
 
-        item.erro_apontamento = descricao_erro or retorno_texto
-        item.tipo_apontamento = 'api'
-        item.resp_apontamento = user if getattr(user, 'is_authenticated', False) else None
-        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-        raise IntegracaoERPMontagemError(
-            f'API ERP retornou status {response_integracao.status_code}.',
-            description=descricao_erro,
-            payload_enviado=payload_integracao,
-            retorno_api=retorno_texto,
+        return _registrar_erro(
+            f'API ERP retornou status {response_integracao.status_code}: {descricao_erro}',
+            retorno_api=resposta_api_json,
         )
 
     if not isinstance(resposta_api_json, dict):
         retorno_texto = (response_integracao.text or '')[:500]
-        item.erro_apontamento = retorno_texto
-        item.tipo_apontamento = 'api'
-        item.resp_apontamento = user if getattr(user, 'is_authenticated', False) else None
-        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-        raise IntegracaoERPMontagemError(
-            'API ERP nao retornou JSON valido.',
-            payload_enviado=payload_integracao,
-            retorno_api=retorno_texto,
-        )
+        return _registrar_erro('API ERP nao retornou JSON valido. ' + retorno_texto)
 
     status_erp = str(resposta_api_json.get('status') or '').strip().lower()
     if status_erp == 'error':
         descricao_erro = str(resposta_api_json.get('description') or 'Erro retornado pela API ERP.')
-        item.erro_apontamento = descricao_erro
-        item.tipo_apontamento = 'api'
-        item.resp_apontamento = user if getattr(user, 'is_authenticated', False) else None
-        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-        raise IntegracaoERPMontagemError(
-            'API ERP retornou erro de negocio.',
-            http_status=422,
-            description=descricao_erro,
-            payload_enviado=payload_integracao,
-            retorno_api=resposta_api_json,
-        )
+        return _registrar_erro(descricao_erro, retorno_api=resposta_api_json)
 
     if status_erp != 'success':
-        item.erro_apontamento = str(resposta_api_json)
-        item.tipo_apontamento = 'api'
-        item.resp_apontamento = user if getattr(user, 'is_authenticated', False) else None
-        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-        raise IntegracaoERPMontagemError(
-            'Resposta da API ERP em formato inesperado.',
-            payload_enviado=payload_integracao,
-            retorno_api=resposta_api_json,
-        )
+        return _registrar_erro('Resposta da API ERP em formato inesperado: ' + str(resposta_api_json))
 
     item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp_montagem(
         resposta_api_json,
@@ -668,16 +632,6 @@ def atualizar_status_ordem(request):
 
     except Ordem.DoesNotExist:
         return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
-    except IntegracaoERPMontagemError as exc:
-        return JsonResponse(
-            {
-                'error': exc.message,
-                'description': exc.description,
-                'payload_enviado': exc.payload_enviado,
-                'retorno_api': exc.retorno_api,
-            },
-            status=exc.http_status,
-        )
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
@@ -2220,7 +2174,7 @@ def api_erp_apontamentos_montagem(request):
 
     queryset = (
         PecasOrdem.objects
-        .filter(qtd_boa__gt=0, ordem__grupo_maquina='montagem')
+        .filter(qtd_boa__gt=0, ordem__grupo_maquina='montagem', data__date__gte=date(2026, 6, 24))
         .select_related('ordem', 'ordem__maquina', 'ordem__operador_final', 'operador', 'resp_apontamento')
         .annotate(
             ordem_ja_apontada=Exists(subquery_ordem_apontada),
@@ -2350,7 +2304,7 @@ def api_erp_apontar_item_montagem(request, pk):
         .first()
     )
 
-    if item.apontado or item_ja_apontado_ordem:
+    if item.apontado or (item_ja_apontado_ordem and not item.erro_apontamento):
         item_referencia = item if item.apontado else item_ja_apontado_ordem
         resp_ref = getattr(item_referencia, 'resp_apontamento', None)
         return JsonResponse(
@@ -2372,15 +2326,7 @@ def api_erp_apontar_item_montagem(request, pk):
 
     payload_integracao = None
     if tipo_apontamento == 'api':
-        payload_integracao = {
-            "id": f"montagem-item-{item.id}",
-            "data": localtime(now()).strftime('%d/%m/%Y'),
-            "pessoa": "4357",
-            "recurso": _extrair_codigo_peca(item.peca),
-            "processo": "S Mont Conjuntos Carretas",
-            "produzido": item.qtd_boa,
-            "observacao": str(item.ordem_id),
-        }
+        payload_integracao = _payload_apontamento_erp_montagem(item)
 
         if settings.DEBUG:
             print(
