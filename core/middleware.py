@@ -1,9 +1,54 @@
+import logging
+import time
+
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.core.cache import cache
 from django.db import OperationalError
 
 from core.models import RotaAcesso
+
+logger = logging.getLogger(__name__)
+
+try:
+    from sqlalchemy.exc import TimeoutError as _SQLAlchemyPoolTimeoutError
+    _DB_TRANSIENT_ERRORS = (OperationalError, _SQLAlchemyPoolTimeoutError)
+except ImportError:
+    _DB_TRANSIENT_ERRORS = (OperationalError,)
+
+
+class DBConnectionRetryMiddleware:
+    """
+    O banco (RDS, us-east-1) fica em regiao diferente do app (Render,
+    oregon): instabilidades transitorias de rede entre as regioes derrubam
+    varias conexoes ao mesmo tempo (OperationalError) ou esgotam o pool de
+    conexoes (sqlalchemy.exc.TimeoutError). Tenta a requisicao de novo uma
+    vez apos uma pausa curta antes de devolver erro ao usuario.
+    """
+
+    MAX_TENTATIVAS = 2
+    PAUSA_SEGUNDOS = 0.5
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        for tentativa in range(1, self.MAX_TENTATIVAS + 1):
+            try:
+                return self.get_response(request)
+            except _DB_TRANSIENT_ERRORS as exc:
+                if tentativa >= self.MAX_TENTATIVAS:
+                    raise
+                logger.warning(
+                    "Erro transitorio de conexao com o banco (tentativa %s/%s) em %s: %s",
+                    tentativa, self.MAX_TENTATIVAS, request.path, exc,
+                )
+                # Descarta a sessao parcialmente carregada para que a
+                # proxima tentativa recarregue do zero (evita o
+                # AttributeError de SessionStore sem _session_cache).
+                request.__dict__.pop("session", None)
+                time.sleep(self.PAUSA_SEGUNDOS)
+        return self.get_response(request)
 
 _ROTA_CACHE_KEY = 'rota_acesso_map'
 _ROTA_CACHE_TTL = 300  # 5 minutos

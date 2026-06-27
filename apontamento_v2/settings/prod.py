@@ -26,10 +26,17 @@ DATABASES = {
         'PORT': env('DB_PORT'),
         'CONN_MAX_AGE': 0,
         'POOL_OPTIONS': {
-            'POOL_SIZE': 10,
-            'MAX_OVERFLOW': 20,
+            # Pool maior e timeout de espera mais curto: o RDS fica em
+            # us-east-1 e o app roda em oregon, entao instabilidades de rede
+            # entre as regioes derrubam varias conexoes ao mesmo tempo.
+            # Esperar 30s por uma vaga prende a thread da requisicao (e o
+            # worker do daphne) por muito tempo durante essas rajadas; com
+            # timeout curto a requisicao falha rapido e o
+            # DBConnectionRetryMiddleware tenta de novo.
+            'POOL_SIZE': 15,
+            'MAX_OVERFLOW': 25,
             'RECYCLE': 300,
-            'TIMEOUT': 30,
+            'TIMEOUT': 10,
             'PRE_PING': True,
         },
         'OPTIONS': {

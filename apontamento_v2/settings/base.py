@@ -55,6 +55,10 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     # 'whitenoise.middleware.WhiteNoiseMiddleware', # temporario em dev
 
+    # Antes do SessionMiddleware: ao reexecutar get_response() no retry,
+    # a sessao e recarregada do zero junto com o resto da cadeia.
+    'core.middleware.DBConnectionRetryMiddleware',
+
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
