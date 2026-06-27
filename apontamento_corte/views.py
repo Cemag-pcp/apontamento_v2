@@ -2285,6 +2285,7 @@ def api_erp_apontamentos_corte(request):
             qtd_boa__gt=0,
             ordem__status_atual='finalizada',
             ordem__grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3'],
+            ordem__ultima_atualizacao__date__gte=date(2026, 6, 24),
         )
         .select_related('ordem', 'ordem__maquina', 'ordem__operador_final', 'ordem__propriedade', 'resp_apontamento')
         .prefetch_related('ordem__transferencias_chapa_corte')
