@@ -1218,6 +1218,11 @@ function mostrarModalFinalizar(ordemId, grupoMaquina, maquinaPreferidaId = null,
             return data;
         })
         .then((data) => {
+            // Independente do resultado do apontamento ao ERP (ja tratado
+            // como nao bloqueante no backend), o card deve sumir e mostrar
+            // sucesso ao operador em vez de ficar travado semitransparente.
+            cardsPendentes.forEach((cardEl) => cardEl.remove());
+
             if (data.transferencia_chapa) {
                 if (data.transferencia_chapa.enviado) {
                     console.log('Transferencia de chapa enviada ao Innovaro:', data.transferencia_chapa);
