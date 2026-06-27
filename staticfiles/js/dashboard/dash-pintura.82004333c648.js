@@ -1,0 +1,580 @@
+// Funcionalidade do filtro de datas
+document.addEventListener('DOMContentLoaded', function() {
+    const filterBtn = document.getElementById('filterBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+
+    const filterBtnTemporal = document.getElementById('filterBtnTemporal');
+    const resetBtnTemporal  = document.getElementById('resetBtnTemporal');
+    const startDateTemporal = document.getElementById('startDateTemporal');
+    const endDateTemporal   = document.getElementById('endDateTemporal');
+
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Análise temporal começa 6 meses atrás por padrão
+    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+
+    startDateInput.valueAsDate = firstDayOfMonth;
+    endDateInput.valueAsDate = today;
+
+    startDateTemporal.valueAsDate = sixMonthsAgo;
+    endDateTemporal.valueAsDate   = today;
+
+    function formatDateBr(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!match) return raw;
+        const [, y, m, d] = match;
+        return `${d}/${m}/${y}`;
+    }
+
+    async function carregarGraficoProducao(startDate, endDate) {
+        const queryParams = new URLSearchParams();
+        if (startDate) queryParams.append('data_inicio', startDate);
+        if (endDate) queryParams.append('data_fim', endDate);
+
+        const url = `/inspecao/pintura/api/indicador-pintura-analise-temporal/?${queryParams.toString()}`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar os dados do gráfico.');
+
+            const productionData = await response.json();
+
+            // Atualiza o gráfico
+            productionChart.data.labels = productionData.map(item => item.mes);
+            productionChart.data.datasets[0].data = productionData.map(item => item.qtd_peca_produzida);
+            productionChart.data.datasets[1].data = productionData.map(item => item.qtd_peca_inspecionada);
+            productionChart.data.datasets[2].data = productionData.map(item => item.taxa_nao_conformidade * 100);
+            productionChart.update();
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao carregar gráfico de produção.');
+        }
+    }
+
+    async function carregarGraficoCausas(startDate, endDate) {
+
+        let url = '/inspecao/pintura/api/causas-nao-conformidade/';
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar causas de não conformidade.');
+            const causesData = await response.json();
+
+            // Agrupar por causa
+            const causesCount = {};
+            causesData.forEach(item => {
+                const causa = item.nome_causa;
+                const total = item.quantidade;
+                causesCount[causa] = (causesCount[causa] || 0) + total;
+            });
+
+            // Atualiza o gráfico
+            causesChart.data.labels = Object.keys(causesCount);
+            causesChart.data.datasets[0].data = Object.values(causesCount);
+            causesChart.update();
+
+        } catch (error) {
+            console.error('Erro ao carregar gráfico de causas:', error);
+            alert('Erro ao carregar gráfico de causas.');
+        }
+    }
+
+    async function carregarCarrosselImagens(startDate, endDate) {
+
+        let url = '/inspecao/pintura/api/imagens-nao-conformidade/';
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar imagens de não conformidade.');
+            const imagens = await response.json();
+
+            const carouselInner = document.querySelector('#imageCarousel .carousel-inner');
+            carouselInner.innerHTML = ''; // Limpa itens antigos
+
+            if (imagens.length === 0) {
+                carouselInner.innerHTML = `
+                    <div class="carousel-item active">
+                        <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+                            <p class="text-muted">Nenhuma imagem encontrada no período selecionado.</p>
+                        </div>
+                    </div>`;
+                return;
+            }
+
+            imagens.forEach((item, index) => {
+                const causas = item.causas.join(', ');
+                const itemHTML = `
+                    <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                        <img src="https://apontamentov2-teste.s3.sa-east-1.amazonaws.com/${item.arquivo_url}" class="d-block w-100" alt="Imagem de não conformidade">
+                        <div class="carousel-caption d-none d-md-block">
+                            <h5>${causas}</h5>
+                            <p>Data: ${formatDateBr(item.data_execucao)} | Quantidade: ${item.quantidade}</p>
+                        </div>
+                    </div>
+                `;
+                carouselInner.insertAdjacentHTML('beforeend', itemHTML);
+            });
+
+        } catch (error) {
+            console.error('Erro ao carregar carrossel de imagens:', error);
+            alert('Erro ao carregar imagens de não conformidade.');
+        }
+    }
+
+    async function carregarTabelasPorTipo(startDate, endDate) {
+
+        let url = '/inspecao/pintura/api/causas-nao-conformidade-tipo/';
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar causas por tipo.');
+
+            const data = await response.json();
+
+            const tabelaPU = document.querySelector('#table-pu tbody');
+            const tabelaPO = document.querySelector('#table-po tbody');
+            const rankingPU = document.querySelector('#table-ranking-pu tbody');
+            const rankingPO = document.querySelector('#table-ranking-po tbody');
+
+            tabelaPU.innerHTML = '';
+            tabelaPO.innerHTML = '';
+            rankingPU.innerHTML = '';
+            rankingPO.innerHTML = '';
+
+            // Se não houver nenhum dado, exibe mensagem nas duas tabelas
+            if (data.length === 0) {
+                const semDados4 = `<tr><td colspan="4" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                const semDados2 = `<tr><td colspan="2" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                tabelaPU.innerHTML = semDados4;
+                tabelaPO.innerHTML = semDados4;
+                rankingPU.innerHTML = semDados2;
+                rankingPO.innerHTML = semDados2;
+                return;
+            }
+
+            // Se houver dados, separa por tipo
+            let temPU = false;
+            let temPO = false;
+            const totaisPU = {};
+            const totaisPO = {};
+
+            data.forEach(item => {
+                const rowHTML = `
+                    <tr>
+                        <td>${formatDateBr(item.Data)}</td>
+                        <td>${item.Causa}</td>
+                        <td>${item.Peça}</td>
+                        <td>${item.Quantidade}</td>
+                    </tr>
+                `;
+
+                if (item.Tipo === 'PU') {
+                    tabelaPU.insertAdjacentHTML('beforeend', rowHTML);
+                    temPU = true;
+                    totaisPU[item.Causa] = (totaisPU[item.Causa] || 0) + item.Quantidade;
+                } else if (item.Tipo === 'PÓ') {
+                    tabelaPO.insertAdjacentHTML('beforeend', rowHTML);
+                    temPO = true;
+                    totaisPO[item.Causa] = (totaisPO[item.Causa] || 0) + item.Quantidade;
+                }
+            });
+
+            // Se um dos tipos não veio na resposta, exibe aviso individual
+            if (!temPU) {
+                tabelaPU.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum dado do tipo PU encontrado.</td></tr>`;
+                rankingPU.innerHTML = `<tr><td colspan="2" class="text-center text-muted">Nenhum dado do tipo PU encontrado.</td></tr>`;
+            } else {
+                Object.entries(totaisPU)
+                    .sort((a, b) => b[1] - a[1])
+                    .forEach(([causa, quantidade]) => {
+                        rankingPU.insertAdjacentHTML('beforeend',
+                            `<tr><td>${causa}</td><td>${quantidade.toLocaleString('pt-BR')}</td></tr>`);
+                    });
+            }
+
+            if (!temPO) {
+                tabelaPO.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum dado do tipo PÓ encontrado.</td></tr>`;
+                rankingPO.innerHTML = `<tr><td colspan="2" class="text-center text-muted">Nenhum dado do tipo PÓ encontrado.</td></tr>`;
+            } else {
+                Object.entries(totaisPO)
+                    .sort((a, b) => b[1] - a[1])
+                    .forEach(([causa, quantidade]) => {
+                        rankingPO.insertAdjacentHTML('beforeend',
+                            `<tr><td>${causa}</td><td>${quantidade.toLocaleString('pt-BR')}</td></tr>`);
+                    });
+            }
+
+        } catch (error) {
+            console.error('Erro ao carregar tabelas por tipo:', error);
+            alert('Erro ao carregar dados de não conformidades por tipo.');
+        }
+    }
+
+    async function carregarTabelaCausas(startDate, endDate) {
+
+        let url = '/inspecao/pintura/api/causas-nao-conformidade/';
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar causas.');
+            const data = await response.json();
+
+            const tabela = document.querySelector('#table-causas tbody');
+            const tabelaRankingVazia = document.querySelector('#table-ranking-causas tbody');
+            tabela.innerHTML = '';
+            tabelaRankingVazia.innerHTML = '';
+
+            if (data.length === 0) {
+                tabela.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
+                    </tr>
+                `;
+                tabelaRankingVazia.innerHTML = `
+                    <tr>
+                        <td colspan="2" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            data.forEach(item => {
+                const row = `
+                    <tr>
+                        <td>${formatDateBr(item.data_execucao)}</td>
+                        <td>${item.ordem_id}</td>
+                        <td>${item.peca}</td>
+                        <td>${item.nome_causa}</td>
+                        <td>${item.quantidade}</td>
+                    </tr>
+                `;
+                tabela.insertAdjacentHTML('beforeend', row);
+            });
+
+            // Preenche o ranking agrupado por causa
+            const tabelaRanking = tabelaRankingVazia;
+
+            const totais = {};
+            data.forEach(item => {
+                totais[item.nome_causa] = (totais[item.nome_causa] || 0) + item.quantidade;
+            });
+
+            Object.entries(totais)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([causa, quantidade]) => {
+                    tabelaRanking.insertAdjacentHTML('beforeend', `
+                        <tr>
+                            <td>${causa}</td>
+                            <td>${quantidade.toLocaleString('pt-BR')}</td>
+                        </tr>
+                    `);
+                });
+
+        } catch (error) {
+            console.error('Erro ao carregar tabela de causas:', error);
+            alert('Erro ao carregar dados de causas.');
+        }
+    }
+
+    async function carregarTabelaCausasDiaria(startDate, endDate) {
+
+        let url = '/inspecao/pintura/api/causas-nao-conformidade-diaria/';
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar causas diÃ¡rias.');
+            const data = await response.json();
+
+            const tabela = document.querySelector('#table-causas-diaria tbody');
+            tabela.innerHTML = '';
+
+            if (data.length === 0) {
+                tabela.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">Nenhum dado encontrado para o perÃ­odo selecionado.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            data.forEach(item => {
+                const row = `
+                    <tr>
+                        <td>${formatDateBr(item.data_execucao)}</td>
+                        <td>${item.peca}</td>
+                        <td>${item.cor || ""}</td>
+                        <td>${item.causas}</td>
+                        <td>${item.quantidade_nao_conforme}</td>
+                        <td>${item.quantidade_produzida}</td>
+                    </tr>
+                `;
+                tabela.insertAdjacentHTML('beforeend', row);
+            });
+
+        } catch (error) {
+            console.error('Erro ao carregar tabela de causas diÃ¡rias:', error);
+            alert('Erro ao carregar dados de causas diÃ¡rias.');
+        }
+    }
+
+    async function carregarTabelaProducao(startDate, endDate) {
+
+        let url = '/inspecao/pintura/api/indicador-pintura-resumo-analise-temporal/';
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar dados de produção.');
+            const data = await response.json();
+
+            const tabela = document.querySelector('#table-producao tbody');
+            tabela.innerHTML = '';
+
+            if (data.length === 0) {
+                tabela.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td>
+                    </tr>
+                `;
+                atualizarKPIs(0, 0, 0);
+                return;
+            }
+
+            data.forEach(item => {
+                const row = `
+                    <tr>
+                        <td>${formatDateBr(item.Data)}</td>
+                        <td>${item["N° de peças produzidas"]}</td>
+                        <td>${item["N° de inspeções"]}</td>
+                        <td>${item["N° de peças não conforme"]}</td>
+                        <td>${item["Lotes não conforme"]}</td>
+                        <td>${item["% de inspeção"]}</td>
+                    </tr>
+                `;
+                tabela.insertAdjacentHTML('beforeend', row);
+            });
+
+            const totalProd = data.reduce((s, i) => s + i["N° de peças produzidas"], 0);
+            const totalInsp = data.reduce((s, i) => s + i["N° de inspeções"], 0);
+            const totalNC   = data.reduce((s, i) => s + i["N° de peças não conforme"], 0);
+            atualizarKPIs(totalProd, totalInsp, totalNC);
+
+        } catch (error) {
+            console.error('Erro ao carregar tabela de produção:', error);
+            alert('Erro ao carregar dados de produção.');
+        }
+    }
+
+    function atualizarKPIs(totalProd, totalInsp, totalNC) {
+        const pctInsp     = totalProd > 0 ? (totalInsp / totalProd * 100).toFixed(0) : 0;
+        const indiceGlobal = totalInsp > 0 ? (totalNC / totalInsp * 100).toFixed(2).replace('.', ',') : '0,00';
+
+        document.getElementById('kpi-pecas-pintadas').textContent     = totalProd.toLocaleString('pt-BR');
+        document.getElementById('kpi-pecas-inspecionadas').textContent = totalInsp.toLocaleString('pt-BR');
+        document.getElementById('kpi-pct-inspecao').textContent        = pctInsp + '%';
+        document.getElementById('kpi-nao-conformidade').textContent    = totalNC.toLocaleString('pt-BR');
+        document.getElementById('kpi-indice-global').textContent       = indiceGlobal + '%';
+    }
+
+    // ── Filtro TEMPORAL (apenas o gráfico) ──
+    filterBtnTemporal.addEventListener('click', function() {
+        const s = startDateTemporal.value;
+        const e = endDateTemporal.value;
+        if (!s || !e) { alert('Selecione as datas do período temporal.'); return; }
+        if (s > e)    { alert('A data inicial deve ser anterior à data final.'); return; }
+        carregarGraficoProducao(s, e);
+    });
+
+    resetBtnTemporal.addEventListener('click', function() {
+        startDateTemporal.valueAsDate = sixMonthsAgo;
+        endDateTemporal.valueAsDate   = today;
+        carregarGraficoProducao(startDateTemporal.value, endDateTemporal.value);
+    });
+
+    // ── Filtro GLOBAL (KPI cards + demais seções) ──
+    filterBtn.addEventListener('click', function() {
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+
+        if (!startDate || !endDate) {
+            alert('Por favor, selecione as datas de início e fim.');
+            return;
+        }
+        if (startDate > endDate) {
+            alert('A data inicial deve ser anterior à data final.');
+            return;
+        }
+
+        document.querySelectorAll('.alert-info').forEach(el => el.remove());
+        const filterInfo = document.createElement('div');
+        filterInfo.className = 'alert alert-info mt-3';
+        filterInfo.innerText = `Filtro aplicado: ${formatDateBr(startDate)} até ${formatDateBr(endDate)}`;
+        document.querySelector('.card-body').appendChild(filterInfo);
+
+        carregarTabelaProducao(startDate, endDate);
+        carregarGraficoCausas(startDate, endDate);
+        carregarCarrosselImagens(startDate, endDate);
+        carregarTabelasPorTipo(startDate, endDate);
+        carregarTabelaCausas(startDate, endDate);
+        carregarTabelaCausasDiaria(startDate, endDate);
+    });
+
+    // Botão RESET global
+    resetBtn.addEventListener('click', function() {
+        startDateInput.valueAsDate = firstDayOfMonth;
+        endDateInput.valueAsDate = today;
+        document.querySelectorAll('.alert-info').forEach(el => el.remove());
+        carregarTabelaProducao(startDateInput.value, endDateInput.value);
+        carregarGraficoCausas(startDateInput.value, endDateInput.value);
+        carregarCarrosselImagens(startDateInput.value, endDateInput.value);
+        carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
+        carregarTabelaCausas(startDateInput.value, endDateInput.value);
+        carregarTabelaCausasDiaria(startDateInput.value, endDateInput.value);
+    });
+
+    // Carrega dados ao abrir a página
+    carregarGraficoProducao(startDateTemporal.value, endDateTemporal.value);  // gráfico → filtro temporal
+    carregarTabelaProducao(startDateInput.value, endDateInput.value);          // KPIs → filtro global
+    carregarGraficoCausas(startDateInput.value, endDateInput.value);
+    carregarCarrosselImagens(startDateInput.value, endDateInput.value);
+    carregarTabelasPorTipo(startDateInput.value, endDateInput.value);
+    carregarTabelaCausas(startDateInput.value, endDateInput.value);
+    carregarTabelaCausasDiaria(startDateInput.value, endDateInput.value);
+
+});
+
+// Configuração do gráfico de produção
+const productionCtx = document.getElementById('productionChart').getContext('2d');
+const productionChart = new Chart(productionCtx, {
+    type: 'bar',
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: 'Peças Produzidas',
+                data: [],
+                backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                borderColor: 'rgba(52, 152, 219, 1)',
+                borderWidth: 1
+            },
+            {
+                label: 'Peças Inspecionadas',
+                data: [],
+                backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                borderColor: 'rgba(46, 204, 113, 1)',
+                borderWidth: 1
+            },
+            {
+                label: 'Taxa de Não Conformidade',
+                data: [],
+                type: 'line',
+                backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                borderColor: 'rgba(231, 76, 60, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(231, 76, 60, 1)',
+                yAxisID: 'y1'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Quantidade'
+                }
+            },
+            y1: {
+                beginAtZero: true,
+                position: 'right',
+                title: {
+                    display: true,
+                    text: 'Taxa (%)'
+                },
+                max: 100,
+                grid: {
+                    drawOnChartArea: false
+                }
+            }
+        }
+    }
+});
+
+// Configuração do gráfico de causas
+const causesCtx = document.getElementById('causesChart').getContext('2d');
+const causesChart = new Chart(document.getElementById('causesChart').getContext('2d'), {
+    type: 'pie',
+    data: {
+        labels: [],
+        datasets: [{
+            data: [],
+            backgroundColor: [
+                'rgba(231, 76, 60, 0.7)',
+                'rgba(241, 196, 15, 0.7)',
+                'rgba(52, 152, 219, 0.7)',
+                'rgba(39, 174, 96, 0.7)',
+                'rgba(155, 89, 182, 0.7)',
+                'rgba(127, 140, 141, 0.7)'
+            ],
+            borderColor: [
+                'rgba(231, 76, 60, 1)',
+                'rgba(241, 196, 15, 1)',
+                'rgba(52, 152, 219, 1)',
+                'rgba(39, 174, 96, 1)',
+                'rgba(155, 89, 182, 1)',
+                'rgba(127, 140, 141, 1)'
+            ],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'right'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const label = context.label || '';
+                        const value = context.raw || 0;
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = Math.round((value / total) * 100);
+                        return `${label}: ${value} (${percentage}%)`;
+                    }
+                }
+            }
+        }
+    }
+});

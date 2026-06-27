@@ -1,0 +1,335 @@
+// Configuração do gráfico de produção
+const productionCtx = document.getElementById('productionChart').getContext('2d');
+const productionChart = new Chart(productionCtx, {
+    type: 'bar',
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: 'Peças Inspecionadas',
+                data: [],
+                backgroundColor: 'rgba(37, 99, 235, 0.65)',
+                borderColor: 'rgba(37, 99, 235, 1)',
+                borderWidth: 1
+            },
+            {
+                label: 'Taxa de Não Conformidade (%)',
+                data: [],
+                type: 'line',
+                backgroundColor: 'rgba(224, 90, 43, 0.15)',
+                borderColor: 'rgba(224, 90, 43, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(224, 90, 43, 1)',
+                tension: 0.3,
+                yAxisID: 'y1'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'top' }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: { display: true, text: 'Quantidade' }
+            },
+            y1: {
+                beginAtZero: true,
+                position: 'right',
+                title: { display: true, text: 'Taxa (%)' },
+                max: 100,
+                grid: { drawOnChartArea: false }
+            }
+        }
+    }
+});
+
+// Configuração do gráfico de causas
+const causesChart = new Chart(document.getElementById('causesChart').getContext('2d'), {
+    type: 'pie',
+    data: {
+        labels: [],
+        datasets: [{
+            data: [],
+            backgroundColor: [
+                'rgba(224, 90, 43, 0.8)',
+                'rgba(27, 42, 74, 0.8)',
+                'rgba(37, 99, 235, 0.8)',
+                'rgba(15, 123, 108, 0.8)',
+                'rgba(155, 89, 182, 0.8)',
+                'rgba(241, 196, 15, 0.8)',
+                'rgba(127, 140, 141, 0.8)'
+            ],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'right' },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const label = context.label || '';
+                        const value = context.raw || 0;
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const pct = Math.round((value / total) * 100);
+                        return `${label}: ${value} (${pct}%)`;
+                    }
+                }
+            }
+        }
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+
+    // Filtro global
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    startDateInput.valueAsDate = firstDayOfMonth;
+    endDateInput.valueAsDate = today;
+
+    // Filtro temporal (gráfico)
+    const startDateTemporal = document.getElementById('startDateTemporal');
+    const endDateTemporal = document.getElementById('endDateTemporal');
+    startDateTemporal.valueAsDate = sixMonthsAgo;
+    endDateTemporal.valueAsDate = today;
+
+    // ── Gráfico de produção (filtro temporal) ──────────────────────────────
+    async function carregarGraficoProducao(startDate, endDate) {
+        const params = new URLSearchParams();
+        if (startDate) params.append('data_inicio', startDate);
+        if (endDate) params.append('data_fim', endDate);
+
+        try {
+            const response = await fetch(`/inspecao/tubos-cilindros/api/indicador-tubos-cilindros-analise-temporal/?${params}`);
+            if (!response.ok) throw new Error('Erro ao buscar dados do gráfico.');
+            const data = await response.json();
+
+            productionChart.data.labels = data.map(item => item.mes);
+            productionChart.data.datasets[0].data = data.map(item => item.qtd_peca_inspecionada);
+            productionChart.data.datasets[1].data = data.map(item => item.taxa_nao_conformidade * 100);
+            productionChart.update();
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    // ── KPIs ───────────────────────────────────────────────────────────────
+    function atualizarKPIs(totalInsp, totalNC) {
+        document.getElementById('kpi-total-produzido').textContent =
+            totalInsp.toLocaleString('pt-BR');
+        document.getElementById('kpi-pecas-inspecionadas').textContent =
+            totalInsp.toLocaleString('pt-BR');
+        document.getElementById('kpi-nao-conformidade').textContent =
+            totalNC.toLocaleString('pt-BR');
+
+        const pctNC = totalInsp > 0 ? (totalNC / totalInsp) * 100 : 0;
+        document.getElementById('kpi-pct-nc').textContent =
+            pctNC.toFixed(1).replace('.', ',') + '%';
+        document.getElementById('kpi-indice-global').textContent =
+            pctNC.toFixed(2).replace('.', ',') + '%';
+    }
+
+    // ── Tabela de inspeção ─────────────────────────────────────────────────
+    async function carregarTabelaProducao(startDate, endDate) {
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        let url = '/inspecao/tubos-cilindros/api/indicador-tubos-cilindros-resumo-analise-temporal/';
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar dados de inspeção.');
+            const data = await response.json();
+
+            const tabela = document.querySelector('#table-producao tbody');
+            tabela.innerHTML = '';
+
+            if (data.length === 0) {
+                tabela.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                atualizarKPIs(0, 0);
+                return;
+            }
+
+            let totalInsp = 0, totalNC = 0;
+
+            data.forEach(item => {
+                const insp = Number(item["N° de inspeções"]) || 0;
+                const nc   = Number(item["N° de não conformidades"]) || 0;
+                totalInsp += insp;
+                totalNC   += nc;
+
+                tabela.insertAdjacentHTML('beforeend', `
+                    <tr>
+                        <td>${item.Data}</td>
+                        <td>${insp.toLocaleString('pt-BR')}</td>
+                        <td>${nc.toLocaleString('pt-BR')}</td>
+                        <td>${item["% de não conformidade"]}</td>
+                    </tr>`);
+            });
+
+            atualizarKPIs(totalInsp, totalNC);
+        } catch (error) {
+            console.error('Erro ao carregar tabela de inspeção:', error);
+        }
+    }
+
+    // ── Tabela de causas ───────────────────────────────────────────────────
+    async function carregarTabelaCausas(startDate, endDate) {
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        let url = '/inspecao/tubos-cilindros/api/causas-nao-conformidade/';
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar causas.');
+            const data = await response.json();
+
+            const tabela = document.querySelector('#table-causas tbody');
+            tabela.innerHTML = '';
+
+            if (data.length === 0) {
+                tabela.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">Nenhuma causa encontrada para o período selecionado.</td></tr>`;
+                return;
+            }
+
+            data.forEach(item => {
+                tabela.insertAdjacentHTML('beforeend', `
+                    <tr>
+                        <td>${item.Data}</td>
+                        <td>${item.Peca}</td>
+                        <td>${item.Causa}</td>
+                        <td>${item["Soma do N° Total de não conformidades"]}</td>
+                    </tr>`);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar tabela de causas:', error);
+        }
+    }
+
+    // ── Gráfico de causas ──────────────────────────────────────────────────
+    async function carregarGraficoCausas(startDate, endDate) {
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        let url = '/inspecao/tubos-cilindros/api/causas-nao-conformidade/';
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar causas.');
+            const data = await response.json();
+
+            const causesCount = {};
+            data.forEach(item => {
+                const causa = item.Causa;
+                const total = item["Soma do N° Total de não conformidades"];
+                causesCount[causa] = (causesCount[causa] || 0) + total;
+            });
+
+            causesChart.data.labels = Object.keys(causesCount);
+            causesChart.data.datasets[0].data = Object.values(causesCount);
+            causesChart.update();
+        } catch (error) {
+            console.error('Erro ao carregar gráfico de causas:', error);
+        }
+    }
+
+    // ── Carrossel de imagens ───────────────────────────────────────────────
+    async function carregarCarrosselImagens(startDate, endDate) {
+        const params = [];
+        if (startDate) params.push(`data_inicio=${startDate}`);
+        if (endDate) params.push(`data_fim=${endDate}`);
+        let url = '/inspecao/tubos-cilindros/api/imagens-nao-conformidade/';
+        if (params.length) url += '?' + params.join('&');
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Erro ao buscar imagens.');
+            const imagens = await response.json();
+
+            const carouselInner = document.querySelector('#imageCarousel .carousel-inner');
+            carouselInner.innerHTML = '';
+
+            if (imagens.length === 0) {
+                carouselInner.innerHTML = `
+                    <div class="carousel-item active">
+                        <div class="d-flex justify-content-center align-items-center" style="height:300px;">
+                            <p class="text-muted">Nenhuma imagem encontrada no período selecionado.</p>
+                        </div>
+                    </div>`;
+                return;
+            }
+
+            imagens.forEach((item, index) => {
+                const causas = item.causas.join(', ');
+                carouselInner.insertAdjacentHTML('beforeend', `
+                    <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                        <img src="${item.imagem_url}" class="d-block w-100" alt="Imagem de não conformidade" style="max-height:500px;object-fit:contain;">
+                        <div class="carousel-caption d-none d-md-block">
+                            <h5>${causas}</h5>
+                            <p>Data: ${item.data_execucao} | Quantidade: ${item.quantidade}</p>
+                        </div>
+                    </div>`);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar carrossel de imagens:', error);
+        }
+    }
+
+    // ── Funções de carga global ────────────────────────────────────────────
+    function carregarSecaoGlobal() {
+        const s = startDateInput.value;
+        const e = endDateInput.value;
+        carregarTabelaProducao(s, e);
+        carregarTabelaCausas(s, e);
+        carregarGraficoCausas(s, e);
+        carregarCarrosselImagens(s, e);
+    }
+
+    // ── Botões filtro temporal ─────────────────────────────────────────────
+    document.getElementById('filterBtnTemporal').addEventListener('click', function () {
+        const s = startDateTemporal.value;
+        const e = endDateTemporal.value;
+        if (!s || !e) { alert('Selecione as datas de início e fim.'); return; }
+        if (s > e) { alert('A data inicial deve ser anterior à data final.'); return; }
+        carregarGraficoProducao(s, e);
+    });
+
+    document.getElementById('resetBtnTemporal').addEventListener('click', function () {
+        startDateTemporal.valueAsDate = sixMonthsAgo;
+        endDateTemporal.valueAsDate = today;
+        carregarGraficoProducao(startDateTemporal.value, endDateTemporal.value);
+    });
+
+    // ── Botões filtro global ───────────────────────────────────────────────
+    document.getElementById('filterBtn').addEventListener('click', function () {
+        const s = startDateInput.value;
+        const e = endDateInput.value;
+        if (!s || !e) { alert('Selecione as datas de início e fim.'); return; }
+        if (s > e) { alert('A data inicial deve ser anterior à data final.'); return; }
+        carregarSecaoGlobal();
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', function () {
+        startDateInput.valueAsDate = firstDayOfMonth;
+        endDateInput.valueAsDate = today;
+        carregarSecaoGlobal();
+    });
+
+    // ── Carga inicial ──────────────────────────────────────────────────────
+    carregarGraficoProducao(startDateTemporal.value, endDateTemporal.value);
+    carregarSecaoGlobal();
+});

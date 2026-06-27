@@ -1,0 +1,141 @@
+:root {
+    --pastel-green: #c1e1c1;
+    --pastel-yellow: #ffeead;
+    --pastel-red: #ffb3b3;
+    --pastel-blue: #b3e0ff;
+    --pastel-purple: #d8b3ff;
+    --light-gray: #f8f9fa;
+}
+
+body {
+    background-color: #f5f5f5;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.card {
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    margin-bottom: 15px;
+    border: none;
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+    font-weight: 600;
+}
+
+.status-indicator {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.status-idle {
+    background-color: var(--pastel-yellow);
+}
+
+.status-stopped {
+    background-color: var(--pastel-red);
+}
+
+.status-operating {
+    background-color: var(--pastel-green);
+}
+
+.machine-status {
+    background-color: white;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.order-card {
+    background-color: white;
+    transition: transform 0.2s;
+}
+
+.order-card:hover {
+    transform: translateY(-3px);
+}
+
+.btn-action {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-waiting {
+    background-color: var(--pastel-yellow);
+    color: #856404;
+}
+
+.badge-started {
+    background-color: var(--pastel-blue);
+    color: #004085;
+}
+
+.badge-interrupted {
+    background-color: var(--pastel-red);
+    color: #721c24;
+}
+
+.badge-completed {
+    background-color: var(--pastel-green);
+    color: #155724;
+}
+
+.section-title {
+    font-weight: 600;
+    margin-bottom: 15px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #eee;
+}
+
+.timer {
+    font-family: monospace;
+    font-weight: bold;
+}
+
+.filter-card {
+    background-color: white;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.filter-btn {
+    background-color: var(--pastel-blue);
+    border: none;
+    color: #004085;
+}
+
+.filter-btn:hover {
+    background-color: #8ecbf5;
+    color: #004085;
+}
+
+.reset-btn {
+    background-color: var(--pastel-purple);
+    border: none;
+    color: #4b0082;
+}
+
+.reset-btn:hover {
+    background-color: #c8a3ff;
+    color: #4b0082;
+}
+
+.form-select, .form-control {
+    border-color: #e0e0e0;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: var(--pastel-blue);
+    box-shadow: 0 0 0 0.25rem rgba(179, 224, 255, 0.25);
+}

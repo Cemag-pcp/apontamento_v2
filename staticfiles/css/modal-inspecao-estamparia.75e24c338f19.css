@@ -1,0 +1,146 @@
+:root {
+    --pastel-green: #c1e1c1;
+    --pastel-yellow: #ffeead;
+    --pastel-red: #ffb3b3;
+    --pastel-blue: #b3e0ff;
+    --pastel-purple: #d8b3ff;
+    --light-gray: #f8f9fa;
+}
+
+.modal-header {
+    background-color: var(--light-gray);
+    border-bottom: none;
+}
+
+.modal-footer {
+    border-top: none;
+}
+
+.inspection-table th, .inspection-table td {
+    vertical-align: middle;
+}
+
+.inspection-table input {
+    width: 100%;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 0.375rem 0.75rem;
+}
+
+.inspection-table input:focus {
+    border-color: var(--pastel-blue);
+    box-shadow: 0 0 0 0.25rem rgba(179, 224, 255, 0.25);
+    outline: none;
+}
+
+.inspection-table .form-check {
+    display: flex;
+    justify-content: center;
+}
+
+.btn-inspection {
+    background-color: var(--pastel-green);
+    border: none;
+    color: #155724;
+}
+
+.btn-inspection:hover {
+    background-color: #a1d1a1;
+    color: #155724;
+}
+
+.non-conformity-container {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-left: 4px solid var(--pastel-red);
+}
+
+.non-conformity-item {
+    background-color: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    position: relative;
+}
+
+.btn-add-nonconformity {
+    background-color: var(--pastel-blue);
+    border: none;
+    color: #004085;
+}
+
+.btn-add-nonconformity:hover {
+    background-color: #8ecbf5;
+    color: #004085;
+}
+
+.btn-remove-nonconformity {
+    top: 10px;
+    right: 10px;
+    background-color: var(--pastel-red);
+    border: none;
+    color: #721c24;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.btn-remove-nonconformity:hover {
+    background-color: #ff9999;
+    color: #721c24;
+}
+
+.form-select, .form-control {
+    border-color: #e0e0e0;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: var(--pastel-blue);
+    box-shadow: 0 0 0 0.25rem rgba(179, 224, 255, 0.25);
+}
+
+.custom-file-upload {
+    border: 1px dashed #ccc;
+    display: inline-block;
+    padding: 6px 12px;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    transition: all 0.3s;
+}
+
+.custom-file-upload:hover {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.file-preview {
+    max-width: 100%;
+    max-height: 150px;
+    margin-top: 10px;
+    border-radius: 4px;
+}
+
+.causes-container {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 10px 15px;
+    background-color: #f8f9fa;
+}
+
+.causes-container .form-check {
+    margin-bottom: 8px;
+}
+
+.causes-container .form-check:last-child {
+    margin-bottom: 0;
+}
