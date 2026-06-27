@@ -614,6 +614,46 @@ def _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa):
         }
 
     propriedade = getattr(ordem, 'propriedade', None)
+
+    # O Innovaro rejeita a transferencia quando a data enviada nao e a data
+    # atual (erro de data testado manualmente). Em vez de mandar e deixar o
+    # ERP recusar, so tenta a transferencia via API quando hoje ainda e o
+    # mesmo dia da finalizacao do apontamento.
+    data_finalizacao = ordem.ultima_atualizacao
+    hoje = localtime(now()).date()
+    if data_finalizacao and localtime(data_finalizacao).date() != hoje:
+        erro = (
+            f"Transferencia via API bloqueada: a ordem foi finalizada em "
+            f"{localtime(data_finalizacao).strftime('%d/%m/%Y')} e hoje e "
+            f"{hoje.strftime('%d/%m/%Y')}. O Innovaro so aceita a transferencia "
+            f"no mesmo dia da finalizacao do apontamento."
+        )
+        registro, _ = TransferenciaChapaCorte.objects.update_or_create(
+            ordem=ordem,
+            defaults={
+                'descricao_chapa': propriedade.descricao_mp if propriedade else None,
+                'espessura_planilha': dados_chapa.get('espessura_planilha') if dados_chapa else None,
+                'espessura_mm': dados_chapa.get('espessura_mm') if dados_chapa else None,
+                'codigo_chapa': str(dados_chapa['codigo']) if dados_chapa and dados_chapa.get('codigo') else None,
+                'quantidade_chapas': dados_chapa.get('quantidade_chapas') or 0 if dados_chapa else 0,
+                'peso_total': dados_chapa.get('peso_total') or 0 if dados_chapa else 0,
+                'deposito_origem': "Almox Central",
+                'deposito_destino': "Almox Corte e Estamparia",
+                'pessoa': "luan araujo soares",
+                'payload': None,
+                'resposta_api': None,
+                'chave_transferencia': None,
+                'status': 'erro',
+                'erro': erro,
+                'transferido_em': None,
+            },
+        )
+        return {
+            'enviado': False,
+            'registro_id': registro.id,
+            'status': registro.status,
+            'erro': erro,
+        }
     pessoa = "luan araujo soares"
     deposito_origem = "Almox Central"
     deposito_destino = "Almox Corte e Estamparia"
@@ -673,9 +713,14 @@ def _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa):
         }
 
     identificacao_ordem = ordem.ordem or ordem.ordem_duplicada or ordem.id
+    # Teste: a documentacao do endpoint /producao/transferir nao lista campo
+    # de data, mas vamos testar se o Innovaro aceita/usa "data" mesmo assim,
+    # com o mesmo valor (ultima_atualizacao) usado no apontamento.
+    data_transferencia = localtime(ordem.ultima_atualizacao or now()).strftime('%d/%m/%Y')
     payload = [
         {
             "id": f"corte-chapa-{ordem.id}",
+            "data": data_transferencia,
             "pessoa": pessoa,
             "recurso": str(dados_chapa['codigo']),
             "quantidade": dados_chapa['peso_total'],
@@ -766,7 +811,10 @@ def _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa):
     registro.erro = None
     registro.resposta_api = resp_json
     registro.chave_transferencia = chave_transferencia
-    registro.transferido_em = now()
+    # ultima_atualizacao reflete a finalizacao da ordem (Ordem e salva ao
+    # finalizar), nao a data em que o operador clicou em "transferir" - que
+    # pode ser bem depois, em ordens transferidas/apontadas com atraso.
+    registro.transferido_em = ordem.ultima_atualizacao or now()
     registro.save(update_fields=[
         'status',
         'erro',
@@ -842,7 +890,7 @@ def _registrar_transferencia_chapa_corte_manual(ordem, dados_chapa, user):
             'chave_transferencia': 'MANUAL',
             'status': 'sucesso',
             'erro': None,
-            'transferido_em': now(),
+            'transferido_em': ordem.ultima_atualizacao or now(),
         },
     )
 
