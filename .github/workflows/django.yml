@@ -50,6 +50,11 @@ jobs:
 
           # Outras
           DEBUG: "False"
+          # Sem isso, settings/__init__.py cai no default 'dev', que usa um
+          # STATICFILES_STORAGE diferente do realmente servido em producao
+          # (apontamento_v2/settings/prod.py). Precisa coletar com as mesmas
+          # configuracoes do ambiente que vai de fato servir os arquivos.
+          DJANGO_ENV: "prod"
 
       - name: Commit and push static files
         run: |

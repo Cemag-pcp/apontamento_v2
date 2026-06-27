@@ -49,14 +49,20 @@ DATABASES = {
 # STATIC_URL = '/static/'
 # STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATIC_ROOT = str(BASE_DIR.joinpath('staticfiles'))
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+
+# Hash do conteudo no nome do arquivo (ex: app.a69c0a5335c5.js): a URL muda
+# sozinha sempre que o conteudo muda, sem precisar editar nenhuma versao
+# manual em templates. Substitui a tentativa anterior de forcar atualizacao
+# via WHITENOISE_MAX_AGE=0, que so evitava cache para requisicoes novas e
+# nao resolvia navegadores que ja tinham cacheado a URL antiga.
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Middleware adicional para produção
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
-# Configuração para forçar atualização de arquivos estáticos
-WHITENOISE_MAX_AGE = 0
+# Como a URL e imutavel por conteudo, pode cachear de forma agressiva
+# (1 ano) sem risco de servir versao desatualizada.
+WHITENOISE_MAX_AGE = 31536000
 
 # Configurações de segurança para produção (certifique-se de ajustar essas conforme necessário)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
