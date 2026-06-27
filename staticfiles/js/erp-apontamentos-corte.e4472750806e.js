@@ -111,7 +111,7 @@ function renderRows(rows) {
     }
 
     tbody.innerHTML = rows.map((row) => `
-        <tr data-item-id="${Number(row.id)}">
+        <tr data-item-id="${Number(row.id)}" data-ordem-id="${Number(row.ordem_id)}">
             <td class="text-center">${renderSelectCheckbox(row)}</td>
             <td>${escapeHtml(row.ordem || '')}</td>
             <td><span class="col-peca-truncada" title="${escapeHtml(formatPecaCodigo(row.peca || ''))}">${escapeHtml(formatPecaCodigo(row.peca || ''))}</span></td>
@@ -230,27 +230,58 @@ function badgeTransferencia(status) {
 }
 
 function updateRowTransferencia(itemId, transferencia) {
-    const tr = tbody?.querySelector(`tr[data-item-id="${Number(itemId)}"]`);
-    if (!tr || !transferencia) return;
+    const trClicada = tbody?.querySelector(`tr[data-item-id="${Number(itemId)}"]`);
+    if (!trClicada || !transferencia) return;
 
-    const cells = tr.querySelectorAll('td');
-    if (cells.length < 19) return;
+    // A transferencia de chapa e por ordem, nao por item: todas as pecas da
+    // mesma ordem compartilham o mesmo status/chave/data de transferencia,
+    // entao todas as linhas dessa ordem precisam refletir o resultado, nao
+    // so a linha em que o botao "Transferir" foi clicado.
+    const ordemId = trClicada.dataset.ordemId;
+    const linhas = ordemId
+        ? Array.from(tbody.querySelectorAll(`tr[data-ordem-id="${ordemId}"]`))
+        : [trClicada];
 
     const status = transferencia.status || '';
     const chave = transferencia.chave_transferencia || '';
-    cells[12].innerHTML = badgeTransferencia(status);
-    cells[13].textContent = chave || '-';
-    cells[16].textContent = transferencia.transferido_em || '-';
-
+    const transferidoEm = transferencia.transferido_em || '';
     const transferido = String(status).toLowerCase() === 'sucesso';
-    if (transferido && apontamentoSelecionado) {
-        apontamentoSelecionado.transferencia_status = status;
-        apontamentoSelecionado.chave_transferencia = chave;
-        apontamentoSelecionado.transferido_em = transferencia.transferido_em || '';
-        cells[0].innerHTML = renderSelectCheckbox(apontamentoSelecionado);
-        cells[18].innerHTML = renderActionButtons(apontamentoSelecionado);
+
+    linhas.forEach((tr) => {
+        const cells = tr.querySelectorAll('td');
+        if (cells.length < 19) return;
+
+        cells[12].innerHTML = badgeTransferencia(status);
+        cells[13].textContent = chave || '-';
+        cells[16].textContent = transferidoEm || '-';
+
+        if (!transferido) return;
+
+        const ehLinhaClicada = Number(tr.dataset.itemId) === Number(itemId);
+        let rowAtualizado = null;
+        if (ehLinhaClicada) {
+            rowAtualizado = apontamentoSelecionado;
+        } else {
+            const raw = tr.querySelector('.chk-apontamento-bloco')?.getAttribute('data-row');
+            if (raw) {
+                try {
+                    rowAtualizado = JSON.parse(raw);
+                } catch (error) {
+                    console.error(error);
+                }
+            }
+        }
+        if (!rowAtualizado) return;
+
+        rowAtualizado.transferencia_status = status;
+        rowAtualizado.chave_transferencia = chave;
+        rowAtualizado.transferido_em = transferidoEm;
+        rowAtualizado.transferencia_erro = '';
+
+        cells[0].innerHTML = renderSelectCheckbox(rowAtualizado);
+        cells[18].innerHTML = renderActionButtons(rowAtualizado);
         bindActionButtonsWithin(tr);
-    }
+    });
 }
 
 function updateRowApontamento(itemId, apontamento) {
