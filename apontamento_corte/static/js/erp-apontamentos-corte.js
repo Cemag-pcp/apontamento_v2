@@ -234,7 +234,7 @@ function updateRowTransferencia(itemId, transferencia) {
     if (!tr || !transferencia) return;
 
     const cells = tr.querySelectorAll('td');
-    if (cells.length < 18) return;
+    if (cells.length < 19) return;
 
     const status = transferencia.status || '';
     const chave = transferencia.chave_transferencia || '';
@@ -247,9 +247,30 @@ function updateRowTransferencia(itemId, transferencia) {
         apontamentoSelecionado.transferencia_status = status;
         apontamentoSelecionado.chave_transferencia = chave;
         apontamentoSelecionado.transferido_em = transferencia.transferido_em || '';
+        cells[0].innerHTML = renderSelectCheckbox(apontamentoSelecionado);
         cells[18].innerHTML = renderActionButtons(apontamentoSelecionado);
-        bindRowActionButtons();
+        bindActionButtonsWithin(tr);
     }
+}
+
+function updateRowApontamento(itemId, apontamento) {
+    const tr = tbody?.querySelector(`tr[data-item-id="${Number(itemId)}"]`);
+    if (!tr || !apontamento || !apontamentoSelecionado) return;
+
+    const cells = tr.querySelectorAll('td');
+    if (cells.length < 19) return;
+
+    apontamentoSelecionado.apontado = true;
+    apontamentoSelecionado.tipo_apontamento = apontamento.tipo_apontamento || apontamentoSelecionado.tipo_apontamento;
+    apontamentoSelecionado.chave_apontamento = apontamento.chave_apontamento || '';
+    apontamentoSelecionado.data_apontamento = apontamento.data_apontamento || apontamentoSelecionado.data_apontamento;
+    apontamentoSelecionado.erro_apontamento = '';
+
+    cells[14].innerHTML = badgeApontamento(apontamentoSelecionado);
+    cells[15].textContent = apontamentoSelecionado.chave_apontamento || '-';
+    cells[0].innerHTML = renderSelectCheckbox(apontamentoSelecionado);
+    cells[18].innerHTML = renderActionButtons(apontamentoSelecionado);
+    bindActionButtonsWithin(tr);
 }
 
 function renderPagination(pagination) {
@@ -326,14 +347,14 @@ function escapeAttrJson(value) {
         .replaceAll('>', '&gt;');
 }
 
-function bindRowActionButtons() {
-    tbody.querySelectorAll('.btn-erro-apontamento-corte').forEach((btn) => {
+function bindActionButtonsWithin(container) {
+    container.querySelectorAll('.btn-erro-apontamento-corte').forEach((btn) => {
         btn.addEventListener('click', () => {
             openErroModal(btn.getAttribute('data-erro') || '');
         });
     });
 
-    tbody.querySelectorAll('.chk-apontamento-bloco').forEach((checkbox) => {
+    container.querySelectorAll('.chk-apontamento-bloco').forEach((checkbox) => {
         checkbox.addEventListener('change', () => {
             const raw = checkbox.getAttribute('data-row');
             if (!raw) return;
@@ -352,7 +373,7 @@ function bindRowActionButtons() {
         });
     });
 
-    tbody.querySelectorAll('.btn-erp-apontar-corte').forEach((btn) => {
+    container.querySelectorAll('.btn-erp-apontar-corte').forEach((btn) => {
         btn.addEventListener('click', () => {
             const raw = btn.getAttribute('data-row');
             if (!raw) return;
@@ -365,7 +386,7 @@ function bindRowActionButtons() {
         });
     });
 
-    tbody.querySelectorAll('.btn-erp-transferir').forEach((btn) => {
+    container.querySelectorAll('.btn-erp-transferir').forEach((btn) => {
         btn.addEventListener('click', () => {
             const raw = btn.getAttribute('data-row');
             if (!raw) return;
@@ -377,7 +398,10 @@ function bindRowActionButtons() {
             }
         });
     });
+}
 
+function bindRowActionButtons() {
+    bindActionButtonsWithin(tbody);
 }
 
 function openErroModal(erro) {
@@ -656,7 +680,6 @@ async function confirmarTransferenciaSelecionada(tipoApontamento = 'api') {
                 showConfirmButton: false,
             });
         }
-        await loadPage(state.page || 1);
     } catch (error) {
         console.error(error);
         if (window.Swal) {
@@ -711,6 +734,7 @@ async function confirmarApontamentoSelecionado(tipoApontamento = 'api') {
         }
 
         modalConfirmarApontamentoCorteInstance?.hide();
+        updateRowApontamento(apontamentoSelecionado.id, payload);
         if (window.Swal) {
             Swal.fire({
                 icon: 'success',
@@ -722,7 +746,6 @@ async function confirmarApontamentoSelecionado(tipoApontamento = 'api') {
                 showConfirmButton: false,
             });
         }
-        await loadPage(state.page || 1);
     } catch (error) {
         console.error(error);
         if (window.Swal) {

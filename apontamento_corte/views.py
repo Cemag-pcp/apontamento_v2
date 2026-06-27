@@ -388,7 +388,13 @@ def _resolver_ficha_tecnica_chapa_corte(item, transferencia=None, codigo_chapa_o
     ]
 
 def _payload_apontamento_item_corte(item, ficha_tecnica=None):
-    data_producao = localtime(item.data) if item.data else localtime(now())
+    # ultima_atualizacao da Ordem reflete o momento da finalizacao (a Ordem
+    # e salva ao finalizar), diferente de item.data, que e a data de criacao
+    # do registro PecasOrdem - pode ficar muito desatualizada em ordens
+    # duplicadas/reaproveitadas que foram criadas bem antes de serem
+    # efetivamente produzidas.
+    data_finalizacao = item.ordem.ultima_atualizacao if item.ordem_id else None
+    data_producao = localtime(data_finalizacao or item.data or now())
     payload = {
         "id": f"corte-item-{item.id}",
         "data": data_producao.strftime('%d/%m/%Y'),
