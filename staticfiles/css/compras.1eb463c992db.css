@@ -1,0 +1,482 @@
+/* compras.css */
+
+:root {
+    --compras-table-grid-color: #e0e0e0;
+}
+
+.compras-dolar-ticker {
+    position: fixed;
+    top: 4.65rem;
+    right: 1rem;
+    z-index: 1030;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    max-width: calc(100vw - 1.5rem);
+    padding: 0.38rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.10);
+    color: #12315f;
+    backdrop-filter: blur(8px);
+}
+
+.compras-dolar-ticker__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #33598f;
+}
+
+.compras-dolar-ticker__valor {
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #0a2f66;
+}
+
+.compras-dolar-ticker__status,
+.compras-dolar-ticker__meta {
+    font-size: 0.7rem;
+    white-space: nowrap;
+    color: #66758d;
+}
+
+.compras-dolar-ticker.is-error {
+    background: rgba(255, 246, 247, 0.96);
+    color: #8a2e3b;
+}
+
+/* ── Título de seção ──────────────────────────────── */
+.compras-section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #003399;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* ── Tabela principal ─────────────────────────────── */
+.compras-table-shell {
+    position: relative;
+    overflow: visible;
+}
+
+.compras-table-scroll-top {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    display: none;
+    width: 100%;
+    height: 18px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: #fff;
+    border: 1px solid var(--compras-table-grid-color);
+    border-bottom: 0;
+    border-radius: 6px 6px 0 0;
+}
+
+.compras-table-scroll-top.is-visible {
+    display: block;
+}
+
+.compras-table-scroll-top__content {
+    height: 1px;
+}
+
+.compras-table-wrap {
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    max-height: calc(100vh - 240px);
+    overflow: auto;
+}
+
+.compras-table-scroll-top.is-visible + .compras-table-wrap {
+    border-radius: 0 0 6px 6px;
+}
+
+.compras-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    color: #222;
+    min-width: 1200px;
+}
+
+/* Cabeçalho */
+.compras-table thead tr {
+    background: #f4f4f4;
+    border-bottom: 2px solid var(--compras-table-grid-color);
+}
+
+.compras-table thead th {
+    padding: 10px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #f4f4f4;
+    border-right: 1px solid var(--compras-table-grid-color);
+}
+
+.compras-table thead th:nth-child(1),
+.compras-table tbody td:nth-child(1) {
+    position: sticky;
+    left: 0;
+}
+
+.compras-table thead th:nth-child(2),
+.compras-table tbody td:nth-child(2) {
+    position: sticky;
+    left: 108px;
+}
+
+.compras-table thead th:nth-child(1),
+.compras-table thead th:nth-child(2) {
+    z-index: 5;
+    background: #f4f4f4;
+}
+
+.compras-table tbody td:nth-child(1),
+.compras-table tbody td:nth-child(2) {
+    z-index: 2;
+    background: #fff;
+}
+
+.compras-table tbody tr:hover td:nth-child(1),
+.compras-table tbody tr:hover td:nth-child(2) {
+    background: #fafbff;
+}
+
+.compras-table thead th:nth-child(1),
+.compras-table tbody td:nth-child(1) {
+    min-width: 108px;
+    box-shadow: none;
+}
+
+.compras-table thead th:nth-child(2),
+.compras-table tbody td:nth-child(2) {
+    min-width: 280px;
+    box-shadow: 1px 0 0 var(--compras-table-grid-color);
+}
+
+.compras-table thead th.num  { text-align: right; }
+.compras-table thead th.center { text-align: center; }
+
+/* Linhas */
+.compras-table tbody tr {
+    transition: background 0.12s;
+}
+.compras-table tbody tr:hover { background: #fafbff; }
+
+.compras-table tbody td {
+    padding: 9px 12px;
+    vertical-align: middle;
+    white-space: nowrap;
+    border-right: 1px solid var(--compras-table-grid-color);
+    border-bottom: 1px solid var(--compras-table-grid-color);
+}
+
+.compras-table thead th:last-child,
+.compras-table tbody td:last-child {
+    border-right: none;
+}
+
+.compras-table tbody td.num  { text-align: right; }
+.compras-table tbody td.center { text-align: center; }
+
+/* Borda esquerda de urgência (discreta) */
+.compras-table tbody tr.urg-critico td:first-child { border-left: 3px solid #e53935; }
+.compras-table tbody tr.urg-curto   td:first-child { border-left: 3px solid #f9a825; }
+.compras-table tbody tr.urg-ok      td:first-child { border-left: 3px solid #43a047; }
+.compras-table tbody tr.urg-pedido  td:first-child { border-left: 3px solid #e65100; }
+
+/* Coluna de código — monospace */
+.compras-table .col-codigo { font-family: monospace; font-size: 12px; color: #444; }
+
+/* Badge de situação */
+.compras-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+.compras-badge.urgente       { color: #b71c1c; background: #fdecea; }
+.compras-badge.curto         { color: #7c5b00; background: #fff8e1; }
+.compras-badge.ok            { color: #1b5e20; background: #e8f5e9; }
+.compras-badge.sem-dado      { color: #777;    background: #f5f5f5; }
+.compras-badge.pedido-pendente { color: #bf360c; background: #fbe9e7; }
+
+.situacao-badges {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: max-content;
+    margin: 0 auto;
+}
+
+.compras-entrega-atrasada {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: #b71c1c;
+    background: #fdecea;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.compras-proxima-compra-curta {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: #7c5b00;
+    background: #fff8e1;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.btn-xs {
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+#plotlyDiv {
+    width: 100%;
+    min-height: 68vh;
+    height: 100%;
+}
+
+/* ── Cards de Sugestão ─────────────────────────────── */
+
+.sugestao-card {
+    border: 1px solid;
+    border-left-width: 4px;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+
+.sugestao-card-header {
+    margin-bottom: 8px;
+}
+
+.sugestao-tipo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 20px;
+}
+
+.sugestao-card-titulo {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    line-height: 1.35;
+}
+
+.sugestao-mensagem {
+    font-size: 0.84rem;
+    color: #374151;
+    line-height: 1.6;
+    margin: 0 0 10px 0;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.sugestao-mensagem strong {
+    font-weight: 700;
+    color: #111;
+}
+
+.sugestao-qtd-box {
+    margin-top: 12px;
+    border: 2px solid;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: rgba(255,255,255,0.6);
+}
+
+.sugestao-indicadores {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.sugestao-indicador {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.sugestao-indicador span {
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.sugestao-indicador strong {
+    color: #0f172a;
+    font-size: 0.9rem;
+}
+
+.sugestao-qtd-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.75;
+}
+
+.sugestao-qtd-valor {
+    font-size: 1.55rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.sugestao-qtd-valor small {
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.7;
+    margin-left: 2px;
+}
+
+.sugestao-vazia {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #9ca3af;
+    font-size: 0.85rem;
+    padding: 24px 0;
+    text-align: center;
+}
+
+.sugestao-vazia i {
+    font-size: 1.8rem;
+}
+
+.compras-projecao-body {
+    min-height: 78vh;
+}
+
+.compras-projecao-grafico {
+    min-width: 0;
+    min-height: 72vh;
+}
+
+.compras-modal-grafico {
+    width: min(1500px, calc(100vw - 420px));
+    max-width: none;
+    margin: 1rem auto 1rem 1rem;
+}
+
+.compras-modal-grafico .modal-content {
+    min-height: calc(100vh - 2rem);
+}
+
+.compras-modal-lateral {
+    background: transparent;
+    pointer-events: none;
+}
+
+.compras-modal-lateral .modal-dialog {
+    width: 360px;
+    max-width: 360px;
+    margin: 1rem 1rem 1rem auto;
+    pointer-events: auto;
+}
+
+.compras-modal-lateral .modal-content {
+    min-height: calc(100vh - 2rem);
+    border: 1px solid #ead9a5;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.compras-modal-lateral .modal-body {
+    background: #fffdf5;
+}
+
+#painelSugestoes {
+    max-height: calc(100vh - 10rem);
+    overflow-y: auto;
+}
+
+@media (max-width: 991.98px) {
+    .compras-dolar-ticker {
+        top: auto;
+        bottom: 0.75rem;
+        left: 0.75rem;
+        right: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        border-radius: 16px;
+    }
+
+    .compras-projecao-body {
+        min-height: auto;
+    }
+
+    .compras-table-wrap {
+        max-height: calc(100vh - 260px);
+    }
+
+    .compras-modal-grafico {
+        width: auto;
+        margin: 0;
+    }
+
+    .compras-projecao-grafico {
+        min-height: auto;
+    }
+
+    #plotlyDiv {
+        min-height: 320px;
+    }
+
+    .compras-modal-lateral .modal-dialog {
+        width: auto;
+        max-width: none;
+        margin: 0.5rem;
+    }
+
+    .compras-modal-lateral .modal-content {
+        min-height: auto;
+    }
+
+    #painelSugestoes {
+        max-height: none;
+    }
+}

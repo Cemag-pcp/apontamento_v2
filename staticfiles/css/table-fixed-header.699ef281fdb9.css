@@ -1,0 +1,33 @@
+/* Define a área de rolagem apenas para o corpo da tabela */
+.table-container {
+    max-height: 500px; /* Altura máxima */
+    overflow-y: auto; /* Ativa a rolagem apenas no corpo */
+    overflow-x: auto; /* Permite rolagem horizontal se necessário */
+    position: relative;
+    border: 1px solid #ddd;
+}
+
+/* Mantém o cabeçalho fixo */
+.header-fixed thead {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 2;
+    box-shadow: 0px 3px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Ajuste para garantir largura uniforme */
+.header-fixed th,
+.header-fixed td {
+    white-space: nowrap;
+    padding: 8px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+}
+
+/* Estiliza o cabeçalho */
+.header-fixed th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    border-bottom: 2px solid #ccc;
+}

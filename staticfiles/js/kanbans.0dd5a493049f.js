@@ -1,0 +1,698 @@
+import { popularPacotesDaCarga, wireModalAlterarPacote } from './carregar_cargas.js';
+import { getCookie } from './criar_caixa.js';
+import { renderStatusCarretas } from './verificar_carretas.js'
+
+// Cache simples para não bombardear a API ao renderizar vários cards
+const _pendenciasCache = new Map();
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildPrintHtml(data, rows) {
+  const header = `
+    <div class="header">
+      <div><strong>Cliente:</strong> ${escapeHtml(data?.cliente_carga || '')}</div>
+      <div><strong>Dt. Carga:</strong> ${escapeHtml(data?.data_carga || '')}</div>
+      <div><strong>Carga:</strong> ${escapeHtml(data?.carga || '')}</div>
+    </div>
+  `;
+
+  const bodyRows = rows.length
+    ? rows.map(r => `
+        <tr>
+          <td>${escapeHtml(r.pacote)}</td>
+          <td>${escapeHtml(r.item)}</td>
+          <td class="qty">${escapeHtml(r.quantidade)}</td>
+        </tr>
+      `).join('')
+    : `<tr><td colspan="3" class="muted">Nenhum pacote encontrado.</td></tr>`;
+
+  return `
+    <!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <title>Pacotes da Carga</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #111; margin: 24px; }
+          h1 { font-size: 18px; margin: 0 0 8px 0; }
+          .header { display: grid; gap: 4px; margin-bottom: 16px; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; }
+          th { background: #f3f4f6; text-align: left; }
+          .qty { text-align: right; width: 90px; }
+          .muted { color: #6b7280; text-align: center; padding: 12px; }
+          @media print {
+            body { margin: 12px; }
+          }
+        </style>
+      </head>
+      <body onload="window.print()">
+        <h1>Lista de Pacotes</h1>
+        ${header}
+        <table>
+          <thead>
+            <tr>
+              <th>Pacote</th>
+              <th>Item</th>
+              <th class="qty">Quantidade</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `;
+}
+
+async function imprimirPacotesDaCarga(cargaId) {
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('N\u00e3o foi poss\u00edvel abrir a janela de impress\u00e3o. Libere pop-ups e tente novamente.');
+    return;
+  }
+
+  win.document.write('<p style="font-family: Arial, sans-serif; padding: 16px;">Carregando...</p>');
+  win.document.close();
+
+  try {
+    const resp = await fetch(`api/buscar-pacote/${encodeURIComponent(cargaId)}/`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+
+    const rows = [];
+    const pacotes = Array.isArray(data?.pacotes) ? data.pacotes : [];
+
+    pacotes.forEach((pacote) => {
+      const itens = Array.isArray(pacote?.itens) ? pacote.itens : [];
+      if (!itens.length) {
+        rows.push({
+          pacote: pacote?.nome || '',
+          item: '(sem itens)',
+          quantidade: ''
+        });
+        return;
+      }
+      itens.forEach((item) => {
+        const desc = item?.descricao ? ` - ${item.descricao}` : '';
+        rows.push({
+          pacote: pacote?.nome || '',
+          item: `${item?.codigo_peca || ''}${desc}`.trim(),
+          quantidade: item?.quantidade ?? ''
+        });
+      });
+    });
+
+    const html = buildPrintHtml(data, rows);
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  } catch (err) {
+    console.error('Erro ao gerar impress\u00e3o:', err);
+    win.document.open();
+    win.document.write('<p style="font-family: Arial, sans-serif; padding: 16px; color: #b91c1c;">Erro ao carregar os pacotes para impress\u00e3o.</p>');
+    win.document.close();
+  }
+}
+
+function mapStage(carga) {
+  // se já vier "estagio" do backend, use direto:
+  if (carga.stage) return carga.stage.toLowerCase(); 
+  // fallback pelo status (ajuste se quiser):
+  const s = (carga.stage || '').toLowerCase();
+  if (['planejamento', 'novo', 'pendente'].includes(s)) return 'planejamento';
+  if (['verificacao', 'revisao', 'erro'].includes(s)) return 'verificacao';
+  if (['despachado', 'entregue', 'finalizado'].includes(s)) return 'despachado';
+  return 'planejamento';
+}
+
+async function excluirCarregamento(cargaId, cardEl) {
+  try {
+    const resp = await fetch(`api/excluir-carga/${encodeURIComponent(cargaId)}/`, {
+      method: 'DELETE',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+    });
+
+    if (!resp.ok) {
+      const msg = await resp.text();
+      throw new Error(msg || 'Erro ao excluir carregamento');
+    }
+
+    cardEl?.remove();
+  } catch (error) {
+    console.error('Falha ao excluir carregamento:', error);
+    alert(error);
+  }
+}
+
+/**
+ * Consulta a API e retorna o número total de itens pendentes (int).
+ * Se houver erro, retorna null (para não travar a UI).
+ */
+export async function verificarPendencias(carregamentoId) {
+  if (!carregamentoId) return null;
+
+  try {
+    const resp = await fetch(`api/verificar-pendencias/${encodeURIComponent(carregamentoId)}/`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const data = await resp.json();
+    const total = Number(data?.total_itens_pendente ?? 0);
+    return total;
+  } catch (e) {
+    console.error('Falha ao verificar pendências:', e);
+    return null;
+  }
+}
+
+/**
+ * Cria o botão "Avançar estágio" com os mesmos atributos que você já usava
+ * e conecta o listener de abertura do modal.
+ */
+export function criarBotaoAvancar(cargaId) {
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-sm btn-outline-primary avancar-estagio';
+  btn.title = 'Proximo estágio';
+  btn.setAttribute('data-bs-toggle', 'modal');
+  btn.setAttribute('data-bs-target', '#modalAvancarEstagio');
+  btn.setAttribute('data-id-carga', String(cargaId));
+  btn.innerHTML = `<i class="fas fa-arrow-right ms-1"></i>`;
+
+  // listener para abrir modal de avançar estágio (mantido)
+  btn.addEventListener('click', function () {
+    const cargaId = this.getAttribute('data-id-carga');
+    const hidden = document.getElementById('idCargaPacote');
+    if (hidden) hidden.value = cargaId;
+    const modalTitle = document.querySelector('#modalAvancarEstagio .modal-title');
+    if (modalTitle) modalTitle.textContent = `Avançar estágio #${cargaId}`;
+    document.getElementById('idItemAvancar').value = cargaId;
+  });
+
+  return btn;
+}
+
+/**
+ * Decide o que renderizar no "slot" do botão/alerta com base no estágio e nas pendências.
+ * - Para estágio 'planejamento': busca pendências e decide entre ALERTA x BOTÃO.
+ * - Demais estágios: mantém sua lógica original.
+ */
+export function preencherSlotAvancar(carga, slotEl) {
+  const pend = (carga.total_pendente == null) ? null : Number(carga.total_pendente);
+  slotEl.innerHTML = '';
+
+  // ── Planejamento ──────────────────────────────────────
+  if (carga.stage === 'planejamento') {
+    slotEl.appendChild(criarBotaoAvancar(carga.id));
+    if (pend > 0) {
+      const b = document.createElement('span');
+      b.className = 'badge bg-warning text-dark';
+      b.title = `${pend} item(ns) sem pacotes`;
+      b.textContent = `${pend} pendente(s)`;
+      slotEl.appendChild(b);
+    }
+    return;
+  }
+
+  // ── Verificação: tudo ok ──────────────────────────────
+  if (carga.stage === 'verificacao' && carga.todos_pacotes_tem_foto_verificacao && !carga.fornecedores_pendentes) {
+    slotEl.appendChild(criarBotaoAvancar(carga.id));
+    return;
+  }
+
+  // ── Despachado: tudo ok ───────────────────────────────
+  if (carga.stage === 'despachado' && carga.todos_pacotes_tem_foto_despachado) {
+    const b = document.createElement('span');
+    b.className = 'badge bg-success';
+    b.textContent = 'Concluído';
+    slotEl.appendChild(b);
+    return;
+  }
+
+  // ── Pendências bloqueando avanço ──────────────────────
+  if (carga.stage === 'verificacao' && !carga.todos_pacotes_tem_foto_verificacao) {
+    const b = document.createElement('span');
+    b.className = 'badge bg-warning text-dark';
+    b.textContent = 'Aguardando fotos';
+    slotEl.appendChild(b);
+  }
+  if (carga.fornecedores_pendentes) {
+    const b = document.createElement('span');
+    b.className = 'badge bg-danger';
+    b.title = 'Informe os fornecedores de peças especiais para avançar';
+    b.textContent = 'Fornecedores';
+    slotEl.appendChild(b);
+  }
+}
+
+export async function atualizarSlotAvancar(dataId, todas_fotos_verificacao, etapa_atual) {
+  // acha o card/slot
+  const card = document.querySelector(`.card[data-id='${dataId}']`);
+  if (!card) return;
+  const slotEl = card.querySelector('.slot-avancar');
+  if (!slotEl) return;
+
+  // container horizontal para botão + aviso
+  const row = document.createElement('div');
+  row.className = 'd-flex align-items-center gap-2';
+
+  if (etapa_atual === 'verificacao' && todas_fotos_verificacao){
+    const btn = criarBotaoAvancar(dataId);
+    row.appendChild(btn);
+
+  } else if (etapa_atual === 'planejamento') {
+    const btn = criarBotaoAvancar(dataId);
+    row.appendChild(btn);
+  }
+
+  const pendBadge = document.createElement('span');
+  pendBadge.innerHTML = '';
+  
+  if (!todas_fotos_verificacao){
+    pendBadge.className = 'badge bg-warning';
+    pendBadge.textContent = 'Aguardando fotos';
+    row.appendChild(pendBadge);
+  }
+
+  // busca pendências
+  let totalPend = null;
+  try {
+    totalPend = await verificarPendencias(dataId);
+  } catch (_) {
+    totalPend = null;
+  }
+
+  // normaliza para número
+  const pend = (totalPend === null || totalPend === undefined) ? null : Number(totalPend);
+
+  // adiciona aviso à direita do botão (quando aplicável)
+  if (pend === null) {
+    const note = document.createElement('span');
+    note.className = 'badge rounded-pill bg-secondary';
+    note.title = 'Não foi possível verificar pendências agora';
+    note.textContent = 'indefinido';
+    row.appendChild(note);
+  } else if (pend > 0) {
+    // ALERTA (texto) como antes
+    const warn = document.createElement('div');
+    warn.className = 'alert alert-warning mb-0 py-1 px-2 small';
+    warn.textContent = `Contém ${pend} item(ns) sem pacotes.`;
+    row.appendChild(warn);
+  }
+  // se pend === 0, não mostra nada além do botão
+
+  // !!! Um único replaceChildren no final (não sobrescreve o aviso)
+  slotEl.replaceChildren(row);
+
+  console.log('alterado com sucesso', pend);
+}
+
+// Mapeia stage para classe de badge Bootstrap
+function stageBadgeClass(stage) {
+  switch ((stage || '').toLowerCase()) {
+    case 'planejamento': return 'bg-primary';
+    case 'verificacao':  return 'bg-warning text-dark';
+    case 'despachado':   return 'bg-success';
+    default:             return 'bg-secondary';
+  }
+}
+
+function stageBadgeLabel(stage) {
+  switch ((stage || '').toLowerCase()) {
+    case 'planejamento': return 'Apontamento';
+    case 'verificacao':  return 'Verificação';
+    case 'despachado':   return 'Despachado';
+    default:             return stage || '—';
+  }
+}
+
+/**
+ * Cria o card do Kanban.
+ */
+export function createKanbanCard(carga) {
+  const stage = (carga.stage || '').toLowerCase();
+
+  const card = document.createElement('div');
+  card.className = 'card card-kanban shadow-sm';
+  card.draggable = true;
+  card.dataset.id                       = carga.id;
+  card.dataset.stage                    = stage;
+  card.dataset.cliente                  = (carga.cliente || '').toLowerCase();
+  card.dataset.dataCarga                = (carga.data_carga || '');
+  card.dataset.todosPhotoVerificacao    = carga.todos_pacotes_tem_foto_verificacao ? 'true' : 'false';
+  card.dataset.todosPhotoDespachado     = carga.todos_pacotes_tem_foto_despachado  ? 'true' : 'false';
+  card.dataset.fornecedoresPendentes    = carga.fornecedores_pendentes             ? 'true' : 'false';
+  card.dataset.totalPendente            = carga.total_pendente || 0;
+
+  // ── Header ──────────────────────────────────────────
+  const header = document.createElement('div');
+  header.className = 'card-header';
+
+  const title = document.createElement('span');
+  title.className = 'ck-title';
+  title.title = `#${carga.id} — ${carga.carga}`;
+  title.textContent = `#${carga.id} — ${carga.carga}`;
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'btn btn-sm btn-outline-danger py-0 px-1 flex-shrink-0';
+  deleteBtn.title = 'Excluir carregamento';
+  deleteBtn.innerHTML = '<i class="fas fa-trash fa-xs"></i>';
+  deleteBtn.addEventListener('click', async () => {
+    if (!confirm('Deseja excluir este carregamento e todos os seus pacotes?')) return;
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+    try {
+      await excluirCarregamento(carga.id, card);
+    } finally {
+      if (document.body.contains(deleteBtn)) {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = '<i class="fas fa-trash fa-xs"></i>';
+      }
+    }
+  });
+
+  header.appendChild(title);
+  header.appendChild(deleteBtn);
+
+  // ── Body ─────────────────────────────────────────────
+  const body = document.createElement('div');
+  body.className = 'card-body';
+
+  // Linha 1: data + badge de etapa
+  const infoRow = document.createElement('div');
+  infoRow.className = 'ck-info-row';
+
+  const dateSpan = document.createElement('span');
+  dateSpan.className = 'ck-date';
+  dateSpan.innerHTML = `<i class="far fa-calendar-alt"></i>${formatarData(carga.data_carga)}`;
+
+  const stageBadge = document.createElement('span');
+  stageBadge.className = `badge ck-stage ${stageBadgeClass(stage)}`;
+  stageBadge.textContent = stageBadgeLabel(stage);
+
+  infoRow.appendChild(dateSpan);
+  infoRow.appendChild(stageBadge);
+
+  // Linha 2: cliente
+  const clienteDiv = document.createElement('div');
+  clienteDiv.className = 'ck-cliente';
+  clienteDiv.title = carga.cliente || '';
+  clienteDiv.textContent = carga.cliente || '—';
+
+  // Linha 3: carretas
+  const carretasDiv = document.createElement('div');
+  carretasDiv.className = 'ck-carretas';
+  const carretasSpan = document.createElement('span');
+  carretasSpan.className = 'status-carretas';
+  carretasDiv.appendChild(carretasSpan);
+
+  // Linha 4: badges de alerta
+  const alertsDiv = document.createElement('div');
+  alertsDiv.className = 'ck-alerts';
+
+  // Linha 5: footer — botões à esquerda, slot avançar à direita
+  const footer = document.createElement('div');
+  footer.className = 'ck-footer';
+
+  const btns = document.createElement('div');
+  btns.className = 'ck-btns';
+
+  const verPacotesBtn = document.createElement('button');
+  verPacotesBtn.className = 'btn btn-sm btn-outline-primary ver-pacotes';
+  verPacotesBtn.title = 'Ver pacotes';
+  verPacotesBtn.setAttribute('data-bs-toggle', 'modal');
+  verPacotesBtn.setAttribute('data-bs-target', '#visualizarPacote');
+  verPacotesBtn.setAttribute('data-id-carga', carga.id);
+  verPacotesBtn.innerHTML = '<i class="fas fa-box me-1"></i>Pacotes';
+  verPacotesBtn.addEventListener('click', function () {
+    const cargaId = this.getAttribute('data-id-carga');
+    const hidden = document.getElementById('idCargaPacote');
+    if (hidden) hidden.value = cargaId;
+    const modalTitle = document.querySelector('#visualizarPacote .modal-title');
+    if (modalTitle) modalTitle.textContent = `Pacotes da carga #${cargaId}`;
+    popularPacotesDaCarga(cargaId);
+  });
+  btns.appendChild(verPacotesBtn);
+
+  if (stage === 'verificacao') {
+    const printBtn = document.createElement('button');
+    printBtn.className = 'btn btn-sm btn-outline-secondary imprimir-pacotes';
+    printBtn.title = 'Imprimir pacotes';
+    printBtn.setAttribute('data-id-carga', carga.id);
+    printBtn.innerHTML = '<i class="fas fa-print"></i>';
+    printBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      imprimirPacotesDaCarga(carga.id);
+    });
+    btns.appendChild(printBtn);
+  }
+
+  const slotAvancar = document.createElement('span');
+  slotAvancar.className = 'slot-avancar';
+
+  footer.appendChild(btns);
+  footer.appendChild(slotAvancar);
+
+  body.appendChild(infoRow);
+  body.appendChild(clienteDiv);
+  body.appendChild(carretasDiv);
+  body.appendChild(alertsDiv);
+  body.appendChild(footer);
+
+  // Renderiza badge de carretas
+  renderStatusCarretas(carretasSpan, carga.id);
+
+  // Drag
+  card.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', String(carga.id));
+    e.dataTransfer.effectAllowed = 'move';
+    card.classList.add('opacity-50');
+  });
+  card.addEventListener('dragend', () => card.classList.remove('opacity-50'));
+
+  card.appendChild(header);
+  card.appendChild(body);
+  return card;
+}
+
+document.getElementById('formAvancarEstagio').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  const id = document.getElementById('idItemAvancar').value;
+  const btnConfirmarAvanco = document.getElementById('btnConfirmarAvanco');
+  btnConfirmarAvanco.disabled = true;
+  btnConfirmarAvanco.innerHTML = 'Confirmando...';
+
+  try {
+    const resp = await fetch(`api/alterar-stage/${id}/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({ stage: '' })
+    });
+
+    if (!resp.ok) throw new Error('Falha ao avançar estágio');
+
+    const data = await resp.json(); // espera { stage_antigo, novo_stage, ... }
+
+    // Fecha modal
+    bootstrap.Modal.getInstance(document.getElementById('modalAvancarEstagio'))?.hide();
+
+    // === 1) Seleciona o card atual pelo data-id
+    const cardEl = document.querySelector(`.card.card-kanban[data-id='${id}']`);
+    if (!cardEl) {
+      console.warn('Card não encontrado no DOM:', id);
+    } else {
+      // === 2) Acha a nova lista do kanban (#col-<stage>) e move o card pra lá
+      const stageKey = String(data.novo_stage || '').toLowerCase(); // ex.: 'verificacao'
+      const destinoCol = document.getElementById(`col-${stageKey}`);
+
+      if (!destinoCol) {
+        console.error('Coluna destino não encontrada:', `col-${stageKey}`);
+      } else {
+        destinoCol.appendChild(cardEl);
+        cardEl.dataset.stage = data.novo_stage;
+
+        // Atualiza o badge de estágio no topo do card
+        const stageBadgeEl = cardEl.querySelector('.ck-stage');
+        if (stageBadgeEl) {
+          stageBadgeEl.className = `badge ck-stage ${stageBadgeClass(data.novo_stage)}`;
+          stageBadgeEl.textContent = stageBadgeLabel(data.novo_stage);
+        }
+      }
+    }
+
+    // Atualiza o slot do botão + warning do próprio card movido
+    try {
+      await atualizarSlotAvancar(id, false, data.novo_stage);
+    } catch (e2) {
+      console.warn('Falha ao atualizar slot avançar:', e2);
+    }
+
+    btnConfirmarAvanco.disabled = false;
+    btnConfirmarAvanco.innerHTML = 'Confirmar avanço';
+  } catch (err) {
+    alert('Erro ao avançar estágio.');
+    btnConfirmarAvanco.disabled = false;
+    btnConfirmarAvanco.innerHTML = 'Confirmar avanço';
+    console.error(err);
+  }
+});
+
+function setupDropZones() {
+  document.querySelectorAll('.kanban-list').forEach(list => {
+    list.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      list.classList.add('drag-over');
+    });
+    list.addEventListener('dragleave', () => list.classList.remove('drag-over'));
+    list.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      list.classList.remove('drag-over');
+      const cardId = e.dataTransfer.getData('text/plain');
+      const card = document.querySelector(`.card-kanban[data-id="${cardId}"]`);
+      if (!card) return;
+
+      list.prepend(card); // move visualmente
+      const newStage = list.parentElement.dataset.stage; // pega o estágio da coluna
+      // atualiza no backend (ajuste URL se necessário)
+      try {
+        await fetch(`api/alterar-stage/${cardId}/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+          },
+          body: JSON.stringify({ stage: newStage })
+        });
+      } catch (err) {
+        console.error('Falha ao atualizar estágio:', err);
+      }
+    });
+  });
+}
+
+export async function carregarCargasKanban() {
+  const colPlanej = document.getElementById('col-planejamento');
+  const colVerif  = document.getElementById('col-verificacao');
+  const colDesp   = document.getElementById('col-despachado');
+
+  // estados de carregamento
+  [colPlanej, colVerif, colDesp].forEach(col => {
+    col.innerHTML = '<div class="text-muted small">Carregando...</div>';
+  });
+
+  try {
+    const resp = await fetch('api/buscar-cargas/'); // note a barra inicial
+    if (!resp.ok) throw new Error('Erro ao buscar cargas');
+    const cargas = await resp.json();
+
+    // limpar colunas
+    [colPlanej, colVerif, colDesp].forEach(col => col.innerHTML = '');
+
+    const despachados = [];
+    const outros = [];
+
+    cargas.forEach((carga) => {
+      const stage = mapStage(carga);
+      if (stage === 'despachado') {
+        despachados.push(carga);
+      } else {
+        outros.push(carga);
+      }
+    });
+
+    // ordenar despachados por data_criacao desc e limitar a 5
+    despachados.sort((a, b) => {
+      const da = new Date(a.data_criacao || 0).getTime();
+      const db = new Date(b.data_criacao || 0).getTime();
+      return db - da;
+    });
+    const despachadosLimitados = despachados.slice(0, 5);
+
+    const renderCargas = (lista) => {
+      lista.forEach((carga) => {
+        const stage = mapStage(carga);
+        const card  = createKanbanCard(carga); // cria card com .slot-avancar
+
+        // escolhe coluna
+        let targetCol = colPlanej;
+        if (stage === 'verificacao') targetCol = colVerif;
+        else if (stage === 'despachado')  targetCol = colDesp;
+
+        // insere o card na coluna
+        targetCol.appendChild(card);
+
+        // >>> CHAMAR A VERIFICAÇÃO *APÓS* MONTAR O CARD <<<
+        const slot = card.querySelector('.slot-avancar');
+        if (slot) {
+          // não bloqueia a UI — roda async
+          preencherSlotAvancar(carga, slot);
+        }
+      });
+    };
+
+    renderCargas(outros);
+    renderCargas(despachadosLimitados);
+
+  } catch (err) {
+    console.error(err);
+    [colPlanej, colApont, colVerif, colDesp].forEach(col => {
+      col.innerHTML = '<div class="text-danger small">Erro ao carregar</div>';
+    });
+  }
+}
+
+// util: converter '2025-08-27' → '27/08/2025'
+function formatarData(iso) {
+  if (!iso) return '';
+  const [ano, mes, dia] = iso.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // setupDropZones();
+  wireModalAlterarPacote();
+  carregarCargasKanban();
+  document.getElementById('btnRefreshKanban')?.addEventListener('click', carregarCargasKanban);
+});
+
+window.addEventListener('expedicao:carretas-reprocessadas', (event) => {
+  const detail = event.detail || {};
+  const cargaId = detail.cargaId;
+  if (!cargaId) return;
+
+  const cardEl = document.querySelector(`.card-kanban[data-id="${cargaId}"]`);
+  if (!cardEl) return;
+
+  if (detail.totalPendente != null) {
+    cardEl.dataset.totalPendente = Number(detail.totalPendente);
+  }
+
+  const slot = cardEl.querySelector('.slot-avancar');
+  if (!slot) return;
+
+  preencherSlotAvancar({
+    id: Number(cargaId),
+    stage: cardEl.dataset.stage,
+    todos_pacotes_tem_foto_verificacao: cardEl.dataset.todosPhotoVerificacao === 'true',
+    todos_pacotes_tem_foto_despachado: cardEl.dataset.todosPhotoDespachado === 'true',
+    fornecedores_pendentes: cardEl.dataset.fornecedoresPendentes === 'true',
+    total_pendente: Number(cardEl.dataset.totalPendente || 0),
+  }, slot);
+});

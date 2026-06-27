@@ -1,0 +1,403 @@
+/* ═══════════════════════════════════════════════
+   Dashboard – Design System Tokens
+   ═══════════════════════════════════════════════ */
+:root {
+    --db-navy:          #1b2a4a;
+    --db-navy-dark:     #0d1b35;
+    --db-blue:          #2563eb;
+    --db-blue-light:    #eff6ff;
+    --db-orange:        #e05a2b;
+    --db-teal:          #0f7b6c;
+    --db-teal-light:    #f0fdfb;
+    --db-red:           #dc2626;
+    --db-green:         #059669;
+
+    --db-bg:            #f0f4f8;
+    --db-surface:       #ffffff;
+    --db-border:        #e2e8f0;
+    --db-border-light:  #f1f5f9;
+
+    --db-text:          #1e293b;
+    --db-text-2:        #475569;
+    --db-text-muted:    #94a3b8;
+
+    --db-row-alt:       #f8fafc;
+    --db-row-hover:     #eff6ff;
+    --db-row-hover-teal:#f0fdfb;
+
+    --db-shadow-sm:     0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+    --db-shadow:        0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+    --db-radius:        10px;
+
+    /* legado */
+    --primary-color:   var(--db-blue);
+    --secondary-color: var(--db-navy);
+    --accent-color:    var(--db-orange);
+    --light-bg:        var(--db-bg);
+    --dark-bg:         #343a40;
+}
+
+/* ── Base ── */
+body {
+    background-color: var(--db-bg);
+    font-family: 'Fira Sans', 'Segoe UI', Tahoma, sans-serif;
+    color: var(--db-text);
+    font-size: 0.875rem;
+}
+
+/* ── Card ── */
+.card {
+    border-radius: var(--db-radius);
+    box-shadow: var(--db-shadow);
+    border: 1px solid var(--db-border-light);
+    background: var(--db-surface);
+    transition: box-shadow .2s ease;
+}
+.card:hover {
+    box-shadow: 0 6px 20px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+}
+
+/* ── Card Header ── */
+.card-header {
+    background: var(--db-navy);
+    color: #fff;
+    border-radius: var(--db-radius) var(--db-radius) 0 0 !important;
+    font-weight: 600;
+    font-size: .78rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: .65rem 1rem;
+    border-bottom: 3px solid rgba(255,255,255,.08);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+/* faixa colorida à esquerda por tipo */
+.card-header::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 1.1em;
+    border-radius: 2px;
+    background: var(--db-orange);
+    flex-shrink: 0;
+}
+.card-header.ch-blue::before   { background: var(--db-blue); }
+.card-header.ch-teal::before   { background: var(--db-teal); }
+.card-header.ch-orange::before { background: var(--db-orange); }
+
+/* ── Tabelas ── */
+.table-responsive {
+    border-radius: 0 0 var(--db-radius) var(--db-radius);
+    overflow: hidden;
+}
+
+.table {
+    margin-bottom: 0;
+    font-size: .82rem;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* thead */
+.table thead th {
+    background: #253858;
+    color: rgba(255,255,255,.92);
+    border: none;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: .6rem .85rem;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+/* tbody */
+.table tbody tr:nth-child(even) td {
+    background: var(--db-row-alt);
+}
+.table tbody tr:nth-child(odd) td {
+    background: var(--db-surface);
+}
+.table tbody tr:hover td {
+    background: var(--db-row-hover);
+    transition: background .15s ease;
+}
+.table tbody td {
+    padding: .5rem .85rem;
+    border-top: 1px solid var(--db-border-light);
+    vertical-align: middle;
+    color: var(--db-text);
+}
+
+/* ── Alinhamento numérico + tipografia tabulada ── */
+.table thead th.col-num,
+.table tbody td.col-num {
+    text-align: right;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: .8rem;
+}
+
+/* Colunas numéricas por posição em cada tabela */
+#table-producao th:nth-child(n+2),
+#table-producao td:nth-child(n+2) {
+    text-align: right;
+    font-family: 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+#table-causas th:nth-child(5),
+#table-causas td:nth-child(5) {
+    text-align: right;
+    font-family: 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+#table-ranking-causas th:nth-child(2),
+#table-ranking-causas td:nth-child(2),
+#table-ranking-pu th:nth-child(2),
+#table-ranking-pu td:nth-child(2),
+#table-ranking-po th:nth-child(2),
+#table-ranking-po td:nth-child(2) {
+    text-align: right;
+    font-family: 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+/* badge de quantidade nas tabelas de ranking */
+#table-ranking-causas td:nth-child(2),
+#table-ranking-pu td:nth-child(2),
+#table-ranking-po td:nth-child(2) {
+    color: var(--db-navy);
+}
+
+#table-pu th:nth-child(4),
+#table-pu td:nth-child(4),
+#table-po th:nth-child(4),
+#table-po td:nth-child(4) {
+    text-align: right;
+    font-family: 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+#table-causas-diaria th:nth-child(n+5),
+#table-causas-diaria td:nth-child(n+5) {
+    text-align: right;
+    font-family: 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Header Banner (compartilhado) ── */
+.pintura-header-banner {
+    background: var(--db-navy-dark);
+    color: #fff;
+    text-align: center;
+    padding: 22px 20px;
+    font-size: 1.55rem;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    border-radius: 6px;
+}
+
+/* ── Meta de inspeção badge ── */
+.meta-inspecao-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f0f0f0;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    color: #333;
+    line-height: 1.3;
+}
+.meta-check {
+    font-size: 1.7rem;
+    color: #27ae60;
+    font-weight: bold;
+    line-height: 1;
+}
+
+/* ── Índice Global ── */
+.indice-global-wrap { display: flex; justify-content: center; }
+.indice-global-badge {
+    background: var(--db-orange);
+    color: #fff;
+    text-align: center;
+    padding: 18px 24px 40px;
+    clip-path: polygon(0 0, 100% 0, 100% 68%, 50% 100%, 0 68%);
+    width: 155px;
+    min-height: 168px;
+}
+.ig-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    line-height: 1.2;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+.ig-value {
+    font-size: 2.1rem;
+    font-weight: 900;
+}
+.ig-meta-label {
+    margin-top: 4px;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    opacity: 0.9;
+}
+.ig-meta-value {
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+/* ── KPI Arrow Cards ── */
+.kpi-arrow-card {
+    background: var(--db-navy);
+    color: #fff;
+    padding: 11px 50px 11px 18px;
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 50%, calc(100% - 22px) 100%, 0 100%);
+}
+.kpi-arrow-card.kpi-teal { background: var(--db-teal); }
+.kpi-lbl {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.85;
+    margin-bottom: 1px;
+}
+.kpi-val {
+    font-size: 1.85rem;
+    font-weight: 900;
+    line-height: 1.1;
+}
+
+/* ── Ranking tables: pill de posição ── */
+.rank-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--db-navy);
+    color: #fff;
+    font-size: .68rem;
+    font-weight: 700;
+    margin-right: .4rem;
+    font-family: 'Fira Code', monospace;
+    flex-shrink: 0;
+}
+.rank-index.top1 { background: var(--db-orange); }
+.rank-index.top2 { background: #64748b; }
+.rank-index.top3 { background: #92400e; color: #fef3c7; }
+
+/* ── Scrollable container ── */
+.table-container {
+    max-height: 320px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+.table-container::-webkit-scrollbar { width: 5px; }
+.table-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+/* ── Dashboard header ── */
+.dashboard-header {
+    background-color: var(--db-navy-dark);
+    color: white;
+    padding: 1.5rem 0;
+    margin-bottom: 2rem;
+    box-shadow: var(--db-shadow);
+}
+
+/* ── Badges legado ── */
+.badge-nc {
+    background-color: var(--db-orange);
+    color: white;
+    padding: .4rem .65rem;
+    border-radius: 5px;
+    font-size: .9rem;
+}
+.badge-insp {
+    background-color: var(--db-blue);
+    color: white;
+    padding: .4rem .65rem;
+    border-radius: 5px;
+    font-size: .9rem;
+}
+
+/* ── Chart ── */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* ── Carousel ── */
+.carousel-item img {
+    width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    background-color: var(--db-row-alt);
+}
+@media (max-width: 576px) {
+    .carousel-item img { max-height: 40vh; }
+}
+.carousel-caption {
+    bottom: 0;
+    top: auto;
+    background-color: rgba(0,0,0,.55);
+    padding: .5rem 1rem;
+    font-size: .8rem;
+    line-height: 1.2;
+}
+.carousel-caption h5 { font-size: 1rem; margin-bottom: .2rem; }
+.carousel-caption p  { font-size: .75rem; margin-bottom: 0; }
+
+/* ── Subtítulo de tipo (PU / PÓ) ── */
+.tipo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    background: var(--db-navy);
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: .3rem .75rem;
+    border-radius: 20px;
+    margin-bottom: .85rem;
+}
+.tipo-badge.teal { background: var(--db-teal); }
+
+/* ── Mensagem de vazio ── */
+.table tbody td.text-muted {
+    color: var(--db-text-muted) !important;
+    font-style: italic;
+    font-size: .8rem;
+}
+
+/* ── sticky thead fix dentro de .table-container ── */
+.table-container .table-fixed-header thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #253858;
+}
