@@ -615,18 +615,21 @@ def _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa):
 
     propriedade = getattr(ordem, 'propriedade', None)
 
-    # O Innovaro rejeita a transferencia quando a data enviada nao e a data
-    # atual (erro de data testado manualmente). Em vez de mandar e deixar o
-    # ERP recusar, so tenta a transferencia via API quando hoje ainda e o
-    # mesmo dia da finalizacao do apontamento.
+    # O endpoint /producao/transferir do Innovaro nao aceita parametro de
+    # data (so id/pessoa/recurso/quantidade/depositoOrigem/depositoDestino).
+    # Transferir em um dia diferente da finalizacao registraria a
+    # movimentacao com a data de hoje no Innovaro, que nao corresponde a
+    # data real da producao - por isso so transferimos via API quando hoje
+    # ainda e o mesmo dia da finalizacao do apontamento.
     data_finalizacao = ordem.ultima_atualizacao
     hoje = localtime(now()).date()
     if data_finalizacao and localtime(data_finalizacao).date() != hoje:
         erro = (
             f"Transferencia via API bloqueada: a ordem foi finalizada em "
             f"{localtime(data_finalizacao).strftime('%d/%m/%Y')} e hoje e "
-            f"{hoje.strftime('%d/%m/%Y')}. O Innovaro so aceita a transferencia "
-            f"no mesmo dia da finalizacao do apontamento."
+            f"{hoje.strftime('%d/%m/%Y')}. A API do Innovaro nao permite informar "
+            f"a data da transferencia, entao so e possivel transferir no mesmo dia "
+            f"da finalizacao para nao registrar a movimentacao com a data errada."
         )
         registro, _ = TransferenciaChapaCorte.objects.update_or_create(
             ordem=ordem,
@@ -713,14 +716,12 @@ def _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa):
         }
 
     identificacao_ordem = ordem.ordem or ordem.ordem_duplicada or ordem.id
-    # Teste: a documentacao do endpoint /producao/transferir nao lista campo
-    # de data, mas vamos testar se o Innovaro aceita/usa "data" mesmo assim,
-    # com o mesmo valor (ultima_atualizacao) usado no apontamento.
-    data_transferencia = localtime(ordem.ultima_atualizacao or now()).strftime('%d/%m/%Y')
+    # O campo "data" foi testado (nao consta na documentacao do endpoint
+    # /producao/transferir) e o Innovaro retornou erro mesmo quando a data
+    # batia com hoje - removido, mantendo so os campos documentados.
     payload = [
         {
             "id": f"corte-chapa-{ordem.id}",
-            "data": data_transferencia,
             "pessoa": pessoa,
             "recurso": str(dados_chapa['codigo']),
             "quantidade": dados_chapa['peso_total'],
