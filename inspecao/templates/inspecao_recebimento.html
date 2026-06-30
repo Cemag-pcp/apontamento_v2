@@ -1907,85 +1907,12 @@
         </div>`;
     }
 
-    function getVideoRecebimentoInputId(prefix, tipo) {
-        return `video-recebimento-${String(prefix || "").replace(/[^a-zA-Z0-9]/g, "")}-${tipo}`;
-    }
-
-    function getArquivoVideoUnidade(prefix, material = materiaisRecebimento[materialAtivoIndex]) {
-        if (!material || !material.videos_unidades) return null;
-        const indiceUnidade = extrairIndiceUnidade(prefix);
-        if (!indiceUnidade) return null;
-        return material.videos_unidades[indiceUnidade] || null;
-    }
-
-    function atualizarStatusVideoRecebimento(prefix, arquivoInfo = getArquivoVideoUnidade(prefix)) {
-        const status = document.querySelector(`[data-video-status="${CSS.escape(prefix)}"]`);
-        if (!status) return;
-
-        if (arquivoInfo && arquivoInfo.nome) {
-            const origem = arquivoInfo.origem === "camera" ? "Câmera" : "Anexo";
-            status.textContent = `${origem}: ${arquivoInfo.nome}`;
-            status.classList.remove("text-muted");
-        } else {
-            status.textContent = "Nenhum vídeo selecionado.";
-            status.classList.add("text-muted");
-        }
-    }
-
-    function limparInputsVideoRecebimento(prefix, excecaoId = "") {
-        document.querySelectorAll(`[data-video-prefix-input="${CSS.escape(prefix)}"]`).forEach((input) => {
-            if (excecaoId && input.id === excecaoId) return;
-            input.value = "";
-        });
-    }
-
-    function definirArquivoVideoRecebimento(prefix, file, origem, inputId = "") {
-        const material = materiaisRecebimento[materialAtivoIndex];
-        if (!material) return;
-
-        const indiceUnidade = extrairIndiceUnidade(prefix);
-        if (!indiceUnidade) return;
-
-        if (!material.videos_unidades) {
-            material.videos_unidades = {};
-        }
-
-        if (file) {
-            material.videos_unidades[indiceUnidade] = {
-                file,
-                nome: file.name,
-                origem: origem || "arquivo",
-            };
-            limparInputsVideoRecebimento(prefix, inputId);
-        } else {
-            delete material.videos_unidades[indiceUnidade];
-            limparInputsVideoRecebimento(prefix);
-        }
-
-        atualizarStatusVideoRecebimento(prefix, material.videos_unidades[indiceUnidade] || null);
-    }
-
-    function renderizarStatusVideosRecebimento() {
-        document.querySelectorAll("[data-video-status]").forEach((status) => {
-            const prefix = status.dataset.videoStatus || "";
-            atualizarStatusVideoRecebimento(prefix);
-        });
-    }
-
-    function criarBlocoVideoRecebimento(prefix) {
-        const inputArquivoId = getVideoRecebimentoInputId(prefix, "arquivo");
-        const inputCameraId = getVideoRecebimentoInputId(prefix, "camera");
-        return `<div class="mb-2 mt-2 border rounded p-2 bg-white" data-video-prefix="${prefix}">
-            <label class="form-label form-label-sm fw-semibold mb-2">Vídeo da inspeção</label>
-            <div class="d-flex flex-wrap gap-2">
-                <label for="${inputArquivoId}" class="btn btn-outline-secondary btn-sm mb-0">Anexar vídeo</label>
-                <label for="${inputCameraId}" class="btn btn-outline-primary btn-sm mb-0">Gravar vídeo</label>
-                <button type="button" class="btn btn-outline-danger btn-sm" data-video-remover="${prefix}">Remover</button>
-            </div>
-            <input type="file" id="${inputArquivoId}" name="${prefix}video_arquivo" class="d-none input-video-recebimento" data-video-prefix-input="${prefix}" data-prefix="${prefix}" data-origem="arquivo" accept="video/*">
-            <input type="file" id="${inputCameraId}" name="${prefix}video_camera" class="d-none input-video-recebimento" data-video-prefix-input="${prefix}" data-prefix="${prefix}" data-origem="camera" accept="video/*" capture="environment">
-            <div class="form-text mt-2">Opcional. No celular, "Gravar vídeo" permite filmar na hora.</div>
-            <div class="small mt-1 text-muted" data-video-status="${prefix}">Nenhum vídeo selecionado.</div>
+    function criarCampoLinkVideoRecebimento(prefix) {
+        const inputId = `video-link-recebimento-${String(prefix || "").replace(/[^a-zA-Z0-9]/g, "")}`;
+        return `<div class="mb-2 mt-2" data-video-link-prefix="${prefix}">
+            <label class="form-label form-label-sm fw-semibold mb-1" for="${inputId}">Link do vídeo</label>
+            <input type="url" id="${inputId}" name="${prefix}video_link" class="form-control form-control-sm" placeholder="https://...">
+            <div class="form-text">Opcional. Cole o link do vídeo (Drive, YouTube, etc).</div>
         </div>`;
     }
 
@@ -2004,9 +1931,9 @@
                 container.insertAdjacentHTML("afterend", criarBlocoImagemRecebimento(prefix));
             }
 
-            const blocoImagem = form.querySelector(`[data-imagem-prefix="${CSS.escape(prefix)}"]`);
-            if (blocoImagem && !form.querySelector(`[data-video-prefix="${CSS.escape(prefix)}"]`)) {
-                blocoImagem.insertAdjacentHTML("afterend", criarBlocoVideoRecebimento(prefix));
+            if (!form.querySelector(`[data-video-link-prefix="${CSS.escape(prefix)}"]`)) {
+                const blocoImagem = form.querySelector(`[data-imagem-prefix="${CSS.escape(prefix)}"]`);
+                (blocoImagem || container).insertAdjacentHTML("afterend", criarCampoLinkVideoRecebimento(prefix));
             }
         });
     }
@@ -2022,7 +1949,8 @@
             const sufixo = nome.replace(/^u\d+_/, "");
             const isObservacao = sufixo === "observacao" || sufixo.endsWith("_observacao");
             const isArquivo = campo.type === "file" || sufixo.startsWith("imagem_");
-            campo.required = !isObservacao && !isArquivo;
+            const isVideoLink = sufixo === "video_link";
+            campo.required = !isObservacao && !isArquivo && !isVideoLink;
         });
 
         const nomeMaterial = document.getElementById("nome-material-recebimento");
@@ -2307,7 +2235,6 @@
             tipo_componentes_cilindros: "haste",
             valores_form: {},
             arquivos_unidades: {},
-            videos_unidades: {},
         };
     }
 
@@ -2377,7 +2304,6 @@
         material.tipo_componentes_cilindros = tipoComponentesCilindrosAtual;
         material.valores_form = capturarValoresFormularioRecebimento();
         material.arquivos_unidades = material.arquivos_unidades || {};
-        material.videos_unidades = material.videos_unidades || {};
 
         document.querySelectorAll(".input-imagem-recebimento").forEach((input) => {
             const prefix = input.dataset.prefix || "";
@@ -2386,21 +2312,6 @@
                 const indiceUnidade = extrairIndiceUnidade(prefix);
                 if (indiceUnidade) {
                     material.arquivos_unidades[indiceUnidade] = {
-                        file,
-                        nome: file.name,
-                        origem: input.dataset.origem || "arquivo",
-                    };
-                }
-            }
-        });
-
-        document.querySelectorAll(".input-video-recebimento").forEach((input) => {
-            const prefix = input.dataset.prefix || "";
-            const file = input.files && input.files[0] ? input.files[0] : null;
-            if (file && prefix) {
-                const indiceUnidade = extrairIndiceUnidade(prefix);
-                if (indiceUnidade) {
-                    material.videos_unidades[indiceUnidade] = {
                         file,
                         nome: file.name,
                         origem: input.dataset.origem || "arquivo",
@@ -2559,7 +2470,6 @@
             ...criarEstadoMaterial(m.nome),
             ...m,
             arquivos_unidades: {},
-            videos_unidades: {},
         }));
         materialAtivoIndex = Math.min(Math.max(rascunho.materialAtivoIndex || 0, 0), materiaisRecebimento.length - 1);
 
@@ -3134,7 +3044,6 @@
         injetarCamposImagemRecebimento();
         aplicarObrigatoriedadeCamposRecebimento();
         renderizarStatusImagensRecebimento();
-        renderizarStatusVideosRecebimento();
 
         const abaAtiva = document.querySelector(`#tabs-unidades-recebimento button[data-bs-target="${alvoAbaAtiva}"]`)
             || document.querySelector('#tabs-unidades-recebimento button[data-bs-target="#unit-tab-1"]');
@@ -3326,8 +3235,6 @@
 
                 const arquivoImagem = material?.arquivos_unidades?.[u] || null;
                 const imagemCampo = arquivoImagem ? `imagem_material_${m + 1}_unidade_${u}` : "";
-                const arquivoVideo = material?.videos_unidades?.[u] || null;
-                const videoCampo = arquivoVideo ? `video_material_${m + 1}_unidade_${u}` : "";
 
                 unidadesMaterial.push({
                     unidade: u,
@@ -3337,9 +3244,6 @@
                     imagem_nome: arquivoImagem?.nome || "",
                     imagem_origem: arquivoImagem?.origem || "",
                     imagem_campo: imagemCampo,
-                    video_nome: arquivoVideo?.nome || "",
-                    video_origem: arquivoVideo?.origem || "",
-                    video_campo: videoCampo,
                 });
 
                 if (unitObservacao) {
@@ -3385,12 +3289,6 @@
                 const arquivoImagem = materiaisRecebimento[materialIndex]?.arquivos_unidades?.[unidade.unidade]?.file;
                 if (campoImagem && arquivoImagem) {
                     formData.append(campoImagem, arquivoImagem, arquivoImagem.name);
-                }
-
-                const campoVideo = unidade?.video_campo || "";
-                const arquivoVideo = materiaisRecebimento[materialIndex]?.videos_unidades?.[unidade.unidade]?.file;
-                if (campoVideo && arquivoVideo) {
-                    formData.append(campoVideo, arquivoVideo, arquivoVideo.name);
                 }
             });
         });
@@ -3509,23 +3407,6 @@
             const prefix = btnRemoverImagem.dataset.imagemRemover || "";
             if (!prefix) return;
             definirArquivoImagemRecebimento(prefix, null, "");
-        });
-
-        document.addEventListener("change", (event) => {
-            const inputVideo = event.target.closest(".input-video-recebimento");
-            if (!inputVideo) return;
-            const prefix = inputVideo.dataset.prefix || "";
-            const file = inputVideo.files && inputVideo.files[0] ? inputVideo.files[0] : null;
-            if (!prefix || !file) return;
-            definirArquivoVideoRecebimento(prefix, file, inputVideo.dataset.origem || "arquivo", inputVideo.id);
-        });
-
-        document.addEventListener("click", (event) => {
-            const btnRemoverVideo = event.target.closest("[data-video-remover]");
-            if (!btnRemoverVideo) return;
-            const prefix = btnRemoverVideo.dataset.videoRemover || "";
-            if (!prefix) return;
-            definirArquivoVideoRecebimento(prefix, null, "");
         });
 
         document.getElementById("pesquisa-pendencias-recebimento").addEventListener("input", renderPendencias);
