@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction, connection
 from django.utils.timezone import now
 from django.db.models import Max
 from django.contrib.auth.models import User
@@ -7,6 +7,7 @@ from storages.backends.s3boto3 import S3Boto3Storage
 from cadastro.models import MotivoInterrupcao,Mp,Operador,MotivoMaquinaParada,MotivoExclusao,Maquina,Pecas,Setor
 
 from datetime import timedelta
+import zlib
 
 STATUS_ANDAMENTO_CHOICES = (
     ('aguardando_iniciar', 'Aguardando iniciar'),
@@ -162,12 +163,22 @@ class Ordem(models.Model):
 
         # Incrementa automaticamente apenas para os grupos diferentes de "Laser" e "Plasma"
         elif not self.pk and self.grupo_maquina not in ['laser_1','laser_2','laser_3','plasma']:
-            # Busca o maior número de ordem dentro do mesmo grupo de máquina
-            ultimo_numero = Ordem.objects.filter(grupo_maquina=self.grupo_maquina).aggregate(
-                Max('ordem')
-            )['ordem__max'] or 0  # Se não houver ordens, começa do 0
-            self.ordem = ultimo_numero + 1
+            # pg_advisory_xact_lock serializa a geração do número de ordem por grupo_maquina:
+            # sem isso, duas criações concorrentes (ex: duplo clique, duas chamadas seguidas
+            # da API de criação de ordem) podem ler o mesmo "último número" antes de qualquer
+            # uma salvar, colidindo na constraint 'unique_ordem_processo' (ordem, maquina).
+            with transaction.atomic():
+                lock_key = zlib.crc32(self.grupo_maquina.encode('utf-8'))
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_key])
 
+                ultimo_numero = Ordem.objects.filter(grupo_maquina=self.grupo_maquina).aggregate(
+                    Max('ordem')
+                )['ordem__max'] or 0  # Se não houver ordens, começa do 0
+                self.ordem = ultimo_numero + 1
+
+                super().save(*args, **kwargs)  # Salva normalmente
+            return
 
         super().save(*args, **kwargs)  # Salva normalmente
 

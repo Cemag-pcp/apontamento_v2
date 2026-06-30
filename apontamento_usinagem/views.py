@@ -77,127 +77,135 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
     Em caso de falha, registra o erro no item e retorna sem lançar exceção.
     """
     try:
-        item = (
-            PecasOrdem.objects
-            .select_related('ordem', 'peca')
-            .filter(pk=item_id, ordem__grupo_maquina='usinagem')
-            .first()
-        )
-        if not item or item.apontado:
-            return
-
-        user_ref = user if getattr(user, 'is_authenticated', False) else None
-
-        if (item.qtd_morta or 0) > 0:
-            item.erro_apontamento = (
-                'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
-                'A funcionalidade de desvio precisa ser ajustada na API.'
+        with transaction.atomic():
+            # select_for_update mantem o lock na linha durante toda a checagem + chamada ao ERP:
+            # evita que uma segunda chamada concorrente (ex: retry do on_commit, dupla finalizacao)
+            # veja 'apontado' desatualizado e dispare uma segunda chamada duplicada ao Innovaro.
+            item = (
+                PecasOrdem.objects
+                .select_for_update(of=('self',))
+                .select_related('ordem', 'peca')
+                .filter(pk=item_id, ordem__grupo_maquina='usinagem')
+                .first()
             )
-            item.tipo_apontamento = 'api'
-            item.resp_apontamento = user_ref
-            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-            return
+            if not item or item.apontado:
+                return
 
-        data_producao = localtime(item.data) if item.data else localtime(now())
-        payload_integracao = {
-            "id": f"usinagem-item-{item.id}",
-            "data": data_producao.strftime('%d/%m/%Y'),
-            "pessoa": "4357",
-            "recurso": str(item.peca.codigo if item.peca else ""),
-            "processo": "S Usinagem",
-            "produzido": item.qtd_boa,
-            "observacao": str(item.ordem_id),
-        }
+            user_ref = user if getattr(user, 'is_authenticated', False) else None
 
-        try:
-            # se for dev não rodar esse bloco
-            # DJANGO_ENV = dev
-            if os.getenv("DJANGO_ENV") == "dev":
-                response_integracao = requests.post(
-                    "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
-                    json=payload_integracao,
-                    auth=("luan araujo", "luanaraujo7"),
-                    timeout=(10, 60),
+            if (item.qtd_morta or 0) > 0:
+                item.erro_apontamento = (
+                    'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
+                    'A funcionalidade de desvio precisa ser ajustada na API.'
                 )
-            else:
-                response_integracao = requests.post(
-                    "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
-                    json=payload_integracao,
-                    auth=("luan araujo", "luanaraujo7"),
-                    timeout=(10, 60),
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = user_ref
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return
+
+            data_producao = localtime(item.data) if item.data else localtime(now())
+            payload_integracao = {
+                "id": f"usinagem-item-{item.id}",
+                "data": data_producao.strftime('%d/%m/%Y'),
+                "pessoa": "4357",
+                "recurso": str(item.peca.codigo if item.peca else ""),
+                "processo": "S Usinagem",
+                "produzido": item.qtd_boa,
+                "observacao": str(item.ordem_id),
+            }
+
+            try:
+                # se for dev não rodar esse bloco
+                # DJANGO_ENV = dev
+                if os.getenv("DJANGO_ENV") == "dev":
+                    response_integracao = requests.post(
+                        "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                        json=payload_integracao,
+                        auth=("luan araujo", "luanaraujo7"),
+                        timeout=(10, 60),
+                    )
+                else:
+                    response_integracao = requests.post(
+                        "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                        json=payload_integracao,
+                        auth=("luan araujo", "luanaraujo7"),
+                        timeout=(10, 60),
+                    )
+            except requests.RequestException as exc:
+                item.erro_apontamento = str(exc)[:2000]
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = user_ref
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return
+
+            try:
+                resposta_api_json = response_integracao.json()
+            except ValueError:
+                resposta_api_json = None
+
+            if not response_integracao.ok:
+                descricao_erro = ''
+                if isinstance(resposta_api_json, dict):
+                    descricao_erro = str(resposta_api_json.get('description') or '')
+                item.erro_apontamento = (descricao_erro or (response_integracao.text or ''))[:2000]
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = user_ref
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return
+
+            if not isinstance(resposta_api_json, dict):
+                item.erro_apontamento = (response_integracao.text or '')[:2000]
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = user_ref
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return
+
+            status_erp = str(resposta_api_json.get('status') or '').strip().lower()
+            if status_erp != 'success':
+                item.erro_apontamento = str(
+                    resposta_api_json.get('description') or resposta_api_json
+                )[:2000]
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = user_ref
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return
+
+            item.apontado = True
+            item.data_apontamento = now()
+            item.tipo_apontamento = 'api'
+            item.resp_apontamento = user_ref
+            item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+                resposta_api_json,
+                payload_integracao,
+            )
+            item.erro_apontamento = aviso_chave
+
+            # Save dentro do mesmo bloco atomic/lock: garante que 'apontado=True' seja
+            # persistido antes da linha ser liberada, fechando a janela de corrida.
+            # Em try separado (sem propagar) porque, se o ERP já confirmou mas o save
+            # falhar aqui, precisamos saber disso para reconciliação manual em vez de
+            # deixar o fluxo silencioso engolir o erro.
+            try:
+                item.save(update_fields=[
+                    'apontado',
+                    'data_apontamento',
+                    'tipo_apontamento',
+                    'resp_apontamento',
+                    'chave_apontamento',
+                    'erro_apontamento',
+                ])
+            except Exception as exc_save:
+                logger.error(
+                    "ERP apontou com sucesso mas falhou ao salvar no banco. "
+                    "item_id=%s chave_erp=%s erro=%s",
+                    item_id,
+                    item.chave_apontamento,
+                    exc_save,
+                    exc_info=True,
                 )
-        except requests.RequestException as exc:
-            item.erro_apontamento = str(exc)[:2000]
-            item.tipo_apontamento = 'api'
-            item.resp_apontamento = user_ref
-            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-            return
-
-        try:
-            resposta_api_json = response_integracao.json()
-        except ValueError:
-            resposta_api_json = None
-
-        if not response_integracao.ok:
-            descricao_erro = ''
-            if isinstance(resposta_api_json, dict):
-                descricao_erro = str(resposta_api_json.get('description') or '')
-            item.erro_apontamento = (descricao_erro or (response_integracao.text or ''))[:2000]
-            item.tipo_apontamento = 'api'
-            item.resp_apontamento = user_ref
-            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-            return
-
-        if not isinstance(resposta_api_json, dict):
-            item.erro_apontamento = (response_integracao.text or '')[:2000]
-            item.tipo_apontamento = 'api'
-            item.resp_apontamento = user_ref
-            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-            return
-
-        status_erp = str(resposta_api_json.get('status') or '').strip().lower()
-        if status_erp != 'success':
-            item.erro_apontamento = str(
-                resposta_api_json.get('description') or resposta_api_json
-            )[:2000]
-            item.tipo_apontamento = 'api'
-            item.resp_apontamento = user_ref
-            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-            return
-
-        item.apontado = True
-        item.data_apontamento = now()
-        item.tipo_apontamento = 'api'
-        item.resp_apontamento = user_ref
-        item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
-            resposta_api_json,
-            payload_integracao,
-        )
-        item.erro_apontamento = aviso_chave
     except Exception:
         # Fluxo silencioso por requisito: nunca interromper a finalização do operador.
         return
-
-    # Save separado do bloco silencioso: se falhar aqui o ERP já registrou a chave
-    # e precisamos saber disso para reconciliação manual.
-    try:
-        item.save(update_fields=[
-            'apontado',
-            'data_apontamento',
-            'tipo_apontamento',
-            'resp_apontamento',
-            'chave_apontamento',
-            'erro_apontamento',
-        ])
-    except Exception as exc_save:
-        logger.error(
-            "ERP apontou com sucesso mas falhou ao salvar no banco. "
-            "item_id=%s chave_erp=%s erro=%s",
-            item_id,
-            item.chave_apontamento,
-            exc_save,
-            exc_info=True,
-        )
 
 def extrair_numeracao(nome_arquivo):
     match = re.search(r"(?i)OP(\d+)", nome_arquivo)  # (?i) torna a busca case insensitive
@@ -1116,207 +1124,212 @@ def api_erp_apontar_item_usinagem(request, pk):
     if tipo_apontamento not in ('manual', 'api'):
         return JsonResponse({'status': 'error', 'message': 'tipo_apontamento inválido.'}, status=400)
 
-    item = get_object_or_404(
-        PecasOrdem.objects.select_related('ordem', 'peca'),
-        pk=pk,
-        ordem__grupo_maquina='usinagem'
-    )
-
-    item_ja_apontado_ordem = (
-        PecasOrdem.objects
-        .filter(ordem_id=item.ordem_id, apontado=True)
-        .exclude(pk=item.pk)
-        .select_related('resp_apontamento')
-        .order_by('-data_apontamento', '-id')
-        .first()
-    )
-
-    if item.apontado or item_ja_apontado_ordem:
-        item_referencia = item if item.apontado else item_ja_apontado_ordem
-        resp_ref = getattr(item_referencia, 'resp_apontamento', None)
-        return JsonResponse(
-            {
-                'status': 'error',
-                'message': 'Esta ordem já foi apontada e não pode ser apontada novamente.',
-                'already_apontado': True,
-                'detalhes': {
-                    'item_id': item_referencia.id,
-                    'ordem_id': item_referencia.ordem_id,
-                    'tipo_apontamento': item_referencia.tipo_apontamento or '',
-                    'data_apontamento': localtime(item_referencia.data_apontamento).strftime('%d/%m/%Y %H:%M') if item_referencia.data_apontamento else '',
-                    'resp_apontamento': (resp_ref.get_full_name() or resp_ref.username) if resp_ref else '',
-                    'chave_apontamento': item_referencia.chave_apontamento or '',
-                }
-            },
-            status=409
+    with transaction.atomic():
+        # select_for_update mantem o lock na linha durante toda a checagem + chamada ao ERP:
+        # uma segunda requisicao concorrente para o mesmo item (duplo clique, retry de rede, etc.)
+        # fica bloqueada ate essa transacao terminar e so entao ve o 'apontado' real, em vez de
+        # fazer uma segunda chamada duplicada ao Innovaro.
+        item = get_object_or_404(
+            PecasOrdem.objects.select_for_update(of=('self',)).select_related('ordem', 'peca'),
+            pk=pk,
+            ordem__grupo_maquina='usinagem'
         )
 
-    if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
-        msg_qtd_morta = (
-            'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
-            'A funcionalidade de desvio precisa ser ajustada na API.'
-        )
-        item.erro_apontamento = msg_qtd_morta
-        item.tipo_apontamento = 'api'
-        item.resp_apontamento = request.user
-        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-        return JsonResponse(
-            {
-                'status': 'error',
-                'message': 'Apontamento via API bloqueado para item com qtd_morta.',
-                'description': msg_qtd_morta,
-            },
-            status=422
+        item_ja_apontado_ordem = (
+            PecasOrdem.objects
+            .filter(ordem_id=item.ordem_id, apontado=True)
+            .exclude(pk=item.pk)
+            .select_related('resp_apontamento')
+            .order_by('-data_apontamento', '-id')
+            .first()
         )
 
-    payload_integracao = None
-    if tipo_apontamento == 'api':
-        data_producao = localtime(item.data) if item.data else localtime(now())
-        payload_integracao = {
-            "id": f"usinagem-item-{item.id}",
-            "data": data_producao.strftime('%d/%m/%Y'),
-            "pessoa": "4357",
-            "recurso": str(item.peca.codigo if item.peca else ""),
-            "processo": "S Usinagem",
-            "produzido": item.qtd_boa,
-            "observacao": str(item.ordem_id),
-        }
-
-        try:
-            if os.getenv("DJANGO_ENV") == "dev":
-                response_integracao = requests.post(
-                    "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
-                    json=payload_integracao,
-                    auth=("luan araujo", "luanaraujo7"),
-                    timeout=(10, 60),
-                )
-            else:
-                response_integracao = requests.post(
-                    "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
-                    json=payload_integracao,
-                    auth=("luan araujo", "luanaraujo7"),
-                    timeout=(10, 60),
-                )
-        except requests.RequestException as exc:
+        if item.apontado or item_ja_apontado_ordem:
+            item_referencia = item if item.apontado else item_ja_apontado_ordem
+            resp_ref = getattr(item_referencia, 'resp_apontamento', None)
             return JsonResponse(
                 {
                     'status': 'error',
-                    'message': f'Falha de comunicação com API ERP: {exc}',
-                    'payload_enviado': payload_integracao,
+                    'message': 'Esta ordem já foi apontada e não pode ser apontada novamente.',
+                    'already_apontado': True,
+                    'detalhes': {
+                        'item_id': item_referencia.id,
+                        'ordem_id': item_referencia.ordem_id,
+                        'tipo_apontamento': item_referencia.tipo_apontamento or '',
+                        'data_apontamento': localtime(item_referencia.data_apontamento).strftime('%d/%m/%Y %H:%M') if item_referencia.data_apontamento else '',
+                        'resp_apontamento': (resp_ref.get_full_name() or resp_ref.username) if resp_ref else '',
+                        'chave_apontamento': item_referencia.chave_apontamento or '',
+                    }
                 },
-                status=502
+                status=409
             )
 
-        resposta_api_json = None
-        try:
-            resposta_api_json = response_integracao.json()
-        except ValueError:
-            resposta_api_json = None
-
-        if not response_integracao.ok:
-            descricao_erro = ''
-            if isinstance(resposta_api_json, dict):
-                descricao_erro = str(resposta_api_json.get('description') or '')
-
-            retorno_texto = ''
-            try:
-                retorno_texto = response_integracao.text[:500]
-            except Exception:
-                retorno_texto = 'Sem detalhes'
-
-            item.erro_apontamento = descricao_erro or retorno_texto
+        if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
+            msg_qtd_morta = (
+                'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
+                'A funcionalidade de desvio precisa ser ajustada na API.'
+            )
+            item.erro_apontamento = msg_qtd_morta
             item.tipo_apontamento = 'api'
             item.resp_apontamento = request.user
             item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-
             return JsonResponse(
                 {
                     'status': 'error',
-                    'message': f'API ERP retornou status {response_integracao.status_code}.',
-                    'payload_enviado': payload_integracao,
-                    'description': descricao_erro,
-                    'retorno_api': retorno_texto,
+                    'message': 'Apontamento via API bloqueado para item com qtd_morta.',
+                    'description': msg_qtd_morta,
                 },
-                status=502
+                status=422
             )
 
-        if isinstance(resposta_api_json, dict):
-            status_erp = str(resposta_api_json.get('status') or '').strip()
+        payload_integracao = None
+        if tipo_apontamento == 'api':
+            data_producao = localtime(item.data) if item.data else localtime(now())
+            payload_integracao = {
+                "id": f"usinagem-item-{item.id}",
+                "data": data_producao.strftime('%d/%m/%Y'),
+                "pessoa": "4357",
+                "recurso": str(item.peca.codigo if item.peca else ""),
+                "processo": "S Usinagem",
+                "produzido": item.qtd_boa,
+                "observacao": str(item.ordem_id),
+            }
 
-            if status_erp.lower() == 'error':
-                descricao_erro = str(resposta_api_json.get('description') or 'Erro retornado pela API ERP.')
-                item.erro_apontamento = descricao_erro
-                item.tipo_apontamento = 'api'
-                item.resp_apontamento = request.user
-                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-
+            try:
+                if os.getenv("DJANGO_ENV") == "dev":
+                    response_integracao = requests.post(
+                        "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                        json=payload_integracao,
+                        auth=("luan araujo", "luanaraujo7"),
+                        timeout=(10, 60),
+                    )
+                else:
+                    response_integracao = requests.post(
+                        "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
+                        json=payload_integracao,
+                        auth=("luan araujo", "luanaraujo7"),
+                        timeout=(10, 60),
+                    )
+            except requests.RequestException as exc:
                 return JsonResponse(
                     {
                         'status': 'error',
-                        'message': 'API ERP retornou erro de negócio.',
-                        'description': descricao_erro,
+                        'message': f'Falha de comunicação com API ERP: {exc}',
                         'payload_enviado': payload_integracao,
-                        'retorno_api': resposta_api_json,
-                    },
-                    status=422
-                )
-
-            if status_erp.lower() == 'success':
-                item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
-                    resposta_api_json,
-                    payload_integracao,
-                )
-                item.erro_apontamento = aviso_chave
-            else:
-                item.erro_apontamento = str(resposta_api_json)
-                item.tipo_apontamento = 'api'
-                item.resp_apontamento = request.user
-                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-                return JsonResponse(
-                    {
-                        'status': 'error',
-                        'message': 'Resposta da API ERP em formato inesperado.',
-                        'payload_enviado': payload_integracao,
-                        'retorno_api': resposta_api_json,
                     },
                     status=502
                 )
-        else:
-            item.erro_apontamento = (response_integracao.text or '')[:2000]
-            item.tipo_apontamento = 'api'
-            item.resp_apontamento = request.user
-            item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
-            return JsonResponse(
-                {
-                    'status': 'error',
-                    'message': 'API ERP não retornou JSON válido.',
-                    'payload_enviado': payload_integracao,
-                    'retorno_api': (response_integracao.text or '')[:500],
-                },
-                status=502
-            )
 
-    item.apontado = True
-    item.data_apontamento = now()
-    item.tipo_apontamento = tipo_apontamento
-    item.resp_apontamento = request.user
-    update_fields = ['apontado', 'data_apontamento', 'tipo_apontamento', 'resp_apontamento']
-    if tipo_apontamento == 'api':
-        update_fields.extend(['chave_apontamento', 'erro_apontamento'])
-    item.save(update_fields=update_fields)
+            resposta_api_json = None
+            try:
+                resposta_api_json = response_integracao.json()
+            except ValueError:
+                resposta_api_json = None
 
-    return JsonResponse({
-        'status': 'success',
-        'message': 'Apontamento confirmado com sucesso.',
-        'item_id': item.id,
-        'apontado': item.apontado,
-        'tipo_apontamento': item.tipo_apontamento,
-        'data_apontamento': localtime(item.data_apontamento).strftime('%d/%m/%Y %H:%M'),
-        'resp_apontamento': request.user.get_full_name() or request.user.username,
-        'chave_apontamento': item.chave_apontamento or '',
-        'erro_apontamento': item.erro_apontamento or '',
-        'payload_enviado': payload_integracao if tipo_apontamento == 'api' else None,
-    })
+            if not response_integracao.ok:
+                descricao_erro = ''
+                if isinstance(resposta_api_json, dict):
+                    descricao_erro = str(resposta_api_json.get('description') or '')
+
+                retorno_texto = ''
+                try:
+                    retorno_texto = response_integracao.text[:500]
+                except Exception:
+                    retorno_texto = 'Sem detalhes'
+
+                item.erro_apontamento = descricao_erro or retorno_texto
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = request.user
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+
+                return JsonResponse(
+                    {
+                        'status': 'error',
+                        'message': f'API ERP retornou status {response_integracao.status_code}.',
+                        'payload_enviado': payload_integracao,
+                        'description': descricao_erro,
+                        'retorno_api': retorno_texto,
+                    },
+                    status=502
+                )
+
+            if isinstance(resposta_api_json, dict):
+                status_erp = str(resposta_api_json.get('status') or '').strip()
+
+                if status_erp.lower() == 'error':
+                    descricao_erro = str(resposta_api_json.get('description') or 'Erro retornado pela API ERP.')
+                    item.erro_apontamento = descricao_erro
+                    item.tipo_apontamento = 'api'
+                    item.resp_apontamento = request.user
+                    item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+
+                    return JsonResponse(
+                        {
+                            'status': 'error',
+                            'message': 'API ERP retornou erro de negócio.',
+                            'description': descricao_erro,
+                            'payload_enviado': payload_integracao,
+                            'retorno_api': resposta_api_json,
+                        },
+                        status=422
+                    )
+
+                if status_erp.lower() == 'success':
+                    item.chave_apontamento, aviso_chave = _normalizar_chave_apontamento_erp(
+                        resposta_api_json,
+                        payload_integracao,
+                    )
+                    item.erro_apontamento = aviso_chave
+                else:
+                    item.erro_apontamento = str(resposta_api_json)
+                    item.tipo_apontamento = 'api'
+                    item.resp_apontamento = request.user
+                    item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                    return JsonResponse(
+                        {
+                            'status': 'error',
+                            'message': 'Resposta da API ERP em formato inesperado.',
+                            'payload_enviado': payload_integracao,
+                            'retorno_api': resposta_api_json,
+                        },
+                        status=502
+                    )
+            else:
+                item.erro_apontamento = (response_integracao.text or '')[:2000]
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = request.user
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return JsonResponse(
+                    {
+                        'status': 'error',
+                        'message': 'API ERP não retornou JSON válido.',
+                        'payload_enviado': payload_integracao,
+                        'retorno_api': (response_integracao.text or '')[:500],
+                    },
+                    status=502
+                )
+
+        item.apontado = True
+        item.data_apontamento = now()
+        item.tipo_apontamento = tipo_apontamento
+        item.resp_apontamento = request.user
+        update_fields = ['apontado', 'data_apontamento', 'tipo_apontamento', 'resp_apontamento']
+        if tipo_apontamento == 'api':
+            update_fields.extend(['chave_apontamento', 'erro_apontamento'])
+        item.save(update_fields=update_fields)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Apontamento confirmado com sucesso.',
+            'item_id': item.id,
+            'apontado': item.apontado,
+            'tipo_apontamento': item.tipo_apontamento,
+            'data_apontamento': localtime(item.data_apontamento).strftime('%d/%m/%Y %H:%M'),
+            'resp_apontamento': request.user.get_full_name() or request.user.username,
+            'chave_apontamento': item.chave_apontamento or '',
+            'erro_apontamento': item.erro_apontamento or '',
+            'payload_enviado': payload_integracao if tipo_apontamento == 'api' else None,
+        })
 
 def buscar_processos(request):
 
