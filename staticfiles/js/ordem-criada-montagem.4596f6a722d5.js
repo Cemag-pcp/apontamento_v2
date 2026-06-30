@@ -193,7 +193,22 @@ document.addEventListener('click', function(e) {
 });
 
 document.getElementById('confirmStartButton').addEventListener('click', function() {
-    confirmarInicioOrdem(currentOrdemId);
+    confirmarInicioOrdem(currentOrdemId).then((sucesso) => {
+        if (!sucesso) return;
+
+        // confirmarInicioOrdem (apontamento-utils.js) so atualiza o backend e fecha o
+        // modal; precisa recarregar "Processos em Andamento" aqui para a nova ordem
+        // iniciada aparecer sem precisar dar F5 na pagina.
+        const filtroDataCarga = document.getElementById('filtro-data-carga');
+        const filtroSetor = document.getElementById('filtro-setor');
+        const filtros = {
+            data_carga: filtroDataCarga.value,
+            setor: filtroSetor.value
+        };
+
+        resetarCardsInicial(filtros);
+        carregarOrdensIniciadas(filtros);
+    });
 });
 
 export function iniciarOrdem(ordemId) {
@@ -892,6 +907,10 @@ function mostrarModalFinalizar(ordemId, maquina, max_itens) {
 
     labelOperadores.setAttribute('data-maquina', maquina)
     qtRealizadaInput.setAttribute('max', max_itens);
+    // Limpa valores residuais de uma finalizacao anterior (de outra ordem) para
+    // nao enviar quantidade/observacao erradas se o usuario nao perceber e so confirmar.
+    qtRealizadaInput.value = '';
+    document.getElementById('obsFinalizar').value = '';
 
     operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
     todosOperadorFinal.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`

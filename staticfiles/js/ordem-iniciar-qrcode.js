@@ -440,6 +440,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         labelOperadores.setAttribute('data-maquina', maquina)
         qtRealizadaInput.setAttribute('max', max_itens);
+        // Limpa valores residuais de uma finalizacao anterior (de outra ordem) para
+        // nao enviar quantidade/observacao erradas se o usuario nao perceber e so confirmar.
+        qtRealizadaInput.value = '';
+        document.getElementById('obsFinalizar').value = '';
 
         operadorSelect.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
         todosOperadorFinal.innerHTML = `<option value="" disabled selected>Selecione um operador...</option>`
