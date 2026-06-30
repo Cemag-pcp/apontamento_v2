@@ -105,6 +105,13 @@ def _apontar_item_via_api_erp_estamparia(item, user):
             description=msg_qtd_morta,
         )
 
+    if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
+        item.erro_apontamento = "ERP desabilitado temporariamente."
+        item.tipo_apontamento = 'api'
+        item.resp_apontamento = user if getattr(user, 'is_authenticated', False) else None
+        item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+        raise IntegracaoERPError("ERP desabilitado temporariamente.", http_status=503)
+
     data_producao = localtime(item.data) if item.data else localtime(now())
     payload_integracao = {
         "id": f"estamparia-item-{item.id}",
@@ -1397,6 +1404,9 @@ def api_erp_apontar_item_estamparia(request, pk):
                     },
                     status=422
                 )
+
+            if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
+                return JsonResponse({'status': 'error', 'message': 'ERP desabilitado temporariamente.'}, status=503)
 
             try:
                 # se for dev não roda

@@ -93,6 +93,13 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
 
             user_ref = user if getattr(user, 'is_authenticated', False) else None
 
+            if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
+                item.erro_apontamento = "ERP desabilitado temporariamente."
+                item.tipo_apontamento = 'api'
+                item.resp_apontamento = user_ref
+                item.save(update_fields=['erro_apontamento', 'tipo_apontamento', 'resp_apontamento'])
+                return
+
             if (item.qtd_morta or 0) > 0:
                 item.erro_apontamento = (
                     'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
@@ -1184,6 +1191,8 @@ def api_erp_apontar_item_usinagem(request, pk):
 
         payload_integracao = None
         if tipo_apontamento == 'api':
+            if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
+                return JsonResponse({'status': 'error', 'message': 'ERP desabilitado temporariamente.'}, status=503)
             data_producao = localtime(item.data) if item.data else localtime(now())
             payload_integracao = {
                 "id": f"usinagem-item-{item.id}",

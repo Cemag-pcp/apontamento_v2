@@ -152,6 +152,9 @@ def _apontar_item_via_api_erp_montagem(item, user):
             'A funcionalidade de desvio precisa ser ajustada na API.'
         )
 
+    if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
+        return _registrar_erro("ERP desabilitado temporariamente.")
+
     try:
         if os.getenv("DJANGO_ENV") == "dev":
             response_integracao = requests.post(
@@ -2402,6 +2405,9 @@ def api_erp_apontar_item_montagem(request, pk):
                     },
                     status=422
                 )
+
+            if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
+                return JsonResponse({'status': 'error', 'message': 'ERP desabilitado temporariamente.'}, status=503)
 
             try:
                 if os.getenv("DJANGO_ENV") == "dev":

@@ -69,6 +69,8 @@ def _url_apontamento_erp_corte():
     )
 
 def _post_apontamento_erp_corte(payload):
+    if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
+        raise requests.RequestException("ERP desabilitado temporariamente.")
     return requests.post(
         _url_apontamento_erp_corte(),
         json=payload,
