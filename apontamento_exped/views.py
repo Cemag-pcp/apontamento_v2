@@ -461,6 +461,7 @@ def carretas(request):
 @csrf_exempt
 @transaction.atomic
 def criar_caixa(request):
+    from datetime import timedelta
     if request.method != 'POST':
         return JsonResponse({'erro': 'Metodo nao permitido'}, status=405)
 
@@ -481,46 +482,65 @@ def criar_caixa(request):
     if not cliente_nome:
         return JsonResponse({'erro': 'Cliente não informado'}, status=400)
 
-    hora_atual = timezone.now().strftime("%H%M%S")
-    carga = Carga.objects.create(
-        nome=f"{carga_nome}_{cliente_nome}_{str(data_carga).replace('-', '')}_{hora_atual}",
-        carga=carga_nome,
-        data_carga=data_carga,
-        cliente=cliente_nome,
-        obs_pacote=observacoes
-    )
-
-    created_carretas = 0
-    carretas_carga_criadas = []
-
+    # Pré-validação dos itens antes de abrir a transação
+    itens_validos = []
     for item in itens:
         carreta_raw        = item.get('codigo_peca', '')
         quantidade_carreta = safe_int(item.get('quantidade'), default=0)
         cor                = item.get('cor')
-
         carreta_limpa = normalize_carreta_text(carreta_raw)
+        if carreta_limpa and quantidade_carreta > 0:
+            itens_validos.append({'carreta': carreta_limpa, 'quantidade': quantidade_carreta, 'cor': cor})
 
-        if not carreta_limpa or quantidade_carreta <= 0:
-            continue
-
-        carreta_carga_object = CarretaCarga.objects.create(
-            carga=carga,
-            carreta=carreta_limpa,
-            quantidade=quantidade_carreta,
-            cor=cor
-        )
-        created_carretas += 1
-        carretas_carga_criadas.append(carreta_carga_object)
-
-    if not carretas_carga_criadas:
+    if not itens_validos:
         return JsonResponse({'erro': 'Nenhuma carreta valida nos itens'}, status=400)
 
-    resultado_pendencias = _criar_pendencias_para_carretas_carga(carretas_carga_criadas)
+    with transaction.atomic():
+        # Idempotência: impede criação duplicada em cliques acidentais (janela de 10 s)
+        recente = Carga.objects.filter(
+            carga=carga_nome,
+            data_carga=data_carga,
+            cliente=cliente_nome,
+            data_criacao__gte=timezone.now() - timedelta(seconds=10),
+        ).first()
+        if recente:
+            return JsonResponse({
+                'mensagem': 'Caixa criada com sucesso!',
+                'id': recente.id,
+                'carretas_criadas': recente.carretas.count(),
+                'pendencias_criadas': 0,
+                'stage': recente.stage,
+                'cliente': recente.cliente,
+                'data_carga': str(recente.data_carga),
+                'carga': recente.carga,
+                'carretas_sem_componentes': [],
+            }, status=201)
+
+        hora_atual = timezone.now().strftime("%H%M%S")
+        carga = Carga.objects.create(
+            nome=f"{carga_nome}_{cliente_nome}_{str(data_carga).replace('-', '')}_{hora_atual}",
+            carga=carga_nome,
+            data_carga=data_carga,
+            cliente=cliente_nome,
+            obs_pacote=observacoes
+        )
+
+        carretas_carga_criadas = []
+        for item in itens_validos:
+            carreta_carga_object = CarretaCarga.objects.create(
+                carga=carga,
+                carreta=item['carreta'],
+                quantidade=item['quantidade'],
+                cor=item['cor'],
+            )
+            carretas_carga_criadas.append(carreta_carga_object)
+
+        resultado_pendencias = _criar_pendencias_para_carretas_carga(carretas_carga_criadas)
 
     return JsonResponse({
         'mensagem': 'Caixa criada com sucesso!',
         'id': carga.id,
-        'carretas_criadas': created_carretas,
+        'carretas_criadas': len(carretas_carga_criadas),
         'pendencias_criadas': resultado_pendencias['pendencias_criadas'],
         'stage': 'verificacao',
         'cliente': cliente_nome,

@@ -1044,77 +1044,75 @@ def finalizar_cambao(request):
                     {"error": "ID do operador é obrigatório!"}, status=400
                 )
 
-            cambao = get_object_or_404(Cambao, id=cambao_id)
-
-            tipo_po = cambao.tipo == "PÓ"
-
-            if cambao.status != "em uso":
-                return JsonResponse(
-                    {"error": "Apenas cambões em uso podem ser finalizados!"}, status=400
-                )
-
-            pecas_no_cambao = CambaoPecas.objects.filter(
-                cambao=cambao, status="pendurada"
-            )
-
-            if not pecas_no_cambao.exists():
-                return JsonResponse(
-                    {"error": "Não há peças associadas a este cambão!"}, status=400
-                )
-
             operador = get_object_or_404(Operador, id=operador_id)
 
-            # Pré-validação de todas as peças antes da transação
-            for item in pecas_no_cambao:
-                peca_ordem_original = item.peca_ordem
+            with transaction.atomic():
+                cambao = get_object_or_404(Cambao.objects.select_for_update(), id=cambao_id)
 
-                qtd_finalizadas = (
-                    PecasOrdem.objects.filter(
-                        ordem=peca_ordem_original.ordem,
-                        peca=peca_ordem_original.peca,
-                    ).aggregate(Sum("qtd_boa"))["qtd_boa__sum"]
-                    or 0
+                tipo_po = cambao.tipo == "PÓ"
+
+                if cambao.status != "em uso":
+                    return JsonResponse(
+                        {"error": "Apenas cambões em uso podem ser finalizados!"}, status=400
+                    )
+
+                pecas_no_cambao = CambaoPecas.objects.filter(
+                    cambao=cambao, status="pendurada"
                 )
 
-                qtd_restante = peca_ordem_original.qtd_planejada - qtd_finalizadas
-
-                if item.quantidade_pendurada > qtd_restante:
-                    quantidade_pendurada = f"{item.quantidade_pendurada:g}"
-                    quantidade_restante = f"{qtd_restante:g}"
-                    quantidade_planejada = f"{peca_ordem_original.qtd_planejada:g}"
-                    quantidade_ja_finalizada = f"{qtd_finalizadas:g}"
-
+                if not pecas_no_cambao.exists():
                     return JsonResponse(
-                        {
-                            "error": (
-                                f"Não foi possível finalizar o cambão porque a peça "
-                                f"'{peca_ordem_original.peca}' da ordem "
-                                f"'{peca_ordem_original.ordem.ordem}' não tem saldo disponível. "
-                                f"Tentativa de finalizar: {quantidade_pendurada}. "
-                                f"Saldo restante: {quantidade_restante}. "
-                                f"Planejado da peça: {quantidade_planejada}. "
-                                f"Já finalizado anteriormente: {quantidade_ja_finalizada}. "
-                                f"Verifique se essa peça já foi concluída ou se o planejamento precisa ser ajustado."
-                            )
-                        },
-                        status=400,
+                        {"error": "Não há peças associadas a este cambão!"}, status=400
                     )
-            
-            # Se passou pela validação, executa a finalização em bloco atômico
-            with transaction.atomic():
+
+                # Pré-validação de todas as peças dentro da transação (evita race condition)
+                for item in pecas_no_cambao:
+                    peca_ordem_original = item.peca_ordem
+
+                    qtd_finalizadas = (
+                        PecasOrdem.objects.filter(
+                            ordem=peca_ordem_original.ordem,
+                            peca=peca_ordem_original.peca,
+                        ).aggregate(Sum("qtd_boa"))["qtd_boa__sum"]
+                        or 0
+                    )
+
+                    qtd_restante = peca_ordem_original.qtd_planejada - qtd_finalizadas
+
+                    if item.quantidade_pendurada > qtd_restante:
+                        quantidade_pendurada = f"{item.quantidade_pendurada:g}"
+                        quantidade_restante = f"{qtd_restante:g}"
+                        quantidade_planejada = f"{peca_ordem_original.qtd_planejada:g}"
+                        quantidade_ja_finalizada = f"{qtd_finalizadas:g}"
+
+                        return JsonResponse(
+                            {
+                                "error": (
+                                    f"Não foi possível finalizar o cambão porque a peça "
+                                    f"'{peca_ordem_original.peca}' da ordem "
+                                    f"'{peca_ordem_original.ordem.ordem}' não tem saldo disponível. "
+                                    f"Tentativa de finalizar: {quantidade_pendurada}. "
+                                    f"Saldo restante: {quantidade_restante}. "
+                                    f"Planejado da peça: {quantidade_planejada}. "
+                                    f"Já finalizado anteriormente: {quantidade_ja_finalizada}. "
+                                    f"Verifique se essa peça já foi concluída ou se o planejamento precisa ser ajustado."
+                                )
+                            },
+                            status=400,
+                        )
+
                 # Só verificar a cor do cambao caso na finalização se o tipo da cor for PÓ
                 if tipo_po:
                     # Verificar cor e sortear uma peca
-                    peca_sorteada = verificar_cor_cambao(cambao.cor,cambao.nome)
+                    peca_sorteada = verificar_cor_cambao(cambao.cor, cambao.nome)
                     if peca_sorteada:
-                        #Registro de teste inicial sem nenhum dado de realização do teste de verificação funcional
                         try:
                             registro_teste_funcional_pintura = TesteFuncional.objects.create(
                                 peca_ordem=peca_sorteada.peca_ordem
                             )
                         except Exception as e:
                             print(e)
-                
+
                 for item in pecas_no_cambao:
                     peca_ordem_original = item.peca_ordem
 
@@ -1139,10 +1137,9 @@ def finalizar_cambao(request):
                     item.save()
 
                 cambao.status = "livre"
-                cambao.cor = ''  # Limpa a cor do cambão
+                cambao.cor = ''
                 cambao.data_fim = now()
                 cambao.save()
-                # ordem = Ordem.objects.get(pk=ordem_id)
                 notificar_ordem(peca_ordem_original.ordem)
 
             return JsonResponse(

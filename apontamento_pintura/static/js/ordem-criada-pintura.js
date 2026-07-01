@@ -2604,6 +2604,10 @@ document.getElementById("confirmarEncerramentoCambao").removeEventListener("clic
 document.getElementById("confirmarEncerramentoCambao").addEventListener("click", finalizarCambao);
 
 function finalizarCambao() {
+    const btnFinalizar = document.getElementById("confirmarEncerramentoCambao");
+    if (btnFinalizar.disabled) return;
+    btnFinalizar.disabled = true;
+
     let modal = document.getElementById("modalFinalizarCambao");
     let modalInstance = bootstrap.Modal.getInstance(modal);
 
@@ -2611,6 +2615,7 @@ function finalizarCambao() {
     const operadorId = document.getElementById("operadorSelect").value;
 
     if (!operadorId) {
+        btnFinalizar.disabled = false;
         Swal.fire({
             icon: "warning",
             title: "Operador não selecionado",
@@ -2633,7 +2638,6 @@ function finalizarCambao() {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            // "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
         },
         body: JSON.stringify({ cambao_id: cambaoId, operador: operadorId })
     })
@@ -2646,12 +2650,14 @@ function finalizarCambao() {
                 text: "O cambão foi encerrado com sucesso.",
                 confirmButtonText: "OK"
             }).then(() => {
+                btnFinalizar.disabled = false;
                 if (modalInstance) {
-                    modalInstance.hide(); // Fecha corretamente o modal
+                    modalInstance.hide();
                 }
                 cambaoProcesso();
             });
         } else {
+            btnFinalizar.disabled = false;
             Swal.fire({
                 icon: "error",
                 title: "Erro ao Finalizar",
@@ -2661,6 +2667,7 @@ function finalizarCambao() {
         }
     })
     .catch(error => {
+        btnFinalizar.disabled = false;
         console.error("Erro ao finalizar cambão:", error);
         Swal.fire({
             icon: "error",
