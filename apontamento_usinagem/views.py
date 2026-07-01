@@ -1191,8 +1191,6 @@ def api_erp_apontar_item_usinagem(request, pk):
 
         payload_integracao = None
         if tipo_apontamento == 'api':
-            if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
-                return JsonResponse({'status': 'error', 'message': 'ERP desabilitado temporariamente.'}, status=503)
             data_producao = localtime(item.data) if item.data else localtime(now())
             payload_integracao = {
                 "id": f"usinagem-item-{item.id}",

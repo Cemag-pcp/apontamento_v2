@@ -2406,9 +2406,6 @@ def api_erp_apontar_item_montagem(request, pk):
                     status=422
                 )
 
-            if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
-                return JsonResponse({'status': 'error', 'message': 'ERP desabilitado temporariamente.'}, status=503)
-
             try:
                 if os.getenv("DJANGO_ENV") == "dev":
                     response_integracao = requests.post(

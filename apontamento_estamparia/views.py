@@ -1405,9 +1405,6 @@ def api_erp_apontar_item_estamparia(request, pk):
                     status=422
                 )
 
-            if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
-                return JsonResponse({'status': 'error', 'message': 'ERP desabilitado temporariamente.'}, status=503)
-
             try:
                 # se for dev não roda
                 # DJANGO_ENV

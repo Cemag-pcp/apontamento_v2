@@ -68,8 +68,8 @@ def _url_apontamento_erp_corte():
         else "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar"
     )
 
-def _post_apontamento_erp_corte(payload):
-    if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
+def _post_apontamento_erp_corte(payload, bypass_disable=False):
+    if not bypass_disable and os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
         raise requests.RequestException("ERP desabilitado temporariamente.")
     return requests.post(
         _url_apontamento_erp_corte(),
@@ -2611,7 +2611,7 @@ def api_erp_apontar_item_corte(request, pk):
             )
 
             try:
-                response_integracao = _post_apontamento_erp_corte(payload_integracao)
+                response_integracao = _post_apontamento_erp_corte(payload_integracao, bypass_disable=True)
             except requests.RequestException as exc:
                 return JsonResponse(
                     {
@@ -2922,7 +2922,7 @@ def api_erp_apontar_itens_corte_bloco(request):
         )
 
         try:
-            response_integracao = _post_apontamento_erp_corte(payload_integracao)
+            response_integracao = _post_apontamento_erp_corte(payload_integracao, bypass_disable=True)
         except requests.RequestException as exc:
             return JsonResponse(
                 {
