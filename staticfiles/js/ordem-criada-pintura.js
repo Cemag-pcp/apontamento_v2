@@ -1939,19 +1939,25 @@ if (typeTemplate === 'apontamento'){
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                // Fecha o modal Bootstrap enquanto o Swal loading ainda está visível
+                // (evita conflito de backdrop entre Bootstrap e SweetAlert2)
+                let modalInstance = bootstrap.Modal.getInstance(modal);
+                if (modalInstance) {
+                    modalInstance.hide();
+                } else {
+                    // Fallback: remove manualmente backdrops órfãos
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+                }
+
                 Swal.fire({
                     icon: "success",
                     title: "Cambão Criado",
                     text: "O cambão foi gerado com sucesso.",
                     confirmButtonText: "OK"
                 }).then(() => {
-                    Swal.close();
-
-                    let modalInstance = bootstrap.Modal.getInstance(modal);
-                    if (modalInstance) {
-                        modalInstance.hide();
-                    };
-                    
                     resetarCardsInicial();
                     cambaoProcesso();
                 });
