@@ -1865,7 +1865,9 @@ if (typeTemplate === 'apontamento'){
     document.getElementById("confirmarCriacaoCambao").addEventListener("click", () => {
 
         const botaoConfirmar = document.getElementById("confirmarCriacaoCambao");
-        
+        if (botaoConfirmar.disabled) return;
+        botaoConfirmar.disabled = true;
+
         const selectCambao = document.getElementById("cambaoSelecionado");
         const selectTipo = document.getElementById("tipoPintura");
         const selectOperador = document.getElementById("operadorInicial");
@@ -1879,6 +1881,7 @@ if (typeTemplate === 'apontamento'){
         if (!cambaoId) {
 
             console.log("Alerta: Cambão não selecionado!");
+            botaoConfirmar.disabled = false;
             Swal.fire({
                 icon: "warning",
                 title: "Seleção obrigatória",
@@ -1889,6 +1892,7 @@ if (typeTemplate === 'apontamento'){
             return;
         } else if (!tipoId) {
             console.log("Alerta: Tipo não selecionado!");
+            botaoConfirmar.disabled = false;
             Swal.fire({
                 icon: "warning",
                 title: "Seleção obrigatória",
@@ -1899,6 +1903,7 @@ if (typeTemplate === 'apontamento'){
             return;
         } else if (!operadorId) {
             console.log("Alerta: Operador não selecionado!");
+            botaoConfirmar.disabled = false;
             Swal.fire({
                 icon: "warning",
                 title: "Seleção obrigatória",
@@ -1951,6 +1956,7 @@ if (typeTemplate === 'apontamento'){
                     cambaoProcesso();
                 });
             } else {
+                botaoConfirmar.disabled = false;
                 Swal.fire({
                     icon: "error",
                     title: "Erro ao Criar Cambão",
@@ -1961,6 +1967,7 @@ if (typeTemplate === 'apontamento'){
         })
         .catch(error => {
             console.error("Erro ao criar cambão:", error);
+            botaoConfirmar.disabled = false;
             Swal.fire({
                 icon: "error",
                 title: "Erro",

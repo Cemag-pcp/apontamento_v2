@@ -668,17 +668,18 @@ def adicionar_pecas_cambao(request):
 
                 # Criar as associações no cambão
                 identificador_lote = lote_em_andamento or uuid4()
+                operador_obj = get_object_or_404(Operador, pk=operador_inicial)
                 for peca_ordem, quantidade in pecas_selecionadas:
-                    CambaoPecas.objects.create(
-                        identificador_lote=identificador_lote,
+                    CambaoPecas.objects.update_or_create(
                         cambao=cambao,
                         peca_ordem=peca_ordem,
-                        quantidade_pendurada=quantidade,
-                        data_pendura=now(),
                         status="pendurada",
-                        operador_inicio=get_object_or_404(
-                            Operador, pk=operador_inicial
-                        ),
+                        defaults={
+                            "identificador_lote": identificador_lote,
+                            "quantidade_pendurada": quantidade,
+                            "data_pendura": now(),
+                            "operador_inicio": operador_obj,
+                        },
                     )
 
                 # Atualizar status do cambão para "em uso"
@@ -1310,6 +1311,7 @@ def cambao_em_processo(request):
     resultado = []
 
     for cambao in cambao_queryset:
+        pecas_qs = cambao.pecas_no_cambao.all()  # usa prefetch cache (status="pendurada")
         pecas = [
             {
                 "id": peca.id,
@@ -1320,14 +1322,15 @@ def cambao_em_processo(request):
                 "quantidade_pendurada": peca.quantidade_pendurada,
                 "data_carga": peca.peca_ordem.ordem.data_carga,
             }
-            for peca in cambao.pecas_no_cambao.all()
+            for peca in pecas_qs
         ]
+        primeira_peca = pecas_qs.first()  # permanece no prefetch cache; evita nova query ao DB
 
         resultado.append({
             "id": cambao.id,
             "cor": cambao.cor,
             "pecas": pecas,
-            "data_pendura": cambao.pecas_no_cambao.first().data_pendura if pecas else None,
+            "data_pendura": primeira_peca.data_pendura if primeira_peca else None,
             "status": "pendurada",
             "cambao_status": cambao.status,  # Adiciona o status do cambão (em uso, interrompido, etc)
             "tipo": cambao.tipo,
