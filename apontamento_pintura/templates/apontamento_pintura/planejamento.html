@@ -499,6 +499,15 @@
 {% endblock %}
 
 {% block scripts %}
+{# Import map: garante que imports relativos resolvam para o arquivo hasheado em produção,
+   evitando que ordem-criada-pintura.js seja carregado duas vezes com URLs diferentes. #}
+<script type="importmap">
+{
+  "imports": {
+    "{% get_static_prefix %}js/ordem-criada-pintura.js": "{% static 'js/ordem-criada-pintura.js' %}"
+  }
+}
+</script>
 <script type="module" src="{% static 'js/ordem-criada-pintura.js' %}"></script>
 <script type="module" src="{% static 'js/ordem-fora-sequenciamento-pintura.js' %}"></script>
 <script type="module" src="{% static 'js/websocket-pintura.js' %}"></script>
