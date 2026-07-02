@@ -248,7 +248,17 @@ def _saldo_disponivel_cambao(peca_ordem, cambao_id_excluir=None):
         or 0
     )
 
-    return max(0, peca_ordem.qtd_planejada - qtd_pendurada)
+    qtd_ja_finalizada = (
+        PecasOrdem.objects.filter(
+            ordem=peca_ordem.ordem,
+            peca=peca_ordem.peca,
+        ).aggregate(
+            total=Sum("qtd_boa", output_field=models.FloatField())
+        )["total"]
+        or 0
+    )
+
+    return max(0, peca_ordem.qtd_planejada - qtd_pendurada - qtd_ja_finalizada)
 
 @csrf_exempt
 def deletar_programa(request):
@@ -644,7 +654,15 @@ def adicionar_pecas_cambao(request):
                         or 0
                     )
 
-                    qtd_disponivel = peca_ordem.qtd_planejada - qtd_pendurada
+                    qtd_ja_finalizada = (
+                        PecasOrdem.objects.filter(
+                            ordem=peca_ordem.ordem,
+                            peca=peca_ordem.peca,
+                        ).aggregate(Sum("qtd_boa"))["qtd_boa__sum"]
+                        or 0
+                    )
+
+                    qtd_disponivel = peca_ordem.qtd_planejada - qtd_pendurada - qtd_ja_finalizada
                     if quantidade > qtd_disponivel:
                         return JsonResponse(
                             {
@@ -1377,6 +1395,22 @@ def itens_disponiveis_cambao(request):
         .values("total_quantidade_pendurada")
     )
 
+    # Subquery para buscar o código da peça (primeira correspondência) usando
+    # OuterRef(OuterRef) para referenciar Ordem.pk dentro de um subquery aninhado
+    primeira_peca_para_boa = PecasOrdem.objects.filter(
+        ordem=OuterRef(OuterRef("pk")), **filtros_peca
+    ).order_by("id")
+
+    soma_qtd_boa_finalizada = (
+        PecasOrdem.objects.filter(
+            ordem=OuterRef("pk"),
+            peca__in=Subquery(primeira_peca_para_boa.values("peca")[:1]),
+        )
+        .values("ordem")
+        .annotate(total=Sum("qtd_boa", output_field=models.FloatField()))
+        .values("total")
+    )
+
     qt_planejada = primeira_peca.values("qtd_planejada")[:1]
 
     ordens_queryset = (
@@ -1392,9 +1426,14 @@ def itens_disponiveis_cambao(request):
                 Value(0.0),
                 output_field=models.FloatField(),
             ),
+            soma_qtd_boa=Coalesce(
+                Subquery(soma_qtd_boa_finalizada, output_field=models.FloatField()),
+                Value(0.0),
+                output_field=models.FloatField(),
+            ),
         )
         .annotate(
-            qt_restante=F("peca_qt_planejada") - F("soma_qtd_pendurada")
+            qt_restante=F("peca_qt_planejada") - F("soma_qtd_pendurada") - F("soma_qtd_boa")
         )
         .filter(
             peca_ordem_id__isnull=False,
