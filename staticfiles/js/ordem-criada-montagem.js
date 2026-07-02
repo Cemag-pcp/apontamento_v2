@@ -193,7 +193,11 @@ document.addEventListener('click', function(e) {
 });
 
 document.getElementById('confirmStartButton').addEventListener('click', function() {
+    if (this.disabled) return;
+    this.disabled = true;
+    const btn = this;
     confirmarInicioOrdem(currentOrdemId).then((sucesso) => {
+        btn.disabled = false;
         if (!sucesso) return;
 
         // confirmarInicioOrdem (apontamento-utils.js) so atualiza o backend e fecha o
@@ -208,7 +212,7 @@ document.getElementById('confirmStartButton').addEventListener('click', function
 
         resetarCardsInicial(filtros);
         carregarOrdensIniciadas(filtros);
-    });
+    }).catch(() => { btn.disabled = false; });
 });
 
 export function iniciarOrdem(ordemId) {
@@ -992,6 +996,9 @@ document.getElementById('botaoVoltarOperadoresMaquina').addEventListener('click'
 
 // Finalizar ordem
 document.getElementById('confirmFinalizar').addEventListener('click', function () {
+    if (this.disabled) return;
+    this.disabled = true;
+    const btnFinalizar = this;
     const ordemId = document.getElementById('ordemIdFinalizar').value;
     const operadorFinal = document.getElementById('operadorFinal');
     const todosOperadorFinal = document.getElementById('todosOperadorFinal');
@@ -1108,6 +1115,7 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         mostrarToast(`Ordem finalizada com sucesso!${chave}`, 'success');
     })
     .catch(error => {
+        btnFinalizar.disabled = false;
         // Rollback: restaura o card
         if (cardEl) {
             cardEl.style.opacity = '1';
@@ -1121,6 +1129,9 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
 
 // Finalizar parcial e continuar ordem
 document.getElementById('confirmFinalizarEContinuar').addEventListener('click', function () {
+    if (this.disabled) return;
+    this.disabled = true;
+    const btnFinalizarContinuar = this;
     const ordemId = document.getElementById('ordemIdFinalizar').value;
     const operadorFinal = document.getElementById('operadorFinal');
     const todosOperadorFinal = document.getElementById('todosOperadorFinal');
@@ -1236,6 +1247,7 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         mostrarToast(`Apontamento registrado com sucesso!${chave}`, 'success');
     })
     .catch(error => {
+        btnFinalizarContinuar.disabled = false;
         // Rollback: restaura o card
         if (cardEl) {
             cardEl.style.opacity = '1';
