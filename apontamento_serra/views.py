@@ -662,7 +662,6 @@ def _validar_e_montar_ordem_serra(item, index=None):
         pecas_validadas.append({'peca': peca_obj, 'quantidade': p.get('quantidade')})
 
     obs_raw = item.get('descricao') or ''
-    obs_final = f"{obs_raw} - Ordem criada por api" if obs_raw else "Ordem criada por api"
 
     try:
         prioridade = int(item.get('ordemPrioridade')) if item.get('ordemPrioridade') else None
@@ -672,7 +671,7 @@ def _validar_e_montar_ordem_serra(item, index=None):
     return {
         'mp_codigo': mp_codigo,
         'descricao_mp': item.get('descricao_mp') or item.get('descricaoMp'),
-        'obs': obs_final,
+        'obs': obs_raw,
         'data_programacao': item.get('dataProgramacao'),
         'tamanho': item.get('tamanhoVara', 0),
         'quantidade': 0 if item.get('quantidade') == '' else item.get('quantidade', 0),
