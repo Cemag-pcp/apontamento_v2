@@ -305,7 +305,7 @@ export function carregarOrdensIniciadas(filtros = {}, silent = false) {
                 let botaoAcao = '';
 
                 botaoAcao = `
-                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor' || data.usuario_tipo_acesso == 'admin'
                     ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
                             <i class="bi bi-arrow-left-right"></i>
                         </button>`: ""}
@@ -402,7 +402,7 @@ export function carregarOrdensInterrompidas(filtros = {}) {
 
             // Defina os botões dinamicamente com base no status
             let botaoAcao = `
-                ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor' || data.usuario_tipo_acesso == 'admin'
                 ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
                         <i class="bi bi-arrow-left-right"></i>
                     </button>`: ""}
