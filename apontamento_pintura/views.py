@@ -391,6 +391,21 @@ def ordens_criadas(request):
         .values("total_qtd_programada")
     )
 
+    # soma do que já foi finalizado em rounds anteriores (PecasOrdem.qtd_boa)
+    primeira_peca_para_boa = PecasOrdem.objects.filter(
+        ordem=OuterRef(OuterRef("pk")), **filtros_peca
+    ).order_by("id")
+
+    soma_qtd_boa_finalizada = (
+        PecasOrdem.objects.filter(
+            ordem=OuterRef("pk"),
+            peca__in=Subquery(primeira_peca_para_boa.values("peca")[:1]),
+        )
+        .values("ordem")
+        .annotate(total=Sum("qtd_boa", output_field=models.FloatField()))
+        .values("total")
+    )
+
     qt_planejada = primeira_peca.values("qtd_planejada")[:1]
 
     ordens_queryset = (
@@ -411,19 +426,25 @@ def ordens_criadas(request):
                 Value(0.0),
                 output_field=models.FloatField(),
             ),
+            soma_qtd_boa=Coalesce(
+                Subquery(soma_qtd_boa_finalizada, output_field=models.FloatField()),
+                Value(0.0),
+                output_field=models.FloatField(),
+            ),
         )
     )
 
-    # 🔧 diferença de lógica apenas para programação
+    # diferença de lógica apenas para programação
     if type_template == "programacao":
         ordens_queryset = ordens_queryset.annotate(
             qt_restante=F("peca_qt_planejada")
             - F("soma_qtd_pendurada")
             - F("soma_qtd_programada")
+            - F("soma_qtd_boa")
         )
     else:
         ordens_queryset = ordens_queryset.annotate(
-            qt_restante=F("peca_qt_planejada") - F("soma_qtd_pendurada")
+            qt_restante=F("peca_qt_planejada") - F("soma_qtd_pendurada") - F("soma_qtd_boa")
         )
 
     ordens_queryset = (
