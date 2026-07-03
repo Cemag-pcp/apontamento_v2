@@ -349,10 +349,14 @@
 <div id="pendencias-recebimento" class="row mt-3">
     <div class="d-flex justify-content-between mt-3 flex-wrap gap-2">
         <h4 style="width: 60%;">Pendencias</h4>
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
             <button type="button" class="btn btn-outline-primary" id="btn-sincronizar-recebimento">
                 Sincronizar
             </button>
+            <div class="input-group" style="max-width: 190px;">
+                <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+                <input type="date" class="form-control" id="filtro-data-pendencias-recebimento" title="Filtrar por data">
+            </div>
             <div class="input-group" style="max-width: 320px;">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
                 <input type="text" class="form-control" id="pesquisa-pendencias-recebimento" placeholder="Pesquisar...">
@@ -623,6 +627,7 @@
     let inspecionadosCache = { columns: [], rows: [], pode_editar: false, classes_resumo: [] };
     let filtroClassePendencias = "";
     let filtroClasseInspecionados = "";
+    let filtroPendenciasData = "";
     let inspecionadosPagina = 1;
     let inspecionadosBuscaTimer = null;
     let pendenciaSelecionada = null;
@@ -838,6 +843,11 @@
         const filtradas = rows.filter((row) => {
             if (filtroClassePendencias && obterClasseInspecaoRecebimento(row) !== filtroClassePendencias) {
                 return false;
+            }
+            if (filtroPendenciasData) {
+                const dataRow = row.data?.["Data"] || "";
+                const [y, m, d] = filtroPendenciasData.split("-");
+                if (dataRow !== `${d}/${m}/${y}`) return false;
             }
             if (!filtro) return true;
             const texto = Object.values(row.data || {}).join(" ").toLowerCase();
@@ -3427,6 +3437,10 @@
         });
         document.getElementById("form-inspecao-recebimento").addEventListener("submit", salvarInspecaoRecebimento);
         document.getElementById("btn-sincronizar-recebimento").addEventListener("click", sincronizarRecebimento);
+        document.getElementById("filtro-data-pendencias-recebimento").addEventListener("change", (e) => {
+            filtroPendenciasData = e.target.value;
+            renderPendencias();
+        });
 
         // controles de quantidade de unidades
         document.getElementById("btn-qtd-menos-recebimento").addEventListener("click", () => {
