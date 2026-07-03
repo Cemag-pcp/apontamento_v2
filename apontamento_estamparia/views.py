@@ -1045,12 +1045,11 @@ def _validar_e_montar_ordem(item, index=None):
         return None, f"{prefix}Máquina com id '{item.get('maquinaPlanejada')}' não encontrada."
 
     obs_raw = item.get('observacoes') or ''
-    obs_final = f"{obs_raw} - Ordem criada por api" if obs_raw else "Ordem criada por api"
 
     return {
         'peca': peca,
         'maquina': maquina,
-        'obs': obs_final,
+        'obs': obs_raw,
         'data_programacao': item.get('dataProgramacao'),
         'prioridade': prioridade,
         'qtd_planejada': item.get('qtdPlanejada'),
@@ -1404,9 +1403,6 @@ def api_erp_apontar_item_estamparia(request, pk):
                     },
                     status=422
                 )
-
-            if os.getenv("DISABLE_ERP_APONTAMENTO") == "true":
-                return JsonResponse({'status': 'error', 'message': 'ERP desabilitado temporariamente.'}, status=503)
 
             try:
                 # se for dev não roda

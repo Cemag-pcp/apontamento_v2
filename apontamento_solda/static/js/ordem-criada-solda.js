@@ -468,7 +468,7 @@ export function carregarOrdensInterrompidas(filtros = {}) {
 
 // Modal para "Interromper"
 function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) {
-    const modal = new bootstrap.Modal(document.getElementById('modalInterromper'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalInterromper'));
     const modalTitle = document.getElementById('modalInterromperLabel');
     const motivoInterrupcaoSelect = $('#motivoInterrupcao'); // AGORA É JQUERY
     const pecasDisponiveisSelect = $('#pecasDisponiveis'); // Usando jQuery para Select2
@@ -523,7 +523,7 @@ function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) 
 }
 
 function mostrarModalRetornarOrdemIniciada(ordemId) {
-    const modalRetornarProcessoIniciado = new bootstrap.Modal(document.getElementById('modalRetornarProcessoIniciado'));
+    const modalRetornarProcessoIniciado = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalRetornarProcessoIniciado'));
     const textRetorno = document.getElementById('text-confirm');
     const modalTitle = document.getElementById("modalExcluirRetorno");
     const form = document.getElementById('formRetornarProcessoIniciado');
@@ -687,7 +687,7 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
 
 // Modal para "Finalizar"
 function mostrarModalFinalizar(ordemId, maquina, max_itens) {
-    const modal = new bootstrap.Modal(document.getElementById('finalizarModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('finalizarModal'));
 
     const operadorSelect = document.getElementById('operadorFinal');
     const qtRealizadaInput = document.getElementById('qtRealizada');
@@ -755,7 +755,7 @@ function mostrarModalFinalizar(ordemId, maquina, max_itens) {
 }
 
 function mostrarModalIniciar(ordemId, maquina) {
-    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal'));
 
     const operadorSelect = document.getElementById('operadorInicial');
     const labelOperadores = document.getElementById('labelOperadores');
@@ -855,6 +855,9 @@ document.getElementById('botaoVoltarOperadoresMaquina').addEventListener('click'
 });
 
 document.getElementById('confirmFinalizar').addEventListener('click', function () {
+    if (this.disabled) return;
+    this.disabled = true;
+    const btnFinalizar = this;
     const ordemId = document.getElementById('ordemIdFinalizar').value;
     const operadorFinal = document.getElementById('operadorFinal');
     const todosOperadorFinal = document.getElementById('todosOperadorFinal');
@@ -963,6 +966,7 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         mostrarToast('Ordem finalizada com sucesso!', 'success');
     })
     .catch(error => {
+        btnFinalizar.disabled = false;
         // Rollback visual
         if (cardElement) {
             cardElement.style.opacity = '1';
@@ -1020,6 +1024,9 @@ document.getElementById('botaoVoltarOperadoresMaquinaOperadorInicial').addEventL
 });
 
 document.getElementById('confirmStartButton').addEventListener('click', function() {
+    if (this.disabled) return;
+    this.disabled = true;
+    const btnStart = this;
     const operadorInicio = document.getElementById('operadorInicial');
     const todosOperadorInicio = document.getElementById('todosOperadorInicial');
 
@@ -1089,6 +1096,7 @@ document.getElementById('confirmStartButton').addEventListener('click', function
         iniciarOrdem(currentOrdemId, operadorId);
     })
     .catch(error => {
+        btnStart.disabled = false;
         console.error('Erro ao verificar quantidade pendente:', error);
 
         Swal.fire({
@@ -1102,7 +1110,7 @@ document.getElementById('confirmStartButton').addEventListener('click', function
 // Modal para "Retornar"
 function mostrarModalRetornar(ordemId) {
     const modalElement = document.getElementById('confirmRetornoModal');
-    const modal = new bootstrap.Modal(modalElement);
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
     const modalTitle = document.getElementById('confirmRetornoModalLabel');
 
     modalTitle.innerHTML = `Retornar Ordem`;
@@ -1678,6 +1686,9 @@ function restaurarFiltros() {
 
 // Finalizar parcial e continuar ordem
 document.getElementById('confirmFinalizarEContinuar').addEventListener('click', function () {
+    if (this.disabled) return;
+    this.disabled = true;
+    const btnFinalizarContinuar = this;
     const ordemId = document.getElementById('ordemIdFinalizar').value;
     const operadorFinal = document.getElementById('operadorFinal');
     const todosOperadorFinal = document.getElementById('todosOperadorFinal');
@@ -1788,6 +1799,7 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         mostrarToast('Ordem atualizada com sucesso!', 'success');
     })
     .catch(error => {
+        btnFinalizarContinuar.disabled = false;
         // Rollback visual
         if (cardElementContinuar) {
             cardElementContinuar.style.opacity = '1';
