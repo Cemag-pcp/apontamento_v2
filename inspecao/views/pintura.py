@@ -405,6 +405,11 @@ def get_itens_inspecao_pintura(request):
         item = {
             "id": data.id,
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+            "data_carga": (
+                data.pecas_ordem_pintura.ordem.data_carga.strftime("%d/%m/%Y")
+                if data.pecas_ordem_pintura.ordem.data_carga
+                else ""
+            ),
             "peca": data.pecas_ordem_pintura.peca,
             "cor": data.pecas_ordem_pintura.ordem.cor,
             "qtd_apontada": data.pecas_ordem_pintura.qtd_boa,
@@ -548,6 +553,11 @@ def get_itens_reinspecao_pintura(request):
             "id": data.id,
             "data": (
                 data_ajustada.strftime("%d/%m/%Y %H:%M:%S") if data_ajustada else None
+            ),
+            "data_carga": (
+                data.pecas_ordem_pintura.ordem.data_carga.strftime("%d/%m/%Y")
+                if data.pecas_ordem_pintura.ordem.data_carga
+                else ""
             ),
             "peca": data.pecas_ordem_pintura.peca,
             "cor": data.pecas_ordem_pintura.ordem.cor,
@@ -703,6 +713,11 @@ def get_itens_inspecionados_pintura(request):
             .values_list("id", flat=True)
             .first(),
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+            "data_carga": (
+                data.pecas_ordem_pintura.ordem.data_carga.strftime("%d/%m/%Y")
+                if data.pecas_ordem_pintura.ordem.data_carga
+                else ""
+            ),
             "peca": data.pecas_ordem_pintura.peca,
             "cor": data.pecas_ordem_pintura.ordem.cor,
             "tipo": data.pecas_ordem_pintura.tipo,

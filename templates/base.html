@@ -302,6 +302,9 @@
         .sb-sidenav-dark .sb-sidenav-menu-nested .nav-link { font-size: 11px !important; color: #6b7280 !important; padding: 5px 16px 5px 40px !important; gap: 0 !important; margin: 1px 0 !important; }
         .sb-sidenav-dark .sb-sidenav-menu-nested .nav-link:hover { background: #f3f4f6 !important; color: #111827 !important; border-radius: 10px !important; margin: 1px 8px !important; padding: 5px 8px 5px 32px !important; }
         .sb-sidenav-dark .sb-sidenav-menu-nested .nav-link.active-sidebar { color: #7c3aed !important; font-weight: 600 !important; box-shadow: inset -3px 0 0 0 #7c3aed !important; background: transparent !important; border-radius: 0 !important; margin: 1px 0 !important; padding: 5px 16px 5px 40px !important; }
+        .sb-sidenav-dark .sb-sidenav-menu-nested .sb-sidenav-menu-nested .nav-link { padding-left: 52px !important; }
+        .sb-sidenav-dark .sb-sidenav-menu-nested .sb-sidenav-menu-nested .nav-link:hover { padding-left: 44px !important; }
+        .sb-sidenav-dark .sb-sidenav-menu-nested .sb-sidenav-menu-nested .nav-link.active-sidebar { padding-left: 52px !important; }
 
         /* Footer */
         .sb-sidenav-dark .sb-sidenav-footer { background: transparent !important; border-top: 1px solid #e5e7eb !important; padding: 12px 16px !important; }
@@ -455,6 +458,7 @@
                                     <a class="nav-link" href="{% url 'cadastro:maquinas' %}">Máquinas</a>
                                     <a class="nav-link" href="{% url 'cadastro:cadastro_pecas' %}">Peças</a>
                                     <a class="nav-link" href="{% url 'cadastro:cadastro_conjuntos' %}">Conjuntos</a>
+                                    <a class="nav-link" href="{% url 'inspecao:conjuntos-inspecionados-montagem' %}">Conj. inspecionados</a>
                                     <a class="nav-link" href="{% url 'cadastro:cadastro_itens_explodidos' %}">Itens Explodidos</a>
                                     <a class="nav-link" href="{% url 'cadastro:cadastro_carretas_explodidas' %}">Carretas Explodidas</a>
                                     <a class="nav-link" href="{% url 'cadastro:chapas_corte' %}">Chapas de corte</a>
@@ -669,45 +673,43 @@
                             </div>
                             {% endif %}
 
-                            <div class="sb-sidenav-menu-heading">Inspeção</div>
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseInspecao" aria-expanded="false" aria-controls="collapseInspecao">
-                                <i class="bi bi-search"></i> Inspeção por setor
+                            <div class="sb-sidenav-menu-heading">Controle de Qualidade</div>
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseQualidadePintura" aria-expanded="false" aria-controls="collapseQualidadePintura">
+                                <i class="bi bi-brush"></i> Pintura
                                 <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseInspecao" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseQualidadePintura" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
-                                    <a class="nav-link" href="{% url 'inspecao:inspecao-pintura' %}">Pintura</a>
-                                    <a class="nav-link" href="{% url 'inspecao:inspecao-banhos-ezinger' %}">Banhos EZINGER</a>
-                                    <a class="nav-link" href="{% url 'inspecao:inspecao-estamparia' %}">Estamparia</a>
-                                    <a class="nav-link" href="{% url 'inspecao:inspecao-montagem' %}">Montagem</a>
-                                    <a class="nav-link" href="{% url 'inspecao:inspecao-serra-usinagem' %}">Serra e Usinagem</a>
-                                    <a class="nav-link" href="{% url 'inspecao:inspecao-corte' %}">Corte</a>
-                                    <a class="nav-link" href="{% url 'inspecao:inspecao-recebimento' %}">Recebimento</a>
-                                    <a class="nav-link" href="{% url 'inspecao:conjuntos-inspecionados-montagem' %}">Conj. inspecionados</a>
+                                    <a class="nav-link" href="{% url 'inspecao:inspecao-pintura' %}">Produção</a>
+                                    <a class="nav-link" href="{% url 'inspecao:inspecao-banhos-ezinger' %}">Banhos</a>
+                                    <a class="nav-link" href="{% url 'inspecao:verificacao-funcional-pintura' %}">Verificação Funcional</a>
                                 </nav>
                             </div>
 
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseInspecaoEstanqueidade" aria-expanded="false" aria-controls="collapseInspecaoEstanqueidade">
-                                <i class="bi bi-water"></i> Estanqueidade
+                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseQualidadeMontagemSolda" aria-expanded="false" aria-controls="collapseQualidadeMontagemSolda">
+                                <i class="bi bi-tools"></i> Montagem/Solda
                                 <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
                             </a>
-                            <div class="collapse" id="collapseInspecaoEstanqueidade" data-bs-parent="#sidenavAccordion">
+                            <div class="collapse" id="collapseQualidadeMontagemSolda" data-bs-parent="#sidenavAccordion">
                                 <nav class="sb-sidenav-menu-nested nav">
-                                    <a class="nav-link" href="{% url 'inspecao:inspecao-tanque' %}">Tanque</a>
-                                    <a class="nav-link" href="{% url 'inspecao:inspecao-tubos-cilindros' %}">Tubos e Cilindros</a>
-                                    <a class="nav-link" href="{% url 'inspecao:conjuntos-inspecionados-estanqueidade' %}">Conj. inspecionados</a>
+                                    <a class="nav-link" href="{% url 'inspecao:inspecao-montagem' %}">Produção</a>
+                                    <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseQualidadeEstanqueirados" aria-expanded="false" aria-controls="collapseQualidadeEstanqueirados">
+                                        Estanqueirados
+                                        <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
+                                    </a>
+                                    <div class="collapse" id="collapseQualidadeEstanqueirados" data-bs-parent="#collapseQualidadeMontagemSolda">
+                                        <nav class="sb-sidenav-menu-nested nav">
+                                            <a class="nav-link" href="{% url 'inspecao:inspecao-tanque' %}">Tanques</a>
+                                            <a class="nav-link" href="{% url 'inspecao:inspecao-tubos-cilindros' %}">Tubos e Cilindros</a>
+                                        </nav>
+                                    </div>
                                 </nav>
                             </div>
 
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseVerificacaoFuncional" aria-expanded="false" aria-controls="collapseVerificacaoFuncional">
-                                <i class="bi bi-check-circle"></i> Verificação Funcional
-                                <div class="sb-sidenav-collapse-arrow"><i class="bi bi-chevron-right"></i></div>
-                            </a>
-                            <div class="collapse" id="collapseVerificacaoFuncional" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
-                                    <a class="nav-link" href="{% url 'inspecao:verificacao-funcional-pintura' %}">Pintura</a>
-                                </nav>
-                            </div>
+                            <a class="nav-link" href="{% url 'controle_qualidade_estamparia' %}"><i class="bi bi-layers"></i> Estamparia</a>
+                            <a class="nav-link" href="{% url 'controle_qualidade_serra_usinagem' %}"><i class="bi bi-rulers"></i> Serra e Usinagem</a>
+                            <a class="nav-link" href="{% url 'controle_qualidade_corte' %}"><i class="bi bi-slash-circle"></i> Corte</a>
+                            <a class="nav-link" href="{% url 'controle_qualidade_recebimento' %}"><i class="bi bi-box-seam"></i> Recebimento</a>
 
                             <div class="sb-sidenav-menu-heading">Dashboard</div>
                             <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseDashboardInspecao" aria-expanded="false" aria-controls="collapseDashboardInspecao">
@@ -895,6 +897,27 @@
                 });
                 groups.push(cur);
 
+                function openSearchCollapse(collapseEl) {
+                    if (!collapseEl) return;
+                    collapseEl.classList.remove('search-hidden');
+                    if (!collapseEl.classList.contains('show')) {
+                        collapseEl.classList.add('show');
+                        searchOpenedCollapses.add(collapseEl.id);
+                    }
+                    var toggler = document.querySelector('[data-bs-target="#' + collapseEl.id + '"]');
+                    if (toggler) {
+                        toggler.classList.remove('collapsed', 'search-hidden');
+                    }
+                }
+
+                function openSearchAncestors(el) {
+                    var collapse = el.closest('.collapse');
+                    while (collapse && collapse.id !== 'sidenavAccordion') {
+                        openSearchCollapse(collapse);
+                        collapse = collapse.parentElement ? collapse.parentElement.closest('.collapse') : null;
+                    }
+                }
+
                 groups.forEach(function(group) {
                     var groupHasMatch = false;
 
@@ -916,6 +939,7 @@
                                     var childMatch = parentMatch || child.textContent.trim().toLowerCase().includes(query);
                                     if (childMatch) {
                                         child.classList.remove('search-hidden');
+                                        openSearchAncestors(child);
                                         childMatchCount++;
                                     } else {
                                         child.classList.add('search-hidden');
@@ -929,12 +953,7 @@
                                 el.classList.remove('search-hidden');
                                 groupHasMatch = true;
                                 if (collapseEl) {
-                                    collapseEl.classList.remove('search-hidden');
-                                    if (!collapseEl.classList.contains('show')) {
-                                        collapseEl.classList.add('show');
-                                        searchOpenedCollapses.add(collapseEl.id);
-                                        el.classList.remove('collapsed');
-                                    }
+                                    openSearchCollapse(collapseEl);
                                 }
                             } else {
                                 el.classList.add('search-hidden');
@@ -1087,16 +1106,21 @@
 
         (function() {
             var path = window.location.pathname;
+            function openActiveCollapse(collapse) {
+                while (collapse) {
+                    collapse.classList.add('show');
+                    var toggler = document.querySelector('[data-bs-target="#' + collapse.id + '"]');
+                    if (toggler) toggler.classList.remove('collapsed');
+                    collapse = collapse.parentElement ? collapse.parentElement.closest('.collapse') : null;
+                }
+            }
+
             document.querySelectorAll('#sidenavAccordion .nav-link[href]').forEach(function(link) {
                 var href = link.getAttribute('href');
                 if (href && href !== '#' && href !== '/' && path.startsWith(href)) {
                     link.classList.add('active-sidebar');
                     var collapse = link.closest('.collapse');
-                    if (collapse) {
-                        collapse.classList.add('show');
-                        var toggler = document.querySelector('[data-bs-target="#' + collapse.id + '"]');
-                        if (toggler) toggler.classList.remove('collapsed');
-                    }
+                    if (collapse) openActiveCollapse(collapse);
                 }
             });
         })();
