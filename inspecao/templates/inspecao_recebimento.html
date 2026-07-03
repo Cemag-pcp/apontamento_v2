@@ -236,22 +236,39 @@
 .ficha-resultado-pill.nao-conforme { background: #dc2626; color: #fff; }
 .ficha-resultado-obs { font-size: .82rem; color: #475569; font-style: italic; }
 
-.ficha-unidades-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.ficha-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: .45rem;
+}
+.ficha-unidades-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    font-size: .76rem;
+    table-layout: auto;
+}
 .ficha-unidades-table thead th {
     background: #1e293b;
     color: #f1f5f9;
-    padding: .45rem .7rem;
-    font-size: .68rem;
+    padding: .42rem .55rem;
+    font-size: .64rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .05em;
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 1.25;
     border: none;
+    vertical-align: middle;
 }
 .ficha-unidades-table tbody td {
-    padding: .45rem .7rem;
+    padding: .42rem .55rem;
     border-bottom: 1px solid #f1f5f9;
-    vertical-align: middle;
+    vertical-align: top;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    word-break: normal;
 }
 .ficha-unidades-table tbody tr:last-child td { border-bottom: none; }
 .ficha-unidades-table tbody tr:nth-child(even) td { background: #f8fafc; }
@@ -321,9 +338,45 @@
     color: #94a3b8;
 }
 
+.ficha-print-only .btn-ver-video-recebimento,
+.ficha-print-only video,
+.ficha-print-only button {
+    display: none !important;
+}
+
+.ficha-print-only .ficha-section,
+.ficha-print-only .ficha-resultado-box,
+.ficha-print-only .ficha-unidades-table {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.ficha-print-only .ficha-table-wrap {
+    overflow: visible;
+    border: none;
+    border-radius: 0;
+}
+
+.ficha-print-only .ficha-unidades-table {
+    min-width: 0;
+    table-layout: fixed;
+    font-size: .62rem;
+}
+
+.ficha-print-only .ficha-unidades-table thead th,
+.ficha-print-only .ficha-unidades-table tbody td {
+    padding: .25rem .32rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.ficha-print-only .ficha-unidades-table thead {
+    display: table-header-group;
+}
+
 @media print {
-    .modal-header, .modal-footer { display: none !important; }
-    .modal-body { padding: 0 !important; }
+    @page { size: A4; margin: 12mm; }
+    body { background: #fff !important; }
     .ficha-doc { padding: 1.5rem; }
 }
 </style>
@@ -437,7 +490,7 @@
                     <span class="fw-semibold" style="font-size:.95rem;" id="modalFichaInspecaoRecebimentoLabel">Ficha de Inspeção de Recebimento</span>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()" title="Imprimir">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="imprimirFichaInspecaoRecebimento()" title="Imprimir">
                         <i class="bi bi-printer"></i> Imprimir
                     </button>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
@@ -1314,6 +1367,72 @@
             .filter((peca) => peca.codigo);
     }
 
+    function imprimirFichaInspecaoRecebimento() {
+        const ficha = document.getElementById("ficha-doc-container");
+        if (!ficha || !ficha.innerHTML.trim()) return;
+
+        const printWindow = window.open("", "_blank", "width=900,height=700");
+        if (!printWindow) {
+            alert("Permita pop-ups para imprimir a ficha.");
+            return;
+        }
+
+        const estilosPagina = Array.from(document.querySelectorAll("style"))
+            .map((style) => style.innerHTML)
+            .join("\n");
+        const linksCss = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+            .map((link) => `<link rel="stylesheet" href="${link.href}">`)
+            .join("\n");
+
+        printWindow.document.open();
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="pt-br">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Ficha de Inspeção de Recebimento</title>
+                ${linksCss}
+                <style>
+                    ${estilosPagina}
+                    html, body {
+                        background: #fff !important;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    body {
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .ficha-doc {
+                        box-shadow: none !important;
+                        width: 100%;
+                        max-width: none;
+                        padding: 0 !important;
+                    }
+                    @media print {
+                        @page { size: A4 landscape; margin: 10mm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <main class="ficha-print-only">
+                    ${ficha.outerHTML}
+                </main>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+
+        printWindow.onload = function() {
+            printWindow.focus();
+            printWindow.print();
+            printWindow.onafterprint = function() {
+                printWindow.close();
+            };
+        };
+    }
+
     function abrirFichaInspecaoRecebimento(row) {
         const container = document.getElementById("ficha-doc-container");
         container.innerHTML = "";
@@ -1422,7 +1541,7 @@
             unidadesHtml = `
                 <div class="ficha-section">
                     <div class="ficha-section-title">Dados por unidade inspecionada</div>
-                    <div style="overflow-x:auto;">
+                    <div class="ficha-table-wrap">
                         <table class="ficha-unidades-table">
                             <thead><tr>${theadCols}</tr></thead>
                             <tbody>${tbodyRows}</tbody>
@@ -1455,7 +1574,7 @@
             pecasDevolucaoHtml = `
                 <div class="ficha-section">
                     <div class="ficha-section-title">Peças utilizadas na devolução</div>
-                    <div style="overflow-x:auto;">
+                    <div class="ficha-table-wrap">
                         <table class="ficha-unidades-table">
                             <thead><tr><th>Unidade</th><th>Chamado de garantia</th><th>Peça</th><th>Quantidade</th></tr></thead>
                             <tbody>${linhasPecas}</tbody>
