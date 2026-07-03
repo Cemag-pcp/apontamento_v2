@@ -236,22 +236,39 @@
 .ficha-resultado-pill.nao-conforme { background: #dc2626; color: #fff; }
 .ficha-resultado-obs { font-size: .82rem; color: #475569; font-style: italic; }
 
-.ficha-unidades-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.ficha-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: .45rem;
+}
+.ficha-unidades-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    font-size: .76rem;
+    table-layout: auto;
+}
 .ficha-unidades-table thead th {
     background: #1e293b;
     color: #f1f5f9;
-    padding: .45rem .7rem;
-    font-size: .68rem;
+    padding: .42rem .55rem;
+    font-size: .64rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .05em;
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 1.25;
     border: none;
+    vertical-align: middle;
 }
 .ficha-unidades-table tbody td {
-    padding: .45rem .7rem;
+    padding: .42rem .55rem;
     border-bottom: 1px solid #f1f5f9;
-    vertical-align: middle;
+    vertical-align: top;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    word-break: normal;
 }
 .ficha-unidades-table tbody tr:last-child td { border-bottom: none; }
 .ficha-unidades-table tbody tr:nth-child(even) td { background: #f8fafc; }
@@ -269,6 +286,98 @@
     border-bottom: 1px solid #cbd5e1;
 }
 .ficha-unidades-table .ficha-material-group:first-child td { border-top: none; }
+
+.ficha-unidades-print {
+    display: none;
+}
+.ficha-print-material {
+    margin: 0 0 1rem;
+}
+.ficha-print-material-title {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    padding: .35rem .55rem;
+    text-transform: uppercase;
+}
+.ficha-print-unit {
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    padding: .55rem;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+.ficha-print-unit:first-child {
+    border-top: 1px solid #e2e8f0;
+}
+.ficha-print-unit-title {
+    color: #1e293b;
+    font-size: .78rem;
+    font-weight: 700;
+    margin-bottom: .45rem;
+}
+.ficha-print-unit-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .4rem .65rem;
+}
+.ficha-print-field {
+    min-width: 0;
+}
+.ficha-print-label {
+    color: #64748b;
+    display: block;
+    font-size: .56rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    line-height: 1.2;
+    margin-bottom: .1rem;
+    text-transform: uppercase;
+}
+.ficha-print-value {
+    color: #1e293b;
+    display: block;
+    font-size: .68rem;
+    font-weight: 500;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+#ficha-print-root {
+    background: #fff;
+    color: #1e293b;
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+#ficha-print-root .print-doc { width: 100%; }
+#ficha-print-root .print-header { align-items: flex-start; border-bottom: 2px solid #1e293b; display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; }
+#ficha-print-root .print-header h1 { font-size: 16px; letter-spacing: .04em; margin: 0; text-transform: uppercase; }
+#ficha-print-root .print-header p { color: #64748b; font-size: 10px; margin: 3px 0 0; }
+#ficha-print-root .print-id { color: #64748b; font-size: 10px; line-height: 1.5; text-align: right; }
+#ficha-print-root .print-id strong { color: #1e293b; display: block; font-size: 13px; }
+#ficha-print-root .print-section { break-inside: avoid; margin-bottom: 12px; page-break-inside: avoid; }
+#ficha-print-root .print-section h2 { border-bottom: 1px solid #cbd5e1; color: #64748b; font-size: 9px; letter-spacing: .08em; margin: 0 0 7px; padding-bottom: 3px; text-transform: uppercase; }
+#ficha-print-root .print-fields { display: grid; gap: 6px 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#ficha-print-root .print-field span { color: #64748b; display: block; font-size: 8px; font-weight: 700; letter-spacing: .05em; margin-bottom: 2px; text-transform: uppercase; }
+#ficha-print-root .print-field strong { color: #1e293b; display: block; font-size: 10px; line-height: 1.25; overflow-wrap: anywhere; }
+#ficha-print-root .print-result { align-items: flex-start; background: #f8fafc; border: 1px solid #cbd5e1; display: flex; gap: 12px; padding: 7px; }
+#ficha-print-root .print-result strong { color: #15803d; min-width: 80px; text-transform: capitalize; }
+#ficha-print-root .print-result span,
+#ficha-print-root .print-result p { margin: 0; overflow-wrap: anywhere; }
+#ficha-print-root .print-table { border-collapse: collapse; table-layout: fixed; width: 100%; }
+#ficha-print-root .print-table th { background: #1e293b; color: #fff; font-size: 7px; font-weight: 700; line-height: 1.15; padding: 3px; text-transform: uppercase; vertical-align: middle; word-break: break-word; }
+#ficha-print-root .print-table td { border-bottom: 1px solid #e2e8f0; font-size: 8px; line-height: 1.2; padding: 3px; vertical-align: top; overflow-wrap: anywhere; }
+#ficha-print-root .print-table tbody tr:nth-child(even) td { background: #f8fafc; }
+#ficha-print-root .print-table .material-row td { background: #e2e8f0 !important; color: #334155; font-size: 8px; font-weight: 700; text-transform: uppercase; }
+#ficha-print-root .print-table.wide-table th { font-size: 6px; padding: 2px; }
+#ficha-print-root .print-table.wide-table td { font-size: 7px; padding: 2px; }
+#ficha-print-root .print-footer { border-top: 1px solid #cbd5e1; color: #94a3b8; display: flex; font-size: 8px; justify-content: space-between; margin-top: 14px; padding-top: 6px; }
 
 /* ── Cards de edição por unidade ─────────────────── */
 .edit-material-header {
@@ -321,10 +430,37 @@
     color: #94a3b8;
 }
 
+.ficha-print-only .btn-ver-video-recebimento,
+.ficha-print-only video,
+.ficha-print-only button {
+    display: none !important;
+}
+
+.ficha-print-only .ficha-section,
+.ficha-print-only .ficha-resultado-box,
+.ficha-print-only .ficha-unidades-table {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.ficha-print-only .ficha-table-wrap {
+    display: none;
+}
+
+.ficha-print-only .ficha-unidades-print {
+    display: block;
+}
+
 @media print {
-    .modal-header, .modal-footer { display: none !important; }
-    .modal-body { padding: 0 !important; }
+    @page { size: A4 landscape; margin: 10mm; }
+    body { background: #fff !important; }
     .ficha-doc { padding: 1.5rem; }
+    body.ficha-printing > *:not(#ficha-print-root) {
+        display: none !important;
+    }
+    #ficha-print-root {
+        display: block !important;
+    }
 }
 </style>
 {% endblock %}
@@ -448,8 +584,8 @@
                     <span class="fw-semibold" style="font-size:.95rem;" id="modalFichaInspecaoRecebimentoLabel">Ficha de Inspeção de Recebimento</span>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()" title="Imprimir">
-                        <i class="bi bi-printer"></i> Imprimir
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportarFichaInspecaoRecebimentoPdf()" title="Exportar PDF">
+                        <i class="bi bi-file-earmark-pdf"></i> Exportar PDF
                     </button>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
@@ -1340,7 +1476,202 @@
             .filter((peca) => peca.codigo);
     }
 
+    let fichaRecebimentoAtual = null;
+
+    function escaparHtmlFicha(valor) {
+        return String(valor ?? "—")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function valorCampoUnidadeRecebimento(col, unidade) {
+        if (col === "unidade") return unidade.unidade ?? "—";
+        if (col === "resultado") return unidade.resultado || "—";
+        if (col === "observacao") return unidade.observacao || "—";
+        if (col === "imagem") return unidade?.imagem?.url || "Imagem anexada";
+        if (col === "video") return unidade?.video?.url || "—";
+        if (col === "devolucao_material") {
+            const codigo = unidade.campos?.[col] || "";
+            return MATERIAIS_DEVOLUCAO[codigo]?.nome || codigo || "—";
+        }
+        return unidade.campos?.[col] || "—";
+    }
+
+    function dadosUnidadesRecebimento(row) {
+        const materiais = row?.dados_inspecao?.materiais || [];
+        const unidades = row?.dados_inspecao?.unidades || [];
+        const unidadesComMaterial = materiais.length
+            ? materiais.flatMap((m) => (m.unidades || []).map((u) => ({
+                ...u,
+                __material_nome: m.nome_material || `Material ${m.material || ""}`.trim(),
+              })))
+            : unidades;
+        const camposOcultos = /^devolucao_peca_\d+_(codigo|quantidade)$/;
+        const camposExtras = [];
+        const possuiImagem = unidadesComMaterial.some(u => Boolean(u?.imagem?.url || u?.imagem?.arquivo));
+        const possuiVideo = unidadesComMaterial.some(u => Boolean(u?.video?.url || u?.video?.arquivo));
+
+        unidadesComMaterial.forEach(u => {
+            Object.keys(u.campos || {}).forEach(c => {
+                if (camposOcultos.test(c)) return;
+                if (!camposExtras.includes(c)) camposExtras.push(c);
+            });
+        });
+
+        const colunasBase = ["unidade", "resultado", "observacao"];
+        if (possuiVideo) colunasBase.push("video");
+        if (possuiImagem) colunasBase.push("imagem");
+
+        return {
+            materiais,
+            unidades,
+            unidadesComMaterial,
+            colunas: [...colunasBase, ...camposExtras],
+        };
+    }
+
+    function montarTabelaUnidadesRecebimento(row) {
+        const { materiais, unidadesComMaterial, colunas } = dadosUnidadesRecebimento(row);
+        if (!unidadesComMaterial.length) return "";
+
+        const labels = colunas.map((col) => {
+            if (col === "video") return "Video Link";
+            return formatarRotuloFicha(col);
+        });
+
+        const renderLinha = (unidade) => `
+            <tr>
+                ${colunas.map((col) => `<td>${escaparHtmlFicha(valorCampoUnidadeRecebimento(col, unidade))}</td>`).join("")}
+            </tr>`;
+
+        let linhas = "";
+        if (materiais.length) {
+            materiais.forEach((material) => {
+                const nomeMaterial = material.nome_material || `Material ${material.material || ""}`.trim();
+                const unidadesDeste = material.unidades || [];
+                if (!unidadesDeste.length) return;
+                linhas += `<tr class="material-row"><td colspan="${colunas.length}">${escaparHtmlFicha(nomeMaterial)}</td></tr>`;
+                linhas += unidadesDeste.map(renderLinha).join("");
+            });
+        } else {
+            linhas = unidadesComMaterial.map(renderLinha).join("");
+        }
+
+        return `
+            <section class="print-section">
+                <h2>Dados por unidade inspecionada</h2>
+                <table class="print-table ${colunas.length > 11 ? "wide-table" : ""}">
+                    <thead>
+                        <tr>${labels.map(label => `<th>${escaparHtmlFicha(label)}</th>`).join("")}</tr>
+                    </thead>
+                    <tbody>${linhas}</tbody>
+                </table>
+            </section>`;
+    }
+
+    function montarPecasDevolucaoRecebimento(row) {
+        const { unidadesComMaterial } = dadosUnidadesRecebimento(row);
+        const unidadesComPecasDevolucao = unidadesComMaterial
+            .map(u => ({ unidade: u, pecas: extrairPecasDevolucao(u.campos) }))
+            .filter(item => item.pecas.length);
+        if (!unidadesComPecasDevolucao.length) return "";
+
+        const linhas = unidadesComPecasDevolucao.flatMap(({ unidade, pecas }) => {
+            const codigoMaterial = unidade.campos?.devolucao_material || "";
+            const mapaPecas = new Map((MATERIAIS_DEVOLUCAO[codigoMaterial]?.pecas || []).map(p => [p.codigo, p.descricao]));
+            const chamado = unidade.campos?.chamado_garantia || "";
+
+            return pecas.map((peca, idx) => `
+                <tr>
+                    ${idx === 0 ? `<td rowspan="${pecas.length}">${escaparHtmlFicha(unidade.unidade ?? "—")}</td>` : ""}
+                    ${idx === 0 ? `<td rowspan="${pecas.length}">${escaparHtmlFicha(chamado || "—")}</td>` : ""}
+                    <td>${escaparHtmlFicha(peca.codigo)}${mapaPecas.has(peca.codigo) ? ` - ${escaparHtmlFicha(mapaPecas.get(peca.codigo))}` : ""}</td>
+                    <td>${escaparHtmlFicha(peca.quantidade || "—")}</td>
+                </tr>`);
+        }).join("");
+
+        return `
+            <section class="print-section">
+                <h2>Peças utilizadas na devolução</h2>
+                <table class="print-table">
+                    <thead><tr><th>Unidade</th><th>Chamado de garantia</th><th>Peça</th><th>Quantidade</th></tr></thead>
+                    <tbody>${linhas}</tbody>
+                </table>
+            </section>`;
+    }
+
+    function montarDocumentoImpressaoRecebimento(row) {
+        const dadosPlanilha = row?.data || {};
+        const meta = row?.meta || {};
+        const camposPrincipais = ["Data", "Fornecedor", "CNPJ", "Nº Nota fiscal", "Tipo de material", "Classe de Inspeção"];
+        const camposRecebimento = camposPrincipais
+            .filter(campo => campo in dadosPlanilha)
+            .concat(Object.keys(dadosPlanilha).filter(campo => !camposPrincipais.includes(campo)));
+        const geradoEm = new Date().toLocaleString("pt-BR");
+
+        const field = (label, value) => `
+            <div class="print-field">
+                <span>${escaparHtmlFicha(label)}</span>
+                <strong>${escaparHtmlFicha(value || "—")}</strong>
+            </div>`;
+
+        const dadosRecebimento = camposRecebimento.map(campo => field(campo, dadosPlanilha[campo])).join("");
+
+        return `
+            <article class="print-doc">
+                <header class="print-header">
+                    <div>
+                        <h1>Ficha de Inspeção de Recebimento</h1>
+                        <p>Controle de qualidade — material recebido</p>
+                    </div>
+                    <div class="print-id">
+                        <strong>#${escaparHtmlFicha(meta.id || "—")}</strong>
+                        Emitido em ${escaparHtmlFicha(geradoEm)}
+                    </div>
+                </header>
+
+                <section class="print-section">
+                    <h2>Dados do recebimento</h2>
+                    <div class="print-fields">
+                        ${dadosRecebimento}
+                        ${field("Data inspeção", meta.data_inspecao)}
+                        ${field("Inspetor", meta.inspetor)}
+                        ${field("Resultado", meta.resultado)}
+                        ${field("Observação", meta.observacao)}
+                    </div>
+                </section>
+
+                <section class="print-section">
+                    <h2>Resultado da inspeção</h2>
+                    <div class="print-result">
+                        <strong>${escaparHtmlFicha(meta.resultado || "—")}</strong>
+                        <span>Data da inspeção: ${escaparHtmlFicha(meta.data_inspecao || "—")}</span>
+                        <span>Inspetor: ${escaparHtmlFicha(meta.inspetor || "—")}</span>
+                        ${meta.observacao ? `<p>${escaparHtmlFicha(meta.observacao)}</p>` : ""}
+                    </div>
+                </section>
+
+                ${montarTabelaUnidadesRecebimento(row)}
+                ${montarPecasDevolucaoRecebimento(row)}
+
+                <footer class="print-footer">
+                    <span>Inspeção de Recebimento — sistema de qualidade</span>
+                    <span>Registro #${escaparHtmlFicha(meta.id || "—")} · ${escaparHtmlFicha(geradoEm)}</span>
+                </footer>
+            </article>`;
+    }
+
+    function exportarFichaInspecaoRecebimentoPdf() {
+        const id = fichaRecebimentoAtual?.meta?.id;
+        if (!id) return;
+        window.location.href = `/inspecao/api/recebimento/ficha-pdf/${id}/`;
+    }
+
     function abrirFichaInspecaoRecebimento(row) {
+        fichaRecebimentoAtual = row;
         const container = document.getElementById("ficha-doc-container");
         container.innerHTML = "";
 
@@ -1427,8 +1758,40 @@
                 return `<td class="${cls}">${v || "—"}</td>`;
             };
 
+            const _valorCampoUnidade = (col, unidade) => {
+                if (col === "unidade") return unidade.unidade ?? "—";
+                if (col === "resultado") return unidade.resultado || "—";
+                if (col === "observacao") return unidade.observacao || "—";
+                if (col === "imagem") return unidade?.imagem?.url ? "Imagem anexada" : "—";
+                if (col === "video") return unidade?.video?.url || "—";
+                if (col === "devolucao_material") {
+                    const codigo = unidade.campos?.[col] || "";
+                    return MATERIAIS_DEVOLUCAO[codigo]?.nome || codigo || "—";
+                }
+                return unidade.campos?.[col] || "—";
+            };
+
+            const _renderPrintUnit = (unidade) => {
+                const unidadeLabel = _valorCampoUnidade("unidade", unidade);
+                const campos = colunas
+                    .filter(col => col !== "unidade")
+                    .map(col => `
+                        <div class="ficha-print-field">
+                            <span class="ficha-print-label">${formatarRotuloFicha(col)}</span>
+                            <span class="ficha-print-value">${_valorCampoUnidade(col, unidade)}</span>
+                        </div>`)
+                    .join("");
+
+                return `
+                    <div class="ficha-print-unit">
+                        <div class="ficha-print-unit-title">Unidade ${unidadeLabel}</div>
+                        <div class="ficha-print-unit-grid">${campos}</div>
+                    </div>`;
+            };
+
             // agrupa por material (mantendo a ordem original)
             let tbodyRows = "";
+            let unidadesPrintHtml = "";
             if (materiais.length) {
                 materiais.forEach(m => {
                     const nomeMaterial = m.nome_material || `Material ${m.material || ""}`.trim();
@@ -1438,22 +1801,32 @@
                     unidadesDeste.forEach(u => {
                         tbodyRows += `<tr>${colunas.map(col => _renderCell(col, u)).join("")}</tr>`;
                     });
+                    unidadesPrintHtml += `
+                        <div class="ficha-print-material">
+                            <div class="ficha-print-material-title">${nomeMaterial}</div>
+                            ${unidadesDeste.map(_renderPrintUnit).join("")}
+                        </div>`;
                 });
             } else {
                 tbodyRows = unidadesComMaterial.map(u =>
                     `<tr>${colunas.map(col => _renderCell(col, u)).join("")}</tr>`
                 ).join("");
+                unidadesPrintHtml = `
+                    <div class="ficha-print-material">
+                        ${unidadesComMaterial.map(_renderPrintUnit).join("")}
+                    </div>`;
             }
 
             unidadesHtml = `
                 <div class="ficha-section">
                     <div class="ficha-section-title">Dados por unidade inspecionada</div>
-                    <div style="overflow-x:auto;">
+                    <div class="ficha-table-wrap">
                         <table class="ficha-unidades-table">
                             <thead><tr>${theadCols}</tr></thead>
                             <tbody>${tbodyRows}</tbody>
                         </table>
                     </div>
+                    <div class="ficha-unidades-print">${unidadesPrintHtml}</div>
                 </div>`;
         }
 
@@ -1481,7 +1854,7 @@
             pecasDevolucaoHtml = `
                 <div class="ficha-section">
                     <div class="ficha-section-title">Peças utilizadas na devolução</div>
-                    <div style="overflow-x:auto;">
+                    <div class="ficha-table-wrap">
                         <table class="ficha-unidades-table">
                             <thead><tr><th>Unidade</th><th>Chamado de garantia</th><th>Peça</th><th>Quantidade</th></tr></thead>
                             <tbody>${linhasPecas}</tbody>

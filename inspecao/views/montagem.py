@@ -191,6 +191,7 @@ def get_itens_inspecao_montagem(request):
     datas = datas.select_related(
         "pecas_ordem_montagem",
         "pecas_ordem_montagem__ordem",
+        "pecas_ordem_montagem__ordem__maquina",
         "pecas_ordem_montagem__operador",
     ).order_by("-id")
 
@@ -209,6 +210,11 @@ def get_itens_inspecao_montagem(request):
         item = {
             "id": data.id,
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+            "data_carga": (
+                data.pecas_ordem_montagem.ordem.data_carga.strftime("%d/%m/%Y")
+                if data.pecas_ordem_montagem.ordem.data_carga
+                else ""
+            ),
             "peca": data.pecas_ordem_montagem.peca,
             "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
             "qtd_apontada": data.pecas_ordem_montagem.qtd_boa,
@@ -343,6 +349,11 @@ def get_itens_reinspecao_montagem(request):
                     "id": data.id,
                     "tipo": "Montagem",
                     "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                    "data_carga": (
+                        data.pecas_ordem_montagem.ordem.data_carga.strftime("%d/%m/%Y")
+                        if data.pecas_ordem_montagem.ordem.data_carga
+                        else ""
+                    ),
                     "peca": data.pecas_ordem_montagem.peca,
                     "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
                     "conformidade": dados_execucao.conformidade,
@@ -359,6 +370,7 @@ def get_itens_reinspecao_montagem(request):
                     "id": data.id,
                     "tipo": "Tanque",
                     "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                    "data_carga": "",
                     "peca": f"{data.estanqueidade.peca.codigo} - {data.estanqueidade.peca.descricao}",
                     "maquina": "Tanque",  # Ou outro identificador apropriado
                     "conformidade": dados_execucao.conformidade,
@@ -484,6 +496,7 @@ def get_itens_inspecionados_montagem(request):
     datas = datas.select_related(
         "pecas_ordem_montagem",
         "pecas_ordem_montagem__ordem",
+        "pecas_ordem_montagem__ordem__maquina",
         "pecas_ordem_montagem__operador",
     ).order_by("-dadosexecucaoinspecao__data_execucao")
 
@@ -514,6 +527,11 @@ def get_itens_inspecionados_montagem(request):
                 "id": data.id,
                 "id_dados_execucao": de.id,
                 "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
+                "data_carga": (
+                    data.pecas_ordem_montagem.ordem.data_carga.strftime("%d/%m/%Y")
+                    if data.pecas_ordem_montagem.ordem.data_carga
+                    else ""
+                ),
                 "peca": data.pecas_ordem_montagem.peca,
                 "qtd_produzida": data.pecas_ordem_montagem.qtd_boa,
                 "qtd_inspecionada": de.nao_conformidade + de.conformidade,

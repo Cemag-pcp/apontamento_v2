@@ -3,7 +3,9 @@ import json
 import logging
 import os
 import re
+from io import BytesIO
 from datetime import datetime
+from html import escape
 
 import gspread
 from boto3.s3.transfer import TransferConfig
@@ -12,8 +14,8 @@ from django.db import connection, transaction
 from django.db.models import Count, Q, TextField, Value
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce
-from django.http import JsonResponse
-from django.shortcuts import render
+from django.http import FileResponse, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.utils.timezone import localtime
 from storages.backends.s3boto3 import S3Boto3Storage
@@ -609,6 +611,497 @@ def recebimento_inspecionados(request):
         },
         status=200,
     )
+
+
+def _rotulo_ficha_recebimento(chave):
+    if chave == "video":
+        return "Video Link"
+    return re.sub(r"\s+", " ", str(chave or "").replace("_", " ")).strip().title()
+
+
+def _valor_campo_unidade_recebimento(coluna, unidade):
+    campos = unidade.get("campos") or {}
+    if coluna == "unidade":
+        return unidade.get("unidade") or "-"
+    if coluna == "resultado":
+        return unidade.get("resultado") or "-"
+    if coluna == "observacao":
+        return unidade.get("observacao") or "-"
+    if coluna == "imagem":
+        imagem = unidade.get("imagem") or {}
+        return imagem.get("url") or imagem.get("arquivo") or "Imagem anexada"
+    if coluna == "video":
+        video = unidade.get("video") or {}
+        return video.get("url") or video.get("arquivo") or "-"
+    return campos.get(coluna) or "-"
+
+
+def _dados_unidades_recebimento_pdf(registro):
+    dados_inspecao = registro.dados_inspecao or {}
+    materiais = dados_inspecao.get("materiais") or []
+    unidades = dados_inspecao.get("unidades") or []
+    unidades_com_material = (
+        [
+            {
+                **unidade,
+                "__material_nome": material.get("nome_material")
+                or f"Material {material.get('material') or ''}".strip(),
+            }
+            for material in materiais
+            for unidade in (material.get("unidades") or [])
+        ]
+        if materiais
+        else unidades
+    )
+
+    campos_ocultos = re.compile(r"^devolucao_peca_\d+_(codigo|quantidade)$")
+    campos_extras = []
+    possui_imagem = False
+    possui_video = False
+
+    for unidade in unidades_com_material:
+        imagem = unidade.get("imagem") or {}
+        video = unidade.get("video") or {}
+        possui_imagem = possui_imagem or bool(imagem.get("url") or imagem.get("arquivo"))
+        possui_video = possui_video or bool(video.get("url") or video.get("arquivo"))
+        for campo in (unidade.get("campos") or {}).keys():
+            if campos_ocultos.match(campo):
+                continue
+            if campo not in campos_extras:
+                campos_extras.append(campo)
+
+    colunas = ["unidade", "resultado", "observacao"]
+    if possui_video:
+        colunas.append("video")
+    if possui_imagem:
+        colunas.append("imagem")
+    colunas.extend(campos_extras)
+
+    linhas = []
+    if materiais:
+        for material in materiais:
+            unidades_material = material.get("unidades") or []
+            if not unidades_material:
+                continue
+            linhas.append(
+                {
+                    "tipo": "material",
+                    "nome": material.get("nome_material")
+                    or f"Material {material.get('material') or ''}".strip(),
+                }
+            )
+            for unidade in unidades_material:
+                linhas.append({"tipo": "unidade", "unidade": unidade})
+    else:
+        linhas = [{"tipo": "unidade", "unidade": unidade} for unidade in unidades_com_material]
+
+    return unidades_com_material, colunas, linhas
+
+
+def _extrair_pecas_devolucao_pdf(campos):
+    pecas = []
+    campos = campos or {}
+    for chave, codigo in campos.items():
+        match = re.match(r"^devolucao_peca_(\d+)_codigo$", chave)
+        if not match or not str(codigo or "").strip():
+            continue
+        idx = match.group(1)
+        pecas.append(
+            {
+                "codigo": codigo,
+                "quantidade": campos.get(f"devolucao_peca_{idx}_quantidade") or "-",
+            }
+        )
+    return pecas
+
+
+def exportar_ficha_recebimento_pdf(request, registro_id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Metodo nao permitido"}, status=405)
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except ImportError:
+        return HttpResponse(
+            "A biblioteca reportlab nao esta instalada. Rode: pip install reportlab",
+            status=500,
+            content_type="text/plain; charset=utf-8",
+        )
+
+    registro = get_object_or_404(
+        InspecaoRecebimento.objects.select_related("inspetor__user"),
+        pk=registro_id,
+        excluido=False,
+    )
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=10 * mm,
+        leftMargin=10 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
+        title=f"Ficha de Inspecao de Recebimento #{registro.id}",
+    )
+
+    base_styles = getSampleStyleSheet()
+    styles = {
+        "title": ParagraphStyle(
+            "FichaTitle",
+            parent=base_styles["Title"],
+            alignment=TA_CENTER,
+            fontName="Helvetica-Bold",
+            fontSize=15,
+            leading=18,
+            textColor=colors.HexColor("#1e293b"),
+            spaceAfter=2,
+        ),
+        "subtitle": ParagraphStyle(
+            "FichaSubtitle",
+            parent=base_styles["BodyText"],
+            alignment=TA_CENTER,
+            fontName="Helvetica",
+            fontSize=9,
+            leading=11,
+            textColor=colors.HexColor("#64748b"),
+        ),
+        "right": ParagraphStyle(
+            "FichaRight",
+            parent=base_styles["BodyText"],
+            alignment=TA_RIGHT,
+            fontName="Helvetica",
+            fontSize=8,
+            leading=10,
+            textColor=colors.HexColor("#64748b"),
+        ),
+        "section": ParagraphStyle(
+            "FichaSection",
+            parent=base_styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=8,
+            leading=10,
+            textColor=colors.HexColor("#64748b"),
+            uppercase=True,
+            spaceBefore=8,
+            spaceAfter=4,
+        ),
+        "cell": ParagraphStyle(
+            "FichaCell",
+            parent=base_styles["BodyText"],
+            fontName="Helvetica",
+            fontSize=7,
+            leading=8,
+            wordWrap="CJK",
+        ),
+        "cell_bold": ParagraphStyle(
+            "FichaCellBold",
+            parent=base_styles["BodyText"],
+            fontName="Helvetica-Bold",
+            fontSize=7,
+            leading=8,
+            wordWrap="CJK",
+        ),
+        "label": ParagraphStyle(
+            "FichaLabel",
+            parent=base_styles["BodyText"],
+            fontName="Helvetica-Bold",
+            fontSize=6,
+            leading=7,
+            textColor=colors.HexColor("#64748b"),
+            wordWrap="CJK",
+        ),
+    }
+
+    def p(valor, style="cell"):
+        return Paragraph(escape(str(valor if valor not in (None, "") else "-")), styles[style])
+
+    def section(titulo):
+        return Paragraph(escape(titulo.upper()), styles["section"])
+
+    def fields_table(campos):
+        cells = []
+        for label, value in campos:
+            cells.append(
+                Paragraph(
+                    f"<b>{escape(str(label))}</b><br/>{escape(str(value if value not in (None, '') else '-'))}",
+                    styles["cell"],
+                )
+            )
+        while len(cells) % 4:
+            cells.append("")
+        rows = [cells[i : i + 4] for i in range(0, len(cells), 4)]
+        table = Table(rows, colWidths=[doc.width / 4] * 4, hAlign="LEFT")
+        table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 2),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        return table
+
+    def split_columns(columns, max_columns=8):
+        if len(columns) <= max_columns:
+            return [columns]
+        first = columns[0]
+        chunks = []
+        for index in range(1, len(columns), max_columns - 1):
+            chunks.append([first, *columns[index : index + max_columns - 1]])
+        return chunks
+
+    def dynamic_table(title, columns, rows):
+        story_items = []
+        if not columns or not rows:
+            return story_items
+
+        chunks = split_columns(columns)
+        for chunk_index, chunk in enumerate(chunks, start=1):
+            table_title = title if len(chunks) == 1 else f"{title} - parte {chunk_index}"
+            story_items.append(section(table_title))
+
+            data = [[p(_rotulo_ficha_recebimento(col), "cell_bold") for col in chunk]]
+            spans = []
+            for row in rows:
+                if row.get("tipo") == "material":
+                    data.append([p(row.get("nome") or "Material", "cell_bold"), *[""] * (len(chunk) - 1)])
+                    spans.append(("SPAN", (0, len(data) - 1), (len(chunk) - 1, len(data) - 1)))
+                    continue
+                unidade = row.get("unidade") or {}
+                data.append([p(_valor_campo_unidade_recebimento(col, unidade)) for col in chunk])
+
+            table = Table(data, colWidths=[doc.width / len(chunk)] * len(chunk), repeatRows=1, hAlign="LEFT")
+            style_commands = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#cbd5e1")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]
+            for span in spans:
+                style_commands.append(span)
+                style_commands.append(("BACKGROUND", span[1], span[2], colors.HexColor("#e2e8f0")))
+            table.setStyle(TableStyle(style_commands))
+            story_items.extend([table, Spacer(1, 6)])
+            if chunk_index < len(chunks):
+                story_items.append(PageBreak())
+        return story_items
+
+    def unidade_cards(title, columns, rows):
+        story_items = []
+        if not columns or not rows:
+            return story_items
+
+        story_items.append(section(title))
+        material_atual = ""
+        campos_card = [col for col in columns if col != "unidade"]
+        card_gap = 10
+        row_gap = 10
+        card_width = (doc.width - (card_gap * 2)) / 3
+        cards_linha = []
+
+        def flush_cards():
+            nonlocal cards_linha
+            if not cards_linha:
+                return
+            while len(cards_linha) < 3:
+                cards_linha.append("")
+            linha = Table(
+                [[cards_linha[0], "", cards_linha[1], "", cards_linha[2]]],
+                colWidths=[card_width, card_gap, card_width, card_gap, card_width],
+                hAlign="LEFT",
+            )
+            linha.setStyle(
+                TableStyle(
+                    [
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), row_gap),
+                    ]
+                )
+            )
+            story_items.append(linha)
+            cards_linha = []
+
+        for row in rows:
+            if row.get("tipo") == "material":
+                material_atual = row.get("nome") or "Material"
+                continue
+
+            unidade = row.get("unidade") or {}
+            unidade_nome = _valor_campo_unidade_recebimento("unidade", unidade)
+            resultado = _valor_campo_unidade_recebimento("resultado", unidade)
+            titulo_card = f"Unidade {unidade_nome}"
+            if material_atual:
+                titulo_card = f"{titulo_card} - {material_atual}"
+
+            header = Table(
+                [[p(titulo_card, "cell_bold")], [p(f"Resultado: {resultado}", "cell_bold")]],
+                colWidths=[card_width],
+            )
+            header.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#e2e8f0")),
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                        ("TOPPADDING", (0, 0), (-1, -1), 5),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ]
+                )
+            )
+
+            campos = []
+            for coluna in campos_card:
+                if coluna == "resultado":
+                    continue
+                campos.append(
+                    Paragraph(
+                        f"<b>{escape(_rotulo_ficha_recebimento(coluna))}</b><br/>"
+                        f"{escape(str(_valor_campo_unidade_recebimento(coluna, unidade)))}",
+                        styles["cell"],
+                    )
+                )
+
+            if not campos:
+                campos.append(p("-", "cell"))
+            while len(campos) % 2:
+                campos.append("")
+
+            linhas_campos = [campos[i : i + 2] for i in range(0, len(campos), 2)]
+            body = Table(linhas_campos, colWidths=[card_width / 2] * 2)
+            body.setStyle(
+                TableStyle(
+                    [
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                        ("TOPPADDING", (0, 0), (-1, -1), 5),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ]
+                )
+            )
+
+            card = Table([[header], [body]], colWidths=[card_width])
+            card.setStyle(
+                TableStyle(
+                    [
+                        ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#cbd5e1")),
+                        ("BACKGROUND", (0, 1), (0, 1), colors.HexColor("#f8fafc")),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                    ]
+                )
+            )
+            cards_linha.append(card)
+            if len(cards_linha) == 3:
+                flush_cards()
+
+        flush_cards()
+        return story_items
+
+    dados = registro.dados or {}
+    inspetor = (
+        registro.inspetor.user.username
+        if registro.inspetor and registro.inspetor.user
+        else ""
+    )
+    data_inspecao = localtime(registro.data_inspecao).strftime("%d/%m/%Y %H:%M")
+    emitido_em = localtime(timezone.now()).strftime("%d/%m/%Y %H:%M:%S")
+    campos_principais = ["Data", "Fornecedor", "CNPJ", "Nº Nota fiscal", "Tipo de material", "Classe de Inspeção"]
+    campos_recebimento = [
+        (campo, dados.get(campo, ""))
+        for campo in campos_principais
+        if campo in dados
+    ]
+    campos_recebimento.extend(
+        (campo, valor)
+        for campo, valor in dados.items()
+        if campo not in campos_principais
+    )
+
+    story = [
+        Paragraph("Ficha de Inspeção de Recebimento", styles["title"]),
+        Paragraph("Controle de qualidade - material recebido", styles["subtitle"]),
+        Table(
+            [
+                [
+                    "",
+                    Paragraph(f"<b>#{registro.id}</b><br/>Emitido em {emitido_em}", styles["right"]),
+                ]
+            ],
+            colWidths=[doc.width * 0.72, doc.width * 0.28],
+        ),
+        Spacer(1, 8),
+        section("Dados do recebimento"),
+        fields_table(
+            [
+                *campos_recebimento,
+                ("Data inspeção", data_inspecao),
+                ("Inspetor", inspetor),
+                ("Resultado", registro.get_resultado_display()),
+                ("Observação", registro.observacao or ""),
+            ]
+        ),
+        section("Resultado da inspeção"),
+        fields_table(
+            [
+                ("Resultado", registro.get_resultado_display()),
+                ("Data da inspeção", data_inspecao),
+                ("Inspetor", inspetor),
+                ("Observação", registro.observacao or ""),
+            ]
+        ),
+    ]
+
+    unidades_com_material, colunas, linhas = _dados_unidades_recebimento_pdf(registro)
+    story.extend(unidade_cards("Dados por unidade inspecionada", colunas, linhas))
+
+    linhas_pecas = []
+    for unidade in unidades_com_material:
+        chamado = (unidade.get("campos") or {}).get("chamado_garantia") or "-"
+        for peca in _extrair_pecas_devolucao_pdf(unidade.get("campos")):
+            linhas_pecas.append(
+                {
+                    "tipo": "unidade",
+                    "unidade": {
+                        "unidade": unidade.get("unidade"),
+                        "resultado": chamado,
+                        "observacao": peca.get("codigo"),
+                        "campos": {"quantidade": peca.get("quantidade")},
+                    },
+                }
+            )
+    story.extend(dynamic_table("Peças utilizadas na devolução", ["unidade", "resultado", "observacao", "quantidade"], linhas_pecas))
+
+    def footer(canvas, document):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(colors.HexColor("#94a3b8"))
+        canvas.drawString(document.leftMargin, 7 * mm, "Inspeção de Recebimento - sistema de qualidade")
+        canvas.drawRightString(document.pagesize[0] - document.rightMargin, 7 * mm, f"Registro #{registro.id} - pagina {document.page}")
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=footer, onLaterPages=footer)
+    buffer.seek(0)
+    filename = f"ficha-inspecao-recebimento-{registro.id}.pdf"
+    return FileResponse(buffer, as_attachment=True, filename=filename, content_type="application/pdf")
 
 
 def inspecionar_recebimento(request):
