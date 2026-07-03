@@ -146,6 +146,7 @@ function buscarItensInspecao(pagina) {
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Dt. Produzida:</strong> ${item.data}<br>
+                        <strong>📅 Data da carga:</strong> ${item.data_carga || "-"}<br>
                         <strong>📍 Tipo:</strong> ${item.tipo}<br>
                         <strong>🎨 Cor:</strong> ${item.cor}<br>
                         <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
