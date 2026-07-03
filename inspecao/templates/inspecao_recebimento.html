@@ -353,9 +353,16 @@
             <button type="button" class="btn btn-outline-primary" id="btn-sincronizar-recebimento">
                 Sincronizar
             </button>
-            <div class="input-group" style="max-width: 190px;">
-                <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
-                <input type="date" class="form-control" id="filtro-data-pendencias-recebimento" title="Filtrar por data">
+            <div class="d-flex align-items-center gap-1">
+                <div class="input-group" style="max-width: 170px;">
+                    <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+                    <input type="date" class="form-control" id="filtro-data-de-pendencias-recebimento" title="Data inicial">
+                </div>
+                <span class="text-muted small">até</span>
+                <div class="input-group" style="max-width: 170px;">
+                    <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+                    <input type="date" class="form-control" id="filtro-data-ate-pendencias-recebimento" title="Data final">
+                </div>
             </div>
             <div class="input-group" style="max-width: 320px;">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
@@ -627,7 +634,8 @@
     let inspecionadosCache = { columns: [], rows: [], pode_editar: false, classes_resumo: [] };
     let filtroClassePendencias = "";
     let filtroClasseInspecionados = "";
-    let filtroPendenciasData = "";
+    let filtroPendenciasDataDe = "";
+    let filtroPendenciasDataAte = "";
     let inspecionadosPagina = 1;
     let inspecionadosBuscaTimer = null;
     let pendenciaSelecionada = null;
@@ -844,10 +852,18 @@
             if (filtroClassePendencias && obterClasseInspecaoRecebimento(row) !== filtroClassePendencias) {
                 return false;
             }
-            if (filtroPendenciasData) {
+            if (filtroPendenciasDataDe || filtroPendenciasDataAte) {
                 const dataRow = row.data?.["Data"] || "";
-                const [y, m, d] = filtroPendenciasData.split("-");
-                if (dataRow !== `${d}/${m}/${y}`) return false;
+                const [dia, mes, ano] = dataRow.split("/");
+                const dataNum = parseInt(`${ano}${mes}${dia}`, 10);
+                if (filtroPendenciasDataDe) {
+                    const [yDe, mDe, dDe] = filtroPendenciasDataDe.split("-");
+                    if (dataNum < parseInt(`${yDe}${mDe}${dDe}`, 10)) return false;
+                }
+                if (filtroPendenciasDataAte) {
+                    const [yAte, mAte, dAte] = filtroPendenciasDataAte.split("-");
+                    if (dataNum > parseInt(`${yAte}${mAte}${dAte}`, 10)) return false;
+                }
             }
             if (!filtro) return true;
             const texto = Object.values(row.data || {}).join(" ").toLowerCase();
@@ -3437,8 +3453,12 @@
         });
         document.getElementById("form-inspecao-recebimento").addEventListener("submit", salvarInspecaoRecebimento);
         document.getElementById("btn-sincronizar-recebimento").addEventListener("click", sincronizarRecebimento);
-        document.getElementById("filtro-data-pendencias-recebimento").addEventListener("change", (e) => {
-            filtroPendenciasData = e.target.value;
+        document.getElementById("filtro-data-de-pendencias-recebimento").addEventListener("change", (e) => {
+            filtroPendenciasDataDe = e.target.value;
+            renderPendencias();
+        });
+        document.getElementById("filtro-data-ate-pendencias-recebimento").addEventListener("change", (e) => {
+            filtroPendenciasDataAte = e.target.value;
             renderPendencias();
         });
 
