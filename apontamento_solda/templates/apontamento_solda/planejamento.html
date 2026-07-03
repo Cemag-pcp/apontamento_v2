@@ -515,6 +515,13 @@
 {% endblock %}
 
 {% block scripts %}
+<script type="importmap">
+{
+  "imports": {
+    "{% get_static_prefix %}js/ordem-criada-solda.js": "{% static 'js/ordem-criada-solda.js' %}"
+  }
+}
+</script>
 <script type="module" src="{% static 'js/ordem-criada-solda.js' %}"></script>
 <script type="module" src="{% static 'js/ordem-fora-sequenciamento-solda.js' %}"></script>
 <script type="module" src="{% static 'js/websocket-solda.js' %}"></script>
