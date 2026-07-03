@@ -560,6 +560,16 @@
 {% endblock %}
 
 {% block scripts %}
+{# Import map: garante que imports relativos resolvam para o arquivo hasheado em produção,
+   evitando que ordem-criada-montagem.js e apontamento-utils.js sejam carregados duas vezes. #}
+<script type="importmap">
+{
+  "imports": {
+    "{% get_static_prefix %}js/ordem-criada-montagem.js": "{% static 'js/ordem-criada-montagem.js' %}",
+    "{% get_static_prefix %}js/apontamento-utils.js": "{% static 'js/apontamento-utils.js' %}"
+  }
+}
+</script>
 <script type="module" src="{% static 'js/ordem-criada-montagem.js' %}"></script>
 <script type="module" src="{% static 'js/ordem-fora-sequenciamento.js' %}"></script>
 <script src="https://unpkg.com/html5-qrcode@2.0.9/dist/html5-qrcode.min.js"></script>

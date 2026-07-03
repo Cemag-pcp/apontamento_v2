@@ -187,13 +187,17 @@ document.addEventListener('click', function(e) {
         modalElement.removeAttribute("aria-hidden");
 
         // Exibe o modal corretamente
-        const confirmModal = new bootstrap.Modal(modalElement);
+        const confirmModal = bootstrap.Modal.getOrCreateInstance(modalElement);
         confirmModal.show();
     }
 });
 
 document.getElementById('confirmStartButton').addEventListener('click', function() {
+    if (this.disabled) return;
+    this.disabled = true;
+    const btn = this;
     confirmarInicioOrdem(currentOrdemId).then((sucesso) => {
+        btn.disabled = false;
         if (!sucesso) return;
 
         // confirmarInicioOrdem (apontamento-utils.js) so atualiza o backend e fecha o
@@ -208,7 +212,7 @@ document.getElementById('confirmStartButton').addEventListener('click', function
 
         resetarCardsInicial(filtros);
         carregarOrdensIniciadas(filtros);
-    });
+    }).catch(() => { btn.disabled = false; });
 });
 
 export function iniciarOrdem(ordemId) {
@@ -301,7 +305,7 @@ export function carregarOrdensIniciadas(filtros = {}, silent = false) {
                 let botaoAcao = '';
 
                 botaoAcao = `
-                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                    ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor' || data.usuario_tipo_acesso == 'admin'
                     ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
                             <i class="bi bi-arrow-left-right"></i>
                         </button>`: ""}
@@ -398,7 +402,7 @@ export function carregarOrdensInterrompidas(filtros = {}) {
 
             // Defina os botões dinamicamente com base no status
             let botaoAcao = `
-                ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor'
+                ${data.usuario_tipo_acesso == 'pcp' || data.usuario_tipo_acesso == 'supervisor' || data.usuario_tipo_acesso == 'admin'
                 ? `<button class="btn btn-danger btn-sm btn-deletar m-2" data-ordem="${ordem.id}" title="Desfazer">
                         <i class="bi bi-arrow-left-right"></i>
                     </button>`: ""}
@@ -539,13 +543,13 @@ function mostrarDetalhesPeca(peca) {
 
     // 2. Abre o Modal (Requer a biblioteca JS do Bootstrap)
     const modalElement = document.getElementById('modalDetalhesPeca');
-    const modal = new bootstrap.Modal(modalElement);
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
     modal.show();
 }
 
 // Modal para "Interromper"
 function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) {
-    const modal = new bootstrap.Modal(document.getElementById('modalInterromper'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalInterromper'));
     const modalTitle = document.getElementById('modalInterromperLabel');
     const motivoInterrupcaoSelect = $('#motivoInterrupcao'); // AGORA É JQUERY
     const pecasDisponiveisSelect = $('#pecasDisponiveis'); // Usando jQuery para Select2
@@ -600,7 +604,7 @@ function mostrarModalInterromper(ordemId, codigoConjunto, maquinaId, dataCarga) 
 }
 
 function mostrarModalRetornarOrdemIniciada(ordemId) {
-    const modalRetornarProcessoIniciado = new bootstrap.Modal(document.getElementById('modalRetornarProcessoIniciado'));
+    const modalRetornarProcessoIniciado = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalRetornarProcessoIniciado'));
     const textRetorno = document.getElementById('text-confirm');
     const modalTitle = document.getElementById("modalExcluirRetorno");
     const form = document.getElementById('formRetornarProcessoIniciado');
@@ -883,7 +887,7 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
 
 // Modal para "Finalizar"
 function mostrarModalFinalizar(ordemId, maquina, max_itens) {
-    const modal = new bootstrap.Modal(document.getElementById('finalizarModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('finalizarModal'));
 
     const operadorSelect = document.getElementById('operadorFinal');
     const qtRealizadaInput = document.getElementById('qtRealizada');
@@ -992,6 +996,9 @@ document.getElementById('botaoVoltarOperadoresMaquina').addEventListener('click'
 
 // Finalizar ordem
 document.getElementById('confirmFinalizar').addEventListener('click', function () {
+    if (this.disabled) return;
+    this.disabled = true;
+    const btnFinalizar = this;
     const ordemId = document.getElementById('ordemIdFinalizar').value;
     const operadorFinal = document.getElementById('operadorFinal');
     const todosOperadorFinal = document.getElementById('todosOperadorFinal');
@@ -1108,6 +1115,7 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         mostrarToast(`Ordem finalizada com sucesso!${chave}`, 'success');
     })
     .catch(error => {
+        btnFinalizar.disabled = false;
         // Rollback: restaura o card
         if (cardEl) {
             cardEl.style.opacity = '1';
@@ -1121,6 +1129,9 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
 
 // Finalizar parcial e continuar ordem
 document.getElementById('confirmFinalizarEContinuar').addEventListener('click', function () {
+    if (this.disabled) return;
+    this.disabled = true;
+    const btnFinalizarContinuar = this;
     const ordemId = document.getElementById('ordemIdFinalizar').value;
     const operadorFinal = document.getElementById('operadorFinal');
     const todosOperadorFinal = document.getElementById('todosOperadorFinal');
@@ -1236,6 +1247,7 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         mostrarToast(`Apontamento registrado com sucesso!${chave}`, 'success');
     })
     .catch(error => {
+        btnFinalizarContinuar.disabled = false;
         // Rollback: restaura o card
         if (cardEl) {
             cardEl.style.opacity = '1';
@@ -1250,7 +1262,7 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
 // Modal para "Retornar"
 function mostrarModalRetornar(ordemId) {
     const modalElement = document.getElementById('confirmRetornoModal');
-    const modal = new bootstrap.Modal(modalElement);
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
     const modalTitle = document.getElementById('confirmRetornoModalLabel');
 
     modalTitle.innerHTML = `Retornar Ordem`;
