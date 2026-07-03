@@ -104,6 +104,7 @@ urlpatterns = [
     path('api/recebimento/sincronizar/', recebimento.sincronizar_recebimento, name='recebimento-sincronizar'),
     path('api/recebimento/pendencias/', recebimento.recebimento_pendencias, name='recebimento-pendencias'),
     path('api/recebimento/inspecionados/', recebimento.recebimento_inspecionados, name='recebimento-inspecionados'),
+    path('api/recebimento/ficha-pdf/<int:registro_id>/', recebimento.exportar_ficha_recebimento_pdf, name='recebimento-ficha-pdf'),
     path('api/recebimento/inspecionar/', recebimento.inspecionar_recebimento, name='recebimento-inspecionar'),
     path('api/recebimento/editar-inspecao/', recebimento.editar_recebimento_inspecao, name='recebimento-editar-inspecao'),
     path('api/recebimento/desfazer-inspecao/', recebimento.desfazer_recebimento_inspecao, name='recebimento-desfazer-inspecao'),
