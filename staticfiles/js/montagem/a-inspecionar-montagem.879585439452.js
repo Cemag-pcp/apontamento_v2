@@ -123,6 +123,7 @@ function buscarItensInspecao(pagina) {
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data:</strong> ${item.data}<br>
+                        <strong>📅 Data da carga:</strong> ${item.data_carga || "-"}<br>
                         <strong>⚙️ Máquina:</strong> ${item.maquina}<br>
                         <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
                         <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}

@@ -1,17 +1,17 @@
 document.addEventListener("DOMContentLoaded", () => {
-    buscarItensReinspecao(1); // Chama a função quando a página carrega, começando na página 1
+    buscarItensInspecao(1); // Chama a função quando a página carrega, começando na página 1
 });
 
-document.getElementById("btn-filtrar-reinspecao").addEventListener("click", (event) => {
-    event.preventDefault();
-    buscarItensReinspecao(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
+document.getElementById("btn-filtrar-inspecao").addEventListener("click", (event) => {
+    event.preventDefault(); // Evita o recarregamento da página caso esteja dentro de um formulário
+    buscarItensInspecao(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
 });
 
-document.getElementById("btn-limpar-reinspecao").addEventListener("click", (event) => {
+document.getElementById("btn-limpar-inspecao").addEventListener("click", (event) => {
     event.preventDefault(); // Evita o recarregamento da página caso esteja dentro de um formulário
 
     // Seleciona todos os inputs dentro do formulário
-    const form = document.getElementById("form-filtrar-reinspecao");
+    const form = document.getElementById("form-filtrar-inspecao");
     form.querySelectorAll("input").forEach(input => {
         if (input.type === "checkbox") {
             input.checked = false; // Desmarca checkboxes
@@ -19,20 +19,20 @@ document.getElementById("btn-limpar-reinspecao").addEventListener("click", (even
             input.value = ""; // Limpa inputs de texto e data
         }
     });
-    buscarItensReinspecao(1);
+    buscarItensInspecao(1);
 });
 
-function buscarItensReinspecao(pagina) {
-    let cardsInspecao = document.getElementById("cards-reinspecao");
-    let qtdPendenteInspecao = document.getElementById("qtd-pendente-reinspecao");
-    let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-reinspecao");
-    let itensInspecionar = document.getElementById("itens-reinspecao");
-    let itensFiltradosCor = document.getElementById("itens-filtrados-reinspecao-cor");
-    let itensFiltradosDataInicio = document.getElementById("itens-filtrados-reinspecao-data-inicio");
-    let itensFiltradosDataFim = document.getElementById("itens-filtrados-reinspecao-data-fim");
-    let itensFiltradosInspetor = document.getElementById("itens-filtrados-reinspecao-inspetor");
-    let itensFiltradosPesquisa = document.getElementById("itens-filtrados-reinspecao-pesquisa");
-    let paginacao = document.getElementById("paginacao-reinspecao-montagem");
+
+function buscarItensInspecao(pagina) {
+    let cardsInspecao = document.getElementById("cards-inspecao");
+    let qtdPendenteInspecao = document.getElementById("qtd-pendente-inspecao");
+    let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecao");
+    let itensInspecionar = document.getElementById("itens-inspecionar");
+    let itensFiltradosCor = document.getElementById("itens-filtrados-inspecao-cor");
+    let itensFiltradosTipos = document.getElementById("itens-filtrados-inspecao-tipos");
+    let itensFiltradosData = document.getElementById("itens-filtrados-inspecao-data");
+    let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecao-pesquisa");
+    let paginacao = document.getElementById("paginacao-inspecao-pintura");
 
     // Limpa os cards antes de buscar novos
     cardsInspecao.innerHTML = `<div class="text-center">
@@ -43,44 +43,54 @@ function buscarItensReinspecao(pagina) {
     paginacao.innerHTML = "";
 
     // Coletar os filtros aplicados
-    let maquinasSelecionadas = [];
-    document.querySelectorAll('.form-check-input-reinspecao-montagem:checked').forEach(checkbox => {
-        maquinasSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
+    let coresSelecionadas = [];
+    let tiposSelecionadas = [];
+    document.querySelectorAll('.form-check-input-inspecao:checked').forEach(checkbox => {
+        let label = checkbox.nextElementSibling.textContent.trim();
+        if (label === "PÓ" || label === "PU") {
+            tiposSelecionadas.push(label);
+        } else {
+            coresSelecionadas.push(label);
+        }
     });
 
-    let inspetorSelecionado = [];
-    document.querySelectorAll('.form-check-input-reinspecao-inspetores:checked').forEach(checkbox => {
-        inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
-    });
+    let dataInicio = document.getElementById('data-filtro-inspecao-inicio').value;
+    let dataFim = document.getElementById('data-filtro-inspecao-fim').value;
 
-    let dataSelecionadaInicio = document.getElementById('data-inicio-reinspecao').value;
-    let dataSelecionadaFim = document.getElementById('data-fim-reinspecao').value;
-    let pesquisarInspecao = document.getElementById('pesquisar-peca-reinspecao').value;
+    let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecao').value;
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
-    if (maquinasSelecionadas.length > 0) {
-        params.append("maquinas", maquinasSelecionadas.join(","));
+    if (coresSelecionadas.length > 0) {
+        params.append("cores", coresSelecionadas.join(","));
         itensFiltradosCor.style.display = "block";
-        itensFiltradosCor.textContent = "maquinas: " + maquinasSelecionadas.join(", ");
+        itensFiltradosCor.textContent = "Cores: " + coresSelecionadas.join(", ");
     } else {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataSelecionadaInicio) {
-        params.append("data_inicio", dataSelecionadaInicio);
-        itensFiltradosDataInicio.style.display = "block";
-        itensFiltradosDataInicio.textContent = "De: " + dataSelecionadaInicio;
+    if (tiposSelecionadas.length > 0) {
+        params.append("tipos_tinta", tiposSelecionadas.join(","));
+        itensFiltradosTipos.style.display = "block";
+        itensFiltradosTipos.textContent = "Tipo de Tinta: " + tiposSelecionadas.join(", ");
     } else {
-        itensFiltradosDataInicio.style.display = "none";
+        itensFiltradosTipos.style.display = "none";
     }
 
-    if (dataSelecionadaFim) {
-        params.append("data_fim", dataSelecionadaFim);
-        itensFiltradosDataFim.style.display = "block";
-        itensFiltradosDataFim.textContent = "Até: " + dataSelecionadaFim;
+    if (dataInicio) {
+        params.append("data_inicio", dataInicio);
+        itensFiltradosData.style.display = "block";
+        itensFiltradosData.textContent = "De: " + dataInicio;
     } else {
-        itensFiltradosDataFim.style.display = "none";
+        itensFiltradosData.style.display = "none";
+    }
+
+    if (dataFim) {
+        params.append("data_fim", dataFim);
+        itensFiltradosData.style.display = "block";
+        itensFiltradosData.textContent = "Até: " + dataFim;
+    } else {
+        itensFiltradosData.style.display = "none";
     }
 
     if (pesquisarInspecao) {
@@ -91,17 +101,9 @@ function buscarItensReinspecao(pagina) {
         itensFiltradosPesquisa.style.display = "none";
     }
 
-    if (inspetorSelecionado.length > 0) {
-        params.append("inspetores", inspetorSelecionado.join(","));
-        itensFiltradosInspetor.style.display = "block";
-        itensFiltradosInspetor.textContent = "Inspetores: " + inspetorSelecionado.join(", ");
-    } else {
-        itensFiltradosInspetor.style.display = "none";
-    }
-
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
-    fetch(`/inspecao/api/itens-reinspecao-montagem/?${params.toString()}`, {
+    fetch(`/inspecao/api/itens-inspecao-pintura/?${params.toString()}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -143,29 +145,33 @@ function buscarItensReinspecao(pagina) {
                     <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                     <p>Inspecao #${item.id}</p>
                     <p>
-                        <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
-                        <strong>🧮 Conformidade:</strong> ${item.conformidade}<br>
-                        <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade}<br>
+                        <strong>📅 Dt. Produzida:</strong> ${item.data}<br>
+                        <strong>📅 Data da carga:</strong> ${item.data_carga || "-"}<br>
+                        <strong>📍 Tipo:</strong> ${item.tipo}<br>
+                        <strong>🎨 Cor:</strong> ${item.cor}<br>
+                        <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
+                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
                     </p>
                     <hr>
                     <button 
                         data-id="${item.id}"
                         data-data="${item.data}"
-                        data-nao-conformidade="${item.nao_conformidade}"
-                        data-conformidade="${item.conformidade}"
+                        data-qtd="${item.qtd_apontada}"
+                        data-tipo="${item.tipo}"
                         data-cor="${item.cor}"
                         data-peca="${item.peca}"
-                    class="btn btn-dark w-100 iniciar-reinspecao">
-                    Iniciar Reinspeção</button>
+                    class="btn btn-dark w-100 iniciar-inspecao">
+                    Iniciar Inspeção</button>
                 </div>
             </div>`;
 
             cardsInspecao.innerHTML += cards;
         });
 
-        itensInspecionar.textContent = "Itens a Reinspecionar";
+        itensInspecionar.textContent = "Itens a Inspecionar";
 
         // Adiciona a paginação
+              // Adiciona a paginação com reticências
         if (items.total_paginas > 1) {
             let paginacaoHTML = `<nav aria-label="Page navigation">
                 <ul class="pagination justify-content-center">`;
@@ -177,7 +183,7 @@ function buscarItensReinspecao(pagina) {
             const adicionarLinkPagina = (i) => {
                 paginacaoHTML += `
                     <li class="page-item ${i === paginaAtual ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="buscarItensReinspecao(${i})">${i}</a>
+                        <a class="page-link" href="#" onclick="buscarItensInspecao(${i})">${i}</a>
                     </li>`;
             };
 
