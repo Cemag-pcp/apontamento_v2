@@ -578,22 +578,8 @@ def _calcular_peso_chapas_corte(propriedade, qtd_chapas):
         quantidade = _parse_decimal_br(propriedade.quantidade if propriedade else None) or 0
 
     espessura = float(espessura_chapa.espessura)
-
-    # Usa a largura do cadastro como valor autoritativo quando disponível.
-    # A parsed do descricao_mp usa min() das duas dimensões, mas o cadastro
-    # define explicitamente a largura padrão da chapa.
-    largura_cadastro = float(espessura_chapa.largura) if espessura_chapa.largura else None
-    largura_efetiva = largura_cadastro if largura_cadastro is not None else dados_chapa['largura']
-
-    # Comprimento: a outra dimensão da descrição (aquela que não é a largura).
-    dim_parsed_a = dados_chapa['largura']    # min das duas dims
-    dim_parsed_b = dados_chapa['comprimento'] # max das duas dims
-    if largura_cadastro is not None and abs(largura_cadastro - dim_parsed_a) < 1:
-        comprimento_efetivo = dim_parsed_b
-    elif largura_cadastro is not None and abs(largura_cadastro - dim_parsed_b) < 1:
-        comprimento_efetivo = dim_parsed_a
-    else:
-        comprimento_efetivo = dim_parsed_b
+    largura_efetiva = dados_chapa['largura']
+    comprimento_efetivo = dados_chapa['comprimento']
 
     peso_total = (
         largura_efetiva
@@ -614,8 +600,8 @@ def _calcular_peso_chapas_corte(propriedade, qtd_chapas):
         'codigo': espessura_chapa.codigo,
         'tipo_chapa': tipo_chapa,
         'tipo_chapa_display': espessura_chapa.get_tipo_chapa_display() if tipo_chapa and tipo_chapa == espessura_chapa.tipo_chapa else '',
-        'largura': largura_efetiva,
-        'comprimento': comprimento_efetivo,
+        'largura': dados_chapa['largura'],
+        'comprimento': dados_chapa['comprimento'],
         'quantidade_chapas': quantidade,
         'peso_total': round(peso_total, 3),
     }
