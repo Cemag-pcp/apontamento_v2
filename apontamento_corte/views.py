@@ -552,8 +552,12 @@ def _extrair_dados_chapa(descricao_mp):
     largura = min(dimensao_a, dimensao_b)
     comprimento = max(dimensao_a, dimensao_b)
 
+    # Remove sufixo de unidade da espessura (ex: "2,65 mm" → "2,65")
+    # para bater com como_aparece_planilha no cadastro de chapas.
+    espessura_planilha = re.sub(r'\s*mm\s*$', '', match.group('espessura').strip(), flags=re.IGNORECASE)
+
     return {
-        'espessura_planilha': match.group('espessura').strip(),
+        'espessura_planilha': espessura_planilha,
         'largura': largura,
         'comprimento': comprimento,
     }
