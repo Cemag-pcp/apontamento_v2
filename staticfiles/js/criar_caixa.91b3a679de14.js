@@ -71,13 +71,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Salvar pacote
     btnSalvarPacote.addEventListener('click', async function () {
+        if (this.disabled) return;
+        this.disabled = true;
         const data = dataCarga.value;
         const carga = selectCarga.value;
         const clienteId = selectCliente.value;
         const observacoes = document.getElementById('observacoes').value;
 
         btnSalvarPacote.innerHTML = 'salvando...'
-        btnSalvarPacote.disabled = true;
 
         const checkboxesSelecionados = document.querySelectorAll('.carreta-checkbox:checked');
 

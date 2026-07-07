@@ -43,8 +43,7 @@ document.getElementById('formConfirmarPacote').addEventListener('submit', async 
 
     const currentCargaId = document.getElementById('idCargaPacote').value;
     const modalElVisualizarPacotes = document.getElementById('visualizarPacote');
-    const modalVisualizarPacotes = bootstrap.Modal.getInstance(modalElVisualizarPacotes) || new bootstrap.Modal(modalElVisualizarPacotes);
-    modalVisualizarPacotes.show();
+    bootstrap.Modal.getOrCreateInstance(modalElVisualizarPacotes).show();
 
     if (currentCargaId) {
       popularPacotesDaCarga(currentCargaId);

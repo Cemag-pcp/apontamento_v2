@@ -1019,12 +1019,10 @@ export function wireModalAlterarPacote(){
 
       // fecha modal
       const modalEl = document.getElementById('modalAlterarPacote');
-      const modal   = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-      modal.hide();
+      bootstrap.Modal.getOrCreateInstance(modalEl).hide();
 
       const modalElVisualizarPacotes = document.getElementById('visualizarPacote');
-      const modalVisualizarPacotes   = bootstrap.Modal.getInstance(modalElVisualizarPacotes) || new bootstrap.Modal(modalElVisualizarPacotes);
-      modalVisualizarPacotes.show();
+      bootstrap.Modal.getOrCreateInstance(modalElVisualizarPacotes).show();
 
       popularPacotesDaCarga(cargaId);
 
@@ -1210,7 +1208,7 @@ async function abrirModalPendencias(cargaId) {
   conteudo.classList.add('d-none');
   tbody.innerHTML = '';
 
-  const modal = new bootstrap.Modal(modalEl);
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
   modal.show();
 
   async function carregarPendencias() {
