@@ -1122,22 +1122,26 @@ document.addEventListener("change", (event) =>{
                 const option = selectInspetor.options[i];
                 option.disabled = true;
             }
-            optionAutoInspecaoNoturna.textContent = "autoInspecaoNoturna";
-            optionAutoInspecaoNoturna.disabled = false;
-            optionAutoInspecaoNoturna.selected = true;
-             
+            if (optionAutoInspecaoNoturna) {
+                optionAutoInspecaoNoturna.textContent = "autoInspecaoNoturna";
+                optionAutoInspecaoNoturna.disabled = false;
+                optionAutoInspecaoNoturna.selected = true;
+            }
+
         }else{
             // Pegar a data atual formatada
             const formattedDate = currentDate.toISOString().split('T')[0];
             document.getElementById('inspectionModal').querySelector('#dataInspecao').value = formattedDate;
-            
+
             for (let i = 0; i < selectInspetor.options.length; i++) {
                 const option = selectInspetor.options[i];
                 option.disabled = false;
             }
-            optionAutoInspecaoNoturna.textContent = "autoInspecaoNoturna - Indisponível";
-            optionAutoInspecaoNoturna.disabled = true;
-            optionAutoInspecaoNoturna.selected = false;
+            if (optionAutoInspecaoNoturna) {
+                optionAutoInspecaoNoturna.textContent = "autoInspecaoNoturna - Indisponível";
+                optionAutoInspecaoNoturna.disabled = true;
+                optionAutoInspecaoNoturna.selected = false;
+            }
         }
 
     }
