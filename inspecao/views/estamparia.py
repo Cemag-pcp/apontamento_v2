@@ -50,7 +50,7 @@ def inspecao_estamparia(request):
     maquinas = Maquina.objects.filter(setor__nome="estamparia", tipo="maquina")
     motivos = Causas.objects.filter(setor="estamparia")
     inspetores = Profile.objects.filter(
-        tipo_acesso="inspetor", permissoes__nome="inspecao/estamparia"
+        tipo_acesso="inspetor", permissoes__nome="controle-de-qualidade/estamparia"
     )
 
     inspetores = [
@@ -67,7 +67,7 @@ def inspecao_estamparia(request):
     if (
         user_profile
         and user_profile.tipo_acesso == "inspetor"
-        and user_profile.permissoes.filter(nome="inspecao/estamparia").exists()
+        and user_profile.permissoes.filter(nome="controle-de-qualidade/estamparia").exists()
     ):
         inspetor_logado = {"nome_usuario": request.user.username, "id": request.user.id}
     else:
