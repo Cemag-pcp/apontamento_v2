@@ -919,7 +919,7 @@ function validarFormulario() {
     }
 
     // 1. Validação de peças mortas
-    const pecaMortaSim = document.getElementById("pecaMortaSim").checked;
+    const pecaMortaSim = document.getElementById("pecaMortaSim").checked;
     if (pecaMortaSim) {
         const quantidade = parseInt(document.getElementById("numPecaDefeituosa").value);
         const causasSelecionadas = document.querySelectorAll("#causasPecaMorta .causa-checkbox:checked").length;
@@ -938,7 +938,7 @@ function validarFormulario() {
                 title: "Por favor, selecione pelo menos uma causa para as peças mortas."
             });
             return false;
-        }
+        }
     }
 
     // 2. Validacao das medicoes tecnicas conforme as linhas exibidas 
@@ -1151,10 +1151,12 @@ function resetInspetorSelect(){
         const option = selectInspetor.options[i];
         option.disabled = false;
     }
-    
-    optionAutoInspecaoNoturna.textContent = "autoInspecaoNoturna - Indisponível";
-    optionAutoInspecaoNoturna.disabled = true;
-    optionAutoInspecaoNoturna.selected = false;
+
+    if (optionAutoInspecaoNoturna) {
+        optionAutoInspecaoNoturna.textContent = "autoInspecaoNoturna - Indisponível";
+        optionAutoInspecaoNoturna.disabled = true;
+        optionAutoInspecaoNoturna.selected = false;
+    }
 }
 
 

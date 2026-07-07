@@ -295,17 +295,13 @@ def get_itens_inspecao_estamparia(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    inspecoes_ids = set(
-        DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
-    )
-
     # Captura os parâmetros enviados na URL
     maquinas_filtradas = (
         request.GET.get("maquinas", "").split(",")
         if request.GET.get("maquinas")
         else []
     )
-    
+
     data_inicio = request.GET.get("data_inicio", None)
     data_fim = request.GET.get("data_fim", None)
 
@@ -313,9 +309,9 @@ def get_itens_inspecao_estamparia(request):
     pagina = int(request.GET.get("pagina", 1))  # Página atual, padrão é 1
     itens_por_pagina = 12  # Itens por página
 
-    # Filtra os dados
+    # Filtra os dados — usa subquery para evitar carregar todos os IDs em memória
     datas = Inspecao.objects.filter(pecas_ordem_estamparia__isnull=False).exclude(
-        id__in=inspecoes_ids
+        id__in=DadosExecucaoInspecao.objects.values("inspecao")
     )
 
     quantidade_total = datas.count()  # Total de itens sem filtro
@@ -345,7 +341,9 @@ def get_itens_inspecao_estamparia(request):
 
     datas = datas.select_related(
         "pecas_ordem_estamparia",
+        "pecas_ordem_estamparia__peca",
         "pecas_ordem_estamparia__ordem",
+        "pecas_ordem_estamparia__ordem__maquina",
         "pecas_ordem_estamparia__operador",
     ).order_by("-id")
 
@@ -358,10 +356,6 @@ def get_itens_inspecao_estamparia(request):
         data_ajustada = data.data_inspecao - timedelta(hours=3)
         matricula_nome_operador = None
 
-        if data.pecas_ordem_estamparia.operador:
-            matricula_nome_operador = f"{data.pecas_ordem_estamparia.operador.matricula} - {data.pecas_ordem_estamparia.operador.nome}"
-
-        # Operador
         if data.pecas_ordem_estamparia.operador:
             matricula_nome_operador = f"{data.pecas_ordem_estamparia.operador.matricula} - {data.pecas_ordem_estamparia.operador.nome}"
 
