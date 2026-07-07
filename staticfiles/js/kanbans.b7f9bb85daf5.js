@@ -493,6 +493,7 @@ document.getElementById('formAvancarEstagio').addEventListener('submit', async f
 
   const id = document.getElementById('idItemAvancar').value;
   const btnConfirmarAvanco = document.getElementById('btnConfirmarAvanco');
+  if (btnConfirmarAvanco.disabled) return;
   btnConfirmarAvanco.disabled = true;
   btnConfirmarAvanco.innerHTML = 'Confirmando...';
 

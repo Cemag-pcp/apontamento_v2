@@ -214,6 +214,7 @@ document.addEventListener('DOMContentLoaded', function () {
         e.preventDefault();
 
         const btnFormCriar = document.getElementById('btnFormCriar');
+        if (btnFormCriar.disabled) return;
         btnFormCriar.disabled = true;
         btnFormCriar.innerHTML = 'Salvando...';
 
@@ -360,7 +361,7 @@ document.addEventListener('DOMContentLoaded', function () {
             modalCriarEl.addEventListener('hidden.bs.modal', onHidden);
 
             const modalElVisualizarPacotes = document.getElementById('visualizarPacote');
-            const modalVisualizarPacotes   = bootstrap.Modal.getInstance(modalElVisualizarPacotes) || new bootstrap.Modal(modalElVisualizarPacotes);
+            const modalVisualizarPacotes   = bootstrap.Modal.getOrCreateInstance(modalElVisualizarPacotes);
             modalVisualizarPacotes.show();
 
             const idCargaPacoteEl = document.getElementById('idCargaPacote');
@@ -392,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Botão voltar (sem salvar, só troca os modais)
     btnVoltar.addEventListener('click', function () {
         const modalCriar = bootstrap.Modal.getInstance(document.getElementById('criarPacoteModal'));
-        const modalVisualizar = new bootstrap.Modal(document.getElementById('visualizarPacote'));
+        const modalVisualizar = bootstrap.Modal.getOrCreateInstance(document.getElementById('visualizarPacote'));
         modalCriar.hide();
         setTimeout(() => modalVisualizar.show(), 300);
     });
