@@ -578,9 +578,12 @@ def _calcular_peso_chapas_corte(propriedade, qtd_chapas):
         quantidade = _parse_decimal_br(propriedade.quantidade if propriedade else None) or 0
 
     espessura = float(espessura_chapa.espessura)
+    largura_efetiva = dados_chapa['largura']
+    comprimento_efetivo = dados_chapa['comprimento']
+
     peso_total = (
-        dados_chapa['largura']
-        * dados_chapa['comprimento']
+        largura_efetiva
+        * comprimento_efetivo
         * espessura
         * 7.85
         * 10 ** -6

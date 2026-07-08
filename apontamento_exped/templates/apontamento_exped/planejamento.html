@@ -674,6 +674,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
+<script type="importmap">
+{
+  "imports": {
+    "{% get_static_prefix %}js/criar_caixa.js": "{% static 'js/criar_caixa.js' %}",
+    "{% get_static_prefix %}js/carregar_cargas.js": "{% static 'js/carregar_cargas.js' %}",
+    "{% get_static_prefix %}js/kanbans.js": "{% static 'js/kanbans.js' %}",
+    "{% get_static_prefix %}js/confirmar_pacote.js": "{% static 'js/confirmar_pacote.js' %}",
+    "{% get_static_prefix %}js/criar_pacote.js": "{% static 'js/criar_pacote.js' %}",
+    "{% get_static_prefix %}js/verificar_carretas.js": "{% static 'js/verificar_carretas.js' %}"
+  }
+}
+</script>
+
 <script type="module" src="{% static 'js/criar_caixa.js' %}"></script>
 <script type="module" src="{% static 'js/carregar_cargas.js' %}"></script>
 <script type="module" src="{% static 'js/kanbans.js' %}"></script>
