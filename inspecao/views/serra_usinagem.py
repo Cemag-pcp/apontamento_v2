@@ -56,7 +56,7 @@ def inspecao_serra_usinagem(request):
 
     motivos = Causas.objects.filter(setor="serra-usinagem")
     inspetores = Profile.objects.filter(
-        tipo_acesso="inspetor", permissoes__nome="inspecao/serra-usinagem"
+        tipo_acesso="inspetor", permissoes__nome="controle-de-qualidade/serra-usinagem"
     )
 
     inspetores = [
@@ -73,7 +73,7 @@ def inspecao_serra_usinagem(request):
     if (
         user_profile
         and user_profile.tipo_acesso == "inspetor"
-        and user_profile.permissoes.filter(nome="inspecao/serra-usinagem").exists()
+        and user_profile.permissoes.filter(nome="controle-de-qualidade/serra-usinagem").exists()
     ):
         inspetor_logado = {"nome_usuario": request.user.username, "id": request.user.id}
     else:
