@@ -982,7 +982,7 @@ function atualizarStatusOrdem(ordemId, grupoMaquina, status, idMaquinaPlanejada)
 
 // Modal para "Interromper"
 function mostrarModalInterromper(ordemId, grupoMaquina) {
-    const modal = new bootstrap.Modal(document.getElementById('modalInterromper'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalInterromper'));
     const modalTitle = document.getElementById('modalInterromperLabel');
     const formInterromper = document.getElementById('formInterromperOrdemCorte');
 
@@ -1060,7 +1060,7 @@ function mostrarModalInterromper(ordemId, grupoMaquina) {
 }
 
 function mostrarModalRetornarOrdemIniciada(ordemId, container) {
-    const modalRetornarProcessoIniciado = new bootstrap.Modal(document.getElementById('modalRetornarProcessoIniciado'));
+    const modalRetornarProcessoIniciado = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalRetornarProcessoIniciado'));
     const textRetorno = document.getElementById('text-confirm');
     const modalTitle = document.getElementById("modalExcluirRetorno");
     const form = document.getElementById('formRetornarProcessoIniciado');
@@ -1123,7 +1123,7 @@ function mostrarModalRetornarOrdemIniciada(ordemId, container) {
 
 // Modal para "Iniciar"
 function mostrarModalIniciar(ordemId, grupoMaquina, idMaquinaPlanejada) {
-    const modal = new bootstrap.Modal(document.getElementById('modalIniciar'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalIniciar'));
     const modalTitle = document.getElementById('modalIniciarLabel');
 
     Swal.fire({
@@ -1234,7 +1234,7 @@ function mostrarModalIniciar(ordemId, grupoMaquina, idMaquinaPlanejada) {
 
 // Modal para "Parcial"
 function mostrarModalFinalizarParcial(ordemId, grupoMaquina) {
-    const modal = new bootstrap.Modal(document.getElementById('modalFinalizarParcial'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalFinalizarParcial'));
     const modalTitle = document.getElementById('modalFinalizarParcialLabel');
     const formFinalizar = document.getElementById('formFinalizarParcial');
 
@@ -1369,7 +1369,7 @@ function mostrarModalFinalizarParcial(ordemId, grupoMaquina) {
 
 // Modal para mandar para mandar para "Proximo processo"
 function mostrarModalProxProcesso(ordemId, grupoMaquina) {
-    const modal = new bootstrap.Modal(document.getElementById('modalProxProcesso'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalProxProcesso'));
     const modalTitle = document.getElementById('modalProxProcessoLabel');
 
     const colQtdProxProcesso = document.getElementById('colQtdProxProcesso');
@@ -1497,7 +1497,7 @@ function mostrarModalProxProcesso(ordemId, grupoMaquina) {
 
 // Modal para para "Iniciar próximo processo"
 function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
-    const modal = new bootstrap.Modal(document.getElementById('modalProxProcesso'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalProxProcesso'));
     const modalTitle = document.getElementById('modalProxProcessoLabel');
 
     // const escolhaMaquina = document.getElementById('escolhaMaquinaProxProcesso');
@@ -1637,7 +1637,7 @@ function mostrarModalIniciarProxProcesso(ordemId, grupoMaquina) {
 
 // Modal para "Finalizar"
 function mostrarModalFinalizar(ordemId, grupoMaquina) {
-    const modal = new bootstrap.Modal(document.getElementById('modalFinalizar'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalFinalizar'));
     const modalTitle = document.getElementById('modalFinalizarLabel');
     const formFinalizar = document.getElementById('formFinalizarOrdemEstamparia');
 
@@ -1780,7 +1780,7 @@ function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
 
     // const maquinaTratada = maquina.toLowerCase().replace(" ","_");
 
-    const modal = new bootstrap.Modal(document.getElementById('modalRetornar'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalRetornar'));
     const modalTitle = document.getElementById('modalRetornarLabel');
     const formRetornar = document.getElementById('formRetornarProducao');
 
@@ -1870,7 +1870,7 @@ function mostrarModalRetornar(ordemId, grupoMaquina, maquina) {
 
 // Modal para "Excluir"
 function mostrarModalExcluir(ordemId, setor) {
-    const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalExcluir'));
     const modalTitle = document.getElementById('modalExcluirLabel');
     const formExcluir = document.getElementById('formExcluir');
 
@@ -1997,7 +1997,7 @@ async function handleSubmit(event) {
             resetarCardsInicial();
 
             // Abre o modal correto
-            const modal = new bootstrap.Modal(document.getElementById('modalIniciarAposPlanejar'));
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalIniciarAposPlanejar'));
             modal.show();
 
             // Remove event listeners antigos antes de adicionar novos
