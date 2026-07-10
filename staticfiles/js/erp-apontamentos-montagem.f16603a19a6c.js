@@ -165,7 +165,7 @@ function renderRows(rows) {
     const visibleRows = rows.filter((row) => !pendingApontamentoIds.has(Number(row.id)));
 
     if (!visibleRows.length) {
-        tbody.innerHTML = '<tr><td colspan="14" class="text-center text-muted py-4">Nenhum apontamento encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" class="text-center text-muted py-4">Nenhum apontamento encontrado.</td></tr>';
         return;
     }
 
@@ -181,6 +181,7 @@ function renderRows(rows) {
             <td>${badgeApontado(row.apontado)}</td>
             <td>${escapeHtml(chaveApontamentoExibida(row) || '-')}</td>
             <td>${escapeHtml(row.resp_apontamento || row.resp_apontamento_username || '-')}</td>
+            <td>${escapeHtml(row.data_inicio_ordem || '-')}</td>
             <td>${escapeHtml(row.data_producao || '-')}</td>
             <td>${escapeHtml(row.data_apontamento || '-')}</td>
             <td>${escapeHtml(row.obs_operador || '-')}</td>
@@ -194,7 +195,7 @@ function renderRows(rows) {
 function removeRowFromTable(itemId) {
     tbody.querySelector(`tr[data-item-id="${Number(itemId)}"]`)?.remove();
     if (!tbody.querySelector('tr[data-item-id]')) {
-        tbody.innerHTML = '<tr><td colspan="14" class="text-center text-muted py-4">Nenhum apontamento encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" class="text-center text-muted py-4">Nenhum apontamento encontrado.</td></tr>';
     }
 }
 
@@ -307,7 +308,7 @@ async function loadPage(page = 1) {
         });
     } catch (error) {
         if (error.name === 'AbortError') return;
-        tbody.innerHTML = '<tr><td colspan="14" class="text-center text-danger py-4">Falha ao carregar os apontamentos.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" class="text-center text-danger py-4">Falha ao carregar os apontamentos.</td></tr>';
         paginationControlsEl.innerHTML = '';
         paginationInfoEl.textContent = '-';
         resumoEl.textContent = 'Erro ao consultar dados';
