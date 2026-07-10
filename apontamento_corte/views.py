@@ -2296,14 +2296,15 @@ def api_ordens_finalizadas_mp(request):
 def api_ordens_criadas(request):
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT 
+            SELECT
                 TO_CHAR(o.data_criacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS data_criacao,
                 COALESCE(o.ordem::TEXT, o.ordem_duplicada) AS ordem,
                 poc.peca,
                 poc.qtd_planejada,
                 o.status_atual,
                 m.nome AS maquina,
-                TO_CHAR(o.ultima_atualizacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS ultima_atualizacao
+                TO_CHAR(o.ultima_atualizacao - interval '3 hours', 'DD/MM/YYYY HH24:MI') AS ultima_atualizacao,
+                o.sequenciada
             FROM apontamento_v2.core_ordem o
             INNER JOIN apontamento_v2.apontamento_corte_pecasordem poc ON poc.ordem_id = o.id
             LEFT JOIN apontamento_v2.cadastro_maquina m ON m.id = o.maquina_id

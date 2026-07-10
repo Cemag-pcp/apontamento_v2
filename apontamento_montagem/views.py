@@ -2212,6 +2212,13 @@ def api_erp_apontamentos_montagem(request):
         .order_by('-data_apontamento', '-id')
     )
 
+    subquery_data_inicio_ordem = (
+        OrdemProcesso.objects
+        .filter(ordem_id=OuterRef('ordem_id'), status='iniciada')
+        .order_by('data_inicio')
+        .values('data_inicio')[:1]
+    )
+
     queryset = (
         PecasOrdem.objects
         .filter(
@@ -2231,6 +2238,7 @@ def api_erp_apontamentos_montagem(request):
             ordem_data_apontamento_ref=Subquery(subquery_ordem_apontada.values('data_apontamento')[:1]),
             ordem_chave_apontamento_ref=Subquery(subquery_ordem_apontada.values('chave_apontamento')[:1]),
             ordem_resp_username_ref=Subquery(subquery_ordem_apontada.values('resp_apontamento__username')[:1]),
+            data_inicio_ordem=Subquery(subquery_data_inicio_ordem),
         )
         .filter(data_producao_real__date__gte=date(2026, 6, 24))
         .order_by('data_producao_real', 'id')
@@ -2309,6 +2317,11 @@ def api_erp_apontamentos_montagem(request):
             'ordem_data_apontamento': (
                 localtime(item.ordem_data_apontamento_ref).strftime('%d/%m/%Y %H:%M')
                 if getattr(item, 'ordem_data_apontamento_ref', None)
+                else ''
+            ),
+            'data_inicio_ordem': (
+                localtime(item.data_inicio_ordem).strftime('%d/%m/%Y %H:%M')
+                if getattr(item, 'data_inicio_ordem', None)
                 else ''
             ),
         })
