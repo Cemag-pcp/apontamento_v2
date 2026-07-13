@@ -112,6 +112,8 @@
         /* Elimina qualquer margin-left no content */
         #layoutSidenav #layoutSidenav_content,
         .sb-sidenav-toggled #layoutSidenav #layoutSidenav_content { margin-left: 0 !important; }
+        /* Cria contexto de contenção para table-responsive funcionar */
+        #layoutSidenav #layoutSidenav_content { overflow-x: hidden; }
         /* Elimina overlay ::before do SB Admin apenas no desktop */
         @media (min-width: 992px) {
             .sb-sidenav-toggled #layoutSidenav #layoutSidenav_content::before { display: none !important; }
