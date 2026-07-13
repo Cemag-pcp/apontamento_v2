@@ -1,5 +1,6 @@
 from django.conf import settings
-from django.http import JsonResponse, Http404
+import csv
+from django.http import JsonResponse, Http404, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.utils.timezone import now,localtime
@@ -2599,12 +2600,147 @@ def api_apontamento_qrcode(request):
         })
     except Ordem.DoesNotExist:
         return JsonResponse(
-            {'status': 'error', 'message': 'Ordem não encontrada'}, 
+            {'status': 'error', 'message': 'Ordem não encontrada'},
             status=404
         )
-    
+
     except Exception as e:
         return JsonResponse(
-            {'status': 'error', 'message': str(e)}, 
+            {'status': 'error', 'message': str(e)},
             status=500
         )
+
+
+@login_required
+def historico_montagem(request):
+    return render(request, "apontamento_montagem/historico_montagem.html")
+
+
+def _build_historico_queryset(filtros):
+    subquery_data_inicio = (
+        OrdemProcesso.objects
+        .filter(ordem_id=OuterRef('ordem_id'), status='iniciada')
+        .order_by('data_inicio')
+        .values('data_inicio')[:1]
+    )
+
+    queryset = (
+        PecasOrdem.objects
+        .filter(ordem__grupo_maquina='montagem')
+        .select_related('ordem', 'ordem__maquina', 'ordem__operador_final', 'operador')
+        .annotate(
+            data_producao_real=Coalesce('processo_ordem__data_inicio', 'data_apontamento', 'data'),
+            data_inicio_ordem=Subquery(subquery_data_inicio),
+        )
+    )
+
+    if filtros.get('ordem'):
+        queryset = queryset.filter(ordem__ordem__icontains=filtros['ordem'])
+
+    if filtros.get('peca'):
+        queryset = queryset.filter(peca__icontains=filtros['peca'])
+
+    if filtros.get('maquina'):
+        queryset = queryset.filter(ordem__maquina__nome__icontains=filtros['maquina'])
+
+    if filtros.get('status'):
+        queryset = queryset.filter(ordem__status_atual=filtros['status'])
+
+    data_producao_inicio = parse_date(filtros.get('data_producao_inicio', '') or '')
+    data_producao_fim = parse_date(filtros.get('data_producao_fim', '') or '')
+    data_carga_inicio = parse_date(filtros.get('data_carga_inicio', '') or '')
+    data_carga_fim = parse_date(filtros.get('data_carga_fim', '') or '')
+
+    if data_producao_inicio:
+        queryset = queryset.filter(data_producao_real__date__gte=data_producao_inicio)
+    if data_producao_fim:
+        queryset = queryset.filter(data_producao_real__date__lte=data_producao_fim)
+    if data_carga_inicio:
+        queryset = queryset.filter(ordem__data_carga__gte=data_carga_inicio)
+    if data_carga_fim:
+        queryset = queryset.filter(ordem__data_carga__lte=data_carga_fim)
+
+    return queryset.order_by('-data_producao_real', '-id')
+
+
+def _historico_row_dict(item):
+    operador = item.operador or (item.ordem.operador_final if item.ordem else None)
+    return {
+        'id': item.id,
+        'ordem': item.ordem.ordem if item.ordem else '',
+        'peca_codigo': _extrair_codigo_peca(item.peca),
+        'peca_descricao': _extrair_descricao_peca(item.peca),
+        'maquina': item.ordem.maquina.nome if item.ordem and item.ordem.maquina else '',
+        'operador': f"{operador.matricula} - {operador.nome}" if operador else '',
+        'qtd_planejada': item.qtd_planejada,
+        'qtd_boa': item.qtd_boa,
+        'qtd_morta': item.qtd_morta,
+        'status': item.ordem.status_atual if item.ordem else '',
+        'data_inicio': localtime(item.data_inicio_ordem).strftime('%d/%m/%Y %H:%M') if getattr(item, 'data_inicio_ordem', None) else '',
+        'data_producao': localtime(item.data_producao_real).strftime('%d/%m/%Y %H:%M') if item.data_producao_real else '',
+        'data_carga': item.ordem.data_carga.strftime('%d/%m/%Y') if item.ordem and item.ordem.data_carga else '',
+    }
+
+
+@login_required
+@require_GET
+def api_historico_montagem(request):
+    filtros = {
+        'ordem': request.GET.get('ordem', '').strip(),
+        'peca': request.GET.get('peca', '').strip(),
+        'maquina': request.GET.get('maquina', '').strip(),
+        'status': request.GET.get('status', '').strip(),
+        'data_producao_inicio': request.GET.get('data_producao_inicio', '').strip(),
+        'data_producao_fim': request.GET.get('data_producao_fim', '').strip(),
+        'data_carga_inicio': request.GET.get('data_carga_inicio', '').strip(),
+        'data_carga_fim': request.GET.get('data_carga_fim', '').strip(),
+    }
+
+    queryset = _build_historico_queryset(filtros)
+
+    if request.GET.get('formato') == 'csv':
+        cabecalho = ['Ordem', 'Codigo', 'Descricao', 'Celula', 'Operador', 'Qtd. Planejada', 'Qtd. Boa', 'Qtd. Morta', 'Status', 'Data Inicio', 'Data Producao', 'Data Carga']
+
+        def gerar_linhas():
+            yield cabecalho
+            for item in queryset.iterator(chunk_size=500):
+                row = _historico_row_dict(item)
+                yield [
+                    row['ordem'], row['peca_codigo'], row['peca_descricao'],
+                    row['maquina'], row['operador'], row['qtd_planejada'],
+                    row['qtd_boa'], row['qtd_morta'], row['status'],
+                    row['data_inicio'], row['data_producao'], row['data_carga'],
+                ]
+
+        class EchoWriter:
+            def write(self, value):
+                return value
+
+        writer = csv.writer(EchoWriter(), delimiter=';')
+        response = StreamingHttpResponse(
+            (writer.writerow(linha) for linha in gerar_linhas()),
+            content_type='text/csv; charset=utf-8-sig',
+        )
+        response['Content-Disposition'] = 'attachment; filename="historico_montagem.csv"'
+        return response
+
+    page = max(int(request.GET.get('page', 1) or 1), 1)
+    limit = int(request.GET.get('limit', 100) or 100)
+    limit = min(max(limit, 10), 500)
+
+    paginator = Paginator(queryset, limit)
+    pagina = paginator.get_page(page)
+
+    itens = [_historico_row_dict(item) for item in pagina.object_list]
+
+    return JsonResponse({
+        'results': itens,
+        'pagination': {
+            'page': pagina.number,
+            'page_size': limit,
+            'total_items': paginator.count,
+            'total_pages': paginator.num_pages,
+            'has_next': pagina.has_next(),
+            'has_previous': pagina.has_previous(),
+        },
+    })

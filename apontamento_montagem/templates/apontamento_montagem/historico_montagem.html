@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+<title>Historico | Montagem</title>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4 mb-3">
+        <div>
+            <h1 class="h3 mb-1">Historico de Producao - Montagem</h1>
+            <p class="text-muted mb-0">Consulta paginada. Use os filtros para narrowar os resultados antes de exportar.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" id="btnExportarCSV" class="btn btn-outline-success btn-sm">
+                <i class="fas fa-file-csv me-1"></i> Exportar CSV
+            </button>
+            <button type="button" id="btnAtualizarTabela" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-rotate-right me-1"></i> Atualizar
+            </button>
+            <span id="historicoResumo" class="text-muted small">Carregando...</span>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-filter me-1"></i> Filtros
+        </div>
+        <div class="card-body">
+            <form id="historicoFiltrosForm" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroOrdem">Ordem</label>
+                    <input type="text" class="form-control" id="filtroOrdem" name="ordem" placeholder="Ex.: 12345">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="filtroPeca">Conjunto</label>
+                    <input type="text" class="form-control" id="filtroPeca" name="peca" placeholder="Codigo ou descricao">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroMaquina">Celula</label>
+                    <input type="text" class="form-control" id="filtroMaquina" name="maquina" placeholder="Nome da celula">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroStatus">Status</label>
+                    <select class="form-select" id="filtroStatus" name="status">
+                        <option value="">Todos</option>
+                        <option value="aguardando_iniciar">Aguardando iniciar</option>
+                        <option value="iniciada">Iniciada</option>
+                        <option value="finalizada">Finalizada</option>
+                        <option value="interrompida">Interrompida</option>
+                        <option value="agua_prox_proc">Aguard. prox. processo</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label" for="filtroLimite">Bloco</label>
+                    <select class="form-select" id="filtroLimite" name="limit">
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroDataProdIni">Data producao de</label>
+                    <input type="date" class="form-control" id="filtroDataProdIni" name="data_producao_inicio">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroDataProdFim">Data producao ate</label>
+                    <input type="date" class="form-control" id="filtroDataProdFim" name="data_producao_fim">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroDataCargaIni">Data carga de</label>
+                    <input type="date" class="form-control" id="filtroDataCargaIni" name="data_carga_inicio">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="filtroDataCargaFim">Data carga ate</label>
+                    <input type="date" class="form-control" id="filtroDataCargaFim" name="data_carga_fim">
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary w-100">Aplicar</button>
+                    <button type="button" id="btnLimparFiltros" class="btn btn-outline-secondary w-100">Limpar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-table me-1"></i> Historico</span>
+            <span id="historicoLoadingState" class="small text-muted d-none">Carregando...</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Ordem</th>
+                            <th>Codigo</th>
+                            <th>Descricao</th>
+                            <th>Celula</th>
+                            <th>Operador</th>
+                            <th class="text-end">Qtd. plan.</th>
+                            <th class="text-end">Qtd. boa</th>
+                            <th class="text-end">Qtd. morta</th>
+                            <th>Status</th>
+                            <th>Data inicio</th>
+                            <th>Data producao</th>
+                            <th>Data carga</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historicoTabela">
+                        <tr>
+                            <td colspan="12" class="text-center text-muted py-4">Carregando...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 p-3">
+                <div class="small text-muted" id="historicoPaginationInfo">-</div>
+                <div class="d-flex align-items-center gap-2" id="historicoPaginationControls"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="historicoConfig"
+     data-api-url="{% url 'montagem:api_historico_montagem' %}"
+     data-csrf-token="{{ csrf_token }}">
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/historico-montagem.js' %}"></script>
+{% endblock %}
