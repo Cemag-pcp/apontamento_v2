@@ -2651,6 +2651,11 @@ def _build_historico_queryset(filtros):
     data_carga_inicio = parse_date(filtros.get('data_carga_inicio', '') or '')
     data_carga_fim = parse_date(filtros.get('data_carga_fim', '') or '')
 
+    # Garante sempre um limite de período para não varrer a tabela inteira
+    nenhum_filtro_data = not any([data_producao_inicio, data_producao_fim, data_carga_inicio, data_carga_fim])
+    if nenhum_filtro_data and not filtros.get('ordem'):
+        data_producao_inicio = (now() - timedelta(days=30)).date()
+
     if data_producao_inicio:
         queryset = queryset.filter(data_producao_real__date__gte=data_producao_inicio)
     if data_producao_fim:
