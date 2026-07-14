@@ -2349,6 +2349,13 @@ def editar_planejamento(request):
                         return JsonResponse({"erro": f"Redução maior que a última execução ({ultima_execucao.qtd_boa})."}, status=400)
                     ultima_execucao.qtd_boa = (ultima_execucao.qtd_boa or 0) - reduzir
                 elif delta > 0:
+                    qtd_plan_ref = float(qt_planejada or ultima_execucao.qtd_planejada or 0)
+                    nova_soma = float(soma_atual) + delta
+                    if qtd_plan_ref and nova_soma > qtd_plan_ref:
+                        return JsonResponse(
+                            {"erro": f"Quantidade produzida ({nova_soma:.0f}) não pode exceder a planejada ({qtd_plan_ref:.0f})."},
+                            status=400,
+                        )
                     ultima_execucao.qtd_boa = (ultima_execucao.qtd_boa or 0) + delta
                 # se delta == 0 não altera
                 if delta != 0:
