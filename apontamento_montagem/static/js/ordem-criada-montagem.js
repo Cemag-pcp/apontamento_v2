@@ -997,7 +997,6 @@ document.getElementById('botaoVoltarOperadoresMaquina').addEventListener('click'
 // Finalizar ordem
 document.getElementById('confirmFinalizar').addEventListener('click', function () {
     if (this.disabled) return;
-    this.disabled = true;
     const btnFinalizar = this;
     const ordemId = document.getElementById('ordemIdFinalizar').value;
     const operadorFinal = document.getElementById('operadorFinal');
@@ -1075,6 +1074,7 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
     };
 
     // Optimistic UI: fechar modal e embassar card enquanto processa
+    btnFinalizar.disabled = true;
     const modalElement = document.getElementById('finalizarModal');
     const finalizarModal = bootstrap.Modal.getInstance(modalElement);
     finalizarModal.hide();
@@ -1104,6 +1104,7 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         return response.json();
     })
     .then(data => {
+        btnFinalizar.disabled = false;
         // Remove o card após confirmação do servidor
         if (cardEl && cardEl.parentNode) {
             cardEl.style.opacity = '0';
@@ -1130,7 +1131,6 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
 // Finalizar parcial e continuar ordem
 document.getElementById('confirmFinalizarEContinuar').addEventListener('click', function () {
     if (this.disabled) return;
-    this.disabled = true;
     const btnFinalizarContinuar = this;
     const ordemId = document.getElementById('ordemIdFinalizar').value;
     const operadorFinal = document.getElementById('operadorFinal');
@@ -1210,6 +1210,7 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
     };
 
     // Optimistic UI: fechar modais imediatamente e embassar card enquanto processa
+    btnFinalizarContinuar.disabled = true;
     const modalElement = document.getElementById('finalizarModal');
     const finalizarModal = bootstrap.Modal.getInstance(modalElement);
     finalizarModal.hide();
@@ -1241,6 +1242,7 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         return response.json();
     })
     .then(data => {
+        btnFinalizarContinuar.disabled = false;
         carregarOrdensIniciadas(filtros, true);
         resetarCardsInicial(filtros);
         const chave = data.chave_apontamento ? ` Chave ERP: ${data.chave_apontamento}` : '';
