@@ -369,7 +369,7 @@ def ordens_criadas(request):
     ).order_by("id")
 
     soma_qtd_pendurada = (
-        CambaoPecas.objects.filter(peca_ordem__ordem=OuterRef("pk"))
+        CambaoPecas.objects.filter(peca_ordem__ordem=OuterRef("pk"), status="pendurada")
         .values("peca_ordem__ordem")
         .annotate(
             total_quantidade_pendurada=Sum(
@@ -1405,7 +1405,7 @@ def itens_disponiveis_cambao(request):
     ).order_by("id")
 
     soma_qtd_pendurada = (
-        CambaoPecas.objects.filter(peca_ordem__ordem=OuterRef("pk"))
+        CambaoPecas.objects.filter(peca_ordem__ordem=OuterRef("pk"), status="pendurada")
         .exclude(cambao_id=cambao.id)
         .values("peca_ordem__ordem")
         .annotate(
