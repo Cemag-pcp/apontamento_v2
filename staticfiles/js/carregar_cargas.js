@@ -829,15 +829,14 @@ export async function popularPacotesDaCarga(cargaId) {
 
           // Ao confirmar
           modal.querySelector('#confirmarFotoBtn').onclick = (e) => {
-            
-            const btn = e.currentTarget;   // referÃªncia ao prÃ³prio botÃ£o
+            e.preventDefault();
+            const btn = e.currentTarget;
             btn.innerHTML = 'Confirmando...';
             btn.disabled = true;
 
-            // Aqui vocÃª envia para o backend via fetch/axios/FormData
             const formData = new FormData();
             formData.append('foto', file);
-            formData.append('pacote', pacote.id)
+            formData.append('pacote', pacote.id);
 
             fetch('api/salvar-foto/', {
               method: 'POST',
@@ -846,29 +845,29 @@ export async function popularPacotesDaCarga(cargaId) {
                 'X-CSRFToken': getCookie('csrftoken')
               }
             })
-            .then(res => res.json())
+            .then(async res => {
+              const data = await res.json();
+              if (!res.ok) throw new Error(data?.erro || `Erro ${res.status} ao salvar a foto.`);
+              return data;
+            })
             .then(data => {
+              input.remove();
               Toast.fire({
-                  icon: "success",
-                  title: "Foto salva com sucesso."
+                icon: "success",
+                title: "Foto salva com sucesso."
               });
-
-              console.log(data.info_add.carga_id, data.info_add.etapa, data.info_add.todos_pacotes_tem_foto_verificacao);
-
               atualizarSlotAvancar(data.info_add.carga_id, data.info_add.todos_pacotes_tem_foto_verificacao, data.info_add.etapa);
-
-              btn.innerHTML = 'Confirmar';
-              btn.disabled = false;
-
               bsModal.hide();
             })
             .catch(err => {
-              alert('Erro ao salvar a foto.');
               console.error(err);
+              bsModal.hide();
+              Toast.fire({
+                icon: "error",
+                title: err.message || 'Erro ao salvar a foto.'
+              });
               btn.innerHTML = 'Confirmar';
               btn.disabled = false;
-
-
             });
           };
 
