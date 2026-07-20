@@ -775,6 +775,7 @@ export async function popularPacotesDaCarga(cargaId) {
 
       // BotÃ£o de adicionar foto
       const btnFoto = document.createElement('button');
+      btnFoto.type = 'button';
       btnFoto.className = 'btn btn-outline-secondary btn-sm';
       btnFoto.innerHTML = '<i class="fas fa-camera"></i>';
       btnFoto.title = "Câmera";
@@ -792,89 +793,52 @@ export async function popularPacotesDaCarga(cargaId) {
         }
 
         // Ao selecionar ou tirar a foto
-        input.onchange = () => {
+        input.onchange = async () => {
           const file = input.files[0];
-          if (!file) {
-            input.remove();
-            return;
-          }
+          input.remove();
+          if (!file) return;
 
           const previewURL = URL.createObjectURL(file);
 
-          // Cria modal para confirmaÃ§Ã£o
-          const modal = document.createElement('div');
-          modal.className = 'modal fade';
-          modal.id = 'fotoModal';
-          modal.tabIndex = -1;
-          modal.innerHTML = `
-            <div class="modal-dialog modal-dialog-centered">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title">Confirmar Foto</h5>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                </div>
-                <div class="modal-body text-center">
-                  <img src="${previewURL}" alt="PrÃ©via" class="img-fluid rounded mb-3" />
-                  <button id="confirmarFotoBtn" class="btn btn-success">Confirmar</button>
-                </div>
-              </div>
-            </div>
-          `;
-
-          document.body.appendChild(modal);
-
-          // Exibe o modal
-          const bsModal = new bootstrap.Modal(modal);
-          bsModal.show();
-
-          // Ao confirmar
-          modal.querySelector('#confirmarFotoBtn').onclick = (e) => {
-            e.preventDefault();
-            const btn = e.currentTarget;
-            btn.innerHTML = 'Confirmando...';
-            btn.disabled = true;
-
-            const formData = new FormData();
-            formData.append('foto', file);
-            formData.append('pacote', pacote.id);
-
-            fetch('api/salvar-foto/', {
-              method: 'POST',
-              body: formData,
-              headers: {
-                'X-CSRFToken': getCookie('csrftoken')
+          const result = await Swal.fire({
+            title: 'Confirmar Foto',
+            imageUrl: previewURL,
+            imageAlt: 'Prévia da foto',
+            imageWidth: '100%',
+            confirmButtonText: 'Confirmar',
+            cancelButtonText: 'Cancelar',
+            showCancelButton: true,
+            showLoaderOnConfirm: true,
+            allowOutsideClick: () => !Swal.isLoading(),
+            preConfirm: async () => {
+              const formData = new FormData();
+              formData.append('foto', file);
+              formData.append('pacote', pacote.id);
+              try {
+                const res = await fetch('api/salvar-foto/', {
+                  method: 'POST',
+                  body: formData,
+                  headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                  Swal.showValidationMessage(data?.erro || `Erro ${res.status} ao salvar a foto.`);
+                  return false;
+                }
+                return data;
+              } catch (err) {
+                Swal.showValidationMessage('Erro de conexão ao salvar a foto.');
+                return false;
               }
-            })
-            .then(async res => {
-              const data = await res.json();
-              if (!res.ok) throw new Error(data?.erro || `Erro ${res.status} ao salvar a foto.`);
-              return data;
-            })
-            .then(data => {
-              input.remove();
-              Toast.fire({
-                icon: "success",
-                title: "Foto salva com sucesso."
-              });
-              atualizarSlotAvancar(data.info_add.carga_id, data.info_add.todos_pacotes_tem_foto_verificacao, data.info_add.etapa);
-              bsModal.hide();
-            })
-            .catch(err => {
-              console.error(err);
-              bsModal.hide();
-              Toast.fire({
-                icon: "error",
-                title: err.message || 'Erro ao salvar a foto.'
-              });
-              btn.innerHTML = 'Confirmar';
-              btn.disabled = false;
-            });
-          };
+            }
+          });
 
-          modal.addEventListener('hidden.bs.modal', () => {
-            URL.revokeObjectURL(previewURL);
-            modal.remove();
-          }, { once: true });
+          URL.revokeObjectURL(previewURL);
+
+          if (result.isConfirmed && result.value) {
+            Toast.fire({ icon: "success", title: "Foto salva com sucesso." });
+            atualizarSlotAvancar(result.value.info_add.carga_id, result.value.info_add.todos_pacotes_tem_foto_verificacao, result.value.info_add.etapa);
+          }
         };
 
         // Aciona o input
@@ -884,6 +848,7 @@ export async function popularPacotesDaCarga(cargaId) {
       btnFoto.onclick = () => abrirSelecaoFoto(true);
 
       const btnArquivo = document.createElement('button');
+      btnArquivo.type = 'button';
       btnArquivo.className = 'btn btn-outline-secondary btn-sm';
       btnArquivo.innerHTML = '<i class="fas fa-image"></i>';
       btnArquivo.title = "Selecionar arquivo";
