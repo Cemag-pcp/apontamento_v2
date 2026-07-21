@@ -123,6 +123,104 @@
         text-align: center;
     }
 
+    .controle-pintura-modal .modal-dialog {
+        max-width: 520px;
+    }
+
+    .controle-pintura-modal .modal-content {
+        font-size: .84rem;
+    }
+
+    .controle-pintura-modal .modal-header,
+    .controle-pintura-modal .modal-footer {
+        padding: .65rem .85rem;
+    }
+
+    .controle-pintura-modal .modal-body {
+        padding: .85rem;
+    }
+
+    .controle-pintura-modal .modal-title {
+        font-size: 1rem;
+    }
+
+    .controle-pintura-modal .form-control,
+    .controle-pintura-modal .form-select,
+    .controle-pintura-modal .input-group-text {
+        min-height: 32px;
+        padding: .25rem .5rem;
+        font-size: .84rem;
+    }
+
+    .controle-pintura-form-vertical {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: .65rem .85rem;
+    }
+
+    .controle-pintura-form-vertical .form-label {
+        margin-bottom: .25rem;
+        font-weight: 600;
+    }
+
+    .controle-pintura-form-section {
+        grid-column: 1 / -1;
+    }
+
+    .controle-pintura-form-subtitle {
+        margin: 0 0 .55rem;
+        font-size: .82rem;
+        font-weight: 700;
+        color: #495057;
+        text-transform: uppercase;
+    }
+
+    .controle-pintura-general-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: .65rem .85rem;
+    }
+
+    .controle-pintura-operation-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .65rem .85rem;
+    }
+
+    .controle-pintura-pressure-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .65rem .85rem;
+    }
+
+    .controle-pintura-product-label {
+        display: block;
+        text-align: center;
+    }
+
+    .controle-pintura-product-units {
+        max-width: 260px;
+        margin: 0 auto;
+    }
+
+    .controle-pintura-compact-field {
+        max-width: 180px;
+        margin: 0 auto;
+    }
+
+    @media (max-width: 575.98px) {
+        .controle-pintura-modal .modal-dialog {
+            max-width: none;
+        }
+
+        .controle-pintura-form-vertical,
+        .controle-pintura-general-row,
+        .controle-pintura-operation-row,
+        .controle-pintura-pressure-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
     @page {
         size: A4 landscape;
         margin: 8mm;
@@ -331,85 +429,144 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalControlePintura" tabindex="-1" aria-labelledby="modalControlePinturaLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+<div class="modal fade controle-pintura-modal" id="modalControlePintura" tabindex="-1" aria-labelledby="modalControlePinturaLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalControlePinturaLabel">Controle Pintura</h5>
+                <h5 class="modal-title" id="modalControlePinturaLabel">Controle de Pintura</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
                 <form id="controlePinturaForm">
                     <input type="hidden" id="controleRegistroId">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label for="controleData" class="form-label">Data</label>
-                            <input type="date" class="form-control" id="controleData">
+                    <div class="controle-pintura-form-vertical">
+                        <div class="controle-pintura-form-section">
+                            <h6 class="controle-pintura-form-subtitle">Informa&ccedil;&otilde;es gerais</h6>
+                            <div class="controle-pintura-general-row">
+                                <div>
+                                    <label for="controleData" class="form-label">Data</label>
+                                    <input type="date" class="form-control" id="controleData">
+                                </div>
+                                <div>
+                                    <label for="controleFornecedor" class="form-label">Fornecedor</label>
+                                    <select class="form-select" id="controleFornecedor">
+                                        <option value="" selected></option>
+                                        <option value="Renner">Renner</option>
+                                        <option value="Weg">Weg</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="controleCor" class="form-label">Cor</label>
+                                    <select class="form-select" id="controleCor">
+                                        <option value="" selected></option>
+                                        <option value="Laranja">Laranja</option>
+                                        <option value="Azul">Azul</option>
+                                        <option value="Verde">Verde</option>
+                                        <option value="Vermelho">Vermelho</option>
+                                        <option value="Cinza">Cinza</option>
+                                        <option value="Amarelo">Amarelo</option>
+                                        <option value="Cinza Escuro">Cinza Escuro</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="controleLote" class="form-label">Lote</label>
+                                    <input type="number" class="form-control" id="controleLote" min="0" step="1">
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label for="controleFornecedor" class="form-label">Fornecedor</label>
-                            <select class="form-select" id="controleFornecedor">
-                                <option value="" selected></option>
-                                <option value="Renner">Renner</option>
-                                <option value="Weg">Weg</option>
-                            </select>
+                        <div class="controle-pintura-form-section">
+                            <h6 class="controle-pintura-form-subtitle">Informa&ccedil;&otilde;es de Produto</h6>
+                            <div class="controle-pintura-form-vertical">
+                                <div>
+                                    <label class="form-label controle-pintura-product-label">Tinta</label>
+                                    <div class="row g-2 controle-pintura-product-units">
+                                        <div class="col-6">
+                                            <div class="input-group">
+                                                <span class="input-group-text">L</span>
+                                                <input type="number" class="form-control" id="controleQuantidadeTinta" min="0" step="0.001" aria-label="Quantidade de tinta em litros">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="input-group">
+                                                <span class="input-group-text">Kg</span>
+                                                <input type="number" class="form-control" id="controleQuantidadeTintaKg" min="0" step="0.001" aria-label="Quantidade de tinta em quilos">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label controle-pintura-product-label">Catalizador</label>
+                                    <div class="row g-2 controle-pintura-product-units">
+                                        <div class="col-6">
+                                            <div class="input-group">
+                                                <span class="input-group-text">L</span>
+                                                <input type="number" class="form-control" id="controleCatalizador" min="0" step="0.001" aria-label="Catalizador em litros">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="input-group">
+                                                <span class="input-group-text">Kg</span>
+                                                <input type="number" class="form-control" id="controleCatalizadorKg" min="0" step="0.001" aria-label="Catalizador em quilos">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label controle-pintura-product-label">Diluente</label>
+                                    <div class="row g-2 controle-pintura-product-units">
+                                        <div class="col-6">
+                                            <div class="input-group">
+                                                <span class="input-group-text">L</span>
+                                                <input type="number" class="form-control" id="controleDiluente" min="0" step="0.001" aria-label="Diluente em litros">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="input-group">
+                                                <span class="input-group-text">Kg</span>
+                                                <input type="number" class="form-control" id="controleDiluenteKg" min="0" step="0.001" aria-label="Diluente em quilos">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="controle-pintura-compact-field">
+                                    <label for="controleViscosidade" class="form-label">Viscosidade (s)</label>
+                                    <input type="number" class="form-control" id="controleViscosidade" min="0" step="0.01">
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label for="controleCor" class="form-label">Cor</label>
-                            <select class="form-select" id="controleCor">
-                                <option value="" selected></option>
-                                <option value="Laranja">Laranja</option>
-                                <option value="Azul">Azul</option>
-                                <option value="Verde">Verde</option>
-                                <option value="Vermelho">Vermelho</option>
-                                <option value="Cinza">Cinza</option>
-                                <option value="Amarelo">Amarelo</option>
-                                <option value="Cinza Escuro">Cinza Escuro</option>
-                            </select>
+                        <div class="controle-pintura-form-section">
+                            <h6 class="controle-pintura-form-subtitle">Opera&ccedil;&atilde;o</h6>
+                            <div class="controle-pintura-operation-row">
+                                <div>
+                                    <label for="controlePintor" class="form-label">Pintor</label>
+                                    <input type="text" class="form-control" id="controlePintor">
+                                </div>
+                                <div>
+                                    <label for="controlePistola" class="form-label">Pistola</label>
+                                    <input type="text" class="form-control" id="controlePistola">
+                                </div>
+                                <div>
+                                    <label for="controleDemaos" class="form-label">Qnt de demaos</label>
+                                    <input type="number" class="form-control" id="controleDemaos" min="0" step="1">
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label for="controleLote" class="form-label">Lote</label>
-                            <input type="number" class="form-control" id="controleLote" min="0" step="1">
-                        </div>
-                        <div class="col-md-3">
-                            <label for="controleQuantidadeTinta" class="form-label">Quantidade de tinta</label>
-                            <input type="number" class="form-control" id="controleQuantidadeTinta" min="0" step="0.01">
-                        </div>
-                        <div class="col-md-3">
-                            <label for="controleCatalizador" class="form-label">Catalizador</label>
-                            <input type="text" class="form-control" id="controleCatalizador">
-                        </div>
-                        <div class="col-md-3">
-                            <label for="controleDiluente" class="form-label">Diluente</label>
-                            <input type="text" class="form-control" id="controleDiluente">
-                        </div>
-                        <div class="col-md-3">
-                            <label for="controleViscosidade" class="form-label">Viscosidade (s)</label>
-                            <input type="number" class="form-control" id="controleViscosidade" min="0" step="0.01">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="controlePintor" class="form-label">Pintor</label>
-                            <input type="text" class="form-control" id="controlePintor">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="controlePistola" class="form-label">Pistola</label>
-                            <input type="text" class="form-control" id="controlePistola">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="controleDemaos" class="form-label">Qnt de demaos</label>
-                            <input type="number" class="form-control" id="controleDemaos" min="0" step="1">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="controlePressao1" class="form-label">Pressao do ar (bar)</label>
-                            <input type="number" class="form-control" id="controlePressao1" min="0" step="0.01">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="controlePressao2" class="form-label">Pressao da tinta (bar)</label>
-                            <input type="number" class="form-control" id="controlePressao2" min="0" step="0.01">
-                        </div>
-                        <div class="col-md-4">
-                            <label for="controlePressao3" class="form-label">Pressao da pistola (bar)</label>
-                            <input type="number" class="form-control" id="controlePressao3" min="0" step="0.01">
+                        <div class="controle-pintura-form-section">
+                            <h6 class="controle-pintura-form-subtitle">Press&atilde;o</h6>
+                            <div class="controle-pintura-pressure-row">
+                                <div>
+                                    <label for="controlePressao1" class="form-label">Pressao do ar (bar)</label>
+                                    <input type="number" class="form-control" id="controlePressao1" min="0" step="0.01">
+                                </div>
+                                <div>
+                                    <label for="controlePressao2" class="form-label">Pressao da tinta (bar)</label>
+                                    <input type="number" class="form-control" id="controlePressao2" min="0" step="0.01">
+                                </div>
+                                <div>
+                                    <label for="controlePressao3" class="form-label">Pressao da pistola (bar)</label>
+                                    <input type="number" class="form-control" id="controlePressao3" min="0" step="0.01">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -435,6 +592,11 @@ document.addEventListener('DOMContentLoaded', function() {
     var modalElement = document.getElementById('modalControlePintura');
     var modalTitle = document.getElementById('modalControlePinturaLabel');
     var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    var conversoesControlePintura = [
+        { litrosId: 'controleQuantidadeTinta', kgsId: 'controleQuantidadeTintaKg', kgPorLitro: 1.1 },
+        { litrosId: 'controleCatalizador', kgsId: 'controleCatalizadorKg', kgPorLitro: 0.988 },
+        { litrosId: 'controleDiluente', kgsId: 'controleDiluenteKg', kgPorLitro: 1.086 }
+    ];
 
     function getValue(id) {
         return document.getElementById(id).value.trim();
@@ -447,6 +609,50 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setValue(id, value) {
         document.getElementById(id).value = value || '';
+    }
+
+    function parseDecimal(value) {
+        if (value === null || value === undefined || value === '') return null;
+        var number = parseFloat(String(value).replace(',', '.'));
+        return Number.isFinite(number) ? number : null;
+    }
+
+    function formatDecimal(value) {
+        if (!Number.isFinite(value)) return '';
+        return (Math.round(value * 1000) / 1000).toFixed(3).replace(/\.?0+$/, '');
+    }
+
+    function sincronizarQuantidadeConversao(origem, destino, fator, operacao) {
+        var valor = parseDecimal(origem.value);
+        if (valor === null) {
+            destino.value = '';
+            return;
+        }
+
+        destino.value = formatDecimal(operacao === 'litros-para-kg' ? valor * fator : valor / fator);
+    }
+
+    function atualizarKgsDoModal() {
+        conversoesControlePintura.forEach(function(conversao) {
+            var litrosInput = document.getElementById(conversao.litrosId);
+            var kgsInput = document.getElementById(conversao.kgsId);
+            sincronizarQuantidadeConversao(litrosInput, kgsInput, conversao.kgPorLitro, 'litros-para-kg');
+        });
+    }
+
+    function configurarConversoesQuantidade() {
+        conversoesControlePintura.forEach(function(conversao) {
+            var litrosInput = document.getElementById(conversao.litrosId);
+            var kgsInput = document.getElementById(conversao.kgsId);
+
+            litrosInput.addEventListener('input', function() {
+                sincronizarQuantidadeConversao(litrosInput, kgsInput, conversao.kgPorLitro, 'litros-para-kg');
+            });
+
+            kgsInput.addEventListener('input', function() {
+                sincronizarQuantidadeConversao(kgsInput, litrosInput, conversao.kgPorLitro, 'kg-para-litros');
+            });
+        });
     }
 
     function formatDateFromIso(value) {
@@ -577,7 +783,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function resetModalForCreate() {
         form.reset();
         registroIdInput.value = '';
-        modalTitle.textContent = 'Controle Pintura';
+        modalTitle.textContent = 'Controle de Pintura';
         saveButton.textContent = 'Adicionar na tabela';
     }
 
@@ -590,6 +796,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setValue('controleQuantidadeTinta', row.dataset.quantidadeTinta);
         setValue('controleCatalizador', row.dataset.catalizador);
         setValue('controleDiluente', row.dataset.diluente);
+        atualizarKgsDoModal();
         setValue('controleViscosidade', row.dataset.viscosidade);
         setValue('controlePintor', row.dataset.pintor);
         setValue('controlePistola', row.dataset.pistola);
@@ -597,7 +804,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setValue('controlePressao1', row.dataset.pressaoAr1);
         setValue('controlePressao2', row.dataset.pressaoAr2);
         setValue('controlePressao3', row.dataset.pressaoAr3);
-        modalTitle.textContent = 'Editar Controle Pintura';
+        modalTitle.textContent = 'Editar Controle de Pintura';
         saveButton.textContent = 'Salvar alterações';
     }
 
@@ -610,6 +817,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     novoButton.addEventListener('click', resetModalForCreate);
+    configurarConversoesQuantidade();
 
     tableBody.addEventListener('click', function(event) {
         var button = event.target.closest('.btn-editar-controle-pintura');
