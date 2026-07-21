@@ -899,26 +899,6 @@
     let tableReq;
     let tableTra;
 
-    const almoxWsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const almoxSocket = new WebSocket(`${almoxWsProtocol}://${window.location.host}/ws/almox/solicitacoes/`);
-
-    almoxSocket.onmessage = function(event) {
-        const data = JSON.parse(event.data);
-        console.log("Atualizacao websocket almox:", data);
-
-        if (tableReq) {
-            tableReq.ajax.reload(null, false);
-        }
-
-        if (tableTra) {
-            tableTra.ajax.reload(null, false);
-        }
-    };
-
-    almoxSocket.onclose = function() {
-        console.warn('WebSocket do almoxarifado desconectado');
-    };
-
     $(document).ready(function (){
         let data_saldo;
 

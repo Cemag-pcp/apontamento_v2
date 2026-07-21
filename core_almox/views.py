@@ -382,80 +382,71 @@ def lista_solicitacoes(request):
     if tipo_sol == "requisicao":
         if order_column == 0:
             requisicoes = requisicoes.order_by('id' if order_dir == 'asc' else '-id')
-        codigos_produtos = set(req.item.codigo for req in requisicoes)
-        saldos,data = busca_saldo_recurso_central(codigos_produtos)
-        for item in requisicoes:
-            item.saldo = saldos.get(item.item.codigo, '0')
+        total = requisicoes.count()
+        requisicoes_paginadas = list(requisicoes[start:start + length])
+        codigos_produtos = set(req.item.codigo for req in requisicoes_paginadas)
+        saldos, data = busca_saldo_recurso_central(codigos_produtos)
 
-        requisicoes_paginadas = requisicoes[start:start+length]
-       
-        
         requisicoes_data = [
-        {
-            "id": req.id,
-            "funcionario": f"{req.funcionario.matricula} - {req.funcionario.nome}",
-            "item": f"{req.item.codigo} - {req.item.nome}",  # Supondo que 'nome' é o campo que contém o nome do item
-            "quantidade": req.quantidade,
-            "prioridade": req.status.prioridade if req.status else "",
-            "prioridade_cor": req.status.cor if req.status else "#6c757d",
-            "prioridade_cor_texto": _cor_texto_contraste(req.status.cor) if req.status else "#ffffff",
-            "classe_requisicao": req.classe_requisicao.nome,
-            "cc": str(req.cc) if req.cc else "",
-            "saldo": req.saldo,
-            "data_solicitacao": req.data_solicitacao.isoformat(),
-            "acoes": 'acoes'
-        }
-        for req in requisicoes_paginadas
+            {
+                "id": req.id,
+                "funcionario": f"{req.funcionario.matricula} - {req.funcionario.nome}",
+                "item": f"{req.item.codigo} - {req.item.nome}",
+                "quantidade": req.quantidade,
+                "prioridade": req.status.prioridade if req.status else "",
+                "prioridade_cor": req.status.cor if req.status else "#6c757d",
+                "prioridade_cor_texto": _cor_texto_contraste(req.status.cor) if req.status else "#ffffff",
+                "classe_requisicao": req.classe_requisicao.nome,
+                "cc": str(req.cc) if req.cc else "",
+                "saldo": saldos.get(req.item.codigo, '0'),
+                "data_solicitacao": req.data_solicitacao.isoformat(),
+                "acoes": 'acoes'
+            }
+            for req in requisicoes_paginadas
         ]
 
         return JsonResponse({
             "operadores": list(operadores_entrega.values()),
             "requisicoes": requisicoes_data,
-            "data_ultimo_saldo":data,
-            "draw": draw,  # Envia de volta o parâmetro 'draw' para sincronização
-            "recordsTotal": requisicoes.count(),  # Total de registros (sem filtros)
-            "recordsFiltered": requisicoes.count()
-            }
-        )
-
+            "data_ultimo_saldo": data,
+            "draw": draw,
+            "recordsTotal": total,
+            "recordsFiltered": total,
+        })
 
     else:
-        #ordenando a tabela pelo id
         if order_column == 0:
             transferencias = transferencias.order_by('id' if order_dir == 'asc' else '-id')
-        codigos_produtos= set(transfer.item.codigo for transfer in transferencias)
-        saldos,data = busca_saldo_recurso_central(codigos_produtos)
-        for item in transferencias:
-            item.saldo = saldos.get(item.item.codigo, '0')
+        total = transferencias.count()
+        transferencias_paginadas = list(transferencias[start:start + length])
+        codigos_produtos = set(transfer.item.codigo for transfer in transferencias_paginadas)
+        saldos, data = busca_saldo_recurso_central(codigos_produtos)
 
-        transferencias_paginadas = transferencias[start:start + length]
-        
         transferencias_data = [
-        {
-            "id": trans.id,
-            "funcionario": f"{trans.funcionario.matricula} - {trans.funcionario.nome}",
-            "item": f"{trans.item.codigo} - {trans.item.nome}",  # Supondo que 'nome' é o campo que contém o nome do item
-            "quantidade": trans.quantidade,
-            "prioridade": trans.status.prioridade if trans.status else "",
-            "prioridade_cor": trans.status.cor if trans.status else "#6c757d",
-            "prioridade_cor_texto": _cor_texto_contraste(trans.status.cor) if trans.status else "#ffffff",
-            "deposito_destino": str(trans.deposito_destino) if trans.deposito_destino else "",
-            "saldo": trans.saldo,
-            "data_solicitacao": trans.data_solicitacao.isoformat(),
-            "rpa": trans.rpa or "",
-            "acoes": 'acoes'
-        }
-        for trans in transferencias_paginadas
+            {
+                "id": trans.id,
+                "funcionario": f"{trans.funcionario.matricula} - {trans.funcionario.nome}",
+                "item": f"{trans.item.codigo} - {trans.item.nome}",
+                "quantidade": trans.quantidade,
+                "prioridade": trans.status.prioridade if trans.status else "",
+                "prioridade_cor": trans.status.cor if trans.status else "#6c757d",
+                "prioridade_cor_texto": _cor_texto_contraste(trans.status.cor) if trans.status else "#ffffff",
+                "deposito_destino": str(trans.deposito_destino) if trans.deposito_destino else "",
+                "saldo": saldos.get(trans.item.codigo, '0'),
+                "data_solicitacao": trans.data_solicitacao.isoformat(),
+                "rpa": trans.rpa or "",
+                "acoes": 'acoes'
+            }
+            for trans in transferencias_paginadas
         ]
 
         return JsonResponse({
-                "operadores": list(operadores_entrega.values()),
-                "transferencias": transferencias_data,
-                "data_ultimo_saldo":data,
-                "recordsTotal": transferencias.count(),  # Total de registros (sem filtros)
-                "recordsFiltered": transferencias.count()
-            }
-        )
+            "operadores": list(operadores_entrega.values()),
+            "transferencias": transferencias_data,
+            "data_ultimo_saldo": data,
+            "recordsTotal": total,
+            "recordsFiltered": total,
+        })
 
 @login_required
 def dashboard(request):
