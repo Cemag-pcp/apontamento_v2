@@ -24,6 +24,12 @@ class DBConnectionRetryMiddleware:
     varias conexoes ao mesmo tempo (OperationalError) ou esgotam o pool de
     conexoes (sqlalchemy.exc.TimeoutError). Tenta a requisicao de novo uma
     vez apos uma pausa curta antes de devolver erro ao usuario.
+
+    Usa process_exception (nao try/except em volta de get_response): o
+    Django ja converte excecao de view em resposta 500 dentro do proprio
+    _get_response, antes dela voltar pra cadeia de middlewares, entao um
+    try/except aqui nunca veria a excecao. process_exception e chamado
+    antes dessa conversao.
     """
 
     MAX_TENTATIVAS = 2
@@ -33,22 +39,29 @@ class DBConnectionRetryMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        for tentativa in range(1, self.MAX_TENTATIVAS + 1):
+        return self.get_response(request)
+
+    def process_exception(self, request, exception):
+        if not isinstance(exception, _DB_TRANSIENT_ERRORS):
+            return None
+
+        for tentativa in range(1, self.MAX_TENTATIVAS):
+            logger.warning(
+                "Erro transitorio de conexao com o banco (tentativa %s/%s) em %s: %s",
+                tentativa, self.MAX_TENTATIVAS, request.path, exception,
+            )
+            # Descarta a sessao parcialmente carregada para que a
+            # proxima tentativa recarregue do zero (evita o
+            # AttributeError de SessionStore sem _session_cache).
+            request.__dict__.pop("session", None)
+            time.sleep(self.PAUSA_SEGUNDOS)
             try:
                 return self.get_response(request)
             except _DB_TRANSIENT_ERRORS as exc:
-                if tentativa >= self.MAX_TENTATIVAS:
-                    raise
-                logger.warning(
-                    "Erro transitorio de conexao com o banco (tentativa %s/%s) em %s: %s",
-                    tentativa, self.MAX_TENTATIVAS, request.path, exc,
-                )
-                # Descarta a sessao parcialmente carregada para que a
-                # proxima tentativa recarregue do zero (evita o
-                # AttributeError de SessionStore sem _session_cache).
-                request.__dict__.pop("session", None)
-                time.sleep(self.PAUSA_SEGUNDOS)
-        return self.get_response(request)
+                exception = exc
+                continue
+
+        return None
 
 _ROTA_CACHE_KEY = 'rota_acesso_map'
 _ROTA_CACHE_TTL = 300  # 5 minutos
