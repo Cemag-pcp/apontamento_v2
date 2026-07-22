@@ -1,6 +1,18 @@
-﻿import { getCookie } from './criar_caixa.js';
+import { getCookie } from './criar_caixa.js';
 import { resetFormCriarPacote } from './criar_pacote.js';
 import { atualizarSlotAvancar, preencherSlotAvancar } from './kanbans.js';
+
+const Toast = Swal.mixin({
+  toast: true,
+  position: "bottom-end",
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+  didOpen: (toast) => {
+    toast.onmouseenter = Swal.stopTimer;
+    toast.onmouseleave = Swal.resumeTimer;
+  }
+});
 
 // helper pra mapear a cor (pt-BR) -> classe do Bootstrap
 function classeCorBadge(cor) {
@@ -29,25 +41,920 @@ function classeCorBadge(cor) {
   }
 })();
 
+// Redimensiona/comprime a foto no navegador antes do upload, pra nao
+// depender do tamanho original vindo da camera do celular (varios MB).
+async function compressImage(file, maxWidth = 1600, maxHeight = 1600, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.floor(width * ratio);
+          height = Math.floor(height * ratio);
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const mimeType = file.type.includes('png') ? 'image/png' : 'image/jpeg';
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error('Falha na geração do blob'));
+            resolve(new File([blob], file.name, { type: mimeType }));
+          },
+          mimeType,
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error('Falha ao carregar imagem'));
+      img.src = event.target.result;
+    };
+    reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------------------------------------------------------------------
+// Envio de foto resiliente a rede ruim/instavel: tenta com timeout e
+// retry; se mesmo assim nao rolar (sem internet, por exemplo), guarda a
+// foto no IndexedDB do navegador e reenvia sozinho quando a conexao
+// voltar. Assim o operador nao perde a foto por causa de wifi de
+// deposito.
+// ---------------------------------------------------------------------
+
+class ErroDeRede extends Error {}
+
+// Pacotes com upload de foto em andamento nesta aba (envio ativo ou
+// retry) - usado só pra feedback visual instantâneo no card, antes do
+// próximo reload do modal.
+const pacotesEmEnvio = new Set();
+
+function badgeProcessandoFotoHtml() {
+  return '<span class="badge bg-info text-dark ms-2 badge-processando-foto">' +
+    '<span class="spinner-border spinner-border-sm me-1" style="width:.6rem;height:.6rem;" role="status"></span>' +
+    'Enviando foto...</span>';
+}
+
+function atualizarBadgeProcessandoPacote(pacoteId, mostrar) {
+  const card = document.querySelector(`.card[data-pacote-id="${pacoteId}"]`);
+  const headerLeft = card?.querySelector('.pacote-header-left');
+  if (!headerLeft) return;
+  const existente = headerLeft.querySelector('.badge-processando-foto');
+  if (mostrar && !existente) {
+    headerLeft.insertAdjacentHTML('beforeend', badgeProcessandoFotoHtml());
+  } else if (!mostrar && existente) {
+    existente.remove();
+  }
+}
+
+const FILA_DB_NAME = 'expedicao_fotos_offline';
+const FILA_STORE = 'fila_fotos';
+
+function abrirFilaDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(FILA_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(FILA_STORE, { keyPath: 'id', autoIncrement: true });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function salvarFotoPendente({ pacoteId, blob, fileName }) {
+  const db = await abrirFilaDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILA_STORE, 'readwrite');
+    tx.objectStore(FILA_STORE).add({ pacoteId, blob, fileName, criadoEm: Date.now() });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function listarFotosPendentes() {
+  const db = await abrirFilaDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILA_STORE, 'readonly');
+    const req = tx.objectStore(FILA_STORE).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function removerFotoPendente(id) {
+  const db = await abrirFilaDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILA_STORE, 'readwrite');
+    tx.objectStore(FILA_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Indicador visual simples de quantas fotos ainda estao esperando envio.
+let badgePendentesEl = null;
+async function atualizarBadgePendentes() {
+  const pendentes = await listarFotosPendentes().catch(() => []);
+  if (!badgePendentesEl) {
+    badgePendentesEl = document.createElement('div');
+    badgePendentesEl.style.cssText = 'position:fixed;bottom:16px;left:16px;z-index:1080;' +
+      'background:#664d03;color:#fff;padding:6px 12px;border-radius:20px;font-size:.85rem;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.2);display:none;';
+    document.body.appendChild(badgePendentesEl);
+  }
+  if (pendentes.length > 0) {
+    badgePendentesEl.textContent = `${pendentes.length} foto(s) aguardando envio`;
+    badgePendentesEl.style.display = 'block';
+  } else {
+    badgePendentesEl.style.display = 'none';
+  }
+}
+
+// POST simples pra api/salvar-foto/, com timeout. Erro de rede/timeout
+// vira ErroDeRede (retentavel); erro que o servidor respondeu (ex:
+// validacao) sobe como Error normal e nao deve ser reenviado sozinho.
+async function enviarFotoAoServidor(pacoteId, blob, fileName, { timeoutMs = 15000 } = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const formData = new FormData();
+    formData.append('foto', blob, fileName);
+    formData.append('pacote', pacoteId);
+
+    let res;
+    try {
+      res = await fetch('api/salvar-foto/', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        signal: controller.signal,
+      });
+    } catch (err) {
+      throw new ErroDeRede(
+        err.name === 'AbortError' ? 'Tempo esgotado ao enviar a foto.' : 'Falha de conexão ao enviar a foto.'
+      );
+    }
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.erro || `Erro ${res.status} ao salvar a foto.`);
+    }
+    return data;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function tentarEnviarComRetry(pacoteId, blob, fileName) {
+  const ESPERAS_MS = [1000, 3000];
+  for (let tentativa = 0; ; tentativa++) {
+    try {
+      return await enviarFotoAoServidor(pacoteId, blob, fileName);
+    } catch (err) {
+      if (!(err instanceof ErroDeRede) || tentativa >= ESPERAS_MS.length) throw err;
+      await new Promise((r) => setTimeout(r, ESPERAS_MS[tentativa]));
+    }
+  }
+}
+
+let flushFilaEmAndamento = false;
+async function processarFilaPendente() {
+  if (flushFilaEmAndamento || !navigator.onLine) return;
+  flushFilaEmAndamento = true;
+  try {
+    const pendentes = await listarFotosPendentes();
+    for (const item of pendentes) {
+      try {
+        const data = await enviarFotoAoServidor(item.pacoteId, item.blob, item.fileName);
+        await removerFotoPendente(item.id);
+        atualizarSlotAvancar(data.info_add.carga_id, data.info_add.todos_pacotes_tem_foto_verificacao, data.info_add.etapa);
+        Toast.fire({ icon: 'success', title: 'Foto pendente enviada.' });
+        await atualizarCardPacote(item.pacoteId, data.info_add.carga_id);
+      } catch (err) {
+        if (err instanceof ErroDeRede) {
+          break; // ainda sem conexao de verdade, tenta de novo mais tarde
+        }
+        // erro de negocio (ex: pacote nao existe mais) - descarta, senao fica pra sempre na fila
+        console.error('Foto pendente descartada por erro do servidor:', err);
+        await removerFotoPendente(item.id);
+      }
+    }
+  } finally {
+    flushFilaEmAndamento = false;
+    atualizarBadgePendentes();
+  }
+}
+
+window.addEventListener('online', processarFilaPendente);
+document.addEventListener('DOMContentLoaded', processarFilaPendente);
+if (document.readyState !== 'loading') processarFilaPendente();
+atualizarBadgePendentes();
+
 function possuiFornecedoresPendentes(codigosEspeciais, fornecedores) {
   return Object.entries(codigosEspeciais || {}).some(([tipo, itens = []]) =>
     itens.some(({ codigo }) => !(fornecedores[`${tipo}_${codigo}`] || '').trim())
   );
 }
 
-export async function popularPacotesDaCarga(cargaId) {
+// Constroi o card de um pacote (usado tanto no render completo do modal
+// quanto na atualizacao pontual de um unico card).
+function criarCardPacote(pacote, data, cargaId, idsNaFila) {
 
-  const Toast = Swal.mixin({
-    toast: true,
-    position: "bottom-end",
-    showConfirmButton: false,
-    timer: 3000,
-    timerProgressBar: true,
-    didOpen: (toast) => {
-    toast.onmouseenter = Swal.stopTimer;
-    toast.onmouseleave = Swal.resumeTimer;
-    }
+  const col = document.createElement('div');
+  col.className = 'col-md-4 col-sm-6 col-pacote';  // 3 colunas em md+, 2 em sm
+  col.dataset.pacoteId = pacote.id;  // facilita filtros
+
+  const card = document.createElement('div');
+  card.className = 'card mb-3 border-0';
+  card.style.display = 'flex';
+  card.style.flexDirection = 'column';
+  card.style.maxHeight = '420px';
+  card.style.boxShadow = '0 2px 10px rgba(0,0,0,.09)';
+  card.style.borderRadius = '10px';
+  card.style.overflow = 'hidden';
+
+  let statusBadgeHtml = '';
+  if (pacote.status_qualidade === 'ok') {
+    statusBadgeHtml = '<span class="badge bg-success ms-2" style="font-size:.6rem;"><i class="fas fa-check me-1"></i>Confirmado</span>';
+  } else if (pacote.status_expedicao === 'ok') {
+    statusBadgeHtml = '<span class="badge bg-primary ms-2" style="font-size:.6rem;"><i class="fas fa-check me-1"></i>Expedição</span>';
+  }
+
+  const header = document.createElement('div');
+  header.className = 'd-flex justify-content-between align-items-center py-2 px-3';
+  header.style.background = 'linear-gradient(90deg,#e9ecef,#f8f9fa)';
+  header.style.borderBottom = '1px solid rgba(0,0,0,.07)';
+  header.style.flexShrink = '0';
+
+  const headerLeft = document.createElement('div');
+  headerLeft.className = 'd-flex align-items-center min-w-0 flex-grow-1 me-2 pacote-header-left';
+  const processandoFotoHtml = (idsNaFila.has(pacote.id) || pacotesEmEnvio.has(pacote.id)) ? badgeProcessandoFotoHtml() : '';
+  headerLeft.innerHTML = `<span class="fw-semibold text-truncate small" title="${pacote.nome}">${pacote.nome}</span>${statusBadgeHtml}${processandoFotoHtml}`;
+
+  const headerActions = document.createElement('div');
+  headerActions.className = 'd-flex align-items-center gap-2 flex-shrink-0';
+
+  if (data.status_carga !== 'despachado') {
+    const btnDuplicar = document.createElement('button');
+    btnDuplicar.className = 'btn btn-outline-secondary btn-sm';
+    btnDuplicar.innerHTML = '<i class="fas fa-copy"></i>';
+    btnDuplicar.title = 'Duplicar pacote';
+    btnDuplicar.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const previous = btnDuplicar.innerHTML;
+      btnDuplicar.disabled = true;
+      btnDuplicar.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+      try {
+        const resp = await fetch(`api/pacotes/duplicar/${pacote.id}/`, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        });
+        const dataResp = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          throw new Error(dataResp?.erro || 'Erro ao duplicar o pacote.');
+        }
+        Toast.fire({ icon: "success", title: dataResp?.mensagem || 'Pacote duplicado.' });
+        await popularPacotesDaCarga(cargaId);
+      } catch (error) {
+        alert(error.message || 'Erro ao duplicar o pacote.');
+      } finally {
+        btnDuplicar.disabled = false;
+        btnDuplicar.innerHTML = previous;
+      }
+    });
+
+    headerActions.appendChild(btnDuplicar);
+
+    const btnDeletar = document.createElement('button');
+    btnDeletar.className = 'btn btn-outline-danger btn-sm';
+    btnDeletar.innerHTML = '<i class="fas fa-trash"></i>';
+    btnDeletar.title = 'Excluir pacote';
+    btnDeletar.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const confirmou = confirm('Deseja excluir este pacote? Os itens voltarão para as pendências.');
+      if (!confirmou) return;
+      const previous = btnDeletar.innerHTML;
+      btnDeletar.disabled = true;
+      btnDeletar.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+      try {
+        const resp = await fetch(`api/pacotes/deletar/${pacote.id}/`, {
+          method: 'DELETE',
+          headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        });
+        const dataResp = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          throw new Error(dataResp?.erro || 'Erro ao excluir o pacote.');
+        }
+        Toast.fire({ icon: "success", title: dataResp?.mensagem || 'Pacote excluÃ­do.' });
+        await popularPacotesDaCarga(cargaId);
+      } catch (error) {
+        alert(error.message || 'Erro ao excluir o pacote.');
+      } finally {
+        btnDeletar.disabled = false;
+        btnDeletar.innerHTML = previous;
+      }
+    });
+
+    headerActions.appendChild(btnDeletar);
+  }
+  header.appendChild(headerLeft);
+  header.appendChild(headerActions);
+
+  // Flag de foto ao lado do nome do pacote
+  // Ao clicar na flag deverÃ¡ chamar uma funÃ§Ã£o que trarÃ¡ as fotos em um modal
+
+  if (pacote.tem_foto === true || pacote.tem_foto === "true") {
+
+    const fotoIcon = document.createElement('button');
+    fotoIcon.className = 'btn btn-outline-primary btn-sm flex-shrink-0';
+    fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
+    fotoIcon.title = 'Este pacote possui foto(s) anexada(s)';
+    fotoIcon.style.cursor = 'pointer';
+
+    fotoIcon.addEventListener('click', (event) => {
+      event.stopPropagation();
+
+      fotoIcon.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      fotoIcon.disabled = true;
+
+      (async () => {
+        try {
+          const response = await fetch(`api/buscar-fotos/${pacote.id}/`);
+          const data = await response.json();
+
+          const buildConteudoModal = (fotos) => {
+            const fotosPorEtapa = {};
+            fotos.forEach(foto => {
+              if (!fotosPorEtapa[foto.etapa]) {
+                fotosPorEtapa[foto.etapa] = [];
+              }
+              fotosPorEtapa[foto.etapa].push(foto);
+            });
+
+            if (!fotos.length) {
+              return '<p class="text-muted">Nenhuma foto encontrada.</p>';
+            }
+
+            return Object.entries(fotosPorEtapa).map(([etapa, fotosEtapa]) => {
+              const imagens = fotosEtapa.map(foto => `
+                <div class="d-inline-block me-2 mb-2 position-relative">
+                  <div class="position-absolute top-0 start-0 m-1" style="z-index:10;">
+                    <input class="form-check-input foto-checkbox" type="checkbox" data-foto-id="${foto.id}"
+                      style="width:1.3em;height:1.3em;cursor:pointer;background-color:rgba(255,255,255,0.85);" />
+                  </div>
+                  <a href="${foto.url}" target="_blank">
+                    <img src="${foto.url}" class="rounded shadow-sm"
+                      style="max-width:200px;height:auto;cursor:zoom-in;" alt="Foto da etapa ${etapa}" />
+                  </a>
+                </div>
+              `).join('');
+              return `
+                <h6 class="mt-3">Etapa: ${etapa}</h6>
+                ${imagens}
+              `;
+            }).join('');
+          };
+
+          const modal = document.createElement('div');
+          modal.className = 'modal fade';
+          modal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">Fotos do Pacote ${pacote.nome}</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body" id="modalFotosBody">
+                  ${buildConteudoModal(data.fotos || [])}
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-danger" id="btnExcluirFotosSelecionadas" disabled>
+                    <i class="fas fa-trash"></i> Excluir fotos selecionadas
+                  </button>
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+              </div>
+            </div>
+          `;
+
+          document.body.appendChild(modal);
+          const bsModal = new bootstrap.Modal(modal);
+          bsModal.show();
+
+          // Remove modal from DOM after hiding
+          modal.addEventListener('hidden.bs.modal', () => {
+            document.body.removeChild(modal);
+          });
+
+          // Atualiza estado do botÃ£o de exclusÃ£o conforme seleção
+          const syncDeleteBtn = () => {
+            const checados = modal.querySelectorAll('.foto-checkbox:checked');
+            modal.querySelector('#btnExcluirFotosSelecionadas').disabled = checados.length === 0;
+          };
+
+          modal.addEventListener('change', (e) => {
+            if (e.target.classList.contains('foto-checkbox')) syncDeleteBtn();
+          });
+
+          // BotÃ£o excluir fotos selecionadas
+          modal.querySelector('#btnExcluirFotosSelecionadas').addEventListener('click', async () => {
+            const checados = [...modal.querySelectorAll('.foto-checkbox:checked')];
+            if (!checados.length) return;
+
+            const qtd = checados.length;
+            const confirmado = await Swal.fire({
+              title: 'Confirmar exclusÃ£o',
+              text: `Deseja excluir ${qtd} foto(s) selecionada(s)? Esta aÃ§Ã£o não pode ser desfeita.`,
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: '#d33',
+              cancelButtonColor: '#6c757d',
+              confirmButtonText: 'Sim, excluir',
+              cancelButtonText: 'Cancelar',
+            }).then(r => r.isConfirmed);
+
+            if (!confirmado) return;
+
+            const btnExcluir = modal.querySelector('#btnExcluirFotosSelecionadas');
+            btnExcluir.disabled = true;
+            btnExcluir.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Excluindo...';
+
+            try {
+              await Promise.all(checados.map(cb =>
+                fetch(`api/excluir-foto/${cb.dataset.fotoId}/`, {
+                  method: 'DELETE',
+                  headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                }).then(r => { if (!r.ok) throw new Error('Erro ao excluir foto'); })
+              ));
+
+              // Recarrega fotos no modal
+              const resp = await fetch(`api/buscar-fotos/${pacote.id}/`);
+              const novosDados = await resp.json();
+              modal.querySelector('#modalFotosBody').innerHTML = buildConteudoModal(novosDados.fotos || []);
+
+              Toast.fire({ icon: 'success', title: `${qtd} foto(s) excluÃ­da(s) com sucesso.` });
+
+              // Atualiza flag do botÃ£o "Ver foto" se não houver mais fotos
+              if (!novosDados.fotos?.length) {
+                fotoIcon.remove();
+              }
+            } catch (err) {
+              alert('Erro ao excluir foto(s): ' + err.message);
+            } finally {
+              btnExcluir.innerHTML = '<i class="fas fa-trash"></i> Excluir fotos selecionadas';
+              syncDeleteBtn();
+            }
+          });
+
+          fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
+          fotoIcon.disabled = false;
+
+        } catch (error) {
+          console.error('Erro ao carregar fotos:', error);
+          alert('Erro ao carregar as fotos do pacote.');
+
+          fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
+          fotoIcon.disabled = false;
+
+        }
+      })();
+    });
+    headerActions.appendChild(fotoIcon);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'px-0 py-0';
+  body.style.overflowY = 'auto';
+  body.style.flex = '1';
+
+  const dataCriacao = document.createElement('div');
+  dataCriacao.className = 'text-muted px-3 pt-2 pb-1';
+  dataCriacao.style.fontSize = '.68rem';
+  dataCriacao.innerText = `Criado em: ${pacote.data_criacao}`;
+
+  const lista = document.createElement('div');
+  lista.className = 'pkg-items';
+
+  card.dataset.pacoteId = pacote.id;
+  lista.dataset.pacoteId = pacote.id;
+
+  if (pacote.itens.length === 0) {
+    const vazio = document.createElement('div');
+    vazio.className = 'item-row item-row-empty text-muted small px-3 py-2';
+    vazio.innerText = 'Nenhum item no pacote.';
+    lista.appendChild(vazio);
+  } else {
+    pacote.itens.forEach((item, idx) => {
+      const li = document.createElement('div');
+      li.className = 'item-row d-flex align-items-center gap-2 px-3 py-1 border-bottom';
+      li.dataset.itemId = (item.id ?? idx);
+
+      const codigoItem = item.codigo_peca || '(sem código)';
+      const descricaoItem = item.descricao || '';
+
+      const info = document.createElement('div');
+      info.className = 'flex-grow-1 min-w-0';
+      info.innerHTML = `
+        <div class="fw-semibold text-truncate" style="font-size:.78rem;" title="${codigoItem}">${codigoItem}</div>
+        <div class="text-muted text-truncate" style="font-size:.72rem;" title="${descricaoItem}">${descricaoItem}${item.fora_planejado ? ' <span class="badge bg-warning text-dark" style="font-size:.6rem;">Fora do plan.</span>' : ''}</div>
+      `;
+      li.dataset.codigo = codigoItem;
+      li.dataset.descricao = descricaoItem;
+
+      // BotÃ£o "Alterar pacote"
+      const btnAlterar = document.createElement('button');
+      btnAlterar.type = 'button';
+      btnAlterar.className = 'btn btn-outline-primary btn-sm flex-shrink-0';
+      // btnAlterar.textContent = 'Alterar pacote';
+      btnAlterar.innerHTML = '<i class="fas fa-exchange-alt"></i>'; // Ãcone de troca
+      btnAlterar.setAttribute('data-bs-toggle', 'modal');
+      btnAlterar.setAttribute('data-bs-target', '#modalAlterarPacote');
+
+      // Ao clicar, preenche o modal e lista os pacotes disponÃ­veis
+      btnAlterar.addEventListener('click', () => {
+        // guarda referÃªncia do <li> atual para mover no DOM apÃ³s sucesso
+        window._editingItemLi = li;
+
+        // campos escondidos
+        document.getElementById('pacoteOrigemId').value = pacote.id;
+        document.getElementById('itemId').value = (item.id ?? idx);
+        document.getElementById('cargaId').value = cargaId;
+
+        // popula o select com todos os pacotes da carga, exceto o atual
+        const sel = document.getElementById('pacoteDestinoId');
+        const helper = document.getElementById('helperPacoteDestino');
+        sel.innerHTML = '';
+        helper.textContent = '';
+
+        const outros = (data.pacotes || []).filter(p => p.id !== pacote.id);
+        if (outros.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'não hÃ¡ outros pacotes';
+          sel.appendChild(opt);
+          sel.disabled = true;
+          helper.textContent = 'Crie outro pacote para mover este item.';
+        } else {
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = 'Selecione...';
+          placeholder.disabled = true;
+          placeholder.selected = true;
+          sel.appendChild(placeholder);
+
+          outros.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.nome;
+            sel.appendChild(opt);
+          });
+          sel.disabled = false;
+        }
+      });
+
+      li.appendChild(info);
+
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'd-flex align-items-center gap-1 flex-shrink-0';
+
+      const podeEditarQtd = (data.status_carga === 'planejamento' || data.status_carga === 'verificacao');
+      if (podeEditarQtd) {
+        const inputQtd = document.createElement('input');
+        inputQtd.type = 'number';
+        inputQtd.min = '1';
+        inputQtd.value = item.quantidade;
+        inputQtd.className = 'form-control form-control-sm text-center';
+        inputQtd.style.width = '52px';
+        inputQtd.style.fontSize = '.78rem';
+
+        const btnSalvarQtd = document.createElement('button');
+        btnSalvarQtd.type = 'button';
+        btnSalvarQtd.className = 'btn btn-outline-secondary btn-sm p-1';
+        btnSalvarQtd.innerHTML = '<i class="fas fa-save" style="font-size:.7rem;"></i>';
+        btnSalvarQtd.title = 'Salvar quantidade';
+
+        btnSalvarQtd.addEventListener('click', async () => {
+          const novaQt = parseInt(inputQtd.value, 10);
+          if (!novaQt || novaQt <= 0) { alert('Quantidade inválida.'); return; }
+          const prevText = btnSalvarQtd.innerHTML;
+          btnSalvarQtd.disabled = true;
+          btnSalvarQtd.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+          try {
+            const resp = await fetch(`api/pacotes/itens/${item.id}/atualizar-quantidade/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+              body: JSON.stringify({ quantidade: novaQt })
+            });
+            const dataResp = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(dataResp?.erro || 'Erro ao atualizar quantidade.');
+            inputQtd.value = dataResp.nova_quantidade;
+          } catch (error) {
+            alert(error.message || 'Erro ao atualizar quantidade.');
+          } finally {
+            btnSalvarQtd.disabled = false;
+            btnSalvarQtd.innerHTML = prevText;
+          }
+        });
+
+        const btnExcluirItem = document.createElement('button');
+        btnExcluirItem.type = 'button';
+        btnExcluirItem.className = 'btn btn-outline-danger btn-sm p-1';
+        btnExcluirItem.innerHTML = '<i class="fas fa-trash" style="font-size:.7rem;"></i>';
+        btnExcluirItem.title = 'Remover item';
+        btnExcluirItem.addEventListener('click', async () => {
+          const confirma = item.fora_planejado
+            ? confirm('Remover este item fora do planejado do pacote?')
+            : confirm('Remover esta peça do pacote? A quantidade voltará para a pendência.');
+          if (!confirma) return;
+          const prev = btnExcluirItem.innerHTML;
+          btnExcluirItem.disabled = true;
+          btnExcluirItem.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+          try {
+            const resp = await fetch(`api/pacotes/itens/${item.id}/deletar/`, {
+              method: 'DELETE',
+              headers: { 'X-CSRFToken': getCookie('csrftoken') }
+            });
+            const dataResp = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(dataResp?.erro || 'Erro ao remover peça.');
+            li.remove();
+            if (!lista.querySelector('.item-row:not(.item-row-empty)')) {
+              const vazio = document.createElement('div');
+              vazio.className = 'item-row item-row-empty text-muted small px-3 py-2';
+              vazio.innerText = 'Nenhum item no pacote.';
+              lista.appendChild(vazio);
+            }
+          } catch (error) {
+            alert(error.message || 'Erro ao remover peça.');
+          } finally {
+            btnExcluirItem.disabled = false;
+            btnExcluirItem.innerHTML = prev;
+          }
+        });
+
+        actionsDiv.appendChild(inputQtd);
+        actionsDiv.appendChild(btnSalvarQtd);
+        actionsDiv.appendChild(btnExcluirItem);
+      } else {
+        const qtyBadge = document.createElement('span');
+        qtyBadge.className = 'badge bg-light text-dark border';
+        qtyBadge.style.fontSize = '.72rem';
+        qtyBadge.textContent = `×${item.quantidade}`;
+        actionsDiv.appendChild(qtyBadge);
+      }
+
+      if (data.status_carga === 'planejamento' && pacote.status_expedicao !== 'ok') {
+        actionsDiv.appendChild(btnAlterar);
+      } else if (data.status_carga === 'verificacao' && pacote.status_qualidade !== 'ok') {
+        actionsDiv.appendChild(btnAlterar);
+      }
+
+      li.appendChild(actionsDiv);
+      lista.appendChild(li);
+    });
+  }
+
+  // BotÃ£o Confirmar APONTAMENTO
+  const btnConfirmarExpedicao = document.createElement('button');
+  btnConfirmarExpedicao.className = 'btn btn-outline-success btn-sm mt-2 w-100';
+  btnConfirmarExpedicao.textContent = 'Confirmar (ExpediÃ§Ã£o)';
+  btnConfirmarExpedicao.setAttribute('data-bs-toggle', 'modal');
+  btnConfirmarExpedicao.setAttribute('data-bs-target', '#modalConfirmarPacote');
+  btnConfirmarExpedicao.setAttribute('data-id-pacote', pacote.id);
+
+  // Passa o ID do pacote para o modal ao clicar
+  btnConfirmarExpedicao.addEventListener('click', () => {
+    document.getElementById('idPacoteConfirmar').value = pacote.id;
+    document.getElementById('obsConfirmarPacote').value = '';  // limpa campo
   });
+
+  // BotÃ£o Confirmar QUALIDADE
+  const btnConfirmarQualidade = document.createElement('button');
+  btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm mt-2 w-100';
+  btnConfirmarQualidade.textContent = 'Confirmar (Qualidade)';
+  btnConfirmarQualidade.setAttribute('data-bs-toggle', 'modal');
+  btnConfirmarQualidade.setAttribute('data-bs-target', '#modalConfirmarPacote');
+  btnConfirmarQualidade.setAttribute('data-id-pacote', pacote.id);
+
+  // Passa o ID do pacote para o modal ao clicar
+  btnConfirmarQualidade.addEventListener('click', () => {
+    document.getElementById('idPacoteConfirmar').value = pacote.id;
+    document.getElementById('obsConfirmarPacote').value = '';  // limpa campo
+  });
+
+  body.appendChild(dataCriacao);
+  body.appendChild(lista);
+
+  const footer = document.createElement('div');
+  footer.className = 'card-footer d-flex flex-column gap-1 py-2';
+  footer.style.borderTop = '1px solid rgba(0,0,0,.07)';
+  footer.style.background = '#fafafa';
+
+  // BotÃ£o de adicionar foto
+  const btnFoto = document.createElement('button');
+  btnFoto.type = 'button';
+  btnFoto.className = 'btn btn-outline-secondary btn-sm';
+  btnFoto.innerHTML = '<i class="fas fa-camera"></i>';
+  btnFoto.title = "Câmera";
+  const abrirSelecaoFoto = (usarCamera = false) => {
+    // Cria input de arquivo invisÃ­vel
+    const input = document.createElement('input');
+    input.type = 'file';
+    // Em alguns navegadores mobile, `image/*` abre a cÃ¢mera direto.
+    // Usar extensÃµes forÃ§a o seletor de arquivos/galeria.
+    input.accept = '.jpg,.jpeg,.png,.webp,.heic,.heif';
+    if (usarCamera) {
+      input.setAttribute('capture', 'environment');
+    } else {
+      input.removeAttribute('capture');
+    }
+
+    // Ao selecionar ou tirar a foto
+    input.onchange = async () => {
+      const file = input.files[0];
+      input.remove();
+      if (!file) return;
+
+      const previewURL = URL.createObjectURL(file);
+
+      const result = await Swal.fire({
+        title: 'Confirmar Foto',
+        imageUrl: previewURL,
+        imageAlt: 'Prévia da foto',
+        imageWidth: '100%',
+        confirmButtonText: 'Confirmar',
+        cancelButtonText: 'Cancelar',
+        showCancelButton: true,
+      });
+
+      URL.revokeObjectURL(previewURL);
+
+      if (!result.isConfirmed) return;
+
+      // Fecha o modal na hora e faz o upload em segundo plano, sem
+      // travar o usuario esperando a foto (grande, da camera) enviar.
+      Toast.fire({ icon: 'info', title: 'Enviando foto...' });
+
+      let arquivoEnvio = file;
+      try {
+        arquivoEnvio = await compressImage(file);
+      } catch (err) {
+        console.warn('Falha ao comprimir imagem, enviando original:', err);
+      }
+
+      pacotesEmEnvio.add(pacote.id);
+      atualizarBadgeProcessandoPacote(pacote.id, true);
+
+      try {
+        const data = await tentarEnviarComRetry(pacote.id, arquivoEnvio, file.name);
+        pacotesEmEnvio.delete(pacote.id);
+        Toast.fire({ icon: 'success', title: 'Foto salva com sucesso.' });
+        atualizarSlotAvancar(data.info_add.carga_id, data.info_add.todos_pacotes_tem_foto_verificacao, data.info_add.etapa);
+        // Atualiza so o card desse pacote (flag "Ver foto" + tira o badge
+        // de "processando"), sem recarregar o modal inteiro.
+        await atualizarCardPacote(pacote.id, data.info_add.carga_id);
+      } catch (err) {
+        pacotesEmEnvio.delete(pacote.id);
+        if (err instanceof ErroDeRede) {
+          await salvarFotoPendente({ pacoteId: pacote.id, blob: arquivoEnvio, fileName: file.name });
+          atualizarBadgePendentes();
+          // continua "processando" no card: agora esta na fila offline
+          atualizarBadgeProcessandoPacote(pacote.id, true);
+          Toast.fire({ icon: 'warning', title: 'Sem conexão: foto salva no aparelho, será enviada automaticamente.' });
+        } else {
+          atualizarBadgeProcessandoPacote(pacote.id, false);
+          console.error(err);
+          Toast.fire({ icon: 'error', title: err.message || 'Erro ao salvar a foto.' });
+        }
+      }
+    };
+
+    // Aciona o input
+    document.body.appendChild(input);
+    input.click();
+  };
+  btnFoto.onclick = () => abrirSelecaoFoto(true);
+
+  const btnArquivo = document.createElement('button');
+  btnArquivo.type = 'button';
+  btnArquivo.className = 'btn btn-outline-secondary btn-sm';
+  btnArquivo.innerHTML = '<i class="fas fa-image"></i>';
+  btnArquivo.title = "Selecionar arquivo";
+  btnArquivo.onclick = () => abrirSelecaoFoto(false);
+
+  // BotÃ£o de imprimir
+  const btnPrint = document.createElement('button');
+  btnPrint.className = 'btn btn-outline-secondary btn-sm';
+  btnPrint.innerHTML = '<i class="fas fa-print"></i>';
+  btnPrint.title = "Imprimir";
+  btnPrint.onclick = () => {
+    // lÃ³gica para impressÃ£o
+    impressaoZebra(pacote.id, pacote.cliente, pacote.data_carga, pacote.nome);
+  };
+
+  const btnGroup = document.createElement('div');
+  btnGroup.className = 'd-flex gap-2';
+
+  if (data.status_carga === 'verificacao' && pacote.status_qualidade !== 'ok') {
+
+    // Confirmar Qualidade
+    btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm flex-grow-1';
+    btnGroup.appendChild(btnConfirmarQualidade);
+
+    btnGroup.appendChild(btnPrint);
+    btnGroup.appendChild(btnFoto);
+    btnGroup.appendChild(btnArquivo);
+
+    footer.appendChild(btnGroup);
+
+  } else if (data.status_carga === 'verificacao' && pacote.status_qualidade === 'ok') {
+    const span = document.createElement('span');
+    span.className = 'text-success fw-bold text-center ms-2';
+    span.textContent = 'Pacote confirmado';
+
+    btnGroup.appendChild(span);
+    btnGroup.appendChild(btnPrint);
+    btnGroup.appendChild(btnFoto);
+    btnGroup.appendChild(btnArquivo);
+
+    footer.appendChild(btnGroup);
+  }
+
+  if (data.status_carga === 'despachado' && pacote.status_qualidade === 'ok') {
+
+    // Confirmar Qualidade
+    // btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm flex-grow-1';
+    // btnGroup.appendChild(btnConfirmarQualidade);
+
+    // btnGroup.appendChild(btnPrint);
+    btnGroup.appendChild(btnFoto);
+    btnGroup.appendChild(btnArquivo);
+
+    footer.appendChild(btnGroup);
+
+  }
+
+  card.appendChild(header);
+  card.appendChild(body);
+  card.appendChild(footer);
+  col.appendChild(card);
+  return col;
+}
+
+// Atualiza so o card de um pacote especifico (sem recarregar o modal
+// inteiro): mostra um overlay "carregando" (transparente + spinner)
+// sobre o card enquanto busca os dados atualizados, depois troca so
+// aquele card no DOM.
+async function atualizarCardPacote(pacoteId, cargaId) {
+  const oldCol = document.querySelector(`.col-pacote[data-pacote-id="${pacoteId}"]`);
+  if (!oldCol) return; // card nao esta na tela agora, nada pra atualizar
+
+  const oldCard = oldCol.querySelector('.card');
+  if (oldCard) {
+    oldCard.style.position = oldCard.style.position || 'relative';
+    oldCard.style.opacity = '0.4';
+    oldCard.style.pointerEvents = 'none';
+    if (!oldCard.querySelector('.card-loading-overlay')) {
+      const overlay = document.createElement('div');
+      overlay.className = 'card-loading-overlay';
+      overlay.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;';
+      overlay.innerHTML = '<span class="spinner-border text-secondary" role="status"></span>';
+      oldCard.appendChild(overlay);
+    }
+  }
+
+  try {
+    const response = await fetch(`api/buscar-pacote/${cargaId}/`);
+    const data = await response.json();
+    const pacoteNovo = (data.pacotes || []).find((p) => p.id === pacoteId);
+    if (!pacoteNovo) {
+      oldCol.remove(); // pacote nao existe mais (ex: excluido em outra aba)
+      return;
+    }
+
+    const filaAtual = await listarFotosPendentes().catch(() => []);
+    const idsNaFila = new Set(filaAtual.map((item) => item.pacoteId));
+
+    const novoCol = criarCardPacote(pacoteNovo, data, cargaId, idsNaFila);
+    oldCol.replaceWith(novoCol);
+  } catch (err) {
+    console.error('Falha ao atualizar card do pacote:', err);
+    if (oldCard) {
+      oldCard.style.opacity = '';
+      oldCard.style.pointerEvents = '';
+      oldCard.querySelector('.card-loading-overlay')?.remove();
+    }
+  }
+}
+
+export async function popularPacotesDaCarga(cargaId) {
 
   const modal = document.getElementById('visualizarPacote');
   const modalBody = modal.querySelector('.modal-body');
@@ -61,6 +968,9 @@ export async function popularPacotesDaCarga(cargaId) {
   try {
     const response = await fetch(`api/buscar-pacote/${cargaId}/`);
     const data = await response.json();
+
+    const filaAtual = await listarFotosPendentes().catch(() => []);
+    const idsNaFila = new Set(filaAtual.map((item) => item.pacoteId));
 
     // Atualiza o badge de fornecedores no card do kanban se necessário
     if (data.status_carga === 'verificacao') {
@@ -95,8 +1005,8 @@ export async function popularPacotesDaCarga(cargaId) {
           const cls = classeCorBadge(cor);
           const tip = `${cor ?? '*'} * qtd: ${quantidade ?? 0}`;
           return `
-            <span class="badge rounded-pill ${cls}" 
-                  data-bs-toggle="tooltip" data-bs-placement="top" 
+            <span class="badge rounded-pill ${cls}"
+                  data-bs-toggle="tooltip" data-bs-placement="top"
                   data-bs-title="${tip}">
               ${carreta} — ${quantidade}
             </span>`;
@@ -204,11 +1114,11 @@ export async function popularPacotesDaCarga(cargaId) {
           });
           if (!resp.ok) throw new Error(await resp.text());
           const data = await resp.json();
-          
+
           const lista = Array.isArray(data.pacotes) ? data.pacotes : [];
 
           // popula o select
-          pacoteExistenteEl.innerHTML = `<option value="">Selecione...</option>` + 
+          pacoteExistenteEl.innerHTML = `<option value="">Selecione...</option>` +
             lista.map(p => `<option value="${p.id_pacote}">${p.nome_pacote}</option>`).join('');
         }
 
@@ -250,7 +1160,7 @@ export async function popularPacotesDaCarga(cargaId) {
       modalBody.appendChild(noData);
       return;
     }
-    
+
     // filtro de itens dentro dos pacotes
     const aplicarFiltro = (termo) => {
       const texto = (termo || '').toLowerCase().trim();
@@ -284,633 +1194,7 @@ export async function popularPacotesDaCarga(cargaId) {
     };
 
     data.pacotes.forEach(pacote => {
-
-      const col = document.createElement('div');
-      col.className = 'col-md-4 col-sm-6 col-pacote';  // 3 colunas em md+, 2 em sm
-      col.dataset.pacoteId = pacote.id;  // facilita filtros
-
-      const card = document.createElement('div');
-      card.className = 'card mb-3 border-0';
-      card.style.display = 'flex';
-      card.style.flexDirection = 'column';
-      card.style.maxHeight = '420px';
-      card.style.boxShadow = '0 2px 10px rgba(0,0,0,.09)';
-      card.style.borderRadius = '10px';
-      card.style.overflow = 'hidden';
-
-      let statusBadgeHtml = '';
-      if (pacote.status_qualidade === 'ok') {
-        statusBadgeHtml = '<span class="badge bg-success ms-2" style="font-size:.6rem;"><i class="fas fa-check me-1"></i>Confirmado</span>';
-      } else if (pacote.status_expedicao === 'ok') {
-        statusBadgeHtml = '<span class="badge bg-primary ms-2" style="font-size:.6rem;"><i class="fas fa-check me-1"></i>Expedição</span>';
-      }
-
-      const header = document.createElement('div');
-      header.className = 'd-flex justify-content-between align-items-center py-2 px-3';
-      header.style.background = 'linear-gradient(90deg,#e9ecef,#f8f9fa)';
-      header.style.borderBottom = '1px solid rgba(0,0,0,.07)';
-      header.style.flexShrink = '0';
-
-      const headerLeft = document.createElement('div');
-      headerLeft.className = 'd-flex align-items-center min-w-0 flex-grow-1 me-2';
-      headerLeft.innerHTML = `<span class="fw-semibold text-truncate small" title="${pacote.nome}">${pacote.nome}</span>${statusBadgeHtml}`;
-
-      const headerActions = document.createElement('div');
-      headerActions.className = 'd-flex align-items-center gap-2 flex-shrink-0';
-
-      if (data.status_carga !== 'despachado') {
-        const btnDuplicar = document.createElement('button');
-        btnDuplicar.className = 'btn btn-outline-secondary btn-sm';
-        btnDuplicar.innerHTML = '<i class="fas fa-copy"></i>';
-        btnDuplicar.title = 'Duplicar pacote';
-        btnDuplicar.addEventListener('click', async (event) => {
-          event.stopPropagation();
-          const previous = btnDuplicar.innerHTML;
-          btnDuplicar.disabled = true;
-          btnDuplicar.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-          try {
-            const resp = await fetch(`api/pacotes/duplicar/${pacote.id}/`, {
-              method: 'POST',
-              headers: { 'X-CSRFToken': getCookie('csrftoken') }
-            });
-            const dataResp = await resp.json().catch(() => ({}));
-            if (!resp.ok) {
-              throw new Error(dataResp?.erro || 'Erro ao duplicar o pacote.');
-            }
-            Toast.fire({ icon: "success", title: dataResp?.mensagem || 'Pacote duplicado.' });
-            await popularPacotesDaCarga(cargaId);
-          } catch (error) {
-            alert(error.message || 'Erro ao duplicar o pacote.');
-          } finally {
-            btnDuplicar.disabled = false;
-            btnDuplicar.innerHTML = previous;
-          }
-        });
-
-        headerActions.appendChild(btnDuplicar);
-
-        const btnDeletar = document.createElement('button');
-        btnDeletar.className = 'btn btn-outline-danger btn-sm';
-        btnDeletar.innerHTML = '<i class="fas fa-trash"></i>';
-        btnDeletar.title = 'Excluir pacote';
-        btnDeletar.addEventListener('click', async (event) => {
-          event.stopPropagation();
-          const confirmou = confirm('Deseja excluir este pacote? Os itens voltarão para as pendências.');
-          if (!confirmou) return;
-          const previous = btnDeletar.innerHTML;
-          btnDeletar.disabled = true;
-          btnDeletar.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-          try {
-            const resp = await fetch(`api/pacotes/deletar/${pacote.id}/`, {
-              method: 'DELETE',
-              headers: { 'X-CSRFToken': getCookie('csrftoken') }
-            });
-            const dataResp = await resp.json().catch(() => ({}));
-            if (!resp.ok) {
-              throw new Error(dataResp?.erro || 'Erro ao excluir o pacote.');
-            }
-            Toast.fire({ icon: "success", title: dataResp?.mensagem || 'Pacote excluÃ­do.' });
-            await popularPacotesDaCarga(cargaId);
-          } catch (error) {
-            alert(error.message || 'Erro ao excluir o pacote.');
-          } finally {
-            btnDeletar.disabled = false;
-            btnDeletar.innerHTML = previous;
-          }
-        });
-
-        headerActions.appendChild(btnDeletar);
-      }
-      header.appendChild(headerLeft);
-      header.appendChild(headerActions);
-
-      // Flag de foto ao lado do nome do pacote
-      // Ao clicar na flag deverÃ¡ chamar uma funÃ§Ã£o que trarÃ¡ as fotos em um modal
-
-      if (pacote.tem_foto === true || pacote.tem_foto === "true") {
-        
-        const fotoIcon = document.createElement('button');
-        fotoIcon.className = 'btn btn-outline-primary btn-sm flex-shrink-0';
-        fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
-        fotoIcon.title = 'Este pacote possui foto(s) anexada(s)';
-        fotoIcon.style.cursor = 'pointer';
-
-        fotoIcon.addEventListener('click', (event) => {
-          event.stopPropagation();
-
-          fotoIcon.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-          fotoIcon.disabled = true;
-
-          (async () => {
-            try {
-              const response = await fetch(`api/buscar-fotos/${pacote.id}/`);
-              const data = await response.json();
-
-              const buildConteudoModal = (fotos) => {
-                const fotosPorEtapa = {};
-                fotos.forEach(foto => {
-                  if (!fotosPorEtapa[foto.etapa]) {
-                    fotosPorEtapa[foto.etapa] = [];
-                  }
-                  fotosPorEtapa[foto.etapa].push(foto);
-                });
-
-                if (!fotos.length) {
-                  return '<p class="text-muted">Nenhuma foto encontrada.</p>';
-                }
-
-                return Object.entries(fotosPorEtapa).map(([etapa, fotosEtapa]) => {
-                  const imagens = fotosEtapa.map(foto => `
-                    <div class="d-inline-block me-2 mb-2 position-relative">
-                      <div class="position-absolute top-0 start-0 m-1" style="z-index:10;">
-                        <input class="form-check-input foto-checkbox" type="checkbox" data-foto-id="${foto.id}"
-                          style="width:1.3em;height:1.3em;cursor:pointer;background-color:rgba(255,255,255,0.85);" />
-                      </div>
-                      <a href="${foto.url}" target="_blank">
-                        <img src="${foto.url}" class="rounded shadow-sm"
-                          style="max-width:200px;height:auto;cursor:zoom-in;" alt="Foto da etapa ${etapa}" />
-                      </a>
-                    </div>
-                  `).join('');
-                  return `
-                    <h6 class="mt-3">Etapa: ${etapa}</h6>
-                    ${imagens}
-                  `;
-                }).join('');
-              };
-
-              const modal = document.createElement('div');
-              modal.className = 'modal fade';
-              modal.innerHTML = `
-                <div class="modal-dialog modal-lg">
-                  <div class="modal-content">
-                    <div class="modal-header">
-                      <h5 class="modal-title">Fotos do Pacote ${pacote.nome}</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                    </div>
-                    <div class="modal-body" id="modalFotosBody">
-                      ${buildConteudoModal(data.fotos || [])}
-                    </div>
-                    <div class="modal-footer">
-                      <button type="button" class="btn btn-danger" id="btnExcluirFotosSelecionadas" disabled>
-                        <i class="fas fa-trash"></i> Excluir fotos selecionadas
-                      </button>
-                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    </div>
-                  </div>
-                </div>
-              `;
-
-              document.body.appendChild(modal);
-              const bsModal = new bootstrap.Modal(modal);
-              bsModal.show();
-
-              // Remove modal from DOM after hiding
-              modal.addEventListener('hidden.bs.modal', () => {
-                document.body.removeChild(modal);
-              });
-
-              // Atualiza estado do botÃ£o de exclusÃ£o conforme seleção
-              const syncDeleteBtn = () => {
-                const checados = modal.querySelectorAll('.foto-checkbox:checked');
-                modal.querySelector('#btnExcluirFotosSelecionadas').disabled = checados.length === 0;
-              };
-
-              modal.addEventListener('change', (e) => {
-                if (e.target.classList.contains('foto-checkbox')) syncDeleteBtn();
-              });
-
-              // BotÃ£o excluir fotos selecionadas
-              modal.querySelector('#btnExcluirFotosSelecionadas').addEventListener('click', async () => {
-                const checados = [...modal.querySelectorAll('.foto-checkbox:checked')];
-                if (!checados.length) return;
-
-                const qtd = checados.length;
-                const confirmado = await Swal.fire({
-                  title: 'Confirmar exclusÃ£o',
-                  text: `Deseja excluir ${qtd} foto(s) selecionada(s)? Esta aÃ§Ã£o não pode ser desfeita.`,
-                  icon: 'warning',
-                  showCancelButton: true,
-                  confirmButtonColor: '#d33',
-                  cancelButtonColor: '#6c757d',
-                  confirmButtonText: 'Sim, excluir',
-                  cancelButtonText: 'Cancelar',
-                }).then(r => r.isConfirmed);
-
-                if (!confirmado) return;
-
-                const btnExcluir = modal.querySelector('#btnExcluirFotosSelecionadas');
-                btnExcluir.disabled = true;
-                btnExcluir.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Excluindo...';
-
-                try {
-                  await Promise.all(checados.map(cb =>
-                    fetch(`api/excluir-foto/${cb.dataset.fotoId}/`, {
-                      method: 'DELETE',
-                      headers: { 'X-CSRFToken': getCookie('csrftoken') }
-                    }).then(r => { if (!r.ok) throw new Error('Erro ao excluir foto'); })
-                  ));
-
-                  // Recarrega fotos no modal
-                  const resp = await fetch(`api/buscar-fotos/${pacote.id}/`);
-                  const novosDados = await resp.json();
-                  modal.querySelector('#modalFotosBody').innerHTML = buildConteudoModal(novosDados.fotos || []);
-
-                  Toast.fire({ icon: 'success', title: `${qtd} foto(s) excluÃ­da(s) com sucesso.` });
-
-                  // Atualiza flag do botÃ£o "Ver foto" se não houver mais fotos
-                  if (!novosDados.fotos?.length) {
-                    fotoIcon.remove();
-                  }
-                } catch (err) {
-                  alert('Erro ao excluir foto(s): ' + err.message);
-                } finally {
-                  btnExcluir.innerHTML = '<i class="fas fa-trash"></i> Excluir fotos selecionadas';
-                  syncDeleteBtn();
-                }
-              });
-
-              fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
-              fotoIcon.disabled = false;
-
-            } catch (error) {
-              console.error('Erro ao carregar fotos:', error);
-              alert('Erro ao carregar as fotos do pacote.');
-    
-              fotoIcon.innerHTML = 'Ver foto <i class="fas fa-camera"></i>';
-              fotoIcon.disabled = false;
-
-            }
-          })();
-        });
-        headerActions.appendChild(fotoIcon);
-      }
-
-      const body = document.createElement('div');
-      body.className = 'px-0 py-0';
-      body.style.overflowY = 'auto';
-      body.style.flex = '1';
-
-      const dataCriacao = document.createElement('div');
-      dataCriacao.className = 'text-muted px-3 pt-2 pb-1';
-      dataCriacao.style.fontSize = '.68rem';
-      dataCriacao.innerText = `Criado em: ${pacote.data_criacao}`;
-
-      const lista = document.createElement('div');
-      lista.className = 'pkg-items';
-
-      card.dataset.pacoteId = pacote.id;
-      lista.dataset.pacoteId = pacote.id;
-
-      if (pacote.itens.length === 0) {
-        const vazio = document.createElement('div');
-        vazio.className = 'item-row item-row-empty text-muted small px-3 py-2';
-        vazio.innerText = 'Nenhum item no pacote.';
-        lista.appendChild(vazio);
-      } else {
-        pacote.itens.forEach((item, idx) => {
-          const li = document.createElement('div');
-          li.className = 'item-row d-flex align-items-center gap-2 px-3 py-1 border-bottom';
-          li.dataset.itemId = (item.id ?? idx);
-
-          const codigoItem = item.codigo_peca || '(sem código)';
-          const descricaoItem = item.descricao || '';
-
-          const info = document.createElement('div');
-          info.className = 'flex-grow-1 min-w-0';
-          info.innerHTML = `
-            <div class="fw-semibold text-truncate" style="font-size:.78rem;" title="${codigoItem}">${codigoItem}</div>
-            <div class="text-muted text-truncate" style="font-size:.72rem;" title="${descricaoItem}">${descricaoItem}${item.fora_planejado ? ' <span class="badge bg-warning text-dark" style="font-size:.6rem;">Fora do plan.</span>' : ''}</div>
-          `;
-          li.dataset.codigo = codigoItem;
-          li.dataset.descricao = descricaoItem;
-
-          // BotÃ£o "Alterar pacote"
-          const btnAlterar = document.createElement('button');
-          btnAlterar.type = 'button';
-          btnAlterar.className = 'btn btn-outline-primary btn-sm flex-shrink-0';
-          // btnAlterar.textContent = 'Alterar pacote';
-          btnAlterar.innerHTML = '<i class="fas fa-exchange-alt"></i>'; // Ãcone de troca
-          btnAlterar.setAttribute('data-bs-toggle', 'modal');
-          btnAlterar.setAttribute('data-bs-target', '#modalAlterarPacote');
-
-          // Ao clicar, preenche o modal e lista os pacotes disponÃ­veis
-          btnAlterar.addEventListener('click', () => {
-            // guarda referÃªncia do <li> atual para mover no DOM apÃ³s sucesso
-            window._editingItemLi = li;
-
-            // campos escondidos
-            document.getElementById('pacoteOrigemId').value = pacote.id;
-            document.getElementById('itemId').value = (item.id ?? idx);
-            document.getElementById('cargaId').value = cargaId;
-
-            // popula o select com todos os pacotes da carga, exceto o atual
-            const sel = document.getElementById('pacoteDestinoId');
-            const helper = document.getElementById('helperPacoteDestino');
-            sel.innerHTML = '';
-            helper.textContent = '';
-
-            const outros = (data.pacotes || []).filter(p => p.id !== pacote.id);
-            if (outros.length === 0) {
-              const opt = document.createElement('option');
-              opt.value = '';
-              opt.textContent = 'não hÃ¡ outros pacotes';
-              sel.appendChild(opt);
-              sel.disabled = true;
-              helper.textContent = 'Crie outro pacote para mover este item.';
-            } else {
-              const placeholder = document.createElement('option');
-              placeholder.value = '';
-              placeholder.textContent = 'Selecione...';
-              placeholder.disabled = true;
-              placeholder.selected = true;
-              sel.appendChild(placeholder);
-
-              outros.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p.id;
-                opt.textContent = p.nome;
-                sel.appendChild(opt);
-              });
-              sel.disabled = false;
-            }
-          });
-
-          li.appendChild(info);
-
-          const actionsDiv = document.createElement('div');
-          actionsDiv.className = 'd-flex align-items-center gap-1 flex-shrink-0';
-
-          const podeEditarQtd = (data.status_carga === 'planejamento' || data.status_carga === 'verificacao');
-          if (podeEditarQtd) {
-            const inputQtd = document.createElement('input');
-            inputQtd.type = 'number';
-            inputQtd.min = '1';
-            inputQtd.value = item.quantidade;
-            inputQtd.className = 'form-control form-control-sm text-center';
-            inputQtd.style.width = '52px';
-            inputQtd.style.fontSize = '.78rem';
-
-            const btnSalvarQtd = document.createElement('button');
-            btnSalvarQtd.type = 'button';
-            btnSalvarQtd.className = 'btn btn-outline-secondary btn-sm p-1';
-            btnSalvarQtd.innerHTML = '<i class="fas fa-save" style="font-size:.7rem;"></i>';
-            btnSalvarQtd.title = 'Salvar quantidade';
-
-            btnSalvarQtd.addEventListener('click', async () => {
-              const novaQt = parseInt(inputQtd.value, 10);
-              if (!novaQt || novaQt <= 0) { alert('Quantidade inválida.'); return; }
-              const prevText = btnSalvarQtd.innerHTML;
-              btnSalvarQtd.disabled = true;
-              btnSalvarQtd.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-              try {
-                const resp = await fetch(`api/pacotes/itens/${item.id}/atualizar-quantidade/`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
-                  body: JSON.stringify({ quantidade: novaQt })
-                });
-                const dataResp = await resp.json().catch(() => ({}));
-                if (!resp.ok) throw new Error(dataResp?.erro || 'Erro ao atualizar quantidade.');
-                inputQtd.value = dataResp.nova_quantidade;
-              } catch (error) {
-                alert(error.message || 'Erro ao atualizar quantidade.');
-              } finally {
-                btnSalvarQtd.disabled = false;
-                btnSalvarQtd.innerHTML = prevText;
-              }
-            });
-
-            const btnExcluirItem = document.createElement('button');
-            btnExcluirItem.type = 'button';
-            btnExcluirItem.className = 'btn btn-outline-danger btn-sm p-1';
-            btnExcluirItem.innerHTML = '<i class="fas fa-trash" style="font-size:.7rem;"></i>';
-            btnExcluirItem.title = 'Remover item';
-            btnExcluirItem.addEventListener('click', async () => {
-              const confirma = item.fora_planejado
-                ? confirm('Remover este item fora do planejado do pacote?')
-                : confirm('Remover esta peça do pacote? A quantidade voltará para a pendência.');
-              if (!confirma) return;
-              const prev = btnExcluirItem.innerHTML;
-              btnExcluirItem.disabled = true;
-              btnExcluirItem.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-              try {
-                const resp = await fetch(`api/pacotes/itens/${item.id}/deletar/`, {
-                  method: 'DELETE',
-                  headers: { 'X-CSRFToken': getCookie('csrftoken') }
-                });
-                const dataResp = await resp.json().catch(() => ({}));
-                if (!resp.ok) throw new Error(dataResp?.erro || 'Erro ao remover peça.');
-                li.remove();
-                if (!lista.querySelector('.item-row:not(.item-row-empty)')) {
-                  const vazio = document.createElement('div');
-                  vazio.className = 'item-row item-row-empty text-muted small px-3 py-2';
-                  vazio.innerText = 'Nenhum item no pacote.';
-                  lista.appendChild(vazio);
-                }
-              } catch (error) {
-                alert(error.message || 'Erro ao remover peça.');
-              } finally {
-                btnExcluirItem.disabled = false;
-                btnExcluirItem.innerHTML = prev;
-              }
-            });
-
-            actionsDiv.appendChild(inputQtd);
-            actionsDiv.appendChild(btnSalvarQtd);
-            actionsDiv.appendChild(btnExcluirItem);
-          } else {
-            const qtyBadge = document.createElement('span');
-            qtyBadge.className = 'badge bg-light text-dark border';
-            qtyBadge.style.fontSize = '.72rem';
-            qtyBadge.textContent = `×${item.quantidade}`;
-            actionsDiv.appendChild(qtyBadge);
-          }
-
-          if (data.status_carga === 'planejamento' && pacote.status_expedicao !== 'ok') {
-            actionsDiv.appendChild(btnAlterar);
-          } else if (data.status_carga === 'verificacao' && pacote.status_qualidade !== 'ok') {
-            actionsDiv.appendChild(btnAlterar);
-          }
-
-          li.appendChild(actionsDiv);
-          lista.appendChild(li);
-        });
-      }
-
-      // BotÃ£o Confirmar APONTAMENTO
-      const btnConfirmarExpedicao = document.createElement('button');
-      btnConfirmarExpedicao.className = 'btn btn-outline-success btn-sm mt-2 w-100';
-      btnConfirmarExpedicao.textContent = 'Confirmar (ExpediÃ§Ã£o)';
-      btnConfirmarExpedicao.setAttribute('data-bs-toggle', 'modal');
-      btnConfirmarExpedicao.setAttribute('data-bs-target', '#modalConfirmarPacote');
-      btnConfirmarExpedicao.setAttribute('data-id-pacote', pacote.id);
-
-      // Passa o ID do pacote para o modal ao clicar
-      btnConfirmarExpedicao.addEventListener('click', () => {
-        document.getElementById('idPacoteConfirmar').value = pacote.id;
-        document.getElementById('obsConfirmarPacote').value = '';  // limpa campo
-      });
-
-      // BotÃ£o Confirmar QUALIDADE
-      const btnConfirmarQualidade = document.createElement('button');
-      btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm mt-2 w-100';
-      btnConfirmarQualidade.textContent = 'Confirmar (Qualidade)';
-      btnConfirmarQualidade.setAttribute('data-bs-toggle', 'modal');
-      btnConfirmarQualidade.setAttribute('data-bs-target', '#modalConfirmarPacote');
-      btnConfirmarQualidade.setAttribute('data-id-pacote', pacote.id);
-
-      // Passa o ID do pacote para o modal ao clicar
-      btnConfirmarQualidade.addEventListener('click', () => {
-        document.getElementById('idPacoteConfirmar').value = pacote.id;
-        document.getElementById('obsConfirmarPacote').value = '';  // limpa campo
-      });
-
-      body.appendChild(dataCriacao);
-      body.appendChild(lista);
-
-      const footer = document.createElement('div');
-      footer.className = 'card-footer d-flex flex-column gap-1 py-2';
-      footer.style.borderTop = '1px solid rgba(0,0,0,.07)';
-      footer.style.background = '#fafafa';
-
-      // BotÃ£o de adicionar foto
-      const btnFoto = document.createElement('button');
-      btnFoto.type = 'button';
-      btnFoto.className = 'btn btn-outline-secondary btn-sm';
-      btnFoto.innerHTML = '<i class="fas fa-camera"></i>';
-      btnFoto.title = "Câmera";
-      const abrirSelecaoFoto = (usarCamera = false) => {
-        // Cria input de arquivo invisÃ­vel
-        const input = document.createElement('input');
-        input.type = 'file';
-        // Em alguns navegadores mobile, `image/*` abre a cÃ¢mera direto.
-        // Usar extensÃµes forÃ§a o seletor de arquivos/galeria.
-        input.accept = '.jpg,.jpeg,.png,.webp,.heic,.heif';
-        if (usarCamera) {
-          input.setAttribute('capture', 'environment');
-        } else {
-          input.removeAttribute('capture');
-        }
-
-        // Ao selecionar ou tirar a foto
-        input.onchange = async () => {
-          const file = input.files[0];
-          input.remove();
-          if (!file) return;
-
-          const previewURL = URL.createObjectURL(file);
-
-          const result = await Swal.fire({
-            title: 'Confirmar Foto',
-            imageUrl: previewURL,
-            imageAlt: 'Prévia da foto',
-            imageWidth: '100%',
-            confirmButtonText: 'Confirmar',
-            cancelButtonText: 'Cancelar',
-            showCancelButton: true,
-            showLoaderOnConfirm: true,
-            allowOutsideClick: () => !Swal.isLoading(),
-            preConfirm: async () => {
-              const formData = new FormData();
-              formData.append('foto', file);
-              formData.append('pacote', pacote.id);
-              try {
-                const res = await fetch('api/salvar-foto/', {
-                  method: 'POST',
-                  body: formData,
-                  headers: { 'X-CSRFToken': getCookie('csrftoken') }
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                  Swal.showValidationMessage(data?.erro || `Erro ${res.status} ao salvar a foto.`);
-                  return false;
-                }
-                return data;
-              } catch (err) {
-                Swal.showValidationMessage('Erro de conexão ao salvar a foto.');
-                return false;
-              }
-            }
-          });
-
-          URL.revokeObjectURL(previewURL);
-
-          if (result.isConfirmed && result.value) {
-            Toast.fire({ icon: "success", title: "Foto salva com sucesso." });
-            atualizarSlotAvancar(result.value.info_add.carga_id, result.value.info_add.todos_pacotes_tem_foto_verificacao, result.value.info_add.etapa);
-          }
-        };
-
-        // Aciona o input
-        document.body.appendChild(input);
-        input.click();
-      };
-      btnFoto.onclick = () => abrirSelecaoFoto(true);
-
-      const btnArquivo = document.createElement('button');
-      btnArquivo.type = 'button';
-      btnArquivo.className = 'btn btn-outline-secondary btn-sm';
-      btnArquivo.innerHTML = '<i class="fas fa-image"></i>';
-      btnArquivo.title = "Selecionar arquivo";
-      btnArquivo.onclick = () => abrirSelecaoFoto(false);
-
-      // BotÃ£o de imprimir
-      const btnPrint = document.createElement('button');
-      btnPrint.className = 'btn btn-outline-secondary btn-sm';
-      btnPrint.innerHTML = '<i class="fas fa-print"></i>';
-      btnPrint.title = "Imprimir";
-      btnPrint.onclick = () => {
-        // lÃ³gica para impressÃ£o
-        impressaoZebra(pacote.id, pacote.cliente, pacote.data_carga, pacote.nome);
-      };
-
-      const btnGroup = document.createElement('div');
-      btnGroup.className = 'd-flex gap-2';
-
-      if (data.status_carga === 'verificacao' && pacote.status_qualidade !== 'ok') {
-
-        // Confirmar Qualidade
-        btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm flex-grow-1';
-        btnGroup.appendChild(btnConfirmarQualidade);
-
-        btnGroup.appendChild(btnPrint);
-        btnGroup.appendChild(btnFoto);
-        btnGroup.appendChild(btnArquivo);
-
-        footer.appendChild(btnGroup);
-
-      } else if (data.status_carga === 'verificacao' && pacote.status_qualidade === 'ok') {
-        const span = document.createElement('span');
-        span.className = 'text-success fw-bold text-center ms-2';
-        span.textContent = 'Pacote confirmado';
-
-        btnGroup.appendChild(span);
-        btnGroup.appendChild(btnPrint);
-        btnGroup.appendChild(btnFoto);
-        btnGroup.appendChild(btnArquivo);
-
-        footer.appendChild(btnGroup);
-      }
-
-      if (data.status_carga === 'despachado' && pacote.status_qualidade === 'ok') {
-
-        // Confirmar Qualidade
-        // btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm flex-grow-1';
-        // btnGroup.appendChild(btnConfirmarQualidade);
-
-        // btnGroup.appendChild(btnPrint);
-        btnGroup.appendChild(btnFoto);
-        btnGroup.appendChild(btnArquivo);
-
-        footer.appendChild(btnGroup);
-
-      }
-
-      card.appendChild(header);
-      card.appendChild(body);
-      card.appendChild(footer);
-      col.appendChild(card);
-      cardsContainer.appendChild(col);
+      cardsContainer.appendChild(criarCardPacote(pacote, data, cargaId, idsNaFila));
     });
 
     modalBody.appendChild(document.createElement('hr'));
