@@ -1592,6 +1592,13 @@ def _filtrar_qs(qs, data_inicio, data_fim, tipo_data='inspecao'):
     return qs
 
 
+def _classe_recebimento_devolucao_q(prefixo="dados"):
+    return (
+        Q(**{f"{prefixo}__Classe de Inspeção__istartswith": "devolu"})
+        | Q(**{f"{prefixo}__Classe de inspeção__istartswith": "devolu"})
+    )
+
+
 def _build_date_filter(tipo_data, di, df, params):
     """Returns (join_sql, where_conditions) and appends date params to params list."""
     where = []
@@ -1624,8 +1631,12 @@ def api_recebimento_resumo(request):
 
     qs = _filtrar_qs(InspecaoRecebimento.objects.filter(excluido=False), di, df, tipo_data)
     total      = qs.count()
+    classe_devolucao = _classe_recebimento_devolucao_q()
+    devolucoes = qs.filter(classe_devolucao).count()
     conforme   = qs.filter(resultado="conforme").count()
     nc         = qs.filter(resultado="nao_conforme").count()
+    conforme_devolucoes = qs.filter(classe_devolucao, resultado="conforme").count()
+    nc_devolucoes = qs.filter(classe_devolucao, resultado="nao_conforme").count()
 
     pendentes_qs = InspecaoRecebimentoItem.objects.filter(inspecionado=False, excluido=False)
     if di:
@@ -1633,12 +1644,17 @@ def api_recebimento_resumo(request):
     if df:
         pendentes_qs = pendentes_qs.filter(data_referencia__lte=df)
     pendentes = pendentes_qs.count()
+    pendentes_devolucoes = pendentes_qs.filter(_classe_recebimento_devolucao_q()).count()
 
     return JsonResponse({
         "total": total,
+        "devolucoes": devolucoes,
         "conforme": conforme,
+        "conforme_devolucoes": conforme_devolucoes,
         "nao_conforme": nc,
+        "nao_conforme_devolucoes": nc_devolucoes,
         "pendentes": pendentes,
+        "pendentes_devolucoes": pendentes_devolucoes,
         "taxa_conformidade":    round(conforme / total * 100, 1) if total else 0,
         "taxa_nao_conformidade": round(nc / total * 100, 1) if total else 0,
     })
@@ -1665,8 +1681,17 @@ def api_recebimento_analise_temporal(request):
         SELECT
             TO_CHAR({date_trunc}, 'YYYY-MM')                                       AS mes,
             COUNT(*)                                                                AS total,
-            COUNT(*) FILTER (WHERE ir.resultado = 'conforme')                      AS conforme,
-            COUNT(*) FILTER (WHERE ir.resultado = 'nao_conforme')                  AS nao_conforme
+            COUNT(*) FILTER (
+                WHERE ir.resultado = 'conforme'
+                  AND NOT (COALESCE(ir.dados->>'Classe de Inspeção', ir.dados->>'Classe de inspeção', '') ILIKE 'devolu%%')
+            )                                                                       AS conforme,
+            COUNT(*) FILTER (
+                WHERE ir.resultado = 'nao_conforme'
+                  AND NOT (COALESCE(ir.dados->>'Classe de Inspeção', ir.dados->>'Classe de inspeção', '') ILIKE 'devolu%%')
+            )                                                                       AS nao_conforme,
+            COUNT(*) FILTER (
+                WHERE COALESCE(ir.dados->>'Classe de Inspeção', ir.dados->>'Classe de inspeção', '') ILIKE 'devolu%%'
+            )                                                                       AS devolucoes
         FROM inspecao_inspecaorecebimento ir
         {join_sql}
         WHERE {' AND '.join(where)}
@@ -1683,6 +1708,7 @@ def api_recebimento_analise_temporal(request):
             "total": r[1],
             "conforme": r[2],
             "nao_conforme": r[3],
+            "devolucoes": r[4],
             "taxa_nc": round(r[3] / r[1] * 100, 1) if r[1] else 0,
         }
         for r in rows
