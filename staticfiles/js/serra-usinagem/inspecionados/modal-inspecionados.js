@@ -1,305 +1,345 @@
+function escaparHtmlSerraUsinagem(valor) {
+    return String(valor ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function campoFichaSerraUsinagem(label, value) {
+    return `
+        <div class="ficha-field">
+            <span class="ficha-field-label">${escaparHtmlSerraUsinagem(label)}</span>
+            <span class="ficha-field-value">${escaparHtmlSerraUsinagem(value || "-")}</span>
+        </div>`;
+}
+
+function montarTabelaMedidasSerraUsinagem(medidasPorProcesso) {
+    if (!medidasPorProcesso || !Object.keys(medidasPorProcesso).length) return "";
+
+    const linhas = [];
+    Object.entries(medidasPorProcesso).forEach(([tipoProcesso, detalhes]) => {
+        const detalhesPorAmostra = {};
+        detalhes.forEach((detalhe) => {
+            if (!detalhesPorAmostra[detalhe.amostra]) detalhesPorAmostra[detalhe.amostra] = [];
+            detalhesPorAmostra[detalhe.amostra].push(detalhe);
+        });
+
+        Object.entries(detalhesPorAmostra).forEach(([amostra, detalhesAmostra]) => {
+            detalhesAmostra.forEach((detalhe) => {
+                linhas.push(`
+                    <tr>
+                        <td>${escaparHtmlSerraUsinagem(tipoProcesso)}</td>
+                        <td>${escaparHtmlSerraUsinagem(amostra)}</td>
+                        <td>${escaparHtmlSerraUsinagem(detalhe.cabecalho)}</td>
+                        <td>${escaparHtmlSerraUsinagem(detalhe.valor)}mm</td>
+                        <td class="${detalhe.conforme ? "text-success" : "text-danger"}">${detalhe.conforme ? "Sim" : "Nao"}</td>
+                    </tr>`);
+            });
+        });
+    });
+
+    if (!linhas.length) return "";
+
+    return `
+        <div class="ficha-table-wrap mt-3${linhas.length > 10 ? " is-scrollable-y" : ""}">
+            <table class="ficha-unidades-table">
+                <thead>
+                    <tr>
+                        <th>Processo</th>
+                        <th>Amostra</th>
+                        <th>Cabecalho</th>
+                        <th>Valor</th>
+                        <th>Conforme</th>
+                    </tr>
+                </thead>
+                <tbody>${linhas.join("")}</tbody>
+            </table>
+        </div>`;
+}
+
+function montarTabelaCausasSerraUsinagem(causas) {
+    if (!Array.isArray(causas) || !causas.length) return "";
+
+    const linhas = causas.map((causa, index) => {
+        const imagens = Array.isArray(causa.imagens) && causa.imagens.length
+            ? `<div class="ficha-nc-gallery">${causa.imagens.map((imagem) => `
+                <a href="${escaparHtmlSerraUsinagem(imagem.url)}" target="_blank" rel="noopener noreferrer">
+                    <img src="${escaparHtmlSerraUsinagem(imagem.url)}" alt="Nao conformidade ${index + 1}">
+                </a>`).join("")}</div>`
+            : "-";
+
+        return `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escaparHtmlSerraUsinagem((causa.nomes || []).join(", ") || "-")}</td>
+                <td>${escaparHtmlSerraUsinagem(causa.quantidade ?? 0)}</td>
+                <td>${escaparHtmlSerraUsinagem(causa.destino || "-")}</td>
+                <td>${imagens}</td>
+            </tr>`;
+    }).join("");
+
+    return `
+        <div class="ficha-section mt-3 mb-0">
+            <div class="ficha-section-title">Causas da nao conformidade</div>
+            <div class="ficha-table-wrap">
+                <table class="ficha-unidades-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Causas</th>
+                            <th>Quantidade</th>
+                            <th>Destino</th>
+                            <th>Imagens</th>
+                        </tr>
+                    </thead>
+                    <tbody>${linhas}</tbody>
+                </table>
+            </div>
+        </div>`;
+}
+
+function montarInfoAdicionaisSerraUsinagem(infoAdicionais) {
+    if (!infoAdicionais) return "";
+
+    return `
+        <div class="ficha-section">
+            <div class="ficha-section-title">Informacoes adicionais</div>
+            <div class="ficha-fields">
+                ${campoFichaSerraUsinagem("Inspecao completa", infoAdicionais.inspecao_completa ? "Sim" : "Nao")}
+                ${infoAdicionais.ficha_url
+                    ? `<div class="ficha-field">
+                        <span class="ficha-field-label">Ficha</span>
+                        <span class="ficha-field-value">
+                            <a href="${escaparHtmlSerraUsinagem(infoAdicionais.ficha_url)}" target="_blank" rel="noopener noreferrer">Ver imagem</a>
+                        </span>
+                    </div>`
+                    : ""}
+            </div>
+        </div>`;
+}
+
+function montarExecucaoSerraUsinagem(element, index, total) {
+    const isFirstItem = index === 0;
+    const naoConformeQtd = Number(element.nao_conformidade ?? 0);
+    const resultado = naoConformeQtd > 0 ? "Nao conforme" : "Conforme";
+    const resultClass = naoConformeQtd > 0 ? "nao-conforme" : "conforme";
+    const titulo = element.num_execucao === 0 ? "Inspecao" : "Reinspecao";
+    const trashIcon = isFirstItem
+        ? `<i class="bi bi-trash trash-history-last-execution"
+                data-id="${escaparHtmlSerraUsinagem(element.id)}"
+                data-id-inspecao="${escaparHtmlSerraUsinagem(element.id_inspecao)}"
+                data-nao-conformidade="${escaparHtmlSerraUsinagem(element.nao_conformidade)}"
+                data-conformidade="${escaparHtmlSerraUsinagem(element.conformidade)}"
+                data-data="${escaparHtmlSerraUsinagem(element.data_execucao)}"
+                data-primeira-execucao="${total - 1}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                data-bs-custom-class="custom-tooltip"
+                data-bs-title="Deseja excluir esta execucao?"></i>`
+        : `<i class="bi bi-trash trash-history-others-execution"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                data-bs-custom-class="custom-tooltip"
+                data-bs-title="Exclua a ultima execucao para conseguir excluir a execucao #${escaparHtmlSerraUsinagem(element.num_execucao)}"></i>`;
+
+    return `
+        <div class="ficha-execucao-card" data-id="${escaparHtmlSerraUsinagem(element.id)}" data-nao-conformidade="${escaparHtmlSerraUsinagem(element.nao_conformidade)}" data-data="${escaparHtmlSerraUsinagem(element.data_execucao)}">
+            <div class="ficha-execucao-header">
+                <h6 class="ficha-execucao-title">${titulo} #${escaparHtmlSerraUsinagem(element.num_execucao)}</h6>
+                ${trashIcon}
+            </div>
+            <div class="ficha-execucao-body">
+                <div class="ficha-resultado-box ${resultClass}">
+                    <span class="ficha-resultado-pill ${resultClass}">${resultado}</span>
+                    <div class="ficha-fields flex-grow-1">
+                        ${campoFichaSerraUsinagem("Data da execucao", element.data_execucao)}
+                        ${campoFichaSerraUsinagem("Inspetor", element.inspetor)}
+                        ${campoFichaSerraUsinagem("Conformidade", element.conformidade)}
+                        ${campoFichaSerraUsinagem("Nao conformidade", element.nao_conformidade)}
+                    </div>
+                </div>
+                ${montarTabelaCausasSerraUsinagem(element.causas)}
+                ${montarInfoAdicionaisSerraUsinagem(element.info_adicionais)}
+                ${montarTabelaMedidasSerraUsinagem(element.medidas_por_processo)}
+            </div>
+        </div>`;
+}
+
+function carregarCausasDaExecucaoSerraUsinagem(element) {
+    const naoConformeQtd = Number(element.nao_conformidade ?? 0);
+    if (naoConformeQtd <= 0) return Promise.resolve({ ...element, causas: [] });
+
+    return fetch(`/inspecao/api/historico-causas-serra-usinagem/${element.id}`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+        },
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Erro na requisicao HTTP. Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => ({ ...element, causas: data.causas || [] }));
+}
+
+function montarFichaSerraUsinagem(data, button) {
+    const history = Array.isArray(data.history) ? data.history : [];
+    const ultima = history[0] || {};
+    const naoConformeQtd = Number(ultima.nao_conformidade ?? button.dataset.naoConformidade ?? 0);
+    const resultado = naoConformeQtd > 0 ? "Nao conforme" : "Conforme";
+    const resultClass = naoConformeQtd > 0 ? "nao-conforme" : "conforme";
+    const geradoEm = new Date().toLocaleString("pt-BR");
+    const registroId = button.dataset.id || "";
+
+    const dadosItem = [
+        ["Peca", button.dataset.peca],
+        ["Tipo", button.dataset.tipo],
+        ["Maquina", button.dataset.maquina],
+        ["Data da ultima inspecao", button.dataset.data],
+        ["Conformidade", button.dataset.conformidade],
+        ["Nao conformidade", button.dataset.naoConformidade],
+    ].map(([label, value]) => campoFichaSerraUsinagem(label, value)).join("");
+
+    return `
+        <div class="ficha-doc-header">
+            <div>
+                <div class="ficha-doc-title">Ficha de Inspecao de Serra e Usinagem</div>
+                <div class="ficha-doc-subtitle">Controle de qualidade - serra e usinagem</div>
+            </div>
+            <div class="ficha-doc-id">
+                <strong>#${escaparHtmlSerraUsinagem(registroId || "-")}</strong>
+                Emitido em ${escaparHtmlSerraUsinagem(geradoEm)}
+            </div>
+        </div>
+
+        <div class="ficha-section">
+            <div class="ficha-section-title">Dados do item</div>
+            <div class="ficha-fields">${dadosItem}</div>
+        </div>
+
+        <div class="ficha-section">
+            <div class="ficha-section-title">Resultado da inspecao</div>
+            <div class="ficha-resultado-box ${resultClass}">
+                <span class="ficha-resultado-pill ${resultClass}">${resultado}</span>
+                <div class="ficha-fields flex-grow-1">
+                    ${campoFichaSerraUsinagem("Data da inspecao", ultima.data_execucao || button.dataset.data)}
+                    ${campoFichaSerraUsinagem("Inspetor", ultima.inspetor)}
+                    ${campoFichaSerraUsinagem("Conformidade", ultima.conformidade ?? button.dataset.conformidade)}
+                    ${campoFichaSerraUsinagem("Nao conformidade", ultima.nao_conformidade ?? button.dataset.naoConformidade)}
+                </div>
+            </div>
+        </div>
+
+        <div class="ficha-section">
+            <div class="ficha-section-title">Historico de execucoes</div>
+            ${history.length
+                ? history.map((element, index) => montarExecucaoSerraUsinagem(element, index, history.length)).join("")
+                : `<p class="text-muted mb-0">Nenhuma execucao encontrada.</p>`}
+        </div>
+
+        <div class="ficha-doc-footer">
+            <span>Inspecao de Serra e Usinagem - sistema de qualidade</span>
+            <span>Registro #${escaparHtmlSerraUsinagem(registroId || "-")} - ${escaparHtmlSerraUsinagem(geradoEm)}</span>
+        </div>`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("click", function(event) {
-        if (event.target.classList.contains('historico-inspecao')) {
-            const buttonSeeDetails = document.querySelectorAll(".historico-inspecao");
-            const button = event.target;
+        const button = event.target.closest(".historico-inspecao");
+        if (!button) return;
+
+        const buttonSeeDetails = document.querySelectorAll(".historico-inspecao");
+        buttonSeeDetails.forEach((detailsButton) => {
+            detailsButton.disabled = true;
+        });
+        button.querySelector(".spinner-border").style.display = "flex";
+        const containerFicha = document.getElementById("ficha-doc-serra-usinagem");
+        const id = button.getAttribute("data-id");
+
+        containerFicha.innerHTML = "";
+
+        fetch(`/inspecao/api/historico-serra-usinagem/${id}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+            },
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro na requisicao HTTP. Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const history = Array.isArray(data.history) ? data.history : [];
+            return Promise.all(history.map(carregarCausasDaExecucaoSerraUsinagem))
+                .then(historyComCausas => ({ ...data, history: historyComCausas }));
+        })
+        .then(data => {
+            containerFicha.innerHTML = montarFichaSerraUsinagem(data, button);
+
+            const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltips.forEach(t => new bootstrap.Tooltip(t));
+            const modal = new bootstrap.Modal(document.getElementById("modal-historico-serra-usinagem"));
+            modal.show();
+        })
+        .catch(error => {
+            console.error(error);
+            Swal.fire({
+                icon: "error",
+                title: "Erro",
+                text: "Ocorreu um erro ao carregar o historico de inspecao.",
+                confirmButtonText: "OK"
+            });
+        })
+        .finally(() => {
             buttonSeeDetails.forEach((detailsButton) => {
-                detailsButton.disabled = true;
-            })
-            button.querySelector(".spinner-border").style.display = "flex";
-            let listaTimeline = document.querySelector(".timeline");
-            const id = event.target.getAttribute("data-id");
-
-            listaTimeline.innerHTML = "";
-            
-            fetch(`/inspecao/api/historico-serra-usinagem/${id}`, {
-                method:"GET",
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Erro na requisição HTTP. Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log(data);
-
-                data.history.forEach((element, index) => {
-                    const isFirstItem = index === 0;
-                    
-                    // HTML para informações adicionais
-                    let infoAdicionaisHTML = '';
-                    if (element.info_adicionais) {
-                        infoAdicionaisHTML = `
-                            <div class="mt-3 info-adicionais-container">
-                                <h6 class="mb-2">Informações Adicionais: #${element.info_adicionais.id}</h6>
-                                <ul class="list-unstyled">
-                                    <li><strong>Inspeção Completa:</strong> ${element.info_adicionais.inspecao_completa ? 'Sim' : 'Não'}</li>
-                                    ${element.info_adicionais.ficha_url ? 
-                                        `<li><strong>Ficha:</strong> <a href="${element.info_adicionais.ficha_url}" target="_blank">Ver imagem</a></li>` : ''}
-                                </ul>
-                            </div>`;
-                    }
-
-                    // HTML para medidas por processo e amostra
-                    let medidasPorProcessoHTML = '';
-                    if (element.medidas_por_processo && Object.keys(element.medidas_por_processo).length > 0) {
-                        medidasPorProcessoHTML = `<div class="mt-3 medidas-processo-container">`;
-                        
-                        // Para cada tipo de processo
-                        for (const [tipoProcesso, detalhes] of Object.entries(element.medidas_por_processo)) {
-                            medidasPorProcessoHTML += `
-                                <h6 class="mb-2">Processo: ${tipoProcesso}</h6>
-                                <div class="processo-container mb-4">`;
-                            
-                            // Agrupar detalhes por amostra
-                            const detalhesPorAmostra = {};
-                            detalhes.forEach(detalhe => {
-                                if (!detalhesPorAmostra[detalhe.amostra]) {
-                                    detalhesPorAmostra[detalhe.amostra] = [];
-                                }
-                                detalhesPorAmostra[detalhe.amostra].push(detalhe);
-                            });
-                            
-                            // Para cada amostra
-                            for (const [amostra, detalhesAmostra] of Object.entries(detalhesPorAmostra)) {
-                                medidasPorProcessoHTML += `
-                                    <div class="amostra-container mb-3">
-                                        <h6 class="mb-2">Amostra ${amostra}</h6>
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-bordered">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th>Cabeçalho</th>
-                                                        <th>Valor</th>
-                                                        <th>Conforme</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>`;
-                                
-                                // Para cada detalhe da amostra
-                                detalhesAmostra.forEach(detalhe => {
-                                    medidasPorProcessoHTML += `
-                                        <tr class="${detalhe.conforme ? '' : 'table-danger'}">
-                                            <td>${detalhe.cabecalho}</td>
-                                            <td>${detalhe.valor}mm</td>
-                                            <td>${detalhe.conforme ? 'Sim' : 'Não'}</td>
-                                        </tr>`;
-                                });
-                                
-                                medidasPorProcessoHTML += `</tbody></table></div></div>`;
-                            }
-                            
-                            medidasPorProcessoHTML += `</div>`;
-                        }
-                        
-                        medidasPorProcessoHTML += `</div>`;
-                    }
-
-                    listaTimeline.innerHTML += `
-                        <li class="timeline-item" style="cursor:pointer;" 
-                            data-id="${element.id}" 
-                            data-nao-conformidade="${element.nao_conformidade}" 
-                            data-data="${element.data_execucao}">
-                            <span class="timeline-icon ${element.nao_conformidade == 0 ? 'success' : 'danger'}">
-                                <i class="bi ${element.nao_conformidade == 0 ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
-                            </span>
-                            <div class="timeline-content">
-                                <div class="d-flex justify-content-between">
-                                    <h5>${element.num_execucao === 0? `Inspeção`: `Reinspeção`} #${element.num_execucao}</h5>
-                                    ${isFirstItem ? `
-                                        <i class="bi bi-trash trash-history-last-execution" 
-                                            data-id="${element.id}" 
-                                            data-id-inspecao="${element.id_inspecao}"
-                                            data-nao-conformidade="${element.nao_conformidade}"
-                                            data-conformidade="${element.conformidade}" 
-                                            data-data="${element.data_execucao}"
-                                            data-primeira-execucao="${data.history.length - 1}"
-                                            data-bs-toggle="tooltip" 
-                                            data-bs-placement="top"
-                                            data-bs-custom-class="custom-tooltip"
-                                            data-bs-title="Deseja excluir esta execução?">
-                                        </i>
-                                    ` : `<i class="bi bi-trash trash-history-others-execution" 
-                                            data-bs-toggle="tooltip" 
-                                            data-bs-placement="top"
-                                            data-bs-custom-class="custom-tooltip"
-                                            data-bs-title="Exclua a última execução para conseguir excluir a execução #${element.num_execucao}">
-                                        </i>`}
-                                </div>
-                                <p class="date">${element.data_execucao}</p>
-                                <p><strong>Inspetor:</strong> ${element.inspetor}</p>
-                                <p class="text-muted"><strong>Conformidade:</strong> ${element.conformidade}</p>
-                                <p class="${element.nao_conformidade == 0 ? 'text-success' : 'text-danger'}">
-                                    <strong>Não Conformidade:</strong> ${element.nao_conformidade}
-                                </p>
-                                ${infoAdicionaisHTML}
-                                ${medidasPorProcessoHTML}
-                            </div>
-                        </li>`;
-                });
-                
-                const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-                tooltips.forEach(t => new bootstrap.Tooltip(t));
-                const modal = new bootstrap.Modal(document.getElementById("modal-historico-serra-usinagem"));
-                modal.show();
-            })
-            .catch(error => {
-                console.error(error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: 'Ocorreu um erro ao carregar o histórico de inspeção.',
-                    confirmButtonText: 'OK'
-                });
-            })
-            .finally(d => {
-                buttonSeeDetails.forEach((detailsButton) => {
-                    detailsButton.disabled = false;
-                })
-                button.querySelector(".spinner-border").style.display = "none";
-            })
-        }
+                detailsButton.disabled = false;
+            });
+            button.querySelector(".spinner-border").style.display = "none";
+        });
     });
 
     document.addEventListener("click", function(event) {
-        if (event.target.closest('.bi-trash')) {
-            if(event.target.classList.contains('trash-history-last-execution')) {
+        if (event.target.closest(".bi-trash")) {
+            if(event.target.classList.contains("trash-history-last-execution")) {
                 const confirmModal = bootstrap.Modal.getInstance(document.getElementById("modal-historico-serra-usinagem"));
                 confirmModal.hide();
 
-                const id = event.target.getAttribute('data-id');
-                const idInspecao = event.target.getAttribute('data-id-inspecao');
-                const conformidade = event.target.getAttribute('data-conformidade');
-                const naoConformidade = event.target.getAttribute('data-nao-conformidade');
-                const dataExecucao = event.target.getAttribute('data-data');
-                const indexItem = event.target.getAttribute('data-primeira-execucao');
+                const id = event.target.getAttribute("data-id");
+                const idInspecao = event.target.getAttribute("data-id-inspecao");
+                const conformidade = event.target.getAttribute("data-conformidade");
+                const naoConformidade = event.target.getAttribute("data-nao-conformidade");
+                const dataExecucao = event.target.getAttribute("data-data");
+                const indexItem = event.target.getAttribute("data-primeira-execucao");
 
                 let textDescricao;
                 if (parseInt(indexItem) !== 0) {
-                    textDescricao = "Tem certeza que deseja excluir esta execução? Ao excluir o item será retornado para 'Itens a Reinspecionar'";
+                    textDescricao = "Tem certeza que deseja excluir esta execucao? Ao excluir o item sera retornado para 'Itens a Reinspecionar'";
                 } else {
-                    textDescricao = "Tem certeza que deseja excluir esta execução? Ao excluir o item será retornado para 'Itens a Inspecionar'";
+                    textDescricao = "Tem certeza que deseja excluir esta execucao? Ao excluir o item sera retornado para 'Itens a Inspecionar'";
                 }
-                
-                // Preenche o modal com os dados
-                document.getElementById('modal-execucao-conformidade').textContent = conformidade;
-                document.getElementById('modal-execucao-nao-conformidade').textContent = naoConformidade;
-                document.getElementById('modal-execucao-data').textContent = dataExecucao;
-                document.getElementById('descricao-exclusao').textContent = textDescricao;
 
-                document.getElementById('confirmar-exclusao').setAttribute('data-execucao-id', id);
-                document.getElementById('confirmar-exclusao').setAttribute('data-inspecao-id', idInspecao);
-                document.getElementById('confirmar-exclusao').setAttribute('primeira-execucao', parseInt(indexItem) === 0);
-                
+                document.getElementById("modal-execucao-conformidade").textContent = conformidade;
+                document.getElementById("modal-execucao-nao-conformidade").textContent = naoConformidade;
+                document.getElementById("modal-execucao-data").textContent = dataExecucao;
+                document.getElementById("descricao-exclusao").textContent = textDescricao;
+
+                document.getElementById("confirmar-exclusao").setAttribute("data-execucao-id", id);
+                document.getElementById("confirmar-exclusao").setAttribute("data-inspecao-id", idInspecao);
+                document.getElementById("confirmar-exclusao").setAttribute("primeira-execucao", parseInt(indexItem) === 0);
+
                 const modalExcluirExecution = new bootstrap.Modal(document.getElementById("modal-excluir-execucao"));
                 modalExcluirExecution.show();
             }
             return;
         }
-        if (event.target.closest(".timeline-item")) { 
 
-            const naoConformidade = event.target.closest(".timeline-item").getAttribute("data-nao-conformidade");
-            if(parseFloat(naoConformidade) > 0) {
-    
-                const modalHistorico = document.getElementById("modal-historico-serra-usinagem");
-                const listaCausas = document.getElementById("causas-serra-usinagem");
-                const confirmModal = bootstrap.Modal.getInstance(modalHistorico);
-                const id = event.target.closest(".timeline-item").getAttribute("data-id");
-                const dataExecucao = event.target.closest(".timeline-item").getAttribute("data-data");
-                confirmModal.hide();
-
-                listaCausas.innerHTML = `<div class="card" aria-hidden="true">
-                                            <img src="/static/img/fundo cinza.png" class="card-img-top" alt="Tela cinza">
-                                            <div class="card-body">
-                                                <h5 class="card-title placeholder-glow">
-                                                <span class="placeholder col-6"></span>
-                                                </h5>
-                                                <p class="card-text placeholder-glow">
-                                                    <span class="placeholder col-12"></span>
-                                                </p>
-                                                <p class="card-text placeholder-glow">
-                                                    <span class="placeholder col-4"></span>
-                                                </p>
-                                            </div>
-                                        </div>` 
-                                
-                const modalCausas = new bootstrap.Modal(document.getElementById("modal-causas-historico-serra-usinagem"));
-                modalCausas.show();
-
-                fetch(`/inspecao/api/historico-causas-serra-usinagem/${id}`, {
-                    method:"GET",
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    },
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Erro na requisição HTTP. Status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    listaCausas.innerHTML = "";
-                    console.log(data)
-                    data.causas.forEach((causa, index) => {
-                        let causaHTML = 
-                        `<div class="row mb-3" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
-                            <div class="d-flex justify-content-between">
-                                <span class="label-modal text-end mb-3 mt-3">Quantidade: ${causa.quantidade}</span>
-                                <span class="label-modal text-end mb-3 mt-3">${index + 1}ª Causa</span>
-                            </div>`;
-                        
-                        if(causa.imagens.length > 0) {
-                            causa.imagens.forEach(imagem => {
-                                causaHTML += `<div class="card mb-3 p-0">
-                                                <img src="${imagem.url}" class="card-img-top" alt="...">
-                                                <div class="card-body">
-                                                    <h5 class="card-title">${causa.nomes.join(", ")}</h5>
-                                                    <span class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></span>
-                                                    <p class="card-text label-modal"><small class="text-muted">Destino: ${causa.destino}</small></p>
-                                                </div>
-                                            </div>`;
-                            });                            
-                        } else {
-                            causaHTML += `<div class="card mb-3 p-0">
-                                            <div class="card-body">
-                                                <h5 class="card-title">${causa.nomes.join(", ")}</h5>
-                                                <span class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></span>
-                                                <p class="card-text label-modal"><small class="text-muted">Destino: ${causa.destino}</small></p>
-                                            </div>
-                                        </div>`;
-                        }
-                        causaHTML += `</div>`;
-                
-                        listaCausas.innerHTML += causaHTML;
-                    });
-                })
-                .catch(error => {
-                    console.error(error);
-                })
-            } else {
-                const Toast = Swal.mixin({
-                    toast: true,
-                    position: "top-end",
-                    showConfirmButton: false,
-                    timer: 3000,
-                    timerProgressBar: true,
-                    didOpen: (toast) => {
-                      toast.onmouseenter = Swal.stopTimer;
-                      toast.onmouseleave = Swal.resumeTimer;
-                    }
-                  });
-                  Toast.fire({
-                    icon: "info",
-                    title: "Não possui não conformidade"
-                  });
-            }
-        }
     });
 });

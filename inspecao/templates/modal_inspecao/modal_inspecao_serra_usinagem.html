@@ -1,16 +1,15 @@
-<div class="modal fade" id="modal-historico-serra-usinagem" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="reinspecionar-serra-usinagemLabel">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="reinspecionar-serra-usinagemLabel">Histórico de Serra e Usinagem</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="modal fade" id="modal-historico-serra-usinagem" tabindex="-1" aria-labelledby="reinspecionar-serra-usinagemLabel">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header border-0 pb-0 px-4 pt-3" style="background:#f8fafc;">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-clipboard2-check text-primary fs-5"></i>
+            <span class="fw-semibold" style="font-size:.95rem;" id="reinspecionar-serra-usinagemLabel">Ficha de Inspecao de Serra e Usinagem</span>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
         </div>
-        <div class="modal-body">
-            <section class="py-3">
-                <ul class="timeline">
-
-                </ul>
-              </section>
+        <div class="modal-body p-0" style="background:#f8fafc;">
+            <div id="ficha-doc-serra-usinagem" class="ficha-doc"></div>
         </div>
       </div>
     </div>

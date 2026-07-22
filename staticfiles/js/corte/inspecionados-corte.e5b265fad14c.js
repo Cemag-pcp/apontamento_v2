@@ -274,6 +274,116 @@ document.addEventListener("DOMContentLoaded", () => {
     buscarInspecionados(1);
 });
 
+function escaparHtmlCorte(valor) {
+    return String(valor ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function campoFichaCorte(label, value) {
+    return `
+        <div class="ficha-field">
+            <span class="ficha-field-label">${escaparHtmlCorte(label)}</span>
+            <span class="ficha-field-value">${escaparHtmlCorte(value || "-")}</span>
+        </div>`;
+}
+
+function montarTabelaNaoConformidadesCorte(naoConformidades) {
+    if (!Array.isArray(naoConformidades) || !naoConformidades.length) return "";
+
+    const linhas = naoConformidades.map((nc, index) => {
+        const causas = Array.isArray(nc.causas) && nc.causas.length ? nc.causas.join(", ") : "-";
+        const imagens = Array.isArray(nc.imagens) && nc.imagens.length
+            ? `<div class="ficha-nc-gallery">${nc.imagens.map((url) => `
+                <a href="${escaparHtmlCorte(url)}" target="_blank" rel="noopener noreferrer">
+                    <img src="${escaparHtmlCorte(url)}" alt="Nao conformidade ${index + 1}">
+                </a>`).join("")}</div>`
+            : "-";
+
+        return `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escaparHtmlCorte(causas)}</td>
+                <td>${escaparHtmlCorte(nc.quantidade ?? 0)}</td>
+                <td>${escaparHtmlCorte(nc.destino || "-")}</td>
+                <td>${imagens}</td>
+            </tr>`;
+    }).join("");
+
+    return `
+        <div class="ficha-section">
+            <div class="ficha-section-title">Nao conformidades</div>
+            <div class="ficha-table-wrap">
+                <table class="ficha-unidades-table">
+                    <thead><tr><th>#</th><th>Causas</th><th>Quantidade</th><th>Destino</th><th>Imagens</th></tr></thead>
+                    <tbody>${linhas}</tbody>
+                </table>
+            </div>
+        </div>`;
+}
+
+function montarFichaInspecaoCorte(data) {
+    const naoConformeQtd = Number(data.nao_conformidade ?? 0);
+    const resultado = naoConformeQtd > 0 ? "Nao conforme" : "Conforme";
+    const resultClass = naoConformeQtd > 0 ? "nao-conforme" : "conforme";
+    const geradoEm = new Date().toLocaleString("pt-BR");
+    const dadosPeca = [
+        ["Peca", data.peca],
+        ["Ordem", data.ordem],
+        ["Maquina", data.conjunto],
+        ["Qtd planejada", data.qtd_planejada],
+        ["Qtd cortada", data.qtd_boa],
+        ["Qtd morta", data.qtd_morta],
+    ].map(([label, value]) => campoFichaCorte(label, value)).join("");
+    const dadosInspecao = [
+        ["Data da inspecao", data.data_inspecao],
+        ["Inspetor", data.inspetor],
+        ["Conformes", data.conformidade ?? 0],
+        ["Nao conformes", naoConformeQtd],
+    ].map(([label, value]) => campoFichaCorte(label, value)).join("");
+    const ficha100 = data.ficha_100_url
+        ? `<div class="ficha-section">
+               <div class="ficha-section-title">Ficha Inspecao 100%</div>
+               <a href="${escaparHtmlCorte(data.ficha_100_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">
+                   <i class="bi bi-file-earmark-text"></i> Visualizar ficha
+               </a>
+           </div>`
+        : "";
+
+    return `
+        <div class="ficha-doc-header">
+            <div>
+                <div class="ficha-doc-title">Ficha de Inspecao de Corte</div>
+                <div class="ficha-doc-subtitle">Controle de qualidade - plasma</div>
+            </div>
+            <div class="ficha-doc-id">
+                <strong>#${escaparHtmlCorte(data.inspecao_id || "-")}</strong>
+                Emitido em ${escaparHtmlCorte(geradoEm)}
+            </div>
+        </div>
+        <div class="ficha-section">
+            <div class="ficha-section-title">Dados da peca</div>
+            <div class="ficha-fields">${dadosPeca}</div>
+        </div>
+        <div class="ficha-section">
+            <div class="ficha-section-title">Resultado da inspecao</div>
+            <div class="ficha-resultado-box ${resultClass}">
+                <span class="ficha-resultado-pill ${resultClass}">${resultado}</span>
+                <div class="ficha-fields flex-grow-1">${dadosInspecao}</div>
+            </div>
+            ${data.observacao ? `<div class="ficha-resultado-obs mt-2"><i class="bi bi-chat-left-text me-1"></i>${escaparHtmlCorte(data.observacao)}</div>` : ""}
+        </div>
+        ${montarTabelaNaoConformidadesCorte(data.nao_conformidades)}
+        ${ficha100}
+        <div class="ficha-doc-footer">
+            <span>Inspecao de Corte - sistema de qualidade</span>
+            <span>Registro #${escaparHtmlCorte(data.inspecao_id || "-")} - ${escaparHtmlCorte(geradoEm)}</span>
+        </div>`;
+}
+
 async function abrirModalPeca(pecaId) {
     try {
         const response = await fetch(`/inspecao/api/detalhes-inspecao-corte/${pecaId}/`, {
@@ -292,92 +402,9 @@ async function abrirModalPeca(pecaId) {
         }
 
         const data = await response.json();
-        
-        console.log(data);
 
         const container = document.getElementById("lista-historico-pecas-corte");
-        container.innerHTML = "";
-
-        const section = document.createElement("section");
-        section.className = "py-3";
-
-        const timeline = document.createElement("ul");
-        timeline.className = "timeline";
-
-        const item = document.createElement("li");
-        item.className = "timeline-item";
-
-        const naoConformeQtd = Number(data.nao_conformidade ?? 0);
-        const iconClass = naoConformeQtd > 0 ? "bi-x-circle-fill" : "bi-check-circle-fill";
-        const statusClass = naoConformeQtd > 0 ? "danger" : "success";
-
-        item.innerHTML = `
-            <span class="timeline-icon ${statusClass}">
-                <i class="bi ${iconClass}"></i>
-            </span>
-
-            <div class="timeline-content">
-                <div class="d-flex justify-content-between">
-                    <h5>Inspeção #${data.inspecao_id ?? "-"}</h5>
-                </div>
-                <p><strong>Ordem: ${data.ordem}</strong>
-                <p><strong>${data.peca}</strong>
-                <p class="date">${data.data_inspecao ?? "-"}</p>
-                <p><strong>Qtd cortada:</strong> ${data.qtd_boa ?? "-"}</p>
-                <p><strong>Máquina:</strong> ${data.conjunto ?? "-"}</p>
-                <p><strong>Inspetor:</strong> ${data.inspetor ?? "-"}</p>
-
-                <p class="text-muted">
-                    <strong>Conformidade:</strong> ${data.conformidade ?? 0}
-                </p>
-
-                ${
-                    naoConformeQtd > 0
-                        ? `<p class="text-danger"><strong>Não Conformidade:</strong> ${naoConformeQtd}</p>`
-                        : ""
-                }
-
-                ${
-                    data.observacao
-                        ? `<div class="mt-3">
-                               <h6 class="mb-2">Observações:</h6>
-                               <p class="mb-0">${data.observacao}</p>
-                           </div>`
-                        : ""
-                }
-
-                ${
-                    data.nao_conformidades?.length > 0
-                        ? `<div class="mt-3">
-                               <h6 class="mb-2">Informações sobre a não conformidade:</h6>
-                               <ul class="list-unstyled mb-0">
-                                   ${data.nao_conformidades.map(nc => `
-                                       <li class="mb-2">
-                                           <strong>Causas:</strong> ${(nc.causas || []).join(", ")}<br>
-                                           <strong>Quantidade:</strong> ${nc.quantidade ?? 0}<br>
-                                           <strong>Destino:</strong> ${nc.destino ?? "-"}
-                                           ${nc.imagens?.length > 0 ? `<br><strong>Imagens:</strong><br>${nc.imagens.map(url => `<a href="${url}" target="_blank"><img src="${url}" style="max-width: 100px; margin: 5px;" /></a>`).join('')}` : ''}
-                                       </li>
-                                   `).join("")}
-                               </ul>
-                           </div>`
-                        : ""
-                }
-
-                ${
-                    data.ficha_100_url
-                        ? `<div class="mt-3">
-                               <h6 class="mb-2">Ficha Inspeção 100%:</h6>
-                               <a href="${data.ficha_100_url}" target="_blank" class="btn btn-primary">Visualizar Ficha</a>
-                           </div>`
-                        : ""
-                }
-            </div>
-        `;
-
-        timeline.appendChild(item);
-        section.appendChild(timeline);
-        container.appendChild(section);
+        container.innerHTML = montarFichaInspecaoCorte(data);
 
         const modal = bootstrap.Modal.getOrCreateInstance(
             document.getElementById("modal-historico-ordem-corte")
