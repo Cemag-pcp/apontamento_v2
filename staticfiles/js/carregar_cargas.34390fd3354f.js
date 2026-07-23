@@ -14,6 +14,25 @@ const Toast = Swal.mixin({
   }
 });
 
+// Em mobile/tablet, abrir a camera nativa (input capture) pode fazer o
+// SO matar a aba por falta de memoria; ao voltar, o navegador recarrega
+// a pagina do zero silenciosamente, perdendo a foto e todo o estado JS
+// antes do upload rodar. Guarda um flag no sessionStorage antes de abrir
+// a camera; se a pagina recarregar no meio disso, o flag sobrevive e
+// avisamos o usuario em vez de falhar em silencio.
+const CAMERA_EM_ANDAMENTO_KEY = 'expedicao_camera_em_andamento';
+
+(function avisarSeRecarregouDuranteCamera() {
+  const pacotePendente = sessionStorage.getItem(CAMERA_EM_ANDAMENTO_KEY);
+  if (!pacotePendente) return;
+  sessionStorage.removeItem(CAMERA_EM_ANDAMENTO_KEY);
+  Toast.fire({
+    icon: 'warning',
+    title: 'A página recarregou ao voltar da câmera (comum em celular/tablet). Tente enviar a foto de novo.',
+    timer: 6000,
+  });
+})();
+
 // helper pra mapear a cor (pt-BR) -> classe do Bootstrap
 function classeCorBadge(cor) {
   const c = String(cor || '').toLowerCase();
@@ -43,43 +62,43 @@ function classeCorBadge(cor) {
 
 // Redimensiona/comprime a foto no navegador antes do upload, pra nao
 // depender do tamanho original vindo da camera do celular (varios MB).
+// Usa createImageBitmap em vez de FileReader+dataURL: decodifica direto
+// do arquivo, sem passar a imagem inteira por uma string base64 (que
+// usa ~33% mais memoria e fica retida ate o GC rodar) - em mobile, logo
+// depois de voltar da camera, memoria e o recurso mais escasso, entao
+// isso ajuda a evitar que o SO mate a aba por pressao de memoria.
 async function compressImage(file, maxWidth = 1600, maxHeight = 1600, quality = 0.7) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+  const bitmap = await createImageBitmap(file);
+  try {
+    let width = bitmap.width;
+    let height = bitmap.height;
 
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height);
-          width = Math.floor(width * ratio);
-          height = Math.floor(height * ratio);
-        }
+    if (width > maxWidth || height > maxHeight) {
+      const ratio = Math.min(maxWidth / width, maxHeight / height);
+      width = Math.floor(width * ratio);
+      height = Math.floor(height * ratio);
+    }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, width, height);
 
-        const mimeType = file.type.includes('png') ? 'image/png' : 'image/jpeg';
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) return reject(new Error('Falha na geração do blob'));
-            resolve(new File([blob], file.name, { type: mimeType }));
-          },
-          mimeType,
-          quality
-        );
-      };
-      img.onerror = () => reject(new Error('Falha ao carregar imagem'));
-      img.src = event.target.result;
-    };
-    reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
-    reader.readAsDataURL(file);
-  });
+    const mimeType = file.type.includes('png') ? 'image/png' : 'image/jpeg';
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error('Falha na geração do blob'));
+          resolve(new File([blob], file.name, { type: mimeType }));
+        },
+        mimeType,
+        quality
+      );
+    });
+  } finally {
+    bitmap.close();
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -776,8 +795,12 @@ function criarCardPacote(pacote, data, cargaId, idsNaFila) {
       input.removeAttribute('capture');
     }
 
+    // Cancelar a captura tambem conta como "voltou vivo" - limpa o flag
+    input.oncancel = () => sessionStorage.removeItem(CAMERA_EM_ANDAMENTO_KEY);
+
     // Ao selecionar ou tirar a foto
     input.onchange = async () => {
+      sessionStorage.removeItem(CAMERA_EM_ANDAMENTO_KEY);
       const file = input.files[0];
       input.remove();
       if (!file) return;
@@ -837,6 +860,9 @@ function criarCardPacote(pacote, data, cargaId, idsNaFila) {
     };
 
     // Aciona o input
+    if (usarCamera) {
+      sessionStorage.setItem(CAMERA_EM_ANDAMENTO_KEY, String(pacote.id));
+    }
     document.body.appendChild(input);
     input.click();
   };
