@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Expedição CEMAG",
+    "slug": "expedicao-cemag",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "br.com.cemag.expedicao",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "O app usa a câmera pra tirar foto dos pacotes na expedição."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5ccf6937-3ca6-4112-affd-9fd6183d5770"
+      }
+    }
+  }
+}

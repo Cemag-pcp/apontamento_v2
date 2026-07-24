@@ -415,9 +415,11 @@
                                 <td><span class="controle-pintura-cell-text">{{ registro.pressao_ar_2 }}</span></td>
                                 <td><span class="controle-pintura-cell-text">{{ registro.pressao_ar_3 }}</span></td>
                                 <td class="text-center">
+                                    {% if can_editar_controle_pintura %}
                                     <button type="button" class="btn btn-sm btn-outline-primary btn-editar-controle-pintura" title="Editar" aria-label="Editar">
                                         <i class="fas fa-pen"></i>
                                     </button>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -592,6 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var modalElement = document.getElementById('modalControlePintura');
     var modalTitle = document.getElementById('modalControlePinturaLabel');
     var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    var canEditarControlePintura = {{ can_editar_controle_pintura|yesno:"true,false" }};
     var conversoesControlePintura = [
         { litrosId: 'controleQuantidadeTinta', kgsId: 'controleQuantidadeTintaKg', kgPorLitro: 1.1 },
         { litrosId: 'controleCatalizador', kgsId: 'controleCatalizadorKg', kgPorLitro: 0.988 },
@@ -722,6 +725,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function appendActionCell(row) {
         var cell = document.createElement('td');
         cell.className = 'text-center';
+        if (!canEditarControlePintura) {
+            row.appendChild(cell);
+            return;
+        }
         cell.innerHTML = [
             '<button type="button" class="btn btn-sm btn-outline-primary btn-editar-controle-pintura" title="Editar" aria-label="Editar">',
             '<i class="fas fa-pen"></i>',

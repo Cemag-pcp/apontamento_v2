@@ -1,311 +1,336 @@
+function escaparHtmlEstamparia(valor) {
+    return String(valor ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function campoFichaEstamparia(label, value) {
+    return `
+        <div class="ficha-field">
+            <span class="ficha-field-label">${escaparHtmlEstamparia(label)}</span>
+            <span class="ficha-field-value">${escaparHtmlEstamparia(value || "-")}</span>
+        </div>`;
+}
+
+function montarTabelaMedidasEstamparia(medidas) {
+    if (!Array.isArray(medidas) || !medidas.length) return "";
+
+    const linhas = medidas.map((medida, index) => `
+        <tr>
+            <td>${index + 1}</td>
+            <td>${escaparHtmlEstamparia(medida.cabecalhoMedidaA || "-")}</td>
+            <td>${escaparHtmlEstamparia(medida.medidaA || "-")}</td>
+            <td>${escaparHtmlEstamparia(medida.cabecalhoMedidaB || "-")}</td>
+            <td>${escaparHtmlEstamparia(medida.medidaB || "-")}</td>
+            <td>${escaparHtmlEstamparia(medida.cabecalhoMedidaC || "-")}</td>
+            <td>${escaparHtmlEstamparia(medida.medidaC || "-")}</td>
+            <td>${escaparHtmlEstamparia(medida.cabecalhoMedidaD || "-")}</td>
+            <td>${escaparHtmlEstamparia(medida.medidaD || "-")}</td>
+        </tr>`).join("");
+
+    return `
+        <div class="ficha-table-wrap mt-3${medidas.length > 10 ? " is-scrollable-y" : ""}">
+            <table class="ficha-unidades-table">
+                <thead>
+                    <tr>
+                        <th>Amostra</th>
+                        <th>Cabecalho A</th>
+                        <th>Medida A</th>
+                        <th>Cabecalho B</th>
+                        <th>Medida B</th>
+                        <th>Cabecalho C</th>
+                        <th>Medida C</th>
+                        <th>Cabecalho D</th>
+                        <th>Medida D</th>
+                    </tr>
+                </thead>
+                <tbody>${linhas}</tbody>
+            </table>
+        </div>`;
+}
+
+function montarTabelaCausasEstamparia(causas) {
+    if (!Array.isArray(causas) || !causas.length) return "";
+
+    const linhas = causas.map((causa, index) => {
+        const imagens = Array.isArray(causa.imagens) && causa.imagens.length
+            ? `<div class="ficha-nc-gallery">${causa.imagens.map((imagem) => `
+                <a href="${escaparHtmlEstamparia(imagem.url)}" target="_blank" rel="noopener noreferrer">
+                    <img src="${escaparHtmlEstamparia(imagem.url)}" alt="Nao conformidade ${index + 1}">
+                </a>`).join("")}</div>`
+            : "-";
+
+        return `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escaparHtmlEstamparia((causa.nomes || []).join(", ") || "-")}</td>
+                <td>${escaparHtmlEstamparia(causa.quantidade ?? 0)}</td>
+                <td>${escaparHtmlEstamparia(causa.destino || "-")}</td>
+                <td>${imagens}</td>
+            </tr>`;
+    }).join("");
+
+    return `
+        <div class="ficha-section mt-3 mb-0">
+            <div class="ficha-section-title">Causas da nao conformidade</div>
+            <div class="ficha-table-wrap">
+                <table class="ficha-unidades-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Causas</th>
+                            <th>Quantidade</th>
+                            <th>Destino</th>
+                            <th>Imagens</th>
+                        </tr>
+                    </thead>
+                    <tbody>${linhas}</tbody>
+                </table>
+            </div>
+        </div>`;
+}
+
+function montarInfoAdicionaisEstamparia(infoAdicionais) {
+    if (!infoAdicionais) return "";
+
+    return `
+        <div class="ficha-section">
+            <div class="ficha-section-title">Informacoes adicionais</div>
+            <div class="ficha-fields">
+                ${campoFichaEstamparia("Inspecao completa", infoAdicionais.inspecao_completa ? "Sim" : "Nao")}
+                ${campoFichaEstamparia("Qtd mortas", infoAdicionais.qtd_mortas ?? 0)}
+                ${campoFichaEstamparia("Motivo mortas", (infoAdicionais.motivo_mortas || []).join(", ") || "-")}
+                ${infoAdicionais.ficha_url
+                    ? `<div class="ficha-field">
+                        <span class="ficha-field-label">Ficha</span>
+                        <span class="ficha-field-value">
+                            <a href="${escaparHtmlEstamparia(infoAdicionais.ficha_url)}" target="_blank" rel="noopener noreferrer">Ver imagem</a>
+                        </span>
+                    </div>`
+                    : ""}
+            </div>
+        </div>`;
+}
+
+function montarExecucaoEstamparia(element, index, total) {
+    const isFirstItem = index === 0;
+    const naoConformeQtd = Number(element.nao_conformidade ?? 0);
+    const resultado = naoConformeQtd > 0 ? "Nao conforme" : "Conforme";
+    const resultClass = naoConformeQtd > 0 ? "nao-conforme" : "conforme";
+    const titulo = element.num_execucao === 0 ? "Inspecao" : "Reinspecao";
+    const trashIcon = isFirstItem
+        ? `<i class="bi bi-trash trash-history-last-execution"
+                data-id="${escaparHtmlEstamparia(element.id)}"
+                data-id-inspecao="${escaparHtmlEstamparia(element.id_inspecao)}"
+                data-nao-conformidade="${escaparHtmlEstamparia(element.nao_conformidade)}"
+                data-conformidade="${escaparHtmlEstamparia(element.conformidade)}"
+                data-data="${escaparHtmlEstamparia(element.data_execucao)}"
+                data-primeira-execucao="${total - 1}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                data-bs-custom-class="custom-tooltip"
+                data-bs-title="Deseja excluir esta execucao?"></i>`
+        : `<i class="bi bi-trash trash-history-others-execution"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                data-bs-custom-class="custom-tooltip"
+                data-bs-title="Exclua a ultima execucao para conseguir excluir a execucao #${escaparHtmlEstamparia(element.num_execucao)}"></i>`;
+
+    return `
+        <div class="ficha-execucao-card">
+            <div class="ficha-execucao-header">
+                <h6 class="ficha-execucao-title">${titulo} #${escaparHtmlEstamparia(element.num_execucao)}</h6>
+                ${trashIcon}
+            </div>
+            <div class="ficha-execucao-body">
+                <div class="ficha-resultado-box ${resultClass}">
+                    <span class="ficha-resultado-pill ${resultClass}">${resultado}</span>
+                    <div class="ficha-fields flex-grow-1">
+                        ${campoFichaEstamparia("Data da execucao", element.data_execucao)}
+                        ${campoFichaEstamparia("Inspetor", element.inspetor)}
+                        ${campoFichaEstamparia("Conformidade", element.conformidade)}
+                        ${campoFichaEstamparia("Nao conformidade", element.nao_conformidade)}
+                    </div>
+                </div>
+                ${montarTabelaCausasEstamparia(element.causas)}
+                ${montarInfoAdicionaisEstamparia(element.info_adicionais)}
+                ${montarTabelaMedidasEstamparia(element.medidas_inspecao)}
+            </div>
+        </div>`;
+}
+
+function carregarCausasDaExecucaoEstamparia(element) {
+    const naoConformeQtd = Number(element.nao_conformidade ?? 0);
+    if (naoConformeQtd <= 0) return Promise.resolve({ ...element, causas: [] });
+
+    return fetch(`/inspecao/api/historico-causas-estamparia/${element.id}`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+        },
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Erro na requisicao HTTP. Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => ({ ...element, causas: data.causas || [] }));
+}
+
+function montarFichaEstamparia(data, button) {
+    const history = Array.isArray(data.history) ? data.history : [];
+    const ultima = history[0] || {};
+    const naoConformeQtd = Number(ultima.nao_conformidade ?? button.dataset.naoConformidade ?? 0);
+    const resultado = naoConformeQtd > 0 ? "Nao conforme" : "Conforme";
+    const resultClass = naoConformeQtd > 0 ? "nao-conforme" : "conforme";
+    const geradoEm = new Date().toLocaleString("pt-BR");
+    const registroId = button.dataset.id || "";
+
+    const dadosItem = [
+        ["Peca", button.dataset.peca],
+        ["Maquina", button.dataset.maquina],
+        ["Data da ultima inspecao", button.dataset.data],
+        ["Conformidade", ultima.conformidade ?? button.dataset.conformidade],
+        ["Nao conformidade", ultima.nao_conformidade ?? button.dataset.naoConformidade],
+    ].map(([label, value]) => campoFichaEstamparia(label, value)).join("");
+
+    return `
+        <div class="ficha-doc-header">
+            <div>
+                <div class="ficha-doc-title">Ficha de Inspecao de Estamparia</div>
+                <div class="ficha-doc-subtitle">Controle de qualidade - estamparia</div>
+            </div>
+            <div class="ficha-doc-id">
+                <strong>#${escaparHtmlEstamparia(registroId || "-")}</strong>
+                Emitido em ${escaparHtmlEstamparia(geradoEm)}
+            </div>
+        </div>
+
+        <div class="ficha-section">
+            <div class="ficha-section-title">Dados do item</div>
+            <div class="ficha-fields">${dadosItem}</div>
+        </div>
+
+        <div class="ficha-section">
+            <div class="ficha-section-title">Resultado da inspecao</div>
+            <div class="ficha-resultado-box ${resultClass}">
+                <span class="ficha-resultado-pill ${resultClass}">${resultado}</span>
+                <div class="ficha-fields flex-grow-1">
+                    ${campoFichaEstamparia("Data da inspecao", ultima.data_execucao || button.dataset.data)}
+                    ${campoFichaEstamparia("Inspetor", ultima.inspetor)}
+                    ${campoFichaEstamparia("Conformidade", ultima.conformidade ?? button.dataset.conformidade)}
+                    ${campoFichaEstamparia("Nao conformidade", ultima.nao_conformidade ?? button.dataset.naoConformidade)}
+                </div>
+            </div>
+        </div>
+
+        <div class="ficha-section">
+            <div class="ficha-section-title">Historico de execucoes</div>
+            ${history.length
+                ? history.map((element, index) => montarExecucaoEstamparia(element, index, history.length)).join("")
+                : `<p class="text-muted mb-0">Nenhuma execucao encontrada.</p>`}
+        </div>
+
+        <div class="ficha-doc-footer">
+            <span>Inspecao de Estamparia - sistema de qualidade</span>
+            <span>Registro #${escaparHtmlEstamparia(registroId || "-")} - ${escaparHtmlEstamparia(geradoEm)}</span>
+        </div>`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("click", function(event) {
-        if (event.target.classList.contains('historico-inspecao')) {
+        const button = event.target.closest(".historico-inspecao");
+        if (!button) return;
 
-            const buttonSeeDetails = document.querySelectorAll(".historico-inspecao");
-            const button = event.target;
+        const buttonSeeDetails = document.querySelectorAll(".historico-inspecao");
+        buttonSeeDetails.forEach((detailsButton) => {
+            detailsButton.disabled = true;
+        });
+        button.querySelector(".spinner-border").style.display = "flex";
+        const containerFicha = document.getElementById("ficha-doc-estamparia");
+        const id = button.getAttribute("data-id");
+
+        containerFicha.innerHTML = "";
+
+        fetch(`/inspecao/api/historico-estamparia/${id}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+            },
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro na requisicao HTTP. Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const history = Array.isArray(data.history) ? data.history : [];
+            return Promise.all(history.map(carregarCausasDaExecucaoEstamparia))
+                .then(historyComCausas => ({ ...data, history: historyComCausas }));
+        })
+        .then(data => {
+            containerFicha.innerHTML = montarFichaEstamparia(data, button);
+
+            const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltips.forEach(t => new bootstrap.Tooltip(t));
+            const modal = new bootstrap.Modal(document.getElementById("modal-historico-estamparia"));
+            modal.show();
+        })
+        .catch(error => {
+            console.error(error);
+            Swal.fire({
+                icon: "error",
+                title: "Erro",
+                text: "Ocorreu um erro ao carregar o historico de inspecao.",
+                confirmButtonText: "OK"
+            });
+        })
+        .finally(() => {
             buttonSeeDetails.forEach((detailsButton) => {
-                detailsButton.disabled = true;
-            })
-            button.querySelector(".spinner-border").style.display = "flex";
-            let listaTimeline = document.querySelector(".timeline");
-            const id = event.target.getAttribute("data-id");
-
-            listaTimeline.innerHTML = "";
-            
-            fetch(`/inspecao/api/historico-estamparia/${id}`, {
-                method:"GET",
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Erro na requisição HTTP. Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log(data);
-
-                data.history.forEach((element, index) => {
-                    const isFirstItem = index === 0;
-                                        
-                    // HTML para informações adicionais
-                    let infoAdicionaisHTML = '';
-                    if (element.info_adicionais) {
-                        infoAdicionaisHTML = `
-                            <div class="mt-3 info-adicionais-container">
-                                <h6 class="mb-2">Informações Adicionais: #${element.info_adicionais.id}</h6>
-                                <ul class="list-unstyled">
-                                    <li><strong>Inspeção Completa:</strong> ${element.info_adicionais.inspecao_completa ? 'Sim' : 'Não'}</li>
-                                    <li><strong>Qtd. Mortas:</strong> ${element.info_adicionais.qtd_mortas}</li>
-                                    ${element.info_adicionais.motivo_mortas.length > 0 ? 
-                                        `<li><strong>Motivo Mortas:</strong> ${element.info_adicionais.motivo_mortas.join(', ')}</li>` : ''}
-                                    ${element.info_adicionais.ficha_url ? 
-                                        `<li><strong>Ficha:</strong> <a href="${element.info_adicionais.ficha_url}" target="_blank">Ver imagem</a></li>` : ''}
-                                </ul>
-                            </div>`;
-                    }
-
-                    // HTML para medidas de inspeção
-                    let medidasHTML = '';
-                    if (element.medidas_inspecao && element.medidas_inspecao.length > 0) {
-                        medidasHTML = `<div class="mt-3 medidas-inspecao-container">
-                                        <h6 class="mb-2">Medidas de Inspeção:</h6>
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-bordered">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th>Medida Referência</th>
-                                                        <th>Valor</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>`;
-                        
-                        // Para cada peça inspecionada
-                        element.medidas_inspecao.forEach((medida, index) => {
-                            const pecaNum = index + 1;
-                            medidasHTML += `
-                                <tr class="table-info">
-                                    <td colspan="2"><strong>Amostra ${pecaNum}</strong></td>
-                                </tr>`;
-                            
-                            // Medida A
-                            if (medida.medidaA !== null && medida.medidaA !== undefined) {
-                                medidasHTML += `
-                                    <tr>
-                                        <td>${medida.cabecalhoMedidaA || 'Medida A'}</td>
-                                        <td>${medida.medidaA}mm</td>
-                                    </tr>`;
-                            }
-                            
-                            // Medida B
-                            if (medida.medidaB !== null && medida.medidaB !== undefined) {
-                                medidasHTML += `
-                                    <tr>
-                                        <td>${medida.cabecalhoMedidaB || 'Medida B'}</td>
-                                        <td>${medida.medidaB}mm</td>
-                                    </tr>`;
-                            }
-                            
-                            // Medida C
-                            if (medida.medidaC !== null && medida.medidaC !== undefined) {
-                                medidasHTML += `
-                                    <tr>
-                                        <td>${medida.cabecalhoMedidaC || 'Medida C'}</td>
-                                        <td>${medida.medidaC}mm</td>
-                                    </tr>`;
-                            }
-                            
-                            // Medida D
-                            if (medida.medidaD !== null && medida.medidaD !== undefined) {
-                                medidasHTML += `
-                                    <tr>
-                                        <td>${medida.cabecalhoMedidaD || 'Medida D'}</td>
-                                        <td>${medida.medidaD}mm</td>
-                                    </tr>`;
-                            }
-                        });
-                        
-                        medidasHTML += `</tbody></table></div></div>`;
-                    }
-
-                    listaTimeline.innerHTML += `
-                        <li class="timeline-item" style="cursor:pointer;" 
-                            data-id="${element.id}" 
-                            data-nao-conformidade="${element.nao_conformidade}" 
-                            data-data="${element.data_execucao}">
-                            <span class="timeline-icon ${element.nao_conformidade == 0 ? 'success' : 'danger'}">
-                                <i class="bi ${element.nao_conformidade == 0 ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
-                            </span>
-                            <div class="timeline-content">
-                                <div class="d-flex justify-content-between">
-                                    <h5>${element.num_execucao === 0? `Inspeção`: `Reinspeção`} #${element.num_execucao}</h5>
-                                    ${isFirstItem ? `
-                                        <i class="bi bi-trash trash-history-last-execution" 
-                                            data-id="${element.id}" 
-                                            data-id-inspecao="${element.id_inspecao}"
-                                            data-nao-conformidade="${element.nao_conformidade}"
-                                            data-conformidade="${element.conformidade}" 
-                                            data-data="${element.data_execucao}"
-                                            data-primeira-execucao="${data.history.length - 1}"
-                                            data-bs-toggle="tooltip" 
-                                            data-bs-placement="top"
-                                            data-bs-custom-class="custom-tooltip"
-                                            data-bs-title="Deseja excluir esta execução?">
-                                        </i>
-                                    ` : `<i class="bi bi-trash trash-history-others-execution" 
-                                            data-bs-toggle="tooltip" 
-                                            data-bs-placement="top"
-                                            data-bs-custom-class="custom-tooltip"
-                                            data-bs-title="Exclua a última execução para conseguir excluir a execução #${element.num_execucao}">
-                                        </i>`}
-                                </div>
-                                <p class="date">${element.data_execucao}</p>
-                                <p><strong>Inspetor:</strong> ${element.inspetor}</p>
-                                <p class="text-muted"><strong>Conformidade:</strong> ${element.conformidade}</p>
-                                <p class="${element.nao_conformidade == 0 ? 'text-success' : 'text-danger'}">
-                                    <strong>Não Conformidade:</strong> ${element.nao_conformidade}
-                                </p>
-                                ${infoAdicionaisHTML}
-                                ${medidasHTML}
-                            </div>
-                        </li>`;
-                });
-                
-                const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-                tooltips.forEach(t => new bootstrap.Tooltip(t));
-                const modal = new bootstrap.Modal(document.getElementById("modal-historico-estamparia"));
-                modal.show();
-            })
-            .catch(error => {
-                console.error(error);
-            })
-            .finally(d => {
-                buttonSeeDetails.forEach((detailsButton) => {
-                    detailsButton.disabled = false;
-                })
-                button.querySelector(".spinner-border").style.display = "none";
-            })
-        }
+                detailsButton.disabled = false;
+            });
+            button.querySelector(".spinner-border").style.display = "none";
+        });
     });
 
     document.addEventListener("click", function(event) {
-        if (event.target.closest('.bi-trash')) {
-            if(event.target.classList.contains('trash-history-last-execution')) {
-                const confirmModal = bootstrap.Modal.getInstance(document.getElementById("modal-historico-estamparia"));
-                confirmModal.hide();
+        if (!event.target.closest(".bi-trash")) return;
+        if(event.target.classList.contains("trash-history-last-execution")) {
+            const confirmModal = bootstrap.Modal.getInstance(document.getElementById("modal-historico-estamparia"));
+            confirmModal.hide();
 
-                const id = event.target.getAttribute('data-id');
-                const idInspecao = event.target.getAttribute('data-id-inspecao');
-                const conformidade = event.target.getAttribute('data-conformidade');
-                const naoConformidade = event.target.getAttribute('data-nao-conformidade');
-                const dataExecucao = event.target.getAttribute('data-data');
-                const indexItem = event.target.getAttribute('data-primeira-execucao');
+            const id = event.target.getAttribute("data-id");
+            const idInspecao = event.target.getAttribute("data-id-inspecao");
+            const conformidade = event.target.getAttribute("data-conformidade");
+            const naoConformidade = event.target.getAttribute("data-nao-conformidade");
+            const dataExecucao = event.target.getAttribute("data-data");
+            const indexItem = event.target.getAttribute("data-primeira-execucao");
 
-                let textDescricao;
-                if (parseInt(indexItem) !== 0) {
-                    textDescricao = "Tem certeza que deseja excluir esta execução? Ao excluir o item será retornado para 'Itens a Reinspecionar'";
-                } else {
-                    textDescricao = "Tem certeza que deseja excluir esta execução? Ao excluir o item será retornado para 'Itens a Inspecionar'";
-                }
-                
-                // Preenche o modal com os dados
-                document.getElementById('modal-execucao-conformidade').textContent = conformidade;
-                document.getElementById('modal-execucao-nao-conformidade').textContent = naoConformidade;
-                document.getElementById('modal-execucao-data').textContent = dataExecucao;
-                document.getElementById('descricao-exclusao').textContent = textDescricao;
-
-                document.getElementById('confirmar-exclusao').setAttribute('data-execucao-id', id);
-                document.getElementById('confirmar-exclusao').setAttribute('data-inspecao-id', idInspecao);
-                document.getElementById('confirmar-exclusao').setAttribute('primeira-execucao', parseInt(indexItem) === 0);
-                
-                const modalExcluirExecution = new bootstrap.Modal(document.getElementById("modal-excluir-execucao"));
-                modalExcluirExecution.show();
-            }
-            return;
-        }
-        if (event.target.closest(".timeline-item")) { 
-
-            const naoConformidade = event.target.closest(".timeline-item").getAttribute("data-nao-conformidade");
-            if(parseFloat(naoConformidade) > 0) {
-    
-                const modalHistorico = document.getElementById("modal-historico-estamparia");
-                const listaCausas = document.getElementById("causas-estamparia");
-                const confirmModal = bootstrap.Modal.getInstance(modalHistorico);
-                const id = event.target.closest(".timeline-item").getAttribute("data-id");
-                const dataExecucao = event.target.closest(".timeline-item").getAttribute("data-data");
-                confirmModal.hide();
-
-                listaCausas.innerHTML = `<div class="card" aria-hidden="true">
-                                            <img src="/static/img/fundo cinza.png" class="card-img-top" alt="Tela cinza">
-                                            <div class="card-body">
-                                                <h5 class="card-title placeholder-glow">
-                                                <span class="placeholder col-6"></span>
-                                                </h5>
-                                                <p class="card-text placeholder-glow">
-                                                    <span class="placeholder col-12"></span>
-                                                </p>
-                                                <p class="card-text placeholder-glow">
-                                                    <span class="placeholder col-4"></span>
-                                                </p>
-                                            </div>
-                                        </div>` 
-                                
-                const modalCausas = new bootstrap.Modal(document.getElementById("modal-causas-historico-estamparia"));
-                modalCausas.show();
-
-                fetch(`/inspecao/api/historico-causas-estamparia/${id}`, {
-                    method:"GET",
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    },
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Erro na requisição HTTP. Status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    listaCausas.innerHTML = "";
-                    console.log(data)
-                    data.causas.forEach((causa, index) => {
-                        let causaHTML = 
-                        `<div class="row mb-3" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
-                            <div class="d-flex justify-content-between">
-                                <span class="label-modal text-end mb-3 mt-3">Quantidade: ${causa.quantidade}</span>
-                                <span class="label-modal text-end mb-3 mt-3">${index + 1}ª Causa</span>
-                            </div>`;
-                        
-                        if(causa.imagens.length > 0) {
-                            causa.imagens.forEach(imagem => {
-                                causaHTML += `<div class="card mb-3 p-0">
-                                                <img src="${imagem.url}" class="card-img-top" alt="...">
-                                                <div class="card-body">
-                                                    <h5 class="card-title">${causa.nomes.join(", ")}</h5>
-                                                    <span class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></span>
-                                                    <p class="card-text label-modal"><small class="text-muted">Destino: ${causa.destino}</small></p>
-                                                </div>
-                                            </div>`;
-                            });                            
-                        } else {
-                            causaHTML += `<div class="card mb-3 p-0">
-                                            <div class="card-body">
-                                                <h5 class="card-title">${causa.nomes.join(", ")}</h5>
-                                                <span class="card-text label-modal"><small class="text-muted">${dataExecucao}</small></span>
-                                                <p class="card-text label-modal"><small class="text-muted">Destino: ${causa.destino}</small></p>
-                                            </div>
-                                        </div>`;
-                        }
-                        causaHTML += `</div>`;
-                
-                        listaCausas.innerHTML += causaHTML;
-                    });
-                })
-                .catch(error => {
-                    console.error(error);
-                })
+            let textDescricao;
+            if (parseInt(indexItem) !== 0) {
+                textDescricao = "Tem certeza que deseja excluir esta execucao? Ao excluir o item sera retornado para 'Itens a Reinspecionar'";
             } else {
-                const Toast = Swal.mixin({
-                    toast: true,
-                    position: "top-end",
-                    showConfirmButton: false,
-                    timer: 3000,
-                    timerProgressBar: true,
-                    didOpen: (toast) => {
-                      toast.onmouseenter = Swal.stopTimer;
-                      toast.onmouseleave = Swal.resumeTimer;
-                    }
-                  });
-                  Toast.fire({
-                    icon: "info",
-                    title: "Não possui não conformidade"
-                  });
+                textDescricao = "Tem certeza que deseja excluir esta execucao? Ao excluir o item sera retornado para 'Itens a Inspecionar'";
             }
+
+            document.getElementById("modal-execucao-conformidade").textContent = conformidade;
+            document.getElementById("modal-execucao-nao-conformidade").textContent = naoConformidade;
+            document.getElementById("modal-execucao-data").textContent = dataExecucao;
+            document.getElementById("descricao-exclusao").textContent = textDescricao;
+
+            document.getElementById("confirmar-exclusao").setAttribute("data-execucao-id", id);
+            document.getElementById("confirmar-exclusao").setAttribute("data-inspecao-id", idInspecao);
+            document.getElementById("confirmar-exclusao").setAttribute("primeira-execucao", parseInt(indexItem) === 0);
+
+            const modalExcluirExecution = new bootstrap.Modal(document.getElementById("modal-excluir-execucao"));
+            modalExcluirExecution.show();
         }
     });
 });

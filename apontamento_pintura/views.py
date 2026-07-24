@@ -29,9 +29,17 @@ from core.utils import notificar_ordem
 def planejamento(request):
     return render(request, "apontamento_pintura/planejamento.html")
 
+def _usuario_pode_editar_controle_pintura(user):
+    profile = getattr(user, "profile", None)
+    tipo_acesso = (getattr(profile, "tipo_acesso", "") or "").strip().lower()
+    return tipo_acesso in {"supervisor", "pcp", "admin"}
+
 def controle_pintura(request):
     registros = ControlePintura.objects.all()
-    return render(request, "apontamento_pintura/controle_pintura.html", {"registros": registros})
+    return render(request, "apontamento_pintura/controle_pintura.html", {
+        "registros": registros,
+        "can_editar_controle_pintura": _usuario_pode_editar_controle_pintura(request.user),
+    })
 
 def _controle_pintura_payload(registro):
     return {
@@ -140,6 +148,9 @@ def editar_controle_pintura(request, pk):
     dados, erro = _dados_controle_pintura_request(request)
     if erro:
         return erro
+
+    if not _usuario_pode_editar_controle_pintura(request.user):
+        return JsonResponse({"error": "Voce nao tem permissao para editar registros de pintura."}, status=403)
 
     registro = get_object_or_404(ControlePintura, pk=pk)
     for campo, valor in dados.items():

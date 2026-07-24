@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static %}
 
 {% block title %}<title>Dashboard Recebimento</title>{% endblock %}
@@ -62,6 +62,9 @@
             <div class="card-body text-center py-3">
                 <div class="kpi-lbl text-uppercase" style="color:var(--db-text-muted);font-size:.65rem;letter-spacing:.08em;">Total Inspecionado</div>
                 <div class="kpi-val" id="kpi-total" style="font-size:2.2rem;font-weight:900;color:var(--db-navy);">—</div>
+                <div class="text-muted" style="font-size:.72rem;">
+                    Devoluções: <strong id="kpi-devolucoes" style="color:var(--db-orange);">—</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -71,6 +74,9 @@
                 <div class="kpi-lbl text-uppercase" style="color:var(--db-text-muted);font-size:.65rem;letter-spacing:.08em;">Conformes</div>
                 <div class="kpi-val" id="kpi-conforme" style="font-size:2.2rem;font-weight:900;color:var(--db-green);">—</div>
                 <div class="text-muted" style="font-size:.72rem;" id="kpi-taxa-conf">—%</div>
+                <div class="text-muted" style="font-size:.72rem;">
+                    Devoluções: <strong id="kpi-conforme-devolucoes" style="color:var(--db-orange);">—</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -80,6 +86,9 @@
                 <div class="kpi-lbl text-uppercase" style="color:var(--db-text-muted);font-size:.65rem;letter-spacing:.08em;">Não Conformes</div>
                 <div class="kpi-val" id="kpi-nc" style="font-size:2.2rem;font-weight:900;color:var(--db-red);">—</div>
                 <div class="text-muted" style="font-size:.72rem;" id="kpi-taxa-nc">—%</div>
+                <div class="text-muted" style="font-size:.72rem;">
+                    Devoluções: <strong id="kpi-nc-devolucoes" style="color:var(--db-orange);">—</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -89,6 +98,9 @@
                 <div class="kpi-lbl text-uppercase" style="color:var(--db-text-muted);font-size:.65rem;letter-spacing:.08em;">Pendentes</div>
                 <div class="kpi-val" id="kpi-pendentes" style="font-size:2.2rem;font-weight:900;color:var(--db-orange);">—</div>
                 <div class="text-muted" style="font-size:.72rem;">aguardando inspeção</div>
+                <div class="text-muted" style="font-size:.72rem;">
+                    Devoluções: <strong id="kpi-pendentes-devolucoes" style="color:var(--db-orange);">—</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -163,5 +175,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'js/dashboard/dash-recebimento.js' %}"></script>
+<script src="{% static 'js/dashboard/dash-recebimento.js' %}?v=devolucoes-por-kpi-20260722"></script>
 {% endblock %}

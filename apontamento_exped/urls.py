@@ -1,10 +1,13 @@
-from django.urls import path
+from django.urls import include, path
 from . import views
 
 app_name = 'expedicao'
 
 urlpatterns = [
-    
+
+    # API mobile (app Android, autenticacao por token)
+    path('api/mobile/', include('apontamento_exped.urls_mobile')),
+
     #templates
     path('', views.planejamento, name='planejamento'),
     path('relatorios/', views.relatorios, name='relatorios'),
