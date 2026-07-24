@@ -1,0 +1,358 @@
+"""
+Logica de negocio da expedicao, extraida das views pra ser compartilhada
+entre a tela web (JsonResponse) e a API mobile (DRF Response) sem
+duplicar codigo. Funcoes puras: recebem/devolvem tipos Python simples ou
+instancias de model, nunca HttpRequest/JsonResponse.
+"""
+from datetime import timedelta
+from collections import defaultdict
+from zoneinfo import ZoneInfo
+
+from django.db.models import Sum, Exists, OuterRef, Count
+from django.db.models.functions import Coalesce
+from django.utils import timezone
+from django.utils.timezone import localtime
+
+from .models import (
+    Carga, Pacote, ImagemPacote, PendenciasPacote, ItemPacote,
+    FornecedorItemCarga, CarretaCarga,
+)
+
+# Tipos especiais de peças que exigem fornecedor informado antes de avançar da verificação
+_TIPOS_ESPECIAIS = ['Pneu', 'Cilindro', 'Roda']
+
+
+def _detectar_codigos_especiais_da_carga(carga_id):
+    """
+    Retorna dict {tipo: [{codigo, descricao}, ...]} com os códigos únicos
+    de peças especiais presentes nos itens da carga.
+    """
+    itens = ItemPacote.objects.filter(
+        pacote__carga_id=carga_id
+    ).select_related('codigo')
+
+    # tipo -> {codigo: descricao}
+    codigos = {tipo: {} for tipo in _TIPOS_ESPECIAIS}
+    for item in itens:
+        cod_obj = getattr(item, 'codigo', None)
+        codigo = (getattr(cod_obj, 'codigo', '') or item.codigo_informado or '').strip()
+        descricao = (getattr(cod_obj, 'descricao', '') or item.descricao_informada or '').strip()
+        texto = f"{codigo} {descricao}".upper()
+        for tipo in _TIPOS_ESPECIAIS:
+            if tipo.upper() in texto and codigo:
+                codigos[tipo][codigo] = descricao
+
+    return {
+        tipo: [{'codigo': c, 'descricao': d} for c, d in cod_dict.items()]
+        for tipo, cod_dict in codigos.items()
+        if cod_dict
+    }
+
+
+class FotoObrigatoriaError(Exception):
+    """Levantada quando tenta confirmar um pacote em verificacao sem foto anexada."""
+    pass
+
+
+def listar_cargas_ativas():
+    """Cargas ativas (planejamento/verificação) + despachadas recentes (últimos 30 dias)."""
+    corte_despachado = timezone.now() - timedelta(days=30)
+    cargas = list(
+        Carga.objects
+        .exclude(stage='despachado', data_criacao__lt=corte_despachado)
+        .values('id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'stage', 'data_criacao')
+    )
+
+    if not cargas:
+        return []
+
+    carga_ids = [c['id'] for c in cargas]
+
+    # 1 query: total de pacotes por carga
+    total_pacotes_map = {
+        r['carga_id']: r['total']
+        for r in Pacote.objects
+            .filter(carga_id__in=carga_ids)
+            .values('carga_id')
+            .annotate(total=Count('id'))
+    }
+
+    # 1 query: pacotes com foto de verificação por carga
+    foto_verif_map = {
+        r['carga_id']: r['total']
+        for r in Pacote.objects
+            .filter(carga_id__in=carga_ids, pacote_imagem__stage='verificacao')
+            .values('carga_id')
+            .annotate(total=Count('id', distinct=True))
+    }
+
+    # 1 query: pacotes com foto de despachado por carga
+    foto_desp_map = {
+        r['carga_id']: r['total']
+        for r in Pacote.objects
+            .filter(carga_id__in=carga_ids, pacote_imagem__stage='despachado')
+            .values('carga_id')
+            .annotate(total=Count('id', distinct=True))
+    }
+
+    # 1 query: total de itens pendentes por carga
+    pendente_map = {
+        r['carreta_carga__carga_id']: r['total']
+        for r in PendenciasPacote.objects
+            .filter(carreta_carga__carga_id__in=carga_ids, qt_necessaria__gt=0)
+            .values('carreta_carga__carga_id')
+            .annotate(total=Sum('qt_necessaria'))
+    }
+
+    # Detectar fornecedores pendentes (apenas cargas em verificação)
+    verificacao_ids = [c['id'] for c in cargas if c['stage'] == 'verificacao']
+
+    # codigos_por_carga: carga_id -> {tipo -> set of codigos}
+    codigos_por_carga = defaultdict(lambda: defaultdict(set))
+    if verificacao_ids:
+        items_verif = ItemPacote.objects.filter(
+            pacote__carga_id__in=verificacao_ids
+        ).values('pacote__carga_id', 'codigo__codigo', 'codigo__descricao',
+                 'codigo_informado', 'descricao_informada')
+
+        for row in items_verif:
+            codigo = (row['codigo__codigo'] or row['codigo_informado'] or '').strip()
+            descricao = (row['codigo__descricao'] or row['descricao_informada'] or '').strip()
+            texto = f"{codigo} {descricao}".upper()
+            cid_row = row['pacote__carga_id']
+            for tipo in _TIPOS_ESPECIAIS:
+                if tipo.upper() in texto and codigo:
+                    codigos_por_carga[cid_row][tipo].add(codigo)
+
+        # fornecedores já salvos para essas cargas: carga_id -> {(tipo, codigo) -> fornecedor}
+        forn_map = defaultdict(dict)
+        for f in FornecedorItemCarga.objects.filter(carga_id__in=verificacao_ids):
+            forn_map[f.carga_id][(f.tipo, f.codigo)] = f.fornecedor
+    else:
+        forn_map = {}
+
+    for carga in cargas:
+        cid = carga['id']
+        total_pac = total_pacotes_map.get(cid, 0)
+        foto_verif = foto_verif_map.get(cid, 0)
+        foto_desp = foto_desp_map.get(cid, 0)
+        pendente = pendente_map.get(cid, 0)
+
+        carga['todos_pacotes_tem_foto_verificacao'] = (
+            total_pac > 0 and total_pac == foto_verif and pendente == 0
+        )
+        carga['todos_pacotes_tem_foto_despachado'] = (
+            total_pac > 0 and total_pac == foto_desp
+        )
+        carga['total_pendente'] = pendente
+
+        # Badge de fornecedores pendentes
+        if carga['stage'] == 'verificacao':
+            codigos = codigos_por_carga.get(cid, {})
+            faltando = any(
+                not forn_map.get(cid, {}).get((tipo, cod), '').strip()
+                for tipo, cods in codigos.items()
+                for cod in cods
+            )
+            carga['fornecedores_pendentes'] = faltando
+        else:
+            carga['fornecedores_pendentes'] = False
+
+    return cargas
+
+
+def detalhar_pacotes_da_carga(carga):
+    """Pacotes + itens de uma carga, junto com carretas e (se em verificação) fornecedores."""
+    pacotes_qs = (
+        Pacote.objects
+        .filter(carga=carga)
+        .annotate(tem_foto=Exists(ImagemPacote.objects.filter(pacote=OuterRef('pk'))))
+        .order_by('id')
+        .prefetch_related('itens')
+    )
+
+    dados = []
+    for pacote in pacotes_qs:
+        itens = pacote.itens.all().select_related('codigo')
+        itens_list = []
+        for item in itens:
+            cod_obj = getattr(item, 'codigo', None)
+            codigo_peca = getattr(cod_obj, 'codigo', None) or item.codigo_informado
+            descricao = getattr(cod_obj, 'descricao', None) or item.descricao_informada
+            itens_list.append({
+                'id': item.id,
+                'codigo_peca': codigo_peca,
+                'descricao': descricao,
+                'quantidade': item.quantidade,
+                'fora_planejado': bool(getattr(item, 'fora_planejado', False)),
+            })
+
+        dados.append({
+            'id': pacote.id,
+            'nome': pacote.nome,
+            'status_expedicao': pacote.status_confirmacao_expedicao,
+            'status_qualidade': pacote.status_confirmacao_qualidade,
+            'data_criacao': (
+                localtime(pacote.data_criacao, ZoneInfo('America/Fortaleza')).strftime('%d/%m/%Y %H:%M')
+                if getattr(pacote, 'data_criacao', None) else None
+            ),
+            'itens': itens_list,
+            'cliente': carga.cliente,
+            'data_carga': carga.data_carga.strftime("%d/%m/%Y"),
+            'tem_foto': bool(getattr(pacote, 'tem_foto', False)),
+        })
+
+    carretas = list(
+        CarretaCarga.objects
+        .filter(carga=carga)
+        .values('id', 'carreta', 'quantidade', 'cor')
+        .order_by('carreta', 'id')
+    )
+
+    # Códigos especiais e fornecedores (só relevante no estágio verificação)
+    codigos_especiais = {}
+    fornecedores = {}
+    if carga.stage == 'verificacao':
+        codigos_especiais = _detectar_codigos_especiais_da_carga(carga.id)
+        salvos = FornecedorItemCarga.objects.filter(carga=carga)
+        fornecedores = {f"{f.tipo}_{f.codigo}": f.fornecedor for f in salvos}
+
+    return {
+        'pacotes': dados,
+        'status_carga': carga.stage,
+        'cliente_carga': carga.cliente,
+        'data_carga': carga.data_carga.strftime("%d/%m/%Y"),
+        'carga': carga.carga,
+        'carretas': carretas,
+        'codigos_especiais': codigos_especiais,
+        'fornecedores': fornecedores,
+    }
+
+
+def salvar_foto_pacote(pacote, arquivo):
+    """Anexa uma foto (UploadedFile) a um pacote e devolve o status atualizado da carga."""
+    carga = pacote.carga
+    id_carga = carga.id
+    stage = carga.stage
+
+    # Gera nome customizado (preserva extensão)
+    extensao = (arquivo.name.rsplit('.', 1)[-1] if '.' in arquivo.name else 'jpg')
+    nome_arquivo = f"pacote_{pacote.id}_{timezone.now().strftime('%Y%m%d%H%M%S')}.{extensao}"
+    arquivo.name = nome_arquivo
+
+    imagem = ImagemPacote.objects.create(
+        pacote=pacote,
+        arquivo=arquivo,
+        stage=stage
+    )
+
+    # ---- Cálculos de status da carga (mesmo padrão de listar_cargas_ativas) ----
+    pacotes = Pacote.objects.filter(carga_id=id_carga)
+    total_pacotes = pacotes.count()
+
+    pacotes_com_foto_verificacao = (
+        ImagemPacote.objects
+        .filter(pacote__in=pacotes, stage='verificacao')
+        .values('pacote').distinct().count()
+    )
+    pacotes_com_foto_despachado = (
+        ImagemPacote.objects
+        .filter(pacote__in=pacotes, stage='despachado')
+        .values('pacote').distinct().count()
+    )
+
+    total_pendente = (
+        PendenciasPacote.objects
+        .filter(carreta_carga__carga_id=id_carga, qt_necessaria__gt=0)
+        .aggregate(total=Coalesce(Sum('qt_necessaria'), 0))
+        ['total']
+    ) or 0
+
+    todos_verificacao_ok = (
+        total_pacotes > 0 and
+        total_pacotes == pacotes_com_foto_verificacao and
+        total_pendente == 0
+    )
+    todos_despachado_ok = (
+        total_pacotes > 0 and
+        total_pacotes == pacotes_com_foto_despachado
+    )
+
+    return {
+        'status': 'ok',
+        'url': imagem.arquivo.url,
+        'info_add': {
+            'carga_id': id_carga,
+            'etapa': carga.stage,
+            'total_pacotes': total_pacotes,
+            'pacotes_com_foto_verificacao': pacotes_com_foto_verificacao,
+            'pacotes_com_foto_despachado': pacotes_com_foto_despachado,
+            'total_pendente': int(total_pendente),
+            'todos_pacotes_tem_foto_verificacao': todos_verificacao_ok,
+            'todos_pacotes_tem_foto_despachado': todos_despachado_ok,
+        }
+    }
+
+
+def listar_fotos_pacote(pacote_id):
+    imagens = ImagemPacote.objects.filter(pacote_id=pacote_id)
+    return [{'id': img.id, 'url': img.arquivo.url, 'etapa': img.stage} for img in imagens]
+
+
+def confirmar_pacote_service(pacote, observacao):
+    """Confirma qualidade/expedição de um pacote conforme o stage atual da carga.
+
+    Levanta FotoObrigatoriaError se o pacote estiver em verificacao sem
+    nenhuma foto anexada - cada caller (view classica / DRF) decide como
+    formatar essa resposta de erro.
+    """
+    stage = pacote.carga.stage
+
+    if stage == 'verificacao':
+        imagens = ImagemPacote.objects.filter(pacote=pacote, stage=stage)
+        if not imagens.exists():
+            raise FotoObrigatoriaError('É necessário anexar ao menos uma foto antes de confirmar o pacote.')
+
+    if stage == 'apontamento':
+        pacote.status_confirmacao_expedicao = 'ok'
+        pacote.data_confirmacao_expedicao = timezone.now()
+        pacote.obs_expedicao = observacao
+    elif stage == 'verificacao':
+        pacote.status_confirmacao_qualidade = 'ok'
+        pacote.data_confirmacao_qualidade = timezone.now()
+        pacote.obs_qualidade = observacao
+
+    pacote.save()
+
+    return {'mensagem': 'Pacote confirmado com sucesso!'}
+
+
+def listar_pendencias_carga(carga_id):
+    """Itens pendentes (qt_necessaria > 0) do carregamento informado (carga_id)."""
+    qs = (
+        PendenciasPacote.objects
+        .filter(
+            carreta_carga__carga_id=int(carga_id),
+            qt_necessaria__gt=0
+        )
+        .select_related('carreta_carga')
+        .order_by('carreta_carga__carreta', 'codigo')
+    )
+
+    itens = [
+        {
+            "id": p.id,
+            "carreta_carga_id": p.carreta_carga_id,
+            "carreta": getattr(p.carreta_carga, "carreta", None),
+            "codigo": p.codigo,
+            "descricao": p.descricao,
+            "qt_necessaria": p.qt_necessaria,
+            "data_criacao": p.data_criacao.isoformat(),
+        }
+        for p in qs
+    ]
+
+    return {
+        "total_itens": len(itens),
+        "itens": itens
+    }
