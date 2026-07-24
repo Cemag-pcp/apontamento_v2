@@ -191,7 +191,7 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
         <View style={styles.linhaBotoesFoto}>
           <TouchableOpacity
             style={[styles.botaoCamera, styles.botaoFotoMetade]}
-            onPress={() => navigation.navigate('Camera', { cargaId, pacoteId, pacoteNome })}
+            onPress={() => navigation.navigate('Camera', { cargaId, pacoteId, pacoteNome, stageCarga })}
           >
             <Text style={styles.botaoCameraTexto}>📷 Tirar foto</Text>
           </TouchableOpacity>

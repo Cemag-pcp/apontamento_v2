@@ -27,10 +27,10 @@ export default function ItemAvulsoScreen({ route, navigation }: Props) {
       return;
     }
 
-    navigation.navigate('CriarPacote', {
-      cargaId,
-      cargaNome,
-      novoItemAvulso: { codigo: cod, descricao: desc, quantidade: qtd },
+    navigation.navigate({
+      name: 'CriarPacote',
+      params: { cargaId, cargaNome, novoItemAvulso: { codigo: cod, descricao: desc, quantidade: qtd } },
+      merge: true,
     });
   }
 
