@@ -1,0 +1,10 @@
+- generic [ref=e3]:
+  - heading "Login" [level=3] [ref=e4]
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]: Usuário
+      - textbox "Usuário" [ref=e8]
+    - generic [ref=e9]:
+      - generic [ref=e10]: Senha
+      - textbox "Senha" [ref=e11]
+    - button "Entrar" [ref=e12] [cursor=pointer]

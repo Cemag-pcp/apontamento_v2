@@ -1,4 +1,4 @@
-import { carregarTabela, getOperadorById } from './datatable-list-operador.js';
+import { carregarTabela, getOperadorById } from './datatable-list-operador.js?v=20260724-2';
 
 let botaoClicado = null;
 
