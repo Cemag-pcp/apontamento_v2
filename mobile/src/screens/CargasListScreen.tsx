@@ -6,7 +6,6 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
-import { useFilaOffline } from '../context/FilaOfflineContext';
 import * as api from '../api/expedicao';
 import type { Carga, StageCarga } from '../api/types';
 
@@ -28,7 +27,6 @@ const COR_STAGE: Record<StageCarga, string> = {
 
 export default function CargasListScreen({ navigation }: Props) {
   const { token, user, sair } = useAuth();
-  const { pendentes } = useFilaOffline();
   const [cargas, setCargas] = useState<Carga[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
@@ -72,14 +70,6 @@ export default function CargasListScreen({ navigation }: Props) {
           <Text style={styles.sair}>Sair</Text>
         </TouchableOpacity>
       </View>
-
-      {pendentes > 0 && (
-        <View style={styles.avisoFila}>
-          <Text style={styles.avisoFilaTexto}>
-            {pendentes} foto{pendentes > 1 ? 's' : ''} aguardando envio (sem conexão)
-          </Text>
-        </View>
-      )}
 
       {carregando ? (
         <ActivityIndicator style={styles.loading} size="large" />
@@ -128,8 +118,6 @@ const styles = StyleSheet.create({
   },
   saudacao: { fontSize: 15, fontWeight: '600', color: '#1b1b1b' },
   sair: { color: '#c0392b', fontWeight: '600' },
-  avisoFila: { backgroundColor: '#664d03', paddingVertical: 8, paddingHorizontal: 16 },
-  avisoFilaTexto: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center' },
   loading: { marginTop: 40 },
   listaVazia: { flexGrow: 1, justifyContent: 'center' },
   vazioTexto: { textAlign: 'center', color: '#888', padding: 24 },

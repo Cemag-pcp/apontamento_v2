@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import { FilaOfflineProvider } from './src/context/FilaOfflineContext';
 import RootNavigator from './src/navigation/RootNavigator';
+import StatusEnvioGlobal from './src/components/StatusEnvioGlobal';
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <FilaOfflineProvider>
           <NavigationContainer>
             <RootNavigator />
+            <StatusEnvioGlobal />
             <StatusBar style="auto" />
           </NavigationContainer>
         </FilaOfflineProvider>

@@ -16,14 +16,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PacoteDetail'>;
 export default function PacoteDetailScreen({ route, navigation }: Props) {
   const { cargaId, pacoteId, pacoteNome, stageCarga } = route.params;
   const { token } = useAuth();
-  const { enfileirarFoto } = useFilaOffline();
+  const { enviarFotoEmSegundoPlano, versaoAtualizacao } = useFilaOffline();
 
   const [itens, setItens] = useState<ItemPacote[]>([]);
   const [fotos, setFotos] = useState<FotoPacote[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
-  const [erroUpload, setErroUpload] = useState<string | null>(null);
+  const [mensagemEnvio, setMensagemEnvio] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     if (!token) return;
@@ -48,55 +47,36 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
     })();
   }, [carregar]);
 
-  // Re-sincroniza ao voltar pra tela - pega fotos que a fila offline
-  // reenviou sozinha em segundo plano enquanto o usuario estava em outra tela.
+  // Re-sincroniza ao voltar pra tela - pega fotos que terminaram de subir
+  // (em segundo plano ou pela fila offline) enquanto o usuario estava
+  // em outra tela.
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', carregar);
     return unsubscribe;
   }, [navigation, carregar]);
 
+  // Toda vez que alguma foto termina de subir (em qualquer pacote, em
+  // qualquer tela), revalida - cobre o caso do usuario ainda estar
+  // nessa tela quando o envio em segundo plano termina.
+  useEffect(() => {
+    if (versaoAtualizacao > 0) carregar();
+  }, [versaoAtualizacao, carregar]);
+
   // Volta da CameraScreen com uma foto capturada (via param, nao callback,
-  // pra nao passar funcao nao-serializavel entre telas).
+  // pra nao passar funcao nao-serializavel entre telas). O envio roda em
+  // segundo plano (fire-and-forget) - a tela nao trava esperando, o
+  // usuario pode navegar livremente na hora.
   useEffect(() => {
     if (route.params.capturedUri) {
       const uri = route.params.capturedUri;
       navigation.setParams({ capturedUri: undefined });
-      enviarFoto(uri);
+      enviarFotoEmSegundoPlano(pacoteId, uri);
+      setMensagemEnvio('Enviando foto...');
+      const timer = setTimeout(() => setMensagemEnvio(null), 3000);
+      return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route.params.capturedUri]);
-
-  async function enviarFoto(uri: string) {
-    if (!token) return;
-    setEnviandoFoto(true);
-    setErroUpload(null);
-    try {
-      await api.enviarFotoDoPacote(token, pacoteId, uri);
-      await carregar();
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 0) {
-        // sem conexao de verdade: guarda no aparelho e reenvia sozinho
-        // quando a conexao voltar, em vez de exigir retry manual.
-        await enfileirarFoto(pacoteId, uri);
-        Alert.alert(
-          'Sem conexão',
-          'A foto foi salva no aparelho e será enviada automaticamente quando a conexão voltar.'
-        );
-      } else {
-        setErroUpload(err instanceof ApiError ? err.message : 'Falha ao enviar a foto.');
-        // guarda a uri pra permitir "tentar de novo" sem tirar a foto de novo
-        setUltimaFotoFalha(uri);
-      }
-    } finally {
-      setEnviandoFoto(false);
-    }
-  }
-
-  const [ultimaFotoFalha, setUltimaFotoFalha] = useState<string | null>(null);
-
-  function tentarNovamente() {
-    if (ultimaFotoFalha) enviarFoto(ultimaFotoFalha);
-  }
 
   async function handleConfirmar() {
     if (!token) return;
@@ -147,26 +127,15 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
           </ScrollView>
         )}
 
-        {enviandoFoto && (
+        {mensagemEnvio && (
           <View style={styles.linhaEnviando}>
-            <ActivityIndicator size="small" />
-            <Text style={styles.enviandoTexto}>Enviando foto...</Text>
-          </View>
-        )}
-
-        {erroUpload && !enviandoFoto && (
-          <View style={styles.linhaErro}>
-            <Text style={styles.erroTexto}>{erroUpload}</Text>
-            <TouchableOpacity onPress={tentarNovamente}>
-              <Text style={styles.tentarNovamente}>Tentar novamente</Text>
-            </TouchableOpacity>
+            <Text style={styles.enviandoTexto}>✓ {mensagemEnvio}</Text>
           </View>
         )}
 
         <TouchableOpacity
           style={styles.botaoCamera}
           onPress={() => navigation.navigate('Camera', { cargaId, pacoteId, pacoteNome })}
-          disabled={enviandoFoto}
         >
           <Text style={styles.botaoCameraTexto}>📷 Tirar foto</Text>
         </TouchableOpacity>
@@ -204,10 +173,7 @@ const styles = StyleSheet.create({
   itemQtd: { color: '#333', fontSize: 12, marginTop: 2 },
   miniatura: { width: 90, height: 90, borderRadius: 8, marginRight: 8, backgroundColor: '#eee' },
   linhaEnviando: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  enviandoTexto: { color: '#555', fontSize: 13 },
-  linhaErro: { marginTop: 10 },
-  erroTexto: { color: '#c0392b', fontSize: 13 },
-  tentarNovamente: { color: '#1b6ec2', fontWeight: '600', marginTop: 4 },
+  enviandoTexto: { color: '#198754', fontSize: 13, fontWeight: '600' },
   botaoCamera: { marginTop: 14, backgroundColor: '#eef4fb', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
   botaoCameraTexto: { color: '#1b6ec2', fontWeight: '600', fontSize: 15 },
   avisoConfirmar: { color: '#b8860b', fontSize: 13, marginBottom: 10 },

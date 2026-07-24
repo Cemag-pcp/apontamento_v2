@@ -46,6 +46,7 @@ export function enviarFotoDoPacote(token: string, pacoteId: number, uri: string,
     method: 'POST',
     token,
     formData,
+    timeoutMs: 30000,
   });
 }
 

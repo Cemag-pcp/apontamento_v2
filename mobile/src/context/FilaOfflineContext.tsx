@@ -1,11 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from './AuthContext';
+import * as api from '../api/expedicao';
+import { ApiError } from '../api/client';
 import * as fila from '../offline/fotoQueue';
 
 interface FilaOfflineContextValue {
   pendentes: number;
-  enfileirarFoto: (pacoteId: number, fileUri: string, fileName?: string) => Promise<void>;
+  emAndamento: number;
+  versaoAtualizacao: number;
+  enviarFotoEmSegundoPlano: (pacoteId: number, fileUri: string, fileName?: string) => void;
   processarAgora: () => Promise<void>;
 }
 
@@ -14,6 +19,10 @@ const FilaOfflineContext = createContext<FilaOfflineContextValue | undefined>(un
 export function FilaOfflineProvider({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   const [pendentes, setPendentes] = useState(0);
+  const [emAndamento, setEmAndamento] = useState(0);
+  // incrementa a cada foto enviada com sucesso - telas escutam isso pra
+  // saber quando revalidar seus dados, sem precisar de callback direto.
+  const [versaoAtualizacao, setVersaoAtualizacao] = useState(0);
   const processandoRef = useRef(false);
 
   const atualizarContagem = useCallback(async () => {
@@ -26,6 +35,7 @@ export function FilaOfflineProvider({ children }: { children: React.ReactNode })
     processandoRef.current = true;
     try {
       await fila.processarFilaPendente(token);
+      setVersaoAtualizacao((v) => v + 1);
     } finally {
       processandoRef.current = false;
       await atualizarContagem();
@@ -44,13 +54,34 @@ export function FilaOfflineProvider({ children }: { children: React.ReactNode })
     return unsubscribe;
   }, [processarAgora]);
 
-  const enfileirarFoto = useCallback(async (pacoteId: number, fileUri: string, fileName = 'foto.jpg') => {
-    await fila.salvarFotoPendente(pacoteId, fileUri, fileName);
-    await atualizarContagem();
-  }, [atualizarContagem]);
+  // Envio "dispara e esquece": a tela chama isso e continua livre na hora,
+  // sem esperar o upload terminar. Se der erro de rede/timeout, cai
+  // sozinho na fila offline; erro de negocio (ex: pacote invalido) avisa
+  // o usuario, ja que nao adianta reenviar sozinho.
+  const enviarFotoEmSegundoPlano = useCallback((pacoteId: number, fileUri: string, fileName = 'foto.jpg') => {
+    setEmAndamento((n) => n + 1);
+    (async () => {
+      try {
+        if (!token) throw new ApiError('Não autenticado.', 0);
+        await api.enviarFotoDoPacote(token, pacoteId, fileUri, fileName);
+        setVersaoAtualizacao((v) => v + 1);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 0) {
+          await fila.salvarFotoPendente(pacoteId, fileUri, fileName);
+          await atualizarContagem();
+        } else {
+          Alert.alert('Erro ao enviar foto', err instanceof ApiError ? err.message : 'Falha ao enviar a foto.');
+        }
+      } finally {
+        setEmAndamento((n) => n - 1);
+      }
+    })();
+  }, [token, atualizarContagem]);
 
   return (
-    <FilaOfflineContext.Provider value={{ pendentes, enfileirarFoto, processarAgora }}>
+    <FilaOfflineContext.Provider
+      value={{ pendentes, emAndamento, versaoAtualizacao, enviarFotoEmSegundoPlano, processarAgora }}
+    >
       {children}
     </FilaOfflineContext.Provider>
   );

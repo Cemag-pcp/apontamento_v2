@@ -13,17 +13,24 @@ interface RequestOptions {
   token?: string | null;
   body?: unknown;
   formData?: FormData;
+  timeoutMs?: number;
 }
 
 // Chamada generica pra API mobile: prefixa a URL, adiciona o token (se
 // tiver) e trata erro de forma consistente (le o campo "erro"/"detail"
-// da resposta quando o backend devolve JSON de erro).
+// da resposta quando o backend devolve JSON de erro). Tem timeout
+// (default 20s) porque fetch do RN nao tem um embutido - sem isso, uma
+// conexao ruim (nao caida de vez, so lenta) trava esperando pra sempre
+// em vez de cair no fallback de erro de rede.
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', token, body, formData } = options;
+  const { method = 'GET', token, body, formData, timeoutMs = 20000 } = options;
 
   const headers: Record<string, string> = {};
   if (token) headers['Authorization'] = `Token ${token}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   let res: Response;
   try {
@@ -31,9 +38,12 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       method,
       headers,
       body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),
+      signal: controller.signal,
     });
   } catch (err) {
     throw new ApiError('Falha de conexão com o servidor.', 0);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (res.status === 204) return undefined as T;
