@@ -12,7 +12,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Carga, Pacote
+from .models import Carga, ImagemPacote, Pacote
 from .serializers import (
     ConfirmarPacoteSerializer,
     CriarPacoteSerializer,
@@ -25,6 +25,7 @@ from .services import (
     confirmar_pacote_service,
     criar_ou_atualizar_pacote,
     detalhar_pacotes_da_carga,
+    excluir_foto_pacote,
     listar_cargas_ativas,
     listar_fotos_pacote,
     listar_pendencias_carga,
@@ -104,6 +105,13 @@ class UploadFotoView(APIView):
         pacote = get_object_or_404(Pacote, id=pacote_id)
         resultado = salvar_foto_pacote(pacote, serializer.validated_data['foto'])
         return Response(resultado, status=status.HTTP_201_CREATED)
+
+
+class ExcluirFotoView(APIView):
+    def delete(self, request, foto_id):
+        imagem = get_object_or_404(ImagemPacote, id=foto_id)
+        excluir_foto_pacote(imagem)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CriarPacoteView(APIView):

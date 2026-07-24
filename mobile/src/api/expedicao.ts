@@ -50,6 +50,10 @@ export function enviarFotoDoPacote(token: string, pacoteId: number, uri: string,
   });
 }
 
+export function excluirFotoDoPacote(token: string, fotoId: number) {
+  return apiFetch<void>(`/fotos/${fotoId}/`, { method: 'DELETE', token });
+}
+
 export function criarPacote(token: string, cargaId: number, dados: CriarPacoteInput) {
   return apiFetch<CriarPacoteResponse>(`/cargas/${cargaId}/pacotes/criar/`, {
     method: 'POST',

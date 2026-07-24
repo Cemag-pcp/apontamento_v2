@@ -19,6 +19,7 @@ from .services import (
     FotoObrigatoriaError, PacoteValidationError, listar_cargas_ativas,
     detalhar_pacotes_da_carga, salvar_foto_pacote, listar_fotos_pacote,
     confirmar_pacote_service, listar_pendencias_carga, criar_ou_atualizar_pacote,
+    excluir_foto_pacote,
 )
 from cadastro.models import CarretasExplodidas
 
@@ -971,8 +972,7 @@ def buscar_fotos(request, pacote_id):
 @require_http_methods(["DELETE"])
 def excluir_foto(request, foto_id):
     imagem = get_object_or_404(ImagemPacote, id=foto_id)
-    imagem.arquivo.delete(save=False)
-    imagem.delete()
+    excluir_foto_pacote(imagem)
     return JsonResponse({'mensagem': 'Foto excluída com sucesso.'})
 
 @require_http_methods(["DELETE"])

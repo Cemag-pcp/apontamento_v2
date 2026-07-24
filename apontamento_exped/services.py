@@ -306,6 +306,12 @@ def listar_fotos_pacote(pacote_id):
     return [{'id': img.id, 'url': img.arquivo.url, 'etapa': img.stage} for img in imagens]
 
 
+def excluir_foto_pacote(imagem):
+    """Remove uma ImagemPacote (arquivo + registro)."""
+    imagem.arquivo.delete(save=False)
+    imagem.delete()
+
+
 def confirmar_pacote_service(pacote, observacao):
     """Confirma qualidade/expedição de um pacote conforme o stage atual da carga.
 
