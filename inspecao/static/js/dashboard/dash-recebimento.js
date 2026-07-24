@@ -47,15 +47,19 @@ async function carregarResumo(params) {
         const d = await r.json();
 
         document.getElementById('kpi-total').textContent     = fmt(d.total);
+        document.getElementById('kpi-devolucoes').textContent = fmt(d.devolucoes);
         document.getElementById('kpi-conforme').textContent  = fmt(d.conforme);
+        document.getElementById('kpi-conforme-devolucoes').textContent = fmt(d.conforme_devolucoes);
         document.getElementById('kpi-nc').textContent        = fmt(d.nao_conforme);
+        document.getElementById('kpi-nc-devolucoes').textContent = fmt(d.nao_conforme_devolucoes);
         document.getElementById('kpi-pendentes').textContent = fmt(d.pendentes);
+        document.getElementById('kpi-pendentes-devolucoes').textContent = fmt(d.pendentes_devolucoes);
         document.getElementById('kpi-taxa-conf').textContent = fmtPct(d.taxa_conformidade);
         document.getElementById('kpi-taxa-nc').textContent   = fmtPct(d.taxa_nao_conformidade);
 
         // Atualiza donut
         if (chartResultado) {
-            chartResultado.data.datasets[0].data = [d.conforme, d.nao_conforme];
+            chartResultado.data.datasets[0].data = [d.conforme, d.nao_conforme, d.devolucoes];
             chartResultado.update();
         }
     } catch (e) {
@@ -72,13 +76,15 @@ async function carregarTemporal(params) {
         const labels   = d.map(i => i.mes);
         const conforme = d.map(i => i.conforme);
         const nc       = d.map(i => i.nao_conforme);
+        const devolucoes = d.map(i => i.devolucoes);
         const taxaNC   = d.map(i => i.taxa_nc);
 
         if (chartTemporal) {
             chartTemporal.data.labels = labels;
             chartTemporal.data.datasets[0].data = conforme;
             chartTemporal.data.datasets[1].data = nc;
-            chartTemporal.data.datasets[2].data = taxaNC;
+            chartTemporal.data.datasets[2].data = devolucoes;
+            chartTemporal.data.datasets[3].data = taxaNC;
             chartTemporal.update();
         }
     } catch (e) {
@@ -187,10 +193,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     order: 2,
                 },
                 {
+                    label: 'Devoluções',
+                    data: [],
+                    backgroundColor: COLOR_ORANGE,
+                    borderRadius: 4,
+                    order: 2,
+                },
+                {
                     label: '% Não Conforme',
                     data: [],
                     type: 'line',
-                    borderColor: COLOR_ORANGE,
+                    borderColor: COLOR_NAVY,
                     backgroundColor: 'transparent',
                     borderWidth: 2,
                     pointRadius: 4,
@@ -222,8 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
     chartResultado = new Chart(document.getElementById('chartResultado'), {
         type: 'doughnut',
         data: {
-            labels: ['Conforme', 'Não Conforme'],
-            datasets: [{ data: [0, 0], backgroundColor: [COLOR_GREEN, COLOR_RED], borderWidth: 2 }],
+            labels: ['Conforme', 'Não Conforme', 'Devoluções'],
+            datasets: [{ data: [0, 0, 0], backgroundColor: [COLOR_GREEN, COLOR_RED, COLOR_ORANGE], borderWidth: 2 }],
         },
         options: {
             responsive: true,
@@ -273,9 +286,13 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarTudo();
 
     document.getElementById('filterBtn').addEventListener('click', carregarTudo);
+    document.querySelectorAll('input[name="tipoData"]').forEach((input) => {
+        input.addEventListener('change', carregarTudo);
+    });
     document.getElementById('resetBtn').addEventListener('click', () => {
         document.getElementById('startDate').valueAsDate = new Date(today.getFullYear(), today.getMonth(), 1);
         document.getElementById('endDate').valueAsDate   = today;
+        document.getElementById('tipoInspecao').checked = true;
         carregarTudo();
     });
 });

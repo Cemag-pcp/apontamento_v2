@@ -193,6 +193,7 @@ function buscarItensInspecionados(pagina) {
                             data-id="${item.id}"
                             data-data="${item.data}"
                             data-peca="${item.peca}"
+                            data-maquina="${item.maquina}"
                             data-tipo="${item.tipo}"
                             data-nao-conformidade="${item.nao_conformidade}"
                             data-conformidade="${item.conformidade}"

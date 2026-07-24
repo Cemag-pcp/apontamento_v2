@@ -8,6 +8,128 @@
 <link rel="stylesheet" href="{% static 'css/modal-inspecao-estamparia.css' %}">
 <link rel="stylesheet" href="{% static 'css/inspecao.css' %}">
 <link rel="stylesheet" href="{% static 'css/select2.css' %}">
+<style>
+.ficha-doc {
+    background: #fff;
+    font-size: .875rem;
+    color: #1e293b;
+    padding: 2rem 2.5rem;
+}
+.ficha-doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid #1e293b;
+    margin-bottom: 1.5rem;
+}
+.ficha-doc-title { font-size: 1rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #1e293b; }
+.ficha-doc-subtitle { font-size: .75rem; color: #64748b; margin-top: .15rem; }
+.ficha-doc-id { text-align: right; font-size: .75rem; color: #64748b; line-height: 1.6; }
+.ficha-doc-id strong { display: block; font-size: .95rem; color: #1e293b; }
+.ficha-section { margin-bottom: 1.5rem; }
+.ficha-section-title {
+    font-size: .65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #64748b;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: .3rem;
+    margin-bottom: .85rem;
+}
+.ficha-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: .6rem 1.5rem;
+}
+.ficha-field { display: flex; flex-direction: column; }
+.ficha-field-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: .15rem; }
+.ficha-field-value { font-size: .875rem; color: #1e293b; font-weight: 500; overflow-wrap: anywhere; }
+.ficha-resultado-box {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: .85rem 1.25rem;
+    border-radius: .5rem;
+    margin-top: .5rem;
+}
+.ficha-resultado-box.conforme { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.ficha-resultado-box.nao-conforme { background: #fff1f2; border: 1px solid #fecdd3; }
+.ficha-resultado-pill {
+    font-size: .95rem;
+    font-weight: 700;
+    padding: .35em .9em;
+    border-radius: 2rem;
+    white-space: nowrap;
+}
+.ficha-resultado-pill.conforme { background: #16a34a; color: #fff; }
+.ficha-resultado-pill.nao-conforme { background: #dc2626; color: #fff; }
+.ficha-resultado-obs { font-size: .82rem; color: #475569; font-style: italic; }
+.ficha-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: .45rem;
+}
+.ficha-unidades-table {
+    width: 100%;
+    min-width: 680px;
+    border-collapse: collapse;
+    font-size: .76rem;
+}
+.ficha-unidades-table thead th {
+    background: #1e293b;
+    color: #f1f5f9;
+    padding: .42rem .55rem;
+    font-size: .64rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    border: none;
+    vertical-align: middle;
+}
+.ficha-unidades-table tbody td {
+    padding: .42rem .55rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+.ficha-unidades-table tbody tr:last-child td { border-bottom: none; }
+.ficha-unidades-table tbody tr:nth-child(even) td { background: #f8fafc; }
+.ficha-nc-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: .45rem;
+}
+.ficha-nc-gallery img {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: .35rem;
+    border: 1px solid #e2e8f0;
+}
+.ficha-doc-footer {
+    margin-top: 2rem;
+    padding-top: .75rem;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    font-size: .72rem;
+    color: #94a3b8;
+}
+@media (max-width: 576px) {
+    .ficha-doc { padding: 1.25rem; }
+    .ficha-doc-header,
+    .ficha-resultado-box,
+    .ficha-doc-footer { flex-direction: column; align-items: flex-start; }
+    .ficha-doc-id { text-align: left; }
+}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -175,16 +297,18 @@
     </div>
 </div>
 
-<div class="modal fade" id="modal-historico-ordem-corte" data-bs-backdrop="static" tabindex="-1" aria-labelledby="modalHistoricoOrdemCorteLabel">
-    <div class="modal-dialog modal-md">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalHistoricoOrdemCorteLabel">Histórico</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="modal fade" id="modal-historico-ordem-corte" tabindex="-1" aria-labelledby="modalHistoricoOrdemCorteLabel">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0 px-4 pt-3" style="background:#f8fafc;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-clipboard2-check text-primary fs-5"></i>
+                    <span class="fw-semibold" style="font-size:.95rem;" id="modalHistoricoOrdemCorteLabel">Ficha de Inspecao de Corte</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
-            <div class="modal-body">
-
-                <div class="accordion" id="lista-historico-pecas-corte"></div>
+            <div class="modal-body p-0" style="background:#f8fafc;">
+                <div id="lista-historico-pecas-corte" class="ficha-doc"></div>
             </div>
         </div>
     </div>
@@ -336,7 +460,7 @@
     var podeDesfazerInspecao = {% if pode_desfazer %}true{% else %}false{% endif %};
 </script>
 <script src="{% static 'js/corte/a-inspecionar-corte.js' %}"></script>
-<script src="{% static 'js/corte/inspecionados-corte.js' %}"></script>
+<script src="{% static 'js/corte/inspecionados-corte.js' %}?v=ficha-modal-20260722"></script>
 <script>
     function activeRow(rowVisible, rowInvisible, clickedElement) {
         document.getElementById(rowVisible).style.display = "flex";
