@@ -24,6 +24,37 @@
             </button>
         </header>
 
+        <h4 class="mb-3 text-secondary">Pesquise o operador</h4>
+        <form id="operadoresFiltroForm" class="mb-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label for="filtroOperadorBusca" class="form-label fw-semibold">Operador</label>
+                    <input type="text" class="form-control" id="filtroOperadorBusca" placeholder="Nome ou matricula" autocomplete="off">
+                </div>
+                <div class="col-md-3">
+                    <label for="filtroOperadorSetor" class="form-label fw-semibold">Setor</label>
+                    <select class="form-select" id="filtroOperadorSetor">
+                        <option value="">Todos</option>
+                        {% for setor in setores %}
+                        <option value="{{ setor.id }}">{{ setor.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filtroOperadorStatus" class="form-label fw-semibold">Status</label>
+                    <select class="form-select" id="filtroOperadorStatus">
+                        <option value="">Todos</option>
+                        <option value="ativo">Ativos</option>
+                        <option value="inativo">Inativos</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="button" id="aplicarFiltrosOperador" class="btn btn-primary w-100">Filtrar</button>
+                    <button type="button" id="limparFiltrosOperador" class="btn btn-outline-secondary w-100">Limpar</button>
+                </div>
+            </div>
+        </form>
+
         <section class="operators-table-card">
             <div class="table-responsive">
                 <table id="tableOperadores" class="operators-table">
@@ -71,6 +102,5 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script type="module" src="{% static 'js/datatable-list-operador.js' %}"></script>
-<script type="module" src="{% static 'js/operador-crud.js' %}"></script>
+<script type="module" src="{% static 'js/operador-crud.js' %}?v=20260724-2"></script>
 {% endblock %}

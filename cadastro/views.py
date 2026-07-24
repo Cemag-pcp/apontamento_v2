@@ -49,8 +49,15 @@ def buscar_processos(request):
     return JsonResponse({'processos': processos})
 
 def operadores(request):
+    setor_ids = (
+        Operador.objects
+        .exclude(setor__isnull=True)
+        .values_list('setor_id', flat=True)
+        .distinct()
+    )
+    setores = Setor.objects.filter(id__in=setor_ids).order_by('nome')
 
-    return render(request,'operadores/operadores.html')
+    return render(request, 'operadores/operadores.html', {'setores': setores})
 
 def api_operadores(request):
     operadores = (
