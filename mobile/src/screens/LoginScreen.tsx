@@ -39,6 +39,7 @@ export default function LoginScreen() {
       <TextInput
         style={styles.input}
         placeholder="Usuário"
+        placeholderTextColor="#888"
         autoCapitalize="none"
         autoCorrect={false}
         value={username}
@@ -48,6 +49,7 @@ export default function LoginScreen() {
       <TextInput
         style={styles.input}
         placeholder="Senha"
+        placeholderTextColor="#888"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
@@ -70,6 +72,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1, borderColor: '#d0d0d0', borderRadius: 8,
     paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12, fontSize: 16,
+    color: '#1b1b1b', backgroundColor: '#fff',
   },
   erro: { color: '#c0392b', marginBottom: 12, textAlign: 'center' },
   botao: { backgroundColor: '#1b6ec2', borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 8 },

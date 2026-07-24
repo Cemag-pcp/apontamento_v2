@@ -11,6 +11,7 @@ import PacoteDetailScreen from '../screens/PacoteDetailScreen';
 import CameraScreen from '../screens/CameraScreen';
 import PendenciasScreen from '../screens/PendenciasScreen';
 import CriarPacoteScreen from '../screens/CriarPacoteScreen';
+import ItemAvulsoScreen from '../screens/ItemAvulsoScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -44,6 +45,11 @@ export default function RootNavigator() {
         name="Camera"
         component={CameraScreen}
         options={{ headerShown: false, presentation: 'fullScreenModal' }}
+      />
+      <Stack.Screen
+        name="ItemAvulso"
+        component={ItemAvulsoScreen}
+        options={{ headerShown: false, presentation: 'modal' }}
       />
     </Stack.Navigator>
   );

@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   secaoTitulo: { fontSize: 15, fontWeight: '700', marginBottom: 8, color: '#1b1b1b' },
   vazioTexto: { color: '#888', fontSize: 13 },
   item: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  itemCodigo: { fontWeight: '600', fontSize: 13 },
+  itemCodigo: { fontWeight: '600', fontSize: 13, color: '#1b1b1b' },
   itemDescricao: { color: '#666', fontSize: 12 },
   itemQtd: { color: '#333', fontSize: 12, marginTop: 2 },
   miniatura: { width: 90, height: 90, borderRadius: 8, marginRight: 8, backgroundColor: '#eee' },

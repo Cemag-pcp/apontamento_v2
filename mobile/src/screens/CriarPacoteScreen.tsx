@@ -29,13 +29,21 @@ export default function CriarPacoteScreen({ route, navigation }: Props) {
   const [quantidades, setQuantidades] = useState<Record<number, string>>({});
 
   const [itensAvulsos, setItensAvulsos] = useState<ItemForaPlanejadoInput[]>([]);
-  const [novoCodigo, setNovoCodigo] = useState('');
-  const [novaDescricao, setNovaDescricao] = useState('');
-  const [novaQtd, setNovaQtd] = useState('');
 
   useEffect(() => {
     navigation.setOptions({ title: `Novo pacote — ${cargaNome}` });
   }, [navigation, cargaNome]);
+
+  // Volta da ItemAvulsoScreen (modal) com um item novo, via param - mesmo
+  // padrao usado pela CameraScreen pra voltar com a foto capturada.
+  useEffect(() => {
+    if (route.params.novoItemAvulso) {
+      const item = route.params.novoItemAvulso;
+      navigation.setParams({ novoItemAvulso: undefined });
+      setItensAvulsos((prev) => [...prev, item]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params.novoItemAvulso]);
 
   useEffect(() => {
     (async () => {
@@ -64,20 +72,6 @@ export default function CriarPacoteScreen({ route, navigation }: Props) {
     }
     const num = Math.min(parseInt(limpo, 10), max);
     setQuantidades((prev) => ({ ...prev, [pendenciaId]: String(num) }));
-  }
-
-  function adicionarItemAvulso() {
-    const codigo = novoCodigo.trim();
-    const descricao = novaDescricao.trim();
-    const qtd = parseInt(novaQtd, 10);
-    if (!codigo || !descricao || !qtd || qtd <= 0) {
-      Alert.alert('Item inválido', 'Preencha código, descrição e uma quantidade maior que zero.');
-      return;
-    }
-    setItensAvulsos((prev) => [...prev, { codigo, descricao, quantidade: qtd }]);
-    setNovoCodigo('');
-    setNovaDescricao('');
-    setNovaQtd('');
   }
 
   function removerItemAvulso(index: number) {
@@ -146,6 +140,7 @@ export default function CriarPacoteScreen({ route, navigation }: Props) {
           <TextInput
             style={styles.input}
             placeholder="Nome do pacote"
+            placeholderTextColor="#888"
             value={nomePacote}
             onChangeText={setNomePacote}
           />
@@ -194,6 +189,7 @@ export default function CriarPacoteScreen({ route, navigation }: Props) {
                   value={quantidades[item.id] || ''}
                   onChangeText={(v) => alterarQuantidade(item.id, v, item.qt_necessaria)}
                   placeholder="0"
+                  placeholderTextColor="#888"
                 />
               </View>
             );
@@ -215,14 +211,12 @@ export default function CriarPacoteScreen({ route, navigation }: Props) {
           </View>
         ))}
 
-        <View style={styles.formAvulso}>
-          <TextInput style={styles.input} placeholder="Código" value={novoCodigo} onChangeText={setNovoCodigo} />
-          <TextInput style={styles.input} placeholder="Descrição" value={novaDescricao} onChangeText={setNovaDescricao} />
-          <TextInput style={styles.input} placeholder="Quantidade" keyboardType="numeric" value={novaQtd} onChangeText={setNovaQtd} />
-          <TouchableOpacity style={styles.botaoAdicionarAvulso} onPress={adicionarItemAvulso}>
-            <Text style={styles.botaoAdicionarAvulsoTexto}>+ Adicionar item avulso</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.botaoAdicionarAvulso}
+          onPress={() => navigation.navigate('ItemAvulso', { cargaId, cargaNome })}
+        >
+          <Text style={styles.botaoAdicionarAvulsoTexto}>+ Adicionar item avulso</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.secao}>
@@ -248,6 +242,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1, borderColor: '#d0d0d0', borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 8,
+    color: '#1b1b1b', backgroundColor: '#fff',
   },
   listaPacotes: { gap: 6 },
   itemPacoteExistente: { borderWidth: 1, borderColor: '#d0d0d0', borderRadius: 8, padding: 10 },
@@ -258,17 +253,17 @@ const styles = StyleSheet.create({
   checkbox: { padding: 4 },
   checkboxMarca: { fontSize: 20, color: '#1b6ec2' },
   pendenciaInfo: { flex: 1 },
-  itemCodigo: { fontWeight: '600', fontSize: 13 },
+  itemCodigo: { fontWeight: '600', fontSize: 13, color: '#1b1b1b' },
   itemDescricao: { color: '#666', fontSize: 12 },
   itemCarreta: { color: '#999', fontSize: 11, marginTop: 2 },
   inputQtd: {
     width: 52, borderWidth: 1, borderColor: '#d0d0d0', borderRadius: 8,
     paddingVertical: 6, textAlign: 'center', fontSize: 14,
+    color: '#1b1b1b', backgroundColor: '#fff',
   },
   linhaAvulso: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eee' },
   remover: { color: '#c0392b', fontSize: 12, fontWeight: '600' },
-  formAvulso: { marginTop: 10 },
-  botaoAdicionarAvulso: { backgroundColor: '#eef4fb', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  botaoAdicionarAvulso: { backgroundColor: '#eef4fb', borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginTop: 10 },
   botaoAdicionarAvulsoTexto: { color: '#1b6ec2', fontWeight: '600', fontSize: 13 },
   botaoSalvar: { backgroundColor: '#198754', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
   botaoSalvarTexto: { color: '#fff', fontSize: 16, fontWeight: '600' },
