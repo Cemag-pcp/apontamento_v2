@@ -16,9 +16,9 @@ from .models import Carga,ItemPacote,Pacote,VerificacaoPacote, CarretaCarga, Ima
 from .utils import chamar_impressora, buscar_conjuntos_carreta, limpar_cor, chamar_impressora_qrcode
 from .services import (
     _TIPOS_ESPECIAIS, _detectar_codigos_especiais_da_carga,
-    FotoObrigatoriaError, listar_cargas_ativas, detalhar_pacotes_da_carga,
-    salvar_foto_pacote, listar_fotos_pacote, confirmar_pacote_service,
-    listar_pendencias_carga,
+    FotoObrigatoriaError, PacoteValidationError, listar_cargas_ativas,
+    detalhar_pacotes_da_carga, salvar_foto_pacote, listar_fotos_pacote,
+    confirmar_pacote_service, listar_pendencias_carga, criar_ou_atualizar_pacote,
 )
 from cadastro.models import CarretasExplodidas
 
@@ -760,158 +760,23 @@ def guardar_pacotes(request):
         return JsonResponse({"erro": "JSON inválido"}, status=400)
 
     id_carga = data.get("idCargaPacote")
-    nome_pacote = data.get("nomePacote")
-    pacote_existente = data.get("pacoteExistenteId")  # pode vir null/None
-    itens = data.get("itens", [])
-    itens_fora_planejado = data.get("itensForaPlanejado", [])
-
     if not id_carga:
         return JsonResponse({"erro": "idCargaPacote é obrigatório"}, status=400)
-    if not nome_pacote and not pacote_existente:
-        return JsonResponse({"erro": "nomePacote é obrigatório"}, status=400)
 
     carga = get_object_or_404(Carga, id=id_carga)
 
-    with transaction.atomic():
-        if pacote_existente:
-            pacote = get_object_or_404(Pacote, id=pacote_existente, carga=carga)
-        else:
-            pacote = Pacote.objects.create(nome=nome_pacote, carga=carga)
+    try:
+        resultado = criar_ou_atualizar_pacote(
+            carga,
+            nome_pacote=data.get("nomePacote"),
+            pacote_existente_id=data.get("pacoteExistenteId"),
+            itens=data.get("itens", []),
+            itens_fora_planejado=data.get("itensForaPlanejado", []),
+        )
+    except PacoteValidationError as exc:
+        return JsonResponse({"erro": str(exc)}, status=400)
 
-        if itens:
-            pend_ids = [int(i.get("pendencia_id", 0) or 0) for i in itens]
-            if any(pid <= 0 for pid in pend_ids):
-                return JsonResponse({"erro": "Cada item deve conter pendencia_id válido."}, status=400)
-
-            pendencias_qs = (
-                PendenciasPacote.objects
-                .select_for_update()
-                .select_related("carreta_carga")
-                .filter(id__in=pend_ids)
-            )
-
-            pend_por_id = {p.id: p for p in pendencias_qs}
-            faltantes = [pid for pid in pend_ids if pid not in pend_por_id]
-            if faltantes:
-                return JsonResponse({"erro": f"Pendência(s) inexistente(s): {faltantes}"}, status=400)
-
-            for p in pend_por_id.values():
-                if getattr(p.carreta_carga, "carga_id", None) != carga.id:
-                    return JsonResponse({
-                        "erro": f"A pendência {p.id} não pertence à carga #{carga.id}"
-                    }, status=400)
-
-            itens_criados = []
-            for item in itens:
-                try:
-                    qtd = int(item.get("quantidade", 0))
-                except (TypeError, ValueError):
-                    return JsonResponse({"erro": "Quantidade inválida."}, status=400)
-                if qtd <= 0:
-                    return JsonResponse({"erro": "Quantidade deve ser maior que zero."}, status=400)
-
-                pend_id = int(item.get("pendencia_id"))
-                pend = pend_por_id[pend_id]
-                saldo_pendente = int(pend.qt_necessaria or 0)
-                if saldo_pendente <= 0:
-                    return JsonResponse({
-                        "erro": f"O item {pend.codigo} - {pend.descricao} não possui saldo pendente para empacotar."
-                    }, status=400)
-                if qtd > saldo_pendente:
-                    return JsonResponse({
-                        "erro": (
-                            f"O item {pend.codigo} - {pend.descricao} "
-                            f"ultrapassa a quantidade pendente (disp: {saldo_pendente}, req: {qtd})"
-                        )
-                    }, status=400)
-
-                itens_criados.append(ItemPacote(
-                    pacote=pacote,
-                    codigo_id=pend_id,
-                    quantidade=qtd
-                ))
-
-                pend.qt_necessaria = pend.qt_necessaria - qtd
-                pend.save(update_fields=["qt_necessaria"])
-
-            if itens_criados:
-                ItemPacote.objects.bulk_create(itens_criados)
-
-        if itens_fora_planejado:
-            itens_avulsos = []
-            for item in itens_fora_planejado:
-                codigo = str(item.get("codigo", "")).strip()
-                descricao = str(item.get("descricao", "")).strip()
-                try:
-                    qtd = int(item.get("quantidade", 0))
-                except (TypeError, ValueError):
-                    return JsonResponse({"erro": "Quantidade inválida para item fora do planejado."}, status=400)
-
-                if not codigo or not descricao:
-                    return JsonResponse({"erro": "Código e descrição são obrigatórios para item fora do planejado."}, status=400)
-                if qtd <= 0:
-                    return JsonResponse({"erro": "Quantidade deve ser maior que zero para item fora do planejado."}, status=400)
-
-                itens_avulsos.append(ItemPacote(
-                    pacote=pacote,
-                    codigo=None,
-                    codigo_informado=codigo,
-                    descricao_informada=descricao,
-                    fora_planejado=True,
-                    quantidade=qtd
-                ))
-
-            if itens_avulsos:
-                ItemPacote.objects.bulk_create(itens_avulsos)
-
-    # ---- resumo após a criação (inalterado) ----
-    pacotes = Pacote.objects.filter(carga_id=id_carga)
-    total_pacotes = pacotes.count()
-    pacotes_com_foto_verificacao = (
-        ImagemPacote.objects
-        .filter(pacote__in=pacotes, stage='verificacao')
-        .values('pacote').distinct().count()
-    )
-    pacotes_com_foto_despachado = (
-        ImagemPacote.objects
-        .filter(pacote__in=pacotes, stage='despachado')
-        .values('pacote').distinct().count()
-    )
-
-    total_pendente = (
-        PendenciasPacote.objects
-        .filter(carreta_carga__carga_id=id_carga, qt_necessaria__gt=0)
-        .aggregate(total=Coalesce(Sum('qt_necessaria'), 0))
-        ['total']
-    )
-
-    todos_verificacao_ok = (
-        total_pacotes > 0 and
-        total_pacotes == pacotes_com_foto_verificacao and
-        total_pendente == 0
-    )
-    todos_despachado_ok = (
-        total_pacotes > 0 and
-        total_pacotes == pacotes_com_foto_despachado
-    )
-
-    return JsonResponse({
-        "mensagem": "Pacote criado com sucesso!",
-        "pacote_id": pacote.id,
-        "etapa": carga.stage,
-        "info_add": {
-            "id": carga.id,
-            "nome": carga.nome,
-            "carga": carga.carga,
-            "data_carga": carga.data_carga.isoformat() if carga.data_carga else None,
-            "cliente": carga.cliente,
-            "obs_pacote": carga.obs_pacote,
-            "stage": carga.stage,
-            "todos_pacotes_tem_foto_verificacao": todos_verificacao_ok,
-            "todos_pacotes_tem_foto_despachado": todos_despachado_ok,
-            "total_pendente": int(total_pendente or 0),
-        }
-    }, status=201)
+    return JsonResponse(resultado, status=201)
 
 def buscar_pacotes_carga(request, id):
     carga = get_object_or_404(Carga, id=id)

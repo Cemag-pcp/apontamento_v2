@@ -13,10 +13,17 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Carga, Pacote
-from .serializers import ConfirmarPacoteSerializer, LoginSerializer, UploadFotoSerializer
+from .serializers import (
+    ConfirmarPacoteSerializer,
+    CriarPacoteSerializer,
+    LoginSerializer,
+    UploadFotoSerializer,
+)
 from .services import (
     FotoObrigatoriaError,
+    PacoteValidationError,
     confirmar_pacote_service,
+    criar_ou_atualizar_pacote,
     detalhar_pacotes_da_carga,
     listar_cargas_ativas,
     listar_fotos_pacote,
@@ -96,6 +103,27 @@ class UploadFotoView(APIView):
 
         pacote = get_object_or_404(Pacote, id=pacote_id)
         resultado = salvar_foto_pacote(pacote, serializer.validated_data['foto'])
+        return Response(resultado, status=status.HTTP_201_CREATED)
+
+
+class CriarPacoteView(APIView):
+    def post(self, request, carga_id):
+        serializer = CriarPacoteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        dados = serializer.validated_data
+
+        carga = get_object_or_404(Carga, id=carga_id)
+        try:
+            resultado = criar_ou_atualizar_pacote(
+                carga,
+                nome_pacote=dados.get('nome_pacote'),
+                pacote_existente_id=dados.get('pacote_existente_id'),
+                itens=dados.get('itens', []),
+                itens_fora_planejado=dados.get('itens_fora_planejado', []),
+            )
+        except PacoteValidationError as exc:
+            return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         return Response(resultado, status=status.HTTP_201_CREATED)
 
 

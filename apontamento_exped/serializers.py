@@ -12,3 +12,21 @@ class ConfirmarPacoteSerializer(serializers.Serializer):
 
 class UploadFotoSerializer(serializers.Serializer):
     foto = serializers.ImageField()
+
+
+class ItemPacoteInputSerializer(serializers.Serializer):
+    pendencia_id = serializers.IntegerField()
+    quantidade = serializers.IntegerField()
+
+
+class ItemForaPlanejadoInputSerializer(serializers.Serializer):
+    codigo = serializers.CharField()
+    descricao = serializers.CharField()
+    quantidade = serializers.IntegerField()
+
+
+class CriarPacoteSerializer(serializers.Serializer):
+    nome_pacote = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    pacote_existente_id = serializers.IntegerField(required=False, allow_null=True)
+    itens = ItemPacoteInputSerializer(many=True, required=False)
+    itens_fora_planejado = ItemForaPlanejadoInputSerializer(many=True, required=False)

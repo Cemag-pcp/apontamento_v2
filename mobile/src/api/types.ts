@@ -111,3 +111,39 @@ export interface UploadFotoResponse {
 export interface ConfirmarPacoteResponse {
   mensagem: string;
 }
+
+export interface ItemPendenciaInput {
+  pendencia_id: number;
+  quantidade: number;
+}
+
+export interface ItemForaPlanejadoInput {
+  codigo: string;
+  descricao: string;
+  quantidade: number;
+}
+
+export interface CriarPacoteInput {
+  nome_pacote?: string;
+  pacote_existente_id?: number;
+  itens?: ItemPendenciaInput[];
+  itens_fora_planejado?: ItemForaPlanejadoInput[];
+}
+
+export interface CriarPacoteResponse {
+  mensagem: string;
+  pacote_id: number;
+  etapa: string;
+  info_add: {
+    id: number;
+    nome: string;
+    carga: string;
+    data_carga: string | null;
+    cliente: string;
+    obs_pacote: string;
+    stage: StageCarga;
+    todos_pacotes_tem_foto_verificacao: boolean;
+    todos_pacotes_tem_foto_despachado: boolean;
+    total_pendente: number;
+  };
+}

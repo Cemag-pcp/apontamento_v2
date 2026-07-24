@@ -11,4 +11,5 @@ export type RootStackParamList = {
   };
   Camera: { cargaId: number; pacoteId: number; pacoteNome: string };
   Pendencias: { cargaId: number; cargaNome: string };
+  CriarPacote: { cargaId: number; cargaNome: string };
 };

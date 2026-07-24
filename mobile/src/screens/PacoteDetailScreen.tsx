@@ -6,6 +6,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
+import { useFilaOffline } from '../context/FilaOfflineContext';
 import * as api from '../api/expedicao';
 import { ApiError } from '../api/client';
 import type { FotoPacote, ItemPacote } from '../api/types';
@@ -15,6 +16,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PacoteDetail'>;
 export default function PacoteDetailScreen({ route, navigation }: Props) {
   const { cargaId, pacoteId, pacoteNome, stageCarga } = route.params;
   const { token } = useAuth();
+  const { enfileirarFoto } = useFilaOffline();
 
   const [itens, setItens] = useState<ItemPacote[]>([]);
   const [fotos, setFotos] = useState<FotoPacote[]>([]);
@@ -46,6 +48,13 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
     })();
   }, [carregar]);
 
+  // Re-sincroniza ao voltar pra tela - pega fotos que a fila offline
+  // reenviou sozinha em segundo plano enquanto o usuario estava em outra tela.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', carregar);
+    return unsubscribe;
+  }, [navigation, carregar]);
+
   // Volta da CameraScreen com uma foto capturada (via param, nao callback,
   // pra nao passar funcao nao-serializavel entre telas).
   useEffect(() => {
@@ -57,7 +66,7 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route.params.capturedUri]);
 
-  async function enviarFoto(uri: string, tentativaRetry = false) {
+  async function enviarFoto(uri: string) {
     if (!token) return;
     setEnviandoFoto(true);
     setErroUpload(null);
@@ -65,9 +74,19 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
       await api.enviarFotoDoPacote(token, pacoteId, uri);
       await carregar();
     } catch (err) {
-      setErroUpload(err instanceof ApiError ? err.message : 'Falha ao enviar a foto.');
-      // guarda a uri pra permitir "tentar de novo" sem tirar a foto de novo
-      setUltimaFotoFalha(uri);
+      if (err instanceof ApiError && err.status === 0) {
+        // sem conexao de verdade: guarda no aparelho e reenvia sozinho
+        // quando a conexao voltar, em vez de exigir retry manual.
+        await enfileirarFoto(pacoteId, uri);
+        Alert.alert(
+          'Sem conexão',
+          'A foto foi salva no aparelho e será enviada automaticamente quando a conexão voltar.'
+        );
+      } else {
+        setErroUpload(err instanceof ApiError ? err.message : 'Falha ao enviar a foto.');
+        // guarda a uri pra permitir "tentar de novo" sem tirar a foto de novo
+        setUltimaFotoFalha(uri);
+      }
     } finally {
       setEnviandoFoto(false);
     }

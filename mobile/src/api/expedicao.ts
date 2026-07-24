@@ -1,7 +1,8 @@
 import { apiFetch } from './client';
 import type {
-  Carga, ConfirmarPacoteResponse, FotoPacote, LoginResponse,
-  PacotesDaCargaResponse, PendenciasResponse, UploadFotoResponse, Usuario,
+  Carga, ConfirmarPacoteResponse, CriarPacoteInput, CriarPacoteResponse,
+  FotoPacote, LoginResponse, PacotesDaCargaResponse, PendenciasResponse,
+  UploadFotoResponse, Usuario,
 } from './types';
 
 export function login(username: string, password: string) {
@@ -45,6 +46,14 @@ export function enviarFotoDoPacote(token: string, pacoteId: number, uri: string,
     method: 'POST',
     token,
     formData,
+  });
+}
+
+export function criarPacote(token: string, cargaId: number, dados: CriarPacoteInput) {
+  return apiFetch<CriarPacoteResponse>(`/cargas/${cargaId}/pacotes/criar/`, {
+    method: 'POST',
+    token,
+    body: dados,
   });
 }
 

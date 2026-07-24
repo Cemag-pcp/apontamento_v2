@@ -34,9 +34,14 @@ export default function PacotesScreen({ route, navigation }: Props) {
     navigation.setOptions({
       title: cargaNome,
       headerRight: () => (
-        <TouchableOpacity onPress={() => navigation.navigate('Pendencias', { cargaId, cargaNome })}>
-          <Text style={styles.linkPendencias}>Pendências</Text>
-        </TouchableOpacity>
+        <View style={styles.acoesHeader}>
+          <TouchableOpacity onPress={() => navigation.navigate('CriarPacote', { cargaId, cargaNome })}>
+            <Text style={styles.linkNovoPacote}>+ Pacote</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Pendencias', { cargaId, cargaNome })}>
+            <Text style={styles.linkPendencias}>Pendências</Text>
+          </TouchableOpacity>
+        </View>
       ),
     });
   }, [navigation, cargaId, cargaNome]);
@@ -109,6 +114,8 @@ export default function PacotesScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f5f7' },
+  acoesHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  linkNovoPacote: { color: '#1b6ec2', fontWeight: '600' },
   linkPendencias: { color: '#1b6ec2', fontWeight: '600', marginRight: 4 },
   loading: { marginTop: 40 },
   listaVazia: { flexGrow: 1, justifyContent: 'center' },

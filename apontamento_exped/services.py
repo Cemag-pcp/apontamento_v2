@@ -8,8 +8,10 @@ from datetime import timedelta
 from collections import defaultdict
 from zoneinfo import ZoneInfo
 
+from django.db import transaction
 from django.db.models import Sum, Exists, OuterRef, Count
 from django.db.models.functions import Coalesce
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.timezone import localtime
 
@@ -51,6 +53,11 @@ def _detectar_codigos_especiais_da_carga(carga_id):
 
 class FotoObrigatoriaError(Exception):
     """Levantada quando tenta confirmar um pacote em verificacao sem foto anexada."""
+    pass
+
+
+class PacoteValidationError(Exception):
+    """Levantada quando os dados pra criar/atualizar um pacote sao invalidos."""
     pass
 
 
@@ -355,4 +362,160 @@ def listar_pendencias_carga(carga_id):
     return {
         "total_itens": len(itens),
         "itens": itens
+    }
+
+
+def criar_ou_atualizar_pacote(carga, nome_pacote=None, pacote_existente_id=None,
+                               itens=None, itens_fora_planejado=None):
+    """Cria um pacote novo (ou usa um existente) e anexa itens das pendencias
+    e/ou itens fora do planejado (codigo/descricao livres).
+
+    Levanta PacoteValidationError com a mensagem apropriada pra qualquer
+    problema de validacao - cada caller (view classica / DRF) formata a
+    resposta de erro no seu proprio idioma. Http404 (pacote existente
+    inexistente) propaga normalmente, tratado pelo framework em ambos os
+    casos.
+    """
+    itens = itens or []
+    itens_fora_planejado = itens_fora_planejado or []
+
+    if not nome_pacote and not pacote_existente_id:
+        raise PacoteValidationError("nomePacote é obrigatório")
+
+    with transaction.atomic():
+        if pacote_existente_id:
+            pacote = get_object_or_404(Pacote, id=pacote_existente_id, carga=carga)
+        else:
+            pacote = Pacote.objects.create(nome=nome_pacote, carga=carga)
+
+        if itens:
+            pend_ids = [int(i.get("pendencia_id", 0) or 0) for i in itens]
+            if any(pid <= 0 for pid in pend_ids):
+                raise PacoteValidationError("Cada item deve conter pendencia_id válido.")
+
+            pendencias_qs = (
+                PendenciasPacote.objects
+                .select_for_update()
+                .select_related("carreta_carga")
+                .filter(id__in=pend_ids)
+            )
+
+            pend_por_id = {p.id: p for p in pendencias_qs}
+            faltantes = [pid for pid in pend_ids if pid not in pend_por_id]
+            if faltantes:
+                raise PacoteValidationError(f"Pendência(s) inexistente(s): {faltantes}")
+
+            for p in pend_por_id.values():
+                if getattr(p.carreta_carga, "carga_id", None) != carga.id:
+                    raise PacoteValidationError(f"A pendência {p.id} não pertence à carga #{carga.id}")
+
+            itens_criados = []
+            for item in itens:
+                try:
+                    qtd = int(item.get("quantidade", 0))
+                except (TypeError, ValueError):
+                    raise PacoteValidationError("Quantidade inválida.")
+                if qtd <= 0:
+                    raise PacoteValidationError("Quantidade deve ser maior que zero.")
+
+                pend_id = int(item.get("pendencia_id"))
+                pend = pend_por_id[pend_id]
+                saldo_pendente = int(pend.qt_necessaria or 0)
+                if saldo_pendente <= 0:
+                    raise PacoteValidationError(
+                        f"O item {pend.codigo} - {pend.descricao} não possui saldo pendente para empacotar."
+                    )
+                if qtd > saldo_pendente:
+                    raise PacoteValidationError(
+                        f"O item {pend.codigo} - {pend.descricao} "
+                        f"ultrapassa a quantidade pendente (disp: {saldo_pendente}, req: {qtd})"
+                    )
+
+                itens_criados.append(ItemPacote(
+                    pacote=pacote,
+                    codigo_id=pend_id,
+                    quantidade=qtd
+                ))
+
+                pend.qt_necessaria = pend.qt_necessaria - qtd
+                pend.save(update_fields=["qt_necessaria"])
+
+            if itens_criados:
+                ItemPacote.objects.bulk_create(itens_criados)
+
+        if itens_fora_planejado:
+            itens_avulsos = []
+            for item in itens_fora_planejado:
+                codigo = str(item.get("codigo", "")).strip()
+                descricao = str(item.get("descricao", "")).strip()
+                try:
+                    qtd = int(item.get("quantidade", 0))
+                except (TypeError, ValueError):
+                    raise PacoteValidationError("Quantidade inválida para item fora do planejado.")
+
+                if not codigo or not descricao:
+                    raise PacoteValidationError("Código e descrição são obrigatórios para item fora do planejado.")
+                if qtd <= 0:
+                    raise PacoteValidationError("Quantidade deve ser maior que zero para item fora do planejado.")
+
+                itens_avulsos.append(ItemPacote(
+                    pacote=pacote,
+                    codigo=None,
+                    codigo_informado=codigo,
+                    descricao_informada=descricao,
+                    fora_planejado=True,
+                    quantidade=qtd
+                ))
+
+            if itens_avulsos:
+                ItemPacote.objects.bulk_create(itens_avulsos)
+
+    # ---- resumo apos a criacao (mesmo padrao de salvar_foto_pacote) ----
+    id_carga = carga.id
+    pacotes = Pacote.objects.filter(carga_id=id_carga)
+    total_pacotes = pacotes.count()
+    pacotes_com_foto_verificacao = (
+        ImagemPacote.objects
+        .filter(pacote__in=pacotes, stage='verificacao')
+        .values('pacote').distinct().count()
+    )
+    pacotes_com_foto_despachado = (
+        ImagemPacote.objects
+        .filter(pacote__in=pacotes, stage='despachado')
+        .values('pacote').distinct().count()
+    )
+
+    total_pendente = (
+        PendenciasPacote.objects
+        .filter(carreta_carga__carga_id=id_carga, qt_necessaria__gt=0)
+        .aggregate(total=Coalesce(Sum('qt_necessaria'), 0))
+        ['total']
+    )
+
+    todos_verificacao_ok = (
+        total_pacotes > 0 and
+        total_pacotes == pacotes_com_foto_verificacao and
+        total_pendente == 0
+    )
+    todos_despachado_ok = (
+        total_pacotes > 0 and
+        total_pacotes == pacotes_com_foto_despachado
+    )
+
+    return {
+        "mensagem": "Pacote criado com sucesso!",
+        "pacote_id": pacote.id,
+        "etapa": carga.stage,
+        "info_add": {
+            "id": carga.id,
+            "nome": carga.nome,
+            "carga": carga.carga,
+            "data_carga": carga.data_carga.isoformat() if carga.data_carga else None,
+            "cliente": carga.cliente,
+            "obs_pacote": carga.obs_pacote,
+            "stage": carga.stage,
+            "todos_pacotes_tem_foto_verificacao": todos_verificacao_ok,
+            "todos_pacotes_tem_foto_despachado": todos_despachado_ok,
+            "total_pendente": int(total_pendente or 0),
+        }
     }
