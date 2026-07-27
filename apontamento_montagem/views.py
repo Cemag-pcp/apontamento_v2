@@ -2749,3 +2749,195 @@ def api_historico_montagem(request):
             'has_previous': pagina.has_previous(),
         },
     })
+
+
+@login_required
+def historico_paradas_montagem(request):
+    return render(request, "apontamento_montagem/historico_paradas_montagem.html")
+
+
+def _build_historico_paradas_queryset(filtros):
+    queryset = (
+        OrdemProcesso.objects
+        .filter(ordem__grupo_maquina='montagem', status='interrompida')
+        .select_related('ordem', 'ordem__maquina', 'motivo_interrupcao')
+    )
+
+    if filtros.get('ordem'):
+        queryset = queryset.filter(ordem__ordem__icontains=filtros['ordem'])
+
+    if filtros.get('maquina'):
+        queryset = queryset.filter(ordem__maquina__nome__icontains=filtros['maquina'])
+
+    if filtros.get('motivo'):
+        queryset = queryset.filter(motivo_interrupcao__nome__icontains=filtros['motivo'])
+
+    if filtros.get('peca'):
+        queryset = queryset.filter(ordem__pecas_faltantes__nome_peca__icontains=filtros['peca']).distinct()
+
+    situacao = filtros.get('situacao')
+    if situacao == 'em_andamento':
+        queryset = queryset.filter(data_fim__isnull=True)
+    elif situacao == 'concluida':
+        queryset = queryset.filter(data_fim__isnull=False)
+
+    data_inicio_de = parse_date(filtros.get('data_inicio_de', '') or '')
+    data_inicio_ate = parse_date(filtros.get('data_inicio_ate', '') or '')
+
+    # Garante sempre um limite de período para não varrer a tabela inteira
+    nenhum_filtro_data = not any([data_inicio_de, data_inicio_ate])
+    if nenhum_filtro_data and not filtros.get('ordem'):
+        data_inicio_de = (now() - timedelta(days=30)).date()
+
+    if data_inicio_de:
+        queryset = queryset.filter(data_inicio__date__gte=data_inicio_de)
+    if data_inicio_ate:
+        queryset = queryset.filter(data_inicio__date__lte=data_inicio_ate)
+
+    return queryset.order_by('-data_inicio', '-id')
+
+
+def _mapear_pecas_faltantes_das_paradas(processos):
+    """Associa cada parada (OrdemProcesso interrompida) as PecasFaltantes
+    registradas durante aquela janela.
+
+    Não existe FK direta entre os dois modelos - PecasFaltantes só se liga
+    à Ordem, não a uma interrupção específica. A associação é feita por
+    proximidade de tempo: as peças faltantes de uma interrupção são
+    gravadas na mesma requisição que abre o OrdemProcesso (mesmo
+    atualizar_status_ordem), então data_registro sempre cai dentro da
+    janela [data_inicio, data_fim] daquela parada específica (ou depois de
+    data_inicio, sem limite superior, se a parada ainda está em aberto).
+    """
+    ordem_ids = {p.ordem_id for p in processos}
+    if not ordem_ids:
+        return {}
+
+    from collections import defaultdict
+
+    # Todas as paradas dessas ordens (não só as da página atual) pra
+    # delimitar a janela corretamente mesmo se a paginação cortar o
+    # histórico de uma ordem no meio.
+    paradas_por_ordem = defaultdict(list)
+    for parada in (
+        OrdemProcesso.objects
+        .filter(ordem_id__in=ordem_ids, status='interrompida')
+        .order_by('data_inicio')
+    ):
+        paradas_por_ordem[parada.ordem_id].append(parada)
+
+    pecas_por_ordem = defaultdict(list)
+    for pf in PecasFaltantes.objects.filter(ordem_id__in=ordem_ids).order_by('data_registro'):
+        pecas_por_ordem[pf.ordem_id].append(pf)
+
+    resultado = defaultdict(list)
+    for ordem_id, paradas_da_ordem in paradas_por_ordem.items():
+        for parada in paradas_da_ordem:
+            for pf in pecas_por_ordem.get(ordem_id, []):
+                if pf.data_registro < parada.data_inicio:
+                    continue
+                if parada.data_fim and pf.data_registro > parada.data_fim:
+                    continue
+                resultado[parada.id].append(pf)
+
+    return resultado
+
+
+def _historico_paradas_row_dict(item, pecas_por_parada):
+    pecas = pecas_por_parada.get(item.id, [])
+    duracao_str = ''
+    if item.data_fim:
+        duracao = item.data_fim - item.data_inicio
+    elif item.data_inicio:
+        duracao = now() - item.data_inicio
+    else:
+        duracao = None
+    if duracao is not None:
+        total_min = int(duracao.total_seconds() // 60)
+        horas, minutos = divmod(total_min, 60)
+        duracao_str = f'{horas}h{minutos:02d}m'
+
+    return {
+        'id': item.id,
+        'ordem': item.ordem.ordem if item.ordem else '',
+        'maquina': item.ordem.maquina.nome if item.ordem and item.ordem.maquina else '',
+        'motivo': item.motivo_interrupcao.nome if item.motivo_interrupcao else '',
+        'pecas_faltantes': ', '.join(f'{pf.nome_peca} ({formatar_numero(pf.quantidade)})' for pf in pecas),
+        'data_inicio': localtime(item.data_inicio).strftime('%d/%m/%Y %H:%M') if item.data_inicio else '',
+        'data_fim': localtime(item.data_fim).strftime('%d/%m/%Y %H:%M') if item.data_fim else '',
+        'em_andamento': item.data_fim is None,
+        'duracao': duracao_str,
+    }
+
+
+def formatar_numero(valor):
+    if valor is None:
+        return ''
+    if float(valor).is_integer():
+        return str(int(valor))
+    return str(valor)
+
+
+@login_required
+@require_GET
+def api_historico_paradas_montagem(request):
+    filtros = {
+        'ordem': request.GET.get('ordem', '').strip(),
+        'maquina': request.GET.get('maquina', '').strip(),
+        'motivo': request.GET.get('motivo', '').strip(),
+        'peca': request.GET.get('peca', '').strip(),
+        'situacao': request.GET.get('situacao', '').strip(),
+        'data_inicio_de': request.GET.get('data_inicio_de', '').strip(),
+        'data_inicio_ate': request.GET.get('data_inicio_ate', '').strip(),
+    }
+
+    queryset = _build_historico_paradas_queryset(filtros)
+
+    if request.GET.get('formato') == 'csv':
+        cabecalho = ['Ordem', 'Celula', 'Motivo', 'Peca(s) faltante(s)', 'Data Inicio', 'Data Fim', 'Duracao']
+
+        def gerar_linhas():
+            yield cabecalho
+            processos_csv = list(queryset.iterator(chunk_size=500))
+            pecas_por_parada = _mapear_pecas_faltantes_das_paradas(processos_csv)
+            for item in processos_csv:
+                row = _historico_paradas_row_dict(item, pecas_por_parada)
+                yield [
+                    row['ordem'], row['maquina'], row['motivo'], row['pecas_faltantes'],
+                    row['data_inicio'], row['data_fim'] or 'Em andamento', row['duracao'],
+                ]
+
+        class EchoWriter:
+            def write(self, value):
+                return value
+
+        writer = csv.writer(EchoWriter(), delimiter=';')
+        response = StreamingHttpResponse(
+            (writer.writerow(linha) for linha in gerar_linhas()),
+            content_type='text/csv; charset=utf-8-sig',
+        )
+        response['Content-Disposition'] = 'attachment; filename="historico_paradas_montagem.csv"'
+        return response
+
+    page = max(int(request.GET.get('page', 1) or 1), 1)
+    limit = int(request.GET.get('limit', 100) or 100)
+    limit = min(max(limit, 10), 500)
+
+    paginator = Paginator(queryset, limit)
+    pagina = paginator.get_page(page)
+
+    processos_pagina = list(pagina.object_list)
+    pecas_por_parada = _mapear_pecas_faltantes_das_paradas(processos_pagina)
+    itens = [_historico_paradas_row_dict(item, pecas_por_parada) for item in processos_pagina]
+
+    return JsonResponse({
+        'results': itens,
+        'pagination': {
+            'page': pagina.number,
+            'page_size': limit,
+            'total_items': paginator.count,
+            'total_pages': paginator.num_pages,
+            'has_next': pagina.has_next(),
+            'has_previous': pagina.has_previous(),
+        },
+    })
