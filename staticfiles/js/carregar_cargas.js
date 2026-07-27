@@ -1161,6 +1161,11 @@ export async function popularPacotesDaCarga(cargaId) {
             modoNovoEl.checked = true;
             toggleModoPacote('novo');
 
+            // Botão "Adicionar Cardan": só aparece se alguma carreta desta
+            // carga tiver o token "BB" na descrição (regra de negócio).
+            const btnCardan = document.getElementById('btnAdicionarCardan');
+            if (btnCardan) btnCardan.classList.toggle('d-none', !data.possui_carreta_bb);
+
             // pegue/defina cargaId antes de usar
             // const cargaId = this.getAttribute('data-carga-id') || (window.cargaAtualId ?? '');
             console.log(cargaId);
