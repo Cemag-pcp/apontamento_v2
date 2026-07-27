@@ -7,7 +7,7 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://apontamento-v2-testes.onrender.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://www.cmgprod.com.br"
       },
       "android": {
         "buildType": "apk"
