@@ -1,8 +1,8 @@
 import { apiFetch } from './client';
 import type {
   Carga, ConfirmarPacoteResponse, CriarPacoteInput, CriarPacoteResponse,
-  FotoPacote, LoginResponse, PacotesDaCargaResponse, PendenciasResponse,
-  UploadFotoResponse, Usuario,
+  DuplicarPacoteResponse, ExcluirPacoteResponse, FotoPacote, LoginResponse,
+  PacotesDaCargaResponse, PendenciasResponse, UploadFotoResponse, Usuario,
 } from './types';
 
 export function login(username: string, password: string) {
@@ -68,4 +68,12 @@ export function confirmarPacote(token: string, pacoteId: number, observacao?: st
     token,
     body: { observacao: observacao ?? '' },
   });
+}
+
+export function duplicarPacote(token: string, pacoteId: number) {
+  return apiFetch<DuplicarPacoteResponse>(`/pacotes/${pacoteId}/duplicar/`, { method: 'POST', token });
+}
+
+export function excluirPacote(token: string, pacoteId: number) {
+  return apiFetch<ExcluirPacoteResponse>(`/pacotes/${pacoteId}/`, { method: 'DELETE', token });
 }

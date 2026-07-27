@@ -19,7 +19,7 @@ from .services import (
     FotoObrigatoriaError, PacoteValidationError, listar_cargas_ativas,
     detalhar_pacotes_da_carga, salvar_foto_pacote, listar_fotos_pacote,
     confirmar_pacote_service, listar_pendencias_carga, criar_ou_atualizar_pacote,
-    excluir_foto_pacote,
+    excluir_foto_pacote, deletar_pacote_service, duplicar_pacote_service,
 )
 from cadastro.models import CarretasExplodidas
 
@@ -559,24 +559,12 @@ def deletar_pacote(request, id):
     Permitido apenas se a carga não estiver despachada.
     """
     pacote = get_object_or_404(Pacote.objects.select_related('carga'), id=id)
-    if pacote.carga.stage == 'despachado':
-        return JsonResponse({'erro': 'Não é permitido excluir pacotes despachados.'}, status=400)
+    try:
+        resultado = deletar_pacote_service(pacote)
+    except PacoteValidationError as exc:
+        return JsonResponse({'erro': str(exc)}, status=400)
 
-    itens = list(ItemPacote.objects.filter(pacote=pacote).select_related('codigo'))
-
-    with transaction.atomic():
-        for item in itens:
-            pend = item.codigo
-            if pend:
-                pend.qt_necessaria = (pend.qt_necessaria or 0) + (item.quantidade or 0)
-                pend.save(update_fields=['qt_necessaria'])
-        pacote.delete()
-
-    return JsonResponse({
-        'mensagem': 'Pacote excluído com sucesso.',
-        'carga_id': pacote.carga_id,
-        'stage': pacote.carga.stage,
-    }, status=200)
+    return JsonResponse(resultado, status=200)
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -677,79 +665,12 @@ def duplicar_pacote(request, id):
     O novo nome recebe sufixo incremental (.1, .2, ...).
     """
     pacote = get_object_or_404(Pacote.objects.select_related('carga'), id=id)
-    itens_origem = list(ItemPacote.objects.filter(pacote=pacote).select_related('codigo'))
+    try:
+        resultado = duplicar_pacote_service(pacote)
+    except PacoteValidationError as exc:
+        return JsonResponse({'erro': str(exc)}, status=400)
 
-    if not itens_origem:
-        return JsonResponse({'erro': 'Pacote sem itens para duplicar.'}, status=400)
-
-    with transaction.atomic():
-        base_nome = pacote.nome
-        partes = base_nome.rsplit('.', 1)
-        if len(partes) == 2 and partes[1].isdigit():
-            base_nome = partes[0]
-
-        sufixos = []
-        for nome in Pacote.objects.filter(carga=pacote.carga, nome__startswith=base_nome).values_list('nome', flat=True):
-            resto = nome[len(base_nome):]
-            if resto.startswith('.') and resto[1:].isdigit():
-                try:
-                    sufixos.append(int(resto[1:]))
-                except ValueError:
-                    continue
-        proximo_sufixo = (max(sufixos) if sufixos else 0) + 1
-        novo_nome = f"{base_nome}.{proximo_sufixo}"
-
-        itens_para_criar_planejados = []
-        itens_para_criar_avulsos = []
-        for item in itens_origem:
-            original = int(item.quantidade or 0)
-            if original <= 0:
-                continue
-
-            pend = getattr(item, 'codigo', None)
-            if pend:
-                disponivel = int(pend.qt_necessaria or 0)
-                if disponivel <= 0:
-                    continue
-                usar = min(disponivel, original)
-                if usar > 0:
-                    itens_para_criar_planejados.append((pend, usar))
-            else:
-                itens_para_criar_avulsos.append(item)
-
-        if not itens_para_criar_planejados and not itens_para_criar_avulsos:
-            return JsonResponse({'erro': 'Sem itens válidos para duplicar neste pacote.'}, status=400)
-
-        novo_pacote = Pacote.objects.create(
-            nome=novo_nome,
-            carga=pacote.carga,
-            criado_por=pacote.criado_por,
-        )
-
-        for pend, qtd in itens_para_criar_planejados:
-            ItemPacote.objects.create(
-                pacote=novo_pacote,
-                codigo=pend,
-                quantidade=qtd
-            )
-            pend.qt_necessaria = max(pend.qt_necessaria - qtd, 0)
-            pend.save(update_fields=['qt_necessaria'])
-
-        for item in itens_para_criar_avulsos:
-            ItemPacote.objects.create(
-                pacote=novo_pacote,
-                codigo=None,
-                codigo_informado=item.codigo_informado,
-                descricao_informada=item.descricao_informada,
-                fora_planejado=True,
-                quantidade=item.quantidade
-            )
-
-    return JsonResponse({
-        'mensagem': 'Pacote duplicado com sucesso.',
-        'pacote_id': novo_pacote.id,
-        'nome': novo_pacote.nome,
-    }, status=201)
+    return JsonResponse(resultado, status=201)
 
 
 @csrf_exempt

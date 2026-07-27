@@ -27,6 +27,7 @@ export default function CriarPacoteScreen({ route, navigation }: Props) {
 
   const [pendencias, setPendencias] = useState<PendenciaItem[]>([]);
   const [quantidades, setQuantidades] = useState<Record<number, string>>({});
+  const [buscaPendencia, setBuscaPendencia] = useState('');
 
   const [itensAvulsos, setItensAvulsos] = useState<ItemForaPlanejadoInput[]>([]);
 
@@ -115,6 +116,15 @@ export default function CriarPacoteScreen({ route, navigation }: Props) {
     }
   }
 
+  const termoBusca = buscaPendencia.trim().toLowerCase();
+  const pendenciasFiltradas = termoBusca
+    ? pendencias.filter((item) =>
+        item.codigo.toLowerCase().includes(termoBusca) ||
+        item.descricao.toLowerCase().includes(termoBusca) ||
+        (item.carreta || '').toLowerCase().includes(termoBusca)
+      )
+    : pendencias;
+
   if (carregando) return <ActivityIndicator style={styles.loading} size="large" />;
 
   return (
@@ -165,10 +175,21 @@ export default function CriarPacoteScreen({ route, navigation }: Props) {
 
       <View style={styles.secao}>
         <Text style={styles.secaoTitulo}>Itens pendentes</Text>
+        {pendencias.length > 0 && (
+          <TextInput
+            style={styles.inputBusca}
+            placeholder="Buscar por código, descrição ou carreta"
+            placeholderTextColor="#888"
+            value={buscaPendencia}
+            onChangeText={setBuscaPendencia}
+          />
+        )}
         {pendencias.length === 0 ? (
           <Text style={styles.vazioTexto}>{erro || 'Nenhum item pendente nessa carga.'}</Text>
+        ) : pendenciasFiltradas.length === 0 ? (
+          <Text style={styles.vazioTexto}>Nenhum item encontrado para "{buscaPendencia}".</Text>
         ) : (
-          pendencias.map((item) => {
+          pendenciasFiltradas.map((item) => {
             const selecionado = Number(quantidades[item.id] || 0) > 0;
             return (
               <View key={item.id} style={styles.linhaPendencia}>
@@ -249,6 +270,11 @@ const styles = StyleSheet.create({
   itemPacoteExistenteAtivo: { borderColor: '#1b6ec2', backgroundColor: '#eef4fb' },
   itemPacoteExistenteTexto: { color: '#333', fontSize: 13 },
   itemPacoteExistenteTextoAtivo: { color: '#1b6ec2', fontWeight: '600', fontSize: 13 },
+  inputBusca: {
+    borderWidth: 1, borderColor: '#d0d0d0', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 10,
+    color: '#1b1b1b', backgroundColor: '#fff',
+  },
   linhaPendencia: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eee' },
   checkbox: { padding: 4 },
   checkboxMarca: { fontSize: 20, color: '#1b6ec2' },

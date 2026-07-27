@@ -16,4 +16,6 @@ urlpatterns = [
     path('pacotes/<int:pacote_id>/foto/', api_mobile.UploadFotoView.as_view(), name='upload_foto'),
     path('fotos/<int:foto_id>/', api_mobile.ExcluirFotoView.as_view(), name='excluir_foto'),
     path('pacotes/<int:pacote_id>/confirmar/', api_mobile.ConfirmarPacoteView.as_view(), name='confirmar_pacote'),
+    path('pacotes/<int:pacote_id>/duplicar/', api_mobile.DuplicarPacoteView.as_view(), name='duplicar_pacote'),
+    path('pacotes/<int:pacote_id>/', api_mobile.DeletarPacoteView.as_view(), name='deletar_pacote'),
 ]

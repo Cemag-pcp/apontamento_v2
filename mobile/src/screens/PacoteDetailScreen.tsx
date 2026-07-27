@@ -26,6 +26,8 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
   const [confirmando, setConfirmando] = useState(false);
   const [mensagemEnvio, setMensagemEnvio] = useState<string | null>(null);
   const [excluindoFotoId, setExcluindoFotoId] = useState<number | null>(null);
+  const [duplicando, setDuplicando] = useState(false);
+  const [excluindoPacote, setExcluindoPacote] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!token) return;
@@ -39,8 +41,25 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
   }, [token, cargaId, pacoteId]);
 
   useEffect(() => {
-    navigation.setOptions({ title: pacoteNome });
-  }, [navigation, pacoteNome]);
+    navigation.setOptions({
+      title: pacoteNome,
+      headerRight: stageCarga === 'despachado' ? undefined : () => (
+        <View style={styles.acoesHeader}>
+          <TouchableOpacity onPress={handleDuplicar} disabled={duplicando || excluindoPacote}>
+            {duplicando
+              ? <ActivityIndicator size="small" color="#1b6ec2" />
+              : <Text style={styles.linkDuplicar}>Duplicar</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleExcluirPacote} disabled={duplicando || excluindoPacote}>
+            {excluindoPacote
+              ? <ActivityIndicator size="small" color="#dc3545" />
+              : <Text style={styles.linkExcluir}>Excluir</Text>}
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, pacoteNome, stageCarga, duplicando, excluindoPacote]);
 
   useEffect(() => {
     (async () => {
@@ -120,6 +139,46 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
         },
       },
     ]);
+  }
+
+  async function handleDuplicar() {
+    if (!token) return;
+    setDuplicando(true);
+    try {
+      const resposta = await api.duplicarPacote(token, pacoteId);
+      Alert.alert('Sucesso', resposta.mensagem);
+      navigation.goBack();
+    } catch (err) {
+      Alert.alert('Erro', err instanceof ApiError ? err.message : 'Falha ao duplicar o pacote.');
+    } finally {
+      setDuplicando(false);
+    }
+  }
+
+  function handleExcluirPacote() {
+    Alert.alert(
+      'Excluir pacote',
+      'Deseja excluir este pacote? Os itens voltarão para as pendências.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            if (!token) return;
+            setExcluindoPacote(true);
+            try {
+              const resposta = await api.excluirPacote(token, pacoteId);
+              Alert.alert('Sucesso', resposta.mensagem);
+              navigation.goBack();
+            } catch (err) {
+              Alert.alert('Erro', err instanceof ApiError ? err.message : 'Falha ao excluir o pacote.');
+              setExcluindoPacote(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function handleConfirmar() {
@@ -226,6 +285,9 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f5f7' },
+  acoesHeader: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  linkDuplicar: { color: '#1b6ec2', fontWeight: '600', fontSize: 14 },
+  linkExcluir: { color: '#dc3545', fontWeight: '600', fontSize: 14 },
   loading: { flex: 1, justifyContent: 'center' },
   secao: { backgroundColor: '#fff', margin: 12, borderRadius: 10, padding: 14 },
   secaoTitulo: { fontSize: 15, fontWeight: '700', marginBottom: 8, color: '#1b1b1b' },

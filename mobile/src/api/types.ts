@@ -112,6 +112,18 @@ export interface ConfirmarPacoteResponse {
   mensagem: string;
 }
 
+export interface ExcluirPacoteResponse {
+  mensagem: string;
+  carga_id: number;
+  stage: StageCarga;
+}
+
+export interface DuplicarPacoteResponse {
+  mensagem: string;
+  pacote_id: number;
+  nome: string;
+}
+
 export interface ItemPendenciaInput {
   pendencia_id: number;
   quantidade: number;

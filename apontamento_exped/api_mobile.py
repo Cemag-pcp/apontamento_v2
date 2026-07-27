@@ -24,7 +24,9 @@ from .services import (
     PacoteValidationError,
     confirmar_pacote_service,
     criar_ou_atualizar_pacote,
+    deletar_pacote_service,
     detalhar_pacotes_da_carga,
+    duplicar_pacote_service,
     excluir_foto_pacote,
     listar_cargas_ativas,
     listar_fotos_pacote,
@@ -112,6 +114,28 @@ class ExcluirFotoView(APIView):
         imagem = get_object_or_404(ImagemPacote, id=foto_id)
         excluir_foto_pacote(imagem)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DeletarPacoteView(APIView):
+    def delete(self, request, pacote_id):
+        pacote = get_object_or_404(Pacote.objects.select_related('carga'), id=pacote_id)
+        try:
+            resultado = deletar_pacote_service(pacote)
+        except PacoteValidationError as exc:
+            return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(resultado)
+
+
+class DuplicarPacoteView(APIView):
+    def post(self, request, pacote_id):
+        pacote = get_object_or_404(Pacote.objects.select_related('carga'), id=pacote_id)
+        try:
+            resultado = duplicar_pacote_service(pacote)
+        except PacoteValidationError as exc:
+            return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(resultado, status=status.HTTP_201_CREATED)
 
 
 class CriarPacoteView(APIView):
