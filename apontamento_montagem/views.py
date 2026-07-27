@@ -2941,3 +2941,123 @@ def api_historico_paradas_montagem(request):
             'has_previous': pagina.has_previous(),
         },
     })
+
+
+@login_required
+def timeline_operador_montagem(request):
+    return render(request, "apontamento_montagem/timeline_operador_montagem.html")
+
+
+def _build_timeline_operador_queryset(filtros):
+    # So inclui PecasOrdem com operador atribuido (evento de "produziu/
+    # finalizou") - "iniciou"/"interrompeu" nao guardam qual operador fez a
+    # acao em lugar nenhum do sistema hoje, entao ficam de fora pra nao
+    # mostrar informacao que nao existe de verdade.
+    queryset = (
+        PecasOrdem.objects
+        .filter(ordem__grupo_maquina='montagem')
+        .exclude(operador__isnull=True)
+        .select_related('ordem', 'ordem__maquina', 'operador', 'processo_ordem')
+        .annotate(data_evento=Coalesce('processo_ordem__data_inicio', 'data_apontamento', 'data'))
+    )
+
+    if filtros.get('operador_id'):
+        queryset = queryset.filter(operador_id=filtros['operador_id'])
+
+    data_de = parse_date(filtros.get('data_de', '') or '')
+    data_ate = parse_date(filtros.get('data_ate', '') or '')
+
+    nenhum_filtro_data = not any([data_de, data_ate])
+    if nenhum_filtro_data:
+        data_de = (now() - timedelta(days=7)).date()
+
+    if data_de:
+        queryset = queryset.filter(data_evento__date__gte=data_de)
+    if data_ate:
+        queryset = queryset.filter(data_evento__date__lte=data_ate)
+
+    return queryset.order_by('-data_evento', '-id')
+
+
+def _timeline_operador_row_dict(item):
+    duracao_str = ''
+    processo = item.processo_ordem
+    if processo and processo.data_inicio and processo.data_fim:
+        duracao = processo.data_fim - processo.data_inicio
+        total_min = int(duracao.total_seconds() // 60)
+        horas, minutos = divmod(total_min, 60)
+        duracao_str = f'{horas}h{minutos:02d}m'
+
+    data_evento = getattr(item, 'data_evento', None)
+    return {
+        'id': item.id,
+        'ordem': item.ordem.ordem if item.ordem else '',
+        'peca_codigo': _extrair_codigo_peca(item.peca),
+        'peca_descricao': _extrair_descricao_peca(item.peca),
+        'celula': item.ordem.maquina.nome if item.ordem and item.ordem.maquina else '',
+        'qtd_boa': item.qtd_boa,
+        'qtd_morta': item.qtd_morta,
+        'duracao_processo': duracao_str,
+        'data': localtime(data_evento).strftime('%d/%m/%Y') if data_evento else '',
+        'hora': localtime(data_evento).strftime('%H:%M') if data_evento else '',
+    }
+
+
+@login_required
+@require_GET
+def api_timeline_operador_montagem(request):
+    filtros = {
+        'operador_id': request.GET.get('operador_id', '').strip(),
+        'data_de': request.GET.get('data_de', '').strip(),
+        'data_ate': request.GET.get('data_ate', '').strip(),
+    }
+
+    if not filtros['operador_id']:
+        return JsonResponse({'erro': 'Selecione um operador.'}, status=400)
+
+    queryset = _build_timeline_operador_queryset(filtros)
+
+    if request.GET.get('formato') == 'csv':
+        cabecalho = ['Data', 'Hora', 'Ordem', 'Codigo', 'Descricao', 'Celula', 'Qtd. Boa', 'Qtd. Morta', 'Duracao do processo']
+
+        def gerar_linhas():
+            yield cabecalho
+            for item in queryset.iterator(chunk_size=500):
+                row = _timeline_operador_row_dict(item)
+                yield [
+                    row['data'], row['hora'], row['ordem'], row['peca_codigo'], row['peca_descricao'],
+                    row['celula'], row['qtd_boa'], row['qtd_morta'], row['duracao_processo'],
+                ]
+
+        class EchoWriter:
+            def write(self, value):
+                return value
+
+        writer = csv.writer(EchoWriter(), delimiter=';')
+        response = StreamingHttpResponse(
+            (writer.writerow(linha) for linha in gerar_linhas()),
+            content_type='text/csv; charset=utf-8-sig',
+        )
+        response['Content-Disposition'] = 'attachment; filename="linha_do_tempo_operador_montagem.csv"'
+        return response
+
+    page = max(int(request.GET.get('page', 1) or 1), 1)
+    limit = int(request.GET.get('limit', 200) or 200)
+    limit = min(max(limit, 10), 1000)
+
+    paginator = Paginator(queryset, limit)
+    pagina = paginator.get_page(page)
+
+    itens = [_timeline_operador_row_dict(item) for item in pagina.object_list]
+
+    return JsonResponse({
+        'results': itens,
+        'pagination': {
+            'page': pagina.number,
+            'page_size': limit,
+            'total_items': paginator.count,
+            'total_pages': paginator.num_pages,
+            'has_next': pagina.has_next(),
+            'has_previous': pagina.has_previous(),
+        },
+    })

@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_montagem, name='api_erp_apontar_item_montagem'),
     path('api/historico/', views.api_historico_montagem, name='api_historico_montagem'),
     path('api/historico-paradas/', views.api_historico_paradas_montagem, name='api_historico_paradas_montagem'),
+    path('api/linha-do-tempo-operador/', views.api_timeline_operador_montagem, name='api_timeline_operador_montagem'),
 ]
 
 # templates
@@ -36,6 +37,7 @@ urlpatterns += [
     path('erp/apontamentos/', views.erp_apontamentos_montagem, name='erp_apontamentos_montagem'),
     path('historico/', views.historico_montagem, name='historico_montagem'),
     path('historico-paradas/', views.historico_paradas_montagem, name='historico_paradas_montagem'),
+    path('linha-do-tempo-operador/', views.timeline_operador_montagem, name='timeline_operador_montagem'),
 ]
 
 # Google sheets
