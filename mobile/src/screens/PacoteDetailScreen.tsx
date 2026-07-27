@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import { useFilaOffline } from '../context/FilaOfflineContext';
 import * as api from '../api/expedicao';
 import { ApiError } from '../api/client';
+import { comCache } from '../offline/cache';
+import { useRefetchOnReconnect } from '../utils/useRefetchOnReconnect';
 import type { FotoPacote, ItemPacote, Pacote } from '../api/types';
 import { compressImage } from '../utils/compressImage';
 
@@ -37,17 +39,25 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
   const [excluindoItemId, setExcluindoItemId] = useState<number | null>(null);
   const [itemParaMover, setItemParaMover] = useState<ItemPacote | null>(null);
   const [movendoItem, setMovendoItem] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [erroCarregar, setErroCarregar] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     if (!token) return;
-    const [pacotes, fotosResp] = await Promise.all([
-      api.buscarPacotesDaCarga(token, cargaId),
-      api.buscarFotosDoPacote(token, pacoteId),
-    ]);
-    setPacotesDaCarga(pacotes.pacotes);
-    const pacote = pacotes.pacotes.find((p) => p.id === pacoteId);
-    setItens(pacote?.itens ?? []);
-    setFotos(fotosResp.fotos);
+    try {
+      const [pacotesResultado, fotosResultado] = await Promise.all([
+        comCache(`pacotes_${cargaId}`, () => api.buscarPacotesDaCarga(token, cargaId)),
+        comCache(`fotos_${pacoteId}`, () => api.buscarFotosDoPacote(token, pacoteId)),
+      ]);
+      setErroCarregar(null);
+      setOffline(pacotesResultado.deCache || fotosResultado.deCache);
+      setPacotesDaCarga(pacotesResultado.dados.pacotes);
+      const pacote = pacotesResultado.dados.pacotes.find((p) => p.id === pacoteId);
+      setItens(pacote?.itens ?? []);
+      setFotos(fotosResultado.dados.fotos);
+    } catch (err) {
+      setErroCarregar('Não foi possível carregar o pacote.');
+    }
   }, [token, cargaId, pacoteId]);
 
   useEffect(() => {
@@ -93,6 +103,8 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
   useEffect(() => {
     if (versaoAtualizacao > 0) carregar();
   }, [versaoAtualizacao, carregar]);
+
+  useRefetchOnReconnect(carregar);
 
   // Volta da CameraScreen com uma foto capturada (via param, nao callback,
   // pra nao passar funcao nao-serializavel entre telas). O envio roda em
@@ -283,6 +295,17 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
   return (
     <>
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
+      {offline && (
+        <View style={styles.avisoOffline}>
+          <Text style={styles.avisoOfflineTexto}>📡 Sem conexão — mostrando dados salvos</Text>
+        </View>
+      )}
+      {erroCarregar && (
+        <View style={styles.avisoErro}>
+          <Text style={styles.avisoErroTexto}>{erroCarregar}</Text>
+        </View>
+      )}
+
       <View style={styles.secao}>
         <Text style={styles.secaoTitulo}>Itens</Text>
         <FlatList
@@ -470,6 +493,10 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f5f7' },
+  avisoOffline: { backgroundColor: '#fff3cd', paddingVertical: 6, paddingHorizontal: 16 },
+  avisoOfflineTexto: { color: '#946c00', fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  avisoErro: { backgroundColor: '#f8d7da', paddingVertical: 6, paddingHorizontal: 16 },
+  avisoErroTexto: { color: '#c0392b', fontSize: 12, fontWeight: '600', textAlign: 'center' },
   acoesHeader: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   linkDuplicar: { color: '#1b6ec2', fontWeight: '600', fontSize: 14 },
   linkExcluir: { color: '#dc3545', fontWeight: '600', fontSize: 14 },

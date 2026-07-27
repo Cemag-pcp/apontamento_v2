@@ -9,6 +9,8 @@ import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../api/expedicao';
 import { ApiError } from '../api/client';
+import { comCache } from '../offline/cache';
+import { useRefetchOnReconnect } from '../utils/useRefetchOnReconnect';
 import type { Carga, StageCarga } from '../api/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CargasList'>;
@@ -62,14 +64,16 @@ export default function CargasListScreen({ navigation }: Props) {
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<StageCarga | null>(null);
   const [excluindoCargaId, setExcluindoCargaId] = useState<number | null>(null);
+  const [offline, setOffline] = useState(false);
   const podeExcluirCarga = user?.tipo_acesso === 'pcp';
 
   const carregar = useCallback(async () => {
     if (!token) return;
     try {
       setErro(null);
-      const dados = await api.listarCargas(token);
+      const { dados, deCache } = await comCache('cargas', () => api.listarCargas(token));
       setCargas(dados);
+      setOffline(deCache);
     } catch (err) {
       setErro('Não foi possível carregar as cargas.');
     }
@@ -87,6 +91,8 @@ export default function CargasListScreen({ navigation }: Props) {
     const unsubscribe = navigation.addListener('focus', carregar);
     return unsubscribe;
   }, [navigation, carregar]);
+
+  useRefetchOnReconnect(carregar);
 
   async function handleRefresh() {
     setAtualizando(true);
@@ -138,6 +144,12 @@ export default function CargasListScreen({ navigation }: Props) {
           <Text style={styles.sair}>Sair</Text>
         </TouchableOpacity>
       </View>
+
+      {offline && (
+        <View style={styles.avisoOffline}>
+          <Text style={styles.avisoOfflineTexto}>📡 Sem conexão — mostrando dados salvos</Text>
+        </View>
+      )}
 
       <View style={styles.filtros}>
         <TextInput
@@ -228,6 +240,8 @@ const styles = StyleSheet.create({
   },
   saudacao: { fontSize: 15, fontWeight: '600', color: '#1b1b1b' },
   sair: { color: '#c0392b', fontWeight: '600' },
+  avisoOffline: { backgroundColor: '#fff3cd', paddingVertical: 6, paddingHorizontal: 16 },
+  avisoOfflineTexto: { color: '#946c00', fontSize: 12, fontWeight: '600', textAlign: 'center' },
   filtros: { backgroundColor: '#fff', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e5e5' },
   inputBusca: {
     borderWidth: 1, borderColor: '#d0d0d0', borderRadius: 8,
