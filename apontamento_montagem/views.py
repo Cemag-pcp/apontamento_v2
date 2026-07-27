@@ -2941,3 +2941,150 @@ def api_historico_paradas_montagem(request):
             'has_previous': pagina.has_previous(),
         },
     })
+
+
+@login_required
+def ocupacao_celula_montagem(request):
+    return render(request, "apontamento_montagem/ocupacao_celula_montagem.html")
+
+
+def _formatar_duracao(delta):
+    total_min = max(int(delta.total_seconds() // 60), 0)
+    horas, minutos = divmod(total_min, 60)
+    return f'{horas}h{minutos:02d}m'
+
+
+def _calcular_ocupacao_celula(maquina_id, dia):
+    """
+    Calcula, pra uma celula (Maquina) num dia especifico, quanto tempo ela
+    ficou produzindo (OrdemProcesso status='iniciada' de ordens daquela
+    maquina) e quanto tempo ficou 100% parada (o complemento, dentro da
+    janela do dia).
+
+    "Produzindo" so conta o tempo em que existia de fato um OrdemProcesso
+    'iniciada' cobrindo aquele instante - overlaps entre ordens diferentes
+    (nao deveria acontecer numa celula que roda uma ordem por vez, mas a
+    uniao defensiva evita contar tempo em dobro se acontecer). O restante
+    do periodo (ate agora, se for hoje) conta como parada, com o motivo da
+    interrupcao quando o gap coincide com um OrdemProcesso 'interrompida';
+    senao fica como "Sem ordem em andamento".
+    """
+    from datetime import time as time_cls
+    from django.utils import timezone as dj_timezone
+
+    tz = dj_timezone.get_current_timezone()
+    inicio_dia = dj_timezone.make_aware(datetime.combine(dia, time_cls(7, 0)), tz)
+    fim_dia = dj_timezone.make_aware(datetime.combine(dia, time_cls(17, 0)), tz)
+    agora = now()
+    fim_efetivo = min(fim_dia, agora)
+
+    if fim_efetivo <= inicio_dia:
+        # turno ainda nao comecou nesse dia (ou dia no futuro) - nada a mostrar
+        return {
+            'periodo_total': '0h00m', 'tempo_produzindo': '0h00m', 'tempo_parado': '0h00m',
+            'percentual_produzindo': 0, 'linha_do_tempo': [],
+        }
+
+    # --- segmentos "produzindo" (OrdemProcesso iniciada) ---
+    segmentos_qs = (
+        OrdemProcesso.objects
+        .filter(ordem__maquina_id=maquina_id, status='iniciada', data_inicio__lt=fim_efetivo)
+        .filter(Q(data_fim__isnull=True) | Q(data_fim__gt=inicio_dia))
+        .select_related('ordem')
+        .order_by('data_inicio')
+    )
+
+    intervalos = []  # (inicio, fim, ordem_num) - pra exibicao, sem merge
+    for seg in segmentos_qs:
+        ini = max(seg.data_inicio, inicio_dia)
+        fim = min(seg.data_fim or agora, fim_efetivo)
+        if fim > ini:
+            intervalos.append((ini, fim, seg.ordem.ordem if seg.ordem else ''))
+
+    # merge defensivo (so pra somar duracao total sem contar overlap 2x)
+    merged = []
+    for ini, fim, _ordem in sorted(intervalos, key=lambda t: t[0]):
+        if merged and ini <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], fim))
+        else:
+            merged.append((ini, fim))
+
+    tempo_produzindo = sum((fim - ini for ini, fim in merged), timedelta())
+
+    # --- gaps (parada) = complemento dos segmentos "produzindo" no dia ---
+    gaps = []
+    cursor = inicio_dia
+    for ini, fim in merged:
+        if ini > cursor:
+            gaps.append((cursor, ini))
+        cursor = max(cursor, fim)
+    if cursor < fim_efetivo:
+        gaps.append((cursor, fim_efetivo))
+
+    # --- motivo de cada gap, quando coincide com uma interrupcao ---
+    interrupcoes = list(
+        OrdemProcesso.objects
+        .filter(ordem__maquina_id=maquina_id, status='interrompida', data_inicio__lt=fim_efetivo)
+        .filter(Q(data_fim__isnull=True) | Q(data_fim__gt=inicio_dia))
+        .select_related('motivo_interrupcao', 'ordem')
+        .order_by('data_inicio')
+    )
+
+    def _motivos_do_gap(gap_ini, gap_fim):
+        motivos = []
+        for interrupcao in interrupcoes:
+            ini_i = max(interrupcao.data_inicio, inicio_dia)
+            fim_i = min(interrupcao.data_fim or agora, fim_efetivo)
+            if fim_i > gap_ini and ini_i < gap_fim:
+                nome = interrupcao.motivo_interrupcao.nome if interrupcao.motivo_interrupcao else 'Sem motivo informado'
+                if nome not in motivos:
+                    motivos.append(nome)
+        return ', '.join(motivos) if motivos else 'Sem ordem em andamento'
+
+    # --- linha do tempo unica: produzindo + parada, em ordem cronologica ---
+    linha_do_tempo = (
+        [(ini, fim, 'produzindo', ordem_num, None) for ini, fim, ordem_num in intervalos] +
+        [(ini, fim, 'parada', None, _motivos_do_gap(ini, fim)) for ini, fim in gaps]
+    )
+    linha_do_tempo.sort(key=lambda t: t[0])
+
+    linha_do_tempo_serializada = [
+        {
+            'inicio': localtime(ini).strftime('%H:%M'),
+            'fim': localtime(fim).strftime('%H:%M'),
+            'duracao': _formatar_duracao(fim - ini),
+            'situacao': situacao,
+            'ordem': ordem_num,
+            'motivo': motivo,
+        }
+        for ini, fim, situacao, ordem_num, motivo in linha_do_tempo
+    ]
+
+    periodo_total = fim_efetivo - inicio_dia
+    tempo_parado = periodo_total - tempo_produzindo
+    percentual = (tempo_produzindo.total_seconds() / periodo_total.total_seconds() * 100) if periodo_total.total_seconds() > 0 else 0
+
+    return {
+        'periodo_total': _formatar_duracao(periodo_total),
+        'tempo_produzindo': _formatar_duracao(tempo_produzindo),
+        'tempo_parado': _formatar_duracao(tempo_parado),
+        'percentual_produzindo': round(percentual, 1),
+        'linha_do_tempo': linha_do_tempo_serializada,
+    }
+
+
+@login_required
+@require_GET
+def api_ocupacao_celula_montagem(request):
+    maquina_id = request.GET.get('maquina_id', '').strip()
+    if not maquina_id:
+        return JsonResponse({'erro': 'Selecione uma celula.'}, status=400)
+
+    dia = parse_date(request.GET.get('data', '') or '') or localtime(now()).date()
+
+    maquina = get_object_or_404(Maquina, pk=maquina_id, setor__nome='montagem')
+    resultado = _calcular_ocupacao_celula(maquina_id, dia)
+    resultado['celula'] = maquina.nome
+    resultado['data'] = dia.strftime('%d/%m/%Y')
+
+    return JsonResponse(resultado)

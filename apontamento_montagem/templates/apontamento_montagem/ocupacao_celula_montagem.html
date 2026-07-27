@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+<title>Ocupacao da Celula | Montagem</title>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4 mb-3">
+        <div>
+            <h1 class="h3 mb-1">Ocupacao da Celula - Montagem</h1>
+            <p class="text-muted mb-0">Quanto tempo a celula produziu e quanto tempo ficou 100% parada, num dia.</p>
+        </div>
+        <button type="button" id="btnAtualizar" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-rotate-right me-1"></i> Atualizar
+        </button>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-filter me-1"></i> Filtros
+        </div>
+        <div class="card-body">
+            <form id="ocupacaoFiltrosForm" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="filtroCelula">Celula</label>
+                    <select class="form-select" id="filtroCelula" name="maquina_id" required>
+                        <option value="">Carregando celulas...</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="filtroData">Dia</label>
+                    <input type="date" class="form-control" id="filtroData" name="data">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Buscar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <span id="ocupacaoLoadingState" class="small text-muted d-none">Carregando...</span>
+    <div id="ocupacaoVazio" class="text-center text-muted py-5">
+        Selecione uma celula e clique em "Buscar".
+    </div>
+
+    <div id="ocupacaoResultado" class="d-none">
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <div class="text-uppercase text-muted small">Periodo analisado</div>
+                        <div class="h4 mb-0" id="resPeriodoTotal">-</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center h-100 border-success">
+                    <div class="card-body">
+                        <div class="text-uppercase text-success small">Produzindo</div>
+                        <div class="h4 mb-0 text-success" id="resTempoProduzindo">-</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center h-100 border-danger">
+                    <div class="card-body">
+                        <div class="text-uppercase text-danger small">100% parada</div>
+                        <div class="h4 mb-0 text-danger" id="resTempoParado">-</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <div class="text-uppercase text-muted small">% do periodo produzindo</div>
+                        <div class="h4 mb-0" id="resPercentual">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="progress mb-4" style="height: 28px;">
+            <div id="barraProduzindo" class="progress-bar bg-success" role="progressbar" style="width: 0%;"></div>
+            <div id="barraParado" class="progress-bar bg-danger" role="progressbar" style="width: 0%;"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-timeline me-1"></i> Linha do tempo
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Inicio</th>
+                            <th>Fim</th>
+                            <th>Duracao</th>
+                            <th>Situacao</th>
+                            <th>Ordem / Motivo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaLinhaDoTempo"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="ocupacaoConfig"
+     data-api-url="{% url 'montagem:api_ocupacao_celula_montagem' %}"
+     data-maquinas-url="{% url 'montagem:buscar_maquinas' %}">
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/ocupacao-celula-montagem.js' %}"></script>
+{% endblock %}
