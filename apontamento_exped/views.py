@@ -20,6 +20,7 @@ from .services import (
     detalhar_pacotes_da_carga, salvar_foto_pacote, listar_fotos_pacote,
     confirmar_pacote_service, listar_pendencias_carga, criar_ou_atualizar_pacote,
     excluir_foto_pacote, deletar_pacote_service, duplicar_pacote_service,
+    salvar_fornecedores_carga,
 )
 from cadastro.models import CarretasExplodidas
 
@@ -789,24 +790,8 @@ def salvar_fornecedores(request, carga_id):
     if not isinstance(data, list):
         return JsonResponse({'erro': 'Formato inválido. Esperado lista de {tipo, codigo, fornecedor}.'}, status=400)
 
-    with transaction.atomic():
-        for entry in data:
-            tipo = entry.get('tipo', '').strip()
-            codigo = entry.get('codigo', '').strip()
-            fornecedor = entry.get('fornecedor', '').strip()
-            if tipo and codigo:
-                obj, _ = FornecedorItemCarga.objects.get_or_create(carga=carga, tipo=tipo, codigo=codigo)
-                obj.fornecedor = fornecedor
-                obj.save()
-
-    codigos_especiais = _detectar_codigos_especiais_da_carga(carga.id)
-    salvos = {(f.tipo, f.codigo): f.fornecedor for f in FornecedorItemCarga.objects.filter(carga=carga)}
-    faltando = any(
-        not salvos.get((tipo, item['codigo']), '').strip()
-        for tipo, itens in codigos_especiais.items()
-        for item in itens
-    )
-    return JsonResponse({'mensagem': 'Fornecedores salvos com sucesso!', 'fornecedores_pendentes': faltando})
+    resultado = salvar_fornecedores_carga(carga, data)
+    return JsonResponse(resultado)
 
 @csrf_exempt
 def confirmar_pacote(request, id):

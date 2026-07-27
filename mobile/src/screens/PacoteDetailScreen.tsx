@@ -4,6 +4,7 @@ import {
   Text, TouchableOpacity, View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +18,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PacoteDetail'>;
 
 export default function PacoteDetailScreen({ route, navigation }: Props) {
   const { cargaId, pacoteId, pacoteNome, stageCarga } = route.params;
+  const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const { enviarFotoEmSegundoPlano, versaoAtualizacao } = useFilaOffline();
 
@@ -200,7 +202,7 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
   if (carregando) return <ActivityIndicator style={styles.loading} size="large" />;
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
       <View style={styles.secao}>
         <Text style={styles.secaoTitulo}>Itens</Text>
         <FlatList

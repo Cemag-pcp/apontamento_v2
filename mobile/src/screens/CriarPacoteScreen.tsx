@@ -3,6 +3,7 @@ import {
   ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +15,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CriarPacote'>;
 
 export default function CriarPacoteScreen({ route, navigation }: Props) {
   const { cargaId, cargaNome } = route.params;
+  const insets = useSafeAreaInsets();
   const { token } = useAuth();
 
   const [carregando, setCarregando] = useState(true);
@@ -128,7 +130,7 @@ export default function CriarPacoteScreen({ route, navigation }: Props) {
   if (carregando) return <ActivityIndicator style={styles.loading} size="large" />;
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
       <View style={styles.secao}>
         <Text style={styles.secaoTitulo}>Pacote</Text>
         <View style={styles.linhaModo}>

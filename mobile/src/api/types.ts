@@ -124,6 +124,17 @@ export interface DuplicarPacoteResponse {
   nome: string;
 }
 
+export interface FornecedorItemInput {
+  tipo: string;
+  codigo: string;
+  fornecedor: string;
+}
+
+export interface SalvarFornecedoresResponse {
+  mensagem: string;
+  fornecedores_pendentes: boolean;
+}
+
 export interface ItemPendenciaInput {
   pendencia_id: number;
   quantidade: number;

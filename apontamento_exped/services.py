@@ -168,6 +168,31 @@ def listar_cargas_ativas():
     return cargas
 
 
+def salvar_fornecedores_carga(carga, entries):
+    """Salva/atualiza os fornecedores por codigo de peca especial de uma carga.
+
+    entries: lista de dicts {tipo, codigo, fornecedor}.
+    """
+    with transaction.atomic():
+        for entry in entries:
+            tipo = (entry.get('tipo') or '').strip()
+            codigo = (entry.get('codigo') or '').strip()
+            fornecedor = (entry.get('fornecedor') or '').strip()
+            if tipo and codigo:
+                obj, _ = FornecedorItemCarga.objects.get_or_create(carga=carga, tipo=tipo, codigo=codigo)
+                obj.fornecedor = fornecedor
+                obj.save()
+
+    codigos_especiais = _detectar_codigos_especiais_da_carga(carga.id)
+    salvos = {(f.tipo, f.codigo): f.fornecedor for f in FornecedorItemCarga.objects.filter(carga=carga)}
+    faltando = any(
+        not salvos.get((tipo, item['codigo']), '').strip()
+        for tipo, itens in codigos_especiais.items()
+        for item in itens
+    )
+    return {'mensagem': 'Fornecedores salvos com sucesso!', 'fornecedores_pendentes': faltando}
+
+
 def detalhar_pacotes_da_carga(carga):
     """Pacotes + itens de uma carga, junto com carretas e (se em verificação) fornecedores."""
     pacotes_qs = (

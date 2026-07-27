@@ -3,6 +3,7 @@ import {
   ActivityIndicator, FlatList, RefreshControl, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +14,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Pacotes'>;
 
 export default function PacotesScreen({ route, navigation }: Props) {
   const { cargaId, cargaNome } = route.params;
+  const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const [dados, setDados] = useState<PacotesDaCargaResponse | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -30,11 +32,25 @@ export default function PacotesScreen({ route, navigation }: Props) {
     }
   }, [token, cargaId]);
 
+  const codigosEspeciais = dados?.codigos_especiais ?? {};
+  const fornecedoresSalvos = dados?.fornecedores ?? {};
+  const mostrarFornecedores = dados?.status_carga === 'verificacao' && Object.keys(codigosEspeciais).length > 0;
+  const fornecedoresPendentes = Object.entries(codigosEspeciais).some(
+    ([tipo, itens]) => itens.some((item) => !(fornecedoresSalvos[`${tipo}_${item.codigo}`] || '').trim())
+  );
+
   useEffect(() => {
     navigation.setOptions({
       title: cargaNome,
       headerRight: () => (
         <View style={styles.acoesHeader}>
+          {mostrarFornecedores && (
+            <TouchableOpacity onPress={() => navigation.navigate('Fornecedores', { cargaId, cargaNome })}>
+              <Text style={fornecedoresPendentes ? styles.linkFornecedoresPendente : styles.linkFornecedoresOk}>
+                Fornecedores
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => navigation.navigate('CriarPacote', { cargaId, cargaNome })}>
             <Text style={styles.linkNovoPacote}>+ Pacote</Text>
           </TouchableOpacity>
@@ -44,7 +60,8 @@ export default function PacotesScreen({ route, navigation }: Props) {
         </View>
       ),
     });
-  }, [navigation, cargaId, cargaNome]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, cargaId, cargaNome, mostrarFornecedores, fornecedoresPendentes]);
 
   useEffect(() => {
     (async () => {
@@ -100,7 +117,10 @@ export default function PacotesScreen({ route, navigation }: Props) {
         <FlatList
           data={dados?.pacotes ?? []}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={(dados?.pacotes.length ?? 0) === 0 ? styles.listaVazia : undefined}
+          contentContainerStyle={[
+            (dados?.pacotes.length ?? 0) === 0 && styles.listaVazia,
+            { paddingBottom: insets.bottom + 16 },
+          ]}
           refreshControl={<RefreshControl refreshing={atualizando} onRefresh={handleRefresh} />}
           ListEmptyComponent={
             <Text style={styles.vazioTexto}>{erro || 'Nenhum pacote nessa carga.'}</Text>
@@ -117,6 +137,8 @@ const styles = StyleSheet.create({
   acoesHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   linkNovoPacote: { color: '#1b6ec2', fontWeight: '600' },
   linkPendencias: { color: '#1b6ec2', fontWeight: '600', marginRight: 4 },
+  linkFornecedoresOk: { color: '#198754', fontWeight: '600' },
+  linkFornecedoresPendente: { color: '#b8860b', fontWeight: '600' },
   loading: { marginTop: 40 },
   listaVazia: { flexGrow: 1, justifyContent: 'center' },
   vazioTexto: { textAlign: 'center', color: '#888', padding: 24 },

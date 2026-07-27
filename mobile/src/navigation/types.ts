@@ -19,4 +19,5 @@ export type RootStackParamList = {
     novoItemAvulso?: ItemForaPlanejadoInput;
   };
   ItemAvulso: { cargaId: number; cargaNome: string };
+  Fornecedores: { cargaId: number; cargaNome: string };
 };

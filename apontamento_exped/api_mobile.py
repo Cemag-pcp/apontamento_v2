@@ -16,6 +16,7 @@ from .models import Carga, ImagemPacote, Pacote
 from .serializers import (
     ConfirmarPacoteSerializer,
     CriarPacoteSerializer,
+    FornecedorItemInputSerializer,
     LoginSerializer,
     UploadFotoSerializer,
 )
@@ -32,6 +33,7 @@ from .services import (
     listar_fotos_pacote,
     listar_pendencias_carga,
     salvar_foto_pacote,
+    salvar_fornecedores_carga,
 )
 
 
@@ -157,6 +159,16 @@ class CriarPacoteView(APIView):
             return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(resultado, status=status.HTTP_201_CREATED)
+
+
+class SalvarFornecedoresView(APIView):
+    def post(self, request, carga_id):
+        serializer = FornecedorItemInputSerializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+
+        carga = get_object_or_404(Carga, id=carga_id)
+        resultado = salvar_fornecedores_carga(carga, serializer.validated_data)
+        return Response(resultado)
 
 
 class ConfirmarPacoteView(APIView):

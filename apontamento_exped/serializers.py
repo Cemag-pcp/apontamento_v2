@@ -30,3 +30,9 @@ class CriarPacoteSerializer(serializers.Serializer):
     pacote_existente_id = serializers.IntegerField(required=False, allow_null=True)
     itens = ItemPacoteInputSerializer(many=True, required=False)
     itens_fora_planejado = ItemForaPlanejadoInputSerializer(many=True, required=False)
+
+
+class FornecedorItemInputSerializer(serializers.Serializer):
+    tipo = serializers.CharField()
+    codigo = serializers.CharField()
+    fornecedor = serializers.CharField(allow_blank=True)
