@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, FlatList, RefreshControl, StyleSheet,
-  Text, TouchableOpacity, View,
+  Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -20,6 +20,7 @@ export default function PacotesScreen({ route, navigation }: Props) {
   const [carregando, setCarregando] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [busca, setBusca] = useState('');
 
   const carregar = useCallback(async () => {
     if (!token) return;
@@ -82,6 +83,15 @@ export default function PacotesScreen({ route, navigation }: Props) {
     setAtualizando(false);
   }
 
+  const termoBusca = busca.trim().toLowerCase();
+  const pacotesFiltrados = (dados?.pacotes ?? []).filter((p) => {
+    if (!termoBusca) return true;
+    return p.itens.some((item) =>
+      (item.codigo_peca || '').toLowerCase().includes(termoBusca) ||
+      (item.descricao || '').toLowerCase().includes(termoBusca)
+    );
+  });
+
   function renderPacote({ item }: { item: Pacote }) {
     const stage = dados?.status_carga;
     const confirmado = stage === 'verificacao' ? item.status_qualidade === 'ok' : item.status_expedicao === 'ok';
@@ -111,19 +121,33 @@ export default function PacotesScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      {(dados?.pacotes.length ?? 0) > 0 && (
+        <View style={styles.buscaContainer}>
+          <TextInput
+            style={styles.inputBusca}
+            placeholder="Buscar peça por código ou descrição..."
+            placeholderTextColor="#888"
+            value={busca}
+            onChangeText={setBusca}
+          />
+        </View>
+      )}
+
       {carregando ? (
         <ActivityIndicator style={styles.loading} size="large" />
       ) : (
         <FlatList
-          data={dados?.pacotes ?? []}
+          data={pacotesFiltrados}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={[
-            (dados?.pacotes.length ?? 0) === 0 && styles.listaVazia,
+            pacotesFiltrados.length === 0 && styles.listaVazia,
             { paddingBottom: insets.bottom + 16 },
           ]}
           refreshControl={<RefreshControl refreshing={atualizando} onRefresh={handleRefresh} />}
           ListEmptyComponent={
-            <Text style={styles.vazioTexto}>{erro || 'Nenhum pacote nessa carga.'}</Text>
+            <Text style={styles.vazioTexto}>
+              {erro || (termoBusca ? 'Nenhum pacote contém essa peça.' : 'Nenhum pacote nessa carga.')}
+            </Text>
           }
           renderItem={renderPacote}
         />
@@ -139,6 +163,12 @@ const styles = StyleSheet.create({
   linkPendencias: { color: '#1b6ec2', fontWeight: '600', marginRight: 4 },
   linkFornecedoresOk: { color: '#198754', fontWeight: '600' },
   linkFornecedoresPendente: { color: '#b8860b', fontWeight: '600' },
+  buscaContainer: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e5e5e5' },
+  inputBusca: {
+    borderWidth: 1, borderColor: '#d0d0d0', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 10, fontSize: 14,
+    color: '#1b1b1b', backgroundColor: '#fff',
+  },
   loading: { marginTop: 40 },
   listaVazia: { flexGrow: 1, justifyContent: 'center' },
   vazioTexto: { textAlign: 'center', color: '#888', padding: 24 },
