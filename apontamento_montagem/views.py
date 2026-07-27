@@ -2944,179 +2944,148 @@ def api_historico_paradas_montagem(request):
 
 
 @login_required
-def timeline_operador_montagem(request):
-    return render(request, "apontamento_montagem/timeline_operador_montagem.html")
+def ocupacao_celula_montagem(request):
+    return render(request, "apontamento_montagem/ocupacao_celula_montagem.html")
 
 
-def _build_timeline_operador_queryset(filtros):
-    # So inclui PecasOrdem com operador atribuido (evento de "produziu/
-    # finalizou") - "iniciou"/"interrompeu" nao guardam qual operador fez a
-    # acao em lugar nenhum do sistema hoje, entao ficam de fora pra nao
-    # mostrar informacao que nao existe de verdade.
-    queryset = (
-        PecasOrdem.objects
-        .filter(ordem__grupo_maquina='montagem')
-        .exclude(operador__isnull=True)
-        .select_related('ordem', 'ordem__maquina', 'operador')
-        .annotate(data_evento=Coalesce('processo_ordem__data_inicio', 'data_apontamento', 'data'))
+def _formatar_duracao(delta):
+    total_min = max(int(delta.total_seconds() // 60), 0)
+    horas, minutos = divmod(total_min, 60)
+    return f'{horas}h{minutos:02d}m'
+
+
+def _calcular_ocupacao_celula(maquina_id, dia):
+    """
+    Calcula, pra uma celula (Maquina) num dia especifico, quanto tempo ela
+    ficou produzindo (OrdemProcesso status='iniciada' de ordens daquela
+    maquina) e quanto tempo ficou 100% parada (o complemento, dentro da
+    janela do dia).
+
+    "Produzindo" so conta o tempo em que existia de fato um OrdemProcesso
+    'iniciada' cobrindo aquele instante - overlaps entre ordens diferentes
+    (nao deveria acontecer numa celula que roda uma ordem por vez, mas a
+    uniao defensiva evita contar tempo em dobro se acontecer). O restante
+    do periodo (ate agora, se for hoje) conta como parada, com o motivo da
+    interrupcao quando o gap coincide com um OrdemProcesso 'interrompida';
+    senao fica como "Sem ordem em andamento".
+    """
+    from django.utils import timezone as dj_timezone
+
+    tz = dj_timezone.get_current_timezone()
+    inicio_dia = dj_timezone.make_aware(datetime.combine(dia, datetime.min.time()), tz)
+    fim_dia = dj_timezone.make_aware(datetime.combine(dia, datetime.max.time()), tz)
+    agora = now()
+    fim_efetivo = min(fim_dia, agora)
+
+    if fim_efetivo <= inicio_dia:
+        # dia no futuro - nada a mostrar
+        return {
+            'periodo_total': '0h00m', 'tempo_produzindo': '0h00m', 'tempo_parado': '0h00m',
+            'percentual_produzindo': 0, 'segmentos_produzindo': [], 'segmentos_parado': [],
+        }
+
+    # --- segmentos "produzindo" (OrdemProcesso iniciada) ---
+    segmentos_qs = (
+        OrdemProcesso.objects
+        .filter(ordem__maquina_id=maquina_id, status='iniciada', data_inicio__lt=fim_efetivo)
+        .filter(Q(data_fim__isnull=True) | Q(data_fim__gt=inicio_dia))
+        .select_related('ordem')
+        .order_by('data_inicio')
     )
 
-    if filtros.get('operador_id'):
-        queryset = queryset.filter(operador_id=filtros['operador_id'])
+    intervalos = []  # (inicio, fim, ordem_num) - pra exibicao, sem merge
+    for seg in segmentos_qs:
+        ini = max(seg.data_inicio, inicio_dia)
+        fim = min(seg.data_fim or agora, fim_efetivo)
+        if fim > ini:
+            intervalos.append((ini, fim, seg.ordem.ordem if seg.ordem else ''))
 
-    data_de = parse_date(filtros.get('data_de', '') or '')
-    data_ate = parse_date(filtros.get('data_ate', '') or '')
+    # merge defensivo (so pra somar duracao total sem contar overlap 2x)
+    merged = []
+    for ini, fim, _ordem in sorted(intervalos, key=lambda t: t[0]):
+        if merged and ini <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], fim))
+        else:
+            merged.append((ini, fim))
 
-    nenhum_filtro_data = not any([data_de, data_ate])
-    if nenhum_filtro_data:
-        data_de = (now() - timedelta(days=7)).date()
+    tempo_produzindo = sum((fim - ini for ini, fim in merged), timedelta())
 
-    if data_de:
-        queryset = queryset.filter(data_evento__date__gte=data_de)
-    if data_ate:
-        queryset = queryset.filter(data_evento__date__lte=data_ate)
+    # --- gaps (parada) = complemento dos segmentos "produzindo" no dia ---
+    gaps = []
+    cursor = inicio_dia
+    for ini, fim in merged:
+        if ini > cursor:
+            gaps.append((cursor, ini))
+        cursor = max(cursor, fim)
+    if cursor < fim_efetivo:
+        gaps.append((cursor, fim_efetivo))
 
-    return queryset.order_by('-data_evento', '-id')
-
-
-def _mapear_duracao_producao(itens):
-    """Pra cada evento de producao (PecasOrdem com operador atribuido),
-    acha o OrdemProcesso 'iniciada' daquela ordem que foi fechado por esse
-    evento (interrompido ou finalizado) - a duracao desse segmento
-    (data_fim - data_inicio) eh quanto tempo a ordem ficou rodando de
-    fato ate esse momento.
-
-    Nao da pra usar PecasOrdem.processo_ordem diretamente: na
-    finalizacao ele e realocado pro OrdemProcesso recem-criado daquele
-    status especifico, cujo data_inicio e data_fim sao gravados no mesmo
-    instante (sempre daria 0). Ja o OrdemProcesso 'iniciada' que precede
-    esse evento tem seu PROPRIO data_fim setado nesse mesmo instante -
-    finalizar_atual() fecha o processo em aberto antes de criar o novo -
-    entao ele sim reflete o tempo real rodando.
-    """
-    ordem_ids = {item.ordem_id for item in itens}
-    if not ordem_ids:
-        return {}
-
-    from collections import defaultdict
-
-    eventos_por_ordem = defaultdict(list)
-    for row in (
-        PecasOrdem.objects
-        .filter(ordem_id__in=ordem_ids)
-        .exclude(operador__isnull=True)
-        .annotate(data_evento=Coalesce('processo_ordem__data_inicio', 'data_apontamento', 'data'))
-        .order_by('data_evento', 'id')
-        .values('id', 'ordem_id', 'data_evento')
-    ):
-        eventos_por_ordem[row['ordem_id']].append(row)
-
-    segmentos_por_ordem = defaultdict(list)
-    for row in (
+    # --- motivo de cada gap, quando coincide com uma interrupcao ---
+    interrupcoes = list(
         OrdemProcesso.objects
-        .filter(ordem_id__in=ordem_ids, status='iniciada', data_fim__isnull=False)
-        .order_by('ordem_id', 'data_fim')
-        .values('ordem_id', 'data_inicio', 'data_fim')
-    ):
-        segmentos_por_ordem[row['ordem_id']].append(row)
+        .filter(ordem__maquina_id=maquina_id, status='interrompida', data_inicio__lt=fim_efetivo)
+        .filter(Q(data_fim__isnull=True) | Q(data_fim__gt=inicio_dia))
+        .select_related('motivo_interrupcao', 'ordem')
+        .order_by('data_inicio')
+    )
 
-    resultado = {}
-    for ordem_id, eventos in eventos_por_ordem.items():
-        segmentos = segmentos_por_ordem.get(ordem_id, [])
-        idx = 0
-        for evento in eventos:
-            candidato = None
-            while idx < len(segmentos) and segmentos[idx]['data_fim'] <= evento['data_evento']:
-                candidato = segmentos[idx]
-                idx += 1
-            if candidato:
-                resultado[evento['id']] = candidato['data_fim'] - candidato['data_inicio']
+    def _motivos_do_gap(gap_ini, gap_fim):
+        motivos = []
+        for interrupcao in interrupcoes:
+            ini_i = max(interrupcao.data_inicio, inicio_dia)
+            fim_i = min(interrupcao.data_fim or agora, fim_efetivo)
+            if fim_i > gap_ini and ini_i < gap_fim:
+                nome = interrupcao.motivo_interrupcao.nome if interrupcao.motivo_interrupcao else 'Sem motivo informado'
+                if nome not in motivos:
+                    motivos.append(nome)
+        return ', '.join(motivos) if motivos else 'Sem ordem em andamento'
 
-    return resultado
+    segmentos_produzindo = [
+        {
+            'inicio': localtime(ini).strftime('%H:%M'),
+            'fim': localtime(fim).strftime('%H:%M'),
+            'duracao': _formatar_duracao(fim - ini),
+            'ordem': ordem_num,
+        }
+        for ini, fim, ordem_num in intervalos
+    ]
 
+    segmentos_parado = [
+        {
+            'inicio': localtime(ini).strftime('%H:%M'),
+            'fim': localtime(fim).strftime('%H:%M'),
+            'duracao': _formatar_duracao(fim - ini),
+            'motivo': _motivos_do_gap(ini, fim),
+        }
+        for ini, fim in gaps
+    ]
 
-def _timeline_operador_row_dict(item, duracao_por_evento):
-    duracao_str = ''
-    duracao = duracao_por_evento.get(item.id)
-    if duracao is not None:
-        total_min = max(int(duracao.total_seconds() // 60), 0)
-        horas, minutos = divmod(total_min, 60)
-        duracao_str = f'{horas}h{minutos:02d}m'
+    periodo_total = fim_efetivo - inicio_dia
+    tempo_parado = periodo_total - tempo_produzindo
+    percentual = (tempo_produzindo.total_seconds() / periodo_total.total_seconds() * 100) if periodo_total.total_seconds() > 0 else 0
 
-    data_evento = getattr(item, 'data_evento', None)
     return {
-        'id': item.id,
-        'ordem': item.ordem.ordem if item.ordem else '',
-        'peca_codigo': _extrair_codigo_peca(item.peca),
-        'peca_descricao': _extrair_descricao_peca(item.peca),
-        'celula': item.ordem.maquina.nome if item.ordem and item.ordem.maquina else '',
-        'qtd_boa': item.qtd_boa,
-        'qtd_morta': item.qtd_morta,
-        'duracao_processo': duracao_str,
-        'data': localtime(data_evento).strftime('%d/%m/%Y') if data_evento else '',
-        'hora': localtime(data_evento).strftime('%H:%M') if data_evento else '',
+        'periodo_total': _formatar_duracao(periodo_total),
+        'tempo_produzindo': _formatar_duracao(tempo_produzindo),
+        'tempo_parado': _formatar_duracao(tempo_parado),
+        'percentual_produzindo': round(percentual, 1),
+        'segmentos_produzindo': segmentos_produzindo,
+        'segmentos_parado': segmentos_parado,
     }
 
 
 @login_required
 @require_GET
-def api_timeline_operador_montagem(request):
-    filtros = {
-        'operador_id': request.GET.get('operador_id', '').strip(),
-        'data_de': request.GET.get('data_de', '').strip(),
-        'data_ate': request.GET.get('data_ate', '').strip(),
-    }
+def api_ocupacao_celula_montagem(request):
+    maquina_id = request.GET.get('maquina_id', '').strip()
+    if not maquina_id:
+        return JsonResponse({'erro': 'Selecione uma celula.'}, status=400)
 
-    if not filtros['operador_id']:
-        return JsonResponse({'erro': 'Selecione um operador.'}, status=400)
+    dia = parse_date(request.GET.get('data', '') or '') or localtime(now()).date()
 
-    queryset = _build_timeline_operador_queryset(filtros)
+    maquina = get_object_or_404(Maquina, pk=maquina_id, setor__nome='montagem')
+    resultado = _calcular_ocupacao_celula(maquina_id, dia)
+    resultado['celula'] = maquina.nome
+    resultado['data'] = dia.strftime('%d/%m/%Y')
 
-    if request.GET.get('formato') == 'csv':
-        cabecalho = ['Data', 'Hora', 'Ordem', 'Codigo', 'Descricao', 'Celula', 'Qtd. Boa', 'Qtd. Morta', 'Tempo rodando ate esse evento']
-
-        def gerar_linhas():
-            yield cabecalho
-            itens_csv = list(queryset.iterator(chunk_size=500))
-            duracao_por_evento = _mapear_duracao_producao(itens_csv)
-            for item in itens_csv:
-                row = _timeline_operador_row_dict(item, duracao_por_evento)
-                yield [
-                    row['data'], row['hora'], row['ordem'], row['peca_codigo'], row['peca_descricao'],
-                    row['celula'], row['qtd_boa'], row['qtd_morta'], row['duracao_processo'],
-                ]
-
-        class EchoWriter:
-            def write(self, value):
-                return value
-
-        writer = csv.writer(EchoWriter(), delimiter=';')
-        response = StreamingHttpResponse(
-            (writer.writerow(linha) for linha in gerar_linhas()),
-            content_type='text/csv; charset=utf-8-sig',
-        )
-        response['Content-Disposition'] = 'attachment; filename="linha_do_tempo_operador_montagem.csv"'
-        return response
-
-    page = max(int(request.GET.get('page', 1) or 1), 1)
-    limit = int(request.GET.get('limit', 200) or 200)
-    limit = min(max(limit, 10), 1000)
-
-    paginator = Paginator(queryset, limit)
-    pagina = paginator.get_page(page)
-
-    itens_pagina = list(pagina.object_list)
-    duracao_por_evento = _mapear_duracao_producao(itens_pagina)
-    itens = [_timeline_operador_row_dict(item, duracao_por_evento) for item in itens_pagina]
-
-    return JsonResponse({
-        'results': itens,
-        'pagination': {
-            'page': pagina.number,
-            'page_size': limit,
-            'total_items': paginator.count,
-            'total_pages': paginator.num_pages,
-            'has_next': pagina.has_next(),
-            'has_previous': pagina.has_previous(),
-        },
-    })
+    return JsonResponse(resultado)
