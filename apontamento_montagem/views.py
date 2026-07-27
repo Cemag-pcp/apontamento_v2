@@ -2980,15 +2980,19 @@ def _build_timeline_operador_queryset(filtros):
 
 
 def _mapear_duracao_producao(itens):
-    """Calcula a duracao de cada evento de producao (PecasOrdem com
-    operador) como o tempo decorrido desde o evento anterior da MESMA
-    ordem - ou desde o inicio da ordem (primeiro OrdemProcesso
-    'iniciada'), se for o primeiro evento de producao dela.
+    """Pra cada evento de producao (PecasOrdem com operador atribuido),
+    acha o OrdemProcesso 'iniciada' daquela ordem que foi fechado por esse
+    evento (interrompido ou finalizado) - a duracao desse segmento
+    (data_fim - data_inicio) eh quanto tempo a ordem ficou rodando de
+    fato ate esse momento.
 
-    processo_ordem.data_inicio/data_fim nao servem pra isso: na
-    finalizacao, o PecasOrdem eh realocado pro OrdemProcesso recem-criado
-    daquele status, cujo data_inicio e data_fim sao gravados no mesmissimo
-    instante (ver atualizar_status_ordem) - ou seja, sempre dariam 0.
+    Nao da pra usar PecasOrdem.processo_ordem diretamente: na
+    finalizacao ele e realocado pro OrdemProcesso recem-criado daquele
+    status especifico, cujo data_inicio e data_fim sao gravados no mesmo
+    instante (sempre daria 0). Ja o OrdemProcesso 'iniciada' que precede
+    esse evento tem seu PROPRIO data_fim setado nesse mesmo instante -
+    finalizar_atual() fecha o processo em aberto antes de criar o novo -
+    entao ele sim reflete o tempo real rodando.
     """
     ordem_ids = {item.ordem_id for item in itens}
     if not ordem_ids:
@@ -3007,22 +3011,26 @@ def _mapear_duracao_producao(itens):
     ):
         eventos_por_ordem[row['ordem_id']].append(row)
 
-    primeiro_inicio_por_ordem = {}
+    segmentos_por_ordem = defaultdict(list)
     for row in (
         OrdemProcesso.objects
-        .filter(ordem_id__in=ordem_ids, status='iniciada')
-        .order_by('ordem_id', 'data_inicio')
-        .values('ordem_id', 'data_inicio')
+        .filter(ordem_id__in=ordem_ids, status='iniciada', data_fim__isnull=False)
+        .order_by('ordem_id', 'data_fim')
+        .values('ordem_id', 'data_inicio', 'data_fim')
     ):
-        primeiro_inicio_por_ordem.setdefault(row['ordem_id'], row['data_inicio'])
+        segmentos_por_ordem[row['ordem_id']].append(row)
 
     resultado = {}
     for ordem_id, eventos in eventos_por_ordem.items():
-        referencia = primeiro_inicio_por_ordem.get(ordem_id)
+        segmentos = segmentos_por_ordem.get(ordem_id, [])
+        idx = 0
         for evento in eventos:
-            if referencia and evento['data_evento']:
-                resultado[evento['id']] = evento['data_evento'] - referencia
-            referencia = evento['data_evento']
+            candidato = None
+            while idx < len(segmentos) and segmentos[idx]['data_fim'] <= evento['data_evento']:
+                candidato = segmentos[idx]
+                idx += 1
+            if candidato:
+                resultado[evento['id']] = candidato['data_fim'] - candidato['data_inicio']
 
     return resultado
 
@@ -3065,7 +3073,7 @@ def api_timeline_operador_montagem(request):
     queryset = _build_timeline_operador_queryset(filtros)
 
     if request.GET.get('formato') == 'csv':
-        cabecalho = ['Data', 'Hora', 'Ordem', 'Codigo', 'Descricao', 'Celula', 'Qtd. Boa', 'Qtd. Morta', 'Tempo desde o evento anterior']
+        cabecalho = ['Data', 'Hora', 'Ordem', 'Codigo', 'Descricao', 'Celula', 'Qtd. Boa', 'Qtd. Morta', 'Tempo rodando ate esse evento']
 
         def gerar_linhas():
             yield cabecalho
