@@ -97,7 +97,7 @@ function renderTimeline(rows) {
                         </span>
                         <span class="text-success small">Boa: ${formatNumber(item.qtd_boa)}</span>
                         <span class="text-danger small">Morta: ${formatNumber(item.qtd_morta)}</span>
-                        ${item.duracao_processo ? `<span class="text-muted small">Duracao: ${escapeHtml(item.duracao_processo)}</span>` : ''}
+                        ${item.duracao_processo ? `<span class="text-muted small" title="Tempo desde o evento anterior dessa ordem (ou desde o inicio, se for o primeiro lote)">Desde o anterior: ${escapeHtml(item.duracao_processo)}</span>` : ''}
                     </li>
                 `).join('')}
             </ul>

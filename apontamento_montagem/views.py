@@ -2957,7 +2957,7 @@ def _build_timeline_operador_queryset(filtros):
         PecasOrdem.objects
         .filter(ordem__grupo_maquina='montagem')
         .exclude(operador__isnull=True)
-        .select_related('ordem', 'ordem__maquina', 'operador', 'processo_ordem')
+        .select_related('ordem', 'ordem__maquina', 'operador')
         .annotate(data_evento=Coalesce('processo_ordem__data_inicio', 'data_apontamento', 'data'))
     )
 
@@ -2979,12 +2979,59 @@ def _build_timeline_operador_queryset(filtros):
     return queryset.order_by('-data_evento', '-id')
 
 
-def _timeline_operador_row_dict(item):
+def _mapear_duracao_producao(itens):
+    """Calcula a duracao de cada evento de producao (PecasOrdem com
+    operador) como o tempo decorrido desde o evento anterior da MESMA
+    ordem - ou desde o inicio da ordem (primeiro OrdemProcesso
+    'iniciada'), se for o primeiro evento de producao dela.
+
+    processo_ordem.data_inicio/data_fim nao servem pra isso: na
+    finalizacao, o PecasOrdem eh realocado pro OrdemProcesso recem-criado
+    daquele status, cujo data_inicio e data_fim sao gravados no mesmissimo
+    instante (ver atualizar_status_ordem) - ou seja, sempre dariam 0.
+    """
+    ordem_ids = {item.ordem_id for item in itens}
+    if not ordem_ids:
+        return {}
+
+    from collections import defaultdict
+
+    eventos_por_ordem = defaultdict(list)
+    for row in (
+        PecasOrdem.objects
+        .filter(ordem_id__in=ordem_ids)
+        .exclude(operador__isnull=True)
+        .annotate(data_evento=Coalesce('processo_ordem__data_inicio', 'data_apontamento', 'data'))
+        .order_by('data_evento', 'id')
+        .values('id', 'ordem_id', 'data_evento')
+    ):
+        eventos_por_ordem[row['ordem_id']].append(row)
+
+    primeiro_inicio_por_ordem = {}
+    for row in (
+        OrdemProcesso.objects
+        .filter(ordem_id__in=ordem_ids, status='iniciada')
+        .order_by('ordem_id', 'data_inicio')
+        .values('ordem_id', 'data_inicio')
+    ):
+        primeiro_inicio_por_ordem.setdefault(row['ordem_id'], row['data_inicio'])
+
+    resultado = {}
+    for ordem_id, eventos in eventos_por_ordem.items():
+        referencia = primeiro_inicio_por_ordem.get(ordem_id)
+        for evento in eventos:
+            if referencia and evento['data_evento']:
+                resultado[evento['id']] = evento['data_evento'] - referencia
+            referencia = evento['data_evento']
+
+    return resultado
+
+
+def _timeline_operador_row_dict(item, duracao_por_evento):
     duracao_str = ''
-    processo = item.processo_ordem
-    if processo and processo.data_inicio and processo.data_fim:
-        duracao = processo.data_fim - processo.data_inicio
-        total_min = int(duracao.total_seconds() // 60)
+    duracao = duracao_por_evento.get(item.id)
+    if duracao is not None:
+        total_min = max(int(duracao.total_seconds() // 60), 0)
         horas, minutos = divmod(total_min, 60)
         duracao_str = f'{horas}h{minutos:02d}m'
 
@@ -3018,12 +3065,14 @@ def api_timeline_operador_montagem(request):
     queryset = _build_timeline_operador_queryset(filtros)
 
     if request.GET.get('formato') == 'csv':
-        cabecalho = ['Data', 'Hora', 'Ordem', 'Codigo', 'Descricao', 'Celula', 'Qtd. Boa', 'Qtd. Morta', 'Duracao do processo']
+        cabecalho = ['Data', 'Hora', 'Ordem', 'Codigo', 'Descricao', 'Celula', 'Qtd. Boa', 'Qtd. Morta', 'Tempo desde o evento anterior']
 
         def gerar_linhas():
             yield cabecalho
-            for item in queryset.iterator(chunk_size=500):
-                row = _timeline_operador_row_dict(item)
+            itens_csv = list(queryset.iterator(chunk_size=500))
+            duracao_por_evento = _mapear_duracao_producao(itens_csv)
+            for item in itens_csv:
+                row = _timeline_operador_row_dict(item, duracao_por_evento)
                 yield [
                     row['data'], row['hora'], row['ordem'], row['peca_codigo'], row['peca_descricao'],
                     row['celula'], row['qtd_boa'], row['qtd_morta'], row['duracao_processo'],
@@ -3048,7 +3097,9 @@ def api_timeline_operador_montagem(request):
     paginator = Paginator(queryset, limit)
     pagina = paginator.get_page(page)
 
-    itens = [_timeline_operador_row_dict(item) for item in pagina.object_list]
+    itens_pagina = list(pagina.object_list)
+    duracao_por_evento = _mapear_duracao_producao(itens_pagina)
+    itens = [_timeline_operador_row_dict(item, duracao_por_evento) for item in itens_pagina]
 
     return JsonResponse({
         'results': itens,
