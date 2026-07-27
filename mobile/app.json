@@ -33,6 +33,12 @@
         {
           "cameraPermission": "O app usa a câmera pra tirar foto dos pacotes na expedição."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O app acessa a galeria pra anexar uma foto já existente ao pacote."
+        }
       ]
     ],
     "extra": {

@@ -499,8 +499,10 @@
 {% endblock %}
 
 {% block scripts %}
-{# Import map: garante que imports relativos resolvam para o arquivo hasheado em produção,
-   evitando que ordem-criada-pintura.js seja carregado duas vezes com URLs diferentes. #}
+{% comment %}
+Import map: garante que imports relativos resolvam para o arquivo hasheado em produção,
+evitando que ordem-criada-pintura.js seja carregado duas vezes com URLs diferentes.
+{% endcomment %}
 <script type="importmap">
 {
   "imports": {

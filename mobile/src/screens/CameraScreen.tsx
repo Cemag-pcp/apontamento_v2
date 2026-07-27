@@ -12,7 +12,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Camera'>;
 // existe o cenario de "app em segundo plano perde memoria durante a foto"
 // que causava a recarga silenciosa no fluxo web.
 export default function CameraScreen({ route, navigation }: Props) {
-  const { cargaId, pacoteId, pacoteNome } = route.params;
+  const { cargaId, pacoteId, pacoteNome, stageCarga } = route.params;
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [fotoUri, setFotoUri] = useState<string | null>(null);
@@ -44,10 +44,10 @@ export default function CameraScreen({ route, navigation }: Props) {
     setProcessando(true);
     try {
       const uriComprimida = await compressImage(fotoUri);
-      navigation.navigate('PacoteDetail', {
-        cargaId, pacoteId, pacoteNome,
-        stageCarga: '',
-        capturedUri: uriComprimida,
+      navigation.navigate({
+        name: 'PacoteDetail',
+        params: { cargaId, pacoteId, pacoteNome, stageCarga, capturedUri: uriComprimida },
+        merge: true,
       });
     } finally {
       setProcessando(false);

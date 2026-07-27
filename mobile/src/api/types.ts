@@ -112,6 +112,53 @@ export interface ConfirmarPacoteResponse {
   mensagem: string;
 }
 
+export interface ExcluirPacoteResponse {
+  mensagem: string;
+  carga_id: number;
+  stage: StageCarga;
+}
+
+export interface DuplicarPacoteResponse {
+  mensagem: string;
+  pacote_id: number;
+  nome: string;
+}
+
+export interface FornecedorItemInput {
+  tipo: string;
+  codigo: string;
+  fornecedor: string;
+}
+
+export interface SalvarFornecedoresResponse {
+  mensagem: string;
+  fornecedores_pendentes: boolean;
+}
+
+export interface ExcluirCargaResponse {
+  mensagem: string;
+}
+
+export interface AtualizarQuantidadeItemResponse {
+  mensagem: string;
+  item_id: number;
+  nova_quantidade: number;
+  pendente: number | null;
+  carga_id: number;
+  stage: StageCarga;
+}
+
+export interface ExcluirItemPacoteResponse {
+  mensagem: string;
+  carga_id: number;
+  stage: StageCarga;
+  pendente: number;
+}
+
+export interface MoverItemResponse {
+  mensagem: string;
+}
+
 export interface ItemPendenciaInput {
   pendencia_id: number;
   quantidade: number;

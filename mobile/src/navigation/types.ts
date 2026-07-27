@@ -11,7 +11,7 @@ export type RootStackParamList = {
     stageCarga: string;
     capturedUri?: string;
   };
-  Camera: { cargaId: number; pacoteId: number; pacoteNome: string };
+  Camera: { cargaId: number; pacoteId: number; pacoteNome: string; stageCarga: string };
   Pendencias: { cargaId: number; cargaNome: string };
   CriarPacote: {
     cargaId: number;
@@ -19,4 +19,5 @@ export type RootStackParamList = {
     novoItemAvulso?: ItemForaPlanejadoInput;
   };
   ItemAvulso: { cargaId: number; cargaNome: string };
+  Fornecedores: { cargaId: number; cargaNome: string };
 };

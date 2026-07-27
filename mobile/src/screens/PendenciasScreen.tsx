@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +11,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Pendencias'>;
 
 export default function PendenciasScreen({ route, navigation }: Props) {
   const { cargaId, cargaNome } = route.params;
+  const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const [itens, setItens] = useState<PendenciaItem[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -41,7 +43,10 @@ export default function PendenciasScreen({ route, navigation }: Props) {
       <FlatList
         data={itens}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={itens.length === 0 ? styles.listaVazia : undefined}
+        contentContainerStyle={[
+          itens.length === 0 && styles.listaVazia,
+          { paddingBottom: insets.bottom + 16 },
+        ]}
         ListEmptyComponent={<Text style={styles.vazioTexto}>{erro || 'Nenhuma pendência.'}</Text>}
         renderItem={({ item }) => (
           <View style={styles.card}>

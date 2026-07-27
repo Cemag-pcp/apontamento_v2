@@ -168,6 +168,31 @@ def listar_cargas_ativas():
     return cargas
 
 
+def salvar_fornecedores_carga(carga, entries):
+    """Salva/atualiza os fornecedores por codigo de peca especial de uma carga.
+
+    entries: lista de dicts {tipo, codigo, fornecedor}.
+    """
+    with transaction.atomic():
+        for entry in entries:
+            tipo = (entry.get('tipo') or '').strip()
+            codigo = (entry.get('codigo') or '').strip()
+            fornecedor = (entry.get('fornecedor') or '').strip()
+            if tipo and codigo:
+                obj, _ = FornecedorItemCarga.objects.get_or_create(carga=carga, tipo=tipo, codigo=codigo)
+                obj.fornecedor = fornecedor
+                obj.save()
+
+    codigos_especiais = _detectar_codigos_especiais_da_carga(carga.id)
+    salvos = {(f.tipo, f.codigo): f.fornecedor for f in FornecedorItemCarga.objects.filter(carga=carga)}
+    faltando = any(
+        not salvos.get((tipo, item['codigo']), '').strip()
+        for tipo, itens in codigos_especiais.items()
+        for item in itens
+    )
+    return {'mensagem': 'Fornecedores salvos com sucesso!', 'fornecedores_pendentes': faltando}
+
+
 def detalhar_pacotes_da_carga(carga):
     """Pacotes + itens de uma carga, junto com carretas e (se em verificação) fornecedores."""
     pacotes_qs = (
@@ -304,6 +329,202 @@ def salvar_foto_pacote(pacote, arquivo):
 def listar_fotos_pacote(pacote_id):
     imagens = ImagemPacote.objects.filter(pacote_id=pacote_id)
     return [{'id': img.id, 'url': img.arquivo.url, 'etapa': img.stage} for img in imagens]
+
+
+def excluir_foto_pacote(imagem):
+    """Remove uma ImagemPacote (arquivo + registro)."""
+    imagem.arquivo.delete(save=False)
+    imagem.delete()
+
+
+def excluir_carga_service(carga):
+    """Remove o carregamento e todas as relacoes em cascata (carretas, pacotes, itens, imagens)."""
+    carga.delete()
+
+
+def atualizar_quantidade_item_service(item, nova_quantidade):
+    """Atualiza a quantidade de um item dentro do pacote.
+
+    Permitido apenas nos estagios planejamento e verificacao. Se aumentar,
+    verifica saldo pendente disponivel; se diminuir, devolve a diferenca
+    pra pendencia. Levanta PacoteValidationError pra qualquer violacao.
+    """
+    if nova_quantidade <= 0:
+        raise PacoteValidationError('Quantidade deve ser maior que zero.')
+
+    carga = item.pacote.carga
+    if carga.stage not in ('planejamento', 'verificacao'):
+        raise PacoteValidationError('Alteração permitida apenas em planejamento ou verificação.')
+
+    pend = getattr(item, 'codigo', None)
+    atual = int(item.quantidade or 0)
+    delta = nova_quantidade - atual
+
+    with transaction.atomic():
+        if pend and delta > 0:
+            disponivel = int(pend.qt_necessaria or 0)
+            if disponivel <= 0:
+                raise PacoteValidationError('Este item não possui saldo pendente para aumentar quantidade.')
+            if disponivel < delta:
+                raise PacoteValidationError(f'Quantidade indisponível. Restam {disponivel}.')
+            pend.qt_necessaria = disponivel - delta
+            pend.save(update_fields=['qt_necessaria'])
+        elif pend and delta < 0:
+            pend.qt_necessaria = int(pend.qt_necessaria or 0) + abs(delta)
+            pend.save(update_fields=['qt_necessaria'])
+
+        item.quantidade = nova_quantidade
+        item.save(update_fields=['quantidade'])
+
+    return {
+        'mensagem': 'Quantidade atualizada com sucesso.',
+        'item_id': item.id,
+        'nova_quantidade': nova_quantidade,
+        'pendente': int(pend.qt_necessaria or 0) if pend else None,
+        'carga_id': carga.id,
+        'stage': carga.stage,
+    }
+
+
+def excluir_item_pacote_service(item):
+    """Remove um item do pacote e devolve a quantidade pra pendencia.
+
+    Permitido apenas nos estagios planejamento ou verificacao.
+    """
+    carga = item.pacote.carga
+    if carga.stage not in ('planejamento', 'verificacao'):
+        raise PacoteValidationError('Exclusão permitida apenas em planejamento ou verificacao.')
+
+    pend = item.codigo
+    qtd_item = int(item.quantidade or 0)
+
+    with transaction.atomic():
+        if pend:
+            pend.qt_necessaria = int(pend.qt_necessaria or 0) + qtd_item
+            pend.save(update_fields=['qt_necessaria'])
+        item.delete()
+
+    return {
+        'mensagem': 'Item removido do pacote.',
+        'carga_id': carga.id,
+        'stage': carga.stage,
+        'pendente': int(pend.qt_necessaria or 0) if pend else 0,
+    }
+
+
+def mover_item_pacote(item, pacote_destino):
+    """Move um item pra outro pacote (mesma carga, na pratica - quem chama garante)."""
+    item.pacote = pacote_destino
+    item.save(update_fields=['pacote'])
+    return {'mensagem': 'Pacote alterado com sucesso.'}
+
+
+def deletar_pacote_service(pacote):
+    """Exclui o pacote e devolve as quantidades dos itens pras pendencias.
+
+    Levanta PacoteValidationError se a carga ja estiver despachada - cada
+    caller (view classica / DRF) formata a resposta de erro no seu idioma.
+    """
+    if pacote.carga.stage == 'despachado':
+        raise PacoteValidationError('Não é permitido excluir pacotes despachados.')
+
+    itens = list(ItemPacote.objects.filter(pacote=pacote).select_related('codigo'))
+
+    with transaction.atomic():
+        for item in itens:
+            pend = item.codigo
+            if pend:
+                pend.qt_necessaria = (pend.qt_necessaria or 0) + (item.quantidade or 0)
+                pend.save(update_fields=['qt_necessaria'])
+        carga_id = pacote.carga_id
+        stage = pacote.carga.stage
+        pacote.delete()
+
+    return {
+        'mensagem': 'Pacote excluído com sucesso.',
+        'carga_id': carga_id,
+        'stage': stage,
+    }
+
+
+def duplicar_pacote_service(pacote):
+    """Duplica um pacote reaproveitando os itens, respeitando o saldo pendente.
+
+    O novo nome recebe sufixo incremental (.1, .2, ...). Levanta
+    PacoteValidationError se nao houver itens validos pra duplicar.
+    """
+    itens_origem = list(ItemPacote.objects.filter(pacote=pacote).select_related('codigo'))
+    if not itens_origem:
+        raise PacoteValidationError('Pacote sem itens para duplicar.')
+
+    with transaction.atomic():
+        base_nome = pacote.nome
+        partes = base_nome.rsplit('.', 1)
+        if len(partes) == 2 and partes[1].isdigit():
+            base_nome = partes[0]
+
+        sufixos = []
+        for nome in Pacote.objects.filter(carga=pacote.carga, nome__startswith=base_nome).values_list('nome', flat=True):
+            resto = nome[len(base_nome):]
+            if resto.startswith('.') and resto[1:].isdigit():
+                try:
+                    sufixos.append(int(resto[1:]))
+                except ValueError:
+                    continue
+        proximo_sufixo = (max(sufixos) if sufixos else 0) + 1
+        novo_nome = f"{base_nome}.{proximo_sufixo}"
+
+        itens_para_criar_planejados = []
+        itens_para_criar_avulsos = []
+        for item in itens_origem:
+            original = int(item.quantidade or 0)
+            if original <= 0:
+                continue
+
+            pend = getattr(item, 'codigo', None)
+            if pend:
+                disponivel = int(pend.qt_necessaria or 0)
+                if disponivel <= 0:
+                    continue
+                usar = min(disponivel, original)
+                if usar > 0:
+                    itens_para_criar_planejados.append((pend, usar))
+            else:
+                itens_para_criar_avulsos.append(item)
+
+        if not itens_para_criar_planejados and not itens_para_criar_avulsos:
+            raise PacoteValidationError('Sem itens válidos para duplicar neste pacote.')
+
+        novo_pacote = Pacote.objects.create(
+            nome=novo_nome,
+            carga=pacote.carga,
+            criado_por=pacote.criado_por,
+        )
+
+        for pend, qtd in itens_para_criar_planejados:
+            ItemPacote.objects.create(
+                pacote=novo_pacote,
+                codigo=pend,
+                quantidade=qtd
+            )
+            pend.qt_necessaria = max(pend.qt_necessaria - qtd, 0)
+            pend.save(update_fields=['qt_necessaria'])
+
+        for item in itens_para_criar_avulsos:
+            ItemPacote.objects.create(
+                pacote=novo_pacote,
+                codigo=None,
+                codigo_informado=item.codigo_informado,
+                descricao_informada=item.descricao_informada,
+                fora_planejado=True,
+                quantidade=item.quantidade
+            )
+
+    return {
+        'mensagem': 'Pacote duplicado com sucesso.',
+        'pacote_id': novo_pacote.id,
+        'nome': novo_pacote.nome,
+    }
 
 
 def confirmar_pacote_service(pacote, observacao):

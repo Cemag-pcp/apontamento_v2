@@ -1,8 +1,10 @@
 import { apiFetch } from './client';
 import type {
-  Carga, ConfirmarPacoteResponse, CriarPacoteInput, CriarPacoteResponse,
-  FotoPacote, LoginResponse, PacotesDaCargaResponse, PendenciasResponse,
-  UploadFotoResponse, Usuario,
+  AtualizarQuantidadeItemResponse, Carga, ConfirmarPacoteResponse, CriarPacoteInput,
+  CriarPacoteResponse, DuplicarPacoteResponse, ExcluirCargaResponse,
+  ExcluirItemPacoteResponse, ExcluirPacoteResponse, FornecedorItemInput, FotoPacote,
+  LoginResponse, MoverItemResponse, PacotesDaCargaResponse, PendenciasResponse,
+  SalvarFornecedoresResponse, UploadFotoResponse, Usuario,
 } from './types';
 
 export function login(username: string, password: string) {
@@ -50,6 +52,10 @@ export function enviarFotoDoPacote(token: string, pacoteId: number, uri: string,
   });
 }
 
+export function excluirFotoDoPacote(token: string, fotoId: number) {
+  return apiFetch<void>(`/fotos/${fotoId}/`, { method: 'DELETE', token });
+}
+
 export function criarPacote(token: string, cargaId: number, dados: CriarPacoteInput) {
   return apiFetch<CriarPacoteResponse>(`/cargas/${cargaId}/pacotes/criar/`, {
     method: 'POST',
@@ -63,5 +69,45 @@ export function confirmarPacote(token: string, pacoteId: number, observacao?: st
     method: 'POST',
     token,
     body: { observacao: observacao ?? '' },
+  });
+}
+
+export function duplicarPacote(token: string, pacoteId: number) {
+  return apiFetch<DuplicarPacoteResponse>(`/pacotes/${pacoteId}/duplicar/`, { method: 'POST', token });
+}
+
+export function excluirPacote(token: string, pacoteId: number) {
+  return apiFetch<ExcluirPacoteResponse>(`/pacotes/${pacoteId}/`, { method: 'DELETE', token });
+}
+
+export function salvarFornecedores(token: string, cargaId: number, entradas: FornecedorItemInput[]) {
+  return apiFetch<SalvarFornecedoresResponse>(`/cargas/${cargaId}/fornecedores/`, {
+    method: 'POST',
+    token,
+    body: entradas,
+  });
+}
+
+export function excluirCarga(token: string, cargaId: number) {
+  return apiFetch<ExcluirCargaResponse>(`/cargas/${cargaId}/`, { method: 'DELETE', token });
+}
+
+export function atualizarQuantidadeItem(token: string, itemId: number, quantidade: number) {
+  return apiFetch<AtualizarQuantidadeItemResponse>(`/pacotes/itens/${itemId}/quantidade/`, {
+    method: 'POST',
+    token,
+    body: { quantidade },
+  });
+}
+
+export function excluirItemPacote(token: string, itemId: number) {
+  return apiFetch<ExcluirItemPacoteResponse>(`/pacotes/itens/${itemId}/`, { method: 'DELETE', token });
+}
+
+export function moverItemPacote(token: string, itemId: number, pacoteDestinoId: number) {
+  return apiFetch<MoverItemResponse>(`/pacotes/itens/${itemId}/mover/`, {
+    method: 'POST',
+    token,
+    body: { pacote_destino_id: pacoteDestinoId },
   });
 }
