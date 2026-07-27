@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const itensForaContainer = document.getElementById('itensForaPlanejado');
     const btnAdicionar    = document.getElementById('btnAdicionarItem');
     const btnAdicionarForaPlanejado = document.getElementById('btnAdicionarItemForaPlanejado');
+    const btnAdicionarCardan = document.getElementById('btnAdicionarCardan');
     const formCriarPacote = document.getElementById('formCriar');
     const btnVoltar       = document.getElementById('btnVoltarVisualizarPacote');
 
@@ -188,6 +189,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     btnAdicionarForaPlanejado?.addEventListener('click', () => {
         const row = criarRowItemForaPlanejado();
+        itensForaContainer?.appendChild(row);
+    });
+
+    // Atalho pra carretas com "BB" na descrição: já entra pronto como item
+    // fora do planejado (código/descrição/quantidade preenchidos), o
+    // usuário só confirma - ver btnAdicionarCardan em popularPacotesDaCarga.
+    btnAdicionarCardan?.addEventListener('click', () => {
+        const row = criarRowItemForaPlanejado();
+        row.querySelector('.campo-codigo-fora').value = 'CARDAN';
+        row.querySelector('.campo-descricao-fora').value = 'Cardan';
+        row.querySelector('.campo-quantidade-fora').value = 1;
         itensForaContainer?.appendChild(row);
     });
 
