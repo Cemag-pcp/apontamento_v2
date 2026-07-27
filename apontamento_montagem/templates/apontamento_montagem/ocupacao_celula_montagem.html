@@ -86,46 +86,23 @@
             <div id="barraParado" class="progress-bar bg-danger" role="progressbar" style="width: 0%;"></div>
         </div>
 
-        <div class="row g-4">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-success-subtle">
-                        <i class="fas fa-play me-1"></i> Produzindo
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Inicio</th>
-                                    <th>Fim</th>
-                                    <th>Duracao</th>
-                                    <th>Ordem</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabelaProduzindo"></tbody>
-                        </table>
-                    </div>
-                </div>
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-timeline me-1"></i> Linha do tempo
             </div>
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-danger-subtle">
-                        <i class="fas fa-pause me-1"></i> Parada
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Inicio</th>
-                                    <th>Fim</th>
-                                    <th>Duracao</th>
-                                    <th>Motivo</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabelaParado"></tbody>
-                        </table>
-                    </div>
-                </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Inicio</th>
+                            <th>Fim</th>
+                            <th>Duracao</th>
+                            <th>Situacao</th>
+                            <th>Ordem / Motivo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaLinhaDoTempo"></tbody>
+                </table>
             </div>
         </div>
     </div>

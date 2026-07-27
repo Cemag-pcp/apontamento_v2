@@ -37,34 +37,25 @@ function preencherDataPadrao() {
     inputData.value = hoje.toISOString().slice(0, 10);
 }
 
-function renderTabelaProduzindo(segmentos) {
-    const tbody = document.getElementById('tabelaProduzindo');
-    if (!segmentos.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Nenhum periodo de producao nesse dia.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = segmentos.map((s) => `
-        <tr>
-            <td>${escapeHtml(s.inicio)}</td>
-            <td>${escapeHtml(s.fim)}</td>
-            <td>${escapeHtml(s.duracao)}</td>
-            <td>${escapeHtml(s.ordem || '-')}</td>
-        </tr>
-    `).join('');
+function badgeSituacao(situacao) {
+    return situacao === 'produzindo'
+        ? '<span class="badge bg-success"><i class="fas fa-play me-1"></i>Produzindo</span>'
+        : '<span class="badge bg-danger"><i class="fas fa-pause me-1"></i>Parada</span>';
 }
 
-function renderTabelaParado(segmentos) {
-    const tbody = document.getElementById('tabelaParado');
-    if (!segmentos.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Sem periodos parada nesse dia.</td></tr>';
+function renderTabelaLinhaDoTempo(linhaDoTempo) {
+    const tbody = document.getElementById('tabelaLinhaDoTempo');
+    if (!linhaDoTempo.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nada registrado nesse dia.</td></tr>';
         return;
     }
-    tbody.innerHTML = segmentos.map((s) => `
+    tbody.innerHTML = linhaDoTempo.map((s) => `
         <tr>
             <td>${escapeHtml(s.inicio)}</td>
             <td>${escapeHtml(s.fim)}</td>
             <td>${escapeHtml(s.duracao)}</td>
-            <td>${escapeHtml(s.motivo)}</td>
+            <td>${badgeSituacao(s.situacao)}</td>
+            <td>${s.situacao === 'produzindo' ? `Ordem ${escapeHtml(s.ordem || '-')}` : escapeHtml(s.motivo || '-')}</td>
         </tr>
     `).join('');
 }
@@ -103,8 +94,7 @@ async function carregar() {
         barraParado.style.width = `${percentualParado}%`;
         barraParado.textContent = percentualParado > 8 ? `${percentualParado.toFixed(1)}%` : '';
 
-        renderTabelaProduzindo(payload.segmentos_produzindo || []);
-        renderTabelaParado(payload.segmentos_parado || []);
+        renderTabelaLinhaDoTempo(payload.linha_do_tempo || []);
 
         resultadoEl.classList.remove('d-none');
     } catch (err) {

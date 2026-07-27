@@ -2969,19 +2969,20 @@ def _calcular_ocupacao_celula(maquina_id, dia):
     interrupcao quando o gap coincide com um OrdemProcesso 'interrompida';
     senao fica como "Sem ordem em andamento".
     """
+    from datetime import time as time_cls
     from django.utils import timezone as dj_timezone
 
     tz = dj_timezone.get_current_timezone()
-    inicio_dia = dj_timezone.make_aware(datetime.combine(dia, datetime.min.time()), tz)
-    fim_dia = dj_timezone.make_aware(datetime.combine(dia, datetime.max.time()), tz)
+    inicio_dia = dj_timezone.make_aware(datetime.combine(dia, time_cls(7, 0)), tz)
+    fim_dia = dj_timezone.make_aware(datetime.combine(dia, time_cls(17, 0)), tz)
     agora = now()
     fim_efetivo = min(fim_dia, agora)
 
     if fim_efetivo <= inicio_dia:
-        # dia no futuro - nada a mostrar
+        # turno ainda nao comecou nesse dia (ou dia no futuro) - nada a mostrar
         return {
             'periodo_total': '0h00m', 'tempo_produzindo': '0h00m', 'tempo_parado': '0h00m',
-            'percentual_produzindo': 0, 'segmentos_produzindo': [], 'segmentos_parado': [],
+            'percentual_produzindo': 0, 'linha_do_tempo': [],
         }
 
     # --- segmentos "produzindo" (OrdemProcesso iniciada) ---
@@ -3040,24 +3041,23 @@ def _calcular_ocupacao_celula(maquina_id, dia):
                     motivos.append(nome)
         return ', '.join(motivos) if motivos else 'Sem ordem em andamento'
 
-    segmentos_produzindo = [
-        {
-            'inicio': localtime(ini).strftime('%H:%M'),
-            'fim': localtime(fim).strftime('%H:%M'),
-            'duracao': _formatar_duracao(fim - ini),
-            'ordem': ordem_num,
-        }
-        for ini, fim, ordem_num in intervalos
-    ]
+    # --- linha do tempo unica: produzindo + parada, em ordem cronologica ---
+    linha_do_tempo = (
+        [(ini, fim, 'produzindo', ordem_num, None) for ini, fim, ordem_num in intervalos] +
+        [(ini, fim, 'parada', None, _motivos_do_gap(ini, fim)) for ini, fim in gaps]
+    )
+    linha_do_tempo.sort(key=lambda t: t[0])
 
-    segmentos_parado = [
+    linha_do_tempo_serializada = [
         {
             'inicio': localtime(ini).strftime('%H:%M'),
             'fim': localtime(fim).strftime('%H:%M'),
             'duracao': _formatar_duracao(fim - ini),
-            'motivo': _motivos_do_gap(ini, fim),
+            'situacao': situacao,
+            'ordem': ordem_num,
+            'motivo': motivo,
         }
-        for ini, fim in gaps
+        for ini, fim, situacao, ordem_num, motivo in linha_do_tempo
     ]
 
     periodo_total = fim_efetivo - inicio_dia
@@ -3069,8 +3069,7 @@ def _calcular_ocupacao_celula(maquina_id, dia):
         'tempo_produzindo': _formatar_duracao(tempo_produzindo),
         'tempo_parado': _formatar_duracao(tempo_parado),
         'percentual_produzindo': round(percentual, 1),
-        'segmentos_produzindo': segmentos_produzindo,
-        'segmentos_parado': segmentos_parado,
+        'linha_do_tempo': linha_do_tempo_serializada,
     }
 
 
