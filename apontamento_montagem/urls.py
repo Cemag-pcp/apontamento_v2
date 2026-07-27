@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/erp/apontamentos/', views.api_erp_apontamentos_montagem, name='api_erp_apontamentos_montagem'),
     path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_montagem, name='api_erp_apontar_item_montagem'),
     path('api/historico/', views.api_historico_montagem, name='api_historico_montagem'),
+    path('api/historico-paradas/', views.api_historico_paradas_montagem, name='api_historico_paradas_montagem'),
 ]
 
 # templates
@@ -34,6 +35,7 @@ urlpatterns += [
     path('apontamento-qrcode/', views.apontamento_qrcode, name='apontamento_qrcode'),
     path('erp/apontamentos/', views.erp_apontamentos_montagem, name='erp_apontamentos_montagem'),
     path('historico/', views.historico_montagem, name='historico_montagem'),
+    path('historico-paradas/', views.historico_paradas_montagem, name='historico_paradas_montagem'),
 ]
 
 # Google sheets

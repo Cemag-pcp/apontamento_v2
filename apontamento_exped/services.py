@@ -193,6 +193,18 @@ def salvar_fornecedores_carga(carga, entries):
     return {'mensagem': 'Fornecedores salvos com sucesso!', 'fornecedores_pendentes': faltando}
 
 
+def _carga_tem_carreta_bb(carretas):
+    """Verifica se alguma carreta da carga tem o token 'BB' na descricao
+    (ex: 'FT10500 SS T R15,5 BB M23') - regra que libera adicionar o item
+    'Cardan' como item fora do planejado direto, sem precisar digitar.
+    """
+    for c in carretas:
+        tokens = (c.get('carreta') or '').upper().split()
+        if 'BB' in tokens:
+            return True
+    return False
+
+
 def detalhar_pacotes_da_carga(carga):
     """Pacotes + itens de uma carga, junto com carretas e (se em verificação) fornecedores."""
     pacotes_qs = (
@@ -258,6 +270,7 @@ def detalhar_pacotes_da_carga(carga):
         'carretas': carretas,
         'codigos_especiais': codigos_especiais,
         'fornecedores': fornecedores,
+        'possui_carreta_bb': _carga_tem_carreta_bb(carretas),
     }
 
 
