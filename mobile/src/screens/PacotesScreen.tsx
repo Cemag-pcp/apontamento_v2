@@ -8,6 +8,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../api/expedicao';
+import { comCache } from '../offline/cache';
+import { useRefetchOnReconnect } from '../utils/useRefetchOnReconnect';
 import type { Pacote, PacotesDaCargaResponse } from '../api/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Pacotes'>;
@@ -21,13 +23,18 @@ export default function PacotesScreen({ route, navigation }: Props) {
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [offline, setOffline] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!token) return;
     try {
       setErro(null);
-      const resposta = await api.buscarPacotesDaCarga(token, cargaId);
+      const { dados: resposta, deCache } = await comCache(
+        `pacotes_${cargaId}`,
+        () => api.buscarPacotesDaCarga(token, cargaId)
+      );
       setDados(resposta);
+      setOffline(deCache);
     } catch (err) {
       setErro('Não foi possível carregar os pacotes.');
     }
@@ -77,6 +84,8 @@ export default function PacotesScreen({ route, navigation }: Props) {
     return unsubscribe;
   }, [navigation, carregar]);
 
+  useRefetchOnReconnect(carregar);
+
   async function handleRefresh() {
     setAtualizando(true);
     await carregar();
@@ -121,6 +130,12 @@ export default function PacotesScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      {offline && (
+        <View style={styles.avisoOffline}>
+          <Text style={styles.avisoOfflineTexto}>📡 Sem conexão — mostrando dados salvos</Text>
+        </View>
+      )}
+
       {(dados?.pacotes.length ?? 0) > 0 && (
         <View style={styles.buscaContainer}>
           <TextInput
@@ -163,6 +178,8 @@ const styles = StyleSheet.create({
   linkPendencias: { color: '#1b6ec2', fontWeight: '600', marginRight: 4 },
   linkFornecedoresOk: { color: '#198754', fontWeight: '600' },
   linkFornecedoresPendente: { color: '#b8860b', fontWeight: '600' },
+  avisoOffline: { backgroundColor: '#fff3cd', paddingVertical: 6, paddingHorizontal: 16 },
+  avisoOfflineTexto: { color: '#946c00', fontSize: 12, fontWeight: '600', textAlign: 'center' },
   buscaContainer: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e5e5e5' },
   inputBusca: {
     borderWidth: 1, borderColor: '#d0d0d0', borderRadius: 8,
