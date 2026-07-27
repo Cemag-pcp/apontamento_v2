@@ -560,8 +560,10 @@
 {% endblock %}
 
 {% block scripts %}
-{# Import map: garante que imports relativos resolvam para o arquivo hasheado em produção,
-   evitando que ordem-criada-montagem.js e apontamento-utils.js sejam carregados duas vezes. #}
+{% comment %}
+Import map: garante que imports relativos resolvam para o arquivo hasheado em produção,
+evitando que ordem-criada-montagem.js e apontamento-utils.js sejam carregados duas vezes.
+{% endcomment %}
 <script type="importmap">
 {
   "imports": {
