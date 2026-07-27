@@ -12,26 +12,32 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Carga, ImagemPacote, Pacote
+from .models import Carga, ImagemPacote, ItemPacote, Pacote
 from .serializers import (
+    AtualizarQuantidadeItemSerializer,
     ConfirmarPacoteSerializer,
     CriarPacoteSerializer,
     FornecedorItemInputSerializer,
     LoginSerializer,
+    MoverItemSerializer,
     UploadFotoSerializer,
 )
 from .services import (
     FotoObrigatoriaError,
     PacoteValidationError,
+    atualizar_quantidade_item_service,
     confirmar_pacote_service,
     criar_ou_atualizar_pacote,
     deletar_pacote_service,
     detalhar_pacotes_da_carga,
     duplicar_pacote_service,
+    excluir_carga_service,
     excluir_foto_pacote,
+    excluir_item_pacote_service,
     listar_cargas_ativas,
     listar_fotos_pacote,
     listar_pendencias_carga,
+    mover_item_pacote,
     salvar_foto_pacote,
     salvar_fornecedores_carga,
 )
@@ -81,6 +87,20 @@ class MeView(APIView):
 class CargasListView(APIView):
     def get(self, request):
         return Response(listar_cargas_ativas())
+
+
+class ExcluirCargaView(APIView):
+    def delete(self, request, carga_id):
+        profile = getattr(request.user, 'profile', None)
+        if getattr(profile, 'tipo_acesso', None) != 'pcp':
+            return Response(
+                {'erro': 'Acesso negado: apenas PCP pode excluir carregamentos.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        carga = get_object_or_404(Carga, id=carga_id)
+        excluir_carga_service(carga)
+        return Response({'mensagem': 'Carregamento excluído com sucesso.'})
 
 
 class PacotesCargaView(APIView):
@@ -159,6 +179,46 @@ class CriarPacoteView(APIView):
             return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(resultado, status=status.HTTP_201_CREATED)
+
+
+class AtualizarQuantidadeItemView(APIView):
+    def post(self, request, item_id):
+        serializer = AtualizarQuantidadeItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        item = get_object_or_404(
+            ItemPacote.objects.select_related('codigo', 'pacote__carga'), id=item_id
+        )
+        try:
+            resultado = atualizar_quantidade_item_service(item, serializer.validated_data['quantidade'])
+        except PacoteValidationError as exc:
+            return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(resultado)
+
+
+class ExcluirItemPacoteView(APIView):
+    def delete(self, request, item_id):
+        item = get_object_or_404(
+            ItemPacote.objects.select_related('codigo', 'pacote__carga'), id=item_id
+        )
+        try:
+            resultado = excluir_item_pacote_service(item)
+        except PacoteValidationError as exc:
+            return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(resultado)
+
+
+class MoverItemView(APIView):
+    def post(self, request, item_id):
+        serializer = MoverItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        item = get_object_or_404(ItemPacote, id=item_id)
+        pacote_destino = get_object_or_404(Pacote, id=serializer.validated_data['pacote_destino_id'])
+        resultado = mover_item_pacote(item, pacote_destino)
+        return Response(resultado)
 
 
 class SalvarFornecedoresView(APIView):

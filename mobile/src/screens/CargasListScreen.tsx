@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, RefreshControl, StyleSheet,
+  ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../api/expedicao';
+import { ApiError } from '../api/client';
 import type { Carga, StageCarga } from '../api/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CargasList'>;
@@ -28,6 +29,29 @@ const COR_STAGE: Record<StageCarga, string> = {
 
 const FILTROS_STATUS: StageCarga[] = ['apontamento', 'verificacao', 'despachado'];
 
+interface Flag {
+  label: string;
+  bg: string;
+  cor: string;
+}
+
+function flagsDaCarga(item: Carga): Flag[] {
+  const flags: Flag[] = [];
+  if (item.stage === 'despachado' && item.todos_pacotes_tem_foto_despachado) {
+    flags.push({ label: 'Concluído', bg: '#d4edda', cor: '#198754' });
+  }
+  if (item.stage === 'verificacao' && !item.todos_pacotes_tem_foto_verificacao) {
+    flags.push({ label: 'Aguardando fotos', bg: '#fff3cd', cor: '#946c00' });
+  }
+  if (item.fornecedores_pendentes) {
+    flags.push({ label: 'Fornecedores', bg: '#f8d7da', cor: '#c0392b' });
+  }
+  if (item.total_pendente > 0) {
+    flags.push({ label: `${item.total_pendente} pendente(s)`, bg: '#fff3cd', cor: '#946c00' });
+  }
+  return flags;
+}
+
 export default function CargasListScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { token, user, sair } = useAuth();
@@ -37,6 +61,8 @@ export default function CargasListScreen({ navigation }: Props) {
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<StageCarga | null>(null);
+  const [excluindoCargaId, setExcluindoCargaId] = useState<number | null>(null);
+  const podeExcluirCarga = user?.tipo_acesso === 'pcp';
 
   const carregar = useCallback(async () => {
     if (!token) return;
@@ -66,6 +92,32 @@ export default function CargasListScreen({ navigation }: Props) {
     setAtualizando(true);
     await carregar();
     setAtualizando(false);
+  }
+
+  function handleExcluirCarga(item: Carga) {
+    Alert.alert(
+      'Excluir carregamento',
+      'Deseja excluir este carregamento e todos os seus pacotes?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            if (!token) return;
+            setExcluindoCargaId(item.id);
+            try {
+              await api.excluirCarga(token, item.id);
+              setCargas((atual) => atual.filter((c) => c.id !== item.id));
+            } catch (err) {
+              Alert.alert('Erro', err instanceof ApiError ? err.message : 'Falha ao excluir o carregamento.');
+            } finally {
+              setExcluindoCargaId(null);
+            }
+          },
+        },
+      ],
+    );
   }
 
   const termoBusca = busca.trim().toLowerCase();
@@ -140,15 +192,25 @@ export default function CargasListScreen({ navigation }: Props) {
                 <View style={[styles.badge, { backgroundColor: COR_STAGE[item.stage] }]}>
                   <Text style={styles.badgeTexto}>{LABEL_STAGE[item.stage]}</Text>
                 </View>
+                {podeExcluirCarga && (
+                  <TouchableOpacity
+                    style={styles.botaoExcluirCarga}
+                    onPress={() => handleExcluirCarga(item)}
+                    disabled={excluindoCargaId === item.id}
+                  >
+                    {excluindoCargaId === item.id
+                      ? <ActivityIndicator size="small" color="#c0392b" />
+                      : <Text style={styles.botaoExcluirCargaTexto}>🗑️</Text>}
+                  </TouchableOpacity>
+                )}
               </View>
               <Text style={styles.cardSub}>Carregamento: {item.data_carga}</Text>
               <View style={styles.cardRodape}>
-                {item.total_pendente > 0 && (
-                  <Text style={styles.avisoPendencia}>{item.total_pendente} item(ns) pendente(s)</Text>
-                )}
-                {item.fornecedores_pendentes && (
-                  <Text style={styles.avisoPendencia}>Fornecedores pendentes</Text>
-                )}
+                {flagsDaCarga(item).map((flag, idx) => (
+                  <View key={idx} style={[styles.flagChip, { backgroundColor: flag.bg }]}>
+                    <Text style={[styles.flagChipTexto, { color: flag.cor }]}>{flag.label}</Text>
+                  </View>
+                ))}
               </View>
             </TouchableOpacity>
           )}
@@ -192,7 +254,10 @@ const styles = StyleSheet.create({
   cardTitulo: { fontSize: 15, fontWeight: '700', color: '#1b1b1b', flex: 1 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
   badgeTexto: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  botaoExcluirCarga: { padding: 2 },
+  botaoExcluirCargaTexto: { fontSize: 15 },
   cardSub: { color: '#666', marginTop: 4, fontSize: 13 },
-  cardRodape: { flexDirection: 'row', gap: 10, marginTop: 8, flexWrap: 'wrap' },
-  avisoPendencia: { color: '#b8860b', fontSize: 12, fontWeight: '600' },
+  cardRodape: { flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' },
+  flagChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  flagChipTexto: { fontSize: 11, fontWeight: '600' },
 });

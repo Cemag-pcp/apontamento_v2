@@ -20,7 +20,9 @@ from .services import (
     detalhar_pacotes_da_carga, salvar_foto_pacote, listar_fotos_pacote,
     confirmar_pacote_service, listar_pendencias_carga, criar_ou_atualizar_pacote,
     excluir_foto_pacote, deletar_pacote_service, duplicar_pacote_service,
-    salvar_fornecedores_carga,
+    salvar_fornecedores_carga, excluir_carga_service,
+    atualizar_quantidade_item_service, excluir_item_pacote_service,
+    mover_item_pacote,
 )
 from cadastro.models import CarretasExplodidas
 
@@ -549,7 +551,7 @@ def excluir_carga(request, id):
         return JsonResponse({'erro': 'Acesso negado: apenas PCP pode excluir carregamentos.'}, status=403)
 
     carga = get_object_or_404(Carga, id=id)
-    carga.delete()
+    excluir_carga_service(carga)
     return JsonResponse({'mensagem': 'Carregamento excluÍdo com sucesso.'}, status=200)
 
 @csrf_exempt
@@ -587,45 +589,16 @@ def atualizar_quantidade_item(request, item_id):
     except (TypeError, ValueError):
         return JsonResponse({'erro': 'Quantidade invÃ¡lida.'}, status=400)
 
-    if nova_qt <= 0:
-        return JsonResponse({'erro': 'Quantidade deve ser maior que zero.'}, status=400)
-
     item = get_object_or_404(
         ItemPacote.objects.select_related('codigo', 'pacote__carga'),
         id=item_id
     )
-    carga = item.pacote.carga
-    if carga.stage not in ('planejamento', 'verificacao'):
-        return JsonResponse({'erro': 'AlteraÃ§Ã£o permitida apenas em planejamento ou verificaÃ§Ã£o.'}, status=400)
+    try:
+        resultado = atualizar_quantidade_item_service(item, nova_qt)
+    except PacoteValidationError as exc:
+        return JsonResponse({'erro': str(exc)}, status=400)
 
-    pend = getattr(item, 'codigo', None)
-    atual = int(item.quantidade or 0)
-    delta = nova_qt - atual
-
-    with transaction.atomic():
-        if pend and delta > 0:
-            disponivel = int(pend.qt_necessaria or 0)
-            if disponivel <= 0:
-                return JsonResponse({'erro': 'Este item não possui saldo pendente para aumentar quantidade.'}, status=400)
-            if disponivel < delta:
-                return JsonResponse({'erro': f'Quantidade indisponível. Restam {disponivel}.'}, status=400)
-            pend.qt_necessaria = disponivel - delta
-            pend.save(update_fields=['qt_necessaria'])
-        elif pend and delta < 0:
-            pend.qt_necessaria = int(pend.qt_necessaria or 0) + abs(delta)
-            pend.save(update_fields=['qt_necessaria'])
-
-        item.quantidade = nova_qt
-        item.save(update_fields=['quantidade'])
-
-    return JsonResponse({
-        'mensagem': 'Quantidade atualizada com sucesso.',
-        'item_id': item.id,
-        'nova_quantidade': nova_qt,
-        'pendente': int(pend.qt_necessaria or 0) if pend else None,
-        'carga_id': carga.id,
-        'stage': carga.stage,
-    }, status=200)
+    return JsonResponse(resultado, status=200)
 
 @csrf_exempt
 @require_http_methods(["DELETE", "POST"])
@@ -638,25 +611,12 @@ def deletar_item_pacote(request, item_id):
         ItemPacote.objects.select_related('codigo', 'pacote__carga'),
         id=item_id
     )
-    carga = item.pacote.carga
-    if carga.stage not in ('planejamento', 'verificacao'):
-        return JsonResponse({'erro': 'Exclusão permitida apenas em planejamento ou verificacao.'}, status=400)
+    try:
+        resultado = excluir_item_pacote_service(item)
+    except PacoteValidationError as exc:
+        return JsonResponse({'erro': str(exc)}, status=400)
 
-    pend = item.codigo
-    qtd_item = int(item.quantidade or 0)
-
-    with transaction.atomic():
-        if pend:
-            pend.qt_necessaria = int(pend.qt_necessaria or 0) + qtd_item
-            pend.save(update_fields=['qt_necessaria'])
-        item.delete()
-
-    return JsonResponse({
-        'mensagem': 'Item removido do pacote.',
-        'carga_id': carga.id,
-        'stage': carga.stage,
-        'pendente': int(pend.qt_necessaria or 0) if pend else 0,
-    }, status=200)
+    return JsonResponse(resultado, status=200)
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -808,19 +768,17 @@ def confirmar_pacote(request, id):
     return JsonResponse(resultado, status=200)
 
 def mover_item(request):
-    
+
     data = json.loads(request.body)
 
     item_id = data.get('item_id')
     pacote_destino_id = data.get('pacote_destino_id')
 
     item_pacote_atual = get_object_or_404(ItemPacote, id=item_id)
-    item_pacote_atual.pacote_id = pacote_destino_id
-    item_pacote_atual.save()
+    pacote_destino = get_object_or_404(Pacote, id=pacote_destino_id)
+    resultado = mover_item_pacote(item_pacote_atual, pacote_destino)
 
-    return JsonResponse({
-        'mensagem': 'Pacote alterado com sucesso.',
-    }, status=200)
+    return JsonResponse(resultado, status=200)
 
 def impressao_pacote(request):
 

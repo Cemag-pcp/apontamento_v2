@@ -337,6 +337,88 @@ def excluir_foto_pacote(imagem):
     imagem.delete()
 
 
+def excluir_carga_service(carga):
+    """Remove o carregamento e todas as relacoes em cascata (carretas, pacotes, itens, imagens)."""
+    carga.delete()
+
+
+def atualizar_quantidade_item_service(item, nova_quantidade):
+    """Atualiza a quantidade de um item dentro do pacote.
+
+    Permitido apenas nos estagios planejamento e verificacao. Se aumentar,
+    verifica saldo pendente disponivel; se diminuir, devolve a diferenca
+    pra pendencia. Levanta PacoteValidationError pra qualquer violacao.
+    """
+    if nova_quantidade <= 0:
+        raise PacoteValidationError('Quantidade deve ser maior que zero.')
+
+    carga = item.pacote.carga
+    if carga.stage not in ('planejamento', 'verificacao'):
+        raise PacoteValidationError('Alteração permitida apenas em planejamento ou verificação.')
+
+    pend = getattr(item, 'codigo', None)
+    atual = int(item.quantidade or 0)
+    delta = nova_quantidade - atual
+
+    with transaction.atomic():
+        if pend and delta > 0:
+            disponivel = int(pend.qt_necessaria or 0)
+            if disponivel <= 0:
+                raise PacoteValidationError('Este item não possui saldo pendente para aumentar quantidade.')
+            if disponivel < delta:
+                raise PacoteValidationError(f'Quantidade indisponível. Restam {disponivel}.')
+            pend.qt_necessaria = disponivel - delta
+            pend.save(update_fields=['qt_necessaria'])
+        elif pend and delta < 0:
+            pend.qt_necessaria = int(pend.qt_necessaria or 0) + abs(delta)
+            pend.save(update_fields=['qt_necessaria'])
+
+        item.quantidade = nova_quantidade
+        item.save(update_fields=['quantidade'])
+
+    return {
+        'mensagem': 'Quantidade atualizada com sucesso.',
+        'item_id': item.id,
+        'nova_quantidade': nova_quantidade,
+        'pendente': int(pend.qt_necessaria or 0) if pend else None,
+        'carga_id': carga.id,
+        'stage': carga.stage,
+    }
+
+
+def excluir_item_pacote_service(item):
+    """Remove um item do pacote e devolve a quantidade pra pendencia.
+
+    Permitido apenas nos estagios planejamento ou verificacao.
+    """
+    carga = item.pacote.carga
+    if carga.stage not in ('planejamento', 'verificacao'):
+        raise PacoteValidationError('Exclusão permitida apenas em planejamento ou verificacao.')
+
+    pend = item.codigo
+    qtd_item = int(item.quantidade or 0)
+
+    with transaction.atomic():
+        if pend:
+            pend.qt_necessaria = int(pend.qt_necessaria or 0) + qtd_item
+            pend.save(update_fields=['qt_necessaria'])
+        item.delete()
+
+    return {
+        'mensagem': 'Item removido do pacote.',
+        'carga_id': carga.id,
+        'stage': carga.stage,
+        'pendente': int(pend.qt_necessaria or 0) if pend else 0,
+    }
+
+
+def mover_item_pacote(item, pacote_destino):
+    """Move um item pra outro pacote (mesma carga, na pratica - quem chama garante)."""
+    item.pacote = pacote_destino
+    item.save(update_fields=['pacote'])
+    return {'mensagem': 'Pacote alterado com sucesso.'}
+
+
 def deletar_pacote_service(pacote):
     """Exclui o pacote e devolve as quantidades dos itens pras pendencias.
 

@@ -135,6 +135,30 @@ export interface SalvarFornecedoresResponse {
   fornecedores_pendentes: boolean;
 }
 
+export interface ExcluirCargaResponse {
+  mensagem: string;
+}
+
+export interface AtualizarQuantidadeItemResponse {
+  mensagem: string;
+  item_id: number;
+  nova_quantidade: number;
+  pendente: number | null;
+  carga_id: number;
+  stage: StageCarga;
+}
+
+export interface ExcluirItemPacoteResponse {
+  mensagem: string;
+  carga_id: number;
+  stage: StageCarga;
+  pendente: number;
+}
+
+export interface MoverItemResponse {
+  mensagem: string;
+}
+
 export interface ItemPendenciaInput {
   pendencia_id: number;
   quantidade: number;

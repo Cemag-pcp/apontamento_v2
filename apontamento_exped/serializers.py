@@ -36,3 +36,11 @@ class FornecedorItemInputSerializer(serializers.Serializer):
     tipo = serializers.CharField()
     codigo = serializers.CharField()
     fornecedor = serializers.CharField(allow_blank=True)
+
+
+class AtualizarQuantidadeItemSerializer(serializers.Serializer):
+    quantidade = serializers.IntegerField()
+
+
+class MoverItemSerializer(serializers.Serializer):
+    pacote_destino_id = serializers.IntegerField()
