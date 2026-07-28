@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'comercial',
     'storages',
     'reuniao',
+    'assistente_ia',
 
     'channels',
     'corsheaders',
