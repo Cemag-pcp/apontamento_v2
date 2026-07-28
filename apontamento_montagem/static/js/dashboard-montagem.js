@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let machineChart;
     let cargaChart;
     let activityChart;
+    let paradaChart;
     let taktChart = null;
     let taktDrag  = null; // { datasetIdx, barIdx, value, label, targetBarIdx }
 
@@ -92,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function destroyCharts() {
-        [statusChart, machineChart, cargaChart, activityChart].forEach(chart => {
+        [statusChart, machineChart, cargaChart, activityChart, paradaChart].forEach(chart => {
             if (chart) chart.destroy();
         });
     }
@@ -328,12 +329,42 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function buildParadaChart(data) {
+        const ctx = document.getElementById('paradaChart');
+        paradaChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.map(item => item.label),
+                datasets: [
+                    {
+                        label: 'Horas paradas (07:00-17:00)',
+                        data: data.map(item => item.horas_paradas),
+                        backgroundColor: '#ef4444',
+                        borderRadius: 8,
+                    },
+                ],
+            },
+            options: {
+                maintainAspectRatio: false,
+                responsive: true,
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true, title: { display: true, text: 'Horas' } },
+                },
+                plugins: {
+                    legend: { display: false },
+                },
+            },
+        });
+    }
+
     function renderCharts(payload) {
         destroyCharts();
         buildStatusChart(payload.charts.status);
         buildMachineChart(payload.charts.producao_por_maquina);
         buildCargaChart(payload.charts.andamento_cargas);
         buildActivityChart(payload.charts.atividade_diaria);
+        buildParadaChart(payload.charts.parada_diaria);
     }
 
     async function loadDashboard() {

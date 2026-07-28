@@ -613,6 +613,9 @@ def criar_ou_atualizar_pacote(carga, nome_pacote=None, pacote_existente_id=None,
     itens = itens or []
     itens_fora_planejado = itens_fora_planejado or []
 
+    if carga.stage == 'despachado':
+        raise PacoteValidationError("Não é permitido criar pacotes em cargas despachadas.")
+
     if not nome_pacote and not pacote_existente_id:
         raise PacoteValidationError("nomePacote é obrigatório")
 

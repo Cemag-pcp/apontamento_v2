@@ -46,6 +46,7 @@ export default function PacotesScreen({ route, navigation }: Props) {
   const fornecedoresPendentes = Object.entries(codigosEspeciais).some(
     ([tipo, itens]) => itens.some((item) => !(fornecedoresSalvos[`${tipo}_${item.codigo}`] || '').trim())
   );
+  const podeCriarPacote = dados?.status_carga !== 'despachado';
 
   useEffect(() => {
     navigation.setOptions({
@@ -59,9 +60,11 @@ export default function PacotesScreen({ route, navigation }: Props) {
               </Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => navigation.navigate('CriarPacote', { cargaId, cargaNome })}>
-            <Text style={styles.linkNovoPacote}>+ Pacote</Text>
-          </TouchableOpacity>
+          {podeCriarPacote && (
+            <TouchableOpacity onPress={() => navigation.navigate('CriarPacote', { cargaId, cargaNome })}>
+              <Text style={styles.linkNovoPacote}>+ Pacote</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => navigation.navigate('Pendencias', { cargaId, cargaNome })}>
             <Text style={styles.linkPendencias}>Pendências</Text>
           </TouchableOpacity>
@@ -69,7 +72,7 @@ export default function PacotesScreen({ route, navigation }: Props) {
       ),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigation, cargaId, cargaNome, mostrarFornecedores, fornecedoresPendentes]);
+  }, [navigation, cargaId, cargaNome, mostrarFornecedores, fornecedoresPendentes, podeCriarPacote]);
 
   useEffect(() => {
     (async () => {

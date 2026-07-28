@@ -29,7 +29,7 @@ const COR_STAGE: Record<StageCarga, string> = {
   despachado: '#198754',
 };
 
-const FILTROS_STATUS: StageCarga[] = ['apontamento', 'verificacao', 'despachado'];
+const FILTROS_STATUS: StageCarga[] = ['verificacao', 'despachado'];
 
 interface Flag {
   label: string;

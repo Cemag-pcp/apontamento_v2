@@ -57,5 +57,6 @@ urlpatterns = [
     path('compras/', include('compras.urls')),
     path('comercial/', include('comercial.urls')),
     path('reuniao/', include('reuniao.urls')),
+    path('assistente/', include('assistente_ia.urls')),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

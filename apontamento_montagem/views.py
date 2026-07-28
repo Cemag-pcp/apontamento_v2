@@ -1362,6 +1362,7 @@ def dashboard_data(request):
             'producao_por_maquina': producao_por_maquina,
             'andamento_cargas': andamento_cargas,
             'atividade_diaria': atividade_diaria,
+            'parada_diaria': _calcular_paradas_diarias(data_inicio, data_fim, maquina_id or None),
         },
         'top_conjuntos': top_conjuntos,
         'interruption_ranking': interruption_ranking,
@@ -2952,6 +2953,93 @@ def _formatar_duracao(delta):
     total_min = max(int(delta.total_seconds() // 60), 0)
     horas, minutos = divmod(total_min, 60)
     return f'{horas}h{minutos:02d}m'
+
+
+def _calcular_paradas_diarias(data_inicio, data_fim, maquina_id=None):
+    """
+    Pra cada dia entre data_inicio e data_fim, soma quantas horas a(s)
+    celula(s) de montagem ficaram genuinamente paradas (ZERO ordens com
+    OrdemProcesso 'iniciada' rodando naquele instante) dentro do turno
+    07:00-17:00. Nao conta como parada o tempo em que uma ordem estava
+    'interrompida' se outra ordem, na MESMA celula, estava 'iniciada'
+    nesse meio tempo - mesma logica ja validada em _calcular_ocupacao_celula,
+    so que agrupada por dia (e por todas as celulas, se maquina_id nao for
+    informado) em vez de olhar uma unica celula/dia em detalhe.
+
+    Usa as mesmas janelas "iniciada" pra achar produzindo e trata o
+    complemento do turno como parada - sem depender do registro de
+    'interrompida' pra decidir se estava parado ou nao (esse so entra pra
+    achar o motivo na tela de detalhe, aqui so importa se tinha ordem
+    rodando ou nao).
+    """
+    from django.utils import timezone as dj_timezone
+    from datetime import time as time_cls
+    from collections import defaultdict
+
+    tz = dj_timezone.get_current_timezone()
+    agora = now()
+
+    # trava o intervalo pra nao rodar um agregado gigante sem querer
+    if (data_fim - data_inicio).days > 92:
+        data_inicio = data_fim - timedelta(days=92)
+
+    if maquina_id:
+        maquina_ids = [int(maquina_id)]
+    else:
+        maquina_ids = list(
+            Maquina.objects.filter(setor__nome='montagem', tipo='maquina').values_list('id', flat=True)
+        )
+
+    resultado = []
+    if not maquina_ids:
+        return resultado
+
+    limite_inicio = dj_timezone.make_aware(datetime.combine(data_inicio, time_cls(0, 0)), tz)
+    limite_fim = dj_timezone.make_aware(datetime.combine(data_fim, time_cls(23, 59, 59)), tz)
+
+    segmentos_por_celula = defaultdict(list)
+    for row in (
+        OrdemProcesso.objects
+        .filter(ordem__maquina_id__in=maquina_ids, status='iniciada', data_inicio__lt=limite_fim)
+        .filter(Q(data_fim__isnull=True) | Q(data_fim__gt=limite_inicio))
+        .values('ordem__maquina_id', 'data_inicio', 'data_fim')
+    ):
+        segmentos_por_celula[row['ordem__maquina_id']].append((row['data_inicio'], row['data_fim']))
+
+    cursor = data_inicio
+    while cursor <= data_fim:
+        inicio_turno = dj_timezone.make_aware(datetime.combine(cursor, time_cls(7, 0)), tz)
+        fim_turno = dj_timezone.make_aware(datetime.combine(cursor, time_cls(17, 0)), tz)
+        fim_efetivo = min(fim_turno, agora)
+
+        minutos_parado_dia = 0.0
+        if fim_efetivo > inicio_turno:
+            for m_id in maquina_ids:
+                intervalos = []
+                for ini, fim in segmentos_por_celula.get(m_id, []):
+                    ini_c = max(ini, inicio_turno)
+                    fim_c = min(fim or agora, fim_efetivo)
+                    if fim_c > ini_c:
+                        intervalos.append((ini_c, fim_c))
+
+                merged = []
+                for ini, fim in sorted(intervalos, key=lambda t: t[0]):
+                    if merged and ini <= merged[-1][1]:
+                        merged[-1] = (merged[-1][0], max(merged[-1][1], fim))
+                    else:
+                        merged.append((ini, fim))
+
+                tempo_produzindo = sum((fim - ini for ini, fim in merged), timedelta())
+                periodo_total = fim_efetivo - inicio_turno
+                minutos_parado_dia += (periodo_total - tempo_produzindo).total_seconds() / 60
+
+        resultado.append({
+            'label': cursor.strftime('%d/%m'),
+            'horas_paradas': round(minutos_parado_dia / 60, 1),
+        })
+        cursor += timedelta(days=1)
+
+    return resultado
 
 
 def _calcular_ocupacao_celula(maquina_id, dia):
