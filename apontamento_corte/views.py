@@ -1324,6 +1324,9 @@ def atualizar_status_ordem(request):
                 if ordem.status_atual == status:
                     return JsonResponse({'error': f'Essa ordem ja está {status}. Atualize a página.'}, status=400)
 
+                if ordem.status_atual == 'finalizada':
+                    return JsonResponse({'error': 'Essa ordem já foi finalizada e não pode ser alterada.'}, status=409)
+
                 # Verifica se já existe uma ordem iniciada na mesma máquina
                 if status == 'iniciada' and maquina_nome:
                     ordem_em_andamento = Ordem.objects.filter(
@@ -1333,8 +1336,9 @@ def atualizar_status_ordem(request):
                     if ordem_em_andamento:
                         return JsonResponse({'error': f'Já existe uma ordem iniciada para essa máquina ({maquina_nome}). Finalize ou interrompa antes de iniciar outra.'}, status=400)
 
-                # Finaliza o processo atual (se existir)
-                processo_atual = ordem.processos.filter(data_fim__isnull=True).first()
+                # Finaliza o processo atual (se existir) - ordenado pelo mais recente pra
+                # nao fechar um processo antigo por engano quando houver mais de um aberto.
+                processo_atual = ordem.processos.filter(data_fim__isnull=True).order_by('-data_inicio').first()
                 if processo_atual:
                     processo_atual.finalizar_atual()
 
@@ -3068,11 +3072,17 @@ def excluir_ordem(request):
         ordem = get_object_or_404(Ordem, pk=ordem_id)
         motivo = get_object_or_404(MotivoExclusao, pk=int(motivo_id))
 
+        if ordem.status_atual == 'finalizada':
+            return JsonResponse(
+                {'error': 'Essa ordem já foi finalizada e não pode ser excluída/revertida.'},
+                status=409,
+            )
+
         # Atualiza os campos da ordem
         ordem.sequenciada = None
         ordem.status_atual = 'aguardando_iniciar'
         ordem.motivo_retirar_sequenciada = motivo
-        
+
         ordem.save()
         transaction.on_commit(lambda: notificar_ordem(ordem))
 
