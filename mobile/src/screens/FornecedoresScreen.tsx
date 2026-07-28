@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet,
+  ActivityIndicator, Alert, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
@@ -77,7 +78,13 @@ export default function FornecedoresScreen({ route, navigation }: Props) {
   const tipos = TIPOS_ORDEM.filter((tipo) => (codigosEspeciais[tipo] || []).length > 0);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
+    <KeyboardAwareScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+      enableOnAndroid
+      extraScrollHeight={20}
+      keyboardShouldPersistTaps="handled"
+    >
       {tipos.length === 0 ? (
         <View style={styles.secao}>
           <Text style={styles.vazioTexto}>Nenhum item especial nessa carga.</Text>
@@ -108,7 +115,7 @@ export default function FornecedoresScreen({ route, navigation }: Props) {
           {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar fornecedores</Text>}
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
