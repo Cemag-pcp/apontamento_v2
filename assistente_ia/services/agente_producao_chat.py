@@ -931,6 +931,12 @@ ou problema notável) se isso for realmente útil e em uma frase, não um parág
 
 MODEL = "claude-haiku-4-5"
 
+# Desliga temporariamente a chamada real a API da Anthropic. Enquanto True, o
+# chat continua funcionando normalmente (widget, persistencia, historico),
+# mas so devolve uma mensagem fixa, sem gastar tokens nem chamar a API.
+DESABILITADO_TEMPORARIAMENTE = True
+MENSAGEM_DESABILITADO = "Estamos em fase de teste"
+
 
 def _historico_para_claude(mensagens):
     return [
@@ -945,6 +951,9 @@ def perguntar(pergunta: str, historico_anterior) -> str:
     (lista de MensagemChatAssistente ordenada por criada_em, sem a pergunta atual).
     Retorna o texto da resposta do assistente.
     """
+    if DESABILITADO_TEMPORARIAMENTE:
+        return MENSAGEM_DESABILITADO
+
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
     historico = _historico_para_claude(historico_anterior)
