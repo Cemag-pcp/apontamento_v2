@@ -1189,39 +1189,31 @@ def data_erros_transferencia(request):
 
     queryset = SolicitacaoTransferencia.objects.filter(
         (Q(rpa__isnull=True) | ~Q(rpa="OK")) & Q(data_entrega__isnull=False)
-    )
+    ).select_related("item", "deposito_destino", "funcionario").order_by("-data_solicitacao", "-pk")
 
-    itens_transferencia_erros = []
-
-    for item in queryset:
-        itens_transferencia_erros.append(
-            {
-                "chave": item.pk,
-                "item": f"{item.item.codigo} - {item.item.nome}",
-                "qtd": item.quantidade,
-                "data_solicitacao": item.data_solicitacao,
-                "data_entrega": item.data_entrega,
-                "dep_destino": item.deposito_destino.nome,
-                "solicitante": item.funcionario.nome,
-                "erro": item.rpa,
-            }
-        )
-
-    # Paginação
-    page = int(request.GET.get("start", 0)) // int(request.GET.get("length", 10)) + 1
+    start = int(request.GET.get("start", 0))
     limit = int(request.GET.get("length", 10))
-    paginator = Paginator(itens_transferencia_erros, limit)
+    total = queryset.count()
 
-    try:
-        instrumentos_page = paginator.page(page)
-    except EmptyPage:
-        instrumentos_page = []
+    itens_transferencia_erros = [
+        {
+            "chave": item.pk,
+            "item": f"{item.item.codigo} - {item.item.nome}",
+            "qtd": item.quantidade,
+            "data_solicitacao": item.data_solicitacao,
+            "data_entrega": item.data_entrega,
+            "dep_destino": item.deposito_destino.nome,
+            "solicitante": item.funcionario.nome,
+            "erro": item.rpa,
+        }
+        for item in queryset[start:start + limit]
+    ]
 
     data = {
         "draw": int(request.GET.get("draw", 1)),
-        "recordsTotal": paginator.count,
-        "recordsFiltered": paginator.count,
-        "data": list(instrumentos_page),
+        "recordsTotal": total,
+        "recordsFiltered": total,
+        "data": itens_transferencia_erros,
     }
 
     return JsonResponse(data)
@@ -1231,41 +1223,32 @@ def data_erros_requisicao(request):
 
     queryset = SolicitacaoRequisicao.objects.filter(
         (Q(rpa__isnull=True) | ~Q(rpa="OK")) & Q(data_entrega__isnull=False)
-    )
+    ).select_related("item", "classe_requisicao", "funcionario", "cc").order_by("-data_solicitacao", "-pk")
 
-    itens_requisicao_erros = []
-
-    for item in queryset:
-        itens_requisicao_erros.append(
-            {
-                "chave": item.pk,
-                "item": f"{item.item.codigo} - {item.item.nome}",
-                "qtd": item.quantidade,
-                "data_solicitacao": item.data_solicitacao,
-                "data_entrega": item.data_entrega,
-                "classe_req": item.classe_requisicao.nome,
-                "solicitante": item.funcionario.nome,
-                "cc": item.cc.nome,
-                "erro": item.rpa,
-            }
-        )
-    print("Erros de requisição: ", len(itens_requisicao_erros))
-
-    # Paginação
-    page = int(request.GET.get("start", 0)) // int(request.GET.get("length", 10)) + 1
+    start = int(request.GET.get("start", 0))
     limit = int(request.GET.get("length", 10))
-    paginator = Paginator(itens_requisicao_erros, limit)
+    total = queryset.count()
 
-    try:
-        instrumentos_page = paginator.page(page)
-    except EmptyPage:
-        instrumentos_page = []
+    itens_requisicao_erros = [
+        {
+            "chave": item.pk,
+            "item": f"{item.item.codigo} - {item.item.nome}",
+            "qtd": item.quantidade,
+            "data_solicitacao": item.data_solicitacao,
+            "data_entrega": item.data_entrega,
+            "classe_req": item.classe_requisicao.nome,
+            "solicitante": item.funcionario.nome,
+            "cc": item.cc.nome,
+            "erro": item.rpa,
+        }
+        for item in queryset[start:start + limit]
+    ]
 
     data = {
         "draw": int(request.GET.get("draw", 1)),
-        "recordsTotal": paginator.count,
-        "recordsFiltered": paginator.count,
-        "data": list(instrumentos_page),
+        "recordsTotal": total,
+        "recordsFiltered": total,
+        "data": itens_requisicao_erros,
     }
 
     return JsonResponse(data)
