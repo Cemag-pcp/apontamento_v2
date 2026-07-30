@@ -48,17 +48,12 @@ TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 PROCESSOS_APONTAMENTO_DEPOSITODEST_FALLBACK_CORTE = [
-    "S Mont Prod Especiais",
-    "S Mont Conjuntos Carretas",
-    "S Pintura",
-    "S Expedição",
     "S C Serras",
     "S C Plasma",
     "S C Guilhotina",
     "S Corte Manual",
     "S C Prensas",
     "S C Laser",
-    "S Usinagem",
 ]
 
 def _url_apontamento_erp_corte():
@@ -2338,6 +2333,7 @@ def api_erp_apontamentos_corte(request):
         'ordem': request.GET.get('ordem', '').strip(),
         'peca': request.GET.get('peca', '').strip(),
         'chapa': request.GET.get('chapa', '').strip(),
+        'chave_apontamento': request.GET.get('chave_apontamento', '').strip(),
         'data_producao_inicio': request.GET.get('data_producao_inicio', '').strip(),
         'data_producao_fim': request.GET.get('data_producao_fim', '').strip(),
         'apontado': request.GET.get('apontado', 'nao').strip().lower(),
@@ -2370,6 +2366,9 @@ def api_erp_apontamentos_corte(request):
             Q(ordem__propriedade__descricao_mp__icontains=filtros['chapa']) |
             Q(ordem__propriedade__espessura__icontains=filtros['chapa'])
         )
+
+    if filtros['chave_apontamento']:
+        queryset = queryset.filter(chave_apontamento__icontains=filtros['chave_apontamento'])
 
     data_producao_inicio = parse_date(filtros['data_producao_inicio']) if filtros['data_producao_inicio'] else None
     data_producao_fim = parse_date(filtros['data_producao_fim']) if filtros['data_producao_fim'] else None

@@ -93,6 +93,7 @@ function readFilters() {
         ordem: (data.get('ordem') || '').trim(),
         peca: (data.get('peca') || '').trim(),
         chapa: (data.get('chapa') || '').trim(),
+        chave_apontamento: (data.get('chave_apontamento') || '').trim(),
         data_producao_inicio: (data.get('data_producao_inicio') || '').trim(),
         data_producao_fim: (data.get('data_producao_fim') || '').trim(),
         apontado: (data.get('apontado') || 'nao').trim(),
