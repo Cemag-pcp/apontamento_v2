@@ -1,21 +1,18 @@
-import { cambaoProcesso } from './ordem-criada-pintura.js';
+// WebSocket desabilitado (instabilidade em producao ligada ao channel layer Redis).
+// import { cambaoProcesso } from './ordem-criada-pintura.js';
 
-//testes
+// const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+// const socket = new WebSocket(`${protocol}://${window.location.host}/ws/ordens/iniciadas/`);
 
-// const socket = new WebSocket(`ws://${window.location.host}/ws/ordens/iniciadas/`);
-const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-const socket = new WebSocket(`${protocol}://${window.location.host}/ws/ordens/iniciadas/`);
+// socket.onmessage = function(e) {
+//     const data = JSON.parse(e.data);
+//     console.log("Ordem atualizada:", data);
 
-socket.onmessage = function(e) {
-    const data = JSON.parse(e.data);
-    console.log("Ordem atualizada:", data);
-    
-    // FUTURAMENTE carregar apenas a ordem que realmente foi atualizada, atualizar o card especificamente
-    console.log("chamando carregarOrdensIniciadas");
-    cambaoProcesso();
+//     console.log("chamando carregarOrdensIniciadas");
+//     cambaoProcesso();
 
-};
+// };
 
-socket.onclose = function(e) {
-    console.warn('WebSocket desconectado');
-};
+// socket.onclose = function(e) {
+//     console.warn('WebSocket desconectado');
+// };

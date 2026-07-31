@@ -2,8 +2,6 @@ import os
 import gspread
 import pandas as pd
 from datetime import datetime, timedelta
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
 from datetime import timedelta as dt_timedelta
 # from django.db import transaction
 # from django.utils import timezone as dj_timezone
@@ -18,32 +16,16 @@ from datetime import timedelta as dt_timedelta
 # CACHE_DURATION = timedelta(hours=24) 
 
 def notificar_ordem(ordem):
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "ordens_iniciadas",
-        {
-            "type": "enviar_ordem",
-            "data": {
-                "ordem": ordem.ordem,
-                "ultima_atualizacao": ordem.ultima_atualizacao.isoformat()
-            }
-        }
-    )
+    # WebSocket desabilitado: chamada sincrona ao channel layer (Redis Cloud)
+    # aqui dentro do request travava o Daphne inteiro quando o Redis
+    # engasgava (instancia parava de responder ate no health check do Render).
+    return
 
 
 def notificar_acao_almox(tipo_acao, tipo_solicitacao, solicitacao_id):
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "almox_solicitacoes",
-        {
-            "type": "enviar_acao_almox",
-            "data": {
-                "acao": tipo_acao,
-                "tipo_solicitacao": tipo_solicitacao,
-                "solicitacao_id": solicitacao_id,
-            },
-        },
-    )
+    # WebSocket desabilitado (ver notificar_ordem acima). Nenhuma tela
+    # do almoxarifado tinha listener conectado a esse canal mesmo.
+    return
 
 # def notificacao_almoxarifado(
 #     titulo: str,
