@@ -1657,9 +1657,10 @@ def get_pecas(request):
     per_page = int(request.GET.get('per_page', 10))  # Itens por página (padrão é 10)
 
     # Filtra as peças com base no termo de busca (opcional)
-    pecas_query = PecasOrdem.objects.values_list('peca', flat=True).distinct()  # Apenas o campo `peca`, eliminando duplicatas
+    pecas_query = PecasOrdem.objects.values_list('peca', flat=True)
     if search:
-        pecas_query = pecas_query.filter(peca__icontains=search).order_by('peca')
+        pecas_query = pecas_query.filter(peca__icontains=search)
+    pecas_query = pecas_query.order_by('peca').distinct()
 
     # Paginação
     paginator = Paginator(pecas_query, per_page)
