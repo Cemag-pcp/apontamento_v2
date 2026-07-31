@@ -7,7 +7,7 @@ from core.models import Ordem
 class PecasOrdem(models.Model):
 
     ordem=models.ForeignKey(Ordem, on_delete=models.CASCADE, related_name='ordem_pecas_corte')
-    peca=models.CharField(max_length=255)
+    peca=models.CharField(max_length=255, db_index=True)
     qtd_planejada=models.FloatField()
     qtd_morta=models.FloatField(default=0)
     qtd_boa=models.FloatField(default=0)
