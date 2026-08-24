@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import time
 from io import BytesIO
 from datetime import datetime
 from html import escape
@@ -353,6 +354,17 @@ def _reconcile_recebimento_items(items, incoming_dados, row_index, sheet_hash, d
     return primary_item
 
 
+# Orcamento de tempo por request: a sincronizacao roda linha a linha, de
+# forma sincrona, dentro do worker do Daphne. Uma planilha grande podia
+# manter isso rodando por minutos, prendendo o worker e derrubando a
+# instancia inteira (Render matava a task e reiniciava o servico). Agora
+# cada chamada processa no maximo esse tempo e devolve "concluido: false"
+# com o ponto pra continuar; o front chama de novo automaticamente ate
+# terminar, sem nenhuma request individual ficar longa o suficiente pra
+# travar o processo.
+TEMPO_LIMITE_SYNC_SEGUNDOS = 12
+
+
 def sincronizar_recebimento(request):
     if request.method != "POST":
         return JsonResponse({"error": "MÃ©todo não permitido"}, status=405)
@@ -362,7 +374,7 @@ def sincronizar_recebimento(request):
         return JsonResponse({"error": error}, status=500)
 
     if not values or len(values) < 2:
-        return JsonResponse({"novos": 0, "total": 0}, status=200)
+        return JsonResponse({"novos": 0, "total": 0, "concluido": True}, status=200)
 
     header_row_index = 5
     header_row = values[header_row_index - 1] if len(values) >= header_row_index else []
@@ -375,10 +387,22 @@ def sincronizar_recebimento(request):
     if cutoff is None:
         return JsonResponse({"error": "Data de corte invÃ¡lida"}, status=500)
 
+    try:
+        start_offset = max(int(request.GET.get("start_offset", 0) or 0), 0)
+    except (TypeError, ValueError):
+        start_offset = 0
+
     novos = 0
     total = 0
+    proximo_offset = None
+    inicio = time.monotonic()
 
-    for row_index, row in enumerate(data_rows, start=header_row_index + 1):
+    for offset, row in enumerate(data_rows[start_offset:], start=start_offset):
+        if time.monotonic() - inicio > TEMPO_LIMITE_SYNC_SEGUNDOS:
+            proximo_offset = offset
+            break
+
+        row_index = header_row_index + 1 + offset
         row_values = list(row)
         if not row_values:
             continue
@@ -452,7 +476,17 @@ def sincronizar_recebimento(request):
             )
             continue
 
-    return JsonResponse({"novos": novos, "total": total}, status=200)
+    return JsonResponse(
+        {
+            "novos": novos,
+            "total": total,
+            "concluido": proximo_offset is None,
+            "proximo_offset": proximo_offset,
+            "linha_atual": (proximo_offset if proximo_offset is not None else len(data_rows)) + header_row_index,
+            "total_linhas": len(data_rows) + header_row_index,
+        },
+        status=200,
+    )
 
 
 COLUNAS_PENDENCIAS = [

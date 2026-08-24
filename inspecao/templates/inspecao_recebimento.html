@@ -836,7 +836,6 @@
         const btn = document.getElementById("btn-sincronizar-recebimento");
         btn.disabled = true;
         const textoOriginal = btn.textContent;
-        btn.textContent = "Sincronizando...";
 
         const csrfInput = document.querySelector("[name=csrfmiddlewaretoken]");
         const headers = { "Content-Type": "application/json" };
@@ -844,18 +843,40 @@
             headers["X-CSRFToken"] = csrfInput.value;
         }
 
-        fetch("/inspecao/api/recebimento/sincronizar/", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({}),
-        })
-            .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
-            .then((result) => {
-                if (!result.ok) {
-                    throw new Error(result.data.error || "Erro ao sincronizar.");
-                }
-                carregarPendencias();
+        // Sincroniza em lotes: cada request no backend processa so alguns
+        // segundos de linhas e devolve "concluido: false" com o proximo
+        // ponto pra continuar. Isso evita uma unica request muito longa
+        // (planilhas grandes) que podia travar o servidor inteiro.
+        let novosTotal = 0;
+        let totalTotal = 0;
+
+        function proximoLote(startOffset) {
+            const params = startOffset ? `?start_offset=${startOffset}` : "";
+            btn.textContent = startOffset ? `Sincronizando... (linha ${startOffset})` : "Sincronizando...";
+
+            return fetch(`/inspecao/api/recebimento/sincronizar/${params}`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({}),
             })
+                .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+                .then((result) => {
+                    if (!result.ok) {
+                        throw new Error(result.data.error || "Erro ao sincronizar.");
+                    }
+                    novosTotal += result.data.novos || 0;
+                    totalTotal += result.data.total || 0;
+
+                    if (!result.data.concluido) {
+                        return proximoLote(result.data.proximo_offset);
+                    }
+                })
+                .then(() => {
+                    carregarPendencias();
+                });
+        }
+
+        proximoLote(0)
             .catch((error) => {
                 console.error(error);
                 alert(error.message || "Erro ao sincronizar.");
