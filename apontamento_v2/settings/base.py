@@ -14,7 +14,6 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 SECRET_KEY = env('SECRET_KEY')
 
 INSTALLED_APPS = [
-    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -48,7 +47,6 @@ INSTALLED_APPS = [
     'reuniao',
     'assistente_ia',
 
-    'channels',
     'corsheaders',
 
     'rest_framework',
@@ -105,7 +103,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'apontamento_v2.wsgi.application'
-ASGI_APPLICATION = 'apontamento_v2.asgi.application'
+# ASGI/Daphne desabilitado (ver core/routing.py e apontamento_v2/asgi.py).
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -213,11 +211,4 @@ GSHEETS_MAT_INDIRETO_SPREADSHEET_ID = env('GSHEETS_MAT_INDIRETO_SPREADSHEET_ID',
 
 PLOOMES_USER_KEY = env('PLOOMES_USER_KEY', default='')
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": ["redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210"],
-        },
-    },
-}
+# CHANNEL_LAYERS removido junto com o Channels/Daphne (ver core/routing.py).

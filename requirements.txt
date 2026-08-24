@@ -4,15 +4,13 @@ psycopg2
 asgiref==3.8.1
 boto3==1.35.64
 cachetools==5.5.2
-channels==4.2.2
-channels_redis==4.2.1
-daphne==4.2.1
 Django==4.2.16
 djangorestframework==3.15.2
 django-environ==0.11.2
 django-storages==1.14.6
 google-auth==2.40.3
 gspread==5.7.2
+gunicorn==23.0.0
 openpyxl>=3.1.5
 paho-mqtt
 pillow==11.3.0

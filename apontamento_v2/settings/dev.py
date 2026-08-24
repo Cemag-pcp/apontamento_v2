@@ -67,7 +67,7 @@ SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
-# daphne -b 127.0.0.1 -p 8000 apontamento_v2.asgi:application
+# Daphne/ASGI desabilitado. Rodar local com: python manage.py runserver
 
 LOGGING = {
     'version': 1,
