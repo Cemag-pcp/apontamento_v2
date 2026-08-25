@@ -23,6 +23,7 @@ import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados, TaktCelulaExcluida
 from core.utils import carregar_planilha_base_geral
+from core.whatsapp import enviar_falta_de_peca, destinatarios_falta_de_peca
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile, PecasFaltantes
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos, CarretasExplodidas
 from inspecao.models import Inspecao
@@ -413,6 +414,7 @@ def atualizar_status_ordem(request):
         qt_mortas = body.get('qt_mortas', 0)
         continua = body.get('continua', 'false').lower() == 'true'
         apontamento_erp = None
+        notificacao_falta_peca = None
 
         if not ordem_id or not grupo_maquina or not status:
             return JsonResponse({'error': 'Campos obrigatórios não enviados.'}, status=400)
@@ -648,6 +650,27 @@ def atualizar_status_ordem(request):
                     if pecas_a_criar:
                         PecasFaltantes.objects.bulk_create(pecas_a_criar)
 
+                    if pecas_a_criar and novo_processo.motivo_interrupcao.nome == "Falta peça":
+                        # PecasOrdem.peca e um CharField com o codigo da peca, nao FK -
+                        # busca a Pecas correspondente pra pegar a descricao.
+                        peca_ordem_atual = PecasOrdem.objects.filter(ordem=ordem).first()
+                        peca_obj = (
+                            Pecas.objects.filter(codigo=peca_ordem_atual.peca).first()
+                            if peca_ordem_atual and peca_ordem_atual.peca else None
+                        )
+                        if peca_obj:
+                            conjunto_texto = f"{peca_obj.codigo} - {peca_obj.descricao or ''}".strip(' -')
+                        elif peca_ordem_atual and peca_ordem_atual.peca:
+                            conjunto_texto = peca_ordem_atual.peca
+                        else:
+                            conjunto_texto = str(ordem.ordem)
+
+                        notificacao_falta_peca = {
+                            'celula': ordem.maquina.nome if ordem.maquina else 'N/A',
+                            'conjunto': conjunto_texto,
+                            'pecas': [f"{p.nome_peca} {p.quantidade}un." for p in pecas_a_criar],
+                        }
+
                 # Atualiza o status da ordem
                 ordem.status_atual = status
 
@@ -669,7 +692,24 @@ def atualizar_status_ordem(request):
                 response_payload['apontamento_erp'] = apontamento_erp
                 response_payload['chave_apontamento'] = apontamento_erp.get('chave_apontamento', '')
 
-            return JsonResponse(response_payload)
+        # Fora da transacao (lock da ordem ja liberado): notificacao e
+        # best-effort, uma chamada externa lenta aqui nao pode segurar o
+        # lock nem derrubar a resposta de uma interrupcao que ja foi salva.
+        if notificacao_falta_peca:
+            for telefone in destinatarios_falta_de_peca():
+                try:
+                    _, erro = enviar_falta_de_peca(
+                        telefone=telefone,
+                        celula=notificacao_falta_peca['celula'],
+                        conjunto=notificacao_falta_peca['conjunto'],
+                        pecas_faltantes=notificacao_falta_peca['pecas'],
+                    )
+                    if erro:
+                        logger.warning("Falha ao notificar falta de peca via WhatsApp para %s: %s", telefone, erro)
+                except Exception:
+                    logger.exception("Erro inesperado ao notificar falta de peca via WhatsApp para %s", telefone)
+
+        return JsonResponse(response_payload)
 
     except Ordem.DoesNotExist:
         return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)

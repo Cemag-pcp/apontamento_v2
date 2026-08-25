@@ -10,7 +10,7 @@ from django.db.models import Prefetch, Count, Q
 from django.views.decorators.csrf import csrf_exempt
 
 from .forms import UploadCSVForm
-from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas, ItensExplodidos, CarretasExplodidas, EspessuraChapa
+from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas, ItensExplodidos, CarretasExplodidas, EspessuraChapa, DestinatarioNotificacao
 from . import views
 
 import csv
@@ -20,6 +20,69 @@ from decimal import Decimal, InvalidOperation
 def crud(request):
 
     return render(request, "crud/crud.html")
+
+@login_required
+def configuracoes(request):
+    return render(request, 'configuracoes/configuracoes.html')
+
+@login_required
+@require_GET
+def api_destinatarios_falta_peca(request):
+    destinatarios = DestinatarioNotificacao.objects.filter(
+        tipo_notificacao='falta_peca'
+    ).order_by('nome').values('id', 'nome', 'telefone', 'ativo')
+
+    return JsonResponse({'destinatarios': list(destinatarios)})
+
+@login_required
+def add_destinatario_falta_peca(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    try:
+        dados = json.loads(request.body)
+        destinatario = DestinatarioNotificacao.objects.create(
+            nome=dados['nome'],
+            telefone=dados['telefone'],
+            tipo_notificacao='falta_peca',
+            ativo=dados.get('ativo', True),
+        )
+        return JsonResponse({'id': destinatario.id, 'message': 'Destinatário criado com sucesso'}, status=201)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except KeyError as e:
+        return JsonResponse({'error': f'Campo ausente: {str(e)}'}, status=400)
+    except ValidationError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@login_required
+def edit_destinatario_falta_peca(request, pk):
+    destinatario = get_object_or_404(DestinatarioNotificacao, pk=pk, tipo_notificacao='falta_peca')
+
+    if request.method != 'PUT':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    try:
+        dados = json.loads(request.body)
+        destinatario.nome = dados.get('nome', destinatario.nome)
+        destinatario.telefone = dados.get('telefone', destinatario.telefone)
+        if 'ativo' in dados:
+            destinatario.ativo = dados['ativo']
+        destinatario.save()
+        return JsonResponse({'message': 'Destinatário atualizado com sucesso'})
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except ValidationError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@login_required
+def delete_destinatario_falta_peca(request, pk):
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+    destinatario = get_object_or_404(DestinatarioNotificacao, pk=pk, tipo_notificacao='falta_peca')
+    destinatario.delete()
+    return JsonResponse({'message': 'Destinatário removido com sucesso'})
 
 @require_GET
 def buscar_maquinas(request):

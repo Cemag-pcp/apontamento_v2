@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}
+<title>Configurações</title>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <h2 class="mb-1">Configurações</h2>
+            <p class="text-muted mb-0">Configurações de notificações automáticas do sistema.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-4 col-lg-3">
+            <button type="button" class="card shadow-sm border-0 w-100 text-start p-3 h-100" data-bs-toggle="modal" data-bs-target="#modalDestinatariosFaltaPeca">
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-whatsapp fs-2 text-success"></i>
+                    <div>
+                        <div class="fw-semibold">Destinatários - Falta de peça</div>
+                        <div class="text-muted small">Quem recebe o aviso de interrupção por falta de peça</div>
+                    </div>
+                </div>
+            </button>
+        </div>
+    </div>
+</div>
+
+{% include 'configuracoes/destinatario_falta_peca_modals.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{% static 'js/configuracoes.js' %}"></script>
+{% endblock %}

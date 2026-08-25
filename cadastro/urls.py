@@ -8,6 +8,13 @@ app_name = 'cadastro'
 urlpatterns = [
     path('crud/', crud, name='crud'),
 
+    # Configuracoes
+    path('configuracoes/', views.configuracoes, name='configuracoes'),
+    path('api/destinatarios-falta-peca/', views.api_destinatarios_falta_peca, name='api_destinatarios_falta_peca'),
+    path('add/destinatario-falta-peca/', views.add_destinatario_falta_peca, name='add_destinatario_falta_peca'),
+    path('edit/destinatario-falta-peca/<int:pk>/', views.edit_destinatario_falta_peca, name='edit_destinatario_falta_peca'),
+    path('delete/destinatario-falta-peca/<int:pk>/', views.delete_destinatario_falta_peca, name='delete_destinatario_falta_peca'),
+
     # Máquinas
     path('api/buscar-maquinas/', views.buscar_maquinas, name='buscar_maquinas'),
 

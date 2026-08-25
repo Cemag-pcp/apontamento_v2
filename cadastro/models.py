@@ -54,6 +54,23 @@ class MotivoExclusao(models.Model):
     def __str__(self):
         return self.nome
 
+class DestinatarioNotificacao(models.Model):
+
+    TIPO_CHOICES = (
+        ('falta_peca', 'Falta de peça'),
+    )
+
+    nome = models.CharField(max_length=100)
+    telefone = models.CharField(
+        max_length=20,
+        help_text="Numero com DDI, sem '+' e sem espacos (ex: 5511999998888)",
+    )
+    tipo_notificacao = models.CharField(max_length=30, choices=TIPO_CHOICES, default='falta_peca')
+    ativo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f'{self.nome} ({self.telefone})'
+
 class Operador(models.Model):
 
     STATUS_CHOICES = (('ativo','Ativo'),
