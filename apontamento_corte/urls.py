@@ -10,6 +10,7 @@ urlpatterns = [
     path('', views.planejamento, name='planejamento'),
     path('duplicar-op/', views.duplicar_op, name='duplicar_op'),
     path('erp/apontamentos/', views.erp_apontamentos_corte, name='erp_apontamentos_corte'),
+    path('nao-conforme/', views.nao_conforme, name='nao_conforme'),
 
     #apis
     path('api/salvar-arquivo/', SalvarArquivoView.as_view(), name='salvar_arquivo'),
@@ -24,6 +25,7 @@ urlpatterns = [
     
     path('api/ordens-criadas/', views.get_ordens_criadas, name='get_ordens_criadas'),
     path('api/ordens-criadas/<int:pk_ordem>/pecas/', views.get_pecas_ordem, name='get_pecas_ordem'),
+    path('api/ordens-criadas/<int:pk_ordem>/detalhes/', views.get_detalhes_ordem_corte, name='get_detalhes_ordem_corte'),
     path('api/ordens/editar-informacoes/', views.editar_informacoes_ordem, name='editar_informacoes_ordem'),
     path('api/ordens/atualizar-status/', views.atualizar_status_ordem, name='atualizar_status_ordem'),
     path('api/ordens-iniciadas/', views.get_ordens_iniciadas, name='get_ordens_iniciadas'),
@@ -32,6 +34,10 @@ urlpatterns = [
     path('api/resequenciar-ordem/', views.resequenciar_ordem, name='resequenciar_ordem'),
     path('api/excluir-ordem/', views.excluir_ordem, name='excluir_ordem'),
     path('api/salvar-prioridade/', views.definir_prioridade, name='definir_prioridade'),
+
+    # Pecas nao conforme
+    path('api/pecas-nao-conforme/', views.get_pecas_nao_conforme, name='get_pecas_nao_conforme'),
+    path('api/pecas-nao-conforme/<int:pk>/decidir/', views.decidir_peca_nao_conforme, name='decidir_peca_nao_conforme'),
 
     # verificar se esse endpoint está sendo usado
     path('api/duplicador-ordem/filtrar/', views.filtrar_ordens, name='filtrar_ordens'),

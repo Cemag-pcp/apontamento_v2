@@ -1079,7 +1079,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina, maquinaPreferidaId = null,
                             <tr class="table-light">
                                 <th>Peça</th>
                                 <th>Quantidade Inicial</th>
-                                <th>Mortas</th>
+                                <th>Ñ Conforme</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1096,7 +1096,7 @@ function mostrarModalFinalizar(ordemId, grupoMaquina, maquinaPreferidaId = null,
                                             data-peca-id="${peca.peca}" 
                                             min="0" 
                                             max="${peca.quantidade}" 
-                                            placeholder="Mortas"
+                                            placeholder="Ñ Conforme"
                                             style="width: 100px; text-align: center;">
                                     </td>
                                 </tr>

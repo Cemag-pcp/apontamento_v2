@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.views import View
 from django.conf import settings
 from django.db import transaction, connection
@@ -13,7 +13,7 @@ from django.db.models.functions import Coalesce
 from django.forms.models import model_to_dict
 from django.contrib.auth.decorators import login_required
 
-from .models import Ordem, PecasOrdem, TransferenciaChapaCorte
+from .models import Ordem, PecasOrdem, TransferenciaChapaCorte, PecaNaoConforme
 from core.models import OrdemProcesso,PropriedadesOrdem,MaquinaParada, Profile
 from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, MotivoMaquinaParada, MotivoExclusao, EspessuraChapa, CarretasExplodidas
 from .utils import *
@@ -1119,6 +1119,52 @@ def planejamento(request):
         'motivos_exclusao': motivos_exclusao,
     })
 
+@require_GET
+def get_detalhes_ordem_corte(request, pk_ordem):
+    try:
+        ordem = (
+            Ordem.objects
+            .select_related('propriedade', 'maquina', 'operador_final')
+            .prefetch_related('ordem_pecas_corte')
+            .get(pk=pk_ordem)
+        )
+    except Ordem.DoesNotExist:
+        return JsonResponse({'error': 'Ordem não encontrada.'}, status=404)
+
+    propriedade = getattr(ordem, 'propriedade', None)
+    dados_chapa = _calcular_peso_chapas_corte(propriedade, propriedade.quantidade if propriedade else None)
+
+    chapa = None
+    if propriedade:
+        chapa = {
+            'descricao_mp': propriedade.descricao_mp,
+            'tamanho': propriedade.tamanho,
+            'espessura': propriedade.espessura,
+            'tipo_chapa': propriedade.get_tipo_chapa_display() if propriedade.tipo_chapa else None,
+            'quantidade_chapas': propriedade.quantidade,
+            'codigo_chapa': dados_chapa.get('codigo') if dados_chapa and dados_chapa.get('encontrou_chapa') else None,
+            'peso_total': dados_chapa.get('peso_total') if dados_chapa and dados_chapa.get('encontrou_chapa') else None,
+        }
+
+    pecas = [{
+        'peca': peca.peca,
+        'qtd_planejada': peca.qtd_planejada,
+        'qtd_boa': peca.qtd_boa,
+        'qtd_morta': peca.qtd_morta,
+    } for peca in ordem.ordem_pecas_corte.all()]
+
+    return JsonResponse({
+        'ordem': ordem.ordem or ordem.ordem_duplicada,
+        'maquina': ordem.maquina.nome if ordem.maquina else None,
+        'status': ordem.get_status_atual_display(),
+        'operador_final': f"{ordem.operador_final.matricula} - {ordem.operador_final.nome}" if ordem.operador_final else None,
+        'obs': ordem.obs,
+        'obs_operador': ordem.obs_operador,
+        'chapa': chapa,
+        'pecas': pecas,
+    })
+
+
 def get_pecas_ordem(request, pk_ordem):
     try:
         # Busca a ordem com os relacionamentos necessários
@@ -1387,6 +1433,14 @@ def atualizar_status_ordem(request):
 
                         peca.save()
 
+                        if mortas > 0:
+                            PecaNaoConforme.objects.create(
+                                ordem=ordem,
+                                peca_ordem=peca,
+                                peca=peca.peca,
+                                quantidade=mortas,
+                            )
+
                         if finalizar_parcial:
                             restante = max(qtd_planejada_original - planejada, 0)
                             if restante > 0:
@@ -1584,6 +1638,190 @@ def get_ordens_iniciadas(request):
         'total_pages': paginator.num_pages,
         'total_ordens': paginator.count
     })
+
+@login_required
+def nao_conforme(request):
+    return render(request, 'apontamento_corte/nao_conforme.html')
+
+
+@require_GET
+def get_pecas_nao_conforme(request):
+    filtro_ordem = request.GET.get('ordem', '').strip()
+    filtro_peca = request.GET.get('peca', '').strip()
+    filtro_status = request.GET.get('status', 'pendente').strip()
+
+    page = int(request.GET.get('page', 1))
+    limit = int(request.GET.get('limit', 10))
+
+    registros = PecaNaoConforme.objects.select_related(
+        'ordem', 'ordem__maquina', 'ordem_sucata', 'ordem_recuperada'
+    ).order_by('-data_registro')
+
+    if filtro_status in ('pendente', 'concluida'):
+        registros = registros.filter(status=filtro_status)
+
+    if filtro_ordem:
+        registros = registros.filter(
+            Q(ordem__ordem__icontains=filtro_ordem) | Q(ordem__ordem_duplicada__icontains=filtro_ordem)
+        )
+
+    if filtro_peca:
+        registros = registros.filter(peca__icontains=filtro_peca)
+
+    paginator = Paginator(registros, limit)
+    try:
+        pagina = paginator.page(page)
+    except EmptyPage:
+        return JsonResponse({'registros': [], 'total_pages': paginator.num_pages, 'total': paginator.count})
+
+    dados = [{
+        'id': registro.id,
+        'ordem_id': registro.ordem_id,
+        'ordem': registro.ordem.ordem or registro.ordem.ordem_duplicada,
+        'maquina': registro.ordem.maquina.nome if registro.ordem.maquina else None,
+        'peca': registro.peca,
+        'quantidade': registro.quantidade,
+        'status': registro.status,
+        'qtd_sucata': registro.qtd_sucata,
+        'qtd_recuperada': registro.qtd_recuperada,
+        'ordem_sucata': (registro.ordem_sucata.ordem_duplicada if registro.ordem_sucata else None),
+        'ordem_recuperada': (registro.ordem_recuperada.ordem_duplicada if registro.ordem_recuperada else None),
+        'data_registro': registro.data_registro,
+    } for registro in pagina]
+
+    return JsonResponse({
+        'registros': dados,
+        'page': pagina.number,
+        'total_pages': paginator.num_pages,
+        'total': paginator.count,
+    })
+
+
+@require_POST
+def decidir_peca_nao_conforme(request, pk):
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    try:
+        qtd_sucata = float(body.get('qtd_sucata') or 0)
+        qtd_recuperada = float(body.get('qtd_recuperada') or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Quantidades inválidas.'}, status=400)
+
+    if qtd_sucata < 0 or qtd_recuperada < 0:
+        return JsonResponse({'error': 'Quantidades não podem ser negativas.'}, status=400)
+
+    try:
+        with transaction.atomic():
+            registro = get_object_or_404(
+                PecaNaoConforme.objects.select_for_update(of=('self',)).select_related('ordem'),
+                pk=pk,
+            )
+
+            if registro.status != 'pendente':
+                return JsonResponse({'error': 'Esse registro já foi resolvido.'}, status=409)
+
+            if abs((qtd_sucata + qtd_recuperada) - registro.quantidade) > 0.001:
+                return JsonResponse(
+                    {'error': f'A soma de sucata + recuperada precisa ser exatamente {registro.quantidade}, sem sobra.'},
+                    status=400,
+                )
+
+            ordem_original = registro.ordem
+            ordem_base = ordem_original.ordem or ordem_original.ordem_duplicada
+
+            ordem_sucata = None
+            ordem_recuperada = None
+
+            if qtd_sucata > 0:
+                numero_sucata = Ordem.objects.filter(
+                    ordem_pai=ordem_original, ordem_duplicada__endswith='_sucata'
+                ).count() + 1
+                ordem_sucata = Ordem.objects.create(
+                    ordem=None,
+                    ordem_pai=ordem_original,
+                    ordem_duplicada=f"{ordem_base}_{numero_sucata}_sucata",
+                    obs=f"Sucata da ordem #{ordem_base} - peça {registro.peca}",
+                    grupo_maquina=ordem_original.grupo_maquina,
+                    maquina=ordem_original.maquina,
+                    data_programacao=now().date(),
+                    status_atual='finalizada',
+                    status_prioridade=3,
+                    operador_final=ordem_original.operador_final,
+                )
+                propriedade_original = getattr(ordem_original, 'propriedade', None)
+                if propriedade_original:
+                    # Identifica a chapa de origem (mesma da ordem original) pra
+                    # a tela de apontamentos ERP conseguir resolver espessura e
+                    # codigo da chapa. quantidade=0 porque nao ha chapa nova
+                    # sendo consumida - e so o rastreio de qual material a
+                    # sucata veio.
+                    PropriedadesOrdem.objects.create(
+                        ordem=ordem_sucata,
+                        mp_codigo=propriedade_original.mp_codigo,
+                        descricao_mp=propriedade_original.descricao_mp,
+                        tamanho=propriedade_original.tamanho,
+                        espessura=propriedade_original.espessura,
+                        quantidade=0,
+                        tipo_chapa=propriedade_original.tipo_chapa,
+                    )
+                PecasOrdem.objects.create(
+                    ordem=ordem_sucata,
+                    peca=registro.peca,
+                    qtd_planejada=qtd_sucata,
+                    qtd_morta=qtd_sucata,
+                    qtd_boa=0,
+                )
+                transaction.on_commit(lambda: notificar_ordem(ordem_sucata))
+
+            if qtd_recuperada > 0:
+                numero_recuperada = Ordem.objects.filter(
+                    ordem_pai=ordem_original, ordem_duplicada__endswith='_recuperada'
+                ).count() + 1
+                ordem_recuperada = Ordem.objects.create(
+                    ordem=None,
+                    ordem_pai=ordem_original,
+                    ordem_duplicada=f"{ordem_base}_{numero_recuperada}_recuperada",
+                    obs=f"Recuperação da ordem #{ordem_base} - peça {registro.peca}",
+                    grupo_maquina=ordem_original.grupo_maquina,
+                    maquina=ordem_original.maquina,
+                    data_programacao=now().date(),
+                    status_atual='finalizada',
+                    status_prioridade=3,
+                    operador_final=ordem_original.operador_final,
+                )
+                # Sem PropriedadesOrdem: materia-prima/peso ficam em branco
+                # pra ordem recuperada, conforme decidido.
+                PecasOrdem.objects.create(
+                    ordem=ordem_recuperada,
+                    peca=registro.peca,
+                    qtd_planejada=qtd_recuperada,
+                    qtd_boa=qtd_recuperada,
+                    qtd_morta=0,
+                )
+                transaction.on_commit(lambda: notificar_ordem(ordem_recuperada))
+
+            registro.qtd_sucata = qtd_sucata
+            registro.qtd_recuperada = qtd_recuperada
+            registro.ordem_sucata = ordem_sucata
+            registro.ordem_recuperada = ordem_recuperada
+            registro.status = 'concluida'
+            registro.resp_decisao = request.user if request.user.is_authenticated else None
+            registro.data_decisao = now()
+            registro.save()
+
+        return JsonResponse({
+            'message': 'Decisão registrada com sucesso.',
+            'ordem_sucata': ordem_sucata.ordem_duplicada if ordem_sucata else None,
+            'ordem_recuperada': ordem_recuperada.ordem_duplicada if ordem_recuperada else None,
+        })
+    except Http404:
+        return JsonResponse({'error': 'Registro não encontrado.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @require_GET
 def get_ordens_interrompidas(request):
@@ -2343,7 +2581,7 @@ def api_erp_apontamentos_corte(request):
     queryset = (
         PecasOrdem.objects
         .filter(
-            qtd_boa__gt=0,
+            Q(qtd_boa__gt=0) | Q(qtd_morta__gt=0),
             ordem__status_atual='finalizada',
             ordem__grupo_maquina__in=['plasma', 'laser_1', 'laser_2', 'laser_3'],
             ordem__ultima_atualizacao__date__gte=date(2026, 6, 24),
