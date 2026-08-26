@@ -335,9 +335,11 @@ def get_itens_inspecao_pintura(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    inspecoes_ids = set(
-        DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
-    )
+    # Nao materializa em set()/list(): DadosExecucaoInspecao e uma tabela
+    # global (todos os setores), so cresce, e virar uma lista de milhares de
+    # ids soltos num "NOT IN" inline deixava essa view cada vez mais lenta.
+    # Passando o queryset direto, o Django gera uma subquery no SQL.
+    inspecoes_ids = DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
 
     # Captura os parâmetros enviados na URL
     cores_filtradas = (
@@ -589,9 +591,9 @@ def get_itens_inspecionados_pintura(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    inspecionados_ids = set(
-        DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
-    )
+    # Ver comentario equivalente em get_itens_inspecao_pintura: passa o
+    # queryset direto (sem materializar em set/list) pra virar subquery no SQL.
+    inspecionados_ids = DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
 
     # Captura os filtros aplicados pela URL
     cores_filtradas = (
