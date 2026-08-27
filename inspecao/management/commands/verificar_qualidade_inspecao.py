@@ -31,6 +31,14 @@ class Command(BaseCommand):
         "e notifica os destinatarios de qualidade via WhatsApp."
     )
 
+    # Pula os checks padrao do Django (rodam antes de qualquer comando): eles
+    # importam o urls.py do projeto inteiro pra validar namespaces, o que
+    # carrega modulos com efeito colateral no import (ex: cargas/utils.py
+    # autentica no Google Sheets no nivel do modulo) e exige credenciais que
+    # esse comando nao usa. Roda num ambiente minimo (GitHub Actions) que so
+    # tem as credenciais do WhatsApp e do banco.
+    requires_system_checks = []
+
     def handle(self, *args, **options):
         destinatarios = destinatarios_notificacao_qualidade()
         if not destinatarios:
