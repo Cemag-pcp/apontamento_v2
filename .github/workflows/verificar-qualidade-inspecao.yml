@@ -1,0 +1,48 @@
+name: Verificar qualidade - inspecao diaria
+
+on:
+  schedule:
+    # 12:00 UTC = 09:00 America/Sao_Paulo (UTC-3, sem horario de verao)
+    - cron: '0 12 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verificar qualidade de inspecao
+        run: python manage.py verificar_qualidade_inspecao
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_STORAGE_BUCKET_NAME: ${{ secrets.AWS_STORAGE_BUCKET_NAME }}
+          AWS_S3_REGION_NAME: ${{ secrets.AWS_S3_REGION_NAME }}
+
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          BASE_TESTE: ${{ secrets.BASE_TESTE }}
+          BASE_PROD: ${{ secrets.BASE_PROD }}
+          RPA_API_KEY: ${{ secrets.RPA_API_KEY }}
+
+          whatsapp_api_version: ${{ secrets.WHATSAPP_API_VERSION }}
+          whatsapp_phone_number_id: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          whatsapp_token: ${{ secrets.WHATSAPP_TOKEN }}
+
+          DEBUG: "False"
+          DJANGO_ENV: "prod"

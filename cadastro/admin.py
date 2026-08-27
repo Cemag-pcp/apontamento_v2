@@ -57,3 +57,10 @@ admin.site.register(MotivoExclusao, RestrictedAdmin)
 admin.site.register(Carretas, RestrictedAdmin)
 admin.site.register(PecasEstanqueidade, PecasEstanqueidadeAdmim)
 admin.site.register(ItensExplodidos, ItensExplodidosAdmin)
+
+class DestinatarioNotificacaoAdmin(ProfilePermissionMixin, admin.ModelAdmin):
+    list_display = ('nome', 'telefone', 'tipo_notificacao', 'ativo')
+    list_filter = ('tipo_notificacao', 'ativo')
+    search_fields = ('nome', 'telefone')
+
+admin.site.register(DestinatarioNotificacao, DestinatarioNotificacaoAdmin)

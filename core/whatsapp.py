@@ -101,3 +101,35 @@ def destinatarios_falta_de_peca():
         .filter(tipo_notificacao='falta_peca', ativo=True)
         .values_list('telefone', flat=True)
     )
+
+
+def enviar_notificacao_qualidade(telefone, mensagem):
+    """
+    Dispara o template 'notificacao_qualidade_1' (cabecalho fixo "ATENCAO!!").
+
+    mensagem: texto ja formatado que vai em {{1}}, ex:
+        "Faz *2* dias que nao e registrado inspecao no setor de *Pintura*."
+    Suporta negrito do WhatsApp (*texto*), mas nao pode ter \n/\t nem mais
+    de 4 espacos seguidos (restricao da API pra valor de variavel) - use \r
+    se precisar de quebra de linha (ver enviar_falta_de_peca).
+    """
+    return enviar_whatsapp_template(
+        telefone=telefone,
+        template_name="notificacao_qualidade_1",
+        idioma="pt_BR",
+        parametros_corpo=[mensagem],
+    )
+
+
+def destinatarios_notificacao_qualidade():
+    """
+    Numeros (com DDI, sem "+") que recebem a notificacao de qualidade,
+    cadastrados em Cadastro > Configuracoes.
+    """
+    from cadastro.models import DestinatarioNotificacao
+
+    return list(
+        DestinatarioNotificacao.objects
+        .filter(tipo_notificacao='notificacao_qualidade', ativo=True)
+        .values_list('telefone', flat=True)
+    )

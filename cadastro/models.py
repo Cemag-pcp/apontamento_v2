@@ -58,6 +58,7 @@ class DestinatarioNotificacao(models.Model):
 
     TIPO_CHOICES = (
         ('falta_peca', 'Falta de peça'),
+        ('notificacao_qualidade', 'Notificação de qualidade'),
     )
 
     nome = models.CharField(max_length=100)
