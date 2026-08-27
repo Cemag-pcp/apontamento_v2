@@ -1,14 +1,14 @@
 <!-- Modal: lista de destinatarios -->
-<div class="modal fade" id="modalDestinatariosFaltaPeca" tabindex="-1" aria-labelledby="modalDestinatariosFaltaPecaLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="modalDestinatariosNotificacao" tabindex="-1" aria-labelledby="modalDestinatariosNotificacaoLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h1 class="modal-title fs-5" id="modalDestinatariosFaltaPecaLabel">Destinatários - Falta de peça</h1>
+        <h1 class="modal-title fs-5" id="modalDestinatariosNotificacaoLabel">Destinatários</h1>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="d-flex justify-content-end mb-3">
-          <button type="button" class="btn btn-primary btn-sm" id="btnAbrirAddDestinatarioFaltaPeca">
+          <button type="button" class="btn btn-primary btn-sm" id="btnAbrirAddDestinatario">
             <i class="bi bi-plus-lg"></i> Adicionar destinatário
           </button>
         </div>
@@ -23,7 +23,7 @@
                 <th class="text-end">Ações</th>
               </tr>
             </thead>
-            <tbody id="tabelaDestinatariosFaltaPeca">
+            <tbody id="tabelaDestinatariosNotificacao">
               <tr>
                 <td colspan="4" class="text-center text-muted py-4">Carregando...</td>
               </tr>
@@ -39,31 +39,32 @@
 </div>
 
 <!-- Modal: adicionar/editar destinatario -->
-<div class="modal fade" id="modalFormDestinatarioFaltaPeca" tabindex="-1" aria-labelledby="modalFormDestinatarioFaltaPecaLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="modalFormDestinatarioNotificacao" tabindex="-1" aria-labelledby="modalFormDestinatarioNotificacaoLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form id="formDestinatarioFaltaPeca">
+      <form id="formDestinatarioNotificacao">
         {% csrf_token %}
-        <input type="hidden" name="destinatario_id" id="destinatarioFaltaPecaId" value="">
+        <input type="hidden" name="destinatario_id" id="destinatarioNotificacaoId" value="">
+        <input type="hidden" name="tipo_notificacao" id="destinatarioNotificacaoTipo" value="">
         <div class="modal-header">
-          <h1 class="modal-title fs-5" id="modalFormDestinatarioFaltaPecaLabel">Adicionar destinatário</h1>
+          <h1 class="modal-title fs-5" id="modalFormDestinatarioNotificacaoLabel">Adicionar destinatário</h1>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label" for="destinatarioFaltaPecaNome">Nome</label>
-            <input class="form-control" type="text" name="nome" id="destinatarioFaltaPecaNome" placeholder="Ex.: PCP Montagem" required>
+            <label class="form-label" for="destinatarioNotificacaoNome">Nome</label>
+            <input class="form-control" type="text" name="nome" id="destinatarioNotificacaoNome" placeholder="Ex.: PCP Montagem" required>
           </div>
 
           <div class="mb-3">
-            <label class="form-label" for="destinatarioFaltaPecaTelefone">Telefone</label>
-            <input class="form-control" type="text" name="telefone" id="destinatarioFaltaPecaTelefone" placeholder="5585999012483" pattern="[0-9]{10,15}" required>
+            <label class="form-label" for="destinatarioNotificacaoTelefone">Telefone</label>
+            <input class="form-control" type="text" name="telefone" id="destinatarioNotificacaoTelefone" placeholder="5585999012483" pattern="[0-9]{10,15}" required>
             <div class="form-text">DDI + DDD + número, só números, sem espaço, sem "+" (ex: 5585999012483).</div>
           </div>
 
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" name="ativo" id="destinatarioFaltaPecaAtivo" checked>
-            <label class="form-check-label" for="destinatarioFaltaPecaAtivo">Ativo</label>
+            <input class="form-check-input" type="checkbox" name="ativo" id="destinatarioNotificacaoAtivo" checked>
+            <label class="form-check-label" for="destinatarioNotificacaoAtivo">Ativo</label>
           </div>
         </div>
         <div class="modal-footer">

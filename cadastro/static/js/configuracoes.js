@@ -1,17 +1,22 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const modalListaEl = document.getElementById('modalDestinatariosFaltaPeca');
-    const modalFormEl = document.getElementById('modalFormDestinatarioFaltaPeca');
+    const modalListaEl = document.getElementById('modalDestinatariosNotificacao');
+    const modalFormEl = document.getElementById('modalFormDestinatarioNotificacao');
     const modalLista = new bootstrap.Modal(modalListaEl);
     const modalForm = new bootstrap.Modal(modalFormEl);
 
-    const tabela = document.getElementById('tabelaDestinatariosFaltaPeca');
-    const form = document.getElementById('formDestinatarioFaltaPeca');
-    const inputId = document.getElementById('destinatarioFaltaPecaId');
-    const inputNome = document.getElementById('destinatarioFaltaPecaNome');
-    const inputTelefone = document.getElementById('destinatarioFaltaPecaTelefone');
-    const inputAtivo = document.getElementById('destinatarioFaltaPecaAtivo');
-    const tituloModalForm = document.getElementById('modalFormDestinatarioFaltaPecaLabel');
+    const tituloModalLista = document.getElementById('modalDestinatariosNotificacaoLabel');
+    const tabela = document.getElementById('tabelaDestinatariosNotificacao');
+    const form = document.getElementById('formDestinatarioNotificacao');
+    const inputId = document.getElementById('destinatarioNotificacaoId');
+    const inputTipo = document.getElementById('destinatarioNotificacaoTipo');
+    const inputNome = document.getElementById('destinatarioNotificacaoNome');
+    const inputTelefone = document.getElementById('destinatarioNotificacaoTelefone');
+    const inputAtivo = document.getElementById('destinatarioNotificacaoAtivo');
+    const tituloModalForm = document.getElementById('modalFormDestinatarioNotificacaoLabel');
     const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    let tipoAtual = null;
+    let rotuloAtual = '';
 
     function escapeHtml(texto) {
         const div = document.createElement('div');
@@ -23,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tabela.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Carregando...</td></tr>';
 
         try {
-            const response = await fetch('/cadastro/api/destinatarios-falta-peca/');
+            const response = await fetch(`/cadastro/api/destinatarios-notificacao/?tipo=${encodeURIComponent(tipoAtual)}`);
             const data = await response.json();
 
             if (!data.destinatarios || data.destinatarios.length === 0) {
@@ -61,20 +66,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function abrirModalLista(tipo, rotulo) {
+        tipoAtual = tipo;
+        rotuloAtual = rotulo;
+        tituloModalLista.textContent = `Destinatários - ${rotulo}`;
+        modalLista.show();
+    }
+
     function abrirModalForm({ id = '', nome = '', telefone = '', ativo = true } = {}) {
         inputId.value = id;
+        inputTipo.value = tipoAtual;
         inputNome.value = nome;
         inputTelefone.value = telefone;
         inputAtivo.checked = ativo === true || ativo === 'true';
-        tituloModalForm.textContent = id ? 'Editar destinatário' : 'Adicionar destinatário';
+        tituloModalForm.textContent = id ? 'Editar destinatário' : `Adicionar destinatário - ${rotuloAtual}`;
 
         modalLista.hide();
         modalForm.show();
     }
 
-    modalListaEl.addEventListener('show.bs.modal', carregarDestinatarios);
+    document.querySelectorAll('.btn-abrir-destinatarios').forEach(botao => {
+        botao.addEventListener('click', () => {
+            abrirModalLista(botao.dataset.tipo, botao.dataset.rotulo);
+        });
+    });
 
-    document.getElementById('btnAbrirAddDestinatarioFaltaPeca').addEventListener('click', () => {
+    modalListaEl.addEventListener('show.bs.modal', () => {
+        if (tipoAtual) {
+            carregarDestinatarios();
+        }
+    });
+
+    document.getElementById('btnAbrirAddDestinatario').addEventListener('click', () => {
         abrirModalForm();
     });
 
@@ -108,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirmacao.isConfirmed) return;
 
         try {
-            const response = await fetch(`/cadastro/delete/destinatario-falta-peca/${id}/`, {
+            const response = await fetch(`/cadastro/delete/destinatario-notificacao/${id}/`, {
                 method: 'DELETE',
                 headers: { 'X-CSRFToken': csrfToken },
             });
@@ -138,11 +161,12 @@ document.addEventListener('DOMContentLoaded', () => {
             nome: inputNome.value.trim(),
             telefone: inputTelefone.value.trim(),
             ativo: inputAtivo.checked,
+            tipo_notificacao: inputTipo.value,
         };
 
         const url = id
-            ? `/cadastro/edit/destinatario-falta-peca/${id}/`
-            : '/cadastro/add/destinatario-falta-peca/';
+            ? `/cadastro/edit/destinatario-notificacao/${id}/`
+            : '/cadastro/add/destinatario-notificacao/';
         const method = id ? 'PUT' : 'POST';
 
         try {

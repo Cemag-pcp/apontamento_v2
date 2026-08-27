@@ -21,30 +21,42 @@ def crud(request):
 
     return render(request, "crud/crud.html")
 
+TIPOS_NOTIFICACAO_VALIDOS = {choice[0] for choice in DestinatarioNotificacao.TIPO_CHOICES}
+
 @login_required
 def configuracoes(request):
-    return render(request, 'configuracoes/configuracoes.html')
+    return render(request, 'configuracoes/configuracoes.html', {
+        'tipos_notificacao': DestinatarioNotificacao.TIPO_CHOICES,
+    })
 
 @login_required
 @require_GET
-def api_destinatarios_falta_peca(request):
+def api_destinatarios_notificacao(request):
+    tipo = request.GET.get('tipo', '')
+    if tipo not in TIPOS_NOTIFICACAO_VALIDOS:
+        return JsonResponse({'error': 'tipo de notificação inválido.'}, status=400)
+
     destinatarios = DestinatarioNotificacao.objects.filter(
-        tipo_notificacao='falta_peca'
+        tipo_notificacao=tipo
     ).order_by('nome').values('id', 'nome', 'telefone', 'ativo')
 
     return JsonResponse({'destinatarios': list(destinatarios)})
 
 @login_required
-def add_destinatario_falta_peca(request):
+def add_destinatario_notificacao(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método não permitido'}, status=405)
 
     try:
         dados = json.loads(request.body)
+        tipo = dados.get('tipo_notificacao', '')
+        if tipo not in TIPOS_NOTIFICACAO_VALIDOS:
+            return JsonResponse({'error': 'tipo de notificação inválido.'}, status=400)
+
         destinatario = DestinatarioNotificacao.objects.create(
             nome=dados['nome'],
             telefone=dados['telefone'],
-            tipo_notificacao='falta_peca',
+            tipo_notificacao=tipo,
             ativo=dados.get('ativo', True),
         )
         return JsonResponse({'id': destinatario.id, 'message': 'Destinatário criado com sucesso'}, status=201)
@@ -56,8 +68,8 @@ def add_destinatario_falta_peca(request):
         return JsonResponse({'error': str(e)}, status=400)
 
 @login_required
-def edit_destinatario_falta_peca(request, pk):
-    destinatario = get_object_or_404(DestinatarioNotificacao, pk=pk, tipo_notificacao='falta_peca')
+def edit_destinatario_notificacao(request, pk):
+    destinatario = get_object_or_404(DestinatarioNotificacao, pk=pk)
 
     if request.method != 'PUT':
         return JsonResponse({'error': 'Método não permitido'}, status=405)
@@ -76,11 +88,11 @@ def edit_destinatario_falta_peca(request, pk):
         return JsonResponse({'error': str(e)}, status=400)
 
 @login_required
-def delete_destinatario_falta_peca(request, pk):
+def delete_destinatario_notificacao(request, pk):
     if request.method != 'DELETE':
         return JsonResponse({'error': 'Método não permitido'}, status=405)
 
-    destinatario = get_object_or_404(DestinatarioNotificacao, pk=pk, tipo_notificacao='falta_peca')
+    destinatario = get_object_or_404(DestinatarioNotificacao, pk=pk)
     destinatario.delete()
     return JsonResponse({'message': 'Destinatário removido com sucesso'})
 

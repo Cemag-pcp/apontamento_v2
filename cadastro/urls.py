@@ -10,10 +10,10 @@ urlpatterns = [
 
     # Configuracoes
     path('configuracoes/', views.configuracoes, name='configuracoes'),
-    path('api/destinatarios-falta-peca/', views.api_destinatarios_falta_peca, name='api_destinatarios_falta_peca'),
-    path('add/destinatario-falta-peca/', views.add_destinatario_falta_peca, name='add_destinatario_falta_peca'),
-    path('edit/destinatario-falta-peca/<int:pk>/', views.edit_destinatario_falta_peca, name='edit_destinatario_falta_peca'),
-    path('delete/destinatario-falta-peca/<int:pk>/', views.delete_destinatario_falta_peca, name='delete_destinatario_falta_peca'),
+    path('api/destinatarios-notificacao/', views.api_destinatarios_notificacao, name='api_destinatarios_notificacao'),
+    path('add/destinatario-notificacao/', views.add_destinatario_notificacao, name='add_destinatario_notificacao'),
+    path('edit/destinatario-notificacao/<int:pk>/', views.edit_destinatario_notificacao, name='edit_destinatario_notificacao'),
+    path('delete/destinatario-notificacao/<int:pk>/', views.delete_destinatario_notificacao, name='delete_destinatario_notificacao'),
 
     # Máquinas
     path('api/buscar-maquinas/', views.buscar_maquinas, name='buscar_maquinas'),

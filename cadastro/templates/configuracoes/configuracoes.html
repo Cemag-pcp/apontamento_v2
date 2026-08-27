@@ -16,21 +16,24 @@
     </div>
 
     <div class="row g-4">
+        {% for valor, rotulo in tipos_notificacao %}
         <div class="col-md-4 col-lg-3">
-            <button type="button" class="card shadow-sm border-0 w-100 text-start p-3 h-100" data-bs-toggle="modal" data-bs-target="#modalDestinatariosFaltaPeca">
+            <button type="button" class="card shadow-sm border-0 w-100 text-start p-3 h-100 btn-abrir-destinatarios"
+                data-tipo="{{ valor }}" data-rotulo="{{ rotulo }}">
                 <div class="d-flex align-items-center gap-3">
                     <i class="bi bi-whatsapp fs-2 text-success"></i>
                     <div>
-                        <div class="fw-semibold">Destinatários - Falta de peça</div>
-                        <div class="text-muted small">Quem recebe o aviso de interrupção por falta de peça</div>
+                        <div class="fw-semibold">Destinatários - {{ rotulo }}</div>
+                        <div class="text-muted small">Quem recebe a notificação de "{{ rotulo }}"</div>
                     </div>
                 </div>
             </button>
         </div>
+        {% endfor %}
     </div>
 </div>
 
-{% include 'configuracoes/destinatario_falta_peca_modals.html' %}
+{% include 'configuracoes/destinatario_notificacao_modals.html' %}
 {% endblock %}
 
 {% block scripts %}
