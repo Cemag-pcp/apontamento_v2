@@ -2645,13 +2645,20 @@ def api_erp_apontamentos_corte(request):
         elif dados_chapa and dados_chapa.get('tipo_chapa_display'):
             tipo_chapa_display = _normalizar_tipo_chapa_display(dados_chapa.get('tipo_chapa_display'))
 
+        # qtd_morta so faz sentido mostrar aqui quando ja veio de uma decisao
+        # de destino (ordem "_sucata"); um qtd_morta > 0 numa ordem original
+        # ainda pendente de decisao em "Pecas nao conforme" fica oculto (-)
+        # pra nao parecer um numero acionavel/definitivo nessa tela.
+        veio_de_designacao = bool(ordem.ordem_duplicada) and str(ordem.ordem_duplicada).endswith('_sucata')
+        qtd_morta_exibicao = item.qtd_morta if (not item.qtd_morta or veio_de_designacao) else None
+
         itens.append({
             'id': item.id,
             'ordem_id': item.ordem_id,
             'ordem': ordem_display,
             'peca': item.peca,
             'qtd_boa': item.qtd_boa,
-            'qtd_morta': item.qtd_morta,
+            'qtd_morta': qtd_morta_exibicao,
             'qtd_planejada': item.qtd_planejada,
             'maquina': ordem.maquina.nome if ordem.maquina else '',
             'operador': f"{operador.matricula} - {operador.nome}" if operador else '',
