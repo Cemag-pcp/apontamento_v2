@@ -4,6 +4,7 @@ from .views import (
     corte,
     estamparia,
     estanqueidade,
+    indicadores,
     montagem,
     pintura,
     recebimento,
@@ -14,6 +15,7 @@ from .views import (
 app_name = "inspecao"
 
 urlpatterns = [
+    path('api/indicadores-inspetores/', indicadores.api_indicadores_inspetores, name='api-indicadores-inspetores'),
     path('api/conjuntos-inspecionados/<str:codigo>/', montagem.add_remove_conjuntos_inspecionados, name='remover_conjunto'),
     path('api/conjuntos-inspecionados/', montagem.add_remove_conjuntos_inspecionados, name='adicionar_conjunto'),
     path('api/cadastro-pecas-estanqueidade/<str:codigo>/', estanqueidade.crud_pecas_estanqueidade, name='cadastro-pecas-estanqueidade-editar-remover'),

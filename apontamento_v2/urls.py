@@ -6,6 +6,7 @@ from django.views.generic import RedirectView
 from core import views as core_views
 from inspecao.views import corte as inspecao_corte
 from inspecao.views import estamparia as inspecao_estamparia
+from inspecao.views import indicadores as inspecao_indicadores
 from inspecao.views import recebimento as inspecao_recebimento
 from inspecao.views import serra_usinagem as inspecao_serra_usinagem
 
@@ -50,6 +51,11 @@ urlpatterns = [
         'controle-de-qualidade/recebimento/',
         inspecao_recebimento.inspecao_recebimento,
         name='controle_qualidade_recebimento',
+    ),
+    path(
+        'controle-de-qualidade/indicadores-inspetores/',
+        inspecao_indicadores.indicadores_inspetores,
+        name='controle_qualidade_indicadores_inspetores',
     ),
     path('inspecao/', include('inspecao.urls')),
     path('cargas/', include('cargas.urls')),
