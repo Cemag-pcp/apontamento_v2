@@ -493,6 +493,15 @@ def get_itens_reinspecao_estamparia(request):
         .annotate(total_conformidade=Sum("conformidade"))
     }
 
+    nao_conformidades_dict = {
+        item["inspecao_id"]: item["total_nao_conformidade"]
+        for item in DadosExecucaoInspecao.objects.filter(
+            inspecao_id__in=[inspecao.id for inspecao in pagina_obj]
+        )
+        .values("inspecao_id")
+        .annotate(total_nao_conformidade=Sum("nao_conformidade"))
+    }
+
     # Otimização 4: Reduzir consultas no loop usando prefetch_related e valores já carregados
     dados = []
     for data in pagina_obj:
@@ -512,9 +521,12 @@ def get_itens_reinspecao_estamparia(request):
             info_adicionais = None
             qtd_mortas = 0
 
+        # Reinspecionar deve cobrir so as pecas reprovadas (nao_conformidade),
+        # nao o lote inteiro (qtd_boa) - antes descontava conformidade de
+        # qtd_boa, o que incluia pecas nunca inspecionadas na primeira
+        # passada junto com as reprovadas de fato.
         qtd_total = (
-            data.pecas_ordem_estamparia.qtd_boa
-            - conformidades_dict.get(data.id, 0)
+            nao_conformidades_dict.get(data.id, 0)
             - qtd_mortas
         )
 
