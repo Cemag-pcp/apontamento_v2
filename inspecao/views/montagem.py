@@ -773,7 +773,13 @@ def indicador_montagem_analise_temporal(request):
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
         if data_fim:
-            data_fim = datetime.strptime(data_fim, "%Y-%m-%d")
+            # +1 dia porque "data" e um timestamp com hora real: BETWEEN com
+            # data_fim na meia-noite virava um intervalo de largura zero
+            # quando data_inicio == data_fim (so casaria com um registro
+            # gravado exatamente as 00:00:00), zerando os contadores pra
+            # filtro de 1 dia so. Com o dia seguinte de limite superior
+            # (exclusivo), o dia escolhido inteiro fica coberto.
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
     except ValueError:
         return JsonResponse(
             {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
@@ -781,13 +787,13 @@ def indicador_montagem_analise_temporal(request):
 
     sql = """
     WITH producao_total AS (
-        SELECT 
+        SELECT
             EXTRACT(YEAR FROM data) AS ano,
             EXTRACT(MONTH FROM data) AS mes,
             SUM(qtd_boa) AS total_produzido
         FROM apontamento_v2.apontamento_montagem_pecasordem
         WHERE qtd_boa IS NOT NULL
-            AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+            AND data >= %(data_inicio)s AND data < %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
     ),
     inspecoes_total AS (
@@ -799,7 +805,7 @@ def indicador_montagem_analise_temporal(request):
         FROM apontamento_v2.apontamento_montagem_pecasordem amp
         INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_montagem_id = amp.id
         INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
-        WHERE amp.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        WHERE amp.data >= %(data_inicio)s AND amp.data < %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM amp.data), EXTRACT(MONTH FROM amp.data)
     )
     SELECT 
@@ -850,7 +856,10 @@ def indicador_montagem_resumo_analise_temporal(request):
         if data_inicio:
             data_inicio = datetime.strptime(data_inicio, "%Y-%m-%d")
         if data_fim:
-            data_fim = datetime.strptime(data_fim, "%Y-%m-%d")
+            # Ver comentario equivalente em indicador_montagem_analise_temporal:
+            # +1 dia (limite superior exclusivo) pra cobrir o dia inteiro em
+            # vez de so o instante da meia-noite.
+            data_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
     except ValueError:
         return JsonResponse(
             {"erro": "Formato de data inválido. Use YYYY-MM-DD."}, status=400
@@ -858,13 +867,13 @@ def indicador_montagem_resumo_analise_temporal(request):
 
     sql = """
     WITH producao_total AS (
-    SELECT 
+    SELECT
         EXTRACT(YEAR FROM data) AS ano,
         EXTRACT(MONTH FROM data) AS mes,
         SUM(qtd_boa) AS total_produzido
     FROM apontamento_v2.apontamento_montagem_pecasordem
     WHERE qtd_boa IS NOT NULL
-        AND data BETWEEN %(data_inicio)s AND %(data_fim)s
+        AND data >= %(data_inicio)s AND data < %(data_fim)s
     GROUP BY EXTRACT(YEAR FROM data), EXTRACT(MONTH FROM data)
     ),
     inspecoes_total AS (
@@ -876,7 +885,7 @@ def indicador_montagem_resumo_analise_temporal(request):
         FROM apontamento_v2.apontamento_montagem_pecasordem app
         INNER JOIN apontamento_v2.inspecao_inspecao i ON i.pecas_ordem_montagem_id = app.id
         INNER JOIN apontamento_v2.inspecao_dadosexecucaoinspecao dei ON dei.inspecao_id = i.id
-        WHERE app.data BETWEEN %(data_inicio)s AND %(data_fim)s
+        WHERE app.data >= %(data_inicio)s AND app.data < %(data_fim)s
         GROUP BY EXTRACT(YEAR FROM app.data), EXTRACT(MONTH FROM app.data)
     )
     SELECT 
