@@ -197,6 +197,7 @@ def _base_queryset_historico_requisicao():
         "cc",
         "classe_requisicao",
         "entregue_por",
+        "status",
     )
 
 
@@ -278,6 +279,7 @@ def _serializar_historico_requisicao(solicitacao):
             else f"{solicitacao.rpa[:45]}..."
         ),
         "chave_innovaro": solicitacao.chave_innovaro or "",
+        "prioridade": solicitacao.status.prioridade if solicitacao.status else "",
     }
 
 
@@ -419,6 +421,7 @@ def exportar_historico_requisicao_csv(request):
                 "Entregue por",
                 "Data de Entrega",
                 "Status almox",
+                "Prioridade de entrega",
             ]
         )
 
@@ -437,6 +440,7 @@ def exportar_historico_requisicao_csv(request):
                     item["entregue_por__nome"],
                     item["data_entrega"],
                     item["status"],
+                    item["prioridade"],
                 ]
             )
 
