@@ -547,6 +547,8 @@ def envio_inspecao_tubos_cilindros(request):
 
             # Convertendo a string para um objeto datetime
             data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
+            if data_ajustada > timezone.now():
+                return JsonResponse({"error": "A data da inspeção não pode ser maior que hoje."}, status=400)
 
             codigo = peca.split(" - ", maxsplit=1)[0]
             descricao = peca.split(" - ", maxsplit=1)[1]
@@ -651,6 +653,8 @@ def envio_reinspecao_tubos_cilindros(request):
             observacao = request.POST.get("observacao_reteste_estanqueidade")
 
             data_ajustada = timezone.make_aware(datetime.fromisoformat(data_reinspecao))
+            if data_ajustada > timezone.now():
+                return JsonResponse({"error": "A data da inspeção não pode ser maior que hoje."}, status=400)
 
             if (
                 tipo_inspecao_estanqueidade == "tubo"
@@ -886,6 +890,8 @@ def envio_inspecao_tanque(request):
             data_inspecao_ajustada = timezone.make_aware(
                 datetime.fromisoformat(data_inspecao)
             )
+            if data_inspecao_ajustada > timezone.now():
+                return JsonResponse({"error": "A data da inspeção não pode ser maior que hoje."}, status=400)
             data_carga_ajustada = timezone.make_aware(
                 datetime.fromisoformat(data_carga)
             )
@@ -1041,6 +1047,8 @@ def envio_reinspecao_tanque(request):
             data_reinspecao_ajustada = timezone.make_aware(
                 datetime.fromisoformat(data_reinspecao)
             )
+            if data_reinspecao_ajustada > timezone.now():
+                return JsonResponse({"error": "A data da inspeção não pode ser maior que hoje."}, status=400)
 
             # Exibir os dados no console para depuração
             print("Tipo de Inspeção:", tipo_inspecao)
@@ -2188,6 +2196,8 @@ def envio_inspecao_solda_tanque(request):
 
             # Convertendo a string para um objeto datetime
             data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
+            if data_ajustada > timezone.now():
+                return JsonResponse({"error": "A data da inspeção não pode ser maior que hoje."}, status=400)
 
             tanque_obj = InspecaoEstanqueidade.objects.get(pk=id_inspecao)
 

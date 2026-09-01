@@ -870,6 +870,8 @@ def envio_reinspecao_estamparia(request):
             ficha_reinspecao = request.FILES.get("ficha_reinspecao")
 
             data_convertida = timezone.make_aware(datetime.fromisoformat(data_inspecao))
+            if data_convertida > timezone.now():
+                return JsonResponse({"error": "A data da inspeção não pode ser maior que hoje."}, status=400)
 
             inspecao = Inspecao.objects.get(id=id_inspecao)
             inspetor = Profile.objects.get(id=inspetor_id)

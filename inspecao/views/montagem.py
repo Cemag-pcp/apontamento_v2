@@ -645,6 +645,8 @@ def envio_inspecao_montagem(request):
 
             # Convertendo a string para um objeto datetime
             data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
+            if data_ajustada > timezone.now():
+                return JsonResponse({"error": "A data da inspeção não pode ser maior que hoje."}, status=400)
 
             # Obtém a inspeção e o inspetor
             inspecao = Inspecao.objects.get(id=id_inspecao)
@@ -708,6 +710,8 @@ def envio_reinspecao_montagem(request):
             observacao = request.POST.get("observacao-reinspecao-montagem")
 
             data_ajustada = timezone.make_aware(datetime.fromisoformat(data_inspecao))
+            if data_ajustada > timezone.now():
+                return JsonResponse({"error": "A data da inspeção não pode ser maior que hoje."}, status=400)
 
             inspecao = Inspecao.objects.get(id=id_inspecao)
             inspetor = Profile.objects.get(user__pk=inspetor)
