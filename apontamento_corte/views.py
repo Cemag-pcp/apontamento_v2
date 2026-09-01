@@ -1687,6 +1687,9 @@ def get_pecas_nao_conforme(request):
         'ordem_sucata': (registro.ordem_sucata.ordem_duplicada if registro.ordem_sucata else None),
         'ordem_recuperada': (registro.ordem_recuperada.ordem_duplicada if registro.ordem_recuperada else None),
         'data_registro': registro.data_registro,
+        # ultima_atualizacao reflete o momento da finalizacao da ordem
+        # (a Ordem e salva ao finalizar, ver atualizar_status_ordem).
+        'ordem_finalizada_em': localtime(registro.ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M'),
     } for registro in pagina]
 
     return JsonResponse({
