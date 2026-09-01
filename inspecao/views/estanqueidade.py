@@ -406,11 +406,16 @@ def get_itens_inspecionados_tubos_cilindros(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
+    # Exclui quem ainda esta pendente de reinspecao, pra nao aparecer nas duas abas ao mesmo tempo.
+    reinspecoes_pendentes_ids = ReinspecaoEstanqueidade.objects.filter(
+        reinspecionado=False
+    ).values_list("inspecao", flat=True)
+
     # Construir a base da consulta a partir do modelo mais detalhado
     # Começamos com DadosExecucaoInspecaoEstanqueidade, que contém a maioria dos dados que precisamos.
     base_query = DadosExecucaoInspecaoEstanqueidade.objects.filter(
         inspecao_estanqueidade__peca__tipo__in=["tubo", "cilindro"]
-    )
+    ).exclude(inspecao_estanqueidade__in=reinspecoes_pendentes_ids)
 
     # Aplicar filtros da requisição (data, pesquisa, inspetores)
     # Filtros são aplicados no início para reduzir o conjunto de dados o mais cedo possível.
@@ -1275,9 +1280,17 @@ def get_itens_inspecionados_tanque(request):
 
     # Filtra apenas peças do tipo "tanque"
     pecas_filtradas = PecasEstanqueidade.objects.filter(tipo="tanque")
+
+    # Exclui quem ainda esta pendente de reinspecao, pra nao aparecer nas duas abas ao mesmo tempo.
+    reinspecoes_pendentes_ids = ReinspecaoEstanqueidade.objects.filter(
+        reinspecionado=False
+    ).values_list("inspecao", flat=True)
+
     inspecionados_ids = set(
         DadosExecucaoInspecaoEstanqueidade.objects.filter(
             inspecao_estanqueidade__peca__in=pecas_filtradas
+        ).exclude(
+            inspecao_estanqueidade__in=reinspecoes_pendentes_ids
         ).values_list("inspecao_estanqueidade", flat=True)
     )
 

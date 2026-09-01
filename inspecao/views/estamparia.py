@@ -584,8 +584,13 @@ def get_itens_inspecionados_estamparia(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    inspecionados_ids = set(
-        DadosExecucaoInspecao.objects.values_list("inspecao", flat=True)
+    # Exclui quem ainda esta pendente de reinspecao, pra nao aparecer nas duas abas ao mesmo tempo.
+    reinspecoes_pendentes_ids = Reinspecao.objects.filter(reinspecionado=False).values_list(
+        "inspecao", flat=True
+    )
+    inspecionados_ids = (
+        DadosExecucaoInspecao.objects.exclude(inspecao__in=reinspecoes_pendentes_ids)
+        .values_list("inspecao", flat=True)
     )
 
     # Captura os filtros aplicados pela URL

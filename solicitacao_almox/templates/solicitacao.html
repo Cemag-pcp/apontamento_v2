@@ -5,6 +5,17 @@
 {% block links %}
     <link rel="stylesheet" href="/static/css/inspecao.css">
     <link rel="stylesheet" href="/static/css/select2.css">
+    <style>
+        /* Remove as setinhas de incremento/decremento dos campos numéricos */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -730,6 +741,15 @@
                 
             });
     });
+</script>
+
+<script>
+    // Evita que o scroll do mouse altere o valor dos campos numéricos enquanto estão focados
+    document.addEventListener('wheel', function (event) {
+        if (document.activeElement && document.activeElement.matches('input[type="number"]')) {
+            document.activeElement.blur();
+        }
+    }, { passive: true });
 </script>
 
 {% endblock %}

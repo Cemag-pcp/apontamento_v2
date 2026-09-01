@@ -527,12 +527,17 @@ def get_itens_inspecionados_serra_usinagem(request):
     pesquisar = request.GET.get("pesquisar")  # Ex: "peça 123"
     pagina = request.GET.get("pagina", 1)
 
+    # Exclui quem ainda esta pendente de reinspecao, pra nao aparecer nas duas abas ao mesmo tempo.
+    reinspecoes_pendentes_ids = Reinspecao.objects.filter(reinspecionado=False).values_list(
+        "inspecao", flat=True
+    )
+
     # Buscar apenas inspeções que possuem execução com num_execucao=0
     inspecoes = Inspecao.objects.filter(
         Q(pecas_ordem_serra__isnull=False) | Q(pecas_ordem_usinagem__isnull=False),
         dadosexecucaoinspecao__isnull=False,  # Filtra apenas inspeções com execução
         dadosexecucaoinspecao__num_execucao=0  # Filtra apenas a primeira execução
-    ).distinct()
+    ).exclude(id__in=reinspecoes_pendentes_ids).distinct()
 
     status_conformidade_filtrados = (
         request.GET.get("status-conformidade", "").split(",")
