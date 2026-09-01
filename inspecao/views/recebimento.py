@@ -137,6 +137,10 @@ def _load_recebimento_sheet():
 
     try:
         gc = gspread.service_account_from_dict(credentials)
+        # Sem isso, uma resposta lenta do Google Sheets prende o worker
+        # indefinidamente - o timeout aqui precisa ficar bem abaixo do
+        # timeout do worker do gunicorn pra falhar antes dele ser morto.
+        gc.set_timeout((5, 20))
         sheet = gc.open_by_key(SHEET_ID)
         worksheet = sheet.worksheet(SHEET_TAB)
         values = worksheet.get_all_values()

@@ -70,7 +70,7 @@ def _post_apontamento_erp_corte(payload, bypass_disable=False):
         _url_apontamento_erp_corte(),
         json=payload,
         auth=("luan araujo", "luanaraujo7"),
-        timeout=(10, 60),
+        timeout=(5, 20),
     )
 
 def _erro_depositodest_indefinido_corte(descricao):
@@ -764,7 +764,7 @@ def _chamar_innovaro_transferir_chapa_corte(ordem, dados_chapa):
             url,
             json=payload,
             auth=("luan araujo", "luanaraujo7"),
-            timeout=(10, 60),
+            timeout=(5, 20),
         )
     except requests.RequestException as exc:
         erro = f"Erro de conexao com o Innovaro: {exc}"

@@ -129,14 +129,14 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
                         "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(10, 60),
+                        timeout=(5, 20),
                     )
                 else:
                     response_integracao = requests.post(
                         "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(10, 60),
+                        timeout=(5, 20),
                     )
             except requests.RequestException as exc:
                 item.erro_apontamento = str(exc)[:2000]
@@ -1207,14 +1207,14 @@ def api_erp_apontar_item_usinagem(request, pk):
                         "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(10, 60),
+                        timeout=(5, 20),
                     )
                 else:
                     response_integracao = requests.post(
                         "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(10, 60),
+                        timeout=(5, 20),
                     )
             except requests.RequestException as exc:
                 return JsonResponse(

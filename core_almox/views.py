@@ -109,7 +109,7 @@ def _chamar_innovaro_transferir(solicitacao):
     print(f"[Innovaro] URL: {url}")
 
     try:
-        response = requests.post(url, json=payload, auth=("luan araujo", "luanaraujo7"), timeout=(10, 60))
+        response = requests.post(url, json=payload, auth=("luan araujo", "luanaraujo7"), timeout=(5, 20))
     except requests.RequestException as exc:
         print(f"[Innovaro] erro de conexão: {exc}")
         return None, f"Erro de conexão com o Innovaro: {exc}"
@@ -154,7 +154,7 @@ def _chamar_innovaro_transferir_lote(solicitacoes):
     print(f"[Innovaro Lote] URL: {url}")
 
     try:
-        response = requests.post(url, json=payload, auth=("luan araujo", "luanaraujo7"), timeout=(10, 60))
+        response = requests.post(url, json=payload, auth=("luan araujo", "luanaraujo7"), timeout=(5, 20))
     except requests.RequestException as exc:
         print(f"[Innovaro Lote] erro de conexão: {exc}")
         return [(s, None, f"Erro de conexão: {exc}") for s in solicitacoes]

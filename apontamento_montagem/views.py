@@ -163,14 +163,14 @@ def _apontar_item_via_api_erp_montagem(item, user):
                 "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                 json=payload_integracao,
                 auth=("luan araujo", "luanaraujo7"),
-                timeout=(10, 60),
+                timeout=(5, 20),
             )
         else:
             response_integracao = requests.post(
                 "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                 json=payload_integracao,
                 auth=("luan araujo", "luanaraujo7"),
-                timeout=(10, 60),
+                timeout=(5, 20),
             )
     except requests.RequestException as exc:
         return _registrar_erro(f'Falha de comunicacao com API ERP: {exc}')
@@ -2467,14 +2467,14 @@ def api_erp_apontar_item_montagem(request, pk):
                         "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(10, 60),
+                        timeout=(5, 20),
                     )
                 else:
                     response_integracao = requests.post(
                         "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(10, 60),
+                        timeout=(5, 20),
                     )
             except requests.RequestException as exc:
                 return JsonResponse(
