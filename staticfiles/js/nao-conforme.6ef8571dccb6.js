@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buscarRegistros(pagina = 1) {
         paginaAtual = pagina;
-        tabela.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Carregando...</td></tr>';
+        tabela.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Carregando...</td></tr>';
 
         const params = new URLSearchParams();
         const ordem = document.getElementById('filtro-ordem-nao-conforme').value.trim();
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(response => response.json())
             .then(data => {
                 if (!data.registros || data.registros.length === 0) {
-                    tabela.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Nenhum registro encontrado.</td></tr>';
+                    tabela.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Nenhum registro encontrado.</td></tr>';
                     paginacao.innerHTML = '';
                     return;
                 }
@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <td>${escapeHtml(registro.maquina || '-')}</td>
                             <td>${escapeHtml(registro.peca)}</td>
                             <td>${formatarNumero(registro.quantidade)}</td>
+                            <td>${escapeHtml(registro.ordem_finalizada_em || '-')}</td>
                             <td>
                                 ${registro.status === 'pendente'
                                     ? '<span class="badge text-bg-warning">Pendente</span>'
@@ -94,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 montarPaginacao(data.page, data.total_pages);
             })
             .catch(() => {
-                tabela.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">Erro ao carregar registros.</td></tr>';
+                tabela.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">Erro ao carregar registros.</td></tr>';
             });
     }
 
