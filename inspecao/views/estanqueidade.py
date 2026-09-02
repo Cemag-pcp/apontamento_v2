@@ -1274,6 +1274,31 @@ def get_itens_reinspecao_tanque(request):
     )
 
 
+def _ids_tanque_com_solda_nao_conforme(estanqueidade_ids):
+    """Retorna os ids de InspecaoEstanqueidade cuja ULTIMA inspecao de solda
+    (por data_execucao) ainda esta nao conforme - ignora nao conformidades
+    de submissoes antigas ja corrigidas por uma reinspecao/nova submissao."""
+    execucoes = (
+        DadosExecucaoInspecao.objects.filter(
+            inspecao__estanqueidade_id__in=estanqueidade_ids
+        )
+        .order_by("inspecao__estanqueidade_id", "-data_execucao")
+        .values("inspecao__estanqueidade_id", "nao_conformidade")
+    )
+
+    vistos = set()
+    ids_nao_conforme = set()
+    for execucao in execucoes:
+        tanque_id = execucao["inspecao__estanqueidade_id"]
+        if tanque_id in vistos:
+            continue
+        vistos.add(tanque_id)
+        if execucao["nao_conformidade"] > 0:
+            ids_nao_conforme.add(tanque_id)
+
+    return ids_nao_conforme
+
+
 def get_itens_inspecionados_tanque(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
@@ -1364,14 +1389,11 @@ def get_itens_inspecionados_tanque(request):
         
     # Aplicar filtros de status da solda
     if status_solda_filtrado:
-        # Primeiro, obtenha os IDs das inspeções com não conformidade na solda
-        ids_com_nao_conformidade_solda = set(
-            DadosExecucaoInspecao.objects.filter(
-                inspecao__estanqueidade_id__in=datas.values_list('id', flat=True),
-                nao_conformidade__gt=0
-            ).values_list("inspecao__estanqueidade_id", flat=True)
+        # Considera apenas o estado da ULTIMA inspecao de solda de cada tanque.
+        ids_com_nao_conformidade_solda = _ids_tanque_com_solda_nao_conforme(
+            datas.values_list('id', flat=True)
         )
-        
+
         if "conforme" in status_solda_filtrado and "nao_conforme" in status_solda_filtrado:
             # Mostrar todos (não filtrar)
             pass
@@ -1387,7 +1409,8 @@ def get_itens_inspecionados_tanque(request):
         # Primeiro, obtenha os IDs dos testes com não conformidade
         ids_com_nao_conformidade_teste = set(
             InspecaoEstanqueidade.objects.filter(
-                dadosexecucaoinspecaoestanqueidade__detalhespressaotanque__nao_conformidade__gt=0
+                peca__tipo="tanque",
+                dadosexecucaoinspecaoestanqueidade__detalhespressaotanque__nao_conformidade__gt=0,
             ).values_list('id', flat=True)
         )
         
@@ -1407,15 +1430,6 @@ def get_itens_inspecionados_tanque(request):
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
-    # Prefetch para otimizar a consulta dos dados de execução e informações adicionais
-    dados_execucao = (
-        DadosExecucaoInspecaoEstanqueidade.objects.filter(
-            inspecao_estanqueidade__in=pagina_obj
-        )
-        .select_related("inspetor__user", "inspecao_estanqueidade__peca")
-        .prefetch_related("detalhespressaotanque_set")
-    )
-
     # Subconsulta para obter o maior num_execucao para cada inspecao_estanqueidade
     maior_num_execucao_subquery = (
         DadosExecucaoInspecaoEstanqueidade.objects.filter(
@@ -1426,14 +1440,15 @@ def get_itens_inspecionados_tanque(request):
         .values("max_num_execucao")
     )
 
-    # Filtra os dados de execução para incluir apenas os registros com o maior num_execucao
+    # Filtra os dados de execução para incluir apenas os registros com o maior num_execucao,
+    # restrito apenas aos itens da página atual (evita varrer todo o conjunto filtrado).
     dados_execucao = (
         DadosExecucaoInspecaoEstanqueidade.objects.filter(
-            inspecao_estanqueidade__in=datas,
+            inspecao_estanqueidade__in=pagina_obj,
             num_execucao=Subquery(maior_num_execucao_subquery),
         )
         .select_related("inspetor__user", "inspecao_estanqueidade__peca")
-        .prefetch_related("infoadicionaisexectuboscilindros_set")
+        .prefetch_related("detalhespressaotanque_set")
     )
 
     # Cria um dicionário para mapear inspecao_id para seus dados de execução e informações adicionais
@@ -1457,15 +1472,9 @@ def get_itens_inspecionados_tanque(request):
         )
     )
     
-    # 3. Busca na tabela DadosExecucaoInspecao quais inspeções têm nao_conformidade > 0
-    ids_com_nao_conformidade = set(
-        DadosExecucaoInspecao.objects.filter(
-            inspecao__estanqueidade_id__in=ids_pagina_atual,
-            nao_conformidade__gt=0
-        ).values_list("inspecao__estanqueidade_id", flat=True)
-    )
-
-    print(ids_com_nao_conformidade)
+    # 3. Considera apenas o estado da ULTIMA inspecao de solda de cada tanque
+    # (uma reinspecao/nova submissao conforme deve "limpar" o status anterior).
+    ids_com_nao_conformidade = _ids_tanque_com_solda_nao_conforme(ids_pagina_atual)
 
     dados = []
     for data in pagina_obj:
@@ -1643,8 +1652,10 @@ def get_historico_tanque(request, id):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # Otimiza a consulta usando select_related e prefetch_related
-    dados = (
+    eventos = []
+
+    # Execuções de teste de estanqueidade (pressao) - cada execucao pode ter varios testes (ct, ctc, etc.)
+    execucoes_estanqueidade = (
         DadosExecucaoInspecaoEstanqueidade.objects.filter(inspecao_estanqueidade__id=id)
         .select_related("inspetor__user")
         .prefetch_related(
@@ -1653,38 +1664,87 @@ def get_historico_tanque(request, id):
                 queryset=DetalhesPressaoTanque.objects.all(),
             )
         )
-        .order_by("-id")
+        .order_by("num_execucao")
     )
 
-    print(dados)
+    for execucao in execucoes_estanqueidade:
+        testes = [
+            {
+                "tipo_teste": detalhes.get_tipo_teste_display(),
+                "pressao_inicial": detalhes.pressao_inicial,
+                "pressao_final": detalhes.pressao_final,
+                "tempo_execucao": (
+                    detalhes.tempo_execucao.strftime("%H:%M:%S")
+                    if detalhes.tempo_execucao
+                    else None
+                ),
+                "nao_conformidade": detalhes.nao_conformidade,
+            }
+            for detalhes in execucao.detalhespressaotanque_set.all()
+        ]
 
-    # Usa list comprehension para construir a lista de histórico
-    list_history = []
-    for dado in dados:
-        detalhes_pressao_list = dado.detalhespressaotanque_set.all()
-        for detalhes_pressao in detalhes_pressao_list:
-            list_history.append(
-                {
-                    "id": dado.id,
-                    "id_detalhes_pressao": detalhes_pressao.id,
-                    "data_execucao": (dado.data_exec - timedelta(hours=3)).strftime(
-                        "%d/%m/%Y %H:%M:%S"
-                    ),
-                    "num_execucao": dado.num_execucao,
-                    "inspetor": dado.inspetor.user.username if dado.inspetor else None,
-                    "pressao_inicial": detalhes_pressao.pressao_inicial,
-                    "pressao_final": detalhes_pressao.pressao_final,
-                    "nao_conformidade": detalhes_pressao.nao_conformidade,
-                    "tipo_teste": detalhes_pressao.tipo_teste,
-                    "tempo_execucao": (
-                        detalhes_pressao.tempo_execucao.strftime("%H:%M:%S")
-                        if detalhes_pressao.tempo_execucao
-                        else None
-                    ),
-                }
-            )
+        data_execucao = timezone.localtime(execucao.data_exec)
+        eventos.append(
+            {
+                "categoria": "estanqueidade",
+                "titulo": "Inspeção" if execucao.num_execucao == 0 else "Reinspeção",
+                "data": data_execucao.strftime("%d/%m/%Y %H:%M:%S"),
+                "data_ordenacao": data_execucao.isoformat(),
+                "inspetor": execucao.inspetor.user.username if execucao.inspetor else None,
+                "testes": testes,
+                "possui_nao_conformidade": any(t["nao_conformidade"] for t in testes),
+            }
+        )
 
-    return JsonResponse({"history": list_history}, status=200)
+    # Execucoes de inspecao de solda, vinculadas ao mesmo tanque via Inspecao.estanqueidade
+    execucoes_solda = (
+        DadosExecucaoInspecao.objects.filter(inspecao__estanqueidade_id=id)
+        .select_related("inspetor__user")
+        .prefetch_related(
+            "causasnaoconformidade_set__causa",
+            "causasnaoconformidade_set__arquivos",
+        )
+        .order_by("data_execucao")
+    )
+
+    for execucao in execucoes_solda:
+        causas = []
+        for causa_nc in execucao.causasnaoconformidade_set.all():
+            imagens = [
+                {"url": arquivo.arquivo.url}
+                for arquivo in causa_nc.arquivos.all()
+                if arquivo.arquivo
+            ]
+            for causa in causa_nc.causa.all():
+                causas.append(
+                    {
+                        "nome": causa.nome,
+                        "quantidade": causa_nc.quantidade,
+                        "imagens": imagens,
+                    }
+                )
+
+        data_execucao = (
+            timezone.localtime(execucao.data_execucao) if execucao.data_execucao else None
+        )
+        eventos.append(
+            {
+                "categoria": "solda",
+                "titulo": "Inspeção de solda",
+                "data": data_execucao.strftime("%d/%m/%Y %H:%M:%S") if data_execucao else None,
+                "data_ordenacao": data_execucao.isoformat() if data_execucao else "",
+                "inspetor": execucao.inspetor.user.username if execucao.inspetor else None,
+                "conformidade": execucao.conformidade,
+                "nao_conformidade": execucao.nao_conformidade,
+                "observacao": execucao.observacao,
+                "causas": causas,
+                "possui_nao_conformidade": execucao.nao_conformidade > 0,
+            }
+        )
+
+    eventos.sort(key=lambda evento: evento["data_ordenacao"], reverse=True)
+
+    return JsonResponse({"eventos": eventos}, status=200)
 
 
 ### dashboard tanque ###
