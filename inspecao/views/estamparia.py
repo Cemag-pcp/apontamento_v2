@@ -924,11 +924,13 @@ def envio_reinspecao_estamparia(request):
                             nao_conformidade=dados_nao_conformidade,
                             imagem=imagem,
                         )
-            else:
-                reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
-                if reinspecao:
-                    reinspecao.reinspecionado = True
-                    reinspecao.save()
+
+            # A reinspecao e a ultima etapa: encerra a fila mesmo se ainda
+            # houver nao conformidade residual, nao devolve pra reinspecionar de novo.
+            reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
+            if reinspecao:
+                reinspecao.reinspecionado = True
+                reinspecao.save()
 
         return JsonResponse({"success": True})
 
