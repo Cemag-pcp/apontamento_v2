@@ -153,7 +153,8 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
             let statusSolda;
             let status;
             let inspectionType;
-            let isCompliance
+            let isCompliance;
+            let badgeSoldaHtml = '';
 
             if (item.possui_nao_conformidade) {
                 iconeNaoConformidade = '<i class="bi bi-exclamation-triangle-fill text-danger"></i>';
@@ -175,11 +176,14 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                 status = 'cancelado';
                 inspectionType = 'inspecionar-solda';
                 isCompliance = 'Solda não inspecionada — clique para inspecionar';
-            } else {
-                status = 'entregue';
-                inspectionType = 'get-inspecionar-solda';
-                isCompliance = 'Solda inspecionada — clique para ver detalhes';
+                badgeSoldaHtml = `
+                    <p class="status-badge status-${status} ${inspectionType}"
+                    style="font-size:13px; cursor:pointer;" data-id="${item.id}"
+                    data-nome="${item.peca}">${isCompliance}</p>
+                `;
             }
+            // Quando a solda ja foi inspecionada, os detalhes ficam disponiveis
+            // apenas no "Ver detalhes" (historico unificado) - sem botao proprio aqui.
 
             const cards = `
             <div class="col-md-4 mb-4">
@@ -187,9 +191,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                     <div class="d-flex justify-content-between">
                         <h5 style="width:70%;"> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                         <div class="text-center">
-                            <p class="status-badge status-${status} ${inspectionType}" 
-                            style="font-size:13px; cursor:pointer;" data-id="${item.id}" 
-                            data-nome="${item.peca}">${isCompliance}</p>
+                            ${badgeSoldaHtml}
                         </div>
                     </div>
                     <h6 class="card-subtitle mb-2 text-muted">Inspeção #${item.id}</h6>
