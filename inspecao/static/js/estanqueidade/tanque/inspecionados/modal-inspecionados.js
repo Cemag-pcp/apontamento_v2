@@ -95,7 +95,7 @@ function renderizarEventoEstanqueidadeTanque(evento) {
             <div class="timeline-content">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <span class="title">
-                        <span class="badge bg-primary-subtle text-primary-emphasis me-1">Estanqueidade</span>
+                        <span class="badge bg-primary-subtle me-1" style="color:#000;">Estanqueidade</span>
                         ${escaparHtmlHistoricoTanque(evento.titulo)}
                     </span>
                     <span class="date">${evento.data}</span>
@@ -152,7 +152,7 @@ function renderizarEventoSoldaTanque(evento) {
             <div class="timeline-content">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <span class="title">
-                        <span class="badge bg-dark-subtle text-dark-emphasis me-1">Solda</span>
+                        <span class="badge bg-secondary-subtle me-1" style="color:#000;">Solda</span>
                         ${escaparHtmlHistoricoTanque(evento.titulo)}
                     </span>
                     <span class="date">${evento.data || "N/A"}</span>
