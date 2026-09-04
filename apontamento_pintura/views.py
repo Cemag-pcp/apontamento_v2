@@ -2606,19 +2606,23 @@ def api_historico_pintura(request):
             "peca_ordem__operador_fim",
         )
         .exclude(peca_ordem__isnull=True)
+        # Filtra pela data de finalizacao (quando existe); itens ainda em
+        # andamento (data_fim nulo) caem pra data de pendura, senao nunca
+        # apareceriam em nenhum filtro de data.
+        .annotate(data_filtro=Coalesce("data_fim", "data_pendura"))
     )
 
     if data_inicio_str:
         try:
             di = datetime.strptime(data_inicio_str, "%Y-%m-%d").date()
-            qs = qs.filter(data_pendura__date__gte=di)
+            qs = qs.filter(data_filtro__date__gte=di)
         except ValueError:
             pass
 
     if data_fim_str:
         try:
             df = datetime.strptime(data_fim_str, "%Y-%m-%d").date()
-            qs = qs.filter(data_pendura__date__lte=df)
+            qs = qs.filter(data_filtro__date__lte=df)
         except ValueError:
             pass
 
