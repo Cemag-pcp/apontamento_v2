@@ -208,6 +208,19 @@ def _row_hash_from_list(row_values):
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+HEADER_ROW_INDEX = 5
+
+
+def _montar_dados_linha(header_row, row_values):
+    selected_headers = _make_unique_headers(
+        [header_row[i] if i < len(header_row) else "" for i in COLUNAS_EXIBIR]
+    )
+    return {
+        selected_headers[idx]: (row_values[col_idx] if col_idx < len(row_values) else "")
+        for idx, col_idx in enumerate(COLUNAS_EXIBIR)
+    }
+
+
 def _is_filled(value):
     return str(value or "").strip() != ""
 
@@ -380,12 +393,8 @@ def sincronizar_recebimento(request):
     if not values or len(values) < 2:
         return JsonResponse({"novos": 0, "total": 0, "concluido": True}, status=200)
 
-    header_row_index = 5
-    header_row = values[header_row_index - 1] if len(values) >= header_row_index else []
-    selected_headers = _make_unique_headers(
-        [header_row[i] if i < len(header_row) else "" for i in COLUNAS_EXIBIR]
-    )
-    data_rows = values[header_row_index:]
+    header_row = values[HEADER_ROW_INDEX - 1] if len(values) >= HEADER_ROW_INDEX else []
+    data_rows = values[HEADER_ROW_INDEX:]
 
     cutoff = _parse_br_date(DEFAULT_CUT_OFF_DATE)
     if cutoff is None:
@@ -406,7 +415,7 @@ def sincronizar_recebimento(request):
             proximo_offset = offset
             break
 
-        row_index = header_row_index + 1 + offset
+        row_index = HEADER_ROW_INDEX + 1 + offset
         row_values = list(row)
         if not row_values:
             continue
@@ -424,12 +433,7 @@ def sincronizar_recebimento(request):
         total += 1
         sheet_hash = _row_hash_from_list(row_values)
 
-        dados = {
-            selected_headers[idx]: (
-                row_values[col_idx] if col_idx < len(row_values) else ""
-            )
-            for idx, col_idx in enumerate(COLUNAS_EXIBIR)
-        }
+        dados = _montar_dados_linha(header_row, row_values)
 
         try:
             existing_by_line = InspecaoRecebimentoItem.objects.filter(
@@ -486,9 +490,72 @@ def sincronizar_recebimento(request):
             "total": total,
             "concluido": proximo_offset is None,
             "proximo_offset": proximo_offset,
-            "linha_atual": (proximo_offset if proximo_offset is not None else len(data_rows)) + header_row_index,
-            "total_linhas": len(data_rows) + header_row_index,
+            "linha_atual": (proximo_offset if proximo_offset is not None else len(data_rows)) + HEADER_ROW_INDEX,
+            "total_linhas": len(data_rows) + HEADER_ROW_INDEX,
         },
+        status=200,
+    )
+
+
+def atualizar_item_recebimento(request, item_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    item = get_object_or_404(InspecaoRecebimentoItem, pk=item_id, excluido=False)
+
+    if not item.linha_planilha:
+        return JsonResponse(
+            {"error": "Este item não possui uma linha da planilha associada para atualizar."},
+            status=400,
+        )
+
+    credentials = get_google_credentials()
+    if credentials is None:
+        return JsonResponse({"error": "Credenciais do Google Sheets não encontradas."}, status=500)
+
+    try:
+        gc = gspread.service_account_from_dict(credentials)
+        # Mesmo cuidado de timeout do restante do modulo - ver _load_recebimento_sheet.
+        gc.set_timeout((5, 20))
+        sheet = gc.open_by_key(item.planilha_id or SHEET_ID)
+        worksheet = sheet.worksheet(item.aba_nome or SHEET_TAB)
+        header_row = worksheet.row_values(HEADER_ROW_INDEX)
+        row_values = worksheet.row_values(item.linha_planilha)
+    except Exception as exc:
+        return JsonResponse({"error": f"Erro ao consultar a planilha: {exc}"}, status=502)
+
+    if not row_values:
+        return JsonResponse(
+            {"error": "Não foi possível encontrar essa linha na planilha (pode ter sido removida ou deslocada)."},
+            status=404,
+        )
+
+    incoming_dados = _montar_dados_linha(header_row, row_values)
+    data_coluna_a = _parse_br_date(row_values[0])
+    sheet_hash = _row_hash_from_list(row_values)
+
+    # So sobrescreve campos que ja estavam preenchidos se o novo valor tambem
+    # vier preenchido - evita apagar dado bom por causa de uma leitura vazia.
+    merged_dados = _merge_sheet_data(item.dados, incoming_dados)
+
+    update_fields = []
+    if merged_dados != item.dados:
+        item.dados = merged_dados
+        update_fields.append("dados")
+    if data_coluna_a and item.data_referencia != data_coluna_a:
+        item.data_referencia = data_coluna_a
+        update_fields.append("data_referencia")
+    if sheet_hash != item.sheet_hash and not (
+        InspecaoRecebimentoItem.objects.filter(sheet_hash=sheet_hash).exclude(pk=item.pk).exists()
+    ):
+        item.sheet_hash = sheet_hash
+        update_fields.append("sheet_hash")
+
+    if update_fields:
+        item.save(update_fields=update_fields)
+
+    return JsonResponse(
+        {"success": True, "dados": item.dados, "atualizado": bool(update_fields)},
         status=200,
     )
 
