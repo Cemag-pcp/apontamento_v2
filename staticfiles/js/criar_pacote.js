@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnAdicionar    = document.getElementById('btnAdicionarItem');
     const btnAdicionarForaPlanejado = document.getElementById('btnAdicionarItemForaPlanejado');
     const btnAdicionarCardan = document.getElementById('btnAdicionarCardan');
+    const btnSugerirPacote = document.getElementById('btnSugerirPacote');
+    const sugestaoInfo    = document.getElementById('sugestaoPacoteInfo');
     const formCriarPacote = document.getElementById('formCriar');
     const btnVoltar       = document.getElementById('btnVoltarVisualizarPacote');
 
@@ -201,6 +203,78 @@ document.addEventListener('DOMContentLoaded', function () {
         row.querySelector('.campo-descricao-fora').value = 'Cardan';
         row.querySelector('.campo-quantidade-fora').value = 1;
         itensForaContainer?.appendChild(row);
+    });
+
+    // Sugere um pacote com base no histórico de pacotes de outras cargas
+    // com a mesma carreta, usando só o que está pendente nesta carga.
+    btnSugerirPacote?.addEventListener('click', async () => {
+        const idCarga = document.getElementById('idCargaPacote')?.value;
+        if (!idCarga) {
+            alert('Selecione/defina a Carga antes de pedir uma sugestão.');
+            return;
+        }
+
+        const textoOriginal = btnSugerirPacote.innerHTML;
+        btnSugerirPacote.disabled = true;
+        btnSugerirPacote.innerHTML = 'Buscando...';
+        if (sugestaoInfo) {
+            sugestaoInfo.className = 'small text-muted mt-2';
+            sugestaoInfo.textContent = '';
+        }
+
+        try {
+            const resp = await fetch(`api/pacotes/sugerir/${encodeURIComponent(idCarga)}/`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!resp.ok) {
+                const txt = await resp.text();
+                throw new Error(`Falha ao buscar sugestão (${resp.status}): ${txt}`);
+            }
+
+            const data = await resp.json();
+
+            if (!data.sugestao) {
+                if (sugestaoInfo) {
+                    sugestaoInfo.className = 'small text-muted mt-2';
+                    sugestaoInfo.textContent = data.mensagem || 'Nenhuma sugestão disponível para as pendências atuais.';
+                }
+                return;
+            }
+
+            // Limpa as linhas de itens planejados atuais antes de preencher a sugestão
+            itensContainer.querySelectorAll('.item-pacote').forEach((row) => {
+                const select = row.querySelector('.campo-item');
+                if (select && $(select).data('select2')) $(select).select2('destroy');
+                row.remove();
+            });
+
+            const pendencias = await carregarPendencias(idCarga);
+
+            data.sugestao.itens.forEach((item) => {
+                const row = criarRowItem();
+                const selectEl = row.querySelector('.campo-item');
+                initSelect2Local(selectEl, pendencias);
+                itensContainer.appendChild(row);
+
+                $(selectEl).val(item.pendencia_id).trigger('change');
+                const qtdEl = row.querySelector('input[name="quantidade[]"]');
+                if (qtdEl) qtdEl.value = item.quantidade;
+            });
+
+            if (sugestaoInfo) {
+                sugestaoInfo.className = 'small text-success mt-2';
+                sugestaoInfo.textContent =
+                    `Sugestão confirmada por ${data.sugestao.ocorrencias_historicas} pacote(s) histórico(s) ` +
+                    `da carreta ${data.sugestao.carreta} (cobertura ${data.sugestao.cobertura_percentual}%). ` +
+                    `Revise os itens, defina o nome do pacote e salve.`;
+            }
+        } catch (err) {
+            console.error(err);
+            alert(err?.message || 'Falha ao buscar sugestão de pacote.');
+        } finally {
+            btnSugerirPacote.disabled = false;
+            btnSugerirPacote.innerHTML = textoOriginal;
+        }
     });
 
     // Remover item (delegação — mantém compatibilidade com seu padrão)
@@ -415,6 +489,8 @@ export async function resetFormCriarPacote({ novaLinha = false, refresh = false 
     const formCriarPacote = document.getElementById('formCriar');
     const itensContainer  = document.getElementById('itensPacote');
     const itensForaContainer = document.getElementById('itensForaPlanejado');
+    const sugestaoInfo = document.getElementById('sugestaoPacoteInfo');
+    if (sugestaoInfo) sugestaoInfo.textContent = '';
     if (!formCriarPacote || !itensContainer) return;
 
     // destruir Select2 existentes
