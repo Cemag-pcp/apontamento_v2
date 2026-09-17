@@ -22,7 +22,7 @@ from .services import (
     excluir_foto_pacote, deletar_pacote_service, duplicar_pacote_service,
     salvar_fornecedores_carga, excluir_carga_service,
     atualizar_quantidade_item_service, excluir_item_pacote_service,
-    mover_item_pacote,
+    mover_item_pacote, sugerir_pacote_service,
 )
 from cadastro.models import CarretasExplodidas
 
@@ -664,6 +664,16 @@ def guardar_pacotes(request):
 def buscar_pacotes_carga(request, id):
     carga = get_object_or_404(Carga, id=id)
     return JsonResponse(detalhar_pacotes_da_carga(carga))
+
+def sugerir_pacote(request, id):
+    carga = get_object_or_404(Carga, id=id)
+    sugestao = sugerir_pacote_service(carga)
+    if not sugestao:
+        return JsonResponse({
+            'sugestao': None,
+            'mensagem': 'Nenhuma sugestão com histórico suficiente para as pendências atuais.',
+        })
+    return JsonResponse({'sugestao': sugestao})
 
 def listar_pacotes_criados(request, id):
     # garante que a carga existe (opcional)

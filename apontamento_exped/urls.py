@@ -27,6 +27,7 @@ urlpatterns = [
     path('api/pacotes/duplicar/<int:id>/', views.duplicar_pacote, name='duplicar_pacote'),
     path('api/guardar-pacote/', views.guardar_pacotes, name='guardar_pacotes'),
     path('api/buscar-pacote/<int:id>/', views.buscar_pacotes_carga, name='buscar_pacotes_carga'),
+    path('api/pacotes/sugerir/<int:id>/', views.sugerir_pacote, name='sugerir_pacote'),
     path('api/alterar-stage/<int:id>/', views.alterar_stage, name='alterar_stage'),
     path('api/confirmar-pacote/<int:id>/', views.confirmar_pacote, name='confirmar_pacote'),
     path('api/pacotes/mover-item/', views.mover_item, name='mover_item'),

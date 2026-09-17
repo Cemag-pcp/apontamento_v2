@@ -5,7 +5,7 @@ duplicar codigo. Funcoes puras: recebem/devolvem tipos Python simples ou
 instancias de model, nunca HttpRequest/JsonResponse.
 """
 from datetime import timedelta
-from collections import defaultdict
+from collections import defaultdict, Counter
 from zoneinfo import ZoneInfo
 
 from django.db import transaction
@@ -597,6 +597,117 @@ def listar_pendencias_carga(carga_id):
         "total_itens": len(itens),
         "itens": itens
     }
+
+
+def sugerir_pacote_service(carga, cobertura_minima=0.75):
+    """Sugere um pacote a partir das pendencias disponiveis na carga.
+
+    A sugestao parte sempre do que esta disponivel (nunca inventa item);
+    o historico de pacotes de OUTRAS cargas com a mesma carreta e usado so
+    pra confirmar que aquele agrupamento de pendencias e um padrao real
+    (cobertura minima de itens do padrao historico presentes na pendencia
+    atual). Entre os padroes confirmados, escolhe o de maior cobertura
+    (desempate por numero de ocorrencias historicas e depois por
+    quantidade de itens cobertos).
+
+    Retorna None se nao houver pendencia ou nenhum padrao confirmado.
+    """
+    pendencias = list(
+        PendenciasPacote.objects
+        .filter(carreta_carga__carga_id=carga.id, qt_necessaria__gt=0)
+        .select_related('carreta_carga')
+    )
+    if not pendencias:
+        return None
+
+    pendencias_por_carreta = defaultdict(list)
+    for p in pendencias:
+        pendencias_por_carreta[p.carreta_carga.carreta].append(p)
+
+    melhor_score = None
+    melhor_sugestao = None
+
+    for carreta_codigo, pends in pendencias_por_carreta.items():
+        # Se o mesmo codigo aparecer em mais de uma pendencia da carreta
+        # (ex: duas carretas iguais na mesma carga), usa a de maior saldo.
+        pendentes_map = {}
+        for p in pends:
+            atual = pendentes_map.get(p.codigo)
+            if atual is None or (p.qt_necessaria or 0) > (atual.qt_necessaria or 0):
+                pendentes_map[p.codigo] = p
+        codigos_pendentes = set(pendentes_map.keys())
+        if not codigos_pendentes:
+            continue
+
+        pacotes_historicos_ids = (
+            Pacote.objects
+            .filter(carga__carretas__carreta=carreta_codigo)
+            .exclude(carga_id=carga.id)
+            .values_list('id', flat=True)
+            .distinct()
+        )
+
+        itens_historicos = (
+            ItemPacote.objects
+            .filter(pacote_id__in=pacotes_historicos_ids, codigo__isnull=False)
+            .values('pacote_id', 'codigo__codigo', 'quantidade')
+        )
+
+        itens_por_pacote_historico = defaultdict(list)
+        for row in itens_historicos:
+            itens_por_pacote_historico[row['pacote_id']].append(
+                (row['codigo__codigo'], row['quantidade'])
+            )
+
+        # Conta quantas vezes cada combinacao de codigos (fingerprint) se
+        # repete entre os pacotes historicos dessa carreta.
+        freq_fingerprint = Counter()
+        exemplo_qtd_por_fingerprint = {}
+        for lst in itens_por_pacote_historico.values():
+            fp = frozenset(codigo for codigo, _ in lst)
+            if not fp:
+                continue
+            freq_fingerprint[fp] += 1
+            exemplo_qtd_por_fingerprint.setdefault(fp, dict(lst))
+
+        for fp, ocorrencias in freq_fingerprint.items():
+            intersecao = fp & codigos_pendentes
+            if not intersecao:
+                continue
+            cobertura = len(intersecao) / len(fp)
+            if cobertura < cobertura_minima:
+                continue
+
+            score = (round(cobertura, 4), ocorrencias, len(intersecao))
+            if melhor_score is not None and score <= melhor_score:
+                continue
+
+            qtds_hist = exemplo_qtd_por_fingerprint[fp]
+            itens_sugeridos = []
+            for codigo in sorted(intersecao):
+                pend = pendentes_map[codigo]
+                qtd_sugerida = min(int(qtds_hist.get(codigo) or 1), int(pend.qt_necessaria or 0))
+                if qtd_sugerida <= 0:
+                    continue
+                itens_sugeridos.append({
+                    'pendencia_id': pend.id,
+                    'codigo': pend.codigo,
+                    'descricao': pend.descricao,
+                    'quantidade': qtd_sugerida,
+                })
+
+            if not itens_sugeridos:
+                continue
+
+            melhor_score = score
+            melhor_sugestao = {
+                'carreta': carreta_codigo,
+                'cobertura_percentual': round(cobertura * 100, 1),
+                'ocorrencias_historicas': ocorrencias,
+                'itens': itens_sugeridos,
+            }
+
+    return melhor_sugestao
 
 
 def criar_ou_atualizar_pacote(carga, nome_pacote=None, pacote_existente_id=None,
