@@ -196,19 +196,13 @@ function popularTabelaResumo(cargas) {
     });
 }
 
-function gerarArquivos(){
-    const dataInicio = document.getElementById("data-inicio").value;
-    const dataFim = document.getElementById("data-fim").value;
-    const setor = document.getElementById("setorSelect").value;
-
-    if (!dataInicio || !dataFim || !setor) {
-        alert("Preencha todos os campos!");
-        return;
+function baixarZipSequenciamento(dataInicio, dataFim, setor, celulasSelecionadas) {
+    let url = `api/gerar-arquivos/?data_inicio=${dataInicio}&data_fim=${dataFim}&setor=${setor}`;
+    if (Array.isArray(celulasSelecionadas) && celulasSelecionadas.length > 0) {
+        url += `&celulas=${encodeURIComponent(celulasSelecionadas.join(','))}`;
     }
 
-    const url = `api/gerar-arquivos/?data_inicio=${dataInicio}&data_fim=${dataFim}&setor=${setor}`;
-
-    fetch(url)
+    return fetch(url)
         .then(response => {
             if (!response.ok) {
                 throw new Error("Erro ao gerar sequenciamento.");
@@ -225,6 +219,178 @@ function gerarArquivos(){
             a.remove();
         })
         .catch(error => console.error("Erro:", error));
+}
+
+function ensureModalCelulasGerarArquivos() {
+    let modal = document.getElementById("modalCelulasGerarArquivos");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalCelulasGerarArquivos";
+        Object.assign(modal.style, {
+            position: "fixed",
+            inset: "0",
+            background: "rgba(0,0,0,.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: "9999",
+        });
+
+        const box = document.createElement("div");
+        Object.assign(box.style, {
+            background: "#fff",
+            width: "min(520px, 92vw)",
+            maxHeight: "80vh",
+            borderRadius: "12px",
+            boxShadow: "0 10px 30px rgba(0,0,0,.2)",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+        });
+
+        box.innerHTML = `
+            <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+                <h3 style="margin:0;font:600 18px/1.2 system-ui">Selecionar células</h3>
+                <button id="fecharModalCelulasGerarArquivos" style="border:0;background:#f5f5f5;padding:8px 12px;border-radius:8px;cursor:pointer">Fechar</button>
+            </div>
+            <div id="modalCelulasGerarArquivosBody" style="padding:12px 20px;overflow:auto"></div>
+            <div style="padding:14px 20px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end">
+                <button id="confirmarCelulasGerarArquivos" style="background:#198754;color:#fff;border:0;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer">Gerar Arquivos</button>
+            </div>
+        `;
+
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+    }
+    return modal;
+}
+
+function escolherCelulasEGerar(dataInicio, dataFim, setor, celulas) {
+    return new Promise((resolve) => {
+        const modal = ensureModalCelulasGerarArquivos();
+        const body = document.getElementById("modalCelulasGerarArquivosBody");
+        body.innerHTML = "";
+
+        const info = document.createElement("p");
+        Object.assign(info.style, { margin: "0 0 12px", fontSize: "13px", color: "#6b7280" });
+        info.textContent = "Escolha para quais células deseja gerar os arquivos de sequenciamento:";
+        body.appendChild(info);
+
+        const lblTodas = document.createElement("label");
+        Object.assign(lblTodas.style, {
+            display: "flex", alignItems: "center", gap: "8px",
+            marginBottom: "10px", paddingBottom: "10px",
+            borderBottom: "1px solid #eee", fontWeight: "600",
+        });
+
+        const ckTodas = document.createElement("input");
+        ckTodas.type = "checkbox";
+        ckTodas.checked = true;
+
+        lblTodas.appendChild(ckTodas);
+        lblTodas.appendChild(document.createTextNode("Marcar/desmarcar todas"));
+        body.appendChild(lblTodas);
+
+        const lista = document.createElement("div");
+        lista.style.display = "grid";
+        lista.style.gap = "8px";
+
+        celulas.forEach((obj) => {
+            const nome = obj?.celula ?? obj;
+            const lbl = document.createElement("label");
+            lbl.style.display = "flex";
+            lbl.style.alignItems = "center";
+            lbl.style.gap = "8px";
+
+            const ck = document.createElement("input");
+            ck.type = "checkbox";
+            ck.name = "celulaGerarArquivos";
+            ck.value = nome;
+            ck.checked = true;
+
+            lbl.appendChild(ck);
+            lbl.appendChild(document.createTextNode(nome));
+            lista.appendChild(lbl);
+        });
+
+        body.appendChild(lista);
+
+        const checksCelulas = () => Array.from(lista.querySelectorAll('input[name="celulaGerarArquivos"]'));
+
+        ckTodas.onchange = () => {
+            checksCelulas().forEach((ck) => { ck.checked = ckTodas.checked; });
+        };
+
+        lista.addEventListener("change", (e) => {
+            if (e.target.name !== "celulaGerarArquivos") return;
+            const todasMarcadas = checksCelulas().every((ck) => ck.checked);
+            ckTodas.checked = todasMarcadas;
+        });
+
+        const fechar = () => {
+            modal.remove();
+            resolve();
+        };
+
+        document.getElementById("fecharModalCelulasGerarArquivos").onclick = fechar;
+
+        const btnConfirmar = document.getElementById("confirmarCelulasGerarArquivos");
+        btnConfirmar.disabled = false;
+        btnConfirmar.textContent = "Gerar Arquivos";
+        btnConfirmar.onclick = async () => {
+            const selecionadas = Array.from(
+                document.querySelectorAll('input[name="celulaGerarArquivos"]:checked')
+            ).map((el) => el.value);
+
+            if (selecionadas.length === 0) {
+                alert("Selecione ao menos uma célula.");
+                return;
+            }
+
+            btnConfirmar.disabled = true;
+            btnConfirmar.textContent = "Gerando...";
+
+            await baixarZipSequenciamento(dataInicio, dataFim, setor, selecionadas);
+
+            modal.remove();
+            resolve();
+        };
+    });
+}
+
+async function gerarArquivos(){
+    const dataInicio = document.getElementById("data-inicio").value;
+    const dataFim = document.getElementById("data-fim").value;
+    const setor = document.getElementById("setorSelect").value;
+
+    if (!dataInicio || !dataFim || !setor) {
+        alert("Preencha todos os campos!");
+        return;
+    }
+
+    // Pintura continua gerando direto, sem escolha de célula.
+    if (setor !== 'montagem' && setor !== 'solda') {
+        return baixarZipSequenciamento(dataInicio, dataFim, setor, null);
+    }
+
+    let celulas = [];
+    try {
+        const resp = await fetch(`api/cargas-liberadas/?data_inicio=${encodeURIComponent(dataInicio)}&data_fim=${encodeURIComponent(dataFim)}`);
+        if (!resp.ok) throw new Error("Erro ao buscar células");
+        const payload = await resp.json();
+        celulas = Array.isArray(payload?.cargas?.celulas) ? payload.cargas.celulas : [];
+    } catch (err) {
+        console.error(err);
+        alert("Erro ao buscar as células disponíveis. Tente novamente.");
+        return;
+    }
+
+    if (celulas.length === 0) {
+        // Sem células pra escolher - gera tudo, como no comportamento original.
+        return baixarZipSequenciamento(dataInicio, dataFim, setor, null);
+    }
+
+    return escolherCelulasEGerar(dataInicio, dataFim, setor, celulas);
 }
 
 function gerarPlanejamento() {
