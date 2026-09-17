@@ -519,8 +519,15 @@ def criar_array_datas(data_inicial, data_final):
     
     return array_datas
 
-def gerar_arquivos(data_inicial, data_final, setor):
+def gerar_arquivos(data_inicial, data_final, setor, celulas_filtro=None):
+    """
+    celulas_filtro: lista opcional de nomes de celula pra restringir quais
+    arquivos sao gerados (montagem/solda geram 1 arquivo por celula). None
+    ou lista vazia = gera pra todas as celulas encontradas (comportamento
+    original).
+    """
     filenames = []
+    celulas_filtro = set(celulas_filtro) if celulas_filtro else None
 
     resultado = criar_array_datas(data_inicial, data_final)
     base_carretas_original, base_carga_original = get_data_from_sheets()
@@ -981,6 +988,8 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             celulas_unique = pd.DataFrame(tab_completa['Célula'].unique())
             celulas_unique = celulas_unique.dropna(axis=0)
+            if celulas_filtro:
+                celulas_unique = celulas_unique[celulas_unique[0].isin(celulas_filtro)]
             celulas_unique.reset_index(inplace=True)
 
             recurso_unique = pd.DataFrame(tab_completa['Recurso'].unique())
@@ -1220,6 +1229,8 @@ def gerar_arquivos(data_inicial, data_final, setor):
 
             celulas_unique = pd.DataFrame(tab_completa['Célula'].unique())
             celulas_unique = celulas_unique.dropna(axis=0)
+            if celulas_filtro:
+                celulas_unique = celulas_unique[celulas_unique[0].isin(celulas_filtro)]
             celulas_unique.reset_index(inplace=True)
 
             recurso_unique = pd.DataFrame(tab_completa['Recurso'].unique())

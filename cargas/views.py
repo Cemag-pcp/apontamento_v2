@@ -721,12 +721,14 @@ def gerar_arquivos_sequenciamento(request):
     data_inicio = request.GET.get('data_inicio')
     data_final = request.GET.get('data_fim')
     setor = request.GET.get('setor')
+    celulas_param = request.GET.get('celulas')
+    celulas_filtro = [c.strip() for c in celulas_param.split(',') if c.strip()] if celulas_param else None
 
     if not data_inicio or not data_final or not setor:
         return HttpResponse("Erro: Parâmetros obrigatórios ausentes.", status=400)
 
     # Gerar os arquivos e a tabela completa
-    arquivos_gerados = gerar_arquivos(data_inicio, data_final, setor)
+    arquivos_gerados = gerar_arquivos(data_inicio, data_final, setor, celulas_filtro=celulas_filtro)
 
     if not arquivos_gerados:
         return HttpResponse("Nenhum arquivo foi gerado.", status=500)
