@@ -96,6 +96,7 @@ class Mp(models.Model):
     codigo = models.CharField(max_length=100)
     descricao = models.CharField(max_length=255)
     setor = models.ForeignKey(Setor, on_delete=models.CASCADE, related_name='setor')
+    ativo = models.BooleanField(default=True)
 
     def __str__(self):
         return f'{self.codigo} - {self.descricao}'

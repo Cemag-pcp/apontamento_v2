@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from .forms import UploadCSVForm
 from .models import Pecas, Setor, Maquina, Operador, Mp, MotivoExclusao, MotivoInterrupcao, MotivoMaquinaParada, Conjuntos, Carretas, ItensExplodidos, CarretasExplodidas, EspessuraChapa, DestinatarioNotificacao
+from core.models import PropriedadesOrdem
 from . import views
 
 import csv
@@ -652,6 +653,163 @@ def cadastro_pecas_api(request):
             'success': f'Peca {"ativada" if peca.ativo else "desabilitada"} com sucesso.',
             'ativo': peca.ativo,
         })
+
+    return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
+
+@login_required
+def cadastro_tubos(request):
+    return render(request, 'cadastro_tubos.html')
+
+@csrf_exempt
+@login_required
+def cadastro_tubos_api(request):
+    """
+    Tubos = materia-prima (Mp) do setor 'serra'.
+
+    GET: lista tubos paginados (busca por codigo/descricao, filtro ativo).
+    POST: cria novo tubo.
+    PATCH: atualiza tubo.
+    PUT: alterna ativo/inativo.
+    DELETE: remove tubo - bloqueado se houver ordem vinculada (PropriedadesOrdem).
+    """
+    setor_serra = get_object_or_404(Setor, nome='serra')
+
+    if request.method == 'GET':
+        page_number = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 10)
+
+        try:
+            page_number = int(page_number)
+            page_size = int(page_size)
+        except ValueError:
+            return JsonResponse({'error': 'Parametros de paginacao invalidos.'}, status=400)
+
+        queryset = Mp.objects.filter(setor=setor_serra).order_by('codigo')
+
+        ativo_param = request.GET.get('ativo', 'true').lower()
+        if ativo_param == 'false':
+            queryset = queryset.filter(ativo=False)
+        elif ativo_param == 'all':
+            pass  # sem filtro
+        else:
+            queryset = queryset.filter(ativo=True)
+
+        search_param = request.GET.get('search')
+        if search_param:
+            queryset = queryset.filter(
+                Q(codigo__icontains=search_param) | Q(descricao__icontains=search_param)
+            )
+
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page_number)
+
+        tubos = [
+            {
+                'id': tubo.id,
+                'codigo': tubo.codigo,
+                'descricao': tubo.descricao,
+                'ativo': tubo.ativo,
+            }
+            for tubo in page_obj.object_list
+        ]
+
+        return JsonResponse({
+            'results': tubos,
+            'page': page_obj.number,
+            'page_size': page_obj.paginator.per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        })
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        codigo = (data.get('codigo') or '').strip()
+        if not codigo:
+            return JsonResponse({'error': 'Codigo e obrigatorio.'}, status=400)
+
+        if Mp.objects.filter(setor=setor_serra, codigo=codigo).exists():
+            return JsonResponse({'error': 'Ja existe um tubo cadastrado com esse codigo.'}, status=400)
+
+        tubo = Mp.objects.create(
+            codigo=codigo,
+            descricao=(data.get('descricao') or '').strip() or codigo,
+            setor=setor_serra,
+        )
+
+        return JsonResponse({'success': 'Tubo criado com sucesso.', 'id': tubo.id}, status=201)
+
+    if request.method == 'PATCH':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        tubo_id = data.get('id')
+        if not tubo_id:
+            return JsonResponse({'error': 'ID do tubo nao informado.'}, status=400)
+
+        tubo = get_object_or_404(Mp, id=tubo_id, setor=setor_serra)
+
+        codigo = (data.get('codigo') or '').strip()
+        if not codigo:
+            return JsonResponse({'error': 'Codigo e obrigatorio.'}, status=400)
+
+        if Mp.objects.filter(setor=setor_serra, codigo=codigo).exclude(id=tubo.id).exists():
+            return JsonResponse({'error': 'Ja existe um tubo cadastrado com esse codigo.'}, status=400)
+
+        tubo.codigo = codigo
+        tubo.descricao = (data.get('descricao') or '').strip() or codigo
+        tubo.save(update_fields=['codigo', 'descricao'])
+
+        return JsonResponse({'success': 'Tubo atualizado com sucesso.'})
+
+    if request.method == 'PUT':
+        # Toggle ativo/inativo
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        tubo_id = data.get('id')
+        if not tubo_id:
+            return JsonResponse({'error': 'ID do tubo nao informado.'}, status=400)
+
+        tubo = get_object_or_404(Mp, id=tubo_id, setor=setor_serra)
+        tubo.ativo = not tubo.ativo
+        tubo.save(update_fields=['ativo'])
+
+        return JsonResponse({
+            'success': f'Tubo {"ativado" if tubo.ativo else "desabilitado"} com sucesso.',
+            'ativo': tubo.ativo,
+        })
+
+    if request.method == 'DELETE':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalido.'}, status=400)
+
+        tubo_id = data.get('id')
+        if not tubo_id:
+            return JsonResponse({'error': 'ID do tubo nao informado.'}, status=400)
+
+        tubo = get_object_or_404(Mp, id=tubo_id, setor=setor_serra)
+
+        qtd_ordens = PropriedadesOrdem.objects.filter(mp_codigo=tubo).count()
+        if qtd_ordens > 0:
+            return JsonResponse({
+                'error': f'Nao e possivel excluir: existe(m) {qtd_ordens} ordem(ns) vinculada(s) a este tubo.'
+            }, status=400)
+
+        tubo.delete()
+
+        return JsonResponse({'success': 'Tubo removido com sucesso.'})
 
     return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
 
