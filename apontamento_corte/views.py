@@ -1795,8 +1795,23 @@ def decidir_peca_nao_conforme(request, pk):
                     status_prioridade=3,
                     operador_final=ordem_original.operador_final,
                 )
-                # Sem PropriedadesOrdem: materia-prima/peso ficam em branco
-                # pra ordem recuperada, conforme decidido.
+                propriedade_original = getattr(ordem_original, 'propriedade', None)
+                if propriedade_original:
+                    # Mesma logica da sucata: identifica a chapa de origem
+                    # (mesma da ordem original) pra tela de apontamentos ERP
+                    # conseguir resolver espessura e codigo da chapa, e pra
+                    # habilitar o botao "Transferir". quantidade=0 porque nao
+                    # ha chapa nova sendo consumida - e so o rastreio de qual
+                    # material a peca recuperada veio.
+                    PropriedadesOrdem.objects.create(
+                        ordem=ordem_recuperada,
+                        mp_codigo=propriedade_original.mp_codigo,
+                        descricao_mp=propriedade_original.descricao_mp,
+                        tamanho=propriedade_original.tamanho,
+                        espessura=propriedade_original.espessura,
+                        quantidade=0,
+                        tipo_chapa=propriedade_original.tipo_chapa,
+                    )
                 PecasOrdem.objects.create(
                     ordem=ordem_recuperada,
                     peca=registro.peca,
