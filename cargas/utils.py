@@ -519,6 +519,287 @@ def criar_array_datas(data_inicial, data_final):
     
     return array_datas
 
+
+MAPA_CORES_PINTURA = {
+    "AM": "Amarelo", "AN": "Azul", "VJ": "Verde", "LJ": "Laranja Jacto",
+    "LC": "Laranja", "VM": "Vermelho", "AV": "Amarelo", "CO": "Cinza", "CE": "Cinza escuro",
+}
+
+
+def consolidar_ordens_planejamento(ordens):
+    agrupadas = {}
+
+    for ordem in ordens:
+        chave = (
+            ordem.get("grupo_maquina", ""),
+            str(ordem.get("data_carga", "")),
+            ordem.get("setor_conjunto", "") or "",
+            ordem.get("peca_nome", "") or "",
+            ordem.get("cor", "") or "",
+        )
+        if chave not in agrupadas:
+            agrupadas[chave] = {**ordem}
+            continue
+
+        agrupadas[chave]["qtd_planejada"] = int(agrupadas[chave].get("qtd_planejada", 0)) + int(
+            ordem.get("qtd_planejada", 0)
+        )
+
+        if agrupadas[chave].get("carga_liberada_id") != ordem.get("carga_liberada_id"):
+            agrupadas[chave]["carga_liberada_id"] = None
+
+        if agrupadas[chave].get("carga_liberada_versao_id") != ordem.get("carga_liberada_versao_id"):
+            agrupadas[chave]["carga_liberada_versao_id"] = None
+
+    return list(agrupadas.values())
+
+
+def _construir_ordens_planejamento_from_items(cargas_liberadas, setor, datas_finais_por_carga):
+    """
+    Gera ordens planejadas cruzando CargaLiberadaItem (banco) × Base_Carretas (Sheets).
+    Substitui gerar_sequenciamento (que lia de Carga_Vendas no Sheets) para garantir
+    que novos itens liberados no banco sejam incluídos no planejamento.
+
+    Movida de cargas/views.py para cargas/utils.py pra poder ser reaproveitada tambem
+    por gerar_arquivos() (garante que os arquivos impressos usem a MESMA fonte/quantidade
+    que a geracao real de Ordem no sistema).
+    """
+    from cargas.models import CargaLiberadaVersao, CargaLiberadaItem
+
+    base_carretas = get_base_carreta()
+    base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
+    base_carretas['Recurso'] = normalizar_codigo_recurso_serie(base_carretas['Recurso'])
+    base_carretas['Recurso'] = base_carretas['Recurso'].apply(
+        lambda x: '0' + x if len(str(x)) == 5 else str(x)
+    )
+    base_carretas['Qtde'] = pd.to_numeric(base_carretas['Qtde'], errors='coerce').fillna(0)
+
+    if setor == 'pintura':
+        if 'Etapa2' in base_carretas.columns:
+            base_carretas = base_carretas[
+                base_carretas['Etapa2'].fillna('') == 'Pintura'
+            ].copy()
+        colunas_carretas = ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula', 'Etapa5']
+    elif setor == 'solda':
+        if 'Etapa3' in base_carretas.columns:
+            base_carretas = base_carretas[base_carretas['Etapa3'].fillna('') != ''].copy()
+        colunas_carretas = ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula']
+    else:  # montagem
+        if 'Etapa' in base_carretas.columns:
+            base_carretas = base_carretas[base_carretas['Etapa'].fillna('') != ''].copy()
+        colunas_carretas = ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula']
+
+    colunas_carretas = [c for c in colunas_carretas if c in base_carretas.columns]
+
+    # Remove apenas linhas EXATAMENTE iguais em (Recurso, Código, Peca, Célula).
+    # Não usar só (Recurso, Célula) pois a mesma máquina pode produzir peças
+    # diferentes na mesma célula — removeria linhas válidas.
+    cols_dedup = [c for c in ['Recurso', 'Código', 'Peca', 'Célula'] if c in base_carretas.columns]
+    antes_dedup = len(base_carretas)
+    base_carretas = base_carretas.drop_duplicates(subset=cols_dedup).reset_index(drop=True)
+    removidas_carreta = antes_dedup - len(base_carretas)
+    if removidas_carreta:
+        logger.warning(
+            "[from_items] base_carretas | %d linhas exatamente duplicadas removidas (Recurso+Código+Peca+Célula)",
+            removidas_carreta,
+        )
+
+    origens = {}  # chave: (peca_nome, celula, cor) → lista de itens que geraram a quantidade
+
+    logger.info(
+        "[from_items] setor=%s | base_carretas carregada | linhas=%d | colunas=%s",
+        setor, len(base_carretas), list(base_carretas.columns),
+    )
+
+    ordens = []
+
+    for carga_liberada in cargas_liberadas:
+        data_carga_planejada = datas_finais_por_carga[carga_liberada["carga_liberada_id"]]
+
+        # Sempre usa a versão mais alta da carga, garantindo que versões
+        # antigas não sejam incluídas mesmo se o dict estiver desatualizado.
+        ultima_versao_id_qs = (
+            CargaLiberadaVersao.objects
+            .filter(carga_liberada_id=carga_liberada["carga_liberada_id"])
+            .order_by('-versao')
+            .values('id')[:1]
+        )
+        itens_qs = CargaLiberadaItem.objects.filter(
+            carga_versao_id__in=ultima_versao_id_qs
+        ).values('codigo_recurso', 'quantidade', 'numero_serie')
+
+        if not itens_qs.exists():
+            logger.info("[from_items] carga=%s sem itens no banco", carga_liberada.get("carga"))
+            continue
+
+        df_itens = pd.DataFrame(list(itens_qs))
+
+        # Deduplica por numero_serie para evitar dupla contagem caso múltiplas versões
+        # sejam lidas acidentalmente (mesmo serial na versão 1 e versão 2).
+        tem_serie = df_itens['numero_serie'].astype(str).str.strip().ne('')
+        if tem_serie.any():
+            antes = len(df_itens)
+            df_itens = df_itens.drop_duplicates(subset=['codigo_recurso', 'numero_serie'])
+            removidos = antes - len(df_itens)
+            if removidos:
+                logger.warning(
+                    "[from_items] carga=%s | %d duplicatas removidas por numero_serie",
+                    carga_liberada.get("carga"), removidos,
+                )
+
+        df_itens['Recurso_original'] = df_itens['codigo_recurso'].astype(str).str.strip()
+
+        if setor == 'pintura':
+            df_itens['Recurso_cor_sigla'] = df_itens['Recurso_original'].str[-2:].str.strip()
+            df_itens['Recurso_cor_sigla'] = df_itens['Recurso_cor_sigla'].where(
+                df_itens['Recurso_cor_sigla'].isin(MAPA_CORES_PINTURA.keys()), 'LC'
+            )
+            df_itens['cor'] = df_itens['Recurso_cor_sigla'].map(MAPA_CORES_PINTURA)
+
+        df_itens['Recurso'] = normalizar_codigo_recurso_serie(df_itens['Recurso_original'])
+        df_itens['Recurso'] = df_itens['Recurso'].apply(lambda x: '0' + x if len(x) == 5 else x)
+
+        df_merged = pd.merge(df_itens, base_carretas[colunas_carretas], on='Recurso', how='left')
+
+        df_merged = df_merged.dropna(subset=['Código', 'Peca', 'Célula']).copy()
+
+        if df_merged.empty:
+            logger.warning("[from_items] carga=%s | merge vazio apos dropna", carga_liberada.get("carga"))
+            continue
+
+        df_merged['Qtde_total'] = (
+            pd.to_numeric(df_merged['quantidade'], errors='coerce').fillna(0).astype(int) *
+            pd.to_numeric(df_merged['Qtde'], errors='coerce').fillna(0).astype(int)
+        )
+
+        df_merged = df_merged[df_merged['Qtde_total'] > 0].copy()
+
+        df_merged['Código'] = (
+            df_merged['Código'].fillna('').astype(str).str.strip()
+            .str.replace(r'\.0$', '', regex=True)
+        )
+        df_merged['Código'] = df_merged['Código'].apply(
+            lambda x: '0' + x if len(x) == 5 else (x[:6] if len(x) == 8 else x)
+        )
+
+        # Coleta origens ANTES do groupby: cada linha do merge mostra
+        # qual recurso do banco (codigo_recurso + quantidade) gerou qual subtotal
+        for _, mrow in df_merged.iterrows():
+            peca_nome_orig = str(mrow.get('Código', '')).strip() + " - " + str(mrow.get('Peca', '')).strip()
+            celula_orig = str(mrow.get('Célula', '')).strip()
+            cor_orig = str(mrow.get('cor', '')).strip() if setor == 'pintura' else ''
+            chave_orig = (peca_nome_orig, celula_orig, cor_orig)
+            if chave_orig not in origens:
+                origens[chave_orig] = []
+            origens[chave_orig].append({
+                "recurso": str(mrow.get('codigo_recurso', mrow.get('Recurso', ''))),
+                "quantidade_item": int(pd.to_numeric(mrow.get('quantidade', 0), errors='coerce') or 0),
+                "qtde_por_unidade": int(pd.to_numeric(mrow.get('Qtde', 0), errors='coerce') or 0),
+                "subtotal": int(mrow.get('Qtde_total', 0)),
+                "carga": carga_liberada.get("carga", ""),
+            })
+
+        if setor == 'pintura':
+            if 'Etapa5' in df_merged.columns:
+                etapa5 = df_merged['Etapa5'].fillna('').str.upper()
+                df_merged.loc[etapa5.str.contains('CINZA'), 'cor'] = 'Cinza'
+                df_merged.loc[etapa5.str.contains('PRETO'), 'cor'] = 'Preto'
+
+            df_final = (
+                df_merged.groupby(['Código', 'Peca', 'Célula', 'cor'], as_index=False)['Qtde_total'].sum()
+            )
+            df_final.drop_duplicates(subset=['Código', 'cor'], inplace=True)
+        else:
+            df_final = (
+                df_merged.groupby(['Código', 'Peca', 'Célula'], as_index=False)['Qtde_total'].sum()
+            )
+            df_final.drop_duplicates(subset=['Código', 'Célula'], inplace=True)
+
+        for _, row in df_final.iterrows():
+            ordens.append({
+                "grupo_maquina": setor.lower(),
+                "cor": row.get("cor", '') if setor == 'pintura' else '',
+                "obs": "Ordem gerada automaticamente",
+                "peca_nome": str(row["Código"]) + " - " + row["Peca"],
+                "qtd_planejada": int(row["Qtde_total"]),
+                "data_carga": data_carga_planejada.isoformat(),
+                "setor_conjunto": row["Célula"],
+                "carga_liberada_id": carga_liberada["carga_liberada_id"],
+                "carga_liberada_versao_id": carga_liberada["carga_liberada_versao_id"],
+            })
+
+    return consolidar_ordens_planejamento(ordens), origens
+
+
+def _listar_cargas_liberadas_do_dia(data_carga):
+    """
+    Versao de _listar_cargas_liberadas_para_planejamento (cargas/services.py)
+    restrita a UMA data especifica - usada por calcular_itens_planejamento_por_data.
+    """
+    from django.db.models import Prefetch
+    from cargas.models import CargaLiberada, CargaLiberadaVersao
+
+    versoes_prefetch = Prefetch(
+        "versoes",
+        queryset=CargaLiberadaVersao.objects.order_by("-versao"),
+        to_attr="versoes_ordenadas",
+    )
+    cargas = (
+        CargaLiberada.objects.filter(data_carga=data_carga, ativo=True)
+        .prefetch_related(versoes_prefetch)
+        .order_by("carga_nome")
+    )
+
+    resultado = []
+    for carga in cargas:
+        versoes_ordenadas = getattr(carga, "versoes_ordenadas", [])
+        if not versoes_ordenadas:
+            continue
+        ultima_versao = versoes_ordenadas[0]
+        resultado.append({
+            "carga_liberada_id": carga.id,
+            "carga_liberada_versao_id": ultima_versao.id,
+            "data_carga": carga.data_carga,
+            "carga": carga.carga_nome,
+            "versao": ultima_versao.versao,
+        })
+    return resultado
+
+
+def calcular_itens_planejamento_por_data(data_carga, setor):
+    """
+    Retorna um DataFrame (Código, Peca, Célula, Qtde_total, cor) com as MESMAS
+    quantidades que seriam usadas para gerar Ordem nesse setor/data pelo sistema
+    (mesma fonte de _construir_ordens_planejamento_from_items: CargaLiberadaItem
+    congelado no momento da liberacao × Base_Carretas). Usada por gerar_arquivos()
+    pra garantir que o arquivo impresso sempre bata com a Ordem gerada no sistema.
+
+    data_carga: objeto date.
+    Retorna DataFrame vazio (mesmas colunas) se nao houver carga liberada nessa data.
+    """
+    cargas_liberadas = _listar_cargas_liberadas_do_dia(data_carga)
+    if not cargas_liberadas:
+        return pd.DataFrame(columns=['Código', 'Peca', 'Célula', 'Qtde_total', 'cor'])
+
+    datas_finais_por_carga = {c['carga_liberada_id']: data_carga for c in cargas_liberadas}
+    ordens, _ = _construir_ordens_planejamento_from_items(cargas_liberadas, setor, datas_finais_por_carga)
+
+    if not ordens:
+        return pd.DataFrame(columns=['Código', 'Peca', 'Célula', 'Qtde_total', 'cor'])
+
+    linhas = []
+    for o in ordens:
+        codigo, _, peca = o['peca_nome'].partition(' - ')
+        linhas.append({
+            'Código': codigo,
+            'Peca': peca,
+            'Célula': o['setor_conjunto'],
+            'Qtde_total': o['qtd_planejada'],
+            'cor': o.get('cor', ''),
+        })
+    return pd.DataFrame(linhas, columns=['Código', 'Peca', 'Célula', 'Qtde_total', 'cor'])
+
+
 def gerar_arquivos(data_inicial, data_final, setor, celulas_filtro=None):
     """
     celulas_filtro: lista opcional de nomes de celula pra restringir quais
@@ -896,95 +1177,14 @@ def gerar_arquivos(data_inicial, data_final, setor, celulas_filtro=None):
 
         if setor == 'montagem':
 
-            base_carretas['Código'] = base_carretas['Código'].astype(str)
-            base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
-
-            ####### retirando cores dos códigos######
-
-            base_carga['Recurso'] = base_carga['Recurso'].astype(str)
-
-            base_carga['Recurso'] = normalizar_codigo_recurso_serie(base_carga['Recurso'])
-
-            ###### retirando espaco em branco####
-            base_carga['Recurso'] = base_carga['Recurso'].str.strip()
-
-            ##### excluindo colunas e linhas#####
-
-            base_carretas.drop(['Etapa2', 'Etapa3', 'Etapa4',
-                            'Etapa5'], axis=1, inplace=True)
-
-            # & (base_carretas['Unit_Price'] < 600)].index, inplace=True)
-            base_carretas.drop(
-                base_carretas[(base_carretas['Etapa'] == '')].index, inplace=True)
-            
-            base_carretas = base_carretas.reset_index(drop=True)
-            colunas_dedup_montagem = [
-                coluna for coluna in ['Recurso', 'Código', 'Peca', 'Qtde', 'Célula']
-                if coluna in base_carretas.columns
-            ]
-            if colunas_dedup_montagem:
-                base_carretas = base_carretas.drop_duplicates(
-                    subset=colunas_dedup_montagem
-                ).reset_index(drop=True)
-            
-            for i in range(len(base_carretas)):
-                recurso = base_carretas.loc[i, 'Recurso']
-                if len(recurso) == 5:
-                    base_carretas.loc[i, 'Recurso'] = "0" + recurso
-
             #### criando código único#####
 
             codigo_unico = str(data_escolhida.date())[:2] + str(data_escolhida.date())[3:5] + str(data_escolhida.date())[6:10]
 
-            #### filtrando data da carga#####
-
-            datas_unique = pd.DataFrame(base_carga['Datas'].unique())
-
-            escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
-            filtro_data = base_carga.loc[escolha_data]
-            filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
-
-            filtro_data = filtro_data.reset_index(drop=True)
-            # filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
-
-            # for i in range(len(filtro_data)):
-            #     if filtro_data['Recurso'][i][0] == '0':
-            #         filtro_data['Recurso'][i] = filtro_data['Recurso'][i][1:]
-            #     if len(filtro_data['Recurso'][i]) == 5:
-            #         filtro_data['Recurso'][i] = "0" + filtro_data['Recurso'][i]
-            
-            ##### juntando planilhas de acordo com o recurso#######
-
-            tab_completa = pd.merge(filtro_data, base_carretas[[
-                                    'Recurso', 'Código', 'Peca', 'Qtde', 'Célula']], on=['Recurso'], how='left')
-            tab_completa = tab_completa.dropna(axis=0)
-
-            # base_carretas[base_carretas['Recurso'] == '034538M21']
-
-            # carretas_agrupadas = filtro_data[['Recurso','Qtde']]
-            # carretas_agrupadas = pd.DataFrame(filtro_data.groupby('Recurso').sum())
-            # carretas_agrupadas = carretas_agrupadas[['Qtde']]
-
-            # st.dataframe(carretas_agrupadas)
-
-            tab_completa['Código'] = (
-                tab_completa['Código']
-                    .fillna('')
-                    .astype(str)
-                    .str.strip()
-                    .str.replace(r'\.0$', '', regex=True)
-            )
-
-            def _normaliza_codigo(codigo: str) -> str:
-                if len(codigo) == 5:
-                    return '0' + codigo
-                if len(codigo) == 8:
-                    return codigo[:6]
-                return codigo
-
-            tab_completa['Código'] = tab_completa['Código'].apply(_normaliza_codigo)
-
-            tab_completa.reset_index(inplace=True, drop=True)
+            # Mesma fonte/quantidade usada pra gerar Ordem no sistema (CargaLiberadaItem
+            # congelado na liberacao × Base_Carretas), em vez de ler Carga_Vendas direto
+            # da planilha - garante que o arquivo impresso bate com o que o sistema cria.
+            tab_completa = calcular_itens_planejamento_por_data(data_escolhida.date(), setor)
 
             celulas_unique = pd.DataFrame(tab_completa['Célula'].unique())
             celulas_unique = celulas_unique.dropna(axis=0)
@@ -992,68 +1192,8 @@ def gerar_arquivos(data_inicial, data_final, setor, celulas_filtro=None):
                 celulas_unique = celulas_unique[celulas_unique[0].isin(celulas_filtro)]
             celulas_unique.reset_index(inplace=True)
 
-            recurso_unique = pd.DataFrame(tab_completa['Recurso'].unique())
-            recurso_unique = recurso_unique.dropna(axis=0)
-
-            # criando coluna de quantidade total de itens
-
-            try:
-                tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(
-                    ',', '.')
-            except:
-                pass
-
-            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(float)
-            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
-
-            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(float)
-            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)
-
-            tab_completa['Qtde_total'] = tab_completa['Qtde_x'] * \
-                tab_completa['Qtde_y']
-
-            tab_completa = tab_completa.drop(
-                columns=['Recurso', 'Qtde_x', 'Qtde_y'])
-
-            tab_completa = tab_completa.groupby(
-                ['Código', 'Peca', 'Célula', 'Datas']).sum()
-
-            # tab_completa1 = tab_completa[['Código','Peca','Célula','Datas','Carga','Qtde_total']]
-
-            # tab_completa = tab_completa.groupby(
-            #     ['Código', 'Peca', 'Célula', 'Datas','Carga']).sum()
-
-            # tab_completa = tab_completa.drop_duplicates()
-
-            tab_completa.reset_index(inplace=True)
-
-            # tratando coluna de código e recurso
-
-            # criando coluna de código para arquivar
-
             hoje = datetime.now()
 
-            ts = pd.Timestamp(hoje)
-
-            hoje1 = hoje.strftime('%d%m%Y')
-
-            controle_seq = tab_completa
-            controle_seq["codigo"] = hoje1 + data_escolhida.strftime('%d%m%Y')
-
-            k = 9
-
-            # if carga_escolhida != 'Selecione':
-            #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
-            
-            # print(tab_completa.columns)
-            # tab_completa = tab_completa.groupby(
-            #     ['Código', 'Peca', 'Célula', 'Datas', 'Carga', 'PED_CHCRIACAO', 'Ano', 'codigo']).sum()
-        
-            tab_completa = tab_completa.reset_index(drop=True)
-
-            # carga_unique = tab_completa['Carga'].unique()
-
-            # for carga in carga_unique:
             file_counter = 1  # Contador de arquivos
             rows_per_file = 21  # Número máximo de linhas por arquivo
             k = 9  # Posição inicial no Excel
@@ -1142,90 +1282,14 @@ def gerar_arquivos(data_inicial, data_final, setor, celulas_filtro=None):
 
         if setor == 'solda':
 
-            base_carretas['Código'] = base_carretas['Código'].astype(str)
-            base_carretas['Recurso'] = base_carretas['Recurso'].astype(str)
-
-            ####### retirando cores dos códigos######
-
-            base_carga['Recurso'] = base_carga['Recurso'].astype(str)
-
-            base_carga['Recurso'] = normalizar_codigo_recurso_serie(base_carga['Recurso'])
-
-            ###### retirando espaco em branco####
-
-            base_carga['Recurso'] = base_carga['Recurso'].str.strip()
-
-            ##### excluindo colunas e linhas#####
-
-            base_carretas.drop(['Etapa2', 'Etapa', 'Etapa4',
-                            'Etapa5'], axis=1, inplace=True)
-
-            # & (base_carretas['Unit_Price'] < 600)].index, inplace=True)
-            base_carretas.drop(
-                base_carretas[(base_carretas['Etapa3'] == '')].index, inplace=True)
-            
-            base_carretas = base_carretas.reset_index(drop=True)
-            
-            for i in range(len(base_carretas)):
-                recurso = base_carretas.loc[i, 'Recurso']
-                if len(recurso) == 5:
-                    base_carretas.loc[i, 'Recurso'] = "0" + recurso
-
             #### criando código único#####
 
             codigo_unico = str(data_escolhida.date())[:2] + str(data_escolhida.date())[3:5] + str(data_escolhida.date())[6:10]
 
-            #### filtrando data da carga#####
-
-            datas_unique = pd.DataFrame(base_carga['Datas'].unique())
-
-            escolha_data = (base_carga['Datas'] == str(data_escolhida.date()))
-            filtro_data = base_carga.loc[escolha_data]
-            filtro_data['Datas'] = pd.to_datetime(filtro_data.Datas)
-
-            filtro_data = filtro_data.reset_index(drop=True)
-            filtro_data['Recurso'] = filtro_data['Recurso'].astype(str)
-
-            for i in range(len(filtro_data)):
-                recurso = filtro_data.loc[i, 'Recurso']
-                if recurso and recurso[0] == '0':
-                    recurso = recurso[1:]
-                if len(recurso) == 5:
-                    recurso = "0" + recurso
-                filtro_data.loc[i, 'Recurso'] = recurso
-            
-            ##### juntando planilhas de acordo com o recurso#######
-
-            tab_completa = pd.merge(filtro_data, base_carretas[[
-                                    'Recurso', 'Código', 'Peca', 'Qtde', 'Célula']], on=['Recurso'], how='left')
-            tab_completa = tab_completa.dropna(axis=0)
-
-            # base_carretas[base_carretas['Recurso'] == '034538M21']
-
-            # carretas_agrupadas = filtro_data[['Recurso','Qtde']]
-            # carretas_agrupadas = pd.DataFrame(filtro_data.groupby('Recurso').sum())
-            # carretas_agrupadas = carretas_agrupadas[['Qtde']]
-
-            # st.dataframe(carretas_agrupadas)
-
-            tab_completa['Código'] = (
-                tab_completa['Código']
-                    .fillna('')
-                    .astype(str)
-                    .str.strip()
-                    .str.replace(r'\.0$', '', regex=True)
-            )
-
-            def _normaliza_codigo(codigo: str) -> str:
-                if len(codigo) == 5:
-                    return '0' + codigo
-                if len(codigo) == 8:
-                    return codigo[:6]
-                return codigo
-
-            tab_completa['Código'] = tab_completa['Código'].apply(_normaliza_codigo)
-
-            tab_completa.reset_index(inplace=True, drop=True)
+            # Mesma fonte/quantidade usada pra gerar Ordem no sistema (CargaLiberadaItem
+            # congelado na liberacao × Base_Carretas), em vez de ler Carga_Vendas direto
+            # da planilha - garante que o arquivo impresso bate com o que o sistema cria.
+            tab_completa = calcular_itens_planejamento_por_data(data_escolhida.date(), setor)
 
             celulas_unique = pd.DataFrame(tab_completa['Célula'].unique())
             celulas_unique = celulas_unique.dropna(axis=0)
@@ -1233,63 +1297,8 @@ def gerar_arquivos(data_inicial, data_final, setor, celulas_filtro=None):
                 celulas_unique = celulas_unique[celulas_unique[0].isin(celulas_filtro)]
             celulas_unique.reset_index(inplace=True)
 
-            recurso_unique = pd.DataFrame(tab_completa['Recurso'].unique())
-            recurso_unique = recurso_unique.dropna(axis=0)
-
-            # criando coluna de quantidade total de itens
-
-            try:
-                tab_completa['Qtde_x'] = tab_completa['Qtde_x'].str.replace(
-                    ',', '.')
-            except:
-                pass
-
-            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(float)
-            tab_completa['Qtde_x'] = tab_completa['Qtde_x'].astype(int)
-
-            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(float)
-            tab_completa['Qtde_y'] = tab_completa['Qtde_y'].astype(int)
-
-            tab_completa['Qtde_total'] = tab_completa['Qtde_x'] * \
-                tab_completa['Qtde_y']
-
-            tab_completa = tab_completa.drop(
-                columns=['Recurso', 'Qtde_x', 'Qtde_y'])
-
-            tab_completa = tab_completa.groupby(
-                ['Código', 'Peca', 'Célula', 'Datas']).sum()
-
-            # tab_completa1 = tab_completa[['Código','Peca','Célula','Datas','Carga','Qtde_total']]
-
-            # tab_completa = tab_completa.groupby(
-            #     ['Código', 'Peca', 'Célula', 'Datas','Carga']).sum()
-
-            # tab_completa = tab_completa.drop_duplicates()
-
-            tab_completa.reset_index(inplace=True)
-
-            # tratando coluna de código e recurso
-
-            # criando coluna de código para arquivar
-
             hoje = datetime.now()
 
-            ts = pd.Timestamp(hoje)
-
-            hoje1 = hoje.strftime('%d%m%Y')
-
-            controle_seq = tab_completa
-            controle_seq["codigo"] = hoje1 + data_escolhida.strftime('%d%m%Y')
-
-            k = 9
-
-            # if carga_escolhida != 'Selecione':
-            #     tab_completa = tab_completa[tab_completa['Carga'] == carga_escolhida]
-            
-            # print(tab_completa.columns)
-            # tab_completa = tab_completa.groupby(
-            #     ['Código', 'Peca', 'Célula', 'Datas', 'Carga', 'PED_CHCRIACAO', 'Ano', 'codigo']).sum()
-        
             tab_completa = tab_completa.reset_index(drop=True)
 
             # carga_unique = tab_completa['Carga'].unique()
