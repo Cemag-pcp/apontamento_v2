@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.appendChild(editCell('tamanho', item.tamanho));
         tr.appendChild(editCell('espessura', item.espessura));
         tr.appendChild(editCell('quantidade', item.quantidade, 'number'));
-        tr.appendChild(textCell(item.aproveitamento ?? '-'));
+        tr.appendChild(editCell('aproveitamento', item.aproveitamento, 'number'));
         tr.appendChild(selectCell('tipo_chapa', item.tipo_chapa, tipoChapaOptions));
         tr.appendChild(textCell(item.retalho ? 'Sim' : 'Não'));
         tr.appendChild(textCell(item.nova_mp_id ?? '-'));
@@ -167,12 +167,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleSave(row, button) {
         const id = row.dataset.id;
         const payload = { id: Number(id) };
-        const fields = ['descricao_mp', 'tamanho', 'espessura', 'quantidade', 'tipo_chapa'];
+        const fields = ['descricao_mp', 'tamanho', 'espessura', 'quantidade', 'aproveitamento', 'tipo_chapa'];
 
         fields.forEach(field => {
             const input = row.querySelector(`[name="${field}"]`);
             if (!input) return;
-            if (field === 'quantidade') {
+            if (field === 'quantidade' || field === 'aproveitamento') {
                 if (input.value !== '') payload[field] = parseFloat(input.value);
             } else if (field === 'tipo_chapa') {
                 payload[field] = input.value || null;
