@@ -1615,7 +1615,7 @@ def propriedades_ordem_api(request):
 
         propriedade = get_object_or_404(PropriedadesOrdem, id=prop_id)
 
-        campos_editaveis = ['descricao_mp', 'tamanho', 'espessura', 'quantidade', 'tipo_chapa']
+        campos_editaveis = ['descricao_mp', 'tamanho', 'espessura', 'quantidade', 'aproveitamento', 'tipo_chapa']
         campos_para_atualizar = {}
 
         for campo in campos_editaveis:
@@ -1638,6 +1638,7 @@ def propriedades_ordem_api(request):
                 'tamanho': propriedade.tamanho,
                 'espessura': propriedade.espessura,
                 'quantidade': propriedade.quantidade,
+                'aproveitamento': propriedade.aproveitamento,
                 'tipo_chapa': propriedade.tipo_chapa,
             }
         })
