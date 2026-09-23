@@ -26,6 +26,8 @@ document.getElementById('fileUpload').addEventListener('change', async (event) =
     formData.append('file', fileInput.files[0]);
 
     formData.append('tipoMaquina', 'plasma');
+    formData.append('maquinaPlanejada', document.getElementById('maquinaPlanejadaPlasma').value);
+    formData.append('retalho', document.getElementById('retalhoPlasma').checked);
 
     // Obter o token CSRF do formulário
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
@@ -94,6 +96,15 @@ document.getElementById('fileUpload').addEventListener('change', async (event) =
         });
         console.error('Erro na requisição:', error);
     }
+});
+
+['maquinaPlanejadaPlasma', 'retalhoPlasma'].forEach((id) => {
+    document.getElementById(id).addEventListener('change', () => {
+        const fileInput = document.getElementById('fileUpload');
+        if (fileInput.files.length) {
+            fileInput.dispatchEvent(new Event('change'));
+        }
+    });
 });
 
 document.getElementById('confirmButton').addEventListener('click', async (event) => {
