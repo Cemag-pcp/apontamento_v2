@@ -1,0 +1,7 @@
+[banco]
+host =
+porta = 5432
+database = postgres
+usuario =
+senha =
+schema = apontamento_v2
