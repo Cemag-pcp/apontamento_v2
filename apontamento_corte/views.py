@@ -18,6 +18,24 @@ from core.models import OrdemProcesso,PropriedadesOrdem,MaquinaParada, Profile
 from cadastro.models import Maquina, MotivoInterrupcao, Operador, Espessura, MotivoMaquinaParada, MotivoExclusao, EspessuraChapa, CarretasExplodidas
 from .utils import *
 from .utils_dashboard import *
+
+
+def _propriedade_ordem(ordem):
+    """Propriedade da ordem ou None. `ordem.propriedade` levanta RelatedObjectDoesNotExist
+    (nao devolve None) quando a ordem nao tem PropriedadesOrdem - ex.: ordens de sucata/recuperada."""
+    return getattr(ordem, 'propriedade', None)
+
+
+def _resumo_propriedade_ordem(propriedade):
+    if not propriedade:
+        return {'descricao_mp': None, 'quantidade': None, 'tipo_chapa': None, 'aproveitamento': None, 'retalho': None}
+    return {
+        'descricao_mp': propriedade.descricao_mp if propriedade.descricao_mp else None,
+        'quantidade': propriedade.quantidade if propriedade.quantidade else None,
+        'tipo_chapa': propriedade.get_tipo_chapa_display() if propriedade.tipo_chapa else None,
+        'aproveitamento': propriedade.aproveitamento if propriedade.aproveitamento else None,
+        'retalho': 'Sim' if propriedade.retalho else None,
+    }
 from apontamento_serra.utils import formatar_timedelta
 from core.utils import notificar_ordem
 
@@ -1172,11 +1190,11 @@ def get_pecas_ordem(request, pk_ordem):
 
         # Propriedades da ordem
         propriedades = {
-            'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
-            'espessura': ordem.propriedade.espessura if ordem.propriedade else None,
-            'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
-            'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
-            'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+            'descricao_mp': _propriedade_ordem(ordem).descricao_mp if _propriedade_ordem(ordem) else None,
+            'espessura': _propriedade_ordem(ordem).espessura if _propriedade_ordem(ordem) else None,
+            'quantidade': _propriedade_ordem(ordem).quantidade if _propriedade_ordem(ordem) else None,
+            'tipo_chapa': _propriedade_ordem(ordem).get_tipo_chapa_display() if _propriedade_ordem(ordem) else None,
+            'aproveitamento': _propriedade_ordem(ordem).aproveitamento if _propriedade_ordem(ordem) else None,
         }
 
         # Peças relacionadas à ordem
@@ -1256,13 +1274,7 @@ def get_ordens_criadas(request):
         'maquina': ordem.maquina.nome if ordem.maquina else None,
         'maquina_id': ordem.maquina.id if ordem.maquina else None,
         'sequenciada': ordem.sequenciada,
-        'propriedade': {
-            'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade.descricao_mp else None,
-            'quantidade': ordem.propriedade.quantidade if ordem.propriedade.quantidade else None,
-            'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade.tipo_chapa else None,
-            'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade.aproveitamento else None,
-            'retalho': 'Sim' if ordem.propriedade.retalho else None,
-        },
+        'propriedade': _resumo_propriedade_ordem(_propriedade_ordem(ordem)),
         'ultima_atualizacao': localtime(ordem.ultima_atualizacao).strftime('%d/%m/%Y %H:%M') if ordem.status_atual == 'finalizada' else None,
         'tempo_estimado': ordem.tempo_estimado if ordem.tempo_estimado else 'Não foi possivel calcular',
     } for ordem in ordens_page]
@@ -1404,21 +1416,22 @@ def atualizar_status_ordem(request):
                     ordem.maquina = maquina_nome
                     ordem.status_prioridade = 1
                 elif status == 'finalizada':
-                    propriedade_atual = ordem.propriedade
+                    propriedade_atual = _propriedade_ordem(ordem)
                     quantidade_chapas_original = propriedade_atual.quantidade if propriedade_atual else 0
                     tipo_chapa_original = propriedade_atual.tipo_chapa if propriedade_atual else None
                     peso_chapas = None
                     transferencia_chapa = None
 
                     # Verifica se a quantidade de chapas mudaram
-                    if int(qtd_chapas) != ordem.propriedade.quantidade:
-                        ordem.propriedade.quantidade = int(qtd_chapas)
-                        ordem.propriedade.save()
-                    if tipo_chapa is not None and tipo_chapa != ordem.propriedade.tipo_chapa:
-                        ordem.propriedade.tipo_chapa = tipo_chapa
-                        ordem.propriedade.save()
+                    if propriedade_atual:
+                        if int(qtd_chapas) != propriedade_atual.quantidade:
+                            propriedade_atual.quantidade = int(qtd_chapas)
+                            propriedade_atual.save()
+                        if tipo_chapa is not None and tipo_chapa != propriedade_atual.tipo_chapa:
+                            propriedade_atual.tipo_chapa = tipo_chapa
+                            propriedade_atual.save()
 
-                    peso_chapas = _calcular_peso_chapas_corte(ordem.propriedade, qtd_chapas)
+                    peso_chapas = _calcular_peso_chapas_corte(propriedade_atual, qtd_chapas)
 
                     pecas_restantes = []
                     for peca in pecas_geral:
@@ -1622,11 +1635,11 @@ def get_ordens_iniciadas(request):
         'maquina_id': ordem.maquina.id if ordem.maquina else None,
         'ultima_atualizacao': ordem.ultima_atualizacao,
         'propriedade': {
-            'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
-            'espessura': ordem.propriedade.espessura if ordem.propriedade else None,
-            'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
-            'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
-            'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+            'descricao_mp': _propriedade_ordem(ordem).descricao_mp if _propriedade_ordem(ordem) else None,
+            'espessura': _propriedade_ordem(ordem).espessura if _propriedade_ordem(ordem) else None,
+            'quantidade': _propriedade_ordem(ordem).quantidade if _propriedade_ordem(ordem) else None,
+            'tipo_chapa': _propriedade_ordem(ordem).get_tipo_chapa_display() if _propriedade_ordem(ordem) else None,
+            'aproveitamento': _propriedade_ordem(ordem).aproveitamento if _propriedade_ordem(ordem) else None,
         }
     } for ordem in ordens_page]
 
@@ -1884,11 +1897,11 @@ def get_ordens_interrompidas(request):
             'comentario_extra': ultimo_processo_interrompido.comentario_extra if ultimo_processo_interrompido else None,
             'ultima_atualizacao': ordem.ultima_atualizacao,
             'propriedade': {
-                'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
-                'espessura': ordem.propriedade.espessura if ordem.propriedade else None,
-                'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
-                'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
-                'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+                'descricao_mp': _propriedade_ordem(ordem).descricao_mp if _propriedade_ordem(ordem) else None,
+                'espessura': _propriedade_ordem(ordem).espessura if _propriedade_ordem(ordem) else None,
+                'quantidade': _propriedade_ordem(ordem).quantidade if _propriedade_ordem(ordem) else None,
+                'tipo_chapa': _propriedade_ordem(ordem).get_tipo_chapa_display() if _propriedade_ordem(ordem) else None,
+                'aproveitamento': _propriedade_ordem(ordem).aproveitamento if _propriedade_ordem(ordem) else None,
             }
         })
 
@@ -1950,7 +1963,7 @@ def filtrar_ordens(request):
     resultados = [
         {
             "id": ordem.id,
-            "mp": ordem.ordem.propriedade.descricao_mp if ordem.ordem.propriedade else "Sem MP",  # Acessa a propriedade corretamente
+            "mp": _propriedade_ordem(ordem.ordem).descricao_mp if _propriedade_ordem(ordem.ordem) else "Sem MP",  # Acessa a propriedade corretamente
             "peca": ordem.peca.codigo,
             "quantidade": ordem.qtd_planejada,
         }
@@ -2104,13 +2117,13 @@ def get_ordens_criadas_duplicar_ordem(request):
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'excluida': ordem.excluida,
-            'aproveitamento': round(ordem.propriedade.aproveitamento, 5) if ordem.propriedade else None,
+            'aproveitamento': round(_propriedade_ordem(ordem).aproveitamento, 5) if _propriedade_ordem(ordem) else None,
             'propriedade': {
-                'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
-                'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
-                'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
-                'aproveitamento': round(ordem.propriedade.aproveitamento, 5) if ordem.propriedade else None,
-                'retalho': 'Sim' if ordem.propriedade and ordem.propriedade.retalho else None,
+                'descricao_mp': _propriedade_ordem(ordem).descricao_mp if _propriedade_ordem(ordem) else None,
+                'quantidade': _propriedade_ordem(ordem).quantidade if _propriedade_ordem(ordem) else None,
+                'tipo_chapa': _propriedade_ordem(ordem).get_tipo_chapa_display() if _propriedade_ordem(ordem) else None,
+                'aproveitamento': round(_propriedade_ordem(ordem).aproveitamento, 5) if _propriedade_ordem(ordem) else None,
+                'retalho': 'Sim' if _propriedade_ordem(ordem) and _propriedade_ordem(ordem).retalho else None,
             }
         } for ordem in ordens_page
     ]
@@ -2148,11 +2161,11 @@ def get_pecas_ordem_duplicar_ordem(request, pk_ordem):
 
         # Propriedades da ordem
         propriedades = {
-            'descricao_mp': ordem.propriedade.descricao_mp if ordem.propriedade else None,
-            'espessura': ordem.propriedade.espessura if ordem.propriedade else None,
-            'quantidade': ordem.propriedade.quantidade if ordem.propriedade else None,
-            'tipo_chapa': ordem.propriedade.get_tipo_chapa_display() if ordem.propriedade else None,
-            'aproveitamento': ordem.propriedade.aproveitamento if ordem.propriedade else None,
+            'descricao_mp': _propriedade_ordem(ordem).descricao_mp if _propriedade_ordem(ordem) else None,
+            'espessura': _propriedade_ordem(ordem).espessura if _propriedade_ordem(ordem) else None,
+            'quantidade': _propriedade_ordem(ordem).quantidade if _propriedade_ordem(ordem) else None,
+            'tipo_chapa': _propriedade_ordem(ordem).get_tipo_chapa_display() if _propriedade_ordem(ordem) else None,
+            'aproveitamento': _propriedade_ordem(ordem).aproveitamento if _propriedade_ordem(ordem) else None,
             'maquina': ordem.grupo_maquina,
             'ordem': ordem.ordem,
         }
@@ -3438,7 +3451,17 @@ class ProcessarArquivoView(View):
 
             # Realizar o tratamento da planilha
             if tipo_maquina=='plasma':
-                excel_tratado,propriedades = tratamento_planilha_plasma(ordem_producao_excel)
+                maquina_plasma = Maquina.objects.filter(
+                    pk=request.POST.get('maquinaPlanejada') or 0, setor__nome='corte'
+                ).first()
+                retalho_plasma = request.POST.get('retalho') == 'true'
+                coluna_tamanho = coluna_tamanho_plasma(
+                    maquina_plasma.nome if maquina_plasma else None,
+                    retalho_plasma,
+                )
+                excel_tratado,propriedades = tratamento_planilha_plasma(
+                    ordem_producao_excel, coluna_tamanho, retalho=retalho_plasma,
+                )
             elif tipo_maquina == 'laser_2':
                 try:
                     # Tenta carregar a aba em inglês
@@ -3453,7 +3476,10 @@ class ProcessarArquivoView(View):
                         # Se nenhuma das duas existir, levanta erro claro
                         raise ValueError("Nenhuma das abas 'AllPartsList' ou 'Lista de Todas as Peças' foi encontrada na planilha.")
                 
-                excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2,ordem_producao_excel_3)
+                excel_tratado,propriedades = tratamento_planilha_laser2(
+                    ordem_producao_excel, ordem_producao_excel_2, ordem_producao_excel_3,
+                    retalho=request.POST.get('retalho') == 'true',
+                )
             elif tipo_maquina == 'laser_3':
                 excel_tratado,propriedades = tratamento_planilha_laser3(ordem_producao_excel)
 
@@ -3538,7 +3564,8 @@ class SalvarArquivoView(View):
             tipo_maquina_object = get_object_or_404(Maquina, nome__contains=tipo_maquina_tratada) if tipo_maquina in ['laser_1','laser_2','laser_3'] else None
 
         if tipo_maquina =='plasma':
-            excel_tratado,propriedades = tratamento_planilha_plasma(ordem_producao_excel)
+            coluna_tamanho = coluna_tamanho_plasma(tipo_maquina_object.nome, retalho)
+            excel_tratado,propriedades = tratamento_planilha_plasma(ordem_producao_excel, coluna_tamanho, retalho=retalho)
         elif tipo_maquina_object.nome=='Laser 2 (JFY)':
 
             # apenas para o laser2
@@ -3555,7 +3582,9 @@ class SalvarArquivoView(View):
                     # Se nenhuma das duas existir, levanta erro claro
                     raise ValueError("Nenhuma das abas 'AllPartsList' ou 'Lista de Todas as Peças' foi encontrada na planilha.")
 
-            excel_tratado,propriedades = tratamento_planilha_laser2(ordem_producao_excel,ordem_producao_excel_2,ordem_producao_excel_3)
+            excel_tratado,propriedades = tratamento_planilha_laser2(
+                ordem_producao_excel, ordem_producao_excel_2, ordem_producao_excel_3, retalho=retalho,
+            )
         elif tipo_maquina_object.nome=='Laser 1':
 
             comprimento = request.POST.get('comprimento')

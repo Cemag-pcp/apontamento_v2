@@ -26,6 +26,7 @@ document.getElementById('fileUploadLaser2').addEventListener('change', async (ev
     formData.append('file', fileInput.files[0]);
     
     formData.append('tipoMaquina', 'laser_2');
+    formData.append('retalho', document.getElementById('retalhoLaser2').checked);
 
     // Obter o token CSRF do formulário
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
@@ -93,6 +94,13 @@ document.getElementById('fileUploadLaser2').addEventListener('change', async (ev
             confirmButtonText: 'OK'
         });
         console.error('Erro na requisição:', error);
+    }
+});
+
+document.getElementById('retalhoLaser2').addEventListener('change', () => {
+    const fileInput = document.getElementById('fileUploadLaser2');
+    if (fileInput.files.length) {
+        fileInput.dispatchEvent(new Event('change'));
     }
 });
 

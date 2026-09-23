@@ -53,7 +53,28 @@ def padronizar_medida_laser_2(s):
     resultado = f"{comprimento} x {largura_str_ajustada} mm"
     return resultado
 
-def tratamento_planilha_plasma(df):
+def formatar_medida_laser_2_exata(s):
+    """Igual a padronizar_medida_laser_2, mas SEM ajustar a largura pros padroes (1200/1500/2550).
+    Usado no retalho, onde o tamanho real (SlabSize) deve ser mantido exatamente como esta na planilha."""
+    try:
+        largura_str, comprimento_str = s.replace("mm", "").split("×")
+        return f"{comprimento_str.strip()} x {largura_str.strip()} mm"
+    except Exception as e:
+        print("Formato inválido:", e)
+        return s
+
+COLUNA_TAMANHO_PLASMA_PADRAO = 24  # coluna Y
+COLUNA_TAMANHO_PLASMA_2 = 16  # coluna Q
+
+
+def coluna_tamanho_plasma(maquina_nome, retalho):
+    """Plasma 2 le o tamanho da chapa da coluna Q; se for retalho, da Y (como as demais)."""
+    if maquina_nome == 'Plasma 2' and not retalho:
+        return COLUNA_TAMANHO_PLASMA_2
+    return COLUNA_TAMANHO_PLASMA_PADRAO
+
+
+def tratamento_planilha_plasma(df, coluna_tamanho=COLUNA_TAMANHO_PLASMA_PADRAO, retalho=False):
 
     # df = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xls')
 
@@ -73,10 +94,14 @@ def tratamento_planilha_plasma(df):
         tempo_estimado_total_tratado = "0"+tempo_estimado_total
         tempo_estimado_total_tratado = tempo_estimado_total_tratado.split('.')[0]
 
-    tamanho_chapa = df[df.columns[24:25]][9:10].values.tolist()[0][0].replace('×', 'x')
+    tamanho_chapa = df[df.columns[coluna_tamanho:coluna_tamanho + 1]][9:10].values.tolist()[0][0].replace('×', 'x')
     qt_chapa = df[df.columns[2:3]][9:10]
 
-    tamanho_chapa = padronizar_medida_plasma(tamanho_chapa)
+    # Retalho mantem o tamanho exato da planilha; chapa nova tem a largura ajustada pro padrao.
+    if retalho:
+        tamanho_chapa = tamanho_chapa.strip()
+    else:
+        tamanho_chapa = padronizar_medida_plasma(tamanho_chapa)
 
     nome_coluna_1 = df[df.columns[0]].name
     aproveitamento_df = df['Unnamed: 22'][4:5]
@@ -171,7 +196,7 @@ def tratamento_planilha_plasma(df):
 
     return df, propriedades
 
-def tratamento_planilha_laser2(df,df2,df3):
+def tratamento_planilha_laser2(df,df2,df3,retalho=False):
 
     # df = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx')
     # df2 = pd.read_excel(r'C:\Users\pcp2\apontamento_usinagem\apontamento_corte\teste.xlsx', sheet_name='AllPartsList')
@@ -182,11 +207,19 @@ def tratamento_planilha_laser2(df,df2,df3):
     aproveitamento_df = df['Unnamed: 5'][6:len(df)-1].mean()
     espessura_df = str(df['Unnamed: 2'][2]).replace(".",",") + " mm"
 
-    # Encontrar a linha que contém "SlabSize(mm*mm):"
-    index_tamanho_chapa_real = np.where(df3 == 'SlabSize(mm*mm):')[0][0]
-    tamanho_chapa_real = df3['Unnamed: 4'][index_tamanho_chapa_real + 1]
+    # Chapa nova: "SheetSize(mm*mm):". Retalho: "SlabSize(mm*mm):".
+    rotulo_tamanho_chapa = 'SlabSize(mm*mm):' if retalho else 'SheetSize(mm*mm):'
+    linhas_rotulo, colunas_rotulo = np.where(df3 == rotulo_tamanho_chapa)
+    if len(linhas_rotulo) == 0:
+        raise ValueError(f'Rótulo "{rotulo_tamanho_chapa}" não encontrado na aba de custos da planilha.')
+    # O valor fica na linha de baixo, na MESMA coluna do rótulo (SheetSize e SlabSize ficam em colunas diferentes).
+    tamanho_chapa_real = df3.iat[linhas_rotulo[0] + 1, colunas_rotulo[0]]
     tamanho_chapa_real = tamanho_chapa_real.replace(".",",").replace("*","×") + " mm"
-    tamanho_chapa_real = padronizar_medida_laser_2(tamanho_chapa_real)
+    # Retalho (SlabSize) mantem o tamanho exato; chapa nova (SheetSize) segue padronizada.
+    if retalho:
+        tamanho_chapa_real = formatar_medida_laser_2_exata(tamanho_chapa_real)
+    else:
+        tamanho_chapa_real = padronizar_medida_laser_2(tamanho_chapa_real)
 
     # buscar tempo estimado total
     tempo_estimado_total = df3['Unnamed: 9'][2]
