@@ -26,6 +26,13 @@ def pasta_base():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def pasta_downloads():
+    """Pasta Downloads do usuario - onde o CSV extraido e salvo (nao na pasta do .exe)."""
+    pasta = os.path.join(os.path.expanduser("~"), "Downloads")
+    os.makedirs(pasta, exist_ok=True)
+    return pasta
+
+
 def criar_config_modelo(caminho):
     conteudo = (
         "[banco]\n"
@@ -115,7 +122,7 @@ def main():
     print(f"\nConectando em {conexao_info['host']}...")
 
     try:
-        caminho_csv = extrair_para_csv(conexao_info, pasta)
+        caminho_csv = extrair_para_csv(conexao_info, pasta_downloads())
     except psycopg2.OperationalError as exc:
         print(f"\nNao foi possivel conectar ao banco.\nDetalhe: {exc}")
         input("\nPressione ENTER para sair...")

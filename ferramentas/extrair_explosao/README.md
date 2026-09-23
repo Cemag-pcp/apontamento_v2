@@ -11,9 +11,9 @@ Ferramenta standalone (.exe) para extrair a tabela `cadastro_carretasexplodidas`
    `host`, `usuario` e `senha` do banco.
 4. Preencha o `config.ini` (editor de texto simples, ex: Notepad) e rode o
    `.exe` de novo.
-5. O CSV é salvo na mesma pasta, com nome
-   `explosao_carretas_AAAAMMDD_HHMMSS.csv` (separador `;`, UTF-8 com BOM —
-   abre certo no Excel).
+5. O CSV é salvo na pasta **Downloads** do usuário (não na pasta do `.exe`),
+   com nome `explosao_carretas_AAAAMMDD_HHMMSS.csv` (separador `;`, UTF-8
+   com BOM — abre certo no Excel).
 
 O `config.ini` fica só na pasta de quem for usar — nunca é embutido no
 `.exe` nem enviado a lugar nenhum.
