@@ -22,7 +22,7 @@ from .services import (
     excluir_foto_pacote, deletar_pacote_service, duplicar_pacote_service,
     salvar_fornecedores_carga, excluir_carga_service,
     atualizar_quantidade_item_service, excluir_item_pacote_service,
-    mover_item_pacote, sugerir_pacote_service,
+    mover_item_pacote, sugerir_pacote_service, avancar_stage_service,
 )
 from cadastro.models import CarretasExplodidas
 
@@ -695,56 +695,14 @@ def alterar_stage(request, id):
     if request.method != 'POST':
         return JsonResponse({'erro': 'Método não permitido'}, status=405)
 
-    # novo_stage = data.get('stage', None)
+    # Regras de avanço centralizadas no service (mesmas usadas pelo app)
     carga = get_object_or_404(Carga, id=id)
-    stage_atual = carga.stage
+    try:
+        resultado = avancar_stage_service(carga)
+    except PacoteValidationError as exc:
+        return JsonResponse({'erro': str(exc)}, status=400)
 
-    # Regras de avanço de estágio
-    # if stage_atual == 'planejamento':
-    
-    #     # VERIFICA SE TODOS PACOTES FORAM CRIADOS
-    #     total = (
-    #         PendenciasPacote.objects
-    #         .filter(carreta_carga__carga_id=id, qt_necessaria__gt=0)
-    #         .aggregate(total=Coalesce(Sum('qt_necessaria'), 0))
-    #         ['total']
-    #     )
-        
-    #     if total > 0:
-    #         return JsonResponse({'erro': 'Forme todos os pacotes antes de passar para próximo estágio.'}, status=400)
-
-    # Atualização do estágio
-    if stage_atual == 'planejamento':
-        carga.stage = 'verificacao'
-    elif stage_atual == 'verificacao':
-        # Verificar fornecedores obrigatórios para cada código especial presente
-        codigos_especiais = _detectar_codigos_especiais_da_carga(id)
-        if codigos_especiais:
-            salvos = {(f.tipo, f.codigo): f.fornecedor
-                      for f in FornecedorItemCarga.objects.filter(carga=carga)}
-            faltando = [
-                f"{tipo} ({item['codigo']})"
-                for tipo, itens in codigos_especiais.items()
-                for item in itens
-                if not salvos.get((tipo, item['codigo']), '').strip()
-            ]
-            if faltando:
-                return JsonResponse({
-                    'erro': f'Informe o fornecedor de {", ".join(faltando)} antes de avançar.'
-                }, status=400)
-
-        carga.stage = 'despachado'
-        carga.data_despachado = timezone.now()
-    else:
-        return JsonResponse({'erro': 'Estágio atual inválido para avanço automático.'}, status=400)
-
-    carga.save()
-
-    return JsonResponse({
-        'mensagem': 'Estágio alterado com sucesso!',
-        'stage_antigo': stage_atual,
-        'novo_stage': carga.stage,
-    }, status=200)
+    return JsonResponse(resultado, status=200)
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -814,7 +772,7 @@ def impressao_pacote(request):
     else:
         obs_completa = "Sem observações"
 
-    chamar_impressora(cliente, data_carga, nome_pacote, obs_completa)
+    chamar_impressora(cliente, data_carga, nome_pacote, obs_completa, pacote.id)
     # chamar_impressora_qrcode()
 
     return JsonResponse({'status': 'ok'})
@@ -883,8 +841,8 @@ def verificar_pendencias(request, carregamento_id):
 @require_http_methods(["POST"])
 def reatualizar_carretas_faltantes(request, carga_id):
     carga = get_object_or_404(Carga, id=carga_id)
-    if carga.stage == 'despachado':
-        return JsonResponse({'erro': 'Nao e permitido reprocessar carretas em cargas despachadas.'}, status=400)
+    if carga.stage in ('bipagem', 'despachado'):
+        return JsonResponse({'erro': 'Nao e permitido reprocessar carretas em cargas em bipagem ou despachadas.'}, status=400)
 
     try:
         payload = json.loads(request.body or '{}')

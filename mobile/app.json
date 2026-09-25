@@ -20,7 +20,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE"
       ]
     },
     "web": {
@@ -31,7 +32,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "O app usa a câmera pra tirar foto dos pacotes na expedição."
+          "cameraPermission": "O app usa a câmera pra tirar foto dos pacotes e ler o código de barras das etiquetas na expedição."
         }
       ],
       [

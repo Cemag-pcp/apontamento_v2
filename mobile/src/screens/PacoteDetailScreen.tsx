@@ -63,7 +63,7 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
   useEffect(() => {
     navigation.setOptions({
       title: pacoteNome,
-      headerRight: stageCarga === 'despachado' ? undefined : () => (
+      headerRight: stageCarga === 'despachado' || stageCarga === 'bipagem' ? undefined : () => (
         <View style={styles.acoesHeader}>
           <TouchableOpacity onPress={handleDuplicar} disabled={duplicando || excluindoPacote}>
             {duplicando
@@ -285,6 +285,10 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
   const pacoteAtual = pacotesDaCarga.find((p) => p.id === pacoteId);
   const outrosPacotes = pacotesDaCarga.filter((p) => p.id !== pacoteId);
   const podeEditarItens = stageCarga === 'planejamento' || stageCarga === 'verificacao';
+  // Confirmacao so grava na verificacao (qualidade) - mesma regra da tela web;
+  // nas outras etapas o backend responde sucesso sem salvar nada.
+  const podeConfirmar = stageCarga === 'verificacao';
+  const jaConfirmado = pacoteAtual?.status_qualidade === 'ok';
   const podeMoverItem = podeEditarItens && (
     (stageCarga === 'planejamento' && pacoteAtual?.status_expedicao !== 'ok') ||
     (stageCarga === 'verificacao' && pacoteAtual?.status_qualidade !== 'ok')
@@ -431,22 +435,30 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      <View style={styles.secao}>
-        {precisaFotoPraConfirmar && (
-          <Text style={styles.avisoConfirmar}>
-            É necessário anexar ao menos uma foto antes de confirmar este pacote.
-          </Text>
-        )}
-        <TouchableOpacity
-          style={[styles.botaoConfirmar, precisaFotoPraConfirmar && styles.botaoDesabilitado]}
-          onPress={handleConfirmar}
-          disabled={precisaFotoPraConfirmar || confirmando}
-        >
-          {confirmando
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.botaoTexto}>Confirmar pacote</Text>}
-        </TouchableOpacity>
-      </View>
+      {podeConfirmar && jaConfirmado && (
+        <View style={styles.secao}>
+          <Text style={styles.textoConfirmado}>✔ Pacote confirmado</Text>
+        </View>
+      )}
+
+      {podeConfirmar && !jaConfirmado && (
+        <View style={styles.secao}>
+          {precisaFotoPraConfirmar && (
+            <Text style={styles.avisoConfirmar}>
+              É necessário anexar ao menos uma foto antes de confirmar este pacote.
+            </Text>
+          )}
+          <TouchableOpacity
+            style={[styles.botaoConfirmar, precisaFotoPraConfirmar && styles.botaoDesabilitado]}
+            onPress={handleConfirmar}
+            disabled={precisaFotoPraConfirmar || confirmando}
+          >
+            {confirmando
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.botaoTexto}>Confirmar pacote</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
 
     <Modal
@@ -546,6 +558,7 @@ const styles = StyleSheet.create({
   botaoCamera: { marginTop: 14, backgroundColor: '#eef4fb', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
   botaoCameraTexto: { color: '#1b6ec2', fontWeight: '600', fontSize: 15 },
   avisoConfirmar: { color: '#b8860b', fontSize: 13, marginBottom: 10 },
+  textoConfirmado: { color: '#198754', fontSize: 16, fontWeight: '700', textAlign: 'center' },
   botaoConfirmar: { backgroundColor: '#198754', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
   botaoDesabilitado: { backgroundColor: '#a5c9b5' },
   botaoTexto: { color: '#fff', fontSize: 16, fontWeight: '600' },

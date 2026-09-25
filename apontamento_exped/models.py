@@ -8,7 +8,7 @@ class Carga(models.Model):
     data_carga = models.DateField(null=True, blank=True)  # Data da carga
     cliente = models.CharField(max_length=100)  # Ex: Cliente X
     obs_pacote = models.TextField(blank=True)  # Observações gerais sobre o pacote
-    stage = models.CharField(max_length=50, choices=[('planejamento', 'Planejamento'), ('apontamento', 'Apontamento'), ('verificacao', 'Verificação'), ('despachado','Despachado')], default='planejamento')
+    stage = models.CharField(max_length=50, choices=[('planejamento', 'Planejamento'), ('apontamento', 'Apontamento'), ('verificacao', 'Verificação'), ('bipagem', 'Bipagem'), ('despachado','Despachado')], default='planejamento')
 
     responsavel_criacao = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
@@ -122,3 +122,19 @@ class ItemPacote(models.Model):
         if self.codigo_id:
             return f"{self.codigo}"
         return f"{self.codigo_informado or 'Item avulso'}"
+
+class BipagemPacote(models.Model):
+    """
+    Registro da leitura do código de barras da etiqueta do pacote no
+    momento do carregamento do caminhão. Um registro por pacote: bipar de
+    novo não duplica, só é informado como já bipado.
+    """
+
+    pacote = models.OneToOneField(Pacote, on_delete=models.CASCADE, related_name='bipagem')
+    bipado_por = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True)
+    # horário da leitura no aparelho (pode chegar depois, via fila offline)
+    data_bipagem = models.DateTimeField()
+    data_registro = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Bipagem {self.pacote}"

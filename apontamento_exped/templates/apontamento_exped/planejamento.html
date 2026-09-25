@@ -300,6 +300,7 @@
                           <option value="">Todos</option>
                           <option value="planejamento">Planejamento</option>
                           <option value="verificacao">Verificação</option>
+                          <option value="bipagem">Bipagem</option>
                           <option value="despachado">Despachado</option>
                         </select>
                       </div>
@@ -318,6 +319,11 @@
                     <div class="kanban-col flex-fill" data-stage="verificacao">
                         <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Verificação</div>
                         <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-verificacao"></div>
+                    </div>
+                    <!-- Coluna: Bipagem (carregamento do caminhão pelo app) -->
+                    <div class="kanban-col flex-fill" data-stage="bipagem">
+                        <div class="kanban-col-header bg-light border rounded px-3 py-2 fw-semibold">Bipagem</div>
+                        <div class="kanban-list border rounded p-2 mt-2 bg-body" id="col-bipagem"></div>
                     </div>
                     <!-- Coluna: Despachado -->
                     <div class="kanban-col flex-fill" data-stage="despachado">

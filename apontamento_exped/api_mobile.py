@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from .models import Carga, ImagemPacote, ItemPacote, Pacote
 from .serializers import (
     AtualizarQuantidadeItemSerializer,
+    BiparPacoteSerializer,
     ConfirmarPacoteSerializer,
     CriarPacoteSerializer,
     FornecedorItemInputSerializer,
@@ -26,7 +27,10 @@ from .services import (
     FotoObrigatoriaError,
     PacoteValidationError,
     atualizar_quantidade_item_service,
+    avancar_stage_service,
+    bipar_pacote_service,
     confirmar_pacote_service,
+    desfazer_bipagem_service,
     criar_ou_atualizar_pacote,
     deletar_pacote_service,
     detalhar_pacotes_da_carga,
@@ -40,6 +44,8 @@ from .services import (
     mover_item_pacote,
     salvar_foto_pacote,
     salvar_fornecedores_carga,
+    status_bipagem_carga,
+    verificar_avanco_stage,
 )
 
 
@@ -228,6 +234,52 @@ class SalvarFornecedoresView(APIView):
 
         carga = get_object_or_404(Carga, id=carga_id)
         resultado = salvar_fornecedores_carga(carga, serializer.validated_data)
+        return Response(resultado)
+
+
+class AvancarStageView(APIView):
+    def get(self, request, carga_id):
+        carga = get_object_or_404(Carga, id=carga_id)
+        return Response(verificar_avanco_stage(carga))
+
+    def post(self, request, carga_id):
+        carga = get_object_or_404(Carga, id=carga_id)
+        try:
+            resultado = avancar_stage_service(carga)
+        except PacoteValidationError as exc:
+            return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(resultado)
+
+
+class BipagemCargaView(APIView):
+    def get(self, request, carga_id):
+        carga = get_object_or_404(Carga, id=carga_id)
+        return Response(status_bipagem_carga(carga))
+
+    def post(self, request, carga_id):
+        serializer = BiparPacoteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        carga = get_object_or_404(Carga, id=carga_id)
+        resultado = bipar_pacote_service(
+            carga,
+            serializer.validated_data['codigo'],
+            profile=getattr(request.user, 'profile', None),
+            data_bipagem=serializer.validated_data.get('data_bipagem'),
+        )
+        # leitura inválida não é erro HTTP: o app mostra o retorno pro operador
+        return Response(resultado)
+
+
+class DesfazerBipagemView(APIView):
+    def delete(self, request, carga_id, pacote_id):
+        carga = get_object_or_404(Carga, id=carga_id)
+        try:
+            resultado = desfazer_bipagem_service(carga, pacote_id)
+        except PacoteValidationError as exc:
+            return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         return Response(resultado)
 
 

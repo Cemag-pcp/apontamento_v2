@@ -13,6 +13,7 @@ import PendenciasScreen from '../screens/PendenciasScreen';
 import CriarPacoteScreen from '../screens/CriarPacoteScreen';
 import ItemAvulsoScreen from '../screens/ItemAvulsoScreen';
 import FornecedoresScreen from '../screens/FornecedoresScreen';
+import BipagemScreen from '../screens/BipagemScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -42,6 +43,7 @@ export default function RootNavigator() {
       <Stack.Screen name="PacoteDetail" component={PacoteDetailScreen} />
       <Stack.Screen name="Pendencias" component={PendenciasScreen} />
       <Stack.Screen name="CriarPacote" component={CriarPacoteScreen} />
+      <Stack.Screen name="Bipagem" component={BipagemScreen} />
       <Stack.Screen
         name="Camera"
         component={CameraScreen}

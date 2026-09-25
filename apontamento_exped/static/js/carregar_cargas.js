@@ -307,6 +307,13 @@ function criarCardPacote(pacote, data, cargaId, idsNaFila) {
     statusBadgeHtml = '<span class="badge bg-primary ms-2" style="font-size:.6rem;"><i class="fas fa-check me-1"></i>Expedição</span>';
   }
 
+  // Bipagem do carregamento (feita pelo app na etapa bipagem)
+  if (data.status_carga === 'bipagem' || data.status_carga === 'despachado') {
+    statusBadgeHtml += pacote.bipado
+      ? '<span class="badge bg-success ms-2" style="font-size:.6rem;"><i class="fas fa-barcode me-1"></i>Bipado</span>'
+      : '<span class="badge bg-warning text-dark ms-2" style="font-size:.6rem;"><i class="fas fa-barcode me-1"></i>Não bipado</span>';
+  }
+
   const header = document.createElement('div');
   header.className = 'd-flex justify-content-between align-items-center py-2 px-3';
   header.style.background = 'linear-gradient(90deg,#e9ecef,#f8f9fa)';
@@ -321,7 +328,8 @@ function criarCardPacote(pacote, data, cargaId, idsNaFila) {
   const headerActions = document.createElement('div');
   headerActions.className = 'd-flex align-items-center gap-2 flex-shrink-0';
 
-  if (data.status_carga !== 'despachado') {
+  // duplicar/excluir pacote: travado na bipagem e no despacho
+  if (!['bipagem', 'despachado'].includes(data.status_carga)) {
     const btnDuplicar = document.createElement('button');
     btnDuplicar.className = 'btn btn-outline-secondary btn-sm';
     btnDuplicar.innerHTML = '<i class="fas fa-copy"></i>';
@@ -913,15 +921,24 @@ function criarCardPacote(pacote, data, cargaId, idsNaFila) {
     footer.appendChild(btnGroup);
   }
 
-  if (data.status_carga === 'despachado' && pacote.status_qualidade === 'ok') {
+  if (data.status_carga === 'bipagem') {
+    // Reimpressao da etiqueta durante o carregamento (etiqueta perdida/danificada)
+    btnGroup.appendChild(btnPrint);
+    footer.appendChild(btnGroup);
+  }
+
+  if (data.status_carga === 'despachado') {
 
     // Confirmar Qualidade
     // btnConfirmarQualidade.className = 'btn btn-outline-success btn-sm flex-grow-1';
     // btnGroup.appendChild(btnConfirmarQualidade);
 
-    // btnGroup.appendChild(btnPrint);
-    btnGroup.appendChild(btnFoto);
-    btnGroup.appendChild(btnArquivo);
+    // Reimpressao da etiqueta (com codigo de barras) pra bipagem no carregamento
+    btnGroup.appendChild(btnPrint);
+    if (pacote.status_qualidade === 'ok') {
+      btnGroup.appendChild(btnFoto);
+      btnGroup.appendChild(btnArquivo);
+    }
 
     footer.appendChild(btnGroup);
 
@@ -1074,7 +1091,8 @@ export async function popularPacotesDaCarga(cargaId) {
 
     infoHTML += `<button type="button" class="btn btn-outline-warning btn-sm" id="btnVisualizarPendencias"><i class="fas fa-clock me-1"></i>Pendências</button>`;
 
-    if (data.status_carga !== 'despachado') {
+    // na bipagem e no despacho a lista de pacotes fica travada
+    if (!['bipagem', 'despachado'].includes(data.status_carga)) {
       infoHTML += `<button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#criarPacoteModal" id="btnAbrirModalCriarPacote"><i class="fas fa-plus me-1"></i>Criar Pacote</button>`;
     }
 
@@ -1103,7 +1121,7 @@ export async function popularPacotesDaCarga(cargaId) {
       btnPendencias.addEventListener('click', () => abrirModalPendencias(cargaId));
     }
 
-    if (data.status_carga !== 'despachado') {
+    if (!['bipagem', 'despachado'].includes(data.status_carga)) {
       // Busca o botÃ£o dentro do escopo do modal, que Ã© mais eficiente
       const btnAbrirModal = modalBody.querySelector('#btnAbrirModalCriarPacote');
 

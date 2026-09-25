@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, RefreshControl, StyleSheet,
+  ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,9 +10,17 @@ import { useAuth } from '../context/AuthContext';
 import * as api from '../api/expedicao';
 import { comCache } from '../offline/cache';
 import { useRefetchOnReconnect } from '../utils/useRefetchOnReconnect';
-import type { Pacote, PacotesDaCargaResponse } from '../api/types';
+import { ApiError } from '../api/client';
+import type { Pacote, PacotesDaCargaResponse, RequisitosAvanco, StageCarga } from '../api/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Pacotes'>;
+
+// chave = proxima etapa. Bipagem -> despachado nao tem botao: acontece
+// sozinho ao bipar o ultimo pacote.
+const TEXTO_BOTAO_AVANCAR: Partial<Record<StageCarga, string>> = {
+  verificacao: 'Avançar para Verificação',
+  bipagem: 'Enviar para Bipagem',
+};
 
 export default function PacotesScreen({ route, navigation }: Props) {
   const { cargaId, cargaNome } = route.params;
@@ -24,6 +32,9 @@ export default function PacotesScreen({ route, navigation }: Props) {
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [offline, setOffline] = useState(false);
+  // null = sem conexao ou ainda carregando: botao de avancar fica escondido
+  const [avanco, setAvanco] = useState<RequisitosAvanco | null>(null);
+  const [avancando, setAvancando] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!token) return;
@@ -38,7 +49,38 @@ export default function PacotesScreen({ route, navigation }: Props) {
     } catch (err) {
       setErro('Não foi possível carregar os pacotes.');
     }
+    try {
+      setAvanco(await api.buscarRequisitosAvanco(token, cargaId));
+    } catch {
+      setAvanco(null);
+    }
   }, [token, cargaId]);
+
+  function confirmarAvanco() {
+    if (!avanco?.proximo_stage) return;
+    const texto = TEXTO_BOTAO_AVANCAR[avanco.proximo_stage] ?? 'Avançar etapa';
+    const avisos = avanco.avisos.length ? `\n\nAtenção: ${avanco.avisos.join(' ')}` : '';
+    Alert.alert(texto, `Confirma o avanço da carga ${cargaNome}?${avisos}`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Confirmar', onPress: avancar },
+    ]);
+  }
+
+  async function avancar() {
+    if (!token) return;
+    setAvancando(true);
+    try {
+      await api.avancarStage(token, cargaId);
+      await carregar();
+    } catch (err) {
+      Alert.alert('Não foi possível avançar', err instanceof ApiError && err.status !== 0
+        ? err.message
+        : 'Sem conexão com o servidor.');
+      await carregar();
+    } finally {
+      setAvancando(false);
+    }
+  }
 
   const codigosEspeciais = dados?.codigos_especiais ?? {};
   const fornecedoresSalvos = dados?.fornecedores ?? {};
@@ -46,7 +88,9 @@ export default function PacotesScreen({ route, navigation }: Props) {
   const fornecedoresPendentes = Object.entries(codigosEspeciais).some(
     ([tipo, itens]) => itens.some((item) => !(fornecedoresSalvos[`${tipo}_${item.codigo}`] || '').trim())
   );
-  const podeCriarPacote = dados?.status_carga !== 'despachado';
+  // na bipagem e no despacho a lista de pacotes fica travada
+  const podeCriarPacote = dados?.status_carga !== 'bipagem' && dados?.status_carga !== 'despachado';
+  const mostrarBipagem = dados?.status_carga === 'bipagem' || dados?.status_carga === 'despachado';
 
   useEffect(() => {
     navigation.setOptions({
@@ -105,8 +149,9 @@ export default function PacotesScreen({ route, navigation }: Props) {
   });
 
   function renderPacote({ item }: { item: Pacote }) {
-    const stage = dados?.status_carga;
-    const confirmado = stage === 'verificacao' ? item.status_qualidade === 'ok' : item.status_expedicao === 'ok';
+    // confirmacao (qualidade) so existe na verificacao - mesma regra da tela web
+    const mostrarConfirmacao = dados?.status_carga === 'verificacao';
+    const confirmado = item.status_qualidade === 'ok';
     return (
       <TouchableOpacity
         style={styles.card}
@@ -122,11 +167,16 @@ export default function PacotesScreen({ route, navigation }: Props) {
           {item.tem_foto && <Text style={styles.iconeFoto}>📷</Text>}
         </View>
         <Text style={styles.cardSub}>{item.itens.length} item(ns)</Text>
-        {confirmado ? (
+        {mostrarConfirmacao && (confirmado ? (
           <Text style={styles.confirmado}>Confirmado</Text>
         ) : (
           <Text style={styles.pendente}>Pendente de confirmação</Text>
-        )}
+        ))}
+        {mostrarBipagem && (item.bipado ? (
+          <Text style={styles.confirmado}>▮▯▮ Bipado</Text>
+        ) : (
+          <Text style={styles.pendente}>▮▯▮ Não bipado</Text>
+        ))}
       </TouchableOpacity>
     );
   }
@@ -137,6 +187,19 @@ export default function PacotesScreen({ route, navigation }: Props) {
         <View style={styles.avisoOffline}>
           <Text style={styles.avisoOfflineTexto}>📡 Sem conexão — mostrando dados salvos</Text>
         </View>
+      )}
+
+      {/* bipagem = carregamento do caminhao; em despachado so consulta */}
+      {mostrarBipagem && dados && dados.pacotes.length > 0 && (
+        <TouchableOpacity
+          style={styles.botaoBipagem}
+          onPress={() => navigation.navigate('Bipagem', { cargaId, cargaNome })}
+        >
+          <Text style={styles.botaoBipagemTexto}>
+            {dados.status_carga === 'bipagem' ? '▮▯▮ Bipar carregamento' : '▮▯▮ Ver conferência'}
+            {' · '}{dados.pacotes.filter((p) => p.bipado).length}/{dados.pacotes.length}
+          </Text>
+        </TouchableOpacity>
       )}
 
       {(dados?.pacotes.length ?? 0) > 0 && (
@@ -170,6 +233,26 @@ export default function PacotesScreen({ route, navigation }: Props) {
           renderItem={renderPacote}
         />
       )}
+
+      {/* avanco de etapa - mesmas regras do botao "Avancar" da tela web */}
+      {!carregando && avanco?.proximo_stage && TEXTO_BOTAO_AVANCAR[avanco.proximo_stage] && (
+        <View style={[styles.barraAvanco, { paddingBottom: insets.bottom + 12 }]}>
+          {avanco.bloqueios.map((b) => (
+            <Text key={b} style={styles.bloqueioTexto}>• {b}</Text>
+          ))}
+          <TouchableOpacity
+            style={[styles.botaoAvancar, !avanco.pode_avancar && styles.botaoAvancarDesabilitado]}
+            onPress={confirmarAvanco}
+            disabled={!avanco.pode_avancar || avancando}
+          >
+            {avancando
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.botaoAvancarTexto}>
+                  {TEXTO_BOTAO_AVANCAR[avanco.proximo_stage] ?? 'Avançar etapa'}
+                </Text>}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -183,6 +266,16 @@ const styles = StyleSheet.create({
   linkFornecedoresPendente: { color: '#b8860b', fontWeight: '600' },
   avisoOffline: { backgroundColor: '#fff3cd', paddingVertical: 6, paddingHorizontal: 16 },
   avisoOfflineTexto: { color: '#946c00', fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  barraAvanco: {
+    backgroundColor: '#fff', paddingHorizontal: 12, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: '#e5e5e5',
+  },
+  bloqueioTexto: { color: '#b02a37', fontSize: 13, marginBottom: 4 },
+  botaoAvancar: { backgroundColor: '#198754', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  botaoAvancarDesabilitado: { backgroundColor: '#a3cfbb' },
+  botaoAvancarTexto: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  botaoBipagem: { backgroundColor: '#1b6ec2', marginHorizontal: 12, marginTop: 12, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  botaoBipagemTexto: { color: '#fff', fontSize: 16, fontWeight: '700' },
   buscaContainer: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e5e5e5' },
   inputBusca: {
     borderWidth: 1, borderColor: '#d0d0d0', borderRadius: 8,

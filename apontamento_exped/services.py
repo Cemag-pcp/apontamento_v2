@@ -9,7 +9,7 @@ from collections import defaultdict, Counter
 from zoneinfo import ZoneInfo
 
 from django.db import transaction
-from django.db.models import Sum, Exists, OuterRef, Count
+from django.db.models import Sum, Exists, OuterRef, Count, Q
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -17,8 +17,9 @@ from django.utils.timezone import localtime
 
 from .models import (
     Carga, Pacote, ImagemPacote, PendenciasPacote, ItemPacote,
-    FornecedorItemCarga, CarretaCarga,
+    FornecedorItemCarga, CarretaCarga, BipagemPacote,
 )
+from .utils import codigo_barras_pacote, pacote_id_do_codigo_barras
 
 # Tipos especiais de peças que exigem fornecedor informado antes de avançar da verificação
 _TIPOS_ESPECIAIS = ['Pneu', 'Cilindro', 'Roda']
@@ -62,12 +63,22 @@ class PacoteValidationError(Exception):
 
 
 def listar_cargas_ativas():
-    """Cargas ativas (planejamento/verificação) + despachadas recentes (últimos 30 dias)."""
+    """Cargas ativas (planejamento/verificação/bipagem) + despachadas recentes (últimos 30 dias).
+
+    Os 30 dias contam da data do despacho - contando da criação, uma carga
+    criada há mais de 30 dias sumia na hora em que era despachada. Cargas
+    antigas sem data_despachado continuam usando a data de criação.
+    """
     corte_despachado = timezone.now() - timedelta(days=30)
     cargas = list(
         Carga.objects
-        .exclude(stage='despachado', data_criacao__lt=corte_despachado)
-        .values('id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'stage', 'data_criacao')
+        .exclude(
+            Q(stage='despachado') & (
+                Q(data_despachado__lt=corte_despachado) |
+                Q(data_despachado__isnull=True, data_criacao__lt=corte_despachado)
+            )
+        )
+        .values('id', 'nome', 'carga', 'data_carga', 'cliente', 'obs_pacote', 'stage', 'data_criacao', 'data_despachado')
     )
 
     if not cargas:
@@ -81,6 +92,15 @@ def listar_cargas_ativas():
         for r in Pacote.objects
             .filter(carga_id__in=carga_ids)
             .values('carga_id')
+            .annotate(total=Count('id'))
+    }
+
+    # 1 query: pacotes bipados no carregamento por carga
+    bipados_map = {
+        r['pacote__carga_id']: r['total']
+        for r in BipagemPacote.objects
+            .filter(pacote__carga_id__in=carga_ids)
+            .values('pacote__carga_id')
             .annotate(total=Count('id'))
     }
 
@@ -152,6 +172,8 @@ def listar_cargas_ativas():
             total_pac > 0 and total_pac == foto_desp
         )
         carga['total_pendente'] = pendente
+        carga['total_pacotes'] = total_pac
+        carga['total_bipados'] = bipados_map.get(cid, 0)
 
         # Badge de fornecedores pendentes
         if carga['stage'] == 'verificacao':
@@ -210,7 +232,10 @@ def detalhar_pacotes_da_carga(carga):
     pacotes_qs = (
         Pacote.objects
         .filter(carga=carga)
-        .annotate(tem_foto=Exists(ImagemPacote.objects.filter(pacote=OuterRef('pk'))))
+        .annotate(
+            tem_foto=Exists(ImagemPacote.objects.filter(pacote=OuterRef('pk'))),
+            bipado=Exists(BipagemPacote.objects.filter(pacote=OuterRef('pk'))),
+        )
         .order_by('id')
         .prefetch_related('itens')
     )
@@ -244,6 +269,7 @@ def detalhar_pacotes_da_carga(carga):
             'cliente': carga.cliente,
             'data_carga': carga.data_carga.strftime("%d/%m/%Y"),
             'tem_foto': bool(getattr(pacote, 'tem_foto', False)),
+            'bipado': bool(getattr(pacote, 'bipado', False)),
         })
 
     carretas = list(
@@ -438,8 +464,8 @@ def deletar_pacote_service(pacote):
     Levanta PacoteValidationError se a carga ja estiver despachada - cada
     caller (view classica / DRF) formata a resposta de erro no seu idioma.
     """
-    if pacote.carga.stage == 'despachado':
-        raise PacoteValidationError('Não é permitido excluir pacotes despachados.')
+    if pacote.carga.stage in ('bipagem', 'despachado'):
+        raise PacoteValidationError('Não é permitido excluir pacotes em bipagem ou despachados.')
 
     itens = list(ItemPacote.objects.filter(pacote=pacote).select_related('codigo'))
 
@@ -466,6 +492,9 @@ def duplicar_pacote_service(pacote):
     O novo nome recebe sufixo incremental (.1, .2, ...). Levanta
     PacoteValidationError se nao houver itens validos pra duplicar.
     """
+    if pacote.carga.stage in ('bipagem', 'despachado'):
+        raise PacoteValidationError('Não é permitido duplicar pacotes em cargas em bipagem ou despachadas.')
+
     itens_origem = list(ItemPacote.objects.filter(pacote=pacote).select_related('codigo'))
     if not itens_origem:
         raise PacoteValidationError('Pacote sem itens para duplicar.')
@@ -540,6 +569,99 @@ def duplicar_pacote_service(pacote):
     }
 
 
+_PROXIMO_STAGE = {'planejamento': 'verificacao', 'verificacao': 'bipagem', 'bipagem': 'despachado'}
+
+
+def verificar_avanco_stage(carga):
+    """Diz se a carga pode ir pra próxima etapa e, se não, o que está faltando.
+
+    Mesmas regras do botão "Avançar" da tela web (kanbans.js):
+    - planejamento -> verificacao: sempre liberado (itens sem pacote só avisam)
+    - verificacao -> bipagem: todos os pacotes com foto de verificação,
+      nenhum item pendente e fornecedores de peças especiais informados
+    - bipagem -> despachado: todos os pacotes bipados no carregamento
+      (acontece sozinho ao bipar o último pacote)
+    - despachado: última etapa
+    """
+    proximo = _PROXIMO_STAGE.get(carga.stage)
+    bloqueios = []
+    avisos = []
+
+    total_pendente = int(
+        PendenciasPacote.objects
+        .filter(carreta_carga__carga_id=carga.id, qt_necessaria__gt=0)
+        .aggregate(total=Coalesce(Sum('qt_necessaria'), 0))['total'] or 0
+    )
+
+    if carga.stage == 'planejamento' and total_pendente > 0:
+        avisos.append(f'{total_pendente} item(ns) ainda sem pacote.')
+
+    if carga.stage == 'verificacao':
+        pacotes = Pacote.objects.filter(carga=carga)
+        if not pacotes.exists():
+            bloqueios.append('A carga não tem pacotes.')
+        sem_foto = list(
+            pacotes
+            .exclude(pacote_imagem__stage='verificacao')
+            .order_by('nome')
+            .values_list('nome', flat=True)
+        )
+        if sem_foto:
+            bloqueios.append(f'{len(sem_foto)} pacote(s) sem foto: {", ".join(sem_foto)}.')
+        if total_pendente > 0:
+            bloqueios.append(f'{total_pendente} item(ns) ainda sem pacote.')
+
+        codigos_especiais = _detectar_codigos_especiais_da_carga(carga.id)
+        if codigos_especiais:
+            salvos = {(f.tipo, f.codigo): f.fornecedor for f in FornecedorItemCarga.objects.filter(carga=carga)}
+            faltando = [
+                f"{tipo} ({item['codigo']})"
+                for tipo, itens in codigos_especiais.items()
+                for item in itens
+                if not salvos.get((tipo, item['codigo']), '').strip()
+            ]
+            if faltando:
+                bloqueios.append(f'Informe o fornecedor de {", ".join(faltando)}.')
+
+    if carga.stage == 'bipagem':
+        total_pacotes = Pacote.objects.filter(carga=carga).count()
+        total_bipados = BipagemPacote.objects.filter(pacote__carga=carga).count()
+        if total_pacotes == 0:
+            bloqueios.append('A carga não tem pacotes.')
+        elif total_bipados < total_pacotes:
+            bloqueios.append(f'Faltam {total_pacotes - total_bipados} pacote(s) para bipar ({total_bipados}/{total_pacotes}).')
+
+    return {
+        'stage_atual': carga.stage,
+        'proximo_stage': proximo,
+        'pode_avancar': proximo is not None and not bloqueios,
+        'bloqueios': bloqueios,
+        'avisos': avisos,
+    }
+
+
+def avancar_stage_service(carga):
+    """Leva a carga pra próxima etapa. Levanta PacoteValidationError se
+    alguma regra de verificar_avanco_stage bloquear."""
+    requisitos = verificar_avanco_stage(carga)
+    if requisitos['proximo_stage'] is None:
+        raise PacoteValidationError('Estágio atual inválido para avanço automático.')
+    if requisitos['bloqueios']:
+        raise PacoteValidationError(' '.join(requisitos['bloqueios']))
+
+    stage_antigo = carga.stage
+    carga.stage = requisitos['proximo_stage']
+    if carga.stage == 'despachado':
+        carga.data_despachado = timezone.now()
+    carga.save()
+
+    return {
+        'mensagem': 'Estágio alterado com sucesso!',
+        'stage_antigo': stage_antigo,
+        'novo_stage': carga.stage,
+    }
+
+
 def confirmar_pacote_service(pacote, observacao):
     """Confirma qualidade/expedição de um pacote conforme o stage atual da carga.
 
@@ -597,6 +719,118 @@ def listar_pendencias_carga(carga_id):
         "total_itens": len(itens),
         "itens": itens
     }
+
+
+def status_bipagem_carga(carga):
+    """Pacotes da carga com o código de barras de cada um e se já foi bipado.
+
+    O app baixa essa lista ao abrir a tela de carregamento e valida as
+    leituras localmente (resposta instantânea e funciona sem conexão).
+    """
+    pacotes = (
+        Pacote.objects
+        .filter(carga=carga)
+        .select_related('bipagem__bipado_por__user')
+        .annotate(total_itens=Count('itens'))
+        .order_by('nome', 'id')
+    )
+
+    dados = []
+    for pacote in pacotes:
+        bipagem = getattr(pacote, 'bipagem', None)
+        bipado_por = None
+        if bipagem and bipagem.bipado_por:
+            user = bipagem.bipado_por.user
+            bipado_por = user.get_full_name() or user.username
+        dados.append({
+            'id': pacote.id,
+            'nome': pacote.nome,
+            'codigo_barras': codigo_barras_pacote(pacote.id),
+            'total_itens': pacote.total_itens,
+            'bipado': bipagem is not None,
+            'data_bipagem': (
+                localtime(bipagem.data_bipagem, ZoneInfo('America/Fortaleza')).strftime('%d/%m/%Y %H:%M')
+                if bipagem else None
+            ),
+            'bipado_por': bipado_por,
+        })
+
+    total_bipados = sum(1 for p in dados if p['bipado'])
+    return {
+        'carga_id': carga.id,
+        'stage': carga.stage,
+        'total_pacotes': len(dados),
+        'total_bipados': total_bipados,
+        'completo': len(dados) > 0 and total_bipados == len(dados),
+        'pacotes': dados,
+    }
+
+
+# A bipagem acontece no carregamento do caminhão, etapa própria entre a
+# verificação e o despacho. Com 100% bipado a carga vai sozinha pra despachado.
+STAGE_BIPAGEM = 'bipagem'
+_MSG_FORA_DA_ETAPA = 'A bipagem só é liberada quando a carga está na etapa Bipagem.'
+
+
+def bipar_pacote_service(carga, codigo, profile=None, data_bipagem=None):
+    """Registra a leitura de uma etiqueta no carregamento da carga.
+
+    Não levanta exceção pra leitura inválida: devolve um 'resultado' que o
+    app usa pra dar o retorno ao operador (ok / duplicado / outra_carga /
+    nao_encontrado / codigo_invalido / fora_da_etapa).
+    """
+    pacote_id = pacote_id_do_codigo_barras(codigo)
+    if pacote_id is None:
+        return {'resultado': 'codigo_invalido', 'mensagem': f'Código "{codigo}" não é de um pacote.'}
+
+    if carga.stage != STAGE_BIPAGEM:
+        return {'resultado': 'fora_da_etapa', 'mensagem': _MSG_FORA_DA_ETAPA, 'stage': carga.stage}
+
+    pacote = Pacote.objects.select_related('carga').filter(id=pacote_id).first()
+    if not pacote:
+        return {'resultado': 'nao_encontrado', 'mensagem': 'Pacote não encontrado (pode ter sido excluído).'}
+
+    if pacote.carga_id != carga.id:
+        return {
+            'resultado': 'outra_carga',
+            'mensagem': f'Pacote {pacote.nome} é da carga {pacote.carga.nome} ({pacote.carga.cliente}).',
+            'pacote_id': pacote.id,
+        }
+
+    bipagem, criado = BipagemPacote.objects.get_or_create(
+        pacote=pacote,
+        defaults={'bipado_por': profile, 'data_bipagem': data_bipagem or timezone.now()},
+    )
+
+    total_pacotes = Pacote.objects.filter(carga=carga).count()
+    total_bipados = BipagemPacote.objects.filter(pacote__carga=carga).count()
+    completo = total_pacotes > 0 and total_bipados == total_pacotes
+
+    if completo:
+        # update condicional: com dois aparelhos bipando os últimos pacotes
+        # ao mesmo tempo, só um faz a transição
+        Carga.objects.filter(id=carga.id, stage=STAGE_BIPAGEM).update(
+            stage='despachado', data_despachado=timezone.now(),
+        )
+        carga.refresh_from_db(fields=['stage', 'data_despachado'])
+
+    return {
+        'resultado': 'ok' if criado else 'duplicado',
+        'mensagem': f'Pacote {pacote.nome} ' + ('bipado.' if criado else 'já tinha sido bipado.'),
+        'pacote_id': pacote.id,
+        'total_pacotes': total_pacotes,
+        'total_bipados': total_bipados,
+        'completo': completo,
+        'stage': carga.stage,
+    }
+
+
+def desfazer_bipagem_service(carga, pacote_id):
+    """Remove a bipagem de um pacote da carga (leitura feita por engano)."""
+    if carga.stage != STAGE_BIPAGEM:
+        raise PacoteValidationError(_MSG_FORA_DA_ETAPA)
+    BipagemPacote.objects.filter(pacote_id=pacote_id, pacote__carga=carga).delete()
+    return status_bipagem_carga(carga)
 
 
 def sugerir_pacote_service(carga, cobertura_minima=0.75):
@@ -724,8 +958,8 @@ def criar_ou_atualizar_pacote(carga, nome_pacote=None, pacote_existente_id=None,
     itens = itens or []
     itens_fora_planejado = itens_fora_planejado or []
 
-    if carga.stage == 'despachado':
-        raise PacoteValidationError("Não é permitido criar pacotes em cargas despachadas.")
+    if carga.stage in ('bipagem', 'despachado'):
+        raise PacoteValidationError("Não é permitido criar pacotes em cargas em bipagem ou despachadas.")
 
     if not nome_pacote and not pacote_existente_id:
         raise PacoteValidationError("nomePacote é obrigatório")

@@ -132,6 +132,7 @@ function mapStage(carga) {
   const s = (carga.stage || '').toLowerCase();
   if (['planejamento', 'novo', 'pendente'].includes(s)) return 'planejamento';
   if (['verificacao', 'revisao', 'erro'].includes(s)) return 'verificacao';
+  if (s === 'bipagem') return 'bipagem';
   if (['despachado', 'entregue', 'finalizado'].includes(s)) return 'despachado';
   return 'planejamento';
 }
@@ -324,6 +325,7 @@ function stageBadgeClass(stage) {
   switch ((stage || '').toLowerCase()) {
     case 'planejamento': return 'bg-primary';
     case 'verificacao':  return 'bg-warning text-dark';
+    case 'bipagem':      return 'bg-info text-dark';
     case 'despachado':   return 'bg-success';
     default:             return 'bg-secondary';
   }
@@ -333,6 +335,7 @@ function stageBadgeLabel(stage) {
   switch ((stage || '').toLowerCase()) {
     case 'planejamento': return 'Apontamento';
     case 'verificacao':  return 'Verificação';
+    case 'bipagem':      return 'Bipagem';
     case 'despachado':   return 'Despachado';
     default:             return stage || '—';
   }
@@ -421,6 +424,20 @@ export function createKanbanCard(carga) {
   // Linha 4: badges de alerta
   const alertsDiv = document.createElement('div');
   alertsDiv.className = 'ck-alerts';
+
+  // Bipagem do carregamento (feita pelo app na etapa bipagem)
+  if ((stage === 'bipagem' || stage === 'despachado') && Number(carga.total_pacotes) > 0) {
+    const bipados = Number(carga.total_bipados || 0);
+    const total = Number(carga.total_pacotes);
+    const completo = bipados >= total;
+    const bipBadge = document.createElement('span');
+    bipBadge.className = `badge ${completo ? 'bg-success' : 'bg-warning text-dark'}`;
+    bipBadge.title = completo
+      ? 'Todos os pacotes foram bipados no carregamento'
+      : `${total - bipados} pacote(s) ainda não bipado(s) no carregamento`;
+    bipBadge.innerHTML = `<i class="fas fa-barcode me-1"></i>Bipados ${bipados}/${total}`;
+    alertsDiv.appendChild(bipBadge);
+  }
 
   // Linha 5: footer — botões à esquerda, slot avançar à direita
   const footer = document.createElement('div');
@@ -591,10 +608,11 @@ function setupDropZones() {
 export async function carregarCargasKanban() {
   const colPlanej = document.getElementById('col-planejamento');
   const colVerif  = document.getElementById('col-verificacao');
+  const colBip    = document.getElementById('col-bipagem');
   const colDesp   = document.getElementById('col-despachado');
 
   // estados de carregamento
-  [colPlanej, colVerif, colDesp].forEach(col => {
+  [colPlanej, colVerif, colBip, colDesp].forEach(col => {
     col.innerHTML = '<div class="text-muted small">Carregando...</div>';
   });
 
@@ -604,7 +622,7 @@ export async function carregarCargasKanban() {
     const cargas = await resp.json();
 
     // limpar colunas
-    [colPlanej, colVerif, colDesp].forEach(col => col.innerHTML = '');
+    [colPlanej, colVerif, colBip, colDesp].forEach(col => col.innerHTML = '');
 
     const despachados = [];
     const outros = [];
@@ -618,10 +636,10 @@ export async function carregarCargasKanban() {
       }
     });
 
-    // ordenar despachados por data_criacao desc e limitar a 5
+    // ordenar despachados pelo despacho mais recente (antigas sem a data: criacao) e limitar a 5
     despachados.sort((a, b) => {
-      const da = new Date(a.data_criacao || 0).getTime();
-      const db = new Date(b.data_criacao || 0).getTime();
+      const da = new Date(a.data_despachado || a.data_criacao || 0).getTime();
+      const db = new Date(b.data_despachado || b.data_criacao || 0).getTime();
       return db - da;
     });
     const despachadosLimitados = despachados.slice(0, 5);
@@ -634,6 +652,7 @@ export async function carregarCargasKanban() {
         // escolhe coluna
         let targetCol = colPlanej;
         if (stage === 'verificacao') targetCol = colVerif;
+        else if (stage === 'bipagem')     targetCol = colBip;
         else if (stage === 'despachado')  targetCol = colDesp;
 
         // insere o card na coluna
@@ -653,7 +672,7 @@ export async function carregarCargasKanban() {
 
   } catch (err) {
     console.error(err);
-    [colPlanej, colApont, colVerif, colDesp].forEach(col => {
+    [colPlanej, colVerif, colBip, colDesp].forEach(col => {
       col.innerHTML = '<div class="text-danger small">Erro ao carregar</div>';
     });
   }

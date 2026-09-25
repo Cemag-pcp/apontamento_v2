@@ -13,7 +13,7 @@ export interface LoginResponse {
   user: Usuario;
 }
 
-export type StageCarga = 'planejamento' | 'apontamento' | 'verificacao' | 'despachado';
+export type StageCarga = 'planejamento' | 'apontamento' | 'verificacao' | 'bipagem' | 'despachado';
 
 export interface Carga {
   id: number;
@@ -28,6 +28,8 @@ export interface Carga {
   todos_pacotes_tem_foto_despachado: boolean;
   total_pendente: number;
   fornecedores_pendentes: boolean;
+  total_pacotes: number;
+  total_bipados: number;
 }
 
 export interface ItemPacote {
@@ -50,6 +52,7 @@ export interface Pacote {
   cliente: string;
   data_carga: string;
   tem_foto: boolean;
+  bipado: boolean;
 }
 
 export interface Carreta {
@@ -175,6 +178,52 @@ export interface CriarPacoteInput {
   pacote_existente_id?: number;
   itens?: ItemPendenciaInput[];
   itens_fora_planejado?: ItemForaPlanejadoInput[];
+}
+
+export interface RequisitosAvanco {
+  stage_atual: StageCarga;
+  proximo_stage: StageCarga | null;
+  pode_avancar: boolean;
+  bloqueios: string[];
+  avisos: string[];
+}
+
+export interface AvancarStageResponse {
+  mensagem: string;
+  stage_antigo: StageCarga;
+  novo_stage: StageCarga;
+}
+
+export interface PacoteBipagem {
+  id: number;
+  nome: string;
+  codigo_barras: string;
+  total_itens: number;
+  bipado: boolean;
+  data_bipagem: string | null;
+  bipado_por: string | null;
+}
+
+export interface BipagemCargaResponse {
+  carga_id: number;
+  stage: StageCarga;
+  total_pacotes: number;
+  total_bipados: number;
+  completo: boolean;
+  pacotes: PacoteBipagem[];
+}
+
+export type ResultadoBipagem =
+  | 'ok' | 'duplicado' | 'outra_carga' | 'nao_encontrado' | 'codigo_invalido' | 'fora_da_etapa';
+
+export interface BiparPacoteResponse {
+  resultado: ResultadoBipagem;
+  mensagem: string;
+  pacote_id?: number;
+  total_pacotes?: number;
+  total_bipados?: number;
+  completo?: boolean;
+  stage?: StageCarga; // vira 'despachado' ao bipar o ultimo pacote
 }
 
 export interface CriarPacoteResponse {

@@ -19,6 +19,7 @@ const LABEL_STAGE: Record<StageCarga, string> = {
   planejamento: 'Planejamento',
   apontamento: 'Apontamento',
   verificacao: 'Verificação',
+  bipagem: 'Bipagem',
   despachado: 'Despachado',
 };
 
@@ -26,10 +27,13 @@ const COR_STAGE: Record<StageCarga, string> = {
   planejamento: '#6c757d',
   apontamento: '#0d6efd',
   verificacao: '#fd7e14',
+  bipagem: '#0dcaf0',
   despachado: '#198754',
 };
 
-const FILTROS_STATUS: StageCarga[] = ['verificacao', 'despachado'];
+// "Bipagem" mostra so as cargas com carregamento pendente (com 100% bipado
+// a carga vai sozinha pra despachado)
+const FILTROS_STATUS: StageCarga[] = ['verificacao', 'bipagem', 'despachado'];
 
 interface Flag {
   label: string;
@@ -41,6 +45,13 @@ function flagsDaCarga(item: Carga): Flag[] {
   const flags: Flag[] = [];
   if (item.stage === 'despachado' && item.todos_pacotes_tem_foto_despachado) {
     flags.push({ label: 'Concluído', bg: '#d4edda', cor: '#198754' });
+  }
+  // bipagem do carregamento; cache antigo pode nao ter o campo
+  if ((item.stage === 'bipagem' || item.stage === 'despachado') && (item.total_pacotes ?? 0) > 0) {
+    const bipados = item.total_bipados ?? 0;
+    flags.push(bipados >= item.total_pacotes
+      ? { label: `Bipados ${bipados}/${item.total_pacotes}`, bg: '#d4edda', cor: '#198754' }
+      : { label: `Bipados ${bipados}/${item.total_pacotes}`, bg: '#fff3cd', cor: '#946c00' });
   }
   if (item.stage === 'verificacao' && !item.todos_pacotes_tem_foto_verificacao) {
     flags.push({ label: 'Aguardando fotos', bg: '#fff3cd', cor: '#946c00' });

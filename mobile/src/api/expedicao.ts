@@ -1,6 +1,8 @@
 import { apiFetch } from './client';
 import type {
-  AtualizarQuantidadeItemResponse, Carga, ConfirmarPacoteResponse, CriarPacoteInput,
+  AtualizarQuantidadeItemResponse, AvancarStageResponse, BipagemCargaResponse, BiparPacoteResponse,
+  RequisitosAvanco,
+  Carga, ConfirmarPacoteResponse, CriarPacoteInput,
   CriarPacoteResponse, DuplicarPacoteResponse, ExcluirCargaResponse,
   ExcluirItemPacoteResponse, ExcluirPacoteResponse, FornecedorItemInput, FotoPacote,
   LoginResponse, MoverItemResponse, PacotesDaCargaResponse, PendenciasResponse,
@@ -102,6 +104,34 @@ export function atualizarQuantidadeItem(token: string, itemId: number, quantidad
 
 export function excluirItemPacote(token: string, itemId: number) {
   return apiFetch<ExcluirItemPacoteResponse>(`/pacotes/itens/${itemId}/`, { method: 'DELETE', token });
+}
+
+export function buscarRequisitosAvanco(token: string, cargaId: number) {
+  return apiFetch<RequisitosAvanco>(`/cargas/${cargaId}/avancar/`, { token });
+}
+
+export function avancarStage(token: string, cargaId: number) {
+  return apiFetch<AvancarStageResponse>(`/cargas/${cargaId}/avancar/`, { method: 'POST', token });
+}
+
+export function buscarBipagemDaCarga(token: string, cargaId: number) {
+  return apiFetch<BipagemCargaResponse>(`/cargas/${cargaId}/bipagem/`, { token });
+}
+
+// dataBipagem: ISO do momento da leitura (importa quando vem da fila offline)
+export function biparPacote(token: string, cargaId: number, codigo: string, dataBipagem?: string) {
+  return apiFetch<BiparPacoteResponse>(`/cargas/${cargaId}/bipagem/`, {
+    method: 'POST',
+    token,
+    body: { codigo, data_bipagem: dataBipagem ?? null },
+  });
+}
+
+export function desfazerBipagem(token: string, cargaId: number, pacoteId: number) {
+  return apiFetch<BipagemCargaResponse>(`/cargas/${cargaId}/bipagem/${pacoteId}/`, {
+    method: 'DELETE',
+    token,
+  });
 }
 
 export function moverItemPacote(token: string, itemId: number, pacoteDestinoId: number) {

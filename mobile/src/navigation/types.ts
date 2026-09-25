@@ -20,4 +20,5 @@ export type RootStackParamList = {
   };
   ItemAvulso: { cargaId: number; cargaNome: string };
   Fornecedores: { cargaId: number; cargaNome: string };
+  Bipagem: { cargaId: number; cargaNome: string };
 };

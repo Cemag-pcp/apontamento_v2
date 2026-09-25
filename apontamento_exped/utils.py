@@ -9,9 +9,28 @@ import re
 
 # ip 226
 
-def chamar_impressora(cliente, data_carga, nome_pacote, obs):
+# Código de barras da etiqueta do pacote (Code 128): prefixo + id com zeros
+# à esquerda. Curto de propósito - quanto menor o conteúdo, mais largas as
+# barras e mais rápida a leitura pela câmera do celular.
+PREFIXO_CODIGO_PACOTE = 'PK'
+_RE_CODIGO_PACOTE = re.compile(rf'^{PREFIXO_CODIGO_PACOTE}0*(\d+)$', re.IGNORECASE)
+
+
+def codigo_barras_pacote(pacote_id):
+    return f"{PREFIXO_CODIGO_PACOTE}{int(pacote_id):06d}"
+
+
+def pacote_id_do_codigo_barras(codigo):
+    """Id do pacote a partir do conteúdo lido, ou None se não for de pacote."""
+    match = _RE_CODIGO_PACOTE.match((codigo or '').strip())
+    return int(match.group(1)) if match else None
+
+
+def chamar_impressora(cliente, data_carga, nome_pacote, obs, pacote_id):
 
     # data_formatada = datetime.strptime(data_carga, "%Y-%m-%d").strftime("%d/%m/%Y")
+
+    codigo_barras = codigo_barras_pacote(pacote_id)
 
     # Monta o ZPL final
     zpl = f"""
@@ -38,20 +57,23 @@ def chamar_impressora(cliente, data_carga, nome_pacote, obs):
 ^GB720,3,3^FS
 
 ^FX ===================== PACOTE =====================
-^FO50,160
+^FO50,140
 ^AE,40,30
 ^FB700,1,0,C,0
 ^FD{nome_pacote}^FS
 
-^FX ===================== OBSERVAÇÕES =====================
-^FO50,220
-^A0N,28,28
-^FDObservações:^FS
+^FX ===================== CÓDIGO DE BARRAS (bipagem no carregamento) =====================
+^FX Code 128 modo automático, texto legível embaixo
+^FO250,180
+^BY3,3,70
+^BCN,70,Y,N,N,A
+^FD{codigo_barras}^FS
 
-^FO50,260
+^FX ===================== OBSERVAÇÕES =====================
+^FO50,285
 ^A0N,24,24
-^FB700,4,10,L,0
-^FD{obs}^FS
+^FB700,2,4,L,0
+^FDObs.: {obs}^FS
 
 ^XZ
 
@@ -61,7 +83,9 @@ def chamar_impressora(cliente, data_carga, nome_pacote, obs):
 
     job_id = str(uuid.uuid4())
     payload = {"job_id": job_id, "zpl": zpl}
-    r.rpush("print-zebra", json.dumps(payload))
+    # Fila compartilhada com a produção - em teste local, use outra fila
+    # (ZEBRA_QUEUE no .env) e rode o worker expedicao.py com REDIS_QUEUE igual.
+    r.rpush(os.getenv("ZEBRA_QUEUE", "print-zebra"), json.dumps(payload))
     print(job_id)
 
 def chamar_impressora_qrcode():
