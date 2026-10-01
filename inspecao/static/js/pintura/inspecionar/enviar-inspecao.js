@@ -1,3 +1,35 @@
+// Toda nao conformidade da pintura exige foto: cada bloco de causa precisa
+// de ao menos uma imagem. Usada na inspecao e na reinspecao
+// (envio-reinspecao.js). Marca os campos sem foto e devolve a lista
+// "Nª causa (nomes)" pra mensagem de erro.
+function validarImagensNaoConformidadePintura(containers) {
+    const pendencias = [];
+    let primeiroCampo = null;
+
+    containers.forEach((container, index) => {
+        const input = container.querySelector('input[type="file"]');
+        if (input.files.length > 0) {
+            input.classList.remove("is-invalid");
+            return;
+        }
+        input.classList.add("is-invalid");
+        const nomes = Array.from(container.querySelector("select").selectedOptions).map((o) => o.text.trim());
+        pendencias.push(`${index + 1}ª causa${nomes.length ? ` (${nomes.join(", ")})` : ""}`);
+        if (!primeiroCampo) primeiroCampo = input;
+    });
+
+    if (primeiroCampo) primeiroCampo.scrollIntoView({ behavior: "smooth", block: "center" });
+    return pendencias;
+}
+
+// Ao escolher a foto, tira o destaque de erro do campo
+document.addEventListener("change", (event) => {
+    const input = event.target;
+    if (input.type === "file" && input.classList.contains("is-invalid") && input.files.length > 0) {
+        input.classList.remove("is-invalid");
+    }
+});
+
 document.getElementById("form-inspecao").addEventListener("submit", async function (event) {
     event.preventDefault();
 
@@ -14,6 +46,20 @@ document.getElementById("form-inspecao").addEventListener("submit", async functi
 
     let totalQuantidadeInput = 0;
     const selectContainerInspecao = document.querySelectorAll(".selectContainerInspecao");
+
+    if (parseFloat(naoConformidade) > 0) {
+        const semFoto = validarImagensNaoConformidadePintura(selectContainerInspecao);
+        if (semFoto.length > 0) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Foto obrigatória na não conformidade',
+                html: 'Anexe ao menos uma foto em:<br>' + semFoto.join('<br>'),
+            });
+            buttonInspecionarPintura.disabled = false;
+            buttonInspecionarPintura.querySelector(".spinner-border").style.display = "none";
+            return;
+        }
+    }
 
     // Processar causas, quantidades e imagens
     for (const container of selectContainerInspecao) {

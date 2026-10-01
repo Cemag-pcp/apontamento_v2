@@ -913,6 +913,31 @@ def get_imagens_causas_conformidades_pintura(request, id, num_execucao):
 
     return JsonResponse({'imagens': imagens})
 
+def _erro_foto_obrigatoria_pintura(request, campo_nao_conformidade, nome_causas, nome_imagens):
+    """Toda nao conformidade da pintura exige foto: cada bloco de causa
+    precisa de ao menos uma imagem. nome_causas/nome_imagens recebem o
+    indice do bloco (ex: "causas_{}" / "imagens_{}"). Devolve a mensagem de
+    erro ou None."""
+    try:
+        if int(request.POST.get(campo_nao_conformidade) or 0) <= 0:
+            return None
+        total = int(request.POST.get("quantidade-total-causas") or 0)
+    except ValueError:
+        return None
+
+    sem_foto = []
+    for i in range(1, total + 1):
+        if not request.FILES.getlist(nome_imagens.format(i)):
+            nomes = Causas.objects.filter(
+                id__in=request.POST.getlist(nome_causas.format(i))
+            ).values_list("nome", flat=True)
+            sem_foto.append(f"{i}ª causa ({', '.join(nomes)})" if nomes else f"{i}ª causa")
+
+    if sem_foto:
+        return "Foto obrigatória em toda não conformidade. Faltando em: " + "; ".join(sem_foto) + "."
+    return None
+
+
 def envio_inspecao_pintura(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
@@ -921,6 +946,13 @@ def envio_inspecao_pintura(request):
     # Verifica se já existe uma inspeção com o mesmo ID
     if DadosExecucaoInspecao.objects.filter(inspecao__pk=id_inspecao).exists():
         return JsonResponse({"error": "Item já inspecionado."}, status=400)
+
+    # o campo de arquivo do formulario (imagens_N) e o que o backend grava
+    erro_foto = _erro_foto_obrigatoria_pintura(
+        request, "nao-conformidade-inspecao-pintura", "causas_{}", "imagens_{}"
+    )
+    if erro_foto:
+        return JsonResponse({"error": erro_foto}, status=400)
 
     try:
         with transaction.atomic():
@@ -990,6 +1022,12 @@ def envio_inspecao_pintura(request):
 def envio_reinspecao_pintura(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    erro_foto = _erro_foto_obrigatoria_pintura(
+        request, "nao-conformidade-reinspecao-pintura", "causas_reinspecao_{}[]", "imagens_reinspecao_{}[]"
+    )
+    if erro_foto:
+        return JsonResponse({"error": erro_foto}, status=400)
 
     try:
         with transaction.atomic():
