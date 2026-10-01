@@ -12,8 +12,9 @@ function construirChecklistUnidadeReinspecaoMontagem(indiceUnidade) {
                 </div>
             </div>
             <div class="checklist-causa-detalhes" style="display:none;">
-                <label class="label-modal">Imagem (opcional):</label>
+                <label class="label-modal">Imagem (obrigatória):<span class="text-danger"> *</span></label>
                 <input class="form-control form-control-sm causa-imagens" type="file" accept="image/*" multiple>
+                <div class="invalid-feedback">Anexe ao menos uma foto desta não conformidade.</div>
             </div>
         </div>
     `).join("");
@@ -53,6 +54,7 @@ function alternarDetalhesCausaReinspecaoMontagem(radio) {
     } else {
         detalhes.style.display = "none";
         item.querySelector(".causa-imagens").value = "";
+        item.querySelector(".causa-imagens").classList.remove("is-invalid");
     }
 }
 

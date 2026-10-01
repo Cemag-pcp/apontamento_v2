@@ -47,6 +47,18 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
         return;
     }
 
+    const semFoto = validarImagensNaoConformidadeMontagem(document.getElementById("unidades-checklist-montagem"));
+    if (semFoto.length > 0) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Foto obrigatória na não conformidade',
+            html: 'Anexe ao menos uma foto em:<br>' + semFoto.join('<br>'),
+        });
+        buttonInspecionarMontagem.disabled = false;
+        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+        return;
+    }
+
     // Agrega as causas marcadas como "Ñ OK" em todas as unidades: cada
     // causa vira um "bloco" (mesmo formato que o backend ja espera via
     // request.POST.getlist(f"causas_{i}")), somando quantas unidades

@@ -1,9 +1,9 @@
-document.getElementById("form-inspecao").addEventListener("submit", function (event) {
+document.getElementById("form-reinspecao").addEventListener("submit", function (event) {
     event.preventDefault();
 
-    const modal = document.getElementById('modal-inspecionar-montagem');
-    const modalInstance = bootstrap.Modal.getInstance(modal); // Obter a instância existente
-    let buttonInspecionarMontagem = document.getElementById("submit-inspecionar-montagem");
+    let modal = document.getElementById('modal-reinspecionar-montagem');
+    let modalInstance = bootstrap.Modal.getInstance(modal); // Obter a instância existente
+    let buttonInspecionarMontagem = document.getElementById("submit-reinspecionar-montagem");
     buttonInspecionarMontagem.disabled = true;
     buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "flex";
 
@@ -16,23 +16,12 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
     // Criar um objeto FormData para enviar os arquivos
     const formData = new FormData(this); // Usar o formulário diretamente
 
-    const qtdProduzida = document.getElementById("qtd-produzida-montagem").value;
-    const qtdInspecionada = document.getElementById("qtd-inspecao-montagem").value;
+    const qtdReinspecao = document.getElementById("qtd-reinspecao-montagem").value;
 
-    if (qtdInspecionada === "" || parseInt(qtdInspecionada, 10) < 1) {
-        cancelarEnvio('Informe a quantidade inspecionada (mínimo 1).');
-        return;
-    }
-
-    if (parseFloat(qtdInspecionada) > parseFloat(qtdProduzida)) {
-        cancelarEnvio('Quantidade Inspecionada não pode ser maior que a quantidade Produzida');
-        return;
-    }
-
-    const cardsUnidades = document.querySelectorAll(".unidade-checklist-card");
+    const cardsUnidades = document.querySelectorAll("#unidades-checklist-reinspecao-montagem .unidade-checklist-card");
     const totalCausas = CAUSAS_MONTAGEM.length;
 
-    if (cardsUnidades.length !== parseInt(qtdInspecionada, 10)) {
+    if (cardsUnidades.length !== parseInt(qtdReinspecao, 10)) {
         cancelarEnvio('Erro ao montar o checklist das unidades. Reabra o modal e tente novamente.');
         return;
     }
@@ -43,16 +32,29 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
     });
 
     if (existeUnidadeIncompleta) {
-        cancelarEnvio('Complete o checklist de todas as unidades inspecionadas antes de enviar.');
+        cancelarEnvio('Complete o checklist de todas as unidades reinspecionadas antes de enviar.');
+        return;
+    }
+
+    // validarImagensNaoConformidadeMontagem vem de modal-inspecionar.js
+    const semFoto = validarImagensNaoConformidadeMontagem(document.getElementById("unidades-checklist-reinspecao-montagem"));
+    if (semFoto.length > 0) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Foto obrigatória na não conformidade',
+            html: 'Anexe ao menos uma foto em:<br>' + semFoto.join('<br>'),
+        });
+        buttonInspecionarMontagem.disabled = false;
+        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
         return;
     }
 
     // Agrega as causas marcadas como "Ñ OK" em todas as unidades: cada
     // causa vira um "bloco" (mesmo formato que o backend ja espera via
-    // request.POST.getlist(f"causas_{i}")), somando quantas unidades
-    // falharam por aquela causa e juntando as imagens de todas elas.
+    // request.POST.getlist(f"causas_reinspecao_{i}")), somando quantas
+    // unidades falharam por aquela causa e juntando as imagens de todas elas.
     const causasAgregadas = new Map();
-    document.querySelectorAll(".unidade-checklist-card .causa-status-nok:checked").forEach((radio) => {
+    document.querySelectorAll("#unidades-checklist-reinspecao-montagem .causa-status-nok:checked").forEach((radio) => {
         const causaId = radio.getAttribute("data-causa-id");
         const item = radio.closest(".checklist-causa-item");
         const imagensInput = item.querySelector(".causa-imagens");
@@ -68,21 +70,21 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
     let totalBlocos = 0;
     causasAgregadas.forEach((entrada, causaId) => {
         totalBlocos += 1;
-        formData.append(`causas_${totalBlocos}`, causaId);
-        formData.append(`quantidade_${totalBlocos}`, entrada.quantidade);
+        formData.append(`causas_reinspecao_${totalBlocos}`, causaId);
+        formData.append(`quantidade_reinspecao_${totalBlocos}`, entrada.quantidade);
         entrada.imagens.forEach((file) => {
-            formData.append(`imagens_${totalBlocos}`, file);
+            formData.append(`imagens_reinspecao_${totalBlocos}`, file);
         });
     });
 
     formData.append("quantidade-total-causas", totalBlocos);
     // Campos desabilitados (conformidade/nao-conformidade sao calculados a
     // partir do checklist) nao entram automaticamente no FormData.
-    formData.append("conformidade-inspecao-montagem", document.getElementById("conformidade-inspecao-montagem").value);
-    formData.append("nao-conformidade-inspecao-montagem", document.getElementById("nao-conformidade-inspecao-montagem").value);
+    formData.append("conformidade-reinspecao-montagem", document.getElementById("conformidade-reinspecao-montagem").value);
+    formData.append("nao-conformidade-reinspecao-montagem", document.getElementById("nao-conformidade-reinspecao-montagem").value);
 
     // Enviar os dados para o backend
-    fetch("/inspecao/api/envio-inspecao-montagem/", {
+    fetch("/inspecao/api/envio-reinspecao-montagem/", {
         method: "POST",
         headers: {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
@@ -122,6 +124,7 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
     })
     .catch(error => {
         console.error(error);
+
         Swal.fire({
             icon: 'error',
             title: 'Erro no envio da inspeção',

@@ -21,8 +21,9 @@ function construirChecklistUnidadeMontagem(indiceUnidade) {
                 </div>
             </div>
             <div class="checklist-causa-detalhes" style="display:none;">
-                <label class="label-modal">Imagem (opcional):</label>
+                <label class="label-modal">Imagem (obrigatória):<span class="text-danger"> *</span></label>
                 <input class="form-control form-control-sm causa-imagens" type="file" accept="image/*" multiple>
+                <div class="invalid-feedback">Anexe ao menos uma foto desta não conformidade.</div>
             </div>
         </div>
     `).join("");
@@ -62,8 +63,45 @@ function alternarDetalhesCausaMontagem(radio) {
     } else {
         detalhes.style.display = "none";
         item.querySelector(".causa-imagens").value = "";
+        item.querySelector(".causa-imagens").classList.remove("is-invalid");
     }
 }
+
+// Toda causa marcada como "Não OK" precisa de ao menos uma foto, em cada
+// unidade. Usada na inspecao e na reinspecao (envio-reinspecao.js).
+// Marca os campos sem foto, abre a primeira unidade com pendencia e
+// devolve a lista "Unidade N: Causa" pra mensagem de erro.
+function validarImagensNaoConformidadeMontagem(container) {
+    const pendencias = [];
+    let primeiroCampo = null;
+
+    container.querySelectorAll(".unidade-checklist-card").forEach((card) => {
+        card.querySelectorAll(".causa-status-nok:checked").forEach((radio) => {
+            const input = radio.closest(".checklist-causa-item").querySelector(".causa-imagens");
+            if (input.files.length > 0) {
+                input.classList.remove("is-invalid");
+                return;
+            }
+            input.classList.add("is-invalid");
+            pendencias.push(`Unidade ${card.dataset.unidade}: ${radio.dataset.causaNome}`);
+            if (!primeiroCampo) primeiroCampo = input;
+        });
+    });
+
+    if (primeiroCampo) {
+        const corpo = primeiroCampo.closest(".collapse");
+        if (corpo) bootstrap.Collapse.getOrCreateInstance(corpo, { toggle: false }).show();
+        primeiroCampo.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    return pendencias;
+}
+
+// Ao escolher a foto, tira o destaque de erro do campo
+document.addEventListener("change", (event) => {
+    if (event.target.classList.contains("causa-imagens") && event.target.files.length > 0) {
+        event.target.classList.remove("is-invalid");
+    }
+});
 
 function atualizarContadoresConformidadeMontagem() {
     const totalCausas = CAUSAS_MONTAGEM.length;
