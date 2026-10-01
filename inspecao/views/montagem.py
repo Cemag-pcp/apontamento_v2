@@ -634,6 +634,32 @@ def get_historico_causas_montagem(request, id):
     return JsonResponse({"causas": causas_list}, status=200)
 
 
+def _erro_foto_obrigatoria_montagem(request, prefixo_causas, prefixo_quantidade, prefixo_imagens):
+    """Toda nao conformidade da montagem exige foto: cada causa enviada
+    precisa de ao menos uma imagem por unidade que falhou (a tela agrega as
+    unidades por causa). Devolve a mensagem de erro ou None."""
+    try:
+        total = int(request.POST.get("quantidade-total-causas") or 0)
+    except ValueError:
+        total = 0
+
+    sem_foto = []
+    for i in range(1, total + 1):
+        try:
+            quantidade = int(request.POST.get(f"{prefixo_quantidade}{i}") or 0)
+        except ValueError:
+            quantidade = 0
+        if len(request.FILES.getlist(f"{prefixo_imagens}{i}")) < max(quantidade, 1):
+            nomes = Causas.objects.filter(
+                id__in=request.POST.getlist(f"{prefixo_causas}{i}")
+            ).values_list("nome", flat=True)
+            sem_foto.append(", ".join(nomes) or f"causa {i}")
+
+    if sem_foto:
+        return "Foto obrigatória em toda não conformidade. Faltando em: " + "; ".join(sem_foto) + "."
+    return None
+
+
 def envio_inspecao_montagem(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
@@ -642,6 +668,10 @@ def envio_inspecao_montagem(request):
 
     if DadosExecucaoInspecao.objects.filter(inspecao__pk=id_inspecao).exists():
         return JsonResponse({"error": "Item já inspecionado."}, status=400)
+
+    erro_foto = _erro_foto_obrigatoria_montagem(request, "causas_", "quantidade_", "imagens_")
+    if erro_foto:
+        return JsonResponse({"error": erro_foto}, status=400)
 
     try:
         with transaction.atomic():
@@ -709,6 +739,12 @@ def envio_inspecao_montagem(request):
 def envio_reinspecao_montagem(request):
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido!"}, status=405)
+
+    erro_foto = _erro_foto_obrigatoria_montagem(
+        request, "causas_reinspecao_", "quantidade_reinspecao_", "imagens_reinspecao_"
+    )
+    if erro_foto:
+        return JsonResponse({"error": erro_foto}, status=400)
 
     try:
         with transaction.atomic():
