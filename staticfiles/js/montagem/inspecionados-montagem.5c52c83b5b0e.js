@@ -28,13 +28,12 @@ function buscarItensInspecionados(pagina) {
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecionados");
     let itensInspecionar = document.getElementById("itens-inspecionados");
     let itensFiltradosCor = document.getElementById("itens-filtrados-inspecionados-cor");
-    let itensFiltradosTipos = document.getElementById("itens-filtrados-inspecionados-tipos");
     let itensFiltradosDataInicio = document.getElementById("itens-filtrados-inspecionados-data-inicio");
     let itensFiltradosDataFim = document.getElementById("itens-filtrados-inspecionados-data-fim");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
     let itensFiltradosStatusConformidade = document.getElementById("itens-filtrados-inspecionados-status");
-    let paginacao = document.getElementById("paginacao-inspecionados-pintura");
+    let paginacao = document.getElementById("paginacao-inspecionados-montagem");
 
     // Limpa os cards antes de buscar novos
     cardsInspecao.innerHTML = `<div class="text-center">
@@ -45,15 +44,9 @@ function buscarItensInspecionados(pagina) {
     paginacao.innerHTML = "";
 
     // Coletar os filtros aplicados
-    let coresSelecionadas = [];
-    let tiposSelecionadas = [];
-    document.querySelectorAll('.form-check-input-inspecionados:checked').forEach(checkbox => {
-        let label = checkbox.nextElementSibling.textContent.trim();
-        if (label === "PÓ" || label === "PU") {
-            tiposSelecionadas.push(label);
-        } else {
-            coresSelecionadas.push(label);
-        }
+    let maquinasSelecionadas = [];
+    document.querySelectorAll('.form-check-input-inspecionados-montagem:checked').forEach(checkbox => {
+        maquinasSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
     let inspetorSelecionado = [];
@@ -61,37 +54,28 @@ function buscarItensInspecionados(pagina) {
         inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let statusConformidade = [];    
-    if (document.getElementById('filter-itens-conformes-pintura').checked) {
+    let statusConformidade = [];
+    if (document.getElementById('filter-itens-conformes-montagem').checked) {
         statusConformidade.push('conforme');
     }
     
     // Verifica se o checkbox de itens não conformes está marcado
-    if (document.getElementById('filter-itens-nao-conformes-pintura').checked) {
+    if (document.getElementById('filter-itens-nao-conformes-montagem').checked) {
         statusConformidade.push('nao_conforme');
     }
 
-    let dataSelecionadaInicio = document.getElementById('data-filtro-inspecionados-inicio').value;
-    let dataSelecionadaFim = document.getElementById('data-filtro-inspecionados-fim').value;
-    
+    let dataSelecionadaInicio = document.getElementById('data-inicio-inspecionados').value;
+    let dataSelecionadaFim = document.getElementById('data-fim-inspecionados').value;
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecionados').value;
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
-    if (coresSelecionadas.length > 0) {
-        params.append("cores", coresSelecionadas.join(","));
+    if (maquinasSelecionadas.length > 0) {
+        params.append("maquinas", maquinasSelecionadas.join(","));
         itensFiltradosCor.style.display = "block";
-        itensFiltradosCor.textContent = "Cores: " + coresSelecionadas.join(", ");
+        itensFiltradosCor.textContent = "Máquinas: " + maquinasSelecionadas.join(", ");
     } else {
         itensFiltradosCor.style.display = "none";
-    }
-
-    if (tiposSelecionadas.length > 0) {
-        params.append("tipos_tinta", tiposSelecionadas.join(","));
-        itensFiltradosTipos.style.display = "block";
-        itensFiltradosTipos.textContent = "Tipo de Tinta: " + tiposSelecionadas.join(", ");
-    } else {
-        itensFiltradosTipos.style.display = "none";
     }
 
     if (dataSelecionadaInicio) {
@@ -109,6 +93,7 @@ function buscarItensInspecionados(pagina) {
     } else {
         itensFiltradosDataFim.style.display = "none";
     }
+
 
     if (pesquisarInspecao) {
         params.append("pesquisar", pesquisarInspecao);
@@ -137,7 +122,7 @@ function buscarItensInspecionados(pagina) {
 
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
-    fetch(`/inspecao/api/itens-inspecionados-pintura/?${params.toString()}`, {
+    fetch(`/inspecao/api/itens-inspecionados-montagem/?${params.toString()}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -153,6 +138,8 @@ function buscarItensInspecionados(pagina) {
 
         const quantidadeInspecoes = items.total;
         const quantidadeFiltradaInspecoes = items.total_filtrado;
+
+        console.log(items)
 
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens inspecionados`;
 
@@ -171,24 +158,6 @@ function buscarItensInspecionados(pagina) {
                 "Amarelo": "yellow", "Cinza": "gray"
             };
 
-            let iconeNaoConformidade;
-
-            if (item.possui_nao_conformidade) {
-            iconeNaoConformidade = `
-                <span class="badge rounded-pill bg-danger">
-                <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                Não conformidade
-                </span>
-            `;
-            } else {
-            iconeNaoConformidade = `
-                <span class="badge rounded-pill bg-success">
-                <i class="bi bi-check-circle-fill me-1"></i>
-                Conforme
-                </span>
-            `;
-            }
-
             let color = borderColors[item.cor];
 
             const cards = `
@@ -199,25 +168,34 @@ function buscarItensInspecionados(pagina) {
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
                         <strong>📅 Data da carga:</strong> ${item.data_carga || "-"}<br>
-                        <strong>📍 Tipo:</strong> ${item.tipo}<br>
-                        <strong>🎨 Cor:</strong> ${item.cor}<br>
-                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}<br>
+                        <strong>⚙️ Máquina:</strong> ${item.maquina}<br>
+                        <strong>🔢 Qtd Produzida:</strong> ${item.qtd_produzida}<br>
+                        <strong>🔍 Qtd Inspecionada:</strong> ${item.qtd_inspecionada}<br>
+                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
-                    <div class="d-flex justify-content-between">
-                        <div class="d-flex align-items-baseline gap-2">
-                            ${iconeNaoConformidade}
-                        </div>
-                        <button 
+                    <div class="d-flex justify-content-center gap-3 mb-2">
+                        <span class="text-success" style="font-size: 0.875rem; font-weight: bold;">
+                            <i class="bi bi-check-circle-fill"></i> Conforme: ${item.conformidade}
+                        </span>
+                        <span class="text-danger" style="font-size: 0.875rem; font-weight: bold;">
+                            <i class="bi bi-x-circle-fill"></i> Não conforme: ${item.nao_conformidade}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button
                             data-id="${item.id}"
                             data-data="${item.data}"
                             data-peca="${item.peca}"
+                            data-maquina="${item.maquina}"
                             data-tipo="${item.tipo}"
                             data-nao-conformidade="${item.nao_conformidade}"
                             data-conformidade="${item.conformidade}"
+                            data-qtd-produzida="${item.qtd_produzida}"
+                            data-qtd-inspecionada="${item.qtd_inspecionada}"
                             data-cor="${item.cor}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
-                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">              
+                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>
                             Ver detalhes
                         </button>

@@ -418,9 +418,9 @@ function buscarItensInspecao(pagina) {
 
             const cards = `
             <div class="col-md-4 mb-4">
-                <div class="card p-3" data-card-inspecao-id="${item.id}" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
+                <div class="card p-3 h-100 d-flex flex-column" data-card-inspecao-id="${item.id}">
                     <h5 class="d-flex align-items-center gap-2 titulo-card-inspecao">
-                        <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a>
+                        <a class="text-truncate" style="min-width:0;" href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer" title="${item.peca}">${item.peca}</a>
                         ${existeRascunhoParcial ? '<span class="badge bg-warning text-dark flag-rascunho-parcial">Parcial</span>' : ''}
                     </h5>
                     <p>Inspecao #${item.id}</p>
@@ -431,13 +431,13 @@ function buscarItensInspecao(pagina) {
                         <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
                     </p>
                     <hr>
-                    <button 
+                    <button
                         data-id="${item.id}"
                         data-data="${item.data}"
                         data-qtd="${item.qtd_apontada}"
                         data-peca="${item.peca}"
                         data-maquina="${item.maquina}"
-                    class="btn btn-dark w-100 iniciar-inspecao" id="openModalButton">
+                    class="btn btn-dark w-100 iniciar-inspecao mt-auto" id="openModalButton">
                     Iniciar Inspeção</button>
                 </div>
             </div>`;
