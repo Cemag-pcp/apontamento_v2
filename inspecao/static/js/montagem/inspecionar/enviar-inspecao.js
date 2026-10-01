@@ -7,72 +7,79 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
     buttonInspecionarMontagem.disabled = true;
     buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "flex";
 
+    function cancelarEnvio(mensagem) {
+        Swal.fire({ icon: 'error', title: mensagem });
+        buttonInspecionarMontagem.disabled = false;
+        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+    }
+
     // Criar um objeto FormData para enviar os arquivos
     const formData = new FormData(this); // Usar o formulário diretamente
 
-    // Adicionar os dados básicos ao FormData
-    const naoConformidade = document.getElementById("nao-conformidade-inspecao-montagem").value;
     const qtdProduzida = document.getElementById("qtd-produzida-montagem").value;
     const qtdInspecionada = document.getElementById("qtd-inspecao-montagem").value;
-    formData.append("nao-conformidade-inspecao-montagem", naoConformidade);
 
-    let totalQuantidadeInput = 0;
-    // Adicionar causas, quantidades e imagens ao FormData
-    const selectContainerInspecao = document.querySelectorAll(".selectContainerInspecao");
-    selectContainerInspecao.forEach((container, index) => {
-        const causaSelect = container.querySelector('select');
-        const quantidadeInput = container.querySelector('input[type="number"]');
-        const imagensInput = container.querySelector('input[type="file"]');
-        totalQuantidadeInput += parseFloat(quantidadeInput.value);
-        console.log(totalQuantidadeInput)
-
-        // Adicionar causas
-        Array.from(causaSelect.selectedOptions).forEach((option, i) => {
-            formData.append(`causas_${index + 1}[${i}]`, option.value);
-        });
-
-        // Adicionar quantidade
-        formData.append(`quantidade_${index + 1}`, quantidadeInput.value);
-
-        // Adicionar arquivos de imagem
-        Array.from(imagensInput.files).forEach((file, i) => {
-            formData.append(`imagens_${index + 1}[${i}]`, file); // Anexar o arquivo diretamente
-        });
-    });
-
-    const naoConformidadeNum = parseFloat(naoConformidade);
-
-    if (parseFloat(qtdInspecionada) > parseFloat(qtdProduzida)) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Quantidade Inspecionada não pode ser maior que a quantidade Produzida',
-        });
-
-        buttonInspecionarMontagem.disabled = false;
-        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+    if (qtdInspecionada === "" || parseInt(qtdInspecionada, 10) < 1) {
+        cancelarEnvio('Informe a quantidade inspecionada (mínimo 1).');
         return;
     }
 
-    if (naoConformidadeNum !== 0) {
-        const erroMensagem = naoConformidadeNum > 0 && totalQuantidadeInput !== naoConformidadeNum
-            ? 'Verifique se a soma dos campos de "Quantidade" está igual ao valor de "N° total de não conformidades"'
-            : naoConformidadeNum < 0
-            ? 'Verifique se o "N° total de conformidades" está com o valor correto'
-            : null;
-    
-        if (erroMensagem) {
-            Swal.fire({
-                icon: 'error',
-                title: erroMensagem,
-            });
-    
-            buttonInspecionarMontagem.disabled = false;
-            buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
-            return;
-        }
+    if (parseFloat(qtdInspecionada) > parseFloat(qtdProduzida)) {
+        cancelarEnvio('Quantidade Inspecionada não pode ser maior que a quantidade Produzida');
+        return;
     }
 
-    formData.append("quantidade-total-causas", selectContainerInspecao.length)
+    const cardsUnidades = document.querySelectorAll(".unidade-checklist-card");
+    const totalCausas = CAUSAS_MONTAGEM.length;
+
+    if (cardsUnidades.length !== parseInt(qtdInspecionada, 10)) {
+        cancelarEnvio('Erro ao montar o checklist das unidades. Reabra o modal e tente novamente.');
+        return;
+    }
+
+    const existeUnidadeIncompleta = Array.from(cardsUnidades).some((card) => {
+        const respondidos = card.querySelectorAll('.causa-status-ok:checked, .causa-status-nok:checked').length;
+        return respondidos < totalCausas;
+    });
+
+    if (existeUnidadeIncompleta) {
+        cancelarEnvio('Complete o checklist de todas as unidades inspecionadas antes de enviar.');
+        return;
+    }
+
+    // Agrega as causas marcadas como "Ñ OK" em todas as unidades: cada
+    // causa vira um "bloco" (mesmo formato que o backend ja espera via
+    // request.POST.getlist(f"causas_{i}")), somando quantas unidades
+    // falharam por aquela causa e juntando as imagens de todas elas.
+    const causasAgregadas = new Map();
+    document.querySelectorAll(".unidade-checklist-card .causa-status-nok:checked").forEach((radio) => {
+        const causaId = radio.getAttribute("data-causa-id");
+        const item = radio.closest(".checklist-causa-item");
+        const imagensInput = item.querySelector(".causa-imagens");
+
+        if (!causasAgregadas.has(causaId)) {
+            causasAgregadas.set(causaId, { quantidade: 0, imagens: [] });
+        }
+        const entrada = causasAgregadas.get(causaId);
+        entrada.quantidade += 1;
+        entrada.imagens.push(...Array.from(imagensInput.files));
+    });
+
+    let totalBlocos = 0;
+    causasAgregadas.forEach((entrada, causaId) => {
+        totalBlocos += 1;
+        formData.append(`causas_${totalBlocos}`, causaId);
+        formData.append(`quantidade_${totalBlocos}`, entrada.quantidade);
+        entrada.imagens.forEach((file) => {
+            formData.append(`imagens_${totalBlocos}`, file);
+        });
+    });
+
+    formData.append("quantidade-total-causas", totalBlocos);
+    // Campos desabilitados (conformidade/nao-conformidade sao calculados a
+    // partir do checklist) nao entram automaticamente no FormData.
+    formData.append("conformidade-inspecao-montagem", document.getElementById("conformidade-inspecao-montagem").value);
+    formData.append("nao-conformidade-inspecao-montagem", document.getElementById("nao-conformidade-inspecao-montagem").value);
 
     // Enviar os dados para o backend
     fetch("/inspecao/api/envio-inspecao-montagem/", {

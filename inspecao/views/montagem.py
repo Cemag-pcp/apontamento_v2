@@ -31,7 +31,7 @@ def inspecao_montagem(request):
         tipo_acesso="inspetor", permissoes__nome="inspecao/montagem"
     )
 
-    causas = Causas.objects.filter(setor="montagem")
+    causas = Causas.objects.filter(setor="montagem", excluida=False)
 
     maquinas = list(
         Maquina.objects.filter(tipo="maquina", setor_id__nome="montagem").values_list(
@@ -62,6 +62,7 @@ def inspecao_montagem(request):
             "inspetor_logado": inspetor_logado,
             "inspetores": lista_inspetores,
             "causas": list_causas,
+            "causas_json": json.dumps(list_causas, ensure_ascii=False),
             "maquinas": maquinas,
         },
     )
@@ -507,7 +508,7 @@ def get_itens_inspecionados_montagem(request):
         "pecas_ordem_montagem__ordem",
         "pecas_ordem_montagem__ordem__maquina",
         "pecas_ordem_montagem__operador",
-    ).order_by("-dadosexecucaoinspecao__data_execucao")
+    ).order_by("-ultima_data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
@@ -517,9 +518,12 @@ def get_itens_inspecionados_montagem(request):
         inspecao__in=pagina_obj
     ).select_related(
         "inspecao", "inspetor__user", "inspecao__pecas_ordem_montagem__ordem__maquina"
-    )
+    ).order_by("data_execucao")
 
-    # Cria um dicionário para mapear inspecao_id para seus dados de execução
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução.
+    # Itera em ordem crescente de data_execucao e vai sobrescrevendo, entao
+    # a ultima escrita por inspecao_id e sempre a execucao mais recente (ex:
+    # a reinspecao, quando existir, prevalece sobre a inspecao original).
     dados_execucao_dict = {de.inspecao_id: de for de in dados_execucao}
 
     dados = []
@@ -527,9 +531,7 @@ def get_itens_inspecionados_montagem(request):
         de = dados_execucao_dict.get(data.id)
 
         if de:
-            data_ajustada = DadosExecucaoInspecao.objects.filter(
-                inspecao=data
-            ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
+            data_ajustada = de.data_execucao - timedelta(hours=3)
             possui_nao_conformidade = de.nao_conformidade > 0 or de.num_execucao > 0
 
             item = {
@@ -547,6 +549,8 @@ def get_itens_inspecionados_montagem(request):
                 "maquina": data.pecas_ordem_montagem.ordem.maquina.nome,
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
+                "conformidade": de.conformidade,
+                "nao_conformidade": de.nao_conformidade,
             }
 
             dados.append(item)
@@ -757,8 +761,11 @@ def envio_reinspecao_montagem(request):
                             causa_nao_conformidade=causa_nao_conformidade,
                             arquivo=imagem,
                         )
-            else:
-                reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
+
+            # A reinspecao e a ultima etapa: encerra a fila mesmo se ainda
+            # houver nao conformidade residual, nao devolve pra reinspecionar de novo.
+            reinspecao = Reinspecao.objects.filter(inspecao=inspecao).first()
+            if reinspecao:
                 reinspecao.reinspecionado = True
                 reinspecao.save()
 

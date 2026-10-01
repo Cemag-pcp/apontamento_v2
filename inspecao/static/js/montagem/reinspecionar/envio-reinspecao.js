@@ -7,60 +7,68 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     buttonInspecionarMontagem.disabled = true;
     buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "flex";
 
+    function cancelarEnvio(mensagem) {
+        Swal.fire({ icon: 'error', title: mensagem });
+        buttonInspecionarMontagem.disabled = false;
+        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+    }
+
     // Criar um objeto FormData para enviar os arquivos
     const formData = new FormData(this); // Usar o formulário diretamente
 
-    // Adicionar os dados básicos ao FormData
-    const naoConformidade = document.getElementById("nao-conformidade-reinspecao-montagem").value;
-    formData.append("nao-conformidade-reinspecao-montagem", naoConformidade);
+    const qtdReinspecao = document.getElementById("qtd-reinspecao-montagem").value;
 
-    let totalQuantidadeInput = 0;
+    const cardsUnidades = document.querySelectorAll("#unidades-checklist-reinspecao-montagem .unidade-checklist-card");
+    const totalCausas = CAUSAS_MONTAGEM.length;
 
-    // Adicionar causas, quantidades e imagens ao FormData
-    const selectContainerInspecao = document.querySelectorAll(".selectContainerReinspecao");
-    selectContainerInspecao.forEach((container, index) => {
-        const causaSelect = container.querySelector('select');
-        const quantidadeInput = container.querySelector('input[type="number"]');
-        const imagensInput = container.querySelector('input[type="file"]');
-        totalQuantidadeInput += parseFloat(quantidadeInput.value);
-        console.log(totalQuantidadeInput)
+    if (cardsUnidades.length !== parseInt(qtdReinspecao, 10)) {
+        cancelarEnvio('Erro ao montar o checklist das unidades. Reabra o modal e tente novamente.');
+        return;
+    }
 
-        // Adicionar causas
-        Array.from(causaSelect.selectedOptions).forEach((option, i) => {
-            formData.append(`causas_reinspecao_${index + 1}[${i}]`, option.value);
-        });
+    const existeUnidadeIncompleta = Array.from(cardsUnidades).some((card) => {
+        const respondidos = card.querySelectorAll('.causa-status-ok:checked, .causa-status-nok:checked').length;
+        return respondidos < totalCausas;
+    });
 
-        // Adicionar quantidade
-        formData.append(`quantidade_reinspecao_${index + 1}`, quantidadeInput.value);
+    if (existeUnidadeIncompleta) {
+        cancelarEnvio('Complete o checklist de todas as unidades reinspecionadas antes de enviar.');
+        return;
+    }
 
-        // Adicionar arquivos de imagem
-        Array.from(imagensInput.files).forEach((file, i) => {
-            formData.append(`imagens_reinspecao_${index + 1}[${i}]`, file); // Anexar o arquivo diretamente
+    // Agrega as causas marcadas como "Ñ OK" em todas as unidades: cada
+    // causa vira um "bloco" (mesmo formato que o backend ja espera via
+    // request.POST.getlist(f"causas_reinspecao_{i}")), somando quantas
+    // unidades falharam por aquela causa e juntando as imagens de todas elas.
+    const causasAgregadas = new Map();
+    document.querySelectorAll("#unidades-checklist-reinspecao-montagem .causa-status-nok:checked").forEach((radio) => {
+        const causaId = radio.getAttribute("data-causa-id");
+        const item = radio.closest(".checklist-causa-item");
+        const imagensInput = item.querySelector(".causa-imagens");
+
+        if (!causasAgregadas.has(causaId)) {
+            causasAgregadas.set(causaId, { quantidade: 0, imagens: [] });
+        }
+        const entrada = causasAgregadas.get(causaId);
+        entrada.quantidade += 1;
+        entrada.imagens.push(...Array.from(imagensInput.files));
+    });
+
+    let totalBlocos = 0;
+    causasAgregadas.forEach((entrada, causaId) => {
+        totalBlocos += 1;
+        formData.append(`causas_reinspecao_${totalBlocos}`, causaId);
+        formData.append(`quantidade_reinspecao_${totalBlocos}`, entrada.quantidade);
+        entrada.imagens.forEach((file) => {
+            formData.append(`imagens_reinspecao_${totalBlocos}`, file);
         });
     });
 
-    const naoConformidadeNum = parseFloat(naoConformidade);
-
-    if (naoConformidadeNum !== 0) {
-        const erroMensagem = naoConformidadeNum > 0 && totalQuantidadeInput !== naoConformidadeNum
-            ? 'Verifique se a soma dos campos de "Quantidade" está igual ao valor de "N° total de não conformidades"'
-            : naoConformidadeNum < 0
-            ? 'Verifique se o "N° total de conformidades" está com o valor correto'
-            : null;
-    
-        if (erroMensagem) {
-            Swal.fire({
-                icon: 'error',
-                title: erroMensagem,
-            });
-    
-            buttonInspecionarMontagem.disabled = false;
-            buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
-            return;
-        }
-    }
-
-    formData.append("quantidade-total-causas", selectContainerInspecao.length)
+    formData.append("quantidade-total-causas", totalBlocos);
+    // Campos desabilitados (conformidade/nao-conformidade sao calculados a
+    // partir do checklist) nao entram automaticamente no FormData.
+    formData.append("conformidade-reinspecao-montagem", document.getElementById("conformidade-reinspecao-montagem").value);
+    formData.append("nao-conformidade-reinspecao-montagem", document.getElementById("nao-conformidade-reinspecao-montagem").value);
 
     // Enviar os dados para o backend
     fetch("/inspecao/api/envio-reinspecao-montagem/", {
@@ -103,7 +111,7 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     })
     .catch(error => {
         console.error(error);
-    
+
         Swal.fire({
             icon: 'error',
             title: 'Erro no envio da inspeção',

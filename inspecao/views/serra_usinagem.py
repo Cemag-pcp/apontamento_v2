@@ -659,6 +659,7 @@ def get_itens_inspecionados_serra_usinagem(request):
                 "peca": peca_info,
                 "maquina": maquina_nome,
                 "qtd_apontada": ordem_peca.qtd_boa,
+                "qtd_inspecionada": execucao.conformidade + execucao.nao_conformidade,
                 "operador": matricula_nome_operador,
                 "status": "Concluído",
                 "inspetor": (

@@ -165,6 +165,80 @@
             .ficha-doc-footer { flex-direction: column; align-items: flex-start; }
             .ficha-doc-id { text-align: left; }
         }
+
+        .checklist-causas-montagem {
+            border: 1px solid #e2e8f0;
+            border-radius: .5rem;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .checklist-causa-item {
+            border-bottom: 1px solid #e2e8f0;
+            padding: .6rem .85rem;
+        }
+        .checklist-causa-item:last-child { border-bottom: none; }
+        .checklist-causa-item:has(.causa-status-nok:checked) {
+            background: #fff1f2;
+        }
+        .checklist-causa-item:has(.causa-status-ok:checked) {
+            background: #f0fdf4;
+        }
+        .checklist-causa-header {
+            margin-bottom: 0;
+            gap: .75rem;
+        }
+        .checklist-causa-label {
+            font-weight: 500;
+        }
+        .checklist-causa-detalhes {
+            margin-top: .6rem;
+            padding-top: .6rem;
+            border-top: 1px dashed #e2e8f0;
+        }
+
+        .label-modal-sm {
+            display: block;
+            font-size: .68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: #64748b;
+            margin-bottom: .2rem;
+        }
+        .campo-readonly-compacto {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #334155;
+        }
+        .campo-readonly-compacto:disabled {
+            background: #f8fafc;
+            opacity: 1;
+        }
+
+        .unidade-checklist-card {
+            border: 1px solid #e2e8f0;
+            border-radius: .5rem;
+            margin-bottom: .6rem;
+            overflow: hidden;
+        }
+        .unidade-checklist-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: .55rem .85rem;
+            background: #f8fafc;
+            cursor: pointer;
+        }
+        .unidade-checklist-header .unidade-checklist-titulo {
+            font-weight: 600;
+            font-size: .85rem;
+        }
+        .unidade-checklist-card .checklist-causas-montagem {
+            border: none;
+            border-top: 1px solid #e2e8f0;
+            border-radius: 0;
+            max-height: none;
+        }
     </style>
 
 {% endblock %}

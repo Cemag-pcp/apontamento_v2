@@ -700,27 +700,34 @@ def get_itens_inspecionados_pintura(request):
         "pecas_ordem_pintura",
         "pecas_ordem_pintura__ordem",
         "pecas_ordem_pintura__operador_fim",
-    ).order_by("-dadosexecucaoinspecao__data_execucao")
+    ).order_by("-ultima_data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
+    dados_execucao = DadosExecucaoInspecao.objects.filter(
+        inspecao__in=pagina_obj
+    ).select_related("inspetor__user").order_by("data_execucao")
+
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução.
+    # Itera em ordem crescente de data_execucao e vai sobrescrevendo, entao
+    # a ultima escrita por inspecao_id e sempre a execucao mais recente (ex:
+    # a reinspecao, quando existir, prevalece sobre a inspecao original).
+    dados_execucao_dict = {de.inspecao_id: de for de in dados_execucao}
+
     dados = []
     for data in pagina_obj:
-        data_ajustada = DadosExecucaoInspecao.objects.filter(inspecao=data).values_list(
-            "data_execucao", flat=True
-        ).last() - timedelta(hours=3)
+        de = dados_execucao_dict.get(data.id)
+        if not de:
+            continue
 
-        possui_nao_conformidade = DadosExecucaoInspecao.objects.filter(
-            inspecao=data, nao_conformidade__gt=0
-        ).exists()
+        data_ajustada = de.data_execucao - timedelta(hours=3)
+        possui_nao_conformidade = de.nao_conformidade > 0
 
         item = {
             "id": data.id,
-            "id_dados_execucao": DadosExecucaoInspecao.objects.filter(inspecao=data)
-            .values_list("id", flat=True)
-            .first(),
+            "id_dados_execucao": de.id,
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
             "data_carga": (
                 data.pecas_ordem_pintura.ordem.data_carga.strftime("%d/%m/%Y")
@@ -730,10 +737,10 @@ def get_itens_inspecionados_pintura(request):
             "peca": data.pecas_ordem_pintura.peca,
             "cor": data.pecas_ordem_pintura.ordem.cor,
             "tipo": data.pecas_ordem_pintura.tipo,
-            "inspetor": DadosExecucaoInspecao.objects.filter(inspecao=data)
-            .values_list("inspetor__user__username", flat=True)
-            .first(),
+            "inspetor": de.inspetor.user.username if de.inspetor else None,
             "possui_nao_conformidade": possui_nao_conformidade,
+            "conformidade": de.conformidade,
+            "nao_conformidade": de.nao_conformidade,
         }
 
         dados.append(item)
@@ -754,30 +761,101 @@ def get_historico_pintura(request, id):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    # Otimiza a consulta usando select_related para trazer dados relacionados
+    inspecao = (
+        Inspecao.objects
+        .select_related(
+            "pecas_ordem_pintura",
+            "pecas_ordem_pintura__ordem",
+            "pecas_ordem_pintura__operador_fim",
+        )
+        .filter(pk=id)
+        .first()
+    )
+    if inspecao is None:
+        return JsonResponse({"error": "Inspeção não encontrada"}, status=404)
+
+    peca_info = None
+    peca_ordem = inspecao.pecas_ordem_pintura
+    if peca_ordem is not None:
+        ordem = peca_ordem.ordem
+        peca_info = {
+            "peca": peca_ordem.peca,
+            "ordem": ordem.ordem if ordem else None,
+            "cor": ordem.cor if ordem else None,
+            "maquina": ordem.maquina if ordem else None,
+            "tipo": peca_ordem.tipo,
+            "qtd_planejada": peca_ordem.qtd_planejada,
+            "qtd_boa": peca_ordem.qtd_boa,
+            "qtd_morta": peca_ordem.qtd_morta,
+            "operador_fim": (
+                f"{peca_ordem.operador_fim.matricula} - {peca_ordem.operador_fim.nome}"
+                if peca_ordem.operador_fim
+                else None
+            ),
+            "data_carga": (
+                (ordem.data_carga - timedelta(hours=3)).strftime("%d/%m/%Y")
+                if ordem and ordem.data_carga
+                else None
+            ),
+        }
+
+    # Otimiza a consulta usando select_related/prefetch_related para trazer
+    # tudo de uma vez (causas, imagens de nao conformidade e de conformidade)
+    # ao inves de exigir uma requisicao extra por execucao pra montar a tela.
     dados = (
         DadosExecucaoInspecao.objects.filter(inspecao__id=id)
         .select_related("inspetor__user")
+        .prefetch_related(
+            "causasnaoconformidade_set__causa",
+            "causasnaoconformidade_set__arquivos",
+        )
         .order_by("-id")
     )
 
-    # Usa list comprehension para construir a lista de histórico
-    list_history = [
-        {
-            "id": dado.id,
-            "id_inspecao": id,
-            "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
-                "%d/%m/%Y %H:%M:%S"
-            ),
-            "num_execucao": dado.num_execucao,
-            "conformidade": dado.conformidade,
-            "nao_conformidade": dado.nao_conformidade,
-            "inspetor": dado.inspetor.user.username,  # Já está otimizado com select_related
-        }
-        for dado in dados
-    ]
+    ids_execucao = [dado.id for dado in dados]
+    imagens_conformidade_por_execucao = defaultdict(list)
+    for arquivo in ArquivoConformidade.objects.filter(dados_execucao_id__in=ids_execucao):
+        if arquivo.arquivo:
+            imagens_conformidade_por_execucao[arquivo.dados_execucao_id].append(
+                {"url": arquivo.arquivo.url}
+            )
 
-    return JsonResponse({"history": list_history}, status=200)
+    list_history = []
+    for dado in dados:
+        causas = []
+        for cnc in dado.causasnaoconformidade_set.all():
+            imagens = [
+                {"url": arquivo.arquivo.url}
+                for arquivo in cnc.arquivos.all()
+                if arquivo.arquivo
+            ]
+            causas_relacionadas = list(cnc.causa.all())
+            causas.append(
+                {
+                    "nomes": [causa.nome for causa in causas_relacionadas],
+                    "setor": causas_relacionadas[0].setor if causas_relacionadas else None,
+                    "quantidade": cnc.quantidade,
+                    "imagens": imagens,
+                }
+            )
+
+        list_history.append(
+            {
+                "id": dado.id,
+                "id_inspecao": id,
+                "data_execucao": (dado.data_execucao - timedelta(hours=3)).strftime(
+                    "%d/%m/%Y %H:%M:%S"
+                ),
+                "num_execucao": dado.num_execucao,
+                "conformidade": dado.conformidade,
+                "nao_conformidade": dado.nao_conformidade,
+                "inspetor": dado.inspetor.user.username,  # Já está otimizado com select_related
+                "causas": causas,
+                "imagens_conformidade": imagens_conformidade_por_execucao.get(dado.id, []),
+            }
+        )
+
+    return JsonResponse({"history": list_history, "peca_info": peca_info}, status=200)
 
 
 def get_historico_causas_pintura(request, id):

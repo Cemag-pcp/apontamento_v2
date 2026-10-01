@@ -8,10 +8,13 @@ function escaparHtmlMontagem(valor) {
 }
 
 function campoFichaMontagem(label, value) {
+    // "value === 0" e um valor legitimo (ex: zero conformidades) - nao deve
+    // cair pro "-" como um "" ou null cairiam.
+    const valorExibido = value === null || value === undefined || value === "" ? "-" : value;
     return `
         <div class="ficha-field">
             <span class="ficha-field-label">${escaparHtmlMontagem(label)}</span>
-            <span class="ficha-field-value">${escaparHtmlMontagem(value || "-")}</span>
+            <span class="ficha-field-value">${escaparHtmlMontagem(valorExibido)}</span>
         </div>`;
 }
 
@@ -134,6 +137,8 @@ function montarFichaMontagem(data, button) {
         ["Peca", button.dataset.peca],
         ["Maquina", button.dataset.maquina],
         ["Data da ultima inspecao", button.dataset.data],
+        ["Qtd. produzida (lote)", button.dataset.qtdProduzida],
+        ["Qtd. inspecionada", button.dataset.qtdInspecionada],
         ["Conformidade", ultima.conformidade ?? button.dataset.conformidade],
         ["Nao conformidade", ultima.nao_conformidade ?? button.dataset.naoConformidade],
     ].map(([label, value]) => campoFichaMontagem(label, value)).join("");

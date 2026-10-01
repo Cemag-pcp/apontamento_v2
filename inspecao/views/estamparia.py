@@ -687,7 +687,7 @@ def get_itens_inspecionados_estamparia(request):
         "pecas_ordem_estamparia",
         "pecas_ordem_estamparia__ordem",
         "pecas_ordem_estamparia__operador",
-    ).order_by("-dadosexecucaoinspecao__data_execucao")
+    ).order_by("-ultima_data_execucao")
 
     # Paginação
     paginador = Paginator(datas, itens_por_pagina)
@@ -697,9 +697,12 @@ def get_itens_inspecionados_estamparia(request):
         inspecao__in=pagina_obj
     ).select_related(
         "inspecao", "inspetor__user", "inspecao__pecas_ordem_estamparia__ordem__maquina"
-    )
+    ).order_by("data_execucao")
 
-    # Cria um dicionário para mapear inspecao_id para seus dados de execução
+    # Cria um dicionário para mapear inspecao_id para seus dados de execução.
+    # Itera em ordem crescente de data_execucao e vai sobrescrevendo, entao
+    # a ultima escrita por inspecao_id e sempre a execucao mais recente (ex:
+    # a reinspecao, quando existir, prevalece sobre a inspecao original).
     dados_execucao_dict = {de.inspecao_id: de for de in dados_execucao}
 
     dados = []
@@ -707,9 +710,7 @@ def get_itens_inspecionados_estamparia(request):
         de = dados_execucao_dict.get(data.id)
 
         if de:
-            data_ajustada = DadosExecucaoInspecao.objects.filter(
-                inspecao=data
-            ).values_list("data_execucao", flat=True).last() - timedelta(hours=3)
+            data_ajustada = de.data_execucao - timedelta(hours=3)
 
             possui_nao_conformidade = de.nao_conformidade > 0 or de.num_execucao > 0
 
@@ -725,6 +726,10 @@ def get_itens_inspecionados_estamparia(request):
                 ),
                 "inspetor": de.inspetor.user.username if de.inspetor else None,
                 "possui_nao_conformidade": possui_nao_conformidade,
+                "conformidade": de.conformidade,
+                "nao_conformidade": de.nao_conformidade,
+                "qtd_produzida": data.pecas_ordem_estamparia.qtd_boa,
+                "qtd_inspecionada": de.conformidade + de.nao_conformidade,
             }
 
             dados.append(item)

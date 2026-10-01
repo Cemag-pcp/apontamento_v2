@@ -195,7 +195,7 @@ def inspecao_tanque(request):
     users = Profile.objects.filter(
         tipo_acesso="inspetor", permissoes__nome="inspecao/tanque"
     )
-    causas = Causas.objects.filter(setor="montagem")
+    causas = Causas.objects.filter(setor="montagem", excluida=False)
 
     lista_inspetores = [
         {"nome_usuario": user.user.username, "id": user.user.id} for user in users
