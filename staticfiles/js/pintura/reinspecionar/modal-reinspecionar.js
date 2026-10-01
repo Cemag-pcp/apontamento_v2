@@ -95,6 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
         newContainer.querySelector("input[type='number']").value = "";
         newContainer.querySelector("input[type='file']").value = "";
         newContainer.querySelector("input[type='file']").name = `imagens_reinspecao_${currentCount}`;
+        newContainer.querySelector("input[type='file']").classList.remove("is-invalid");
 
         containerInspecao.appendChild(newContainer);
 
