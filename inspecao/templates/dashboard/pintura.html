@@ -124,8 +124,9 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header ch-blue">
-                Dados de Produção e Inspeção
+            <div class="card-header d-flex justify-content-between align-items-center ch-blue">
+                <span>Dados de Produção e Inspeção</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-producao" data-nome-csv="pintura_producao_inspecao" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -153,8 +154,9 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header ch-orange">
-                Causas de Não Conformidades
+            <div class="card-header d-flex justify-content-between align-items-center ch-orange">
+                <span>Causas de Não Conformidades</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-causas" data-nome-csv="pintura_causas_nao_conformidade" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -182,8 +184,9 @@
 <div class="row mb-4 justify-content-center">
     <div class="col-md-6 col-lg-5">
         <div class="card">
-            <div class="card-header ch-orange">
-                Ranking de Causas de Não Conformidades
+            <div class="card-header d-flex justify-content-between align-items-center ch-orange">
+                <span>Ranking de Causas de Não Conformidades</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-ranking-causas" data-nome-csv="pintura_ranking_causas" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -231,8 +234,9 @@
 <div class="row mb-4">
     <div class="col-md-6">
         <div class="card h-100">
-            <div class="card-header ch-blue">
-                Não Conformidades por Tipo
+            <div class="card-header d-flex justify-content-between align-items-center ch-blue">
+                <span>Não Conformidades por Tipo</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-pu" data-nome-csv="pintura_nao_conformidades_PU" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="px-3 pt-3 pb-1">
@@ -256,8 +260,9 @@
     </div>
     <div class="col-md-6">
         <div class="card h-100">
-            <div class="card-header ch-teal">
-                Não Conformidades por Tipo
+            <div class="card-header d-flex justify-content-between align-items-center ch-teal">
+                <span>Não Conformidades por Tipo</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-po" data-nome-csv="pintura_nao_conformidades_PO" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="px-3 pt-3 pb-1">
@@ -285,8 +290,9 @@
 <div class="row mb-4 justify-content-center">
     <div class="col-md-5">
         <div class="card h-100">
-            <div class="card-header ch-blue">
-                Ranking de Causas — PU
+            <div class="card-header d-flex justify-content-between align-items-center ch-blue">
+                <span>Ranking de Causas — PU</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-ranking-pu" data-nome-csv="pintura_ranking_causas_PU" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -305,8 +311,9 @@
     </div>
     <div class="col-md-5">
         <div class="card h-100">
-            <div class="card-header ch-teal">
-                Ranking de Causas — PÓ
+            <div class="card-header d-flex justify-content-between align-items-center ch-teal">
+                <span>Ranking de Causas — PÓ</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-ranking-po" data-nome-csv="pintura_ranking_causas_PO" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -346,8 +353,9 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header ch-teal">
-                Causas de Não Conformidade — Diário
+            <div class="card-header d-flex justify-content-between align-items-center ch-teal">
+                <span>Causas de Não Conformidade — Diário</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-causas-diaria" data-nome-csv="pintura_causas_diario" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -378,5 +386,6 @@
 {% block scripts %}
 
     <script src="{% static 'js/dashboard/dash-pintura.js' %}"></script>
+    <script src="{% static 'js/dashboard/exportar-csv.js' %}"></script>
 
 {% endblock %}
