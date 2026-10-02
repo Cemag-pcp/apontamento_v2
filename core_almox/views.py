@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.db import transaction
 from django.db.models import Q
+from django.utils.timezone import localtime, now
 from django.core.paginator import Paginator
 
 
@@ -89,8 +90,54 @@ def _registrar_acao_solicitacao(request, solicitacao, tipo_solicitacao, acao, mo
         usuario=request.user if request.user.is_authenticated else None,
     )
 
+# Marcador em chave_innovaro da solicitacao que ficou sem resposta do
+# Innovaro (read timeout): a requisicao saiu, entao a transferencia PODE ter
+# sido registrada. Fica fora da lista normal (o claim exige chave nula) ate
+# alguem conferir no Innovaro e escolher confirmar ou reenviar.
+CHAVE_VERIFICAR = 'VERIFICAR'
+CHAVE_CONFIRMADA_MANUAL = 'CONFIRMADA-MANUAL'
+MSG_VERIFICAR = (
+    'O Innovaro não respondeu a tempo, mas a transferência pode ter sido registrada. '
+    'Ela foi para a fila de verificação manual: confira no Innovaro antes de transferir de novo.'
+)
+
+
+def _marcar_verificacao_manual(solicitacao, detalhe, entregue_por=None, data_entrega=None):
+    quando = localtime(now()).strftime('%d/%m/%Y %H:%M')
+    quem = f" | operador {entregue_por.matricula} - {entregue_por.nome}" if entregue_por else ""
+    data = f" | entrega {data_entrega}" if data_entrega else ""
+    solicitacao.chave_innovaro = CHAVE_VERIFICAR
+    solicitacao.rpa = f"[VERIFICAR NO INNOVARO] {quando}{quem}{data} | {detalhe}"
+    solicitacao.save(update_fields=["rpa", "chave_innovaro"])
+
+
+def _transferir_e_registrar(solicitacao, entregue_por, data_entrega):
+    """Envia uma transferencia ja "claimada" (chave_innovaro=PROCESSANDO) e
+    registra o resultado. Retorna (situacao, mensagem):
+    'ok' | 'erro' (liberada pra tentar de novo) | 'verificar' (fila manual)."""
+    chave, erro, incerto = _chamar_innovaro_transferir(solicitacao)
+    if incerto:
+        _marcar_verificacao_manual(solicitacao, erro, entregue_por, data_entrega)
+        return 'verificar', MSG_VERIFICAR
+    if erro:
+        solicitacao.rpa = erro
+        solicitacao.chave_innovaro = None  # libera o claim
+        solicitacao.save(update_fields=["rpa", "chave_innovaro"])
+        return 'erro', erro
+
+    solicitacao.entregue_por = entregue_por
+    solicitacao.data_entrega = data_entrega
+    solicitacao.chave_innovaro = str(chave) if chave else None
+    solicitacao.rpa = None
+    solicitacao.save()
+    notificar_acao_almox("entregar", "transferencia", solicitacao.id)
+    return 'ok', ''
+
+
 def _chamar_innovaro_transferir(solicitacao):
-    """Retorna (chave_str | None, erro_str | None). Apenas para transferências."""
+    """Retorna (chave | None, erro | None, incerto). incerto=True quando a
+    requisicao saiu mas o Innovaro nao respondeu (read timeout): nao da pra
+    saber se a transferencia foi registrada."""
     payload = {
         "id": f"almox-transferencia-{solicitacao.id}",
         "pessoa": '4395',
@@ -110,9 +157,12 @@ def _chamar_innovaro_transferir(solicitacao):
 
     try:
         response = requests.post(url, json=payload, auth=("luan araujo", "luanaraujo7"), timeout=(5, 20))
+    except requests.exceptions.ReadTimeout as exc:
+        print(f"[Innovaro] sem resposta (read timeout): {exc}")
+        return None, f"Innovaro sem resposta (read timeout): {exc}", True
     except requests.RequestException as exc:
         print(f"[Innovaro] erro de conexão: {exc}")
-        return None, f"Erro de conexão com o Innovaro: {exc}"
+        return None, f"Erro de conexão com o Innovaro: {exc}", False
 
     print(f"[Innovaro] status: {response.status_code}")
     print(f"[Innovaro] resposta: {response.text}")
@@ -124,15 +174,17 @@ def _chamar_innovaro_transferir(solicitacao):
 
     if not response.ok or resp_json.get("status") == "Error":
         detail = resp_json.get("description") or response.text
-        return None, f"Innovaro retornou erro: {detail}"
+        return None, f"Innovaro retornou erro: {detail}", False
 
     chave = resp_json.get("chaveTransferencia")
     print(f"[Innovaro] chave extraída: {chave}")
-    return chave, None
+    return chave, None, False
 
 
 def _chamar_innovaro_transferir_lote(solicitacoes):
-    """Envia lista de transferências ao Innovaro. Retorna lista de (solicitacao, chave, erro)."""
+    """Envia lista de transferências ao Innovaro. Retorna lista de
+    (solicitacao, chave, erro, incerto) - incerto=True vai pra fila de
+    verificacao manual (sem resposta ou item ausente na resposta)."""
     payload = [
         {
             "id": f"almox-transferencia-{s.id}",
@@ -155,9 +207,12 @@ def _chamar_innovaro_transferir_lote(solicitacoes):
 
     try:
         response = requests.post(url, json=payload, auth=("luan araujo", "luanaraujo7"), timeout=(5, 20))
+    except requests.exceptions.ReadTimeout as exc:
+        print(f"[Innovaro Lote] sem resposta (read timeout): {exc}")
+        return [(s, None, f"Innovaro sem resposta (read timeout): {exc}", True) for s in solicitacoes]
     except requests.RequestException as exc:
         print(f"[Innovaro Lote] erro de conexão: {exc}")
-        return [(s, None, f"Erro de conexão: {exc}") for s in solicitacoes]
+        return [(s, None, f"Erro de conexão: {exc}", False) for s in solicitacoes]
 
     print(f"[Innovaro Lote] status: {response.status_code}")
     print(f"[Innovaro Lote] resposta: {response.text}")
@@ -168,17 +223,20 @@ def _chamar_innovaro_transferir_lote(solicitacoes):
             resp_list = [resp_list]
     except ValueError:
         err = f"Resposta inválida do Innovaro: {response.text}"
-        return [(s, None, err) for s in solicitacoes]
+        # HTTP OK com corpo ilegivel: nao da pra saber o que foi registrado
+        return [(s, None, err, response.ok) for s in solicitacoes]
 
-    result_map = {item.get("id"): item for item in resp_list}
+    result_map = {item.get("id"): item for item in resp_list if isinstance(item, dict)}
 
     results = []
     for s in solicitacoes:
-        item_resp = result_map.get(f"almox-transferencia-{s.id}", {})
-        if item_resp.get("status") == "Error":
-            results.append((s, None, item_resp.get("description") or "Erro desconhecido"))
+        item_resp = result_map.get(f"almox-transferencia-{s.id}")
+        if item_resp is None:
+            results.append((s, None, "Innovaro não devolveu o resultado deste item.", True))
+        elif item_resp.get("status") == "Error":
+            results.append((s, None, item_resp.get("description") or "Erro desconhecido", False))
         else:
-            results.append((s, item_resp.get("chaveTransferencia"), None))
+            results.append((s, item_resp.get("chaveTransferencia"), None, False))
 
     return results
 
@@ -228,8 +286,7 @@ def lista_solicitacoes(request):
             erros = []
             for s in solicitacoes_db:
                 if s.chave_innovaro != 'PROCESSANDO':
-                    msg = ('Solicitação em processamento por outro usuário.'
-                           if s.chave_innovaro == 'PROCESSANDO'
+                    msg = (MSG_VERIFICAR if s.chave_innovaro == CHAVE_VERIFICAR
                            else f'Solicitação #{s.id} já foi processada no Innovaro (chave: {s.chave_innovaro}).')
                     erros.append({"id": s.id, "erro": msg})
 
@@ -241,8 +298,13 @@ def lista_solicitacoes(request):
             resultados = _chamar_innovaro_transferir_lote(solicitacoes)
 
             sucesso = []
-            for sol, chave, erro in resultados:
-                if erro:
+            verificar = []
+            for sol, chave, erro, incerto in resultados:
+                if incerto:
+                    _marcar_verificacao_manual(sol, erro, entregue_por, data_entrega)
+                    verificar.append(sol.id)
+                    erros.append({"id": sol.id, "erro": MSG_VERIFICAR})
+                elif erro:
                     sol.rpa = erro
                     sol.chave_innovaro = None  # libera o claim
                     sol.save(update_fields=["rpa", "chave_innovaro"])
@@ -251,6 +313,7 @@ def lista_solicitacoes(request):
                     sol.entregue_por = entregue_por
                     sol.data_entrega = data_entrega
                     sol.chave_innovaro = str(chave) if chave else None
+                    sol.rpa = None
                     sol.save()
                     notificar_acao_almox("entregar", "transferencia", sol.id)
                     sucesso.append(sol.id)
@@ -259,8 +322,51 @@ def lista_solicitacoes(request):
                 'status': 'Parcial' if erros else 'Sucesso',
                 'tipo': 'transferencia',
                 'sucesso': sucesso,
+                'verificar': verificar,
                 'erros': erros,
             })
+
+        elif "verificacao_confirmar" in request.POST or "verificacao_reenviar" in request.POST:
+            # Fila de verificacao manual (transferencias sem resposta do Innovaro).
+            solicitacao = get_object_or_404(
+                SolicitacaoTransferencia.objects.select_related("item", "deposito_destino"),
+                id=request.POST.get("solicitacao_id"),
+            )
+            entregue_por = get_object_or_404(OperadorAlmox, matricula=request.POST.get("matricula"))
+            data_entrega = request.POST.get("data_entrega")
+            reenviar = "verificacao_reenviar" in request.POST
+
+            # Claim atomico a partir de VERIFICAR: so uma pessoa resolve cada item
+            with transaction.atomic():
+                claimed = SolicitacaoTransferencia.objects.filter(
+                    id=solicitacao.id, chave_innovaro=CHAVE_VERIFICAR, entregue_por__isnull=True
+                ).update(chave_innovaro='PROCESSANDO')
+            if not claimed:
+                return JsonResponse({
+                    'status': 'Erro',
+                    'mensagem': 'Esta transferência não está mais na fila de verificação (já foi resolvida por outro usuário).',
+                }, status=409)
+            solicitacao.refresh_from_db()
+
+            if reenviar:
+                situacao, mensagem = _transferir_e_registrar(solicitacao, entregue_por, data_entrega)
+                if situacao == 'ok':
+                    return JsonResponse({'status': 'Sucesso', 'tipo': 'transferencia'})
+                return JsonResponse({'status': 'Erro', 'mensagem': mensagem}, status=502)
+
+            # Ja estava no Innovaro: marca como entregue sem chamar a API de novo
+            chave = (request.POST.get("chave_innovaro") or "").strip()
+            usuario = request.user.get_full_name() or request.user.username
+            solicitacao.entregue_por = entregue_por
+            solicitacao.data_entrega = data_entrega
+            solicitacao.chave_innovaro = chave or CHAVE_CONFIRMADA_MANUAL
+            solicitacao.rpa = (
+                f"{solicitacao.rpa or ''}\n[CONFIRMADA MANUALMENTE] "
+                f"{localtime(now()).strftime('%d/%m/%Y %H:%M')} por {usuario}"
+            ).strip()
+            solicitacao.save()
+            notificar_acao_almox("entregar", "transferencia", solicitacao.id)
+            return JsonResponse({'status': 'Sucesso', 'tipo': 'transferencia'})
 
         elif "entregar" in request.POST:
             solicitacao_id = request.POST.get("solicitacao_id")
@@ -285,24 +391,22 @@ def lista_solicitacoes(request):
                 if not claimed:
                     solicitacao.refresh_from_db()
                     chave_atual = solicitacao.chave_innovaro or ''
-                    msg = ('Solicitação em processamento por outro usuário. Aguarde.'
-                           if chave_atual == 'PROCESSANDO'
-                           else f'Solicitação #{solicitacao.id} já foi processada no Innovaro (chave: {chave_atual}).')
+                    if chave_atual == 'PROCESSANDO':
+                        msg = 'Solicitação em processamento por outro usuário. Aguarde.'
+                    elif chave_atual == CHAVE_VERIFICAR:
+                        msg = MSG_VERIFICAR
+                    else:
+                        msg = f'Solicitação #{solicitacao.id} já foi processada no Innovaro (chave: {chave_atual}).'
                     return JsonResponse({'status': 'Erro', 'mensagem': msg}, status=409)
 
-                chave, erro = _chamar_innovaro_transferir(solicitacao)
-                if erro:
-                    solicitacao.rpa = erro
-                    solicitacao.chave_innovaro = None  # libera o claim
-                    solicitacao.save(update_fields=["rpa", "chave_innovaro"])
-                    return JsonResponse({'status': 'Erro', 'mensagem': erro}, status=502)
-            else:
-                chave = None
+                situacao, mensagem = _transferir_e_registrar(solicitacao, entregue_por, data_entrega)
+                if situacao != 'ok':
+                    return JsonResponse({'status': 'Erro', 'mensagem': mensagem}, status=502)
+
+                return JsonResponse({'status': 'Sucesso', 'tipo': tipo_solicitacao})
 
             solicitacao.entregue_por = entregue_por
             solicitacao.data_entrega = data_entrega
-            if chave:
-                solicitacao.chave_innovaro = str(chave)
             solicitacao.save()
 
             notificar_acao_almox("entregar", tipo_solicitacao, solicitacao.id)
@@ -415,6 +519,22 @@ def lista_solicitacoes(request):
         })
 
     else:
+        # Fila de verificacao manual fica fora da tabela normal (nao pode ser
+        # entregue/selecionada em lote ate alguem conferir no Innovaro)
+        verificacao_manual = [
+            {
+                "id": trans.id,
+                "funcionario": f"{trans.funcionario.matricula} - {trans.funcionario.nome}",
+                "item": f"{trans.item.codigo} - {trans.item.nome}",
+                "quantidade": trans.quantidade,
+                "deposito_destino": str(trans.deposito_destino) if trans.deposito_destino else "",
+                "data_solicitacao": trans.data_solicitacao.isoformat(),
+                "ocorrencia": trans.rpa or "",
+            }
+            for trans in transferencias.filter(chave_innovaro=CHAVE_VERIFICAR).order_by('id')
+        ]
+        transferencias = transferencias.exclude(chave_innovaro=CHAVE_VERIFICAR)
+
         if order_column == 0:
             transferencias = transferencias.order_by('id' if order_dir == 'asc' else '-id')
         total = transferencias.count()
@@ -443,6 +563,7 @@ def lista_solicitacoes(request):
         return JsonResponse({
             "operadores": list(operadores_entrega.values()),
             "transferencias": transferencias_data,
+            "verificacao_manual": verificacao_manual,
             "data_ultimo_saldo": data,
             "recordsTotal": total,
             "recordsFiltered": total,

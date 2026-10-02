@@ -38,6 +38,71 @@
     </tbody>
 </table>
 
+<!-- Fila de verificação manual: transferências sem resposta do Innovaro (read timeout) -->
+<div id="filaVerificacao" class="card border-warning mb-4 d-none">
+    <div class="card-header bg-warning-subtle d-flex align-items-center justify-content-between">
+        <strong><i class="fas fa-exclamation-triangle me-1"></i> Verificação manual no Innovaro (<span id="contadorVerificacao">0</span>)</strong>
+    </div>
+    <div class="card-body">
+        <p class="small mb-3">
+            O Innovaro não respondeu a tempo nestas transferências, mas elas <strong>podem já ter sido registradas</strong>.
+            Confira no Innovaro antes de agir: se a transferência já existe, clique em <strong>Já está no Innovaro</strong>;
+            se não existe, clique em <strong>Transferir de novo</strong>.
+        </p>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Funcionário</th>
+                        <th>Item</th>
+                        <th>Quantidade</th>
+                        <th>Depósito Destino</th>
+                        <th>Ocorrência</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="filaVerificacaoBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal da fila de verificação -->
+<div class="modal fade" id="verificacaoModal" tabindex="-1" aria-labelledby="verificacaoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="verificacaoModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formVerificacao">
+                    {% csrf_token %}
+                    <input type="hidden" name="solicitacao_id" id="verificacaoSolicitacaoId">
+                    <input type="hidden" id="verificacaoAcao">
+                    <div id="verificacaoAviso" class="alert mb-3"></div>
+                    <div class="mb-3">
+                        <label for="verificacaoOperador" class="form-label">Operador</label>
+                        <select class="form-select" name="matricula" id="verificacaoOperador" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="verificacaoDataEntrega" class="form-label">Data de Entrega</label>
+                        <input type="datetime-local" class="form-control" name="data_entrega" id="verificacaoDataEntrega" required>
+                    </div>
+                    <div class="mb-3" id="verificacaoChaveGrupo">
+                        <label for="verificacaoChave" class="form-label">Chave da transferência no Innovaro <small class="text-muted">(opcional)</small></label>
+                        <input type="text" class="form-control" name="chave_innovaro" id="verificacaoChave" placeholder="Ex.: 102498868">
+                    </div>
+                    <div class="text-end">
+                        <button type="submit" id="verificacaoSubmit" class="btn btn-sm"></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="d-flex align-items-center justify-content-between mb-2">
     <h3 class="mb-0">Transferências</h3>
     <button type="button" id="btnConfirmarLote" class="btn btn-success btn-sm d-none"
@@ -396,6 +461,8 @@
                     if (resp.mensagem) mensagem = resp.mensagem;
                 } catch(e) {}
                 alert(mensagem);
+                // sem resposta do Innovaro a transferencia vai pra fila de verificacao
+                tableTra.ajax.reload();
             },
             complete: function() {
                 buttonEntregaModal.textContent = 'Confirmar Entrega';
@@ -412,6 +479,105 @@
         document.getElementById('erroInnovaroTexto').textContent = button.dataset.erro;
         new bootstrap.Modal(document.getElementById('erroInnovaroModal')).show();
     }
+
+    // --- Fila de verificação manual (Innovaro sem resposta) ---
+    function escaparHtml(texto) {
+        const div = document.createElement('div');
+        div.textContent = texto == null ? '' : String(texto);
+        return div.innerHTML;
+    }
+
+    function renderizarFilaVerificacao(itens) {
+        const card = document.getElementById('filaVerificacao');
+        const body = document.getElementById('filaVerificacaoBody');
+        document.getElementById('contadorVerificacao').textContent = itens.length;
+        card.classList.toggle('d-none', itens.length === 0);
+        body.innerHTML = itens.map((t) => `
+            <tr>
+                <td>${t.id}</td>
+                <td>${escaparHtml(t.funcionario)}</td>
+                <td>${escaparHtml(t.item)}</td>
+                <td>${escaparHtml(t.quantidade)}</td>
+                <td>${escaparHtml(t.deposito_destino)}</td>
+                <td class="small">${escaparHtml(t.ocorrencia)}</td>
+                <td class="text-nowrap">
+                    <button type="button" class="badge rounded-pill btn btn-sm btn-success" onclick="abrirVerificacao(${t.id}, 'confirmar')">Já está no Innovaro</button>
+                    <button type="button" class="badge rounded-pill btn btn-sm btn-outline-danger" onclick="abrirVerificacao(${t.id}, 'reenviar')">Transferir de novo</button>
+                </td>
+            </tr>`).join('');
+    }
+
+    function abrirVerificacao(id, acao) {
+        const confirmar = acao === 'confirmar';
+        document.getElementById('verificacaoSolicitacaoId').value = id;
+        document.getElementById('verificacaoAcao').value = acao;
+        document.getElementById('verificacaoModalLabel').textContent =
+            confirmar ? `Transferência #${id} já está no Innovaro` : `Transferir de novo a #${id}`;
+
+        const aviso = document.getElementById('verificacaoAviso');
+        aviso.className = 'alert mb-3 ' + (confirmar ? 'alert-success' : 'alert-danger');
+        aviso.innerHTML = confirmar
+            ? 'A solicitação será marcada como <strong>entregue</strong> sem enviar nada ao Innovaro.'
+            : 'Só continue se você <strong>conferiu no Innovaro</strong> que esta transferência <strong>não</strong> foi registrada. Senão ela ficará duplicada.';
+
+        document.getElementById('verificacaoChaveGrupo').classList.toggle('d-none', !confirmar);
+        document.getElementById('verificacaoChave').value = '';
+
+        const submit = document.getElementById('verificacaoSubmit');
+        submit.textContent = confirmar ? 'Confirmar entrega' : 'Transferir de novo';
+        submit.className = 'btn btn-sm ' + (confirmar ? 'btn-success' : 'btn-danger');
+
+        const select = document.getElementById('verificacaoOperador');
+        select.innerHTML = '';
+        (operadores || []).forEach((op) => {
+            const option = document.createElement('option');
+            option.value = op.matricula;
+            option.textContent = `${op.matricula} - ${op.nome}`;
+            select.appendChild(option);
+        });
+
+        const agora = new Date();
+        agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset());
+        document.getElementById('verificacaoDataEntrega').value = agora.toISOString().slice(0, 16);
+
+        new bootstrap.Modal(document.getElementById('verificacaoModal')).show();
+    }
+
+    document.getElementById('formVerificacao').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const acao = document.getElementById('verificacaoAcao').value;
+        const submit = document.getElementById('verificacaoSubmit');
+        const textoOriginal = submit.textContent;
+        const formData = $(this).serialize() + (acao === 'confirmar' ? '&verificacao_confirmar=1' : '&verificacao_reenviar=1');
+
+        $.ajax({
+            url: `{% url "lista_solicitacoes" %}`,
+            type: 'POST',
+            data: formData,
+            beforeSend: function() {
+                submit.textContent = 'Carregando...';
+                submit.disabled = true;
+            },
+            success: function() {
+                bootstrap.Modal.getInstance(document.getElementById('verificacaoModal')).hide();
+            },
+            error: function(xhr) {
+                let mensagem = 'Erro ao processar a verificação.';
+                try {
+                    const resp = JSON.parse(xhr.responseText);
+                    if (resp.mensagem) mensagem = resp.mensagem;
+                } catch (e) {}
+                bootstrap.Modal.getInstance(document.getElementById('verificacaoModal')).hide();
+                alert(mensagem);
+            },
+            complete: function() {
+                submit.textContent = textoOriginal;
+                submit.disabled = false;
+                tableTra.ajax.reload();
+            }
+        });
+    });
+    // --- Fim fila de verificação ---
 
     // --- Lote de transferências ---
     let modoLote = false;
@@ -998,6 +1164,7 @@
                     // Aqui é onde você manipula os dados retornados para o DataTable
                     data_saldo = json.data_ultimo_saldo;
                     operadores = json.operadores;
+                    renderizarFilaVerificacao(json.verificacao_manual || []);
                     return json.transferencias;  // Retorna apenas a parte de "requisicoes" do JSON
                 }
             },
