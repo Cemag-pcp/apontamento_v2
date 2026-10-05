@@ -160,6 +160,7 @@
 {% block content %}
 
 <h2 class="fw-bold my-4">Inspeção Estamparia</h2>
+<div data-pct-inspecao='[{"titulo": "Estamparia", "api": "/inspecao/estamparia/api/indicador-estamparia-resumo-analise-temporal/", "prod": "Quantidade de pç produzidas", "insp": "Quantidade pç inspecionada"}]'></div>
 
 <ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
     <li class="nav-item" style="width: 33%;">
@@ -918,6 +919,7 @@
 <script src="{% static 'js/estamparia/inspecionar/enviar-inspecao.js' %}"></script>
 <script src="{% static 'js/estamparia/inspecionados/excluir-execucao.js' %}"></script>
 <script src="{% static 'js/geral/utils.js' %}"></script>
+<script src="{% static 'js/geral/percentual-inspecao.js' %}"></script>
 
 <script>
 

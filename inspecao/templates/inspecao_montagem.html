@@ -246,6 +246,7 @@
 {% block content %}
 
 <h2 class="my-4">Inspeção Montagem</h2>
+<div data-pct-inspecao='[{"titulo": "Montagem", "api": "/inspecao/montagem/api/indicador-montagem-resumo-analise-temporal/", "prod": "N° de peças produzidas", "insp": "N° de inspeções"}]'></div>
 
 <ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
     <li class="nav-item" style="width: 33%;">
@@ -526,6 +527,7 @@
 <script src="{% static 'js/montagem/inspecionados/modal-inspecionados.js' %}?v=ficha-modal-20260722"></script>
 <script src="{% static 'js/montagem/inspecionados/excluir-execucao.js' %}"></script>
 <script src="{% static 'js/geral/utils.js' %}"></script>
+<script src="{% static 'js/geral/percentual-inspecao.js' %}"></script>
 
 <script>
 

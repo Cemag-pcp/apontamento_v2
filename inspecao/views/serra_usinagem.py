@@ -1505,37 +1505,20 @@ def indicador_usinagem_resumo_analise_temporal(request):
         nc_qtd_por_mes[chave_mes] += row["quantidade"] or 0
     nc_count_dict = {k: len(v) for k, v in nc_inspecoes_por_mes.items()}
 
-    # 1) Extrai ordem_id de cada Inspecao filtrada, com o mês correspondente
-    ordem_mes_rows = (
-        queryset
-        .annotate(
-            ano=ExtractYear("data_inspecao"),
-            mes_num=ExtractMonth("data_inspecao"),
-        )
-        .values("ano", "mes_num", "pecas_ordem_usinagem__ordem_id")
-        .distinct()
-    )
-
-    # 2) Monta mapa: ordem_id -> lista de (ano, mes_num)
-    ordem_mes_map = defaultdict(list)
-    for row in ordem_mes_rows:
-        ordem_id = row["pecas_ordem_usinagem__ordem_id"]
-        if ordem_id:
-            ordem_mes_map[ordem_id].append((row["ano"], row["mes_num"]))
-
-    # 3) Busca qtd_boa em PecasOrdemUsinagem pelo ordem_id
-    pecas_qtd = (
-        PecasOrdemUsinagem.objects
-        .filter(ordem_id__in=ordem_mes_map.keys())
-        .values("ordem_id")
+    # Peças produzidas: soma qtd_boa só dos apontamentos feitos no período, pelo mês
+    # do próprio apontamento (antes somava a ordem inteira em todo mês que tivesse inspeção)
+    pecas_periodo = PecasOrdemUsinagem.objects.filter(qtd_boa__gt=0, data__isnull=False)
+    if data_inicio:
+        pecas_periodo = pecas_periodo.filter(data__gte=data_inicio)
+    if data_fim:
+        pecas_periodo = pecas_periodo.filter(data__lt=data_fim)
+    qtd_boa_dict = {
+        (row["ano"], row["mes_num"]): row["total_qtd_boa"] or 0
+        for row in pecas_periodo
+        .annotate(ano=ExtractYear("data"), mes_num=ExtractMonth("data"))
+        .values("ano", "mes_num")
         .annotate(total_qtd_boa=Sum("qtd_boa"))
-    )
-
-    # 4) Distribui por mês
-    qtd_boa_dict = defaultdict(int)
-    for row in pecas_qtd:
-        for mes_key in ordem_mes_map[row["ordem_id"]]:
-            qtd_boa_dict[mes_key] += row["total_qtd_boa"] or 0
+    }
 
     queryset = (
         queryset.annotate(

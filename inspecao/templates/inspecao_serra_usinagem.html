@@ -161,6 +161,7 @@
 {% block content %}
 
 <h2 class="fw-bold my-4">Inspeção Serra e Usinagem</h2>
+<div data-pct-inspecao='[{"titulo": "Serra", "api": "/inspecao/serra/api/indicador-serra-resumo-analise-temporal/", "prod": "N° de peças produzidas", "insp": "N° de inspeções"}, {"titulo": "Usinagem", "api": "/inspecao/usinagem/api/indicador-usinagem-resumo-analise-temporal/", "prod": "Quantidade de pç produzidas", "insp": "Quantidade pç inspecionada"}]'></div>
 
 <ul class="nav nav-tabs mt-3" style="background-color:  #f4f4f5">
     <li class="nav-item" style="width: 33%;">
@@ -720,6 +721,7 @@
 <script src="{% static 'js/serra-usinagem/inspecionados/modal-inspecionados.js' %}?v=ficha-modal-20260722"></script>
 <script src="{% static 'js/serra-usinagem/inspecionados/excluir-execucao.js' %}"></script>
 <script src="{% static 'js/geral/utils.js' %}"></script>
+<script src="{% static 'js/geral/percentual-inspecao.js' %}"></script>
 
 <script>
 
