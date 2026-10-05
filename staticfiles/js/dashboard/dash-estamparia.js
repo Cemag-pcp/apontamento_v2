@@ -33,10 +33,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const indiceGlobal = totalInsp > 0
             ? (totalNC / totalInsp * 100).toFixed(2).replace('.', ',')
             : '0,00';
+        const pctNC = totalInsp > 0
+            ? (totalNC / totalInsp * 100).toFixed(1).replace('.', ',')
+            : '0,0';
 
         document.getElementById('kpi-pecas-produzidas').textContent    = totalProd.toLocaleString('pt-BR');
         document.getElementById('kpi-pecas-inspecionadas').textContent = totalInsp.toLocaleString('pt-BR');
         document.getElementById('kpi-pct-inspecao').textContent        = pctInsp + '%';
+        document.getElementById('kpi-pct-nc').textContent              = pctNC + '%';
         document.getElementById('kpi-nao-conformidade').textContent    = totalNC.toLocaleString('pt-BR');
         document.getElementById('kpi-indice-global').textContent       = indiceGlobal + '%';
     }
@@ -79,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
             tabela.innerHTML = '';
 
             if (data.length === 0) {
-                tabela.innerHTML = `<tr><td colspan="9" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                tabela.innerHTML = `<tr><td colspan="10" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
                 atualizarKPIs(0, 0, 0);
                 return;
             }
@@ -90,13 +94,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (anoAtual !== null && ano !== anoAtual) {
                     tabela.insertAdjacentHTML('beforeend', `
                         <tr class="table-dark">
-                            <td colspan="9" class="text-center py-1" style="letter-spacing:2px;">
+                            <td colspan="10" class="text-center py-1" style="letter-spacing:2px;">
                                 <small>── fim de ${anoAtual} ──</small>
                             </td>
                         </tr>
                     `);
                 }
                 anoAtual = ano;
+                const inspPc = Number(item["Quantidade pç inspecionada"]) || 0;
+                const ncPc = Number(item["Quantidade pç não conforme"]) || 0;
+                const pctNC = inspPc > 0 ? ((ncPc / inspPc) * 100).toFixed(2).replace('.', ',') + '%' : '0,00%';
                 tabela.insertAdjacentHTML('beforeend', `
                     <tr>
                         <td>${formatDateBr(item.Data)}</td>
@@ -108,6 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${item["Quantidade pç inspecionada"]}</td>
                         <td>${item["Quantidade pç não conforme"]}</td>
                         <td>${item["% de inspeção por total de peça"]}</td>
+                        <td>${pctNC}</td>
                     </tr>
                 `);
             });

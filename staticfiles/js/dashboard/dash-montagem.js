@@ -138,6 +138,10 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('kpi-nao-conformidade').textContent =
             totalNC.toLocaleString('pt-BR');
 
+        const pctInsp = totalProd > 0 ? (totalInsp / totalProd) * 100 : 0;
+        document.getElementById('kpi-pct-inspecao').textContent =
+            pctInsp.toFixed(1).replace('.', ',') + '%';
+
         const pctNC = totalInsp > 0 ? (totalNC / totalInsp) * 100 : 0;
         document.getElementById('kpi-pct-nc').textContent =
             pctNC.toFixed(1).replace('.', ',') + '%';

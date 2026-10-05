@@ -33,10 +33,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const indiceGlobal = totalInsp > 0
             ? (totalNC / totalInsp * 100).toFixed(2).replace('.', ',')
             : '0,00';
+        const pctNC = totalInsp > 0
+            ? (totalNC / totalInsp * 100).toFixed(1).replace('.', ',')
+            : '0,0';
 
         document.getElementById('kpi-pecas-produzidas').textContent    = totalProd.toLocaleString('pt-BR');
         document.getElementById('kpi-pecas-inspecionadas').textContent = totalInsp.toLocaleString('pt-BR');
         document.getElementById('kpi-pct-inspecao').textContent        = pctInsp + '%';
+        document.getElementById('kpi-pct-nc').textContent              = pctNC + '%';
         document.getElementById('kpi-nao-conformidade').textContent    = totalNC.toLocaleString('pt-BR');
         document.getElementById('kpi-indice-global').textContent       = indiceGlobal + '%';
     }
@@ -47,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (startDate) queryParams.append('data_inicio', startDate);
         if (endDate)   queryParams.append('data_fim', endDate);
 
-        const url = `/inspecao/estamparia/api/indicador-estamparia-analise-temporal/?${queryParams.toString()}`;
+        const url = `/inspecao/serra/api/indicador-serra-analise-temporal/?${queryParams.toString()}`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error('Erro ao buscar os dados do gráfico.');
@@ -64,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function carregarTabelaProducao(startDate, endDate) {
-        let url = '/inspecao/estamparia/api/indicador-estamparia-resumo-analise-temporal/';
+        let url = '/inspecao/serra/api/indicador-serra-resumo-analise-temporal/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate)   params.push(`data_fim=${endDate}`);
@@ -79,24 +83,15 @@ document.addEventListener('DOMContentLoaded', function() {
             tabela.innerHTML = '';
 
             if (data.length === 0) {
-                tabela.innerHTML = `<tr><td colspan="9" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
+                tabela.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhum dado encontrado para o período selecionado.</td></tr>`;
                 atualizarKPIs(0, 0, 0);
                 return;
             }
 
-            let anoAtual = null;
             data.forEach(item => {
-                const ano = item.Data.split('-')[0];
-                if (anoAtual !== null && ano !== anoAtual) {
-                    tabela.insertAdjacentHTML('beforeend', `
-                        <tr class="table-dark">
-                            <td colspan="9" class="text-center py-1" style="letter-spacing:2px;">
-                                <small>── fim de ${anoAtual} ──</small>
-                            </td>
-                        </tr>
-                    `);
-                }
-                anoAtual = ano;
+                const insp = Number(item["N° de inspeções"]) || 0;
+                const nc = Number(item["N° de não conformidades"]) || 0;
+                const pctNC = insp > 0 ? ((nc / insp) * 100).toFixed(2).replace('.', ',') + '%' : '0,00%';
                 tabela.insertAdjacentHTML('beforeend', `
                     <tr>
                         <td>${formatDateBr(item.Data)}</td>
@@ -104,18 +99,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${item["N° de inspeções"]}</td>
                         <td>${item["N° de não conformidades"]}</td>
                         <td>${item["% de inspeção"]}</td>
-                        <td>${item["Quantidade de pç produzidas"]}</td>
-                        <td>${item["Quantidade pç inspecionada"]}</td>
-                        <td>${item["Quantidade pç não conforme"]}</td>
-                        <td>${item["% de inspeção por total de peça"]}</td>
+                        <td>${pctNC}</td>
                     </tr>
                 `);
             });
 
-            // KPIs usam os valores absolutos de peças
-            const totalProd = data.reduce((s, i) => s + (i["Quantidade de pç produzidas"] || 0), 0);
-            const totalInsp = data.reduce((s, i) => s + (i["Quantidade pç inspecionada"] || 0), 0);
-            const totalNC   = data.reduce((s, i) => s + (i["Quantidade pç não conforme"] || 0), 0);
+            const totalProd = data.reduce((s, i) => s + i["N° de peças produzidas"], 0);
+            const totalInsp = data.reduce((s, i) => s + i["N° de inspeções"], 0);
+            const totalNC   = data.reduce((s, i) => s + i["N° de não conformidades"], 0);
             atualizarKPIs(totalProd, totalInsp, totalNC);
 
         } catch (error) {
@@ -124,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function carregarGraficoCausas(startDate, endDate) {
-        let url = '/inspecao/estamparia/api/causas-nao-conformidade/';
+        let url = '/inspecao/serra/api/causas-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate)   params.push(`data_fim=${endDate}`);
@@ -151,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function carregarCarrosselImagens(startDate, endDate) {
-        let url = '/inspecao/estamparia/api/imagens-nao-conformidade/';
+        let url = '/inspecao/serra/api/imagens-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate)   params.push(`data_fim=${endDate}`);
@@ -193,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function carregarCarrosselFichas(startDate, endDate) {
-        let url = '/inspecao/estamparia/api/fichas-inspecao/';
+        let url = '/inspecao/serra/api/fichas-inspecao/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate)   params.push(`data_fim=${endDate}`);
@@ -219,17 +210,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             fichas.forEach((ficha, index) => {
                 const statusInspecao = ficha.inspecao_completa ? 'Completa' : 'Parcial';
-                const motivos = ficha.motivos_mortas.length > 0
-                    ? `Motivos: ${ficha.motivos_mortas.join(', ')}`
-                    : 'Sem motivos registrados';
-
                 carouselInner.insertAdjacentHTML('beforeend', `
                     <div class="carousel-item ${index === 0 ? 'active' : ''}">
                         <img src="${ficha.ficha_url}" class="d-block w-100" alt="Ficha de inspeção" style="max-height:500px;object-fit:contain;">
                         <div class="carousel-caption d-none d-md-block bg-dark bg-opacity-75 rounded">
                             <h5>Inspeção ${statusInspecao}</h5>
                             <p>Data: ${ficha.data_execucao}</p>
-                            <p>${motivos}</p>
                         </div>
                     </div>
                 `);
@@ -244,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function carregarTabelaCausas(startDate, endDate) {
-        let url = '/inspecao/estamparia/api/causas-nao-conformidade/';
+        let url = '/inspecao/serra/api/causas-nao-conformidade/';
         const params = [];
         if (startDate) params.push(`data_inicio=${startDate}`);
         if (endDate)   params.push(`data_fim=${endDate}`);
@@ -259,7 +245,7 @@ document.addEventListener('DOMContentLoaded', function() {
             tabela.innerHTML = '';
 
             if (data.length === 0) {
-                tabela.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td></tr>`;
+                tabela.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhuma causa encontrada para o período selecionado.</td></tr>`;
                 return;
             }
 
@@ -267,7 +253,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 tabela.insertAdjacentHTML('beforeend', `
                     <tr>
                         <td>${formatDateBr(item.Data)}</td>
-                        <td>${item["ID Ordem"]}</td>
                         <td>${item["Peça"]}</td>
                         <td>${item.Causa}</td>
                         <td>${item["Soma do N° Total de não conformidades"]}</td>
@@ -334,8 +319,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ── Carga inicial ─────────────────────────────────────────
-    carregarGraficoProducao(startDateTemporal.value, endDateTemporal.value); // gráfico → filtro temporal
-    carregarTabelaProducao(startDateInput.value, endDateInput.value);         // KPIs → filtro global
+    carregarGraficoProducao(startDateTemporal.value, endDateTemporal.value);
+    carregarTabelaProducao(startDateInput.value, endDateInput.value);
     carregarGraficoCausas(startDateInput.value, endDateInput.value);
     carregarCarrosselImagens(startDateInput.value, endDateInput.value);
     carregarCarrosselFichas(startDateInput.value, endDateInput.value);
