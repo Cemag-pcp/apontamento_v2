@@ -2108,8 +2108,12 @@ def get_ordens_criadas_duplicar_ordem(request):
         return JsonResponse({'draw': draw, 'recordsTotal': records_filtered, 'recordsFiltered': records_filtered, 'data': []})
 
     # Otimização da Serialização dos Dados (existente)
-    data = [
-        {
+    data = []
+    for ordem in ordens_page:
+        prop = _propriedade_ordem(ordem)
+        # aproveitamento pode vir nulo em ordem recem-criada
+        aproveitamento = round(prop.aproveitamento, 5) if prop and prop.aproveitamento is not None else None
+        data.append({
             'id': ordem.pk,
             'ordem': ordem.ordem,
             'grupo_maquina': ordem.get_grupo_maquina_display(),
@@ -2117,19 +2121,18 @@ def get_ordens_criadas_duplicar_ordem(request):
             'obs': ordem.obs,
             'status_atual': ordem.status_atual,
             'excluida': ordem.excluida,
-            'aproveitamento': round(_propriedade_ordem(ordem).aproveitamento, 5) if _propriedade_ordem(ordem) else None,
+            'aproveitamento': aproveitamento,
             'propriedade': {
-                'descricao_mp': _propriedade_ordem(ordem).descricao_mp if _propriedade_ordem(ordem) else None,
-                'quantidade': _propriedade_ordem(ordem).quantidade if _propriedade_ordem(ordem) else None,
-                'tipo_chapa': _propriedade_ordem(ordem).get_tipo_chapa_display() if _propriedade_ordem(ordem) else None,
-                'aproveitamento': round(_propriedade_ordem(ordem).aproveitamento, 5) if _propriedade_ordem(ordem) else None,
-                'retalho': 'Sim' if _propriedade_ordem(ordem) and _propriedade_ordem(ordem).retalho else None,
+                'descricao_mp': prop.descricao_mp if prop else None,
+                'quantidade': prop.quantidade if prop else None,
+                'tipo_chapa': prop.get_tipo_chapa_display() if prop else None,
+                'aproveitamento': aproveitamento,
+                'retalho': 'Sim' if prop and prop.retalho else None,
             }
-        } for ordem in ordens_page
-    ]
+        })
 
-    #  Ordena os dados com base no aproveitamento corrigido (existente)
-    data.sort(key=lambda x: x['aproveitamento'], reverse=True)
+    #  Ordena os dados com base no aproveitamento corrigido; sem aproveitamento vai pro fim
+    data.sort(key=lambda x: (x['aproveitamento'] is not None, x['aproveitamento'] or 0), reverse=True)
 
     return JsonResponse({
         'draw': draw,
