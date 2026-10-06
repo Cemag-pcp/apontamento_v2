@@ -14,6 +14,8 @@ interface RequestOptions {
   body?: unknown;
   formData?: FormData;
   timeoutMs?: number;
+  // prefixo da API (default: a da expedicao); o almox usa API_ALMOX_PREFIX
+  prefix?: string;
 }
 
 // Chamada generica pra API mobile: prefixa a URL, adiciona o token (se
@@ -23,7 +25,7 @@ interface RequestOptions {
 // conexao ruim (nao caida de vez, so lenta) trava esperando pra sempre
 // em vez de cair no fallback de erro de rede.
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', token, body, formData, timeoutMs = 20000 } = options;
+  const { method = 'GET', token, body, formData, timeoutMs = 20000, prefix = API_MOBILE_PREFIX } = options;
 
   const headers: Record<string, string> = {};
   if (token) headers['Authorization'] = `Token ${token}`;
@@ -34,7 +36,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${API_MOBILE_PREFIX}${path}`, {
+    res = await fetch(`${API_BASE_URL}${prefix}${path}`, {
       method,
       headers,
       body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),

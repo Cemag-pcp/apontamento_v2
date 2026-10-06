@@ -1,0 +1,87 @@
+{# Código de barras do item + impressão da etiqueta de prateleira na Zebra do almox. #}
+{# Uso: {% include 'home/_etiqueta_almox.html' with tipo='requisicao' %} #}
+<div class="modal fade" id="modalEtiquetaAlmox" tabindex="-1" aria-labelledby="modalEtiquetaAlmoxLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEtiquetaAlmoxLabel">Imprimir etiqueta de prateleira</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center border rounded p-3 mb-3">
+                    <div class="fw-bold fs-4" id="etiquetaCodigo"></div>
+                    <div class="text-muted small mb-2" id="etiquetaNome"></div>
+                    <svg id="etiquetaBarras"></svg>
+                </div>
+                <label for="etiquetaCopias" class="form-label">Quantidade de etiquetas</label>
+                <input type="number" class="form-control" id="etiquetaCopias" min="1" max="50" value="1">
+                <div class="form-text">Sai na impressora Zebra do almoxarifado.</div>
+                <div class="alert alert-danger mt-3 mb-0 d-none" id="etiquetaErro"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="etiquetaImprimir">Imprimir</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var TIPO = '{{ tipo }}';
+    var URL_IMPRIMIR = '{% url "imprimir_etiqueta_item_almox" %}';
+    var CSRF = '{{ csrf_token }}';
+
+    function desenhar(svg, codigo, opcoes) {
+        try {
+            JsBarcode(svg, codigo, Object.assign({ format: 'CODE128', displayValue: false, margin: 0 }, opcoes));
+        } catch (e) {
+            svg.replaceWith(Object.assign(document.createElement('span'), { className: 'text-danger small', textContent: 'código inválido' }));
+        }
+    }
+
+    document.querySelectorAll('svg[data-barras]').forEach(function (svg) {
+        desenhar(svg, svg.dataset.barras, { height: 28, width: 1.2 });
+    });
+
+    var modalEl = document.getElementById('modalEtiquetaAlmox');
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    var btnImprimir = document.getElementById('etiquetaImprimir');
+    var erroEl = document.getElementById('etiquetaErro');
+    var itemAtual = null;
+
+    document.querySelectorAll('[data-etiqueta-item]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            itemAtual = { id: btn.dataset.etiquetaItem, codigo: btn.dataset.codigo, nome: btn.dataset.nome };
+            document.getElementById('etiquetaCodigo').textContent = itemAtual.codigo;
+            document.getElementById('etiquetaNome').textContent = itemAtual.nome;
+            document.getElementById('etiquetaCopias').value = 1;
+            erroEl.classList.add('d-none');
+            desenhar(document.getElementById('etiquetaBarras'), itemAtual.codigo, { height: 70, width: 2 });
+            modal.show();
+        });
+    });
+
+    btnImprimir.addEventListener('click', function () {
+        if (!itemAtual) return;
+        var corpo = new FormData();
+        corpo.append('tipo', TIPO);
+        corpo.append('item_id', itemAtual.id);
+        corpo.append('copias', document.getElementById('etiquetaCopias').value);
+        btnImprimir.disabled = true;
+        erroEl.classList.add('d-none');
+        fetch(URL_IMPRIMIR, { method: 'POST', body: corpo, headers: { 'X-CSRFToken': CSRF } })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.d.erro || 'Erro ao imprimir.');
+                modal.hide();
+            })
+            .catch(function (e) {
+                erroEl.textContent = e.message;
+                erroEl.classList.remove('d-none');
+            })
+            .finally(function () { btnImprimir.disabled = false; });
+    });
+});
+</script>

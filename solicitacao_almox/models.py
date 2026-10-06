@@ -43,6 +43,8 @@ class SolicitacaoRequisicao(models.Model):
         blank=True,
     )
     data_entrega = models.DateTimeField(null=True, blank=True)
+    # quantidade conferida na entrega (app); None = entregue a quantidade solicitada
+    quantidade_entregue = models.FloatField(null=True, blank=True)
     rpa = models.TextField(null=True, blank=True)
     chave_innovaro = models.CharField(max_length=255, blank=True, null=True)
 
@@ -81,6 +83,8 @@ class SolicitacaoTransferencia(models.Model):
         blank=True,
     )
     data_entrega = models.DateTimeField(null=True, blank=True)
+    # quantidade conferida na entrega (app); None = entregue a quantidade solicitada
+    quantidade_entregue = models.FloatField(null=True, blank=True)
     rpa = models.TextField(null=True, blank=True)
     chave_innovaro = models.CharField(max_length=255, blank=True, null=True)
 

@@ -19,6 +19,7 @@ from cadastro_almox.models import (
 )
 from core.models import Profile
 from core_almox.models import RegistroAcaoSolicitacaoAlmox
+from core_almox.etiquetas import MAX_COPIAS, imprimir_etiqueta_prateleira
 from core.utils import notificar_acao_almox
 
 from datetime import datetime
@@ -89,13 +90,20 @@ def _registrar_acao_solicitacao(request, solicitacao, tipo_solicitacao, acao, mo
         usuario=request.user if request.user.is_authenticated else None,
     )
 
+def _quantidade_entrega(solicitacao):
+    """Quantidade que sai do almox: a conferida na entrega (app) ou, sem ela, a solicitada."""
+    if solicitacao.quantidade_entregue is not None:
+        return solicitacao.quantidade_entregue
+    return solicitacao.quantidade
+
+
 def _chamar_innovaro_transferir(solicitacao):
     """Retorna (chave_str | None, erro_str | None). Apenas para transferências."""
     payload = {
         "id": f"almox-transferencia-{solicitacao.id}",
         "pessoa": '4395',
         "recurso": solicitacao.item.codigo,
-        "quantidade": solicitacao.quantidade,
+        "quantidade": _quantidade_entrega(solicitacao),
         "depositoOrigem": "Almox central",
         "depositoDestino": solicitacao.deposito_destino.nome,
     }
@@ -138,7 +146,7 @@ def _chamar_innovaro_transferir_lote(solicitacoes):
             "id": f"almox-transferencia-{s.id}",
             "pessoa": '4395',
             "recurso": s.item.codigo,
-            "quantidade": s.quantidade,
+            "quantidade": _quantidade_entrega(s),
             "depositoOrigem": "Almox central",
             "depositoDestino": s.deposito_destino.nome,
         }
@@ -181,6 +189,48 @@ def _chamar_innovaro_transferir_lote(solicitacoes):
             results.append((s, item_resp.get("chaveTransferencia"), None))
 
     return results
+
+
+def entregar_solicitacao(solicitacao, tipo_solicitacao, entregue_por, data_entrega, quantidade_entregue=None):
+    """Marca a solicitação como entregue (transferência passa pelo Innovaro antes).
+
+    Retorna (status_http, mensagem_erro). Usada pela tela web e pelo app.
+    """
+    if quantidade_entregue is not None:
+        solicitacao.quantidade_entregue = quantidade_entregue
+
+    if tipo_solicitacao == "transferencia":
+        # Claim atômico: só avança se chave_innovaro ainda for nula
+        with transaction.atomic():
+            claimed = SolicitacaoTransferencia.objects.filter(
+                id=solicitacao.id, chave_innovaro__isnull=True
+            ).update(chave_innovaro='PROCESSANDO')
+
+        if not claimed:
+            solicitacao.refresh_from_db()
+            chave_atual = solicitacao.chave_innovaro or ''
+            msg = ('Solicitação em processamento por outro usuário. Aguarde.'
+                   if chave_atual == 'PROCESSANDO'
+                   else f'Solicitação #{solicitacao.id} já foi processada no Innovaro (chave: {chave_atual}).')
+            return 409, msg
+
+        chave, erro = _chamar_innovaro_transferir(solicitacao)
+        if erro:
+            solicitacao.rpa = erro
+            solicitacao.chave_innovaro = None  # libera o claim
+            solicitacao.save(update_fields=["rpa", "chave_innovaro"])
+            return 502, erro
+    else:
+        chave = None
+
+    solicitacao.entregue_por = entregue_por
+    solicitacao.data_entrega = data_entrega
+    if chave:
+        solicitacao.chave_innovaro = str(chave)
+    solicitacao.save()
+
+    notificar_acao_almox("entregar", tipo_solicitacao, solicitacao.id)
+    return 200, None
 
 
 @login_required
@@ -275,37 +325,9 @@ def lista_solicitacoes(request):
 
             entregue_por = get_object_or_404(OperadorAlmox, matricula=matricula)
 
-            if tipo_solicitacao == "transferencia":
-                # Claim atômico: só avança se chave_innovaro ainda for nula
-                with transaction.atomic():
-                    claimed = SolicitacaoTransferencia.objects.filter(
-                        id=solicitacao.id, chave_innovaro__isnull=True
-                    ).update(chave_innovaro='PROCESSANDO')
-
-                if not claimed:
-                    solicitacao.refresh_from_db()
-                    chave_atual = solicitacao.chave_innovaro or ''
-                    msg = ('Solicitação em processamento por outro usuário. Aguarde.'
-                           if chave_atual == 'PROCESSANDO'
-                           else f'Solicitação #{solicitacao.id} já foi processada no Innovaro (chave: {chave_atual}).')
-                    return JsonResponse({'status': 'Erro', 'mensagem': msg}, status=409)
-
-                chave, erro = _chamar_innovaro_transferir(solicitacao)
-                if erro:
-                    solicitacao.rpa = erro
-                    solicitacao.chave_innovaro = None  # libera o claim
-                    solicitacao.save(update_fields=["rpa", "chave_innovaro"])
-                    return JsonResponse({'status': 'Erro', 'mensagem': erro}, status=502)
-            else:
-                chave = None
-
-            solicitacao.entregue_por = entregue_por
-            solicitacao.data_entrega = data_entrega
-            if chave:
-                solicitacao.chave_innovaro = str(chave)
-            solicitacao.save()
-
-            notificar_acao_almox("entregar", tipo_solicitacao, solicitacao.id)
+            status_http, mensagem = entregar_solicitacao(solicitacao, tipo_solicitacao, entregue_por, data_entrega)
+            if status_http != 200:
+                return JsonResponse({'status': 'Erro', 'mensagem': mensagem}, status=status_http)
 
             return JsonResponse({
                 'status': 'Sucesso',
@@ -673,6 +695,30 @@ def gerenciar_funcionarios_almox(request):
         'total_inativos': len(funcionarios) - ativos,
     }
     return render(request, 'home/funcionarios_almox.html', context)
+
+
+@login_required
+def imprimir_etiqueta_item(request):
+    """Manda a etiqueta de prateleira (código de barras do item) pra Zebra do almox."""
+    if request.method != "POST":
+        return JsonResponse({"erro": "Método não permitido."}, status=405)
+    if not _usuario_pode_gerir_cadastro_almox(request):
+        return JsonResponse({"erro": "Sem permissão para imprimir etiquetas."}, status=403)
+
+    modelo = ItensSolicitacao if request.POST.get("tipo") == "requisicao" else ItensTransferencia
+    item = get_object_or_404(modelo, pk=request.POST.get("item_id"))
+    try:
+        copias = int(request.POST.get("copias") or 1)
+    except ValueError:
+        return JsonResponse({"erro": "Quantidade de cópias inválida."}, status=400)
+    if copias < 1 or copias > MAX_COPIAS:
+        return JsonResponse({"erro": f"Informe de 1 a {MAX_COPIAS} cópias."}, status=400)
+
+    try:
+        job_id = imprimir_etiqueta_prateleira(item, copias)
+    except Exception as exc:
+        return JsonResponse({"erro": f"Não foi possível enviar para a impressora: {exc}"}, status=502)
+    return JsonResponse({"status": "Sucesso", "job_id": job_id, "copias": copias})
 
 
 @login_required

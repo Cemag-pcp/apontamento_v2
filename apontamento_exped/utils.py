@@ -13,6 +13,11 @@ import re
 # à esquerda. Curto de propósito - quanto menor o conteúdo, mais largas as
 # barras e mais rápida a leitura pela câmera do celular.
 PREFIXO_CODIGO_PACOTE = 'PK'
+# Redis das filas de impressão Zebra (cada impressora tem um worker lendo a sua fila)
+ZEBRA_REDIS_URL = os.getenv(
+    "ZEBRA_REDIS_URL",
+    "redis://default:AWbmAbD4G2CfZPb3RxwuWQ4RfY7JOmxS@redis-19210.c262.us-east-1-3.ec2.redns.redis-cloud.com:19210",
+)
 _RE_CODIGO_PACOTE = re.compile(rf'^{PREFIXO_CODIGO_PACOTE}0*(\d+)$', re.IGNORECASE)
 
 

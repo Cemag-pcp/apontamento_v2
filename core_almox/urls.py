@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 from . import views
 
 urlpatterns = [
@@ -11,4 +11,6 @@ urlpatterns = [
     path('api/solicitacoes/', views.lista_solicitacoes, name='lista_solicitacoes'),
     path('api/atualizar-dados/', views.atualizar_dados, name='atualizar_dados'),
     path('api/processar_edicao/', views.processar_edicao, name='processar_edicao'),
+    path('api/mobile/', include('core_almox.urls_mobile')),
+    path('api/imprimir-etiqueta/', views.imprimir_etiqueta_item, name='imprimir_etiqueta_item_almox'),
 ]

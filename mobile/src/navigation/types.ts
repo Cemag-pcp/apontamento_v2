@@ -1,7 +1,11 @@
 import type { ItemForaPlanejadoInput } from '../api/types';
+import type { SolicitacaoAlmox } from '../api/almox';
 
 export type RootStackParamList = {
   Login: undefined;
+  Home: undefined;
+  AlmoxSolicitacoes: undefined;
+  AlmoxEntrega: { solicitacao: SolicitacaoAlmox };
   CargasList: undefined;
   Pacotes: { cargaId: number; cargaNome: string };
   PacoteDetail: {

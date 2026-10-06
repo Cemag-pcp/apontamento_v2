@@ -14,6 +14,9 @@ import CriarPacoteScreen from '../screens/CriarPacoteScreen';
 import ItemAvulsoScreen from '../screens/ItemAvulsoScreen';
 import FornecedoresScreen from '../screens/FornecedoresScreen';
 import BipagemScreen from '../screens/BipagemScreen';
+import HomeScreen from '../screens/HomeScreen';
+import AlmoxSolicitacoesScreen from '../screens/AlmoxSolicitacoesScreen';
+import AlmoxEntregaScreen from '../screens/AlmoxEntregaScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -37,13 +40,16 @@ export default function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator initialRouteName="CargasList">
+    <Stack.Navigator initialRouteName="Home">
+      <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'CEMAG' }} />
       <Stack.Screen name="CargasList" component={CargasListScreen} options={{ title: 'Cargas' }} />
       <Stack.Screen name="Pacotes" component={PacotesScreen} />
       <Stack.Screen name="PacoteDetail" component={PacoteDetailScreen} />
       <Stack.Screen name="Pendencias" component={PendenciasScreen} />
       <Stack.Screen name="CriarPacote" component={CriarPacoteScreen} />
       <Stack.Screen name="Bipagem" component={BipagemScreen} />
+      <Stack.Screen name="AlmoxSolicitacoes" component={AlmoxSolicitacoesScreen} options={{ title: 'Almoxarifado' }} />
+      <Stack.Screen name="AlmoxEntrega" component={AlmoxEntregaScreen} />
       <Stack.Screen
         name="Camera"
         component={CameraScreen}

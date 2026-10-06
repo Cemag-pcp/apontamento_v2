@@ -5,3 +5,4 @@ export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.3.18:8000';
 
 export const API_MOBILE_PREFIX = '/expedicao/api/mobile';
+export const API_ALMOX_PREFIX = '/almox/api/mobile';

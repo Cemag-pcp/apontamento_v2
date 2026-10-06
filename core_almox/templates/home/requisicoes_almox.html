@@ -58,6 +58,7 @@
                     <thead>
                         <tr>
                             <th>Código</th>
+                            <th>Código de barras</th>
                             <th>Nome</th>
                             <th>Unidade</th>
                             <th>Classes de requisição</th>
@@ -69,6 +70,7 @@
                         {% for item in itens %}
                             <tr>
                                 <td class="fw-semibold">{{ item.codigo }}</td>
+                                <td><svg data-barras="{{ item.codigo }}" aria-label="Código de barras {{ item.codigo }}"></svg></td>
                                 <td>{{ item.nome }}</td>
                                 <td>{{ item.unidade|default:"-" }}</td>
                                 <td>
@@ -86,6 +88,10 @@
                                     {% endif %}
                                 </td>
                                 <td class="text-end">
+                                    <div class="d-inline-flex gap-1 align-items-center">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-etiqueta-item="{{ item.id }}" data-codigo="{{ item.codigo }}" data-nome="{{ item.nome }}">
+                                        <i class="bi bi-upc"></i> Etiqueta
+                                    </button>
                                     <form method="post" onsubmit="return confirm('{% if item.ativo %}Desativar{% else %}Ativar{% endif %} o produto {{ item.codigo }} - {{ item.nome }}?');">
                                         {% csrf_token %}
                                         <input type="hidden" name="item_id" value="{{ item.id }}">
@@ -100,11 +106,12 @@
                                             {% endif %}
                                         </button>
                                     </form>
+                                    </div>
                                 </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
+                                <td colspan="7" class="text-center text-muted py-4">
                                     Nenhum produto encontrado.
                                 </td>
                             </tr>
@@ -228,4 +235,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endif %}
+{% include 'home/_etiqueta_almox.html' with tipo='requisicao' %}
 {% endblock %}
