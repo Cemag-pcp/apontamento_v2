@@ -40,7 +40,8 @@
         {
           "photosPermission": "O app acessa a galeria pra anexar uma foto já existente ao pacote."
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "extra": {
       "eas": {

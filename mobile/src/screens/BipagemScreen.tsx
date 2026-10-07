@@ -14,6 +14,7 @@ import { comCache } from '../offline/cache';
 import * as fila from '../offline/bipagemQueue';
 import { useRefetchOnReconnect } from '../utils/useRefetchOnReconnect';
 import type { BipagemCargaResponse, PacoteBipagem } from '../api/types';
+import { useSomBipagem } from '../utils/useSomBipagem';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Bipagem'>;
 
@@ -46,6 +47,7 @@ export default function BipagemScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
+  const { bipOk, bipErro } = useSomBipagem();
 
   const [dados, setDados] = useState<BipagemCargaResponse | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -99,6 +101,8 @@ export default function BipagemScreen({ route, navigation }: Props) {
 
   function darRetorno(r: Retorno) {
     setRetorno(r);
+    // duplicado tambem e aviso: som de erro chama atencao pra nao achar que entrou
+    if (r.tipo === 'ok') bipOk(); else bipErro();
     Vibration.vibrate(VIBRACAO[r.tipo]);
   }
 

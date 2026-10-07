@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import * as api from '../api/almox';
 import { ApiError } from '../api/client';
 import type { OperadorAlmox } from '../api/almox';
+import { useSomBipagem } from '../utils/useSomBipagem';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AlmoxEntrega'>;
 
@@ -36,6 +37,7 @@ export default function AlmoxEntregaScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
+  const { bipOk, bipErro } = useSomBipagem();
 
   const [codigoConferido, setCodigoConferido] = useState<string | null>(null);
   const [erroLeitura, setErroLeitura] = useState<string | null>(null);
@@ -85,9 +87,11 @@ export default function AlmoxEntregaScreen({ route, navigation }: Props) {
       setCodigoConferido(codigo);
       setErroLeitura(null);
       setLanterna(false);
+      bipOk();
       Vibration.vibrate(80);
     } else {
       setErroLeitura(`Item errado: ${codigo}`);
+      bipErro();
       Vibration.vibrate([0, 400, 120, 400]);
     }
   }
