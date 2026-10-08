@@ -85,7 +85,7 @@ function buscarItensReinspecao(pagina) {
     if (dataSelecionadaInicio) {
         params.append("data_inicio", dataSelecionadaInicio);
         itensFiltradosDataInicio.style.display = "block";
-        itensFiltradosDataInicio.textContent = "De: " + dataSelecionadaInicio;
+        itensFiltradosDataInicio.textContent = "Inspeção de: " + formatarDataBR(dataSelecionadaInicio);
     } else {
         itensFiltradosDataInicio.style.display = "none";
     }
@@ -93,10 +93,14 @@ function buscarItensReinspecao(pagina) {
     if (dataSelecionadaFim) {
         params.append("data_fim", dataSelecionadaFim);
         itensFiltradosDataFim.style.display = "block";
-        itensFiltradosDataFim.textContent = "Até: " + dataSelecionadaFim;
+        itensFiltradosDataFim.textContent = "Inspeção até: " + formatarDataBR(dataSelecionadaFim);
     } else {
         itensFiltradosDataFim.style.display = "none";
     }
+
+    // periodos: producao e carga (somam com o da inspecao)
+    aplicarFiltroPeriodo(params, { campo: 'producao-filtro-reinspecao', param: 'producao', rotulo: 'Produção', chip: 'itens-filtrados-reinspecao-producao' });
+    aplicarFiltroPeriodo(params, { campo: 'carga-filtro-reinspecao', param: 'carga', rotulo: 'Carga', chip: 'itens-filtrados-reinspecao-carga' });
 
     if (pesquisarInspecao) {
         params.append("pesquisar", pesquisarInspecao);
