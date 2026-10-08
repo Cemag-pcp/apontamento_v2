@@ -29,7 +29,7 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
         return;
     }
 
-    const cardsUnidades = document.querySelectorAll(".unidade-checklist-card");
+    const cardsUnidades = document.querySelectorAll("#unidades-checklist-montagem .unidade-checklist-card");
     const totalCausas = CAUSAS_MONTAGEM.length;
 
     if (cardsUnidades.length !== parseInt(qtdInspecionada, 10)) {
@@ -64,7 +64,7 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
     // request.POST.getlist(f"causas_{i}")), somando quantas unidades
     // falharam por aquela causa e juntando as imagens de todas elas.
     const causasAgregadas = new Map();
-    document.querySelectorAll(".unidade-checklist-card .causa-status-nok:checked").forEach((radio) => {
+    document.querySelectorAll("#unidades-checklist-montagem .unidade-checklist-card .causa-status-nok:checked").forEach((radio) => {
         const causaId = radio.getAttribute("data-causa-id");
         const item = radio.closest(".checklist-causa-item");
         const imagensInput = item.querySelector(".causa-imagens");

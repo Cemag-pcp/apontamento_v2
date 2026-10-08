@@ -103,9 +103,21 @@ document.addEventListener("change", (event) => {
     }
 });
 
+// Qtd. Inspecionada vai de 1 ate a quantidade produzida (apontada)
+function maximoQtdInspecaoMontagem() {
+    const produzida = parseInt(document.getElementById("qtd-produzida-montagem").value, 10);
+    return Math.max(Number.isFinite(produzida) ? produzida : 1, 1);
+}
+
+function limitarQtdInspecaoMontagem(valor) {
+    return Math.min(Math.max(parseInt(valor, 10) || 1, 1), maximoQtdInspecaoMontagem());
+}
+
 function atualizarContadoresConformidadeMontagem() {
     const totalCausas = CAUSAS_MONTAGEM.length;
-    const cards = document.querySelectorAll(".unidade-checklist-card");
+    // so as unidades deste modal: o de reinspecao (mesma pagina) tambem tem
+    // .unidade-checklist-card e entrava na conta
+    const cards = document.querySelectorAll("#unidades-checklist-montagem .unidade-checklist-card");
     let conformes = 0;
     let naoConformes = 0;
 
@@ -148,7 +160,11 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("data-finalizada-inspecao-montagem").value = data;
             document.getElementById("peca-inspecao-montagem").value = peca;
             document.getElementById("qtd-produzida-montagem").value = apontada;
-            document.getElementById("qtd-inspecao-montagem").value = 1;
+            const campoQtd = document.getElementById("qtd-inspecao-montagem");
+            const maximoQtd = maximoQtdInspecaoMontagem();
+            campoQtd.max = maximoQtd;
+            campoQtd.value = 1;
+            document.getElementById("qtd-inspecao-montagem-limite").textContent = `Máximo: ${maximoQtd} (produzida)`;
 
             renderizarUnidadesChecklistMontagem(1);
 
@@ -163,7 +179,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (this.value === "") {
             return;
         }
-        const quantidade = Math.max(parseInt(this.value, 10) || 1, 1);
+        // acima da produzida volta na hora pro maximo
+        const quantidade = limitarQtdInspecaoMontagem(this.value);
         if (parseInt(this.value, 10) !== quantidade) {
             this.value = quantidade;
         }
@@ -171,7 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("qtd-inspecao-montagem").addEventListener("blur", function() {
-        const quantidade = Math.max(parseInt(this.value, 10) || 1, 1);
+        const quantidade = limitarQtdInspecaoMontagem(this.value);
         if (this.value === "" || parseInt(this.value, 10) !== quantidade) {
             this.value = quantidade;
             renderizarUnidadesChecklistMontagem(quantidade);
