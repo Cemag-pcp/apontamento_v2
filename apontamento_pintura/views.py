@@ -2626,6 +2626,16 @@ def api_historico_pintura(request):
         except ValueError:
             pass
 
+    # Intervalo da data de carga da ordem
+    for parametro, lookup in (("carga_inicio", "gte"), ("carga_fim", "lte")):
+        valor = request.GET.get(parametro, "").strip()
+        if valor:
+            try:
+                data_carga = datetime.strptime(valor, "%Y-%m-%d").date()
+                qs = qs.filter(**{f"peca_ordem__ordem__data_carga__{lookup}": data_carga})
+            except ValueError:
+                pass
+
     if tipo:
         qs = qs.filter(peca_ordem__tipo=tipo)
 
