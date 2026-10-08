@@ -331,6 +331,23 @@ def alerta_itens_pintura(request):
     return JsonResponse(data)
 
 
+def _filtrar_producao_e_carga(queryset, params):
+    """Filtros de período das abas de inspeção da pintura: data de produção
+    (apontamento da peça na pintura) e data de carga da ordem. Cada um tem o
+    seu intervalo e todos podem ser usados ao mesmo tempo (somam)."""
+    campos = (
+        ("producao_inicio", "pecas_ordem_pintura__data__date__gte"),
+        ("producao_fim", "pecas_ordem_pintura__data__date__lte"),
+        ("carga_inicio", "pecas_ordem_pintura__ordem__data_carga__gte"),
+        ("carga_fim", "pecas_ordem_pintura__ordem__data_carga__lte"),
+    )
+    for parametro, lookup in campos:
+        valor = (params.get(parametro) or "").strip()
+        if valor:
+            queryset = queryset.filter(**{lookup: valor})
+    return queryset
+
+
 def get_itens_inspecao_pintura(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
@@ -368,6 +385,8 @@ def get_itens_inspecao_pintura(request):
 
     if tipos_tinta_filtradas:
         datas = datas.filter(pecas_ordem_pintura__tipo__in=tipos_tinta_filtradas)
+
+    datas = _filtrar_producao_e_carga(datas, request.GET)
 
     if not data_fim:
         data_fim = data_inicio
@@ -491,7 +510,7 @@ def get_itens_reinspecao_pintura(request):
     data_inicio = params.get("data_inicio")
     data_fim = params.get("data_fim")
 
-    print(data_inicio)
+    queryset = _filtrar_producao_e_carga(queryset, request.GET)
 
     if data_inicio and not data_fim:
         data_fim = data_inicio
@@ -653,6 +672,8 @@ def get_itens_inspecionados_pintura(request):
     datas = datas.annotate(
         ultima_data_execucao=Max("dadosexecucaoinspecao__data_execucao")
     )
+
+    datas = _filtrar_producao_e_carga(datas, request.GET)
 
     if data_inicio and data_fim:
         datas = datas.filter(

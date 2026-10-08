@@ -1137,6 +1137,29 @@
         </script>
 
         {% if request.user.is_authenticated %}
+        <script>
+        // Painel lateral (offcanvas) aberto: o balao do assistente cobria os botoes dele.
+        // Painel pela direita -> o balao desliza pra esquerda junto com o painel;
+        // painel de outro lado (ex: menu no celular) -> o balao some ate fechar.
+        document.addEventListener('show.bs.offcanvas', (e) => {
+            const painel = e.target;
+            if (painel.classList.contains('offcanvas-end')) {
+                const largura = painel.getBoundingClientRect().width || 400;
+                document.body.style.setProperty('--offcanvas-largura', `${largura}px`);
+                document.body.classList.add('offcanvas-direita-aberto');
+            } else {
+                document.body.classList.add('offcanvas-aberto');
+            }
+        });
+        document.addEventListener('hide.bs.offcanvas', (e) => {
+            if (e.target.classList.contains('offcanvas-end')) document.body.classList.remove('offcanvas-direita-aberto');
+        });
+        document.addEventListener('hidden.bs.offcanvas', () => {
+            if (!document.querySelector('.offcanvas.show')) {
+                document.body.classList.remove('offcanvas-aberto', 'offcanvas-direita-aberto');
+            }
+        });
+        </script>
         <style>
             #chatAssistenteBubble {
                 position: fixed; right: 24px; bottom: 24px; z-index: 1050;
@@ -1145,6 +1168,16 @@
                 box-shadow: 0 4px 14px rgba(0,0,0,0.25);
                 display: flex; align-items: center; justify-content: center;
                 font-size: 24px; cursor: pointer;
+            }
+            /* painel lateral (offcanvas) aberto: o balao ficava por cima dos botoes dele */
+            #chatAssistenteBubble, #chatAssistentePanel { transition: right .3s ease-in-out; }
+            body.offcanvas-direita-aberto #chatAssistenteBubble,
+            body.offcanvas-direita-aberto #chatAssistentePanel { right: calc(var(--offcanvas-largura, 400px) + 24px); }
+            body.offcanvas-aberto #chatAssistenteBubble { display: none; }
+            @media (max-width: 576px) {
+                /* tela estreita: o painel ocupa quase tudo, nao ha espaco pro balao ao lado */
+                body.offcanvas-direita-aberto #chatAssistenteBubble,
+                body.offcanvas-direita-aberto #chatAssistentePanel { display: none; }
             }
             #chatAssistenteBubble.tem-resposta {
                 animation: chatAssistentePulso 1.1s ease-in-out infinite;

@@ -21,6 +21,13 @@
             z-index: 2000 !important;
         }
 
+        /* painel de filtros que entra pela direita */
+        .painel-filtro-pintura { width: 340px; }
+        .filtro-periodo { background: #f8f9fa; border-radius: 8px; padding: 6px 8px; }
+        .filtro-periodo-titulo { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 2px; }
+        .filtro-periodo .form-label { font-size: 0.7rem; color: #777; }
+        .filtro-periodo .form-control-sm { font-size: 0.78rem; padding: 2px 6px; }
+
         .ficha-doc {
             background: #fff;
             font-size: .875rem;
@@ -219,14 +226,16 @@
     <div class="d-flex justify-content-between mt-3">
         <h4 style="width: 60%;">Inspeções pendentes</h4>
         <div>
-            <div class="btn-group">
-                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-                <form id="form-filtrar-inspecao">
-                    <div class="dropdown-menu p-3" style="width: 250px;">
-                        <p class="fw-bold mx-2 my-1">Filtrar inspeções</p>
-                        <hr>
+            <button class="btn btn-white" type="button" id="dropdownMenuButton" data-bs-toggle="offcanvas" data-bs-target="#painel-filtro-inspecao" aria-controls="painel-filtro-inspecao">
+                <i class="bi bi-funnel"></i> Filtrar
+            </button>
+            <div class="offcanvas offcanvas-end painel-filtro-pintura" tabindex="-1" id="painel-filtro-inspecao" aria-labelledby="painel-filtro-inspecao-titulo">
+                <div class="offcanvas-header border-bottom">
+                    <h5 class="offcanvas-title" id="painel-filtro-inspecao-titulo"><i class="bi bi-funnel"></i> Filtrar inspeções pendentes</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <form id="form-filtrar-inspecao">
                         <input type="text" class="form-control mb-3" id="pesquisar-peca-inspecao" placeholder="Pesquisar as peças...">
                         
                         <h6>Cor</h6>
@@ -255,28 +264,40 @@
                 
                         <!-- <h6 class="mt-3">Date</h6>
                         <input type="date" class="form-control" id="data-filtro-inspecao"> -->
-                        <h6 class="mt-3">Período</h6>
-
-                        <div class="mb-2">
-                            <label for="data-filtro-inspecao-inicio" class="form-label small text-muted">
-                                Data inicial
-                            </label>
-                            <input type="date" class="form-control" id="data-filtro-inspecao-inicio">
+                        <h6 class="mt-3 mb-2">Período</h6>
+                        <div class="filtro-periodo mb-2">
+                            <div class="filtro-periodo-titulo">Produção</div>
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <label for="producao-filtro-inspecao-inicio" class="form-label mb-0">De</label>
+                                    <input type="date" class="form-control form-control-sm" id="producao-filtro-inspecao-inicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="producao-filtro-inspecao-fim" class="form-label mb-0">Até</label>
+                                    <input type="date" class="form-control form-control-sm" id="producao-filtro-inspecao-fim">
+                                </div>
+                            </div>
                         </div>
-
-                        <div>
-                            <label for="data-filtro-inspecao-fim" class="form-label small text-muted">
-                                Data final
-                            </label>
-                            <input type="date" class="form-control" id="data-filtro-inspecao-fim">
+                        <div class="filtro-periodo mb-2">
+                            <div class="filtro-periodo-titulo">Carga</div>
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <label for="carga-filtro-inspecao-inicio" class="form-label mb-0">De</label>
+                                    <input type="date" class="form-control form-control-sm" id="carga-filtro-inspecao-inicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="carga-filtro-inspecao-fim" class="form-label mb-0">Até</label>
+                                    <input type="date" class="form-control form-control-sm" id="carga-filtro-inspecao-fim">
+                                </div>
+                            </div>
                         </div>
 
                         <div class="d-flex justify-content-between mt-3">
                             <button id="btn-limpar-inspecao"  class="btn btn-outline-secondary">Limpar</button>
                             <button id="btn-filtrar-inspecao" class="btn btn-dark">Filtrar</button>
                         </div>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -287,7 +308,8 @@
     <div class="d-flex justify-content-end flex-wrap gap-2 my-2">
         <span id="itens-filtrados-inspecao-cor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Cor: </span>
         <span id="itens-filtrados-inspecao-tipos" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Tipo de Tinta: </span>
-        <span id="itens-filtrados-inspecao-data" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="itens-filtrados-inspecao-producao" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+        <span id="itens-filtrados-inspecao-carga" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;"></span>
         <span id="itens-filtrados-inspecao-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
     </div>
     <!-- Cards -->
@@ -302,14 +324,16 @@
     <div class="d-flex justify-content-between mt-3">
         <h4 style="width: 60%;">Requerem reinspeção</h4>
         <div>
-            <div class="btn-group">
-                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton2" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-                <form id="form-filtrar-reinspecao" action="">
-                    <div class="dropdown-menu p-3" style="width: 250px;">
-                        <p class="fw-bold mx-2 my-1">Filtros</p>
-                        <hr>
+            <button class="btn btn-white" type="button" id="dropdownMenuButton2" data-bs-toggle="offcanvas" data-bs-target="#painel-filtro-reinspecao" aria-controls="painel-filtro-reinspecao">
+                <i class="bi bi-funnel"></i> Filtrar
+            </button>
+            <div class="offcanvas offcanvas-end painel-filtro-pintura" tabindex="-1" id="painel-filtro-reinspecao" aria-labelledby="painel-filtro-reinspecao-titulo">
+                <div class="offcanvas-header border-bottom">
+                    <h5 class="offcanvas-title" id="painel-filtro-reinspecao-titulo"><i class="bi bi-funnel"></i> Filtrar reinspeções</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <form id="form-filtrar-reinspecao">
                         <input id="pesquisar-peca-reinspecao" type="text" class="form-control mb-3" placeholder="Pesquisar...">
                         
                         <h6>Cor</h6>
@@ -338,28 +362,53 @@
                 
                         <!-- <h6 class="mt-3">Date</h6>
                         <input id="data-filtro-reinspecao" type="date" class="form-control"> -->
-                        <h6 class="mt-3">Período</h6>
-
-                        <div class="mb-2">
-                            <label for="data-filtro-reinspecao-inicio" class="form-label small text-muted">
-                                Data inicial
-                            </label>
-                            <input type="date" class="form-control" id="data-filtro-reinspecao-inicio">
+                        <h6 class="mt-3 mb-2">Período</h6>
+                        <div class="filtro-periodo mb-2">
+                            <div class="filtro-periodo-titulo">Inspeção</div>
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <label for="data-filtro-reinspecao-inicio" class="form-label mb-0">De</label>
+                                    <input type="date" class="form-control form-control-sm" id="data-filtro-reinspecao-inicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="data-filtro-reinspecao-fim" class="form-label mb-0">Até</label>
+                                    <input type="date" class="form-control form-control-sm" id="data-filtro-reinspecao-fim">
+                                </div>
+                            </div>
                         </div>
-
-                        <div>
-                            <label for="data-filtro-reinspecao-fim" class="form-label small text-muted">
-                                Data final
-                            </label>
-                            <input type="date" class="form-control" id="data-filtro-reinspecao-fim">
+                        <div class="filtro-periodo mb-2">
+                            <div class="filtro-periodo-titulo">Produção</div>
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <label for="producao-filtro-reinspecao-inicio" class="form-label mb-0">De</label>
+                                    <input type="date" class="form-control form-control-sm" id="producao-filtro-reinspecao-inicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="producao-filtro-reinspecao-fim" class="form-label mb-0">Até</label>
+                                    <input type="date" class="form-control form-control-sm" id="producao-filtro-reinspecao-fim">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="filtro-periodo mb-2">
+                            <div class="filtro-periodo-titulo">Carga</div>
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <label for="carga-filtro-reinspecao-inicio" class="form-label mb-0">De</label>
+                                    <input type="date" class="form-control form-control-sm" id="carga-filtro-reinspecao-inicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="carga-filtro-reinspecao-fim" class="form-label mb-0">Até</label>
+                                    <input type="date" class="form-control form-control-sm" id="carga-filtro-reinspecao-fim">
+                                </div>
+                            </div>
                         </div>
 
                         <div class="d-flex justify-content-between mt-3">
                             <button id="btn-limpar-reinspecao" class="btn btn-outline-secondary">Limpar</button>
                             <button id="btn-filtrar-reinspecao" class="btn btn-dark">Filtrar</button>
                         </div>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -373,6 +422,8 @@
         <span id="itens-filtrados-reinspecao-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
         <span id="itens-filtrados-reinspecao-data-inicio" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
         <span id="itens-filtrados-reinspecao-data-fim" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="itens-filtrados-reinspecao-producao" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+        <span id="itens-filtrados-reinspecao-carga" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;"></span>
         <span id="itens-filtrados-reinspecao-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
     </div>
     <!-- Cards -->
@@ -389,14 +440,16 @@
         <div class="d-flex gap-2">
             <!-- <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar</button> -->
             <div>
-                <div class="btn-group">
-                    <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                        <i class="bi bi-funnel"></i> Filtrar
-                    </button>
-                    <form id="form-filtrar-inspecionados" action="">
-                        <div class="dropdown-menu p-3" style="width: 250px;">
-                            <p class="fw-bold mx-2 my-1">Filtros</p>
-                            <hr>
+                <button class="btn btn-white" type="button" id="dropdownMenuButton3" data-bs-toggle="offcanvas" data-bs-target="#painel-filtro-inspecionados" aria-controls="painel-filtro-inspecionados">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <div class="offcanvas offcanvas-end painel-filtro-pintura" tabindex="-1" id="painel-filtro-inspecionados" aria-labelledby="painel-filtro-inspecionados-titulo">
+                    <div class="offcanvas-header border-bottom">
+                        <h5 class="offcanvas-title" id="painel-filtro-inspecionados-titulo"><i class="bi bi-funnel"></i> Filtrar inspeções realizadas</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                    </div>
+                    <div class="offcanvas-body">
+                        <form id="form-filtrar-inspecionados">
                             <input id="pesquisar-peca-inspecionados" type="text" class="form-control mb-3" placeholder="Search inspections...">
 
                             <h6>Filtrar por</h6>
@@ -437,28 +490,53 @@
                                 
                             <!-- <h6 class="mt-3">Date</h6>
                             <input id="data-filtro-inspecionados" type="date" class="form-control"> -->
-                            <h6 class="mt-3">Período</h6>
-
-                            <div class="mb-2">
-                                <label for="data-filtro-inspecionados-inicio" class="form-label small text-muted">
-                                    Data inicial
-                                </label>
-                                <input type="date" class="form-control" id="data-filtro-inspecionados-inicio">
+                            <h6 class="mt-3 mb-2">Período</h6>
+                        <div class="filtro-periodo mb-2">
+                            <div class="filtro-periodo-titulo">Inspeção</div>
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <label for="data-filtro-inspecionados-inicio" class="form-label mb-0">De</label>
+                                    <input type="date" class="form-control form-control-sm" id="data-filtro-inspecionados-inicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="data-filtro-inspecionados-fim" class="form-label mb-0">Até</label>
+                                    <input type="date" class="form-control form-control-sm" id="data-filtro-inspecionados-fim">
+                                </div>
                             </div>
-
-                            <div>
-                                <label for="data-filtro-inspecionados-fim" class="form-label small text-muted">
-                                    Data final
-                                </label>
-                                <input type="date" class="form-control" id="data-filtro-inspecionados-fim">
+                        </div>
+                        <div class="filtro-periodo mb-2">
+                            <div class="filtro-periodo-titulo">Produção</div>
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <label for="producao-filtro-inspecionados-inicio" class="form-label mb-0">De</label>
+                                    <input type="date" class="form-control form-control-sm" id="producao-filtro-inspecionados-inicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="producao-filtro-inspecionados-fim" class="form-label mb-0">Até</label>
+                                    <input type="date" class="form-control form-control-sm" id="producao-filtro-inspecionados-fim">
+                                </div>
                             </div>
+                        </div>
+                        <div class="filtro-periodo mb-2">
+                            <div class="filtro-periodo-titulo">Carga</div>
+                            <div class="row g-1">
+                                <div class="col-6">
+                                    <label for="carga-filtro-inspecionados-inicio" class="form-label mb-0">De</label>
+                                    <input type="date" class="form-control form-control-sm" id="carga-filtro-inspecionados-inicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="carga-filtro-inspecionados-fim" class="form-label mb-0">Até</label>
+                                    <input type="date" class="form-control form-control-sm" id="carga-filtro-inspecionados-fim">
+                                </div>
+                            </div>
+                        </div>
 
                             <div class="d-flex justify-content-between mt-3">
                                 <button id="btn-limpar-inspecionados" class="btn btn-outline-secondary">Limpar</button>
                                 <button id="btn-filtrar-inspecionados" class="btn btn-dark">Filtrar</button>
                             </div>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -476,6 +554,8 @@
         <span id="itens-filtrados-inspecionados-inspetor" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Inspetor: </span>
         <span id="itens-filtrados-inspecionados-data-inicio" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
         <span id="itens-filtrados-inspecionados-data-fim" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Data: </span>
+        <span id="itens-filtrados-inspecionados-producao" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;"></span>
+        <span id="itens-filtrados-inspecionados-carga" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;"></span>
         <span id="itens-filtrados-inspecionados-pesquisa" class="rounded-pill py-1 px-2" style="background-color: #ebebeb; color: #3d3d3d; font-weight: 600; font-size: 0.75rem; display: none;">Pesquisa: </span>
     </div>
     <!-- Cards -->
@@ -490,6 +570,30 @@
 
 {% block scripts %}
 
+<script>
+// Filtros de periodo das abas (producao, carga, inspecao): cada um com seu
+// intervalo, todos podem ser usados juntos. Le os campos <prefixo>-inicio/-fim,
+// poe os parametros <param>_inicio/_fim na busca e atualiza o chip.
+function formatarDataBR(iso) {
+    const [a, m, d] = String(iso).split('-');
+    return d && m && a ? `${d}/${m}/${a}` : iso;
+}
+function aplicarFiltroPeriodo(params, { campo, param, rotulo, chip }) {
+    const inicio = document.getElementById(`${campo}-inicio`)?.value || '';
+    const fim = document.getElementById(`${campo}-fim`)?.value || '';
+    if (inicio) params.append(`${param}_inicio`, inicio);
+    if (fim) params.append(`${param}_fim`, fim);
+    const elChip = document.getElementById(chip);
+    if (!elChip) return;
+    if (inicio || fim) {
+        elChip.textContent = `${rotulo}: ` + (inicio ? `de ${formatarDataBR(inicio)}` : '')
+            + (inicio && fim ? ' ' : '') + (fim ? `até ${formatarDataBR(fim)}` : '');
+        elChip.style.display = 'block';
+    } else {
+        elChip.style.display = 'none';
+    }
+}
+</script>
 <script src="{% static 'js/pintura/a-inspecionar-pintura.js' %}"></script>
 <script src="{% static 'js/pintura/inspecionados-pintura.js' %}"></script>
 <script src="{% static 'js/pintura/reinspecao-pintura.js' %}"></script>
@@ -522,4 +626,19 @@
 
 </script>
 
+
+<script>
+// Painel de filtros: fecha ao aplicar ou limpar
+document.addEventListener('DOMContentLoaded', () => {
+    ['inspecao', 'reinspecao', 'inspecionados'].forEach((aba) => {
+        const painel = document.getElementById(`painel-filtro-${aba}`);
+        if (!painel) return;
+        [`btn-filtrar-${aba}`, `btn-limpar-${aba}`].forEach((id) => {
+            document.getElementById(id)?.addEventListener('click', () => {
+                bootstrap.Offcanvas.getOrCreateInstance(painel).hide();
+            });
+        });
+    });
+});
+</script>
 {% endblock %}
