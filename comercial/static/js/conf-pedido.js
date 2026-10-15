@@ -701,28 +701,11 @@ async function marcarPedidoComoConferido() {
 let currentPloomesRows = [];
 
 
-function renderMarkdown(text) {
-    if (!text) return '';
-    let html = escapeHtml(text.trim());
-    html = html.replace(/^## (.+)$/gm, '<h6 class="fw-bold mt-2 mb-1">$1</h6>');
-    html = html.replace(/^### (.+)$/gm, '<strong class="d-block mt-2 mb-1">$1</strong>');
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/`([^`\n]+)`/g, '<code class="px-1 rounded" style="background:#e9ecef;font-size:.85em">$1</code>');
-    html = html.replace(/^[\-\*] (.+)$/gm, '<li class="mb-1">$1</li>');
-    html = html.replace(/(<li[\s\S]*?<\/li>\n?)+/g, (m) => `<ul class="mb-1 ps-3">${m}</ul>`);
-    html = html.replace(/\n{2,}/g, '</p><p class="mb-1">');
-    html = html.replace(/\n/g, '<br>');
-    return `<p class="mb-1">${html}</p>`;
-}
-
 function renderAgenteResultado(data) {
     const resultado = document.getElementById('confPedidoAgenteResultado');
 
-    // fallback: raw text (parse error or old format)
     if (!data || !Array.isArray(data.itens)) {
-        const raw = typeof data === 'string' ? data : (data?.analise ?? JSON.stringify(data));
-        const texto = typeof raw === 'string' ? raw : JSON.stringify(raw);
-        resultado.innerHTML = renderMarkdown(texto);
+        resultado.innerHTML = '<div class="small text-danger">A IA retornou uma resposta em formato inesperado. Tente analisar novamente.</div>';
         return;
     }
 
@@ -731,12 +714,12 @@ function renderAgenteResultado(data) {
     const statusClass = statusConsistente ? 'text-success' : 'text-warning';
 
     const rows = data.itens.map((item) => {
-        // divergencia = ERP está errado; crm_divergencia = CRM está errado (independente)
+        // divergencia = ERP não condiz com CRM + observação; crm_divergencia = código do CRM incompleto (informativo)
         const erpErrado = !!item.divergencia;
         const crmErrado = !!item.crm_divergencia;
-        const rowClass = erpErrado ? 'table-danger' : (crmErrado ? 'table-warning' : '');
+        const rowClass = erpErrado ? 'table-danger' : '';
         const iaClass = erpErrado ? 'fw-bold text-danger' : 'fw-bold text-success';
-        const crmBadge = crmErrado ? ' <span class="badge bg-warning text-dark ms-1" title="CRM precisa ser atualizado">CRM ⚠</span>' : '';
+        const crmBadge = crmErrado ? ' <span class="badge bg-warning text-dark ms-1" title="Código do CRM incompleto — a observação complementa">obs. complementa</span>' : '';
         const motivo = item.motivo && item.motivo !== '—' ? escapeHtml(item.motivo) : '';
         return `
             <tr class="${rowClass}">
@@ -754,8 +737,8 @@ function renderAgenteResultado(data) {
                     <tr>
                         <th>ERP</th>
                         <th>CRM</th>
-                        <th>Código sugerido</th>
-                        <th>O que a IA detectou</th>
+                        <th>Esperado (CRM + obs.)</th>
+                        <th>Análise</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
