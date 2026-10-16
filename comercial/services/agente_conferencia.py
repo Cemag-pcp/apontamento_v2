@@ -358,33 +358,40 @@ def _fmt_qtd(q: float) -> str:
 
 
 
-_ROTULOS_ATRIBUTOS = (
-    ('modelo', 'modelo'),
-    ('descGenerica', 'tipo'),
-    ('molaFreio', 'mola/freio'),
-    ('rodado', 'rodado'),
-    ('eixo', 'eixo'),
-    ('tamanho', 'tamanho'),
-    ('pneu', 'pneu'),
-    ('funcionalidade', 'opcionais'),
-    ('cor', 'cor'),
-)
+def _descrever_atributos(produto: dict) -> dict[str, str]:
+    """Atributos do produto em linguagem de chão de fábrica, para comparar ERP × esperado."""
+    mola_freio = produto.get('molaFreio') or ''
+    pneu = produto.get('pneu') or ''
+    funcs = _funcionalidades(produto)
+    desc = {
+        'Modelo': produto.get('modelo') or '',
+        'Tipo': produto.get('descGenerica') or '',
+        'Rodado': produto.get('rodado') or '',
+        'Eixo': produto.get('eixo') or '',
+        'Tamanho': produto.get('tamanho') or '',
+        'Pneus': f"com pneus {pneu}" if pneu else 'sem pneus',
+        'Mangueiras maiores': 'sim' if _MANG_MAIORES in funcs else 'não',
+        'Outros opcionais': ' + '.join(sorted(funcs - {_MANG_MAIORES})) or 'nenhum',
+        'Cor': (produto.get('cor') or '').lower(),
+    }
+    if len(mola_freio) == 2:
+        desc['Mola'] = 'com mola' if mola_freio[0] == 'C' else 'sem mola'
+        desc['Freio'] = 'com freio' if mola_freio[1] == 'C' else 'sem freio'
+    return desc
 
 
-def _diferencas(prod_erp: dict, prod_esperado: dict) -> list[str]:
-    """Descreve em que atributos o produto do ERP difere do esperado."""
-    difs = []
-    for campo, rotulo in _ROTULOS_ATRIBUTOS:
-        if campo == 'funcionalidade':
-            a, b = _funcionalidades(prod_erp), _funcionalidades(prod_esperado)
-            va, vb = ' + '.join(sorted(a)) or 'nenhum', ' + '.join(sorted(b)) or 'nenhum'
-        else:
-            a = va = prod_erp.get(campo) or ''
-            b = vb = prod_esperado.get(campo) or ''
-            va, vb = va or 'nenhum', vb or 'nenhum'
-        if a != b:
-            difs.append(f"{rotulo} {va} (esperado {vb})")
-    return difs
+_ORDEM_ATRIBUTOS = ('Modelo', 'Tipo', 'Rodado', 'Eixo', 'Tamanho', 'Mola', 'Freio', 'Pneus',
+                    'Mangueiras maiores', 'Outros opcionais', 'Cor')
+
+
+def _correcoes(prod_erp: dict, prod_esperado: dict) -> list[dict]:
+    """Lista o que precisa mudar no item do ERP: [{campo, erp, esperado}]."""
+    a, b = _descrever_atributos(prod_erp), _descrever_atributos(prod_esperado)
+    return [
+        {'campo': campo, 'erp': a.get(campo) or '—', 'esperado': b.get(campo) or '—'}
+        for campo in _ORDEM_ATRIBUTOS
+        if (a.get(campo) or '') != (b.get(campo) or '')
+    ]
 
 
 def analisar_pedido(
@@ -393,8 +400,18 @@ def analisar_pedido(
     observacoes: list,
 ) -> dict:
     """
-    Referência = item do CRM + observação do representante (o que foi vendido).
+    Referência = item do CRM (código + campo de cor) + observação do representante.
     Conferido  = item lançado no ERP.
+
+    Cada item volta com:
+      situacao   'ok' (ERP correto) | 'corrigir' (ERP diferente do vendido)
+                 | 'verificar' (não dá para concluir sozinho)
+      erp/crm    {codigo, qtd[, cor]} ou None
+      esperado   código que deveria estar no ERP (ou None)
+      correcoes  [{campo, erp, esperado}] — o que mudar no ERP
+      pedido_vendedor  trecho da observação que pediu algo
+      avisos     mensagens que pedem atenção humana
+      obs_complementa  a observação pede algo que o CRM (código + cor) não traz (informativo)
     """
     try:
         catalogo = _buscar_catalogo()
@@ -416,79 +433,93 @@ def analisar_pedido(
     referencias = [crm or erp for erp, crm in pares]
     pedidos = _extrair_caracteristicas(obs_unicas, referencias)
 
-    linhas = []
+    itens = []
     for (erp, crm), referencia in zip(pares, referencias):
         base = indice.get(_normalizar_codigo(referencia['codigo']))
         pedido = dict(pedidos.get(_normalizar_codigo(referencia['codigo'])) or {})
         if not any(pedido.get(k) is not None for k in ('cor', 'mola', 'freio', 'pneu', 'mangueiras_maiores')):
             pedido.pop('trecho', None)
-        if crm and not _cor_canonica(pedido.get('cor')) and _cor_canonica(crm.get('cor')):
-            pedido['cor'] = crm.get('cor')  # cor informada no campo do CRM
 
-        motivos: list[str] = []
+        # o CRM é código + campo de cor: a cor do campo faz parte do que foi vendido
+        cor_crm = _cor_canonica(crm.get('cor')) if crm else None
+        if cor_crm and not _cor_canonica(pedido.get('cor')):
+            pedido['cor'] = cor_crm
+
+        avisos: list[str] = []
+        correcoes: list[dict] = []
         esperado = None
-        notas: list[str] = []
+        obs_complementa = False
+        situacao = 'ok'
+
         if base is None:
             origem = 'CRM' if crm else 'ERP'
-            motivos.append(f"código do {origem} {referencia['codigo']} não existe no catálogo")
+            avisos.append(f"O código do {origem} ({referencia['codigo']}) não existe no catálogo do Innovaro.")
+            situacao = 'verificar'
         else:
             esperado, notas = _resolver_codigo(base, pedido, catalogo, erp['codigo'] if erp else '')
-            if notas:
-                motivos.append(f"obs. pede: {', '.join(notas)}")
+            avisos.extend(f"{n[0].upper()}{n[1:]}." for n in notas if n.startswith('tipo de pneu'))
             if esperado is None:
-                motivos.append("combinação pedida não existe no catálogo — verificar com o comercial")
-
-        if erp is None:
-            divergencia = True
-            motivos.append("item do CRM não lançado no ERP")
-        elif crm is None:
-            divergencia = True
-            motivos.append("item do ERP sem correspondente no CRM")
-        else:
-            divergencia = esperado is None or _normalizar_codigo(esperado) != _normalizar_codigo(erp['codigo'])
-            if divergencia and esperado:
-                prod_erp = indice.get(_normalizar_codigo(erp['codigo']))
-                if prod_erp is None:
-                    motivos.append(f"código do ERP {erp['codigo']} não existe no catálogo")
-                else:
-                    difs = _diferencas(prod_erp, indice[_normalizar_codigo(esperado)])
-                    motivos.append(
-                        f"ERP com {'; '.join(difs)}" if difs else f"ERP deveria ser {esperado}"
-                    )
-            if erp['quantidade'] != crm['quantidade']:
-                divergencia = True
-                motivos.append(
-                    f"quantidade ERP {_fmt_qtd(erp['quantidade'])} ≠ CRM {_fmt_qtd(crm['quantidade'])}"
+                avisos.append(
+                    "O que foi pedido não existe no catálogo (nenhum produto com essa combinação). "
+                    "Confirmar com o comercial."
+                )
+                situacao = 'verificar'
+            if crm:
+                # o que o CRM sozinho (código + cor) já define, sem a observação
+                so_crm, _ = _resolver_codigo(base, {'cor': cor_crm}, catalogo)
+                obs_complementa = bool(
+                    esperado and so_crm and _normalizar_codigo(esperado) != _normalizar_codigo(so_crm)
                 )
 
-        # informativo: o código no CRM não reflete sozinho o que a observação pede
-        crm_divergencia = bool(crm and notas)
-        if pedido.get('trecho') and motivos:
-            motivos.insert(0, f"obs.: \"{pedido['trecho']}\"")
+        if erp is None:
+            avisos.append("Item vendido (CRM) que não foi lançado no ERP.")
+            situacao = 'corrigir'
+        elif crm is None:
+            avisos.append("Item lançado no ERP que não aparece no CRM.")
+            situacao = 'verificar'
+        else:
+            if esperado and _normalizar_codigo(esperado) != _normalizar_codigo(erp['codigo']):
+                situacao = 'corrigir'
+                prod_erp = indice.get(_normalizar_codigo(erp['codigo']))
+                if prod_erp is None:
+                    avisos.append(f"O código do ERP ({erp['codigo']}) não existe no catálogo do Innovaro.")
+                else:
+                    correcoes = _correcoes(prod_erp, indice[_normalizar_codigo(esperado)])
+            if erp['quantidade'] != crm['quantidade']:
+                situacao = 'corrigir'
+                correcoes.append({
+                    'campo': 'Quantidade',
+                    'erp': _fmt_qtd(erp['quantidade']),
+                    'esperado': _fmt_qtd(crm['quantidade']),
+                })
 
-        linhas.append({
-            'erp': f"{erp['codigo']} | Qtd: {_fmt_qtd(erp['quantidade'])}" if erp else '—',
+        itens.append({
+            'situacao': situacao,
+            'erp': {'codigo': erp['codigo'], 'qtd': _fmt_qtd(erp['quantidade'])} if erp else None,
             'crm': (
-                f"{crm['codigo']} | {crm.get('cor') or 'N/D'} | Qtd: {_fmt_qtd(crm['quantidade'])}"
-                if crm else '—'
+                {'codigo': crm['codigo'], 'cor': (cor_crm or crm.get('cor') or '').lower(),
+                 'qtd': _fmt_qtd(crm['quantidade'])}
+                if crm else None
             ),
-            'ia': esperado or 'NÃO ENCONTRADO',
-            'motivo': '; '.join(motivos) or '—',
-            'divergencia': divergencia,
-            'crm_divergencia': crm_divergencia,
+            'esperado': esperado,
+            'correcoes': correcoes,
+            'pedido_vendedor': pedido.get('trecho') or '',
+            'avisos': avisos,
+            'obs_complementa': obs_complementa,
         })
 
-    n_div = sum(1 for linha in linhas if linha['divergencia'])
-    n_crm = sum(1 for linha in linhas if linha['crm_divergencia'])
-    if n_div:
-        resumo = f"{n_div} item(ns) do ERP não condizem com o CRM + observação."
+    n_corrigir = sum(1 for i in itens if i['situacao'] == 'corrigir')
+    n_verificar = sum(1 for i in itens if i['situacao'] == 'verificar')
+    if n_corrigir:
+        status = 'CORRIGIR'
+        resumo = f"{n_corrigir} de {len(itens)} item(ns) precisa(m) ser corrigido(s) no ERP antes de conferir."
+        if n_verificar:
+            resumo += f" {n_verificar} precisa(m) de verificação manual."
+    elif n_verificar:
+        status = 'VERIFICAR'
+        resumo = f"{n_verificar} de {len(itens)} item(ns) precisa(m) de verificação manual."
     else:
-        resumo = "ERP condiz com o CRM + observação."
-    if n_crm:
-        resumo += f" Em {n_crm} item(ns) o código do CRM está incompleto (a observação complementa)."
+        status = 'OK'
+        resumo = "Tudo certo: o ERP condiz com o que foi vendido."
 
-    return {
-        'itens': linhas,
-        'status': 'DIVERGÊNCIA' if n_div else 'CONSISTENTE',
-        'resumo': resumo,
-    }
+    return {'itens': itens, 'status': status, 'resumo': resumo}
