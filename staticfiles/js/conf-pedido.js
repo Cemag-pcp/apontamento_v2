@@ -701,6 +701,75 @@ async function marcarPedidoComoConferido() {
 let currentPloomesRows = [];
 
 
+// Destaca, segmento a segmento, o que muda entre o código do ERP e o esperado.
+function destacarCodigo(codigo, referencia, classeDiferente) {
+    const ref = new Set(String(referencia || '').toUpperCase().split(/\s+/).filter(Boolean));
+    return String(codigo || '').split(/\s+/).filter(Boolean).map((seg) => {
+        const html = escapeHtml(seg);
+        return ref.has(seg.toUpperCase()) ? html : `<span class="${classeDiferente}">${html}</span>`;
+    }).join(' ');
+}
+
+const SITUACAO_AGENTE = {
+    ok: { rotulo: 'ERP correto', icone: 'bi-check-circle-fill', cor: 'success' },
+    corrigir: { rotulo: 'Corrigir no ERP', icone: 'bi-x-circle-fill', cor: 'danger' },
+    verificar: { rotulo: 'Verificar manualmente', icone: 'bi-exclamation-triangle-fill', cor: 'warning' },
+};
+
+function renderItemAgente(item) {
+    const sit = SITUACAO_AGENTE[item.situacao] || SITUACAO_AGENTE.verificar;
+    const erp = item.erp;
+    const crm = item.crm;
+    const esperado = item.esperado;
+    const mostraEsperado = esperado && (!erp || esperado !== erp.codigo);
+
+    const linhaErp = erp
+        ? `<div><span class="text-muted small d-inline-block" style="width:110px">Lançado no ERP</span>
+               <span class="font-monospace">${mostraEsperado
+                   ? destacarCodigo(erp.codigo, esperado, 'text-danger text-decoration-line-through')
+                   : escapeHtml(erp.codigo)}</span>
+               <span class="text-muted small ms-2">Qtd ${escapeHtml(erp.qtd)}</span></div>`
+        : `<div><span class="text-muted small d-inline-block" style="width:110px">Lançado no ERP</span>
+               <span class="text-danger fw-semibold">não lançado</span></div>`;
+
+    const linhaEsperado = mostraEsperado
+        ? `<div><span class="text-muted small d-inline-block" style="width:110px">Deveria ser</span>
+               <span class="font-monospace">${destacarCodigo(esperado, erp ? erp.codigo : '', 'text-success fw-bold')}</span>
+               ${crm ? `<span class="text-muted small ms-2">Qtd ${escapeHtml(crm.qtd)}</span>` : ''}</div>`
+        : '';
+
+    const correcoes = (item.correcoes || []).length
+        ? `<div class="mt-2"><div class="small fw-semibold mb-1">O que corrigir no ERP:</div>
+               <ul class="mb-0 ps-3 small">${item.correcoes.map((c) => `
+                   <li><strong>${escapeHtml(c.campo)}:</strong>
+                       está <span class="text-danger">${escapeHtml(c.erp)}</span>
+                       → deve ser <span class="text-success fw-semibold">${escapeHtml(c.esperado)}</span></li>`).join('')}
+               </ul></div>`
+        : '';
+
+    const avisos = (item.avisos || []).map((a) => `
+        <div class="small text-warning-emphasis mt-1"><i class="bi bi-exclamation-triangle me-1"></i>${escapeHtml(a)}</div>`).join('');
+
+    const pedido = item.pedido_vendedor
+        ? `<div class="small mt-2"><span class="text-muted">Pedido do vendedor (obs.):</span> “${escapeHtml(item.pedido_vendedor)}”</div>`
+        : '';
+
+    const fonteCrm = crm
+        ? `<div class="small text-muted mt-1">CRM: <span class="font-monospace">${escapeHtml(crm.codigo)}</span>
+               ${crm.cor ? `· cor ${escapeHtml(crm.cor)}` : ''} · Qtd ${escapeHtml(crm.qtd)}
+               ${item.obs_complementa ? ' · <em>a observação acrescenta algo que o CRM não tem</em>' : ''}</div>`
+        : '';
+
+    return `
+        <div class="border rounded p-2 mb-2 bg-white border-${sit.cor}-subtle">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-${sit.cor}${sit.cor === 'warning' ? ' text-dark' : ''}">
+                    <i class="bi ${sit.icone} me-1"></i>${sit.rotulo}</span>
+            </div>
+            ${linhaErp}${linhaEsperado}${correcoes}${avisos}${pedido}${fonteCrm}
+        </div>`;
+}
+
 function renderAgenteResultado(data) {
     const resultado = document.getElementById('confPedidoAgenteResultado');
 
@@ -709,44 +778,18 @@ function renderAgenteResultado(data) {
         return;
     }
 
-    const statusConsistente = (data.status || '').toUpperCase() === 'CONSISTENTE';
-    const statusIcon = statusConsistente ? '✅' : '⚠️';
-    const statusClass = statusConsistente ? 'text-success' : 'text-warning';
-
-    const rows = data.itens.map((item) => {
-        // divergencia = ERP não condiz com CRM + observação; crm_divergencia = código do CRM incompleto (informativo)
-        const erpErrado = !!item.divergencia;
-        const crmErrado = !!item.crm_divergencia;
-        const rowClass = erpErrado ? 'table-danger' : '';
-        const iaClass = erpErrado ? 'fw-bold text-danger' : 'fw-bold text-success';
-        const crmBadge = crmErrado ? ' <span class="badge bg-warning text-dark ms-1" title="Código do CRM incompleto — a observação complementa">obs. complementa</span>' : '';
-        const motivo = item.motivo && item.motivo !== '—' ? escapeHtml(item.motivo) : '';
-        return `
-            <tr class="${rowClass}">
-                <td class="font-monospace small">${escapeHtml(item.erp || '—')}</td>
-                <td class="font-monospace small">${escapeHtml(item.crm || '—')}${crmBadge}</td>
-                <td class="font-monospace small ${iaClass}">${escapeHtml(item.ia || '—')}</td>
-                <td class="small text-muted fst-italic">${motivo}</td>
-            </tr>`;
-    }).join('');
+    const status = (data.status || '').toUpperCase();
+    const banner = {
+        OK: ['success', 'bi-check-circle-fill'],
+        CORRIGIR: ['danger', 'bi-x-circle-fill'],
+        VERIFICAR: ['warning', 'bi-exclamation-triangle-fill'],
+    }[status] || ['secondary', 'bi-info-circle'];
 
     resultado.innerHTML = `
-        <div class="table-responsive mb-2">
-            <table class="table table-sm table-bordered mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>ERP</th>
-                        <th>CRM</th>
-                        <th>Esperado (CRM + obs.)</th>
-                        <th>Análise</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
+        <div class="alert alert-${banner[0]} py-2 d-flex align-items-center gap-2 mb-2">
+            <i class="bi ${banner[1]}"></i><strong>${escapeHtml(data.resumo || '')}</strong>
         </div>
-        <div class="small ${statusClass} fw-semibold mt-1">
-            ${statusIcon} ${escapeHtml(data.status || '')}${data.resumo ? ' — ' + escapeHtml(data.resumo) : ''}
-        </div>`;
+        ${data.itens.map(renderItemAgente).join('')}`;
 }
 
 function agregarItensPorCodigo(itens) {
