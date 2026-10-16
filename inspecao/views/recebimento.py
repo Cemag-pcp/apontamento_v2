@@ -436,25 +436,22 @@ def sincronizar_recebimento(request):
         dados = _montar_dados_linha(header_row, row_values)
 
         try:
-            existing_by_line = InspecaoRecebimentoItem.objects.filter(
-                planilha_id=SHEET_ID,
-                aba_nome=SHEET_TAB,
-                linha_planilha=row_index,
-            ).first()
+            # O numero da linha NAO identifica o recebimento: inserir, apagar ou
+            # ordenar linhas na planilha desloca todas as de baixo, e casar por
+            # linha fundia recebimentos diferentes (um ja inspecionado herdava
+            # outra nota e o original voltava como pendente).
             existing_by_hash = InspecaoRecebimentoItem.objects.filter(sheet_hash=sheet_hash).first()
             existing_by_identity = _find_recebimento_item_by_identity(dados, data_coluna_a)
             existing_by_business_key = _find_recebimento_item_by_business_key(dados, data_coluna_a)
 
             existing_item = (
-                existing_by_line
-                or existing_by_hash
+                existing_by_hash
                 or existing_by_business_key
                 or existing_by_identity
             )
             if existing_item:
                 _reconcile_recebimento_items(
                     items=[
-                        existing_by_line,
                         existing_by_hash,
                         existing_by_business_key,
                         existing_by_identity,
@@ -533,6 +530,20 @@ def atualizar_item_recebimento(request, item_id):
     incoming_dados = _montar_dados_linha(header_row, row_values)
     data_coluna_a = _parse_br_date(row_values[0])
     sheet_hash = _row_hash_from_list(row_values)
+
+    # A linha salva pode ter sido deslocada na planilha (linhas inseridas,
+    # apagadas ou ordenadas): so atualiza se ainda for o mesmo recebimento.
+    chave_item = _business_key_payload(item.dados)
+    if any(chave_item.values()) and _business_key_payload(incoming_dados) != chave_item:
+        return JsonResponse(
+            {
+                "error": (
+                    f"A linha {item.linha_planilha} da planilha agora é de outro recebimento "
+                    "(a planilha foi alterada). Sincronize novamente para localizar a linha correta."
+                )
+            },
+            status=409,
+        )
 
     # So sobrescreve campos que ja estavam preenchidos se o novo valor tambem
     # vier preenchido - evita apagar dado bom por causa de uma leitura vazia.
