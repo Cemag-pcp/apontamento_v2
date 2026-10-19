@@ -48,6 +48,11 @@ import json
 from datetime import timedelta, datetime, timezone
 
 
+def amostras_exigidas(qtd_produzida):
+    """Amostras por tipo de processo para finalizar: 3, ou a produção inteira se for menor."""
+    return max(min(qtd_produzida or 0, 3), 0)
+
+
 def inspecao_serra_usinagem(request):
 
     maquinas = Maquina.objects.filter(
@@ -202,6 +207,25 @@ def get_itens_inspecao_serra_usinagem(request):
         paginator = Paginator(inspecoes, itens_por_pagina)
         page_obj = paginator.get_page(pagina)
 
+        # Amostras já medidas por execução/tipo de processo (uma query para a página toda)
+        ultimas_execucoes = {}
+        for inspecao in page_obj:
+            execucoes = list(inspecao.dadosexecucaoinspecao_set.all())
+            if execucoes:
+                ultimas_execucoes[inspecao.id] = max(execucoes, key=lambda e: e.num_execucao)
+
+        amostras_por_execucao = defaultdict(dict)
+        for row in (
+            DetalheMedidaSerraUsinagem.objects.filter(
+                medida_processo__execucao__in=list(ultimas_execucoes.values())
+            )
+            .values("medida_processo__execucao_id", "medida_processo__tipo_processo")
+            .annotate(qtd=Count("amostra", distinct=True))
+        ):
+            amostras_por_execucao[row["medida_processo__execucao_id"]][
+                row["medida_processo__tipo_processo"]
+            ] = row["qtd"]
+
         # Construção dos resultados
         result = []
         for inspecao in page_obj:
@@ -224,31 +248,34 @@ def get_itens_inspecao_serra_usinagem(request):
                 matricula_nome_operador = f"{operador.matricula} - {operador.nome}"
 
             # Determina status
+            # "inspecao_completa" = inspeção 100% marcada pelo inspetor (não indica fim da inspeção)
             status_info = {
                 "status": "Não iniciado",
                 "inspecao_completa": False,
                 "inspecao_finalizada": False,
+                "amostras_feitas": 0,
+                "amostras_exigidas": amostras_exigidas(ordem_peca.qtd_boa),
             }
 
-            execucoes = list(inspecao.dadosexecucaoinspecao_set.all())
-            if execucoes:
-                ultima_execucao = max(execucoes, key=lambda e: e.num_execucao)
-                if ultima_execucao:
-                    info_adicionais = getattr(ultima_execucao, "info_adicionais", None)
+            ultima_execucao = ultimas_execucoes.get(inspecao.id)
+            if ultima_execucao:
+                info_adicionais = getattr(ultima_execucao, "info_adicionais", None)
 
-                    status_info["inspecao_completa"] = (
-                        info_adicionais.inspecao_completa if info_adicionais else False
-                    )
-                    status_info["inspecao_finalizada"] = (
-                        info_adicionais.inspecao_finalizada if info_adicionais else False
-                    )
+                status_info["inspecao_completa"] = (
+                    info_adicionais.inspecao_completa if info_adicionais else False
+                )
+                status_info["inspecao_finalizada"] = (
+                    info_adicionais.inspecao_finalizada if info_adicionais else False
+                )
 
-                    if status_info["inspecao_finalizada"]:
-                        status_info["status"] = "Finalizada"
-                    elif status_info["inspecao_completa"]:
-                        status_info["status"] = "Completa"
-                    else:
-                        status_info["status"] = "Em andamento"
+                # O tipo de processo com menos amostras é o que segura a finalização
+                contagens = amostras_por_execucao.get(ultima_execucao.id, {})
+                status_info["amostras_feitas"] = min(contagens.values()) if contagens else 0
+
+                if status_info["inspecao_finalizada"]:
+                    status_info["status"] = "Finalizada"
+                else:
+                    status_info["status"] = "Em andamento"
 
             result.append(
                 {
@@ -700,6 +727,8 @@ def envio_inspecao_serra_usinagem(request):
         observacao = data.get("observacao", "")
         inspecao_completa = data.get("inspecao_total")
         inspecao_completa = True if inspecao_completa == "Sim" else False
+        # Salvar parcialmente: grava o que foi medido sem finalizar, mesmo com amostras suficientes
+        salvar_parcial = data.get("salvar_parcial") == "true"
 
         ficha = request.FILES.get("ficha")
 
@@ -900,43 +929,27 @@ def envio_inspecao_serra_usinagem(request):
                             print("URL do arquivo:", obj.arquivo.url)
 
 
-            # Verificar finalização
-            def verificar_finalizacao():
-                # Obter a peça da ordem relacionada à inspeção
-                pecas_ordem = None
-                if inspecao.pecas_ordem_serra:
-                    pecas_ordem = inspecao.pecas_ordem_serra
-                elif inspecao.pecas_ordem_usinagem:
-                    pecas_ordem = inspecao.pecas_ordem_usinagem
-                
-                if not pecas_ordem:
-                    return False  # Se não houver peça relacionada, não pode finalizar
-                
-                qtd_produzida = pecas_ordem.qtd_boa
-                
-                for tipo in inspecoes_ativas:
-                    amostras_count = (
-                        DetalheMedidaSerraUsinagem.objects.filter(
-                            medida_processo__execucao=dados_execucao,
-                            medida_processo__tipo_processo=tipo,
-                        )
-                        .values("amostra")
-                        .distinct()
-                        .count()
-                    )
-                    
-                    # Verifica se o número de amostras é suficiente baseado na quantidade produzida
-                    if qtd_produzida >= 3:
-                        # Se produção >= 3, exige 3 amostras
-                        if amostras_count < 3:
-                            return False
-                    else:
-                        # Se produção < 3, exige amostras igual à quantidade produzida
-                        if amostras_count < qtd_produzida:
-                            return False
-                return True
+            # Verificar finalização: cada tipo ativo precisa do mínimo de amostras
+            pecas_ordem = inspecao.pecas_ordem_serra or inspecao.pecas_ordem_usinagem
+            exigidas = amostras_exigidas(pecas_ordem.qtd_boa) if pecas_ordem else 0
 
-            info_adicionais.inspecao_finalizada = verificar_finalizacao()
+            contagens = [
+                DetalheMedidaSerraUsinagem.objects.filter(
+                    medida_processo__execucao=dados_execucao,
+                    medida_processo__tipo_processo=tipo,
+                )
+                .values("amostra")
+                .distinct()
+                .count()
+                for tipo in inspecoes_ativas
+            ]
+            amostras_feitas = min(contagens) if contagens else 0
+
+            info_adicionais.inspecao_finalizada = (
+                not salvar_parcial
+                and pecas_ordem is not None  # Sem peça relacionada não pode finalizar
+                and all(qtd >= exigidas for qtd in contagens)
+            )
             info_adicionais.save()
             dados_execucao.save()
 
@@ -945,6 +958,8 @@ def envio_inspecao_serra_usinagem(request):
                     "status": "success",
                     "message": "Inspeção registrada com sucesso",
                     "inspecao_finalizada": info_adicionais.inspecao_finalizada,
+                    "amostras_feitas": amostras_feitas,
+                    "amostras_exigidas": exigidas,
                     "execucao_id": dados_execucao.id,
                     "nova_execucao": not bool(dados_execucao_existente),
                 }

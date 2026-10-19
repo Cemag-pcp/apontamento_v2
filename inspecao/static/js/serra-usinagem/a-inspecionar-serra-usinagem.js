@@ -157,6 +157,13 @@ function buscarItensInspecao(pagina) {
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         items.dados.forEach(item => {
+            const emAndamento = item.status === "Em andamento";
+            const statusTexto = emAndamento
+                ? `Parcial (${item.amostras_feitas}/${item.amostras_exigidas} amostras)`
+                : item.status;
+            const badge100 = item.inspecao_completa
+                ? '<p class="status-badge status-aprovado mt-1" style="font-size:13px" title="Inspeção 100% marcada">100%</p>'
+                : '';
 
             const cards = `
             <div class="col-md-4 mb-4">
@@ -164,7 +171,8 @@ function buscarItensInspecao(pagina) {
                     <div class="d-flex justify-content-between">
                         <h5 style="width:70%;"> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                         <div class="text-center">
-                            <p class="status-badge status-${status[item.status]}" style="font-size:13px">${item.status}</p>
+                            <p class="status-badge status-${status[item.status]}" style="font-size:13px">${statusTexto}</p>
+                            ${badge100}
                         </div>
                     </div>
                     <p>Inspecao #${item.id}</p>
@@ -182,7 +190,7 @@ function buscarItensInspecao(pagina) {
                         data-peca="${item.peca}"
                         data-maquina="${item.maquina}"
                     class="btn btn-dark w-100 iniciar-inspecao" id="openModalButton">
-                    Iniciar Inspeção</button>
+                    ${emAndamento ? 'Continuar Inspeção' : 'Iniciar Inspeção'}</button>
                 </div>
             </div>`;
 
@@ -696,7 +704,7 @@ function getSelectedCauses(itemId) {
     return selectedCauses;
 }
 
-function validarFormulario() {
+function validarFormulario({ parcial = false } = {}) {
     // 1. Validação de inspetor
     const inspetor = document.getElementById('inspetor').value;
     if (inspetor === '') {
@@ -719,9 +727,9 @@ function validarFormulario() {
         return false;
     }
 
-    // 2. Validação inspeção 100%
+    // 2. Validação inspeção 100% (pode ficar para depois no salvamento parcial)
     const inspecao_total = document.getElementById("inspecao_total").value;
-    if (inspecao_total === '') {
+    if (inspecao_total === '' && !parcial) {
         Toast.fire({
             icon: "error",
             title: "Por favor, informe se será necessário inspeção 100%."
