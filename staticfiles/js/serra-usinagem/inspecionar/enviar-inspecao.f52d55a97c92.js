@@ -1,14 +1,20 @@
-function enviarDadosInspecao() {
-    if (!validarFormulario()) {
+// parcial = true: grava o que foi medido sem finalizar (dispensa o campo "Inspeção 100%")
+function enviarDadosInspecao(parcial = false) {
+    if (!validarFormulario({ parcial })) {
         return;
     }
 
     const buttonSalvarInspecao = document.getElementById('saveInspection');
+    const buttonSalvarParcial = document.getElementById('savePartialInspection');
+    const buttonClicado = parcial ? buttonSalvarParcial : buttonSalvarInspecao;
+    const textoOriginal = buttonClicado.innerHTML;
     buttonSalvarInspecao.disabled = true;
-    buttonSalvarInspecao.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>';
+    buttonSalvarParcial.disabled = true;
+    buttonClicado.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>';
 
     const formData = new FormData();
 
+    formData.append('salvar_parcial', parcial ? 'true' : 'false');
     formData.append('inspecao_id', document.getElementById('id-inspecao').value);
     formData.append('dataInspecao', document.getElementById('dataInspecao').value);
     formData.append('pecasProduzidas', document.getElementById('pecasProduzidas').value);
@@ -114,14 +120,21 @@ function enviarDadosInspecao() {
         body: formData
     })
         .then(response => response.json().then(data => {
-            if (!response.ok) throw new Error(data.error || `Erro HTTP! Status: ${response.status}`);
+            if (!response.ok) throw new Error(data.error || data.message || `Erro HTTP! Status: ${response.status}`);
             return data;
         }))
-        .then(() => {
-            Toast.fire({
-                icon: 'success',
-                title: 'Inspecao gravada com sucesso!'
-            });
+        .then(data => {
+            const progresso = `${data.amostras_feitas}/${data.amostras_exigidas} amostras`;
+            if (data.inspecao_finalizada) {
+                Toast.fire({ icon: 'success', title: 'Inspeção finalizada com sucesso!' });
+            } else if (parcial) {
+                Toast.fire({ icon: 'info', title: `Inspeção salva parcialmente (${progresso}).` });
+            } else {
+                Toast.fire({
+                    icon: 'warning',
+                    title: `Inspeção salva como parcial: amostras insuficientes (${progresso}).`
+                });
+            }
 
             buscarItensInspecao(1);
             buscarItensReinspecao(1);
@@ -139,8 +152,10 @@ function enviarDadosInspecao() {
         })
         .finally(() => {
             buttonSalvarInspecao.disabled = false;
-            buttonSalvarInspecao.innerHTML = 'Salvar';
+            buttonSalvarParcial.disabled = false;
+            buttonClicado.innerHTML = textoOriginal;
         });
 }
 
-document.getElementById('saveInspection').addEventListener('click', enviarDadosInspecao);
+document.getElementById('saveInspection').addEventListener('click', () => enviarDadosInspecao(false));
+document.getElementById('savePartialInspection').addEventListener('click', () => enviarDadosInspecao(true));
