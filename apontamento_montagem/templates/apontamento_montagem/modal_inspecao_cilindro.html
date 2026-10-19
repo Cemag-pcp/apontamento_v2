@@ -1,0 +1,82 @@
+<!-- Inspeção de estanqueidade da célula CILINDRO. Abre no lugar de enviar a finalização:
+     apontamento e inspeção são gravados juntos em /montagem/api/ordens/finalizar-cilindro/.
+     Sem "X"/Esc/clique fora: só sai voltando para o modal de finalizar ou gravando. -->
+<div class="modal fade" id="modalInspecaoCilindro" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="modalInspecaoCilindroLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <form class="modal-content" id="formInspecaoCilindro" novalidate>
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalInspecaoCilindroLabel">Inspeção de Cilindro</h5>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">Para finalizar a ordem, registre a inspeção de estanqueidade do cilindro.</p>
+                <div class="mb-3">
+                    <label class="form-label" for="pecaInspecaoCilindro">Peça</label>
+                    <input type="text" class="form-control" id="pecaInspecaoCilindro" readonly disabled>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="operadorInspecaoCilindro">Inspetor</label>
+                    <input type="text" class="form-control" id="operadorInspecaoCilindro" readonly disabled>
+                </div>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="form-label" for="qtdInspecaoCilindro">Quantidade inspecionada</label>
+                        <input type="number" class="form-control" id="qtdInspecaoCilindro" readonly disabled>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label" for="ncInspecaoCilindro">Peças não conformes</label>
+                        <input type="number" min="0" class="form-control" id="ncInspecaoCilindro" value="0" required>
+                    </div>
+                </div>
+
+                <div id="causasInspecaoCilindro" class="d-none">
+                    <div id="listaCausasInspecaoCilindro"></div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="removerCausaCilindro" aria-label="Remover causa"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="adicionarCausaCilindro" aria-label="Adicionar causa"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="obsInspecaoCilindro">Observação</label>
+                    <input type="text" maxlength="100" class="form-control" id="obsInspecaoCilindro">
+                </div>
+                <div class="mb-1">
+                    <label class="form-label" for="fichaInspecaoCilindro">Ficha</label>
+                    <input type="file" class="form-control" id="fichaInspecaoCilindro" accept="image/*, application/pdf">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="voltarInspecaoCilindro">Voltar</button>
+                <button type="submit" class="btn btn-success" id="salvarInspecaoCilindro">Finalizar e inspecionar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<template id="templateCausaCilindro">
+    <div class="border rounded-3 p-2 mb-2 causa-cilindro">
+        <div class="small fw-semibold text-end mb-1 numero-causa"></div>
+        <label class="form-label">Causas</label>
+        <div class="border rounded p-2 mb-2" style="max-height: 160px; overflow-y: auto;">
+            {% for causa in causas_cilindro %}
+                <label class="form-check d-block">
+                    <input class="form-check-input" type="checkbox" value="{{ causa.id }}">
+                    <span class="form-check-label">{{ causa.nome }}</span>
+                </label>
+            {% empty %}
+                <span class="small text-muted">Nenhuma causa cadastrada para tubos/cilindros.</span>
+            {% endfor %}
+        </div>
+        <div class="row">
+            <div class="col-5">
+                <label class="form-label">Quantidade</label>
+                <input type="number" min="1" class="form-control quantidade-causa">
+            </div>
+            <div class="col-7">
+                <label class="form-label">Imagens</label>
+                <input type="file" class="form-control imagens-causa" accept="image/*" multiple>
+            </div>
+        </div>
+    </div>
+</template>

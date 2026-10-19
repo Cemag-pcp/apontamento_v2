@@ -557,6 +557,8 @@
   </div>
 </div>
 
+{% include "apontamento_montagem/modal_inspecao_cilindro.html" %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -568,7 +570,8 @@ evitando que ordem-criada-montagem.js e apontamento-utils.js sejam carregados du
 {
   "imports": {
     "{% get_static_prefix %}js/ordem-criada-montagem.js": "{% static 'js/ordem-criada-montagem.js' %}",
-    "{% get_static_prefix %}js/apontamento-utils.js": "{% static 'js/apontamento-utils.js' %}"
+    "{% get_static_prefix %}js/apontamento-utils.js": "{% static 'js/apontamento-utils.js' %}",
+    "{% get_static_prefix %}js/inspecao-cilindro-montagem.js": "{% static 'js/inspecao-cilindro-montagem.js' %}"
   }
 }
 </script>

@@ -343,7 +343,7 @@ def get_itens_reinspecao_tubos_cilindros(request):
         DadosExecucaoInspecaoEstanqueidade.objects.filter(
             inspecao_estanqueidade__in=pagina_obj
         )
-        .select_related("inspetor__user", "inspecao_estanqueidade__peca")
+        .select_related("inspetor__user", "operador", "inspecao_estanqueidade__peca")
         .prefetch_related(
             Prefetch("infoadicionaisexectuboscilindros_set", to_attr="info_adicionais")
         )
@@ -375,7 +375,7 @@ def get_itens_reinspecao_tubos_cilindros(request):
                 "id_dados_execucao": de.id,
                 "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
                 "peca": f"{data.peca.codigo} - {data.peca.descricao}",
-                "inspetor": de.inspetor.user.username if de.inspetor else None,
+                "inspetor": _nome_inspetor_estanqueidade(de),
                 "possui_nao_conformidade": possui_nao_conformidade,
                 "nao_conformidade": (
                     info_adicionais.nao_conformidade if info_adicionais else 0
@@ -474,7 +474,8 @@ def get_itens_inspecionados_tubos_cilindros(request):
     # Adicionamos select_related e prefetch_related ANTES da paginação.
     # Isso garante que, ao iterar sobre a página, os dados já estarão carregados em poucas queries.
     query_final = query_ordenada.select_related(
-        "inspetor__user", 
+        "inspetor__user",
+        "operador",
         "inspecao_estanqueidade__peca"
     ).prefetch_related(
         "infoadicionaisexectuboscilindros_set"
@@ -503,7 +504,7 @@ def get_itens_inspecionados_tubos_cilindros(request):
             "id_dados_execucao": de.id,
             "data": (de.data_exec - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S"),
             "peca": f"{de.inspecao_estanqueidade.peca.codigo} - {de.inspecao_estanqueidade.peca.descricao}",
-            "inspetor": de.inspetor.user.username if de.inspetor else None,
+            "inspetor": _nome_inspetor_estanqueidade(de),
             "possui_nao_conformidade": possui_nao_conformidade,
             "nao_conformidade": info_adicionais.nao_conformidade if info_adicionais else 0,
             "nao_conformidade_refugo": info_adicionais.nao_conformidade_refugo if info_adicionais else 0,
@@ -518,6 +519,70 @@ def get_itens_inspecionados_tubos_cilindros(request):
         "pagina_atual": pagina_obj.number,
         "total_paginas": paginador.num_pages,
     }, status=200)
+
+
+def registrar_inspecao_tubos_cilindros(
+    *,
+    peca,
+    data,
+    quantidade_inspecionada,
+    nao_conformidade,
+    nao_conformidade_refugo=0,
+    observacao=None,
+    ficha=None,
+    causas=(),
+    inspetor=None,
+    operador=None,
+):
+    """Grava uma inspeção de tubo/cilindro (usada pela tela de inspeção e pela montagem).
+
+    causas: lista de {"ids": [id de Causas], "quantidade": int, "imagens": [arquivos]},
+    gravadas só quando há não conformidade (que também abre a reinspeção).
+    Deve ser chamada dentro de uma transação.
+    """
+    inspecao = InspecaoEstanqueidade.objects.create(data_inspecao=data, peca=peca)
+
+    dados_execucao = DadosExecucaoInspecaoEstanqueidade(
+        inspecao_estanqueidade=inspecao,
+        inspetor=inspetor,
+        operador=operador,
+        data_exec=data,
+    )
+    dados_execucao.save()
+
+    informacoes_tubos_cilindros = InfoAdicionaisExecTubosCilindros.objects.create(
+        dados_exec_inspecao=dados_execucao,
+        nao_conformidade=nao_conformidade,
+        nao_conformidade_refugo=nao_conformidade_refugo,
+        qtd_inspecionada=quantidade_inspecionada,
+        observacao=observacao,
+        ficha=ficha,
+    )
+
+    if nao_conformidade + nao_conformidade_refugo > 0:
+        ReinspecaoEstanqueidade.objects.create(inspecao=inspecao)
+        for causa in causas:
+            causa_nao_conformidade = CausasNaoConformidadeEstanqueidade.objects.create(
+                info_tubos_cilindros=informacoes_tubos_cilindros,
+                quantidade=causa["quantidade"],
+            )
+            causa_nao_conformidade.causa.add(*Causas.objects.filter(id__in=causa["ids"]))
+            for imagem in causa.get("imagens", []):
+                ArquivoCausaEstanqueidade.objects.create(
+                    causa_nao_conformidade=causa_nao_conformidade,
+                    arquivos=imagem,
+                )
+
+    return inspecao
+
+
+def _nome_inspetor_estanqueidade(dados_execucao):
+    """Inspetor (usuário) ou, na inspeção feita pelo operador da montagem, o operador."""
+    if dados_execucao.inspetor:
+        return dados_execucao.inspetor.user.username
+    if dados_execucao.operador:
+        return f"{dados_execucao.operador.matricula} - {dados_execucao.operador.nome}"
+    return None
 
 
 def envio_inspecao_tubos_cilindros(request):
@@ -562,57 +627,28 @@ def envio_inspecao_tubos_cilindros(request):
                 codigo=codigo
             ).first()
 
-            inspecao = InspecaoEstanqueidade(
-                data_inspecao=data_ajustada, peca=peca_estanqueidade
-            )
-            inspecao.save()
+            causas = []
+            if int(nao_conformidade_total) > 0:
+                causas = [
+                    {
+                        "ids": _get_prefixed_post_list(request.POST, f"causas_{i}"),
+                        "quantidade": int(request.POST.get(f"quantidade_{i}")),
+                        "imagens": request.FILES.getlist(f"imagens_{i}"),
+                    }
+                    for i in range(1, quantidade_total_causas + 1)
+                ]
 
-            inspetor = Profile.objects.get(user__pk=inspetor_id)
-            dados_execucao = DadosExecucaoInspecaoEstanqueidade(
-                inspecao_estanqueidade=inspecao,
-                inspetor=inspetor,
-                data_exec=data_ajustada,
-            )
-            dados_execucao.save()
-
-            informacoes_tubos_cilindros = InfoAdicionaisExecTubosCilindros(
-                dados_exec_inspecao=dados_execucao,
+            registrar_inspecao_tubos_cilindros(
+                peca=peca_estanqueidade,
+                data=data_ajustada,
+                inspetor=Profile.objects.get(user__pk=inspetor_id),
+                quantidade_inspecionada=quantidade_inspecionada,
                 nao_conformidade=nao_conformidade,
                 nao_conformidade_refugo=nao_conformidade_refugo,
-                qtd_inspecionada=quantidade_inspecionada,
                 observacao=observacao,
                 ficha=ficha_inspecao,
+                causas=causas,
             )
-            informacoes_tubos_cilindros.save()
-
-            # Verifica se há não conformidade
-            if int(nao_conformidade_total) > 0:
-                reinspecao = ReinspecaoEstanqueidade(inspecao=inspecao)
-                reinspecao.save()
-                # Itera sobre todas as causas (causas_1, causas_2, etc.)
-                for i in range(1, quantidade_total_causas + 1):
-                    causas = _get_prefixed_post_list(
-                        request.POST, f"causas_{i}"
-                    )  # Lista de causas
-                    quantidade = request.POST.get(f"quantidade_{i}")
-                    imagens = request.FILES.getlist(f"imagens_{i}")  # Lista de arquivos
-
-                    # Obtém todas as causas de uma vez
-                    causas_objs = Causas.objects.filter(id__in=causas)
-                    causa_nao_conformidade = (
-                        CausasNaoConformidadeEstanqueidade.objects.create(
-                            info_tubos_cilindros=informacoes_tubos_cilindros,
-                            quantidade=int(quantidade),
-                        )
-                    )
-                    causa_nao_conformidade.causa.add(*causas_objs)
-
-                    # Itera sobre cada imagem
-                    for imagem in imagens:
-                        ArquivoCausaEstanqueidade.objects.create(
-                            causa_nao_conformidade=causa_nao_conformidade,
-                            arquivos=imagem,
-                        )
 
         return JsonResponse({"success": True})
 
@@ -746,7 +782,7 @@ def get_historico_tubos_cilindros(request, id):
     # Otimiza a consulta usando select_related e prefetch_related
     dados = (
         DadosExecucaoInspecaoEstanqueidade.objects.filter(inspecao_estanqueidade__id=id)
-        .select_related("inspetor__user")
+        .select_related("inspetor__user", "operador")
         .prefetch_related(
             Prefetch(
                 "infoadicionaisexectuboscilindros_set",
@@ -768,7 +804,7 @@ def get_historico_tubos_cilindros(request, id):
                     "%d/%m/%Y %H:%M:%S"
                 ),
                 "num_execucao": dado.num_execucao,
-                "inspetor": dado.inspetor.user.username if dado.inspetor else None,
+                "inspetor": _nome_inspetor_estanqueidade(dado),
                 "nao_conformidade": (
                     info_adicional.nao_conformidade if info_adicional else None
                 ),

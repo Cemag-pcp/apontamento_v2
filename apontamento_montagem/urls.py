@@ -8,6 +8,7 @@ app_name = 'montagem'
 urlpatterns = [
     path('api/criar-ordem/', views.criar_ordem, name='criar_ordem'),
     path('api/ordens/atualizar-status/', views.atualizar_status_ordem, name='atualizar_status_ordem'),
+    path('api/ordens/finalizar-cilindro/', views.finalizar_ordem_cilindro, name='finalizar_ordem_cilindro'),
     path('api/ordens-criadas/', views.ordens_criadas, name='ordens_criadas'),
     path('api/ordens-interrompidas/', views.ordens_interrompidas, name='ordens_interrompidas'),
     path('api/ordens-iniciadas/', views.ordens_iniciadas, name='ordens_iniciadas'),
