@@ -16,6 +16,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 import json
 import os
+import re
 import requests
 from datetime import datetime, date, timedelta
 import logging
@@ -25,8 +26,9 @@ from .models import PecasOrdem, ConjuntosInspecionados, TaktCelulaExcluida
 from core.utils import carregar_planilha_base_geral
 from core.whatsapp import enviar_falta_de_peca, destinatarios_falta_de_peca
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile, PecasFaltantes
-from cadastro.models import Operador, Maquina, Pecas, Conjuntos, CarretasExplodidas
-from inspecao.models import Inspecao
+from cadastro.models import Operador, Maquina, Pecas, Conjuntos, CarretasExplodidas, PecasEstanqueidade
+from inspecao.models import Inspecao, Causas
+from inspecao.views.estanqueidade import registrar_inspecao_tubos_cilindros
 
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,50 @@ def _normalizar_codigo_inspecao(valor):
 
 def _chave_codigo_inspecao(valor):
     return _normalizar_codigo_inspecao(valor).lstrip("0")
+
+
+def _peca_estanqueidade_cilindro(codigo, peca_nome=""):
+    """Peça de estanqueidade (tipo cilindro) equivalente ao código montado.
+
+    Variações de pintura/acabamento (ex.: 034550G, 037563COG) caem no código base.
+    Se o cilindro ainda não estiver na base, cadastra pelo código base, com a
+    descrição do cadastro de peças (ou do nome da peça na ordem).
+    """
+    pecas_por_chave = {
+        _chave_codigo_inspecao(p.codigo): p
+        for p in PecasEstanqueidade.objects.filter(tipo="cilindro")
+    }
+    chave = _chave_codigo_inspecao(codigo)
+    existente = pecas_por_chave.get(chave) or pecas_por_chave.get(re.sub(r"[A-Z]+$", "", chave))
+    if existente:
+        return existente
+
+    codigo_normalizado = _normalizar_codigo_inspecao(codigo)
+    codigo_base = re.sub(r"[A-Z]+$", "", codigo_normalizado) or codigo_normalizado
+    if not codigo_base:
+        return None
+
+    # O código é único na base: se já existe como tanque/tubo, não reclassifica
+    if PecasEstanqueidade.objects.filter(codigo=codigo_base).exists():
+        logger.warning("Código %s já cadastrado na estanqueidade com outro tipo; cilindro não cadastrado.", codigo_base)
+        return None
+
+    peca_cadastro = Pecas.objects.filter(codigo=codigo_base).first()
+    descricao = peca_cadastro.descricao if peca_cadastro and peca_cadastro.descricao else ""
+    if not descricao:
+        # Ex.: "036117 - 036117 - CILINDRO ..." -> "CILINDRO ..."
+        descricao = _extrair_descricao_peca(peca_nome)
+        while _extrair_codigo_peca(descricao) in (codigo_base, codigo_normalizado) and " - " in descricao:
+            descricao = _extrair_descricao_peca(descricao)
+
+    try:
+        # savepoint: uma corrida no unique não pode derrubar a finalização da ordem
+        with transaction.atomic():
+            return PecasEstanqueidade.objects.create(
+                codigo=codigo_base, descricao=descricao or None, tipo="cilindro"
+            )
+    except IntegrityError:
+        return PecasEstanqueidade.objects.filter(codigo=codigo_base, tipo="cilindro").first()
 
 
 def _extrair_codigo_peca(peca_nome):
@@ -372,6 +418,115 @@ def criar_ordem(request):
         traceback.print_exc()  # Log detalhado do erro no console
         return JsonResponse({'error': f'Erro inesperado: {str(e)}'}, status=500)
     
+class _DesfazerFinalizacaoCilindro(Exception):
+    """Sai da transação (desfazendo inspeção + finalização) devolvendo esta resposta."""
+
+    def __init__(self, response):
+        super().__init__()
+        self.response = response
+
+
+@require_POST
+def finalizar_ordem_cilindro(request):
+    """Finaliza uma ordem da célula CILINDRO junto com a inspeção de estanqueidade.
+
+    multipart/form-data:
+      apontamento: JSON igual ao de atualizar-status (status "finalizada", ordem_id,
+                   operador_final, qt_realizada, obs_finalizar, continua)
+      nao_conformidade, observacao, ficha_inspecao,
+      quantidade-total-causas, causas_N (lista de ids), quantidade_N, imagens_N
+
+    A peça vem da própria ordem (cadastrada na base de cilindros se ainda não existir),
+    o inspetor é o operador que finalizou e a quantidade inspecionada é a realizada. Tudo numa transação: a inspeção é gravada
+    antes da finalização, que é o passo que aponta no ERP.
+    """
+    def erro(mensagem, status=400):
+        return JsonResponse({'error': mensagem}, status=status)
+
+    try:
+        apontamento = json.loads(request.POST.get('apontamento') or '{}')
+    except json.JSONDecodeError:
+        return erro('Apontamento inválido.')
+    if apontamento.get('status') != 'finalizada':
+        return erro('Apontamento inválido.')
+
+    ordem = Ordem.objects.select_related('maquina').filter(pk=apontamento.get('ordem_id')).first()
+    if not ordem:
+        return erro('Ordem não encontrada.', 404)
+    if not ordem.maquina or ordem.maquina.nome.strip().lower() != 'cilindro':
+        return erro('Essa ordem não é da célula CILINDRO.')
+
+    try:
+        operador = Operador.objects.get(pk=int(apontamento.get('operador_final')))
+    except (TypeError, ValueError, Operador.DoesNotExist):
+        return erro('Selecione o operador.')
+
+    try:
+        quantidade_inspecionada = int(apontamento.get('qt_realizada'))
+        nao_conformidade = int(request.POST.get('nao_conformidade') or 0)
+        total_causas = int(request.POST.get('quantidade-total-causas') or 0)
+    except (TypeError, ValueError):
+        return erro('Quantidades da inspeção inválidas.')
+    if quantidade_inspecionada < 1:
+        return erro('Informe a quantidade realizada.')
+    if not 0 <= nao_conformidade <= quantidade_inspecionada:
+        return erro('As peças não conformes devem ficar entre 0 e a quantidade inspecionada.')
+
+    causas = []
+    if nao_conformidade > 0:
+        for i in range(1, total_causas + 1):
+            ids = request.POST.getlist(f'causas_{i}')
+            try:
+                quantidade = int(request.POST.get(f'quantidade_{i}'))
+            except (TypeError, ValueError):
+                quantidade = 0
+            if not ids or quantidade < 1:
+                return erro(f'Preencha as causas e a quantidade da Não conformidade {i}.')
+            causas.append({
+                'ids': ids,
+                'quantidade': quantidade,
+                'imagens': request.FILES.getlist(f'imagens_{i}'),
+            })
+        soma = sum(c['quantidade'] for c in causas)
+        if soma != nao_conformidade:
+            return erro(f'A soma das quantidades ({soma}) deve ser igual às peças não conformes ({nao_conformidade}).')
+
+    peca_ordem = PecasOrdem.objects.filter(ordem=ordem).first()
+    if not peca_ordem:
+        return erro('Nenhuma peça encontrada para essa ordem.')
+
+    try:
+        with transaction.atomic():
+            peca = _peca_estanqueidade_cilindro(_extrair_codigo_peca(peca_ordem.peca), peca_ordem.peca)
+            if not peca:
+                raise _DesfazerFinalizacaoCilindro(erro(
+                    f'Não foi possível cadastrar {peca_ordem.peca} na base de cilindros '
+                    '(o código já está cadastrado como tanque/tubo).'
+                ))
+
+            registrar_inspecao_tubos_cilindros(
+                peca=peca,
+                data=now(),
+                operador=operador,
+                quantidade_inspecionada=quantidade_inspecionada,
+                nao_conformidade=nao_conformidade,
+                observacao=(request.POST.get('observacao') or '')[:100] or None,
+                ficha=request.FILES.get('ficha_inspecao'),
+                causas=causas,
+            )
+
+            resposta = processar_status_ordem_montagem(apontamento, request.user)
+            if resposta.status_code != 200:
+                raise _DesfazerFinalizacaoCilindro(resposta)
+    except _DesfazerFinalizacaoCilindro as e:
+        return e.response
+    except Exception as e:
+        logger.exception('Erro ao finalizar ordem %s com inspeção de cilindro', ordem.pk)
+        return erro(f'Erro ao gravar a inspeção: {e}', 500)
+
+    return resposta
+
+
 @csrf_exempt
 def atualizar_status_ordem(request):
 
@@ -402,11 +557,17 @@ def atualizar_status_ordem(request):
         "qt_mortas": 0
     }
     """
-
     try:
-        # Parse do corpo da requisição
         body = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': 'JSON inválido.'}, status=400)
+    return processar_status_ordem_montagem(body, request.user)
 
+
+def processar_status_ordem_montagem(body, user):
+    """Regra de mudança de status da montagem, usada pela tela web
+    (atualizar_status_ordem) e pela finalização com inspeção de cilindro."""
+    try:
         status = body.get('status')
         ordem_id = body.get('ordem_id')
         grupo_maquina = 'montagem'
@@ -551,7 +712,7 @@ def atualizar_status_ordem(request):
 
                 apontamento_erp = _apontar_item_via_api_erp_montagem(
                     ultimo_peca_ordem,
-                    request.user,
+                    user,
                 )
 
                 codigo = _extrair_codigo_peca(peca.peca)
@@ -1126,7 +1287,11 @@ def planejamento(request):
 
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='montagem').exclude(nome='Finalizada parcial')
 
-    return render(request, 'apontamento_montagem/planejamento.html', {'motivos_maquina_parada': motivos_maquina_parada})
+    return render(request, 'apontamento_montagem/planejamento.html', {
+        'motivos_maquina_parada': motivos_maquina_parada,
+        # Modal de inspeção da célula CILINDRO (peça e inspetor vêm da ordem/finalização)
+        'causas_cilindro': Causas.objects.filter(setor="tubos cilindros", excluida=False).order_by("nome"),
+    })
 
 
 @login_required

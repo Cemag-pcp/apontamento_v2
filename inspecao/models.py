@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from core.models import Profile
-from cadastro.models import PecasEstanqueidade
+from cadastro.models import PecasEstanqueidade, Operador
 from storages.backends.s3boto3 import S3Boto3Storage
 from decimal import Decimal
 
@@ -336,6 +336,10 @@ class DadosExecucaoInspecaoEstanqueidade(models.Model):
     )
     inspetor = models.ForeignKey(
         Profile, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    # Inspeção feita pelo próprio operador na montagem (célula CILINDRO), sem usuário inspetor
+    operador = models.ForeignKey(
+        Operador, on_delete=models.SET_NULL, null=True, blank=True
     )
     num_execucao = models.IntegerField(null=True, blank=True)
     data_exec = models.DateTimeField()

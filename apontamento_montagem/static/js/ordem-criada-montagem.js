@@ -1,4 +1,5 @@
 import { confirmarInicioOrdem } from './apontamento-utils.js';
+import { abrirInspecaoCilindro, isCelulaCilindro } from './inspecao-cilindro-montagem.js';
 
 function mostrarToast(message, type = 'info') {
     Swal.mixin({
@@ -364,7 +365,7 @@ export function carregarOrdensIniciadas(filtros = {}, silent = false) {
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        mostrarModalFinalizar(ordem.ordem_id, ordem.maquina, ordem.qtd_restante);
+                        mostrarModalFinalizar(ordem.ordem_id, ordem.maquina, ordem.qtd_restante, ordem.pecas);
                     });
                 }
 
@@ -886,8 +887,11 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
 }
 
 // Modal para "Finalizar"
-function mostrarModalFinalizar(ordemId, maquina, max_itens) {
-    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('finalizarModal'));
+function mostrarModalFinalizar(ordemId, maquina, max_itens, pecas) {
+    const modalElement = document.getElementById('finalizarModal');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    // Peça da ordem: exibida na inspeção da célula CILINDRO
+    modalElement.dataset.peca = Array.isArray(pecas) ? (pecas[0] || '') : (pecas || '');
 
     const operadorSelect = document.getElementById('operadorFinal');
     const qtRealizadaInput = document.getElementById('qtRealizada');
@@ -994,6 +998,32 @@ document.getElementById('botaoVoltarOperadoresMaquina').addEventListener('click'
     descricaoBotaoVoltar.style.display = 'none';
 });
 
+// Célula CILINDRO: em vez de enviar a finalização, abre a inspeção de estanqueidade e
+// apontamento + inspeção são gravados juntos. Retorna false para as demais células.
+function desviarParaInspecaoCilindro(payload, onSucesso) {
+    const modalElement = document.getElementById('finalizarModal');
+    const maquina = document.getElementById('labelOperadores').getAttribute('data-maquina');
+    if (!isCelulaCilindro(maquina)) return false;
+
+    const operadorFinal = document.getElementById('operadorFinal');
+    const selectAtivo = operadorFinal.getAttribute('data-active') === 'true'
+        ? operadorFinal
+        : document.getElementById('todosOperadorFinal');
+    const opcao = selectAtivo.options[selectAtivo.selectedIndex];
+
+    bootstrap.Modal.getInstance(modalElement)?.hide();
+    bootstrap.Modal.getInstance(document.getElementById('modalFinalizarParcial'))?.hide();
+
+    abrirInspecaoCilindro({
+        apontamento: payload,
+        peca: modalElement.dataset.peca,
+        operador: opcao ? opcao.text : '',
+        onVoltar: () => bootstrap.Modal.getOrCreateInstance(modalElement).show(),
+        onSucesso,
+    });
+    return true;
+}
+
 // Finalizar ordem
 document.getElementById('confirmFinalizar').addEventListener('click', function () {
     if (this.disabled) return;
@@ -1072,6 +1102,14 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         obs_finalizar: obsFinalizar,
         qt_realizada: parseInt(qtRealizada.value)
     };
+
+    const desviouCilindro = desviarParaInspecaoCilindro(payload, data => {
+        carregarOrdensIniciadas(filtros, true);
+        resetarCardsInicial(filtros);
+        const chave = data.chave_apontamento ? ` Chave ERP: ${data.chave_apontamento}` : '';
+        mostrarToast(`Ordem finalizada e inspeção registrada!${chave}`, 'success');
+    });
+    if (desviouCilindro) return;
 
     // Optimistic UI: fechar modal e embassar card enquanto processa
     btnFinalizar.disabled = true;
@@ -1208,6 +1246,14 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         qt_realizada: parseInt(qtRealizada.value),
         continua: continua
     };
+
+    const desviouCilindro = desviarParaInspecaoCilindro(payload, data => {
+        carregarOrdensIniciadas(filtros, true);
+        resetarCardsInicial(filtros);
+        const chave = data.chave_apontamento ? ` Chave ERP: ${data.chave_apontamento}` : '';
+        mostrarToast(`Apontamento e inspeção registrados!${chave}`, 'success');
+    });
+    if (desviouCilindro) return;
 
     // Optimistic UI: fechar modais imediatamente e embassar card enquanto processa
     btnFinalizarContinuar.disabled = true;
