@@ -201,7 +201,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             fichas.forEach((ficha, index) => {
-                const statusInspecao = ficha.inspecao_completa ? 'Completa' : 'Parcial';
+                const statusInspecao = ficha.inspecao_completa ? '100%' : 'por amostragem';
                 carouselInner.insertAdjacentHTML('beforeend', `
                     <div class="carousel-item ${index === 0 ? 'active' : ''}">
                         <img src="${ficha.ficha_url}" class="d-block w-100" alt="Ficha de inspeção" style="max-height:500px;object-fit:contain;">
