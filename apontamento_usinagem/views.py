@@ -489,6 +489,12 @@ def atualizar_status_ordem(request):
                     ordem.maquina = maquina_nome
                     ordem.status_prioridade = 1
 
+                    # Inspeção já no início (como na estamparia): o inspetor acompanha
+                    # em tempo real. Fica na peça base da ordem até a finalização.
+                    peca_inicial = PecasOrdem.objects.filter(ordem=ordem).order_by('id').first()
+                    if peca_inicial and not Inspecao.objects.filter(pecas_ordem_usinagem=peca_inicial).exists():
+                        Inspecao.objects.create(pecas_ordem_usinagem=peca_inicial)
+
                 elif status == 'finalizada':
                     operador_final = int(body.get('operador_final'))
                     obs_final = body.get('obs_finalizar')
@@ -511,10 +517,15 @@ def atualizar_status_ordem(request):
                     )      
 
                     peca.save()
-                    
-                    Inspecao.objects.create(    
-                        pecas_ordem_usinagem=peca_obj
-                    )
+
+                    # A inspeção aberta no início passa para o lote produzido (com o que o
+                    # inspetor já mediu); sem ela, cria como antes.
+                    inspecao_inicial = Inspecao.objects.filter(pecas_ordem_usinagem=peca).first()
+                    if inspecao_inicial:
+                        inspecao_inicial.pecas_ordem_usinagem = peca_obj
+                        inspecao_inicial.save(update_fields=['pecas_ordem_usinagem'])
+                    else:
+                        Inspecao.objects.create(pecas_ordem_usinagem=peca_obj)
 
                     # Envio silencioso ao ERP após confirmar a transação de finalização.
                     transaction.on_commit(
@@ -1397,6 +1408,14 @@ def retornar_processo(request):
             ordem_process = OrdemProcesso.objects.filter(ordem_id=ordem_id)
 
             ordem_process.delete()
+
+            # inspeção aberta no início da ordem e ainda não mexida pelo inspetor:
+            # some junto (volta a ser criada quando a ordem for iniciada de novo)
+            Inspecao.objects.filter(
+                pecas_ordem_usinagem__ordem_id=ordem_id,
+                pecas_ordem_usinagem__qtd_boa=0,
+                dadosexecucaoinspecao__isnull=True,
+            ).delete()
             
             updated_count = Ordem.objects.filter(id=ordem_id).update(
                 maquina=None,
