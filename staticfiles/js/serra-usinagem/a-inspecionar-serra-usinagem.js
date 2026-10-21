@@ -164,6 +164,14 @@ function buscarItensInspecao(pagina) {
             const badge100 = item.inspecao_completa
                 ? '<p class="status-badge status-aprovado mt-1" style="font-size:13px" title="Inspeção 100% marcada">100%</p>'
                 : '';
+            // inspeção aberta no início da ordem: operador ainda produzindo (inspeção em tempo real)
+            const badgeProducao = item.em_producao
+                ? '<p class="status-badge status-entregue mt-1" style="font-size:13px" title="Ordem iniciada pelo operador, ainda não finalizada">Em produção</p>'
+                : '';
+            const linhaQuantidade = item.em_producao
+                ? `<strong>🔢 Quantidade Planejada:</strong> ${item.qtd_planejada} <small class="text-muted">(em produção)</small>`
+                : `<strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}`;
+            const qtdReferencia = item.qtd_apontada || item.qtd_planejada;
 
             const cards = `
             <div class="col-md-4 mb-4">
@@ -173,20 +181,21 @@ function buscarItensInspecao(pagina) {
                         <div class="text-center">
                             <p class="status-badge status-${status[item.status]}" style="font-size:13px">${statusTexto}</p>
                             ${badge100}
+                            ${badgeProducao}
                         </div>
                     </div>
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data:</strong> ${item.data}<br>
                         <strong>⚙️ Máquina:</strong> ${item.maquina}<br>
-                        <strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}<br>
-                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador}
+                        ${linhaQuantidade}<br>
+                        <strong>🧑🏻‍🏭 Operador:</strong> ${item.operador || '-'}
                     </p>
                     <hr>
-                    <button 
+                    <button
                         data-id="${item.id}"
                         data-data="${item.data}"
-                        data-qtd="${item.qtd_apontada}"
+                        data-qtd="${qtdReferencia}"
                         data-peca="${item.peca}"
                         data-maquina="${item.maquina}"
                     class="btn btn-dark w-100 iniciar-inspecao" id="openModalButton">
