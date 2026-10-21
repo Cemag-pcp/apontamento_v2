@@ -44,11 +44,14 @@ export default function CameraScreen({ route, navigation }: Props) {
     setProcessando(true);
     try {
       const uriComprimida = await compressImage(fotoUri);
-      navigation.navigate({
-        name: 'PacoteDetail',
-        params: { cargaId, pacoteId, pacoteNome, stageCarga, capturedUri: uriComprimida },
-        merge: true,
-      });
+      // popTo (e nao navigate): no React Navigation 7 o navigate empilha um
+      // PacoteDetail novo por cima da camera, e o goBack depois de confirmar
+      // o pacote caia de volta nesta tela com a foto.
+      navigation.popTo(
+        'PacoteDetail',
+        { cargaId, pacoteId, pacoteNome, stageCarga, capturedUri: uriComprimida },
+        { merge: true },
+      );
     } finally {
       setProcessando(false);
     }

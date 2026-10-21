@@ -27,11 +27,13 @@ export default function ItemAvulsoScreen({ route, navigation }: Props) {
       return;
     }
 
-    navigation.navigate({
-      name: 'CriarPacote',
-      params: { cargaId, cargaNome, novoItemAvulso: { codigo: cod, descricao: desc, quantidade: qtd } },
-      merge: true,
-    });
+    // popTo volta pro CriarPacote que ja esta na pilha (navigate, no React
+    // Navigation 7, empilharia um novo e perderia os itens ja escolhidos).
+    navigation.popTo(
+      'CriarPacote',
+      { cargaId, cargaNome, novoItemAvulso: { codigo: cod, descricao: desc, quantidade: qtd } },
+      { merge: true },
+    );
   }
 
   return (

@@ -11,12 +11,15 @@ import * as api from '../api/expedicao';
 import { ApiError } from '../api/client';
 import { comCache } from '../offline/cache';
 import { useRefetchOnReconnect } from '../utils/useRefetchOnReconnect';
+import { formatarData } from '../utils/formatarData';
 import type { Carga, StageCarga } from '../api/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CargasList'>;
 
+// Igual a tela web (kanbans.js): o stage 'planejamento' do banco aparece
+// como "Apontamento" - o valor 'apontamento' existe no modelo mas nao e usado.
 const LABEL_STAGE: Record<StageCarga, string> = {
-  planejamento: 'Planejamento',
+  planejamento: 'Apontamento',
   apontamento: 'Apontamento',
   verificacao: 'Verificação',
   bipagem: 'Bipagem',
@@ -24,7 +27,7 @@ const LABEL_STAGE: Record<StageCarga, string> = {
 };
 
 const COR_STAGE: Record<StageCarga, string> = {
-  planejamento: '#6c757d',
+  planejamento: '#0d6efd',
   apontamento: '#0d6efd',
   verificacao: '#fd7e14',
   bipagem: '#0dcaf0',
@@ -33,7 +36,7 @@ const COR_STAGE: Record<StageCarga, string> = {
 
 // "Bipagem" mostra so as cargas com carregamento pendente (com 100% bipado
 // a carga vai sozinha pra despachado)
-const FILTROS_STATUS: StageCarga[] = ['verificacao', 'bipagem', 'despachado'];
+const FILTROS_STATUS: StageCarga[] = ['planejamento', 'verificacao', 'bipagem', 'despachado'];
 
 interface Flag {
   label: string;
@@ -227,7 +230,7 @@ export default function CargasListScreen({ navigation }: Props) {
                   </TouchableOpacity>
                 )}
               </View>
-              <Text style={styles.cardSub}>Carregamento: {item.data_carga}</Text>
+              <Text style={styles.cardSub}>Carregamento: {formatarData(item.data_carga)}</Text>
               <View style={styles.cardRodape}>
                 {flagsDaCarga(item).map((flag, idx) => (
                   <View key={idx} style={[styles.flagChip, { backgroundColor: flag.bg }]}>
