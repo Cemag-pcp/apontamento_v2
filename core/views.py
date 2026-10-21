@@ -1204,7 +1204,16 @@ def retornar_processo(request):
 
         with transaction.atomic():
             deleted_count, _ = OrdemProcesso.objects.filter(ordem_id=ordem_id).delete()
-            
+
+            # serra: inspeção aberta no início da ordem e ainda não mexida pelo
+            # inspetor some junto (volta a ser criada quando a ordem for iniciada de novo)
+            from inspecao.models import Inspecao
+            Inspecao.objects.filter(
+                pecas_ordem_serra__ordem_id=ordem_id,
+                pecas_ordem_serra__qtd_boa=0,
+                dadosexecucaoinspecao__isnull=True,
+            ).delete()
+
             updated_count = Ordem.objects.filter(id=ordem_id).update(
                 maquina=None,
                 status_atual='aguardando_iniciar'

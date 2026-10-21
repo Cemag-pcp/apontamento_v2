@@ -53,6 +53,12 @@ def amostras_exigidas(qtd_produzida):
     return max(min(qtd_produzida or 0, 3), 0)
 
 
+def qtd_referencia_inspecao(peca_ordem):
+    """Quantidade que a inspeção considera: a produzida ou, com a ordem ainda em
+    produção (inspeção aberta no início, nada apontado), a planejada."""
+    return peca_ordem.qtd_boa or peca_ordem.qtd_planejada or 0
+
+
 def inspecao_serra_usinagem(request):
 
     maquinas = Maquina.objects.filter(
@@ -254,7 +260,7 @@ def get_itens_inspecao_serra_usinagem(request):
                 "inspecao_completa": False,
                 "inspecao_finalizada": False,
                 "amostras_feitas": 0,
-                "amostras_exigidas": amostras_exigidas(ordem_peca.qtd_boa),
+                "amostras_exigidas": amostras_exigidas(qtd_referencia_inspecao(ordem_peca)),
             }
 
             ultima_execucao = ultimas_execucoes.get(inspecao.id)
@@ -284,6 +290,10 @@ def get_itens_inspecao_serra_usinagem(request):
                     "peca": peca_info,
                     "maquina": maquina_nome,
                     "qtd_apontada": ordem_peca.qtd_boa,
+                    "qtd_planejada": ordem_peca.qtd_planejada,
+                    # inspeção aberta no início da ordem: operador ainda produzindo
+                    "em_producao": not ordem_peca.qtd_boa and ordem_peca.ordem.status_atual != "finalizada",
+                    "status_ordem": ordem_peca.ordem.status_atual,
                     "operador": matricula_nome_operador,
                     **status_info,
                 }
@@ -931,7 +941,7 @@ def envio_inspecao_serra_usinagem(request):
 
             # Verificar finalização: cada tipo ativo precisa do mínimo de amostras
             pecas_ordem = inspecao.pecas_ordem_serra or inspecao.pecas_ordem_usinagem
-            exigidas = amostras_exigidas(pecas_ordem.qtd_boa) if pecas_ordem else 0
+            exigidas = amostras_exigidas(qtd_referencia_inspecao(pecas_ordem)) if pecas_ordem else 0
 
             contagens = [
                 DetalheMedidaSerraUsinagem.objects.filter(

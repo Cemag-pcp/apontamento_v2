@@ -168,6 +168,12 @@ def atualizar_status_ordem(request):
                     ordem.maquina = maquina_nome
                     ordem.status_prioridade = 1
 
+                    # Inspeção já no início (como na estamparia): o inspetor acompanha
+                    # em tempo real. Uma por peça da ordem; a finalização reaproveita.
+                    for peca_ordem in PecasOrdem.objects.filter(ordem=ordem):
+                        if not Inspecao.objects.filter(pecas_ordem_serra=peca_ordem).exists():
+                            Inspecao.objects.create(pecas_ordem_serra=peca_ordem)
+
                 elif status == 'finalizada':
                     tamanho_vara = body.get('tamanho_vara')
                     qtd_varas = body.get('qtd_vara')
@@ -238,9 +244,9 @@ def atualizar_status_ordem(request):
 
                                 nova_ordem = criar_ordem_usinagem(dados_usinagem) 
 
-                        Inspecao.objects.create(    
-                            pecas_ordem_serra=peca_obj
-                        )                   
+                        # já criada no início da ordem: não duplica
+                        if not Inspecao.objects.filter(pecas_ordem_serra=peca_obj).exists():
+                            Inspecao.objects.create(pecas_ordem_serra=peca_obj)
 
                     nova_ordem = None
                     if finalizar_parcial and pecas_restantes:
