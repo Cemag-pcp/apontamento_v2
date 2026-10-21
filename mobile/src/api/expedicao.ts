@@ -1,6 +1,6 @@
 import { apiFetch } from './client';
 import type {
-  AtualizarQuantidadeItemResponse, Carga, ConfirmarPacoteResponse, CriarPacoteInput,
+  AtualizarQuantidadeItemResponse, AvancarStageResponse, Carga, ConfirmarPacoteResponse, CriarPacoteInput,
   CriarPacoteResponse, DuplicarPacoteResponse, ExcluirCargaResponse,
   ExcluirItemPacoteResponse, ExcluirPacoteResponse, FornecedorItemInput, FotoPacote,
   LoginResponse, MoverItemResponse, PacotesDaCargaResponse, PendenciasResponse,
@@ -86,6 +86,10 @@ export function salvarFornecedores(token: string, cargaId: number, entradas: For
     token,
     body: entradas,
   });
+}
+
+export function avancarStageCarga(token: string, cargaId: number) {
+  return apiFetch<AvancarStageResponse>(`/cargas/${cargaId}/avancar-stage/`, { method: 'POST', token });
 }
 
 export function excluirCarga(token: string, cargaId: number) {

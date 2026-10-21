@@ -61,6 +61,49 @@ class PacoteValidationError(Exception):
     pass
 
 
+class AvancoEstagioError(Exception):
+    """Levantada quando a carga nao pode avancar pro proximo estagio."""
+    pass
+
+
+def avancar_stage_carga(carga):
+    """Avanca a carga pro proximo estagio (planejamento -> verificacao -> despachado).
+
+    Da verificacao so avanca com os fornecedores das pecas especiais
+    informados. Levanta AvancoEstagioError quando nao pode avancar.
+    """
+    stage_atual = carga.stage
+
+    if stage_atual == 'planejamento':
+        carga.stage = 'verificacao'
+    elif stage_atual == 'verificacao':
+        codigos_especiais = _detectar_codigos_especiais_da_carga(carga.id)
+        if codigos_especiais:
+            salvos = {(f.tipo, f.codigo): f.fornecedor
+                      for f in FornecedorItemCarga.objects.filter(carga=carga)}
+            faltando = [
+                f"{tipo} ({item['codigo']})"
+                for tipo, itens in codigos_especiais.items()
+                for item in itens
+                if not salvos.get((tipo, item['codigo']), '').strip()
+            ]
+            if faltando:
+                raise AvancoEstagioError(f'Informe o fornecedor de {", ".join(faltando)} antes de avançar.')
+
+        carga.stage = 'despachado'
+        carga.data_despachado = timezone.now()
+    else:
+        raise AvancoEstagioError('Estágio atual inválido para avanço automático.')
+
+    carga.save()
+
+    return {
+        'mensagem': 'Estágio alterado com sucesso!',
+        'stage_antigo': stage_atual,
+        'novo_stage': carga.stage,
+    }
+
+
 def listar_cargas_ativas():
     """Cargas ativas (planejamento/verificação) + despachadas recentes (últimos 30 dias)."""
     corte_despachado = timezone.now() - timedelta(days=30)

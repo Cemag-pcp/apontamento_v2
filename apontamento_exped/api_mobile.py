@@ -12,7 +12,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Carga, ImagemPacote, ItemPacote, Pacote
+from .models import Carga, ImagemPacote, ItemPacote, Pacote, PendenciasPacote
 from .serializers import (
     AtualizarQuantidadeItemSerializer,
     ConfirmarPacoteSerializer,
@@ -23,7 +23,9 @@ from .serializers import (
     UploadFotoSerializer,
 )
 from .services import (
+    AvancoEstagioError,
     FotoObrigatoriaError,
+    avancar_stage_carga,
     PacoteValidationError,
     atualizar_quantidade_item_service,
     confirmar_pacote_service,
@@ -87,6 +89,38 @@ class MeView(APIView):
 class CargasListView(APIView):
     def get(self, request):
         return Response(listar_cargas_ativas())
+
+
+class AvancarStageCargaView(APIView):
+    def post(self, request, carga_id):
+        carga = get_object_or_404(Carga, id=carga_id)
+
+        # Mesma regra que a web usa pra mostrar o botao de avancar na
+        # verificacao: todos os pacotes com foto de verificacao e nenhuma
+        # pendencia. Fica so aqui pra nao mudar o drag-and-drop da web.
+        if carga.stage == 'verificacao':
+            pacotes = Pacote.objects.filter(carga=carga)
+            sem_foto = pacotes.exclude(pacote_imagem__stage='verificacao').exists()
+            pendente = PendenciasPacote.objects.filter(
+                carreta_carga__carga_id=carga.id, qt_necessaria__gt=0,
+            ).exists()
+            if not pacotes.exists() or sem_foto:
+                return Response(
+                    {'erro': 'Todos os pacotes precisam de foto da verificação antes de avançar.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if pendente:
+                return Response(
+                    {'erro': 'Ainda há itens pendentes sem pacote nessa carga.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        try:
+            resultado = avancar_stage_carga(carga)
+        except AvancoEstagioError as exc:
+            return Response({'erro': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(resultado)
 
 
 class ExcluirCargaView(APIView):

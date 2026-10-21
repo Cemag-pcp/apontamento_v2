@@ -268,15 +268,17 @@ export default function PacoteDetailScreen({ route, navigation }: Props) {
   }
 
   async function handleConfirmar() {
-    if (!token) return;
+    if (!token || confirmando) return;
     setConfirmando(true);
     try {
       const resposta = await api.confirmarPacote(token, pacoteId);
-      Alert.alert('Sucesso', resposta.mensagem);
-      await carregar();
+      // Mantem `confirmando` ligado ate sair da tela, pra o botao nao voltar
+      // a ficar clicavel. A lista de pacotes recarrega no 'focus'.
+      Alert.alert('Sucesso', resposta.mensagem, [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ], { cancelable: true, onDismiss: () => navigation.goBack() });
     } catch (err) {
       Alert.alert('Erro', err instanceof ApiError ? err.message : 'Falha ao confirmar o pacote.');
-    } finally {
       setConfirmando(false);
     }
   }

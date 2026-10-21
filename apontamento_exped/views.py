@@ -23,6 +23,7 @@ from .services import (
     salvar_fornecedores_carga, excluir_carga_service,
     atualizar_quantidade_item_service, excluir_item_pacote_service,
     mover_item_pacote, sugerir_pacote_service,
+    AvancoEstagioError, avancar_stage_carga,
 )
 from cadastro.models import CarretasExplodidas
 
@@ -695,56 +696,13 @@ def alterar_stage(request, id):
     if request.method != 'POST':
         return JsonResponse({'erro': 'Método não permitido'}, status=405)
 
-    # novo_stage = data.get('stage', None)
     carga = get_object_or_404(Carga, id=id)
-    stage_atual = carga.stage
+    try:
+        resultado = avancar_stage_carga(carga)
+    except AvancoEstagioError as exc:
+        return JsonResponse({'erro': str(exc)}, status=400)
 
-    # Regras de avanço de estágio
-    # if stage_atual == 'planejamento':
-    
-    #     # VERIFICA SE TODOS PACOTES FORAM CRIADOS
-    #     total = (
-    #         PendenciasPacote.objects
-    #         .filter(carreta_carga__carga_id=id, qt_necessaria__gt=0)
-    #         .aggregate(total=Coalesce(Sum('qt_necessaria'), 0))
-    #         ['total']
-    #     )
-        
-    #     if total > 0:
-    #         return JsonResponse({'erro': 'Forme todos os pacotes antes de passar para próximo estágio.'}, status=400)
-
-    # Atualização do estágio
-    if stage_atual == 'planejamento':
-        carga.stage = 'verificacao'
-    elif stage_atual == 'verificacao':
-        # Verificar fornecedores obrigatórios para cada código especial presente
-        codigos_especiais = _detectar_codigos_especiais_da_carga(id)
-        if codigos_especiais:
-            salvos = {(f.tipo, f.codigo): f.fornecedor
-                      for f in FornecedorItemCarga.objects.filter(carga=carga)}
-            faltando = [
-                f"{tipo} ({item['codigo']})"
-                for tipo, itens in codigos_especiais.items()
-                for item in itens
-                if not salvos.get((tipo, item['codigo']), '').strip()
-            ]
-            if faltando:
-                return JsonResponse({
-                    'erro': f'Informe o fornecedor de {", ".join(faltando)} antes de avançar.'
-                }, status=400)
-
-        carga.stage = 'despachado'
-        carga.data_despachado = timezone.now()
-    else:
-        return JsonResponse({'erro': 'Estágio atual inválido para avanço automático.'}, status=400)
-
-    carga.save()
-
-    return JsonResponse({
-        'mensagem': 'Estágio alterado com sucesso!',
-        'stage_antigo': stage_atual,
-        'novo_stage': carga.stage,
-    }, status=200)
+    return JsonResponse(resultado, status=200)
 
 @csrf_exempt
 @require_http_methods(["POST"])

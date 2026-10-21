@@ -139,6 +139,12 @@ export interface ExcluirCargaResponse {
   mensagem: string;
 }
 
+export interface AvancarStageResponse {
+  mensagem: string;
+  stage_antigo: StageCarga;
+  novo_stage: StageCarga;
+}
+
 export interface AtualizarQuantidadeItemResponse {
   mensagem: string;
   item_id: number;

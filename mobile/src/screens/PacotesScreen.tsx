@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, RefreshControl, StyleSheet,
+  ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../api/expedicao';
+import { ApiError } from '../api/client';
 import { comCache } from '../offline/cache';
 import { useRefetchOnReconnect } from '../utils/useRefetchOnReconnect';
 import type { Pacote, PacotesDaCargaResponse } from '../api/types';
@@ -24,6 +25,7 @@ export default function PacotesScreen({ route, navigation }: Props) {
   const [erro, setErro] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [offline, setOffline] = useState(false);
+  const [avancando, setAvancando] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!token) return;
@@ -47,6 +49,47 @@ export default function PacotesScreen({ route, navigation }: Props) {
     ([tipo, itens]) => itens.some((item) => !(fornecedoresSalvos[`${tipo}_${item.codigo}`] || '').trim())
   );
   const podeCriarPacote = dados?.status_carga !== 'despachado';
+
+  // Avanco de estagio - mesmas condicoes do botao da web (kanbans.js):
+  // planejamento ("Apontamento") avanca sempre; verificacao so com todos os
+  // pacotes com foto e fornecedores informados. O servidor revalida.
+  const stageCarga = dados?.status_carga;
+  const pacotesDaCarga = dados?.pacotes ?? [];
+  let bloqueioAvanco: string | null = null;
+  if (stageCarga === 'verificacao') {
+    if (pacotesDaCarga.length === 0 || pacotesDaCarga.some((p) => !p.tem_foto)) {
+      bloqueioAvanco = 'Todos os pacotes precisam de foto antes de despachar.';
+    } else if (fornecedoresPendentes) {
+      bloqueioAvanco = 'Informe os fornecedores antes de despachar.';
+    }
+  }
+  if (offline) bloqueioAvanco = 'Sem conexão — não é possível avançar o estágio.';
+  const textoAvancar = stageCarga === 'planejamento' ? 'Avançar para Verificação'
+    : stageCarga === 'verificacao' ? 'Despachar carga'
+    : null;
+
+  function handleAvancar() {
+    if (!textoAvancar || bloqueioAvanco || avancando) return;
+    Alert.alert(textoAvancar, `Confirma ${textoAvancar.toLowerCase()} "${cargaNome}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Confirmar',
+        onPress: async () => {
+          if (!token) return;
+          setAvancando(true);
+          try {
+            const resposta = await api.avancarStageCarga(token, cargaId);
+            await carregar();
+            Alert.alert('Sucesso', resposta.mensagem);
+          } catch (err) {
+            Alert.alert('Erro', err instanceof ApiError ? err.message : 'Falha ao avançar o estágio.');
+          } finally {
+            setAvancando(false);
+          }
+        },
+      },
+    ]);
+  }
 
   useEffect(() => {
     navigation.setOptions({
@@ -170,6 +213,21 @@ export default function PacotesScreen({ route, navigation }: Props) {
           renderItem={renderPacote}
         />
       )}
+
+      {!carregando && textoAvancar && (
+        <View style={[styles.rodapeAvancar, { paddingBottom: insets.bottom + 12 }]}>
+          {bloqueioAvanco && <Text style={styles.avisoAvancar}>{bloqueioAvanco}</Text>}
+          <TouchableOpacity
+            style={[styles.botaoAvancar, (bloqueioAvanco || avancando) && styles.botaoAvancarDesabilitado]}
+            onPress={handleAvancar}
+            disabled={!!bloqueioAvanco || avancando}
+          >
+            {avancando
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.botaoAvancarTexto}>{textoAvancar}</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -203,4 +261,12 @@ const styles = StyleSheet.create({
   cardSub: { color: '#666', marginTop: 4, fontSize: 13 },
   confirmado: { color: '#198754', fontWeight: '600', marginTop: 6, fontSize: 13 },
   pendente: { color: '#b8860b', fontWeight: '600', marginTop: 6, fontSize: 13 },
+  rodapeAvancar: {
+    backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: '#e5e5e5',
+  },
+  avisoAvancar: { color: '#b8860b', fontSize: 13, marginBottom: 8, textAlign: 'center' },
+  botaoAvancar: { backgroundColor: '#0d6efd', borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
+  botaoAvancarDesabilitado: { backgroundColor: '#9ec5fe' },
+  botaoAvancarTexto: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

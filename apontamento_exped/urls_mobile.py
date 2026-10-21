@@ -13,6 +13,7 @@ urlpatterns = [
     path('cargas/<int:carga_id>/pendencias/', api_mobile.PendenciasCargaView.as_view(), name='pendencias_carga'),
     path('cargas/<int:carga_id>/pacotes/criar/', api_mobile.CriarPacoteView.as_view(), name='criar_pacote'),
     path('cargas/<int:carga_id>/fornecedores/', api_mobile.SalvarFornecedoresView.as_view(), name='salvar_fornecedores'),
+    path('cargas/<int:carga_id>/avancar-stage/', api_mobile.AvancarStageCargaView.as_view(), name='avancar_stage_carga'),
     path('cargas/<int:carga_id>/', api_mobile.ExcluirCargaView.as_view(), name='excluir_carga'),
     path('pacotes/<int:pacote_id>/fotos/', api_mobile.FotosPacoteView.as_view(), name='fotos_pacote'),
     path('pacotes/<int:pacote_id>/foto/', api_mobile.UploadFotoView.as_view(), name='upload_foto'),
