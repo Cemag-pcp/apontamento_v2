@@ -5,10 +5,10 @@ function construirChecklistUnidadeReinspecaoMontagem(indiceUnidade) {
                 <span class="checklist-causa-label">${causa.nome}</span>
                 <div class="btn-group btn-group-sm" role="group">
                     <input type="radio" class="btn-check causa-status-ok" name="status-causa-reinsp-${indiceUnidade}-${causa.id}" id="ok-causa-reinsp-${indiceUnidade}-${causa.id}" value="ok" autocomplete="off">
-                    <label class="btn btn-outline-success" for="ok-causa-reinsp-${indiceUnidade}-${causa.id}" title="OK" aria-label="OK"><i class="bi bi-check-lg"></i></label>
+                    <label class="btn btn-outline-success" for="ok-causa-reinsp-${indiceUnidade}-${causa.id}" title="OK">OK</label>
 
                     <input type="radio" class="btn-check causa-status-nok" name="status-causa-reinsp-${indiceUnidade}-${causa.id}" id="nok-causa-reinsp-${indiceUnidade}-${causa.id}" value="${causa.id}" data-causa-id="${causa.id}" data-causa-nome="${causa.nome}" autocomplete="off">
-                    <label class="btn btn-outline-danger" for="nok-causa-reinsp-${indiceUnidade}-${causa.id}" title="Não OK" aria-label="Não OK"><i class="bi bi-x-lg"></i></label>
+                    <label class="btn btn-outline-danger" for="nok-causa-reinsp-${indiceUnidade}-${causa.id}" title="Não OK" aria-label="Não OK">Ñ OK</label>
                 </div>
             </div>
             <div class="checklist-causa-detalhes" style="display:none;">
