@@ -2,12 +2,12 @@ document.addEventListener("DOMContentLoaded", () => {
     buscarItensReinspecao(1); // Chama a função quando a página carrega, começando na página 1
 });
 
-document.getElementById("btn-filtrar-reinspecao-estamparia").addEventListener("click", (event) => {
+document.getElementById("btn-filtrar-reinspecao").addEventListener("click", (event) => {
     event.preventDefault();
     buscarItensReinspecao(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
 });
 
-document.getElementById("btn-limpar-reinspecao-estamparia").addEventListener("click", (event) => {
+document.getElementById("btn-limpar-reinspecao").addEventListener("click", (event) => {
     event.preventDefault(); // Evita o recarregamento da página caso esteja dentro de um formulário
 
     // Seleciona todos os inputs dentro do formulário
@@ -27,12 +27,12 @@ function buscarItensReinspecao(pagina) {
     let qtdPendenteInspecao = document.getElementById("qtd-pendente-reinspecao");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-reinspecao");
     let itensInspecionar = document.getElementById("itens-reinspecao");
-    let itensFiltradosCor = document.getElementById("itens-filtrados-reinspecao-maquina");
+    let itensFiltradosCor = document.getElementById("itens-filtrados-reinspecao-cor");
     let itensFiltradosDataInicio = document.getElementById("itens-filtrados-reinspecao-data-inicio");
     let itensFiltradosDataFim = document.getElementById("itens-filtrados-reinspecao-data-fim");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-reinspecao-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-reinspecao-pesquisa");
-    let paginacao = document.getElementById("paginacao-reinspecao-estamparia");
+    let paginacao = document.getElementById("paginacao-reinspecao-montagem");
 
     // Limpa os cards antes de buscar novos
     cardsInspecao.innerHTML = `<div class="text-center">
@@ -43,9 +43,9 @@ function buscarItensReinspecao(pagina) {
     paginacao.innerHTML = "";
 
     // Coletar os filtros aplicados
-    let coresSelecionadas = [];
-    document.querySelectorAll('.form-check-input-reinspecao:checked').forEach(checkbox => {
-        coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
+    let maquinasSelecionadas = [];
+    document.querySelectorAll('.form-check-input-reinspecao-montagem:checked').forEach(checkbox => {
+        maquinasSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
     let inspetorSelecionado = [];
@@ -53,33 +53,32 @@ function buscarItensReinspecao(pagina) {
         inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    let dataInicio = document.getElementById('data-filtro-reinspecao-inicio').value;
-    let dataFim = document.getElementById('data-filtro-reinspecao-fim').value;
-    
+    let dataSelecionadaInicio = document.getElementById('data-inicio-reinspecao').value;
+    let dataSelecionadaFim = document.getElementById('data-fim-reinspecao').value;
     let pesquisarInspecao = document.getElementById('pesquisar-peca-reinspecao').value;
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
-    if (coresSelecionadas.length > 0) {
-        params.append("cores", coresSelecionadas.join(","));
+    if (maquinasSelecionadas.length > 0) {
+        params.append("maquinas", maquinasSelecionadas.join(","));
         itensFiltradosCor.style.display = "block";
-        itensFiltradosCor.textContent = "Cores: " + coresSelecionadas.join(", ");
+        itensFiltradosCor.textContent = "maquinas: " + maquinasSelecionadas.join(", ");
     } else {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataInicio) {
-        params.append("data_inicio", dataInicio);
+    if (dataSelecionadaInicio) {
+        params.append("data_inicio", dataSelecionadaInicio);
         itensFiltradosDataInicio.style.display = "block";
-        itensFiltradosDataInicio.textContent = "De: " + dataInicio;
+        itensFiltradosDataInicio.textContent = "De: " + dataSelecionadaInicio;
     } else {
         itensFiltradosDataInicio.style.display = "none";
     }
 
-    if (dataFim) {
-        params.append("data_fim", dataFim);
+    if (dataSelecionadaFim) {
+        params.append("data_fim", dataSelecionadaFim);
         itensFiltradosDataFim.style.display = "block";
-        itensFiltradosDataFim.textContent = "Até: " + dataFim;
+        itensFiltradosDataFim.textContent = "Até: " + dataSelecionadaFim;
     } else {
         itensFiltradosDataFim.style.display = "none";
     }
@@ -102,7 +101,7 @@ function buscarItensReinspecao(pagina) {
 
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
-    fetch(`/inspecao/api/itens-reinspecao-estamparia/?${params.toString()}`, {
+    fetch(`/inspecao/api/itens-reinspecao-montagem/?${params.toString()}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -121,15 +120,15 @@ function buscarItensReinspecao(pagina) {
 
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
-        if (params.size > 1) {
+        // Sem filtro o servidor devolve so os ultimos N dias (limitado_dias)
+        if (items.limitado_dias) {
             qtdFiltradaInspecao.style.display = 'block';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} dos últimos ${items.limitado_dias} dias (filtre para ver os mais antigos)`;
         } else {
-            qtdFiltradaInspecao.style.display = 'none';
+            qtdFiltradaInspecao.style.display = params.size > 1 ? 'block' : 'none';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
         }
 
-        qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
-
-        
         items.dados.forEach(item => {
             let borderColors = {
                 "Laranja": "orange", "Verde": "green",
@@ -146,9 +145,9 @@ function buscarItensReinspecao(pagina) {
                     <p>Inspecao #${item.id}</p>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
+                        <strong>📅 Data da carga:</strong> ${item.data_carga || "-"}<br>
                         <strong>🧮 Conformidade:</strong> ${item.conformidade}<br>
                         <strong>🔢 Não conformidade:</strong> ${item.nao_conformidade}<br>
-                        <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
                     <button 
@@ -156,12 +155,10 @@ function buscarItensReinspecao(pagina) {
                         data-data="${item.data}"
                         data-nao-conformidade="${item.nao_conformidade}"
                         data-conformidade="${item.conformidade}"
-                        data-qtd-total="${item.qtd_total}"
+                        data-cor="${item.cor}"
                         data-peca="${item.peca}"
-                        data-maquina="${item.maquina}"
-                        class="btn btn-dark w-100 iniciar-reinspecao">
-                        Iniciar Reinspeção
-                    </button>
+                    class="btn btn-dark w-100 iniciar-reinspecao">
+                    Iniciar Reinspeção</button>
                 </div>
             </div>`;
 
