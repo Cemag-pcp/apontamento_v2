@@ -44,6 +44,11 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import json
 
+# Abas "A inspecionar" e "Reinspeção": sem nenhum filtro aplicado a lista
+# mostra so os registros dos ultimos DIAS_PADRAO_LISTA dias. Qualquer filtro
+# (data, maquina, pesquisa, inspetor) busca em todo o historico.
+DIAS_PADRAO_LISTA = 30
+
 
 def inspecao_estamparia(request):
 
@@ -316,6 +321,12 @@ def get_itens_inspecao_estamparia(request):
 
     quantidade_total = datas.count()  # Total de itens sem filtro
 
+    limitado_periodo_padrao = not (maquinas_filtradas or data_inicio or data_fim or pesquisa_filtrada)
+    if limitado_periodo_padrao:
+        datas = datas.filter(
+            data_inspecao__gte=timezone.now() - timedelta(days=DIAS_PADRAO_LISTA)
+        )
+
     if maquinas_filtradas:
         datas = datas.filter(
             pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas
@@ -390,6 +401,7 @@ def get_itens_inspecao_estamparia(request):
             "total_filtrado": paginador.count,  # Total de itens após filtro
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
+            "limitado_dias": DIAS_PADRAO_LISTA if limitado_periodo_padrao else None,
         },
         status=200,
     )
@@ -426,6 +438,14 @@ def get_itens_reinspecao_estamparia(request):
     # Otimização 2: Construir a query de forma incremental
     query = Q(id__in=reinspecao_ids) & Q(pecas_ordem_estamparia__isnull=False)
 
+    limitado_periodo_padrao = not (
+        maquinas_filtradas or inspetores_filtrados or data_inicio or data_fim or pesquisa_filtrada
+    )
+    if limitado_periodo_padrao:
+        query &= Q(
+            dadosexecucaoinspecao__data_execucao__gte=timezone.now() - timedelta(days=DIAS_PADRAO_LISTA)
+        )
+
     if maquinas_filtradas:
         query &= Q(pecas_ordem_estamparia__ordem__maquina__nome__in=maquinas_filtradas)
 
@@ -452,7 +472,7 @@ def get_itens_reinspecao_estamparia(request):
 
     if pesquisa_filtrada:
         pesquisa_filtrada = pesquisa_filtrada.lower()
-        query &= Q(pecas_ordem_estamparia__peca__icontains=pesquisa_filtrada)
+        query &= Q(pecas_ordem_estamparia__peca__codigo__icontains=pesquisa_filtrada)
 
     if inspetores_filtrados:
         query &= Q(
@@ -575,6 +595,7 @@ def get_itens_reinspecao_estamparia(request):
             "total_filtrado": paginador.count,
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
+            "limitado_dias": DIAS_PADRAO_LISTA if limitado_periodo_padrao else None,
         },
         status=200,
     )

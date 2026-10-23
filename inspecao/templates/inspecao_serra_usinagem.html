@@ -189,14 +189,16 @@
     <div class="d-flex justify-content-between mt-3">
         <h4 style="width: 60%;">Inspeções pendentes</h4>
         <div>
-            <div class="btn-group">
-                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-                <form id="form-filtrar-inspecao">
-                    <div class="dropdown-menu p-3" style="width: 250px;">
-                        <p class="fw-bold mx-2 my-1">Filtrar inspeções</p>
-                        <hr>
+            <button class="btn btn-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-form-filtrar-inspecao" aria-controls="offcanvas-form-filtrar-inspecao">
+                <i class="bi bi-funnel"></i> Filtrar
+            </button>
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-form-filtrar-inspecao" aria-labelledby="offcanvas-form-filtrar-inspecao-label" style="width: 320px;">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="offcanvas-form-filtrar-inspecao-label">Filtrar inspeções</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                </div>
+                <form id="form-filtrar-inspecao" class="offcanvas-body">
+                    <div>
                         <input type="text" class="form-control mb-3" id="pesquisar-peca-inspecao" placeholder="Pesquisar as peças...">
                         
                         <h6>Máquina</h6>
@@ -241,7 +243,7 @@
                 
                         <div class="d-flex justify-content-between mt-3">
                             <button type="button" id="btn-limpar-inspecao-serra-usinagem"  class="btn btn-outline-secondary">Limpar</button>
-                            <button type="button" id="btn-filtrar-inspecao-serra-usinagem" class="btn btn-dark">Filtrar</button>
+                            <button type="button" id="btn-filtrar-inspecao-serra-usinagem" class="btn btn-dark" data-bs-dismiss="offcanvas">Filtrar</button>
                         </div>
                     </div>
                 </form>
@@ -271,14 +273,16 @@
     <div class="d-flex justify-content-between mt-3">
         <h4 style="width: 60%;">Requerem reinspeção</h4>
         <div>
-            <div class="btn-group">
-                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton2" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-                <form id="form-filtrar-reinspecao" action="">
-                    <div class="dropdown-menu p-3" style="width: 250px;">
-                        <p class="fw-bold mx-2 my-1">Filtrar inspeções</p>
-                        <hr>
+            <button class="btn btn-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-form-filtrar-reinspecao" aria-controls="offcanvas-form-filtrar-reinspecao">
+                <i class="bi bi-funnel"></i> Filtrar
+            </button>
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-form-filtrar-reinspecao" aria-labelledby="offcanvas-form-filtrar-reinspecao-label" style="width: 320px;">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="offcanvas-form-filtrar-reinspecao-label">Filtrar inspeções</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                </div>
+                <form id="form-filtrar-reinspecao" action="" class="offcanvas-body">
+                    <div>
                         <input id="pesquisar-peca-reinspecao" type="text" class="form-control mb-3" placeholder="Pesquisar...">
                         
                         <h6>Máquina</h6>
@@ -320,7 +324,7 @@
 
                         <div class="d-flex justify-content-between mt-3">
                             <button id="btn-limpar-reinspecao-serra-usinagem" class="btn btn-outline-secondary">Limpar</button>
-                            <button id="btn-filtrar-reinspecao-serra-usinagem" class="btn btn-dark">Filtrar</button>
+                            <button id="btn-filtrar-reinspecao-serra-usinagem" class="btn btn-dark" data-bs-dismiss="offcanvas">Filtrar</button>
                         </div>
                     </div>
                 </form>
@@ -352,14 +356,16 @@
         <div class="d-flex gap-2">
             <!-- <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar</button> -->
             <div>
-                <div class="btn-group">
-                    <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                        <i class="bi bi-funnel"></i> Filtrar
-                    </button>
-                    <form id="form-filtrar-inspecionados" action="">
-                        <div class="dropdown-menu p-3" style="width: 250px;">
-                            <p class="fw-bold mx-2 my-1">Filtrar inspeções</p>
-                            <hr>
+                <button class="btn btn-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-form-filtrar-inspecionados" aria-controls="offcanvas-form-filtrar-inspecionados">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-form-filtrar-inspecionados" aria-labelledby="offcanvas-form-filtrar-inspecionados-label" style="width: 320px;">
+                    <div class="offcanvas-header">
+                        <h5 class="offcanvas-title" id="offcanvas-form-filtrar-inspecionados-label">Filtrar inspeções</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                    </div>
+                    <form id="form-filtrar-inspecionados" action="" class="offcanvas-body">
+                        <div>
                             <input id="pesquisar-peca-inspecionados" type="text" class="form-control mb-3" placeholder="Search inspections...">
                             
                             <h6>Filtrar por</h6>
@@ -412,7 +418,7 @@
                     
                             <div class="d-flex justify-content-between mt-3">
                                 <button id="btn-limpar-inspecionados" class="btn btn-outline-secondary">Limpar</button>
-                                <button id="btn-filtrar-inspecionados" class="btn btn-dark">Filtrar</button>
+                                <button id="btn-filtrar-inspecionados" class="btn btn-dark" data-bs-dismiss="offcanvas">Filtrar</button>
                             </div>
                         </div>
                     </form>

@@ -33,14 +33,16 @@
     <div class="d-flex justify-content-between mt-3">
         <h4 style="width: 60%;">Testes pendentes</h4>
         <div>
-            <div class="btn-group">
-                <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-                <form id="form-filtrar-verificacao-pendentes">
-                    <div class="dropdown-menu p-3" style="width: 250px;">
-                        <p class="fw-bold mx-2 my-1">Filtrar testes</p>
-                        <hr>
+            <button class="btn btn-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-form-filtrar-verificacao-pendentes" aria-controls="offcanvas-form-filtrar-verificacao-pendentes">
+                <i class="bi bi-funnel"></i> Filtrar
+            </button>
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-form-filtrar-verificacao-pendentes" aria-labelledby="offcanvas-form-filtrar-verificacao-pendentes-label" style="width: 320px;">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="offcanvas-form-filtrar-verificacao-pendentes-label">Filtrar testes</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                </div>
+                <form id="form-filtrar-verificacao-pendentes" class="offcanvas-body">
+                    <div>
                         <input type="text" class="form-control mb-3" id="pesquisar-peca-verificacao-pendentes" placeholder="Pesquisar as peças...">
                         
                         <h6>Cor</h6>
@@ -87,7 +89,7 @@
                 
                         <div class="d-flex justify-content-between mt-3">
                             <button id="btn-limpar-verificacao-pendentes"  class="btn btn-outline-secondary">Limpar</button>
-                            <button id="btn-filtrar-verificacao-pendentes" class="btn btn-dark">Filtrar</button>
+                            <button id="btn-filtrar-verificacao-pendentes" class="btn btn-dark" data-bs-dismiss="offcanvas">Filtrar</button>
                         </div>
                     </div>
                 </form>
@@ -118,14 +120,16 @@
         <div class="d-flex gap-2">
             <!-- <button class="btn btn-white"><i class="bi bi-file-earmark-excel"></i> Exportar</button> -->
             <div>
-                <div class="btn-group">
-                    <button class="btn btn-white dropdown-toggle" type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-                        <i class="bi bi-funnel"></i> Filtrar
-                    </button>
-                    <form id="form-filtrar-verificacao-finalizados" action="">
-                        <div class="dropdown-menu p-3" style="width: 250px;">
-                            <p class="fw-bold mx-2 my-1">Filtrar Testes Finalizados</p>
-                            <hr>
+                <button class="btn btn-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-form-filtrar-verificacao-finalizados" aria-controls="offcanvas-form-filtrar-verificacao-finalizados">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-form-filtrar-verificacao-finalizados" aria-labelledby="offcanvas-form-filtrar-verificacao-finalizados-label" style="width: 320px;">
+                    <div class="offcanvas-header">
+                        <h5 class="offcanvas-title" id="offcanvas-form-filtrar-verificacao-finalizados-label">Filtrar Testes Finalizados</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+                    </div>
+                    <form id="form-filtrar-verificacao-finalizados" action="" class="offcanvas-body">
+                        <div>
                             <input id="pesquisar-peca-verificacao-finalizados" type="text" class="form-control mb-3" placeholder="Buscar Testes Finalizados...">
 
                             <h6>Status</h6>
@@ -206,7 +210,7 @@
                     
                             <div class="d-flex justify-content-between mt-3">
                                 <button id="btn-limpar-verificacao-finalizados" class="btn btn-outline-secondary">Limpar</button>
-                                <button id="btn-filtrar-verificacao-finalizados" class="btn btn-dark">Filtrar</button>
+                                <button id="btn-filtrar-verificacao-finalizados" class="btn btn-dark" data-bs-dismiss="offcanvas">Filtrar</button>
                             </div>
                         </div>
                     </form>

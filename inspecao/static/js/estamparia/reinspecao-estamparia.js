@@ -44,7 +44,7 @@ function buscarItensReinspecao(pagina) {
 
     // Coletar os filtros aplicados
     let coresSelecionadas = [];
-    document.querySelectorAll('.form-check-input-reinspecao:checked').forEach(checkbox => {
+    document.querySelectorAll('.form-check-input-reinspecao-estamparia:checked').forEach(checkbox => {
         coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
     });
 
@@ -61,9 +61,9 @@ function buscarItensReinspecao(pagina) {
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
     if (coresSelecionadas.length > 0) {
-        params.append("cores", coresSelecionadas.join(","));
+        params.append("maquinas", coresSelecionadas.join(","));
         itensFiltradosCor.style.display = "block";
-        itensFiltradosCor.textContent = "Cores: " + coresSelecionadas.join(", ");
+        itensFiltradosCor.textContent = "Máquinas: " + coresSelecionadas.join(", ");
     } else {
         itensFiltradosCor.style.display = "none";
     }
@@ -121,13 +121,14 @@ function buscarItensReinspecao(pagina) {
 
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
-        if (params.size > 1) {
+        // Sem filtro o servidor devolve so os ultimos N dias (limitado_dias)
+        if (items.limitado_dias) {
             qtdFiltradaInspecao.style.display = 'block';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} dos últimos ${items.limitado_dias} dias (filtre para ver os mais antigos)`;
         } else {
-            qtdFiltradaInspecao.style.display = 'none';
+            qtdFiltradaInspecao.style.display = params.size > 1 ? 'block' : 'none';
+            qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
         }
-
-        qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         
         items.dados.forEach(item => {
