@@ -53,10 +53,16 @@ def amostras_exigidas(qtd_produzida):
     return max(min(qtd_produzida or 0, 3), 0)
 
 
-def qtd_referencia_inspecao(peca_ordem):
+def qtd_referencia_inspecao(peca_ordem, qtd_informada=None):
     """Quantidade que a inspeção considera: a produzida ou, com a ordem ainda em
-    produção (inspeção aberta no início, nada apontado), a planejada."""
-    return peca_ordem.qtd_boa or peca_ordem.qtd_planejada or 0
+    produção (inspeção aberta no início, nada apontado), a informada pelo
+    inspetor ou, na falta dela, a planejada."""
+    return peca_ordem.qtd_boa or qtd_informada or peca_ordem.qtd_planejada or 0
+
+
+def ordem_em_producao(peca_ordem):
+    """Inspeção aberta no início da ordem: operador ainda produzindo, nada apontado."""
+    return not peca_ordem.qtd_boa and peca_ordem.ordem.status_atual != "finalizada"
 
 
 def inspecao_serra_usinagem(request):
@@ -253,6 +259,12 @@ def get_itens_inspecao_serra_usinagem(request):
             if operador:
                 matricula_nome_operador = f"{operador.matricula} - {operador.nome}"
 
+            ultima_execucao = ultimas_execucoes.get(inspecao.id)
+            info_adicionais = (
+                getattr(ultima_execucao, "info_adicionais", None) if ultima_execucao else None
+            )
+            qtd_inspecionar = info_adicionais.qtd_inspecionar if info_adicionais else None
+
             # Determina status
             # "inspecao_completa" = inspeção 100% marcada pelo inspetor (não indica fim da inspeção)
             status_info = {
@@ -260,13 +272,12 @@ def get_itens_inspecao_serra_usinagem(request):
                 "inspecao_completa": False,
                 "inspecao_finalizada": False,
                 "amostras_feitas": 0,
-                "amostras_exigidas": amostras_exigidas(qtd_referencia_inspecao(ordem_peca)),
+                "amostras_exigidas": amostras_exigidas(
+                    qtd_referencia_inspecao(ordem_peca, qtd_inspecionar)
+                ),
             }
 
-            ultima_execucao = ultimas_execucoes.get(inspecao.id)
             if ultima_execucao:
-                info_adicionais = getattr(ultima_execucao, "info_adicionais", None)
-
                 status_info["inspecao_completa"] = (
                     info_adicionais.inspecao_completa if info_adicionais else False
                 )
@@ -291,8 +302,9 @@ def get_itens_inspecao_serra_usinagem(request):
                     "maquina": maquina_nome,
                     "qtd_apontada": ordem_peca.qtd_boa,
                     "qtd_planejada": ordem_peca.qtd_planejada,
+                    "qtd_inspecionar": qtd_inspecionar,
                     # inspeção aberta no início da ordem: operador ainda produzindo
-                    "em_producao": not ordem_peca.qtd_boa and ordem_peca.ordem.status_atual != "finalizada",
+                    "em_producao": ordem_em_producao(ordem_peca),
                     "status_ordem": ordem_peca.ordem.status_atual,
                     "operador": matricula_nome_operador,
                     **status_info,
@@ -940,7 +952,24 @@ def envio_inspecao_serra_usinagem(request):
 
             # Verificar finalização: cada tipo ativo precisa do mínimo de amostras
             pecas_ordem = inspecao.pecas_ordem_serra or inspecao.pecas_ordem_usinagem
-            exigidas = amostras_exigidas(qtd_referencia_inspecao(pecas_ordem)) if pecas_ordem else 0
+
+            # Ordem em produção: o operador pode produzir mais que o planejado,
+            # então vale a quantidade a inspecionar informada pelo inspetor
+            if pecas_ordem and ordem_em_producao(pecas_ordem):
+                try:
+                    qtd_informada = int(data.get("pecasProduzidas") or 0)
+                except ValueError:
+                    qtd_informada = 0
+                if qtd_informada > 0:
+                    info_adicionais.qtd_inspecionar = qtd_informada
+
+            exigidas = (
+                amostras_exigidas(
+                    qtd_referencia_inspecao(pecas_ordem, info_adicionais.qtd_inspecionar)
+                )
+                if pecas_ordem
+                else 0
+            )
 
             contagens = [
                 DetalheMedidaSerraUsinagem.objects.filter(
