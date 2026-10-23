@@ -26,6 +26,8 @@ class InfoAdicionaisSerraUsinagem(models.Model):
     )
     inspecao_completa = models.BooleanField(default=False)
     inspecao_finalizada = models.BooleanField(default=False)
+    # Informada pelo inspetor quando a ordem ainda está em produção (qtd planejada não é confiável)
+    qtd_inspecionar = models.PositiveIntegerField(null=True, blank=True)
     ficha = models.ImageField(upload_to="fichas_inspecao/", null=True, blank=True)
 
     observacoes_gerais = models.TextField(null=True, blank=True)
