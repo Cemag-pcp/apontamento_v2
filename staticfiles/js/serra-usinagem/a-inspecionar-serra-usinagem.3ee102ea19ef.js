@@ -21,6 +21,20 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Inicializar contagem de conformidades
     updateConformityCounts();
+
+    // Quantidade a inspecionar editável (ordem em produção): reajusta as linhas das tabelas de medição
+    document.getElementById('pecasProduzidas').addEventListener('change', function () {
+        // Não deixa ficar abaixo das amostras já salvas (as linhas delas sumiriam da tabela)
+        const minimo = parseInt(this.min, 10) || 1;
+        const qtd = parseInt(this.value, 10);
+        if (!qtd || qtd < minimo) {
+            this.value = minimo;
+        }
+        if (typeof window.syncMeasurementRowsSerraUsinagem === 'function') {
+            const linhasAtuais = parseInt(document.getElementById('measurementRowsCount')?.value, 10) || 1;
+            window.syncMeasurementRowsSerraUsinagem(Math.max(linhasAtuais, Math.min(parseInt(this.value, 10), 3)), true);
+        }
+    });
 });
 
 document.getElementById("btn-filtrar-inspecao-serra-usinagem").addEventListener("click", (event) => {
@@ -168,10 +182,13 @@ function buscarItensInspecao(pagina) {
             const badgeProducao = item.em_producao
                 ? '<p class="status-badge status-entregue mt-1" style="font-size:13px" title="Ordem iniciada pelo operador, ainda não finalizada">Em produção</p>'
                 : '';
-            const linhaQuantidade = item.em_producao
+            let linhaQuantidade = item.em_producao
                 ? `<strong>🔢 Quantidade Planejada:</strong> ${item.qtd_planejada} <small class="text-muted">(em produção)</small>`
                 : `<strong>🔢 Quantidade Produzida:</strong> ${item.qtd_apontada}`;
-            const qtdReferencia = item.qtd_apontada || item.qtd_planejada;
+            if (item.em_producao && item.qtd_inspecionar) {
+                linhaQuantidade += `<br><strong>🔍 Quantidade a Inspecionar:</strong> ${item.qtd_inspecionar}`;
+            }
+            const qtdReferencia = item.qtd_apontada || item.qtd_inspecionar || item.qtd_planejada;
 
             const cards = `
             <div class="col-md-4 mb-4">
@@ -196,6 +213,7 @@ function buscarItensInspecao(pagina) {
                         data-id="${item.id}"
                         data-data="${item.data}"
                         data-qtd="${qtdReferencia}"
+                        data-em-producao="${item.em_producao ? 'true' : 'false'}"
                         data-peca="${item.peca}"
                         data-maquina="${item.maquina}"
                     class="btn btn-dark w-100 iniciar-inspecao" id="openModalButton">
@@ -231,7 +249,8 @@ function buscarItensInspecao(pagina) {
                     const itemQtd = this.getAttribute('data-qtd');
                     const itemPeca = this.getAttribute('data-peca');
                     const itemMaquina = this.getAttribute('data-maquina');
-                    
+                    const itemEmProducao = this.getAttribute('data-em-producao') === 'true';
+
                     const modalInspecao = document.getElementById('inspectionModal');
                     
                     // Pegar a data atual formatada
@@ -249,8 +268,16 @@ function buscarItensInspecao(pagina) {
                     }
 
                     // Desabilitar campos para edição
+                    // Ordem em produção: o operador pode fazer mais que o planejado,
+                    // então o inspetor informa quantas peças vai inspecionar
+                    const inputPecas = modalInspecao.querySelector('#pecasProduzidas');
+                    inputPecas.min = '1';
+                    inputPecas.disabled = !itemEmProducao;
+                    inputPecas.readOnly = !itemEmProducao;
+                    modalInspecao.querySelector('label[for="pecasProduzidas"]').textContent = itemEmProducao
+                        ? 'Quantidade a inspecionar'
+                        : 'Peças Produzidas';
                     modalInspecao.querySelector('#maquina').disabled = true;
-                    modalInspecao.querySelector('#pecasProduzidas').disabled = true;
                     modalInspecao.querySelector('#dataInspecao').disabled = true;
                     modalInspecao.querySelector('#conjuntoName').disabled = true;
 
@@ -354,6 +381,8 @@ function preencherLinhasMedicao(dados) {
         const quantidadeAmostras = Object.keys(dadosTipo.amostras || {}).length;
         return Math.max(maiorQuantidade, quantidadeAmostras);
     }, 1);
+
+    document.getElementById('pecasProduzidas').min = String(totalLinhas);
 
     if (typeof window.syncMeasurementRowsSerraUsinagem === 'function') {
         window.syncMeasurementRowsSerraUsinagem(totalLinhas, false);
