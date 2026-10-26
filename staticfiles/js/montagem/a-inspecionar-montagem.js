@@ -106,7 +106,10 @@ function buscarItensInspecao(pagina) {
 
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens pendentes`;
 
-        // Sem filtro o servidor devolve so os ultimos N dias (limitado_dias)
+        // Sem filtro o servidor devolve so os ultimos N dias (limitado_dias).
+        // Nesse caso esconde o total geral de pendentes: ele conta tambem as
+        // inspecoes antigas, que nao aparecem na lista.
+        qtdPendenteInspecao.style.display = items.limitado_dias ? 'none' : '';
         if (items.limitado_dias) {
             qtdFiltradaInspecao.style.display = 'block';
             qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} dos últimos ${items.limitado_dias} dias (filtre para ver os mais antigos)`;
