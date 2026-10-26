@@ -452,6 +452,20 @@ def get_ordens_criadas(request):
         'has_next': ordens_page.has_next(),
     })
 
+ROTA_RETIRAR_PRIORIDADE = 'estamparia/painel-prioridades/retirar'
+
+
+def _pode_retirar_prioridade(user):
+    """PCP sempre pode; os demais so com a permissao marcada na tela de acessos
+    (RotaAcesso criada na migracao 0019_rota_retirar_prioridade)."""
+    if not user.is_authenticated:
+        return False
+    profile = Profile.objects.filter(user=user).first()
+    if profile is None:
+        return False
+    return profile.tipo_acesso == 'pcp' or profile.tem_acesso(ROTA_RETIRAR_PRIORIDADE)
+
+
 @require_GET
 def get_painel_prioridades(request):
     usuario_tipo = (
@@ -488,7 +502,11 @@ def get_painel_prioridades(request):
             'qtd_planejada': primeira_peca.qtd_planejada if primeira_peca else 0,
         })
 
-    return JsonResponse({'ordens': data, 'usuario_tipo_acesso': usuario_tipo})
+    return JsonResponse({
+        'ordens': data,
+        'usuario_tipo_acesso': usuario_tipo,
+        'pode_retirar': _pode_retirar_prioridade(request.user),
+    })
 
 
 @require_GET
@@ -549,12 +567,8 @@ def editar_ordem_prioridade(request):
 
 @require_POST
 def retirar_ordem_prioridade(request):
-    usuario_tipo = (
-        Profile.objects.filter(user=request.user).values_list('tipo_acesso', flat=True).first()
-        if request.user.is_authenticated else None
-    )
-    if usuario_tipo != 'pcp':
-        return JsonResponse({'error': 'Apenas usuarios PCP podem retirar prioridade.'}, status=403)
+    if not _pode_retirar_prioridade(request.user):
+        return JsonResponse({'error': 'Voce nao tem permissao para retirar prioridade.'}, status=403)
 
     try:
         body = json.loads(request.body)
