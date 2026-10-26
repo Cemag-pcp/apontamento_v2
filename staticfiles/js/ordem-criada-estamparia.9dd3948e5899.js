@@ -31,7 +31,9 @@ export function carregarPainelPrioridades() {
         })
         .then(data => {
             container.innerHTML = '';
-            const usuarioPodeRetirar = data.usuario_tipo_acesso === 'pcp';
+            // editar: so PCP; retirar: PCP ou permissao liberada na tela de acessos
+            const usuarioPodeEditar = data.usuario_tipo_acesso === 'pcp';
+            const usuarioPodeRetirar = Boolean(data.pode_retirar);
 
             if (!data.ordens || data.ordens.length === 0) {
                 container.innerHTML = '<li class="text-muted text-center py-3">Nenhuma ordem com prioridade definida.</li>';
@@ -80,10 +82,12 @@ export function carregarPainelPrioridades() {
                                 <button type="button" class="btn btn-sm btn-warning btn-prioridade-iniciar" title="Iniciar">
                                     <i class="fa fa-play"></i>
                                 </button>
-                                ${usuarioPodeRetirar ? `
+                                ${usuarioPodeEditar ? `
                                     <button type="button" class="btn btn-sm btn-outline-primary btn-prioridade-editar" title="Editar prioridade">
                                         <i class="fa fa-pen"></i>
                                     </button>
+                                ` : ''}
+                                ${usuarioPodeRetirar ? `
                                     <button type="button" class="btn btn-sm btn-outline-danger btn-prioridade-retirar" title="Retirar da prioridade">
                                         <i class="fa fa-times"></i>
                                     </button>
@@ -131,10 +135,8 @@ function retirarPrioridadeOrdem(ordemId) {
         icon: 'warning',
         title: 'Retirar da prioridade?',
         showCancelButton: true,
-        confirmButtonText: '',
-        cancelButtonText: '',
-        confirmButtonAriaLabel: 'Confirmar',
-        cancelButtonAriaLabel: 'Cancelar',
+        confirmButtonText: 'Retirar',
+        cancelButtonText: 'Cancelar',
         html: `
             <p class="mb-0">A ordem deixará de aparecer no painel de prioridades.</p>
         `,
