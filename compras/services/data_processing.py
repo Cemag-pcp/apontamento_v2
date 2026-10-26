@@ -181,6 +181,7 @@ def _calcular_datas_projecao(
             'data_estoque_zero': None,
             'data_compra': None,
             'dias_ate_data_compra': None,
+            'data_abaixo_minimo_coberto': None,
         }
 
     pedidos = df_pedidos[
@@ -219,11 +220,13 @@ def _calcular_datas_projecao(
     data_estoque_minimo = None
     data_estoque_zero = None
     estoque = estoque_base
+    estoque_por_data = {}
     datas = pd.date_range(start=hoje, periods=horizonte_dias_uteis, freq='B')
 
     for data in datas:
         estoque -= consumo_diario
         estoque += chegadas_por_data.get(data, 0)
+        estoque_por_data[data.date()] = estoque
 
         if data_estoque_zero is None and estoque <= 0:
             data_estoque_zero = data.date()
@@ -231,13 +234,39 @@ def _calcular_datas_projecao(
         if data_estoque_minimo is None and estoque <= estoque_minimo:
             data_estoque_minimo = data.date()
 
-        if data_estoque_minimo is not None and data_estoque_zero is not None:
-            break
+    # Data em que chegaria uma compra emitida hoje (mesmo prazo da data de compra).
+    chegada_compra_hoje = _adicionar_dias_uteis(hoje, dias_ressupr + 1)
+
+    # Queda abaixo do minimo que nenhuma compra nova evita (acontece antes de
+    # uma compra de hoje chegar), mas que os pedidos ja feitos cobrem: na
+    # chegada de uma compra de hoje o estoque ja voltou acima do minimo. Nesse
+    # caso ela vira so um aviso, e a data de compra passa a vir da proxima
+    # queda depois dessa chegada - senao a data ficava presa no passado, sem
+    # nenhuma compra possivel que a resolvesse. Se na chegada o estoque ainda
+    # estiver abaixo do minimo, os pedidos nao cobrem e a data no passado
+    # continua mostrando o atraso da compra.
+    data_abaixo_minimo_coberto = None
+    data_base_compra = data_estoque_minimo
+    estoque_na_chegada = estoque_por_data.get(chegada_compra_hoje)
+    if (
+        data_estoque_minimo is not None
+        and data_estoque_minimo < chegada_compra_hoje
+        and estoque_na_chegada is not None
+        and estoque_na_chegada > estoque_minimo
+    ):
+        data_abaixo_minimo_coberto = data_estoque_minimo
+        data_base_compra = next(
+            (
+                data for data, valor in estoque_por_data.items()
+                if data >= chegada_compra_hoje and valor <= estoque_minimo
+            ),
+            None,
+        )
 
     data_compra = None
     dias_ate_data_compra = None
-    if data_estoque_minimo is not None:
-        data_compra = _adicionar_dias_uteis(data_estoque_minimo, -(dias_ressupr + 1))
+    if data_base_compra is not None:
+        data_compra = _adicionar_dias_uteis(data_base_compra, -(dias_ressupr + 1))
         dias_ate_data_compra = int(np.busday_count(hoje, data_compra)) if pd.notna(data_compra) else None
 
     return {
@@ -245,6 +274,7 @@ def _calcular_datas_projecao(
         'data_estoque_zero': data_estoque_zero,
         'data_compra': data_compra,
         'dias_ate_data_compra': dias_ate_data_compra,
+        'data_abaixo_minimo_coberto': data_abaixo_minimo_coberto,
     }
 
 
@@ -410,6 +440,7 @@ def processar_material_direto(
     df['data_estoque_zero'] = projecoes_datas.apply(lambda item: item.get('data_estoque_zero'))
     df['data_compra'] = projecoes_datas.apply(lambda item: item.get('data_compra'))
     df['dias_ate_data_compra'] = projecoes_datas.apply(lambda item: item.get('dias_ate_data_compra'))
+    df['data_abaixo_minimo_coberto'] = projecoes_datas.apply(lambda item: item.get('data_abaixo_minimo_coberto'))
     df['dias_ate_estoque_minimo'] = df.apply(
         lambda row: int(np.busday_count(hoje, row['data_estoque_minimo']))
         if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) else None,
@@ -448,6 +479,7 @@ def processar_material_direto(
         pedidos_atrasados = pedidos_material[pedidos_material['data_entrega'] < hoje_ts]
         pedidos_previstos = pedidos_material[pedidos_material['data_entrega'] >= hoje_ts]
         exibir_data_compra = _valor_escalar(row.get('data_compra'))
+        abaixo_minimo_coberto = _valor_escalar(row.get('data_abaixo_minimo_coberto'))
 
         flag_status = _valor_escalar(row.get('flag_urgencia'), 'SEM_DADOS')
 
@@ -476,6 +508,8 @@ def processar_material_direto(
             if pd.notna(_valor_escalar(row.get('data_estoque_minimo'))) else None,
             'data_estoque_zero': row['data_estoque_zero'].strftime('%d/%m/%Y')
             if pd.notna(_valor_escalar(row.get('data_estoque_zero'))) else None,
+            'data_abaixo_minimo_coberto': abaixo_minimo_coberto.strftime('%d/%m/%Y')
+            if pd.notna(abaixo_minimo_coberto) else None,
             'dias_ressupr': round(float(_valor_escalar(row.get('dias_ressupr'), 0) or 0), 0),
             'estoque_minimo': round(float(_valor_escalar(row.get('estoque_minimo'), 0) or 0), 2),
             'flag_urgencia': flag_status,
@@ -725,6 +759,10 @@ def get_projecao_para_material(
         'dias_ate_data_compra': int(dias_ate_data_compra) if pd.notna(dias_ate_data_compra) else None,
         'data_compra': data_compra.strftime('%d/%m/%Y') if pd.notna(data_compra) else None,
         'data_estoque_zero': data_estoque_zero.strftime('%d/%m/%Y') if pd.notna(data_estoque_zero) else None,
+        'data_abaixo_minimo_coberto': (
+            datas_recalculadas['data_abaixo_minimo_coberto'].strftime('%d/%m/%Y')
+            if datas_recalculadas.get('data_abaixo_minimo_coberto') else None
+        ),
         'flag_urgencia': str(_valor_escalar(row.get('flag_urgencia'), '')),
         'serie_real': {'datas': datas_grafico, 'estoques': estoque_diario},
         'serie_ideal': {'datas': datas_ideal, 'estoques': estoque_ideal_diario},

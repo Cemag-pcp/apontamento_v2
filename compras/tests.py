@@ -6,6 +6,7 @@ from django.test import RequestFactory, SimpleTestCase
 from unittest.mock import Mock, patch
 
 from compras.services.data_processing import (
+    _adicionar_dias_uteis,
     _calcular_datas_projecao,
     _parse_data_entrega,
     get_projecao_para_material,
@@ -439,6 +440,36 @@ class ComprasCalculoPedidoPendenteTests(SimpleTestCase):
             resultado["data_estoque_zero"],
         )
         self.assertLess(resultado["dias_ate_data_compra"], 0)
+        self.assertIsNone(resultado["data_abaixo_minimo_coberto"])
+
+    def test_queda_coberta_pelos_pedidos_nao_prende_data_de_compra_no_passado(self):
+        # Caso do 214105: fica 1 dia abaixo do minimo antes de qualquer compra
+        # nova chegar, e o pedido seguinte repoe. A data de compra deve vir da
+        # proxima queda, nao ficar presa no passado.
+        row = pd.Series(
+            {
+                "codigo": "214105",
+                "estoque_almox_central": 1008,
+                "estoque_almox": 1008,
+                "estoque_minimo": 292.84,
+                "consumo_diario": 29.2845,
+                "dias_ressupr": 40,
+                "ped_compras_pendente": 840,
+            }
+        )
+        inicio = pd.date_range(start=pd.Timestamp.now().normalize(), periods=1, freq="B")[0].date()
+        pedidos = pd.DataFrame(
+            [
+                {"codigo": "214105", "data_entrega": pd.Timestamp(_adicionar_dias_uteis(inicio, 19)), "qde_ped_corrigido": 420},
+                {"codigo": "214105", "data_entrega": pd.Timestamp(_adicionar_dias_uteis(inicio, 39)), "qde_ped_corrigido": 420},
+            ]
+        )
+
+        resultado = _calcular_datas_projecao(row, pedidos)
+
+        self.assertEqual(resultado["data_estoque_minimo"], _adicionar_dias_uteis(inicio, 38))
+        self.assertEqual(resultado["data_abaixo_minimo_coberto"], _adicionar_dias_uteis(inicio, 38))
+        self.assertGreater(resultado["dias_ate_data_compra"], 5)
 
 
 class ComprasParseDataEntregaTests(SimpleTestCase):
