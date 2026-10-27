@@ -33,7 +33,7 @@ function buscarItensInspecionados(pagina) {
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
     let itensFiltradosStatusConformidade = document.getElementById("itens-filtrados-inspecionados-status");
-    let paginacao = document.getElementById("paginacao-inspecionados-serra-usinagem");
+    let paginacao = document.getElementById("paginacao-inspecionados-estamparia");
 
     // Limpa os cards antes de buscar novos
     cardsInspecao.innerHTML = `<div class="text-center">
@@ -55,17 +55,17 @@ function buscarItensInspecionados(pagina) {
     });
 
     let statusConformidade = [];
-    if (document.getElementById('filter-itens-conformes-serra-usinagem').checked) {
+    if (document.getElementById('filter-itens-conformes-estamparia').checked) {
         statusConformidade.push('conforme');
     }
     
     // Verifica se o checkbox de itens não conformes está marcado
-    if (document.getElementById('filter-itens-nao-conformes-serra-usinagem').checked) {
+    if (document.getElementById('filter-itens-nao-conformes-estamparia').checked) {
         statusConformidade.push('nao_conforme');
     }
 
-    let dataSelecionadaInicio = document.getElementById('data-inicio-inspecionados').value;
-    let dataSelecionadaFim = document.getElementById('data-fim-inspecionados').value;
+    let dataInicio = document.getElementById('data-inicio-inspecionados').value;
+    let dataFim = document.getElementById('data-fim-inspecionados').value;
     
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecionados').value;
 
@@ -79,18 +79,18 @@ function buscarItensInspecionados(pagina) {
         itensFiltradosCor.style.display = "none";
     }
 
-    if (dataSelecionadaInicio) {
-        params.append("data_inicio", dataSelecionadaInicio);
+    if (dataInicio) {
+        params.append("data_inicio", dataInicio);
         itensFiltradosDataInicio.style.display = "block";
-        itensFiltradosDataInicio.textContent = "Data: " + dataSelecionadaInicio;
+        itensFiltradosDataInicio.textContent = "De: " + dataInicio;
     } else {
         itensFiltradosDataInicio.style.display = "none";
     }
 
-    if (dataSelecionadaFim) {
-        params.append("data_fim", dataSelecionadaFim);
+    if (dataFim) {
+        params.append("data_fim", dataFim);
         itensFiltradosDataFim.style.display = "block";
-        itensFiltradosDataFim.textContent = "Data: " + dataSelecionadaFim;
+        itensFiltradosDataFim.textContent = "Até: " + dataFim;
     } else {
         itensFiltradosDataFim.style.display = "none";
     }
@@ -120,9 +120,13 @@ function buscarItensInspecionados(pagina) {
         itensFiltradosInspetor.style.display = "none";
     }
 
+    // Somente inspecoes que passaram pela reinspecao
+    if (document.getElementById('filter-itens-reinspecionadas')?.checked) {
+        params.append("reinspecionadas", "1");
+    }
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
-    fetch(`/inspecao/api/itens-inspecionados-serra-usinagem/?${params.toString()}`, {
+    fetch(`/inspecao/api/itens-inspecionados-estamparia/?${params.toString()}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -156,15 +160,17 @@ function buscarItensInspecionados(pagina) {
                 "Amarelo": "yellow", "Cinza": "gray"
             };
 
+            let color = borderColors[item.cor];
+
             const cards = `
             <div class="col-md-4 mb-4">
-                <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
+                <div class="card p-3 border-${color} h-100 d-flex flex-column">
+                    <h5 class="text-truncate" title="${item.peca}"> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
                     <p>Inspeção #${item.id}</p>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
                         <strong>📍 Máquina:</strong> ${item.maquina}<br>
-                        <strong>🔢 Qtd Produzida:</strong> ${item.qtd_apontada}<br>
+                        <strong>🔢 Qtd Produzida:</strong> ${item.qtd_produzida}<br>
                         <strong>🔍 Qtd Inspecionada:</strong> ${item.qtd_inspecionada}<br>
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
@@ -177,7 +183,7 @@ function buscarItensInspecionados(pagina) {
                             <i class="bi bi-x-circle-fill"></i> Não conforme: ${item.nao_conformidade}
                         </span>
                     </div>
-                    <div class="d-flex justify-content-end">
+                    <div class="d-flex justify-content-end mt-auto">
                         <button
                             data-id="${item.id}"
                             data-data="${item.data}"

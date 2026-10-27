@@ -1,10 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
-    buscarItensInspecionadosEstanqueidadeTanque(1); // Chama a função quando a página carrega, começando na página 1
+    buscarItensInspecionados(1); // Chama a função quando a página carrega, começando na página 1
 });
 
 document.getElementById("btn-filtrar-inspecionados").addEventListener("click", (event) => {
     event.preventDefault();
-    buscarItensInspecionadosEstanqueidadeTanque(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
+    buscarItensInspecionados(1); // Chama a função quando o botão de filtro é clicado, começando na página 1
 });
 
 document.getElementById("btn-limpar-inspecionados").addEventListener("click", (event) => {
@@ -19,21 +19,21 @@ document.getElementById("btn-limpar-inspecionados").addEventListener("click", (e
             input.value = ""; // Limpa inputs de texto e data
         }
     });
-    buscarItensInspecionadosEstanqueidadeTanque(1);
+    buscarItensInspecionados(1);
 });
 
-function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
+function buscarItensInspecionados(pagina) {
     let cardsInspecao = document.getElementById("cards-inspecionados");
     let qtdPendenteInspecao = document.getElementById("qtd-inspecionados");
     let qtdFiltradaInspecao = document.getElementById("qtd-filtrada-inspecionados");
     let itensInspecionar = document.getElementById("itens-inspecionados");
+    let itensFiltradosCor = document.getElementById("itens-filtrados-inspecionados-maquina");
     let itensFiltradosDataInicio = document.getElementById("itens-filtrados-inspecionados-data-inicio");
     let itensFiltradosDataFim = document.getElementById("itens-filtrados-inspecionados-data-fim");
     let itensFiltradosInspetor = document.getElementById("itens-filtrados-inspecionados-inspetor");
     let itensFiltradosPesquisa = document.getElementById("itens-filtrados-inspecionados-pesquisa");
-    let itensFiltradosSolda = document.getElementById("itens-filtrados-inspecionados-solda");
-    let itensFiltradosTeste = document.getElementById("itens-filtrados-inspecionados-teste");
-    let paginacao = document.getElementById("paginacao-inspecionados-tanque");
+    let itensFiltradosStatusConformidade = document.getElementById("itens-filtrados-inspecionados-status");
+    let paginacao = document.getElementById("paginacao-inspecionados-serra-usinagem");
 
     // Limpa os cards antes de buscar novos
     cardsInspecao.innerHTML = `<div class="text-center">
@@ -43,33 +43,46 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
                                 </div>`;
     paginacao.innerHTML = "";
 
+    // Coletar os filtros aplicados
+    let coresSelecionadas = [];
+    document.querySelectorAll('.form-check-input-inspecionados:checked').forEach(checkbox => {
+        coresSelecionadas.push(checkbox.nextElementSibling.textContent.trim());
+    });
+
     let inspetorSelecionado = [];
     document.querySelectorAll('.form-check-input-inspecionados-inspetores:checked').forEach(checkbox => {
         inspetorSelecionado.push(checkbox.nextElementSibling.textContent.trim());
     });
 
-    // Capturar os novos filtros
-    let statusSoldaSelecionado = [];
-    document.querySelectorAll('.filter-solda:checked').forEach(checkbox => {
-        statusSoldaSelecionado.push(checkbox.value);
-    });
+    let statusConformidade = [];
+    if (document.getElementById('filter-itens-conformes-serra-usinagem').checked) {
+        statusConformidade.push('conforme');
+    }
     
-    let statusTesteSelecionado = [];
-    document.querySelectorAll('.filter-teste:checked').forEach(checkbox => {
-        statusTesteSelecionado.push(checkbox.value);
-    });
+    // Verifica se o checkbox de itens não conformes está marcado
+    if (document.getElementById('filter-itens-nao-conformes-serra-usinagem').checked) {
+        statusConformidade.push('nao_conforme');
+    }
 
     let dataSelecionadaInicio = document.getElementById('data-inicio-inspecionados').value;
     let dataSelecionadaFim = document.getElementById('data-fim-inspecionados').value;
+    
     let pesquisarInspecao = document.getElementById('pesquisar-peca-inspecionados').value;
 
     // Monta os parâmetros de busca
     let params = new URLSearchParams();
+    if (coresSelecionadas.length > 0) {
+        params.append("maquinas", coresSelecionadas.join(","));
+        itensFiltradosCor.style.display = "block";
+        itensFiltradosCor.textContent = "Maquina: " + coresSelecionadas.join(", ");
+    } else {
+        itensFiltradosCor.style.display = "none";
+    }
 
     if (dataSelecionadaInicio) {
         params.append("data_inicio", dataSelecionadaInicio);
         itensFiltradosDataInicio.style.display = "block";
-        itensFiltradosDataInicio.textContent = "De: " + dataSelecionadaInicio;
+        itensFiltradosDataInicio.textContent = "Data: " + dataSelecionadaInicio;
     } else {
         itensFiltradosDataInicio.style.display = "none";
     }
@@ -77,7 +90,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
     if (dataSelecionadaFim) {
         params.append("data_fim", dataSelecionadaFim);
         itensFiltradosDataFim.style.display = "block";
-        itensFiltradosDataFim.textContent = "Até: " + dataSelecionadaFim;
+        itensFiltradosDataFim.textContent = "Data: " + dataSelecionadaFim;
     } else {
         itensFiltradosDataFim.style.display = "none";
     }
@@ -90,6 +103,15 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
         itensFiltradosPesquisa.style.display = "none";
     }
 
+    if (statusConformidade.length > 0) {
+        params.append("status-conformidade", statusConformidade.join(","));
+        itensFiltradosStatusConformidade.style.display = "block";
+        itensFiltradosStatusConformidade.textContent = "Status: " + 
+            statusConformidade.map(s => s === 'conforme' ? 'Itens Conformes' : 'Itens Não Conformes').join(", ");
+    } else {
+        itensFiltradosStatusConformidade.style.display = "none";
+    }
+
     if (inspetorSelecionado.length > 0) {
         params.append("inspetores", inspetorSelecionado.join(","));
         itensFiltradosInspetor.style.display = "block";
@@ -98,26 +120,13 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
         itensFiltradosInspetor.style.display = "none";
     }
 
-    // Adicionar os novos parâmetros à URL
-    if (statusSoldaSelecionado.length > 0) {
-        params.append("status_solda", statusSoldaSelecionado.join(","));
-        itensFiltradosSolda.style.display = "block";
-        itensFiltradosSolda.textContent = "Status Solda: " + statusSoldaSelecionado.join(", ");
-    } else {
-        itensFiltradosSolda.style.display = "none";
+    // Somente inspecoes que passaram pela reinspecao
+    if (document.getElementById('filter-itens-reinspecionadas')?.checked) {
+        params.append("reinspecionadas", "1");
     }
-    
-    if (statusTesteSelecionado.length > 0) {
-        params.append("status_teste", statusTesteSelecionado.join(","));
-        itensFiltradosTeste.style.display = "block";
-        itensFiltradosTeste.textContent = "Status Teste: " + statusTesteSelecionado.join(", ");
-    } else {
-        itensFiltradosTeste.style.display = "none";
-    }
-
     params.append("pagina", pagina); // Adiciona a página atual aos parâmetros
 
-    fetch(`/inspecao/api/itens-inspecionados-tanque/?${params.toString()}`, {
+    fetch(`/inspecao/api/itens-inspecionados-serra-usinagem/?${params.toString()}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -134,8 +143,6 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
         const quantidadeInspecoes = items.total;
         const quantidadeFiltradaInspecoes = items.total_filtrado;
 
-        console.log(items)
-
         qtdPendenteInspecao.textContent = `${quantidadeInspecoes} itens inspecionados`;
 
         if (params.size > 1) {
@@ -147,85 +154,44 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
         qtdFiltradaInspecao.textContent = `${quantidadeFiltradaInspecoes} itens filtrados`;
 
         items.dados.forEach(item => {
-            let iconeNaoConformidade;
-            let iconeNaoConformidadeSolda;
-            let statusEstanqueidade;
-            let statusSolda;
-            let status;
-            let inspectionType;
-            let isCompliance;
-            let badgeSoldaHtml = '';
-
-            if (item.possui_nao_conformidade) {
-                iconeNaoConformidade = '<i class="bi bi-exclamation-triangle-fill text-danger"></i>';
-                statusEstanqueidade = 'Não conforme';
-            } else {
-                iconeNaoConformidade = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
-                statusEstanqueidade = 'Conforme';
-            }
-
-            if (item.possui_nao_conformidade_inspecao_solda) {
-                iconeNaoConformidadeSolda = '<i class="bi bi-exclamation-triangle-fill text-danger"></i>';
-                statusSolda = 'Não conforme';
-            } else {
-                iconeNaoConformidadeSolda = '<i class="bi bi-check-circle-fill" style="color:green"></i>';
-                statusSolda = 'Conforme';
-            }
-
-            if (item.inspecao_geral_realizada === false) {
-                status = 'cancelado';
-                inspectionType = 'inspecionar-solda';
-                isCompliance = 'Solda não inspecionada — clique para inspecionar';
-                badgeSoldaHtml = `
-                    <p class="status-badge status-${status} ${inspectionType}"
-                    style="font-size:13px; cursor:pointer;" data-id="${item.id}"
-                    data-nome="${item.peca}">${isCompliance}</p>
-                `;
-            }
-            // Quando a solda ja foi inspecionada, os detalhes ficam disponiveis
-            // apenas no "Ver detalhes" (historico unificado) - sem botao proprio aqui.
+            let borderColors = {
+                "Laranja": "orange", "Verde": "green",
+                "Vermelho": "red", "Azul": "blue",
+                "Amarelo": "yellow", "Cinza": "gray"
+            };
 
             const cards = `
             <div class="col-md-4 mb-4">
                 <div class="card p-3" style="min-height: 300px; display: flex; flex-direction: column; justify-content: space-between">
-                    <div class="d-flex justify-content-between">
-                        <h5 style="width:70%;"> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
-                        <div class="text-center">
-                            ${badgeSoldaHtml}
-                        </div>
-                    </div>
-                    <h6 class="card-subtitle mb-2 text-muted">Inspeção #${item.id}</h6>
+                    <h5> <a href="https://drive.google.com/drive/u/0/search?q=${pegarCodigoPeca(item.peca)}" target="_blank" rel="noopener noreferrer">${item.peca}</a></h5>
+                    <p>Inspeção #${item.id}</p>
                     <p>
                         <strong>📅 Data da última inspeção:</strong> ${item.data}<br>
-                        <strong>🚚 Data da carga:</strong> ${item.data_carga}<br>
+                        <strong>📍 Máquina:</strong> ${item.maquina}<br>
+                        <strong>🔢 Qtd Produzida:</strong> ${item.qtd_apontada}<br>
+                        <strong>🔍 Qtd Inspecionada:</strong> ${item.qtd_inspecionada}<br>
                         <strong>🧑🏻‍🏭 Inspetor:</strong> ${item.inspetor}
                     </p>
                     <hr>
-                    <div class="d-flex justify-content-between align-items-center">
-                            <div class="col-sm-8">
-                                <div class="d-flex gap-2 align-items-center">
-                                    ${iconeNaoConformidade}
-                                    <span style="font-size: 0.875rem; color:#71717a; font-weight:bold;">
-                                        Estanqueidade: ${statusEstanqueidade}
-                                    </span>
-                                </div>
-                                <div class="d-flex gap-2 align-items-center">
-                                    ${iconeNaoConformidadeSolda}
-                                    <span style="font-size: 0.875rem; color:#71717a; font-weight:bold;">
-                                        Solda: ${statusSolda}
-                                    </span>
-                                </div>
-                            </div>
-                        <button 
+                    <div class="d-flex justify-content-center gap-3 mb-2">
+                        <span class="text-success" style="font-size: 0.875rem; font-weight: bold;">
+                            <i class="bi bi-check-circle-fill"></i> Conforme: ${item.conformidade}
+                        </span>
+                        <span class="text-danger" style="font-size: 0.875rem; font-weight: bold;">
+                            <i class="bi bi-x-circle-fill"></i> Não conforme: ${item.nao_conformidade}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button
                             data-id="${item.id}"
                             data-data="${item.data}"
                             data-peca="${item.peca}"
+                            data-maquina="${item.maquina}"
                             data-tipo="${item.tipo}"
                             data-nao-conformidade="${item.nao_conformidade}"
                             data-conformidade="${item.conformidade}"
-                            data-cor="${item.cor}"
                             data-id-dados-execucao="${item.id_dados_execucao}"
-                        class="btn btn-white historico-inspecao d-flex gap-2 justify-content-between align-items-center">              
+                        class="btn btn-white historico-inspecao w-50 d-flex justify-content-center align-items-center gap-2">
                             <span class="spinner-border spinner-border-sm" style="display:none"></span>
                             Ver detalhes
                         </button>
@@ -250,7 +216,7 @@ function buscarItensInspecionadosEstanqueidadeTanque(pagina) {
             const adicionarLinkPagina = (i) => {
                 paginacaoHTML += `
                     <li class="page-item ${i === paginaAtual ? 'active' : ''}">
-                        <a class="page-link" href="#" onclick="buscarItensInspecionadosEstanqueidadeTanque(${i})">${i}</a>
+                        <a class="page-link" href="#" onclick="buscarItensInspecionados(${i})">${i}</a>
                     </li>`;
             };
 
