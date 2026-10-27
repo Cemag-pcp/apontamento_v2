@@ -619,6 +619,16 @@ def get_itens_inspecionados_serra_usinagem(request):
                 dadosexecucaoinspecao__num_execucao=0,
             )
 
+    # Filtro "Reinspecionadas": so as que passaram pela reinspecao de fato -
+    # concluida e com execucao de reinspecao (num_execucao > 0). Fica de fora a
+    # reinspecao fechada automaticamente quando a peca vai pra sucata.
+    if request.GET.get("reinspecionadas") == "1":
+        inspecoes = inspecoes.filter(
+            id__in=Reinspecao.objects.filter(reinspecionado=True).values("inspecao")
+        ).filter(
+            id__in=DadosExecucaoInspecao.objects.filter(num_execucao__gt=0).values("inspecao")
+        )
+
     if data_inicio and not data_fim:
         data_fim = data_inicio
 

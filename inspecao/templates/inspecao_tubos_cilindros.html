@@ -140,6 +140,10 @@
                     <form id="form-filtrar-inspecionados" class="offcanvas-body">
                         <div>
                             <input id="pesquisar-peca-inspecionados" type="text" class="form-control mb-3" placeholder="Search inspections...">
+                            <div class="form-check mb-3">
+                                <input type="checkbox" id="filter-itens-reinspecionadas" value="">
+                                <label class="form-check-label" for="filter-itens-reinspecionadas">Somente reinspecionadas</label>
+                            </div>
                     
                             <h6 class="mt-3">Inspetor</h6>
                             {% for inspetor in inspetores %}
