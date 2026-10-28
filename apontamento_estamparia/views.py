@@ -23,6 +23,11 @@ from inspecao.models import Inspecao, DadosExecucaoInspecao
 from .utils_dashboard import *
 from apontamento_serra.utils import formatar_timedelta
 from core.utils import notificar_ordem
+from core.permissoes import tem_subacesso
+
+# Sub-acessos da tela /estamparia/ (ver core/permissoes.py e a migracao 0021)
+SUBACESSO_PLANEJAR = 'estamparia#planejar'
+SUBACESSO_RETIRAR_PRIORIDADE = 'estamparia#retirar-prioridade'
 
 from datetime import date, datetime, timedelta
 import os
@@ -273,7 +278,8 @@ def planejamento(request):
                                                                     'operadores':operadores,
                                                                     'motivos_maquina_parada':motivos_maquina_parada,
                                                                     'motivos_exclusao': motivos_exclusao,
-                                                                    'setor_estamparia_id': setor_estamparia.id if setor_estamparia else ''})
+                                                                    'setor_estamparia_id': setor_estamparia.id if setor_estamparia else '',
+                                                                    'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
 
 def get_pecas_ordem(request, pk_ordem, name_maquina):
     try:
@@ -452,18 +458,8 @@ def get_ordens_criadas(request):
         'has_next': ordens_page.has_next(),
     })
 
-ROTA_RETIRAR_PRIORIDADE = 'estamparia/painel-prioridades/retirar'
-
-
 def _pode_retirar_prioridade(user):
-    """PCP sempre pode; os demais so com a permissao marcada na tela de acessos
-    (RotaAcesso criada na migracao 0019_rota_retirar_prioridade)."""
-    if not user.is_authenticated:
-        return False
-    profile = Profile.objects.filter(user=user).first()
-    if profile is None:
-        return False
-    return profile.tipo_acesso == 'pcp' or profile.tem_acesso(ROTA_RETIRAR_PRIORIDADE)
+    return tem_subacesso(user, SUBACESSO_RETIRAR_PRIORIDADE)
 
 
 @require_GET
@@ -1072,6 +1068,9 @@ def _validar_e_montar_ordem(item, index=None):
 
 @csrf_exempt
 def planejar_ordem_estamparia(request):
+
+    if request.method == 'POST' and not tem_subacesso(request.user, SUBACESSO_PLANEJAR):
+        return JsonResponse({'error': 'Você não tem permissão para planejar ordens.'}, status=403)
 
     if request.method == 'POST':
 
