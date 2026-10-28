@@ -2245,6 +2245,13 @@ def api_ordens_finalizadas(request):
                 F('operador_fim__nome'),
                 output_field=CharField()
             ),
+            # Cambão em que a peça foi finalizada: ao finalizar, o CambaoPecas
+            # passa a apontar para esta PecasOrdem (finalizar_cambao)
+            cambao_nome=Subquery(
+                CambaoPecas.objects.filter(peca_ordem=OuterRef('pk'))
+                .order_by('-id')
+                .values('cambao__nome')[:1]
+            ),
         )
         .values(
             'ordem_numero',
@@ -2256,6 +2263,7 @@ def api_ordens_finalizadas(request):
             'data_carga',
             'data_apontamento',
             'operador_nome',
+            'cambao_nome',
         )
         .order_by('data_apontamento')
         .iterator(chunk_size=1000)
@@ -2273,7 +2281,9 @@ def api_ordens_finalizadas(request):
             'qtd_planejada': d['qtd_planejada'],
             'cor': mapa_cor.get(d['cor'], d['cor']),
             'qtd_boa': d['qtd_boa'],
-            'col5': '',
+            # mesma chave/posição de antes (a planilha do Apps Script lê esta
+            # coluna), agora com o cambão em vez de vazio
+            'col5': d['cambao_nome'] or '',
             'tipo': d['tipo'],
             'data_carga': d['data_carga'],
             'data_apontamento': (d['data_apontamento'] - timedelta(hours=3)).date() if d['data_apontamento'] else None,
