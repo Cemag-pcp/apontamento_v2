@@ -200,25 +200,58 @@ function salvarParcialInspecao() {
         quantidadeItensNaoConformidade: itensNaoConformidade.length
     };
 
-    localStorage.setItem(getChaveRascunhoInspecao(idInspecao), JSON.stringify(rascunho));
-    atualizarFlagParcialCard(idInspecao, true);
-    Toast.fire({ icon: "success", title: "Rascunho salvo com sucesso." });
+    // Grava no servidor, pra continuar em outro aparelho (PC/tablet)
+    fetch(urlRascunhoInspecao(idInspecao), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+        },
+        body: JSON.stringify(rascunho)
+    })
+        .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || "Falha ao salvar o rascunho.");
+            // copia antiga só deste navegador: o servidor passa a valer
+            localStorage.removeItem(getChaveRascunhoInspecao(idInspecao));
+            atualizarFlagParcialCard(idInspecao, true);
+            Toast.fire({ icon: "success", title: "Rascunho salvo com sucesso." });
+        })
+        .catch((error) => {
+            Toast.fire({ icon: "error", title: error.message });
+        });
+}
+
+function urlRascunhoInspecao(idInspecao) {
+    return `/inspecao/api/rascunho-inspecao-estamparia/${idInspecao}/`;
 }
 
 function carregarRascunhoParcialInspecao(idInspecao) {
     if (!idInspecao) return;
 
-    const bruto = localStorage.getItem(getChaveRascunhoInspecao(idInspecao));
-    if (!bruto) return;
+    fetch(urlRascunhoInspecao(idInspecao))
+        .then((response) => (response.ok ? response.json() : { existe: false }))
+        .catch(() => ({ existe: false }))
+        .then((resposta) => {
+            // o modal pode ter sido aberto em outra inspeção enquanto buscava
+            if (document.getElementById("id-inspecao").value !== String(idInspecao)) return;
 
-    let rascunho = null;
-    try {
-        rascunho = JSON.parse(bruto);
-    } catch (error) {
-        localStorage.removeItem(getChaveRascunhoInspecao(idInspecao));
-        return;
-    }
+            if (resposta.existe) {
+                aplicarRascunhoParcialInspecao(resposta.dados);
+                return;
+            }
+            // Rascunho antigo, salvo só no navegador antes do servidor guardar
+            const bruto = localStorage.getItem(getChaveRascunhoInspecao(idInspecao));
+            if (!bruto) return;
+            try {
+                aplicarRascunhoParcialInspecao(JSON.parse(bruto));
+            } catch (error) {
+                localStorage.removeItem(getChaveRascunhoInspecao(idInspecao));
+            }
+        });
+}
 
+function aplicarRascunhoParcialInspecao(rascunho) {
     if (!rascunho) return;
 
     if (Number.isInteger(rascunho.linhasMedicaoSolicitadas) && rascunho.linhasMedicaoSolicitadas > 0) {
@@ -418,7 +451,7 @@ function buscarItensInspecao(pagina) {
         }
 
         items.dados.forEach(item => {
-            const existeRascunhoParcial = Boolean(localStorage.getItem(getChaveRascunhoInspecao(item.id)));
+            const existeRascunhoParcial = item.parcial || Boolean(localStorage.getItem(getChaveRascunhoInspecao(item.id)));
 
             const cards = `
             <div class="col-md-4 mb-4">
