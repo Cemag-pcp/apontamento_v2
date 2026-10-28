@@ -175,9 +175,11 @@
             <button type="button" class="btn btn-parada" id="btnPararMaquina" data-bs-toggle="modal" data-bs-target="#modalPararMaquina">
                 <i class="bi bi-stop-circle"></i> Parada de máquina
             </button>
+            {% if pode_planejar %}
             <button type="button" class="btn btn-criar-op" data-bs-toggle="modal" data-bs-target="#modalUsinagem">
                 <i class="bi bi-plus-circle"></i> Planejar
             </button>
+            {% endif %}
         </div>
     </div>
 

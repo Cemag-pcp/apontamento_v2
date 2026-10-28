@@ -32,6 +32,10 @@ import requests
 from datetime import date
 
 from core.utils import notificar_ordem
+from core.permissoes import tem_subacesso
+
+# Sub-acesso da tela /usinagem/ (ver core/permissoes.py e a migracao de sub-acessos)
+SUBACESSO_PLANEJAR = 'usinagem#planejar'
 
 # Caminho para a pasta temporária dentro do projeto
 TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp')
@@ -234,7 +238,8 @@ def planejamento(request):
                                                                       'motivos_maquina_parada':motivos_maquina_parada,
                                                                       'motivos_exclusao': motivos_exclusao,
                                                                       'processos': processos,
-                                                                      'setor_usinagem_id': setor_usinagem.id if setor_usinagem else ''})
+                                                                      'setor_usinagem_id': setor_usinagem.id if setor_usinagem else '',
+                                                                      'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
 
 def processos(request):
 
@@ -242,7 +247,8 @@ def processos(request):
     operadores = Operador.objects.filter(setor__nome='usinagem')
     motivos_maquina_parada = MotivoMaquinaParada.objects.filter(setor__nome='estamparia').exclude(nome='Finalizada parcial')
 
-    return render(request, 'apontamento_usinagem/processos.html', {'motivos':motivos,'operadores':operadores,'motivos_maquina_parada':motivos_maquina_parada,})
+    return render(request, 'apontamento_usinagem/processos.html', {'motivos':motivos,'operadores':operadores,'motivos_maquina_parada':motivos_maquina_parada,
+                                                                   'pode_planejar': tem_subacesso(request.user, SUBACESSO_PLANEJAR)})
 
 def get_pecas_ordem(request, pk_ordem):
     try:
@@ -911,6 +917,9 @@ def _criar_ordem_usinagem(dados):
 
 @csrf_exempt
 def planejar_ordem_usinagem(request):
+
+    if request.method == 'POST' and not tem_subacesso(request.user, SUBACESSO_PLANEJAR):
+        return JsonResponse({'error': 'Você não tem permissão para planejar ordens.'}, status=403)
 
     if request.method == 'POST':
 
