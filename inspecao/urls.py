@@ -45,6 +45,7 @@ urlpatterns = [
     path('api/itens-reinspecao-estamparia/', estamparia.get_itens_reinspecao_estamparia, name='itens-reinspecao-estamparia'),
 
     path('api/envio-inspecao-estamparia/', estamparia.inspecionar_estamparia, name='inspecionar_estamparia'),
+    path('api/rascunho-inspecao-estamparia/<int:id>/', estamparia.rascunho_inspecao_estamparia, name='rascunho_inspecao_estamparia'),
     path('api/envio-reinspecao-estamparia/', estamparia.envio_reinspecao_estamparia, name='envio_reinspecao_estamparia'),
 
     path('api/historico-estamparia/<int:id>', estamparia.get_historico_estamparia, name='historico-estamparia'),

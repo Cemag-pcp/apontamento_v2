@@ -4,7 +4,7 @@ from django.utils.timezone import now
 
 from cadastro.models import Pecas,Operador,Setor
 from core.models import Ordem
-from inspecao.models import DadosExecucaoInspecao, Causas
+from inspecao.models import DadosExecucaoInspecao, Causas, Inspecao
 
 DESTINO_CHOICES=(('retrabalho','Retrabalho'),('sucata','Sucata'))
 
@@ -68,3 +68,14 @@ class DadosNaoConformidade(models.Model):
 class ImagemNaoConformidade(models.Model):
     nao_conformidade = models.ForeignKey(DadosNaoConformidade, on_delete=models.CASCADE, related_name='imagens')
     imagem = models.ImageField(upload_to='nao_conformidade_estamparia/')
+
+class RascunhoInspecaoEstamparia(models.Model):
+    """Inspeção salva parcialmente ("Salvar parcial"): o estado do formulário
+    guardado no servidor, pra continuar em outro aparelho (PC/tablet). Some
+    quando a inspeção é enviada. Fotos não entram (o navegador não deixa
+    repreencher campo de arquivo)."""
+
+    inspecao = models.OneToOneField(Inspecao, on_delete=models.CASCADE, related_name='rascunho_estamparia')
+    dados = models.JSONField()
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    atualizado_em = models.DateTimeField(auto_now=True)

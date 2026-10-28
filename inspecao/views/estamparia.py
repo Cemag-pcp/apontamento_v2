@@ -38,6 +38,7 @@ from apontamento_estamparia.models import (
     MedidasInspecaoEstamparia,
     DadosNaoConformidade,
     ImagemNaoConformidade,
+    RascunhoInspecaoEstamparia,
 )
 
 from datetime import datetime, timedelta
@@ -293,7 +294,50 @@ def inspecionar_estamparia(request):
                 reinspecao = Reinspecao(inspecao=inspecao)
                 reinspecao.save()
 
+            # Inspeção enviada: o "Salvar parcial" dela deixa de valer
+            RascunhoInspecaoEstamparia.objects.filter(inspecao=inspecao).delete()
+
     return JsonResponse({"success": True, "message": "Inspeção realizada com sucesso!"})
+
+
+def rascunho_inspecao_estamparia(request, id):
+    """"Salvar parcial" da inspeção guardado no servidor, pra o inspetor
+    continuar em outro aparelho. GET devolve, POST grava (JSON do formulário),
+    DELETE descarta."""
+    inspecao = get_object_or_404(Inspecao, pk=id, pecas_ordem_estamparia__isnull=False)
+
+    if request.method == "GET":
+        rascunho = RascunhoInspecaoEstamparia.objects.filter(inspecao=inspecao).select_related("usuario").first()
+        if not rascunho:
+            return JsonResponse({"existe": False})
+        return JsonResponse({
+            "existe": True,
+            "dados": rascunho.dados,
+            "usuario": rascunho.usuario.username if rascunho.usuario else None,
+            "atualizado_em": timezone.localtime(rascunho.atualizado_em).strftime("%d/%m/%Y %H:%M"),
+        })
+
+    if request.method == "POST":
+        if DadosExecucaoInspecao.objects.filter(inspecao=inspecao).exists():
+            return JsonResponse({"error": "Item já inspecionado!"}, status=400)
+        try:
+            dados = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "JSON inválido."}, status=400)
+        RascunhoInspecaoEstamparia.objects.update_or_create(
+            inspecao=inspecao,
+            defaults={
+                "dados": dados,
+                "usuario": request.user if request.user.is_authenticated else None,
+            },
+        )
+        return JsonResponse({"success": True})
+
+    if request.method == "DELETE":
+        RascunhoInspecaoEstamparia.objects.filter(inspecao=inspecao).delete()
+        return JsonResponse({"success": True})
+
+    return JsonResponse({"error": "Método não permitido"}, status=405)
 
 
 def get_itens_inspecao_estamparia(request):
@@ -362,6 +406,13 @@ def get_itens_inspecao_estamparia(request):
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
+    # Inspeções com "Salvar parcial" guardado no servidor (selo "Parcial" no card)
+    ids_com_rascunho = set(
+        RascunhoInspecaoEstamparia.objects.filter(
+            inspecao__in=[data.id for data in pagina_obj]
+        ).values_list("inspecao_id", flat=True)
+    )
+
     dados = []
     for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
@@ -390,6 +441,7 @@ def get_itens_inspecao_estamparia(request):
             "maquina": maquina_nome,
             "qtd_apontada": data.pecas_ordem_estamparia.qtd_boa,
             "operador": matricula_nome_operador,
+            "parcial": data.id in ids_com_rascunho,
         }
 
         dados.append(item)
