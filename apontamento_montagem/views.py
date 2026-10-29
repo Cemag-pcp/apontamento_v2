@@ -877,8 +877,18 @@ def processar_status_ordem_montagem(body, user):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
+def _ids_setores(valor):
+    """Parâmetro "setor" do filtro: um id ou vários separados por vírgula ("3,7,12")."""
+    ids = []
+    for parte in (valor or '').split(','):
+        parte = parte.strip()
+        if parte.isdigit():
+            ids.append(int(parte))
+    return ids
+
+
 def ordens_criadas(request):
-   
+
     """
     View que agrega os dados de PecasOrdem (por ordem) e junta com a model Ordem,
     trazendo algumas colunas da Ordem e calculando o saldo:
@@ -891,22 +901,26 @@ def ordens_criadas(request):
     """
 
     data_carga = request.GET.get('data_carga')
-    maquina_param = request.GET.get('setor', '')
+    data_carga_fim = request.GET.get('data_carga_fim', '')  # período "De / Até" (opcional)
+    maquinas_ids = _ids_setores(request.GET.get('setor', ''))
     status_param = request.GET.get('status', '')
     data_programacao = request.GET.get("data-programada", '')
 
-    if data_carga == '':
+    if not data_carga:
         data_carga = now().date()
 
     # Monta os filtros para a model Ordem
     filtros_ordem = {
-        'data_carga': data_carga,
         'grupo_maquina': 'montagem',
         'excluida': False,
     }
-    if maquina_param:
-        maquina = get_object_or_404(Maquina, pk=maquina_param)
-        filtros_ordem['maquina'] = maquina
+    if data_carga_fim and str(data_carga_fim) >= str(data_carga):
+        filtros_ordem['data_carga__gte'] = data_carga
+        filtros_ordem['data_carga__lte'] = data_carga_fim
+    else:
+        filtros_ordem['data_carga'] = data_carga
+    if maquinas_ids:
+        filtros_ordem['maquina_id__in'] = maquinas_ids
     if status_param:
         filtros_ordem['status_atual'] = status_param
     if data_programacao:
@@ -959,14 +973,45 @@ def ordens_criadas(request):
     data_carga = next(iter(datas_carga), None)
     data_formatada_carga = data_carga if data_carga else None
 
-    # Lista de máquinas (apenas das ordens retornadas)
-    maquinas = Ordem.objects.filter(id__in=ordem_ids).exclude(
-        maquina__nome__in=maquinas_excluidas
-    ).values('maquina__nome', 'maquina__id').distinct()
+    # Botões de setor (célula) com o progresso da carga: todas as células da
+    # carga, mesmo com setor/status filtrados, pra o filtro mostrar o painel
+    # inteiro. Progresso = feito / planejado, com o feito de cada ordem
+    # limitado ao planejado dela.
+    filtros_carga = {k: v for k, v in filtros_ordem.items() if k not in ('maquina_id__in', 'status_atual')}
+    progresso_por_ordem = (
+        PecasOrdem.objects.filter(ordem__in=Ordem.objects.filter(**filtros_carga))
+        .exclude(ordem__maquina__isnull=True)
+        .exclude(ordem__maquina__nome__in=maquinas_excluidas)
+        .values('ordem', 'peca', 'ordem__maquina__id', 'ordem__maquina__nome')
+        .annotate(
+            planejada=Coalesce(Avg('qtd_planejada'), Value(0.0, output_field=FloatField())),
+            boa=Coalesce(Sum('qtd_boa'), Value(0.0, output_field=FloatField())),
+        )
+    )
+    progresso_maquinas = {}
+    for item in progresso_por_ordem:
+        maq = progresso_maquinas.setdefault(item['ordem__maquina__id'], {
+            'maquina__id': item['ordem__maquina__id'],
+            'maquina__nome': item['ordem__maquina__nome'],
+            'planejada': 0.0,
+            'feita': 0.0,
+        })
+        maq['planejada'] += item['planejada']
+        maq['feita'] += min(item['boa'], item['planejada'])
+
+    maquinas = []
+    for maq in sorted(progresso_maquinas.values(), key=lambda m: m['maquina__nome']):
+        percentual = round(maq['feita'] / maq['planejada'] * 100) if maq['planejada'] else 0
+        maquinas.append({
+            'maquina__id': maq['maquina__id'],
+            'maquina__nome': maq['maquina__nome'],
+            'percentual': min(percentual, 100),
+            'planejada': round(maq['planejada']),
+        })
 
     return JsonResponse({
         "ordens": list(pecas_ordem_agg),
-        "maquinas": list(maquinas),
+        "maquinas": maquinas,
         "data_programacao": data_formatada,
         "data_formatada_carga": data_formatada_carga
     })
@@ -1024,9 +1069,9 @@ def ordens_iniciadas(request):
     if ordem_id:
         filtros_ordem['id'] = ordem_id # ordem id --> core_ordem
 
-    if maquina_param:
-        maquina = get_object_or_404(Maquina, pk=maquina_param)
-        filtros_ordem['maquina'] = maquina
+    maquinas_ids = _ids_setores(maquina_param)
+    if maquinas_ids:
+        filtros_ordem['maquina_id__in'] = maquinas_ids
 
     # Filtra ordens com status 'iniciada' e grupo de máquina 'montagem'
     ordens_filtradas = Ordem.objects.filter(**filtros_ordem).prefetch_related('ordem_pecas_montagem', 'processos')
@@ -1089,9 +1134,9 @@ def ordens_interrompidas(request):
         'excluida': False,
     }
 
-    if maquina_param:
-        maquina = get_object_or_404(Maquina, pk=maquina_param)
-        filtros_ordem['maquina'] = maquina
+    maquinas_ids = _ids_setores(maquina_param)
+    if maquinas_ids:
+        filtros_ordem['maquina_id__in'] = maquinas_ids
 
     ordens_filtradas = Ordem.objects.filter(**filtros_ordem).prefetch_related('ordem_pecas_montagem', 'processos')
 
