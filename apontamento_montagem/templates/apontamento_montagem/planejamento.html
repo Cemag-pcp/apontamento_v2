@@ -56,87 +56,47 @@
     color: #000;
 }
 
-/* ===== Filtros de Programação ===== */
-.filtros-prog {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
-}
-.filtros-prog-icone {
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    background: #f1f3f5;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 1.5rem; color: #212529;
-}
-.filtros-prog-bloco {
-    background: #fbfcfd;
-    border: 1px solid #eef0f2;
-    border-left: 4px solid #0d6efd;
-    border-radius: 8px;
-    padding: 14px 16px;
-}
-.filtros-prog-titulo { font-weight: 700; font-size: 1.05rem; margin-bottom: 2px; }
-@media (min-width: 992px) {
-    .filtros-prog-divisor { border-left: 1px solid #e5e7eb; padding-left: 24px; }
-}
-.filtros-prog-rodape {
-    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
-    background: #eef6ff;
-    border: 1px solid #d6e7fb;
-    border-radius: 8px;
-    padding: 12px 16px;
-}
-@media (min-width: 768px) {
-    .filtros-prog-sep { border-left: 1px solid #c9d7e8; padding-left: 16px; }
-}
-
-/* Setor: grade de cartões com checkbox, % produzido e barra colorida por faixa */
-.setor-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
-}
+/* Filtro por setor: cartão com nome, % da carga feita e barra de progresso */
 .setor-btn {
-    display: flex; align-items: flex-start; gap: 12px;
-    width: 100%;
-    padding: 12px 14px;
-    border-radius: 8px;
-    border: 1px solid var(--faixa-borda);
-    background: var(--faixa-fundo);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 150px;
+    flex: 0 1 auto;
+    padding: 8px 12px;
+    border-radius: 6px;
     text-align: left;
-    cursor: pointer;
-    transition: box-shadow .15s, transform .05s;
 }
-.setor-btn:hover { box-shadow: 0 2px 6px rgba(0, 0, 0, .08); }
-.setor-btn:active { transform: scale(.99); }
-.setor-btn.selecionado { box-shadow: 0 0 0 2px var(--faixa-cor); }
-.setor-btn .setor-check {
-    width: 20px; height: 20px; margin-top: 1px; flex: 0 0 auto;
-    border: 2px solid #adb5bd; border-radius: 4px; background: #fff;
-    display: inline-flex; align-items: center; justify-content: center;
-    color: #fff; font-size: .75rem;
+/* fundo branco só no não selecionado: o selecionado (btn-primary) fica azul com texto branco */
+.setor-btn.btn-outline-primary { background: #fff; }
+.setor-btn .setor-btn-topo {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
 }
-.setor-btn.selecionado .setor-check { background: #0d6efd; border-color: #0d6efd; }
-.setor-btn .setor-corpo { flex: 1; min-width: 0; }
-.setor-btn .setor-btn-topo { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-.setor-btn .setor-btn-nome { font-weight: 700; color: #212529; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.setor-btn .setor-btn-pct { font-weight: 700; color: var(--faixa-cor); }
-.setor-btn .setor-btn-barra { display: block; height: 8px; border-radius: 4px; background: #e2e6ea; overflow: hidden; }
-.setor-btn .setor-btn-barra > span { display: block; height: 100%; border-radius: 4px; background: var(--faixa-cor); }
-
-/* faixas: >= 90 verde, 70-89 azul, 40-69 laranja, < 40 vermelho */
-.faixa-verde    { --faixa-cor: #198754; --faixa-fundo: #ecf8f1; --faixa-borda: #a3d9b8; }
-.faixa-azul     { --faixa-cor: #0d6efd; --faixa-fundo: #eef5ff; --faixa-borda: #a9c9f5; }
-.faixa-laranja  { --faixa-cor: #f0a500; --faixa-fundo: #fff8e6; --faixa-borda: #f5d68a; }
-.faixa-vermelho { --faixa-cor: #dc3545; --faixa-fundo: #fdeff0; --faixa-borda: #f1aab2; }
-.setor-legenda { display: flex; flex-wrap: wrap; gap: 16px; }
-.setor-dot {
-    display: inline-block; width: 12px; height: 12px; border-radius: 50%;
-    margin-right: 6px; vertical-align: -1px; background: var(--faixa-cor);
+.setor-btn .setor-btn-nome { font-size: .9rem; white-space: nowrap; }
+.setor-btn .setor-btn-nome-wrap { display: inline-flex; align-items: center; gap: 5px; }
+/* alerta: célula com ordem interrompida na carga */
+.setor-btn .setor-btn-alerta { color: #f0a500; font-size: .8rem; }
+.setor-btn.btn-primary .setor-btn-alerta { color: #ffd54a; }
+.setor-btn .setor-btn-pct { font-size: .9rem; font-weight: 700; }
+.setor-btn .setor-btn-barra {
+    display: block;
+    height: 8px;
+    border-radius: 4px;
+    background: #e9ecef;
+    overflow: hidden;
 }
+.setor-btn .setor-btn-barra > span {
+    display: block;
+    height: 100%;
+    background: #5aa3f0;
+    border-radius: 4px;
+}
+/* selecionado (btn-primary): fundo azul, barra clara */
+.setor-btn.btn-primary .setor-btn-barra { background: rgba(255, 255, 255, .35); }
+.setor-btn.btn-primary .setor-btn-barra > span { background: #fff; }
 </style>
 {% endblock %}
 
@@ -217,46 +177,25 @@
         <!-- Painel de Ordens Criadas -->
         <h3 class="mb-3 text-secondary">Painel de Ordens Criadas</h3>
     
-        <!-- Filtros de Programação -->
-        <form id="filtro-form" class="filtros-prog mb-4">
-            <!-- Cabeçalho -->
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="filtros-prog-icone"><i class="fas fa-filter"></i></span>
-                    <div>
-                        <h4 class="mb-0 fw-bold">Filtros de Programação</h4>
-                        <div class="text-muted">Selecione os critérios para visualizar os conjuntos programados</div>
-                    </div>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-success" id="btnForaSequenciamento" data-bs-toggle="modal" data-bs-target="#modalForaSequenciamento">
-                        <i class="fas fa-random me-1"></i> Produção Fora do Sequenciamento
-                    </button>
-                    <button type="button" id="limpar-filtro" class="btn btn-outline-secondary">
-                        <i class="fas fa-undo me-1"></i> Limpar filtros
-                    </button>
-                </div>
+        <!-- Filtro de Produção -->
+        <form id="filtro-form" class="mb-4 p-4 border rounded bg-light shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="mb-0 text-primary"></h5>
+                <button type="button" class="btn btn-success btn-sm" id="btnForaSequenciamento" data-bs-toggle="modal" data-bs-target="#modalForaSequenciamento">
+                    <i class="fas fa-random me-1"></i> Produção Fora do Sequenciamento
+                </button>
             </div>
 
-            <!-- Período da carga + Status -->
-            <div class="filtros-prog-bloco row g-3 mx-0 mb-3">
-                <div class="col-lg-7">
-                    <div class="filtros-prog-titulo"><i class="far fa-calendar me-2"></i>Período da carga</div>
-                    <div class="row g-3">
-                        <div class="col-sm-6">
-                            <label for="filtro-data-carga" class="form-label small mb-1">De</label>
-                            <input type="date" id="filtro-data-carga" class="form-control">
-                        </div>
-                        <div class="col-sm-6">
-                            <label for="filtro-data-carga-fim" class="form-label small mb-1">Até</label>
-                            <input type="date" id="filtro-data-carga-fim" class="form-control">
-                        </div>
-                    </div>
+            <div class="row g-4">
+                <!-- Filtro por Data -->
+                <div class="col-md-4">
+                    <label for="filtro-data-carga" class="form-label fw-semibold">Data da Carga</label>
+                    <input type="date" id="filtro-data-carga" class="form-control">
                 </div>
-                <div class="col-lg-5 filtros-prog-divisor">
-                    <div class="filtros-prog-titulo mb-3"><i class="fas fa-layer-group me-2"></i>Status da programação</div>
+                <div class="col-md-4 mb-2">
+                    <label for="filtro-status" class="form-label">Status</label>
                     <select class="form-select" id="filtro-status">
-                        <option value="">Todos os status</option>
+                        <option class="text-muted" value="">Filtrar por status</option>
                         <option value="aguardando_iniciar">Aguardando iniciar</option>
                         <option value="iniciada">Iniciada</option>
                         <option value="interrompida">Interrompida</option>
@@ -264,50 +203,34 @@
                         <option value="agua_prox_proc">Próximo processo</option>
                     </select>
                 </div>
-            </div>
-
-            <!-- Setor -->
-            <div class="filtros-prog-bloco mb-3">
-                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-                    <div>
-                        <div class="filtros-prog-titulo"><i class="fas fa-cog me-2"></i>Setor</div>
-                        <div class="text-muted small fst-italic">Selecione um ou mais setores para filtrar. O percentual indica o que já foi produzido do total programado.</div>
+                <!-- Filtro por Setor -->
+                <div class="col-md-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-semibold mb-0">Setor</label>
+                        <button type="button" id="limpar-filtro" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-undo me-1"></i> Limpar
+                        </button>
                     </div>
-                    <div class="setor-legenda small">
-                        <span><i class="setor-dot faixa-verde"></i>≥ 90%</span>
-                        <span><i class="setor-dot faixa-azul"></i>70% – 89%</span>
-                        <span><i class="setor-dot faixa-laranja"></i>40% – 69%</span>
-                        <span><i class="setor-dot faixa-vermelho"></i>&lt; 40%</span>
+                    <div id="setor-container" class="d-flex flex-wrap gap-2 p-2 bg-white border rounded">
+                        <p class="text-muted mb-0">Carregando setores...</p>
                     </div>
+                    <input type="hidden" name="filtro-setor" id="filtro-setor">
                 </div>
-                <div id="setor-container" class="setor-grid">
-                    <p class="text-muted mb-0">Carregando setores...</p>
+                
+                <!-- Filtro por data programada -->
+                <div class="col-md-3">
+                    <label for="filtro-data-programada" class="form-label fw-bold">Data programada</label>
+                    <input type="date" id="filtro-data-programada" class="form-control">
                 </div>
-                <input type="hidden" name="filtro-setor" id="filtro-setor">
-            </div>
 
-            <!-- Data programada -->
-            <div class="filtros-prog-bloco d-flex flex-wrap align-items-center gap-4 mb-3">
-                <div>
-                    <div class="filtros-prog-titulo"><i class="far fa-calendar me-2"></i>Data programada <span class="fw-normal text-muted">(opcional)</span></div>
-                    <div class="text-muted small">Filtre por uma data específica de programação</div>
-                </div>
-                <input type="date" id="filtro-data-programada" class="form-control" style="max-width: 260px;">
-            </div>
-
-            <!-- Resumo + ações -->
-            <div class="filtros-prog-rodape">
-                <div class="d-flex flex-wrap align-items-center gap-3 small">
-                    <span><i class="fas fa-info-circle text-primary me-2 fs-5 align-middle"></i><strong id="resumo-itens">–</strong> itens programados para o período selecionado</span>
-                    <span class="filtros-prog-sep"><i class="fas fa-tag me-2"></i><span id="resumo-setores">–</span></span>
-                    <span class="filtros-prog-sep text-muted"><i class="far fa-calendar me-2"></i>Atualizado em <span id="resumo-atualizado">–</span></span>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-outline-primary" id="btnQrCode" data-bs-toggle="modal" data-bs-target="#qrScannerModal">
-                        <i class="bi bi-qr-code-scan"></i> Qr Code
+                <!-- Botão Filtrar -->
+                <div class="d-flex align-items-end justify-content-between">
+                    <button type="submit" class="btn btn-primary w-25" style="min-width: 200px;">
+                        <i class="fas fa-filter me-1"></i> Filtrar
                     </button>
-                    <button type="submit" class="btn btn-primary px-4">
-                        <i class="fas fa-filter me-1"></i> Aplicar filtros
+
+                    <button type="button" class="btn btn-primary" id="btnQrCode" data-bs-toggle="modal" data-bs-target="#qrScannerModal">
+                        <i class="bi bi-qr-code-scan"></i> Qr Code
                     </button>
                 </div>
             </div>
