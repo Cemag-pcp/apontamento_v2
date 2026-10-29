@@ -33,9 +33,12 @@ from ..models import InspecaoRecebimento, InspecaoRecebimentoItem
 # sistema (que nao tem esse problema e se beneficiam do upload paralelo).
 _storage_midia_recebimento = S3Boto3Storage(transfer_config=TransferConfig(use_threads=False))
 
+# "RQ AL-003-000 (Acompanhamento de Entregas)", copia criada em 29/10/2026.
+# A anterior (1mLuw4jM5WpD0pgxXREio15Ju8MZZ7QMJHb3vapz94Ac) foi desativada;
+# a migracao inspecao/0052 levou os itens ja sincronizados para esta.
 SHEET_ID = os.environ.get(
     "RECEBIMENTO_SHEET_ID",
-    "1mLuw4jM5WpD0pgxXREio15Ju8MZZ7QMJHb3vapz94Ac",
+    "1K5MkyAIYmNq3jpSS_GXd5VlqERaBnPW0h8fzxDE-vys",
 )
 SHEET_TAB = os.environ.get(
     "RECEBIMENTO_SHEET_TAB",
