@@ -31,7 +31,7 @@ export const loadOrdens = (container, filtros = {}) => {
 
         document.getElementById('data-entrega-info').textContent = '[carregando...]';
 
-        authFetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&data_carga_fim=${filtros.data_carga_fim || ''}&setor=${filtros.setor || ''}&status=${filtros.status || ''}&data-programada=${filtros.data_programada || ''}`)
+        authFetch(`api/ordens-criadas/?data_carga=${filtros.data_carga}&setor=${filtros.setor || ''}&status=${filtros.status || ''}&data-programada=${filtros.data_programada || ''}`)
             .then(response => response.json())
             .then(data => {
                 const ordens = data.ordens;
@@ -110,56 +110,56 @@ export const loadOrdens = (container, filtros = {}) => {
                     resolve(data);
                 }
 
-                // Total programado (setores e status filtrados) + horario da consulta
-                const totalProgramado = (data.ordens || []).reduce((soma, o) => soma + (Number(o.total_planejada) || 0), 0);
-                document.getElementById('resumo-itens').textContent = Math.round(totalProgramado).toLocaleString('pt-BR');
-                document.getElementById('resumo-atualizado').textContent = new Date().toLocaleString('pt-BR', {
-                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                }).replace(',', ' às');
-
                 if (data.maquinas.length === 0) {
                     setorContainer.innerHTML = '<p class="text-muted">Nenhuma máquina encontrada</p>';
-                    atualizarResumoSetores();
                     return;
                 }
-
-                // Cartão por setor (célula): checkbox, nome, % produzido do programado e
-                // barra colorida pela faixa. Selecao multipla: o campo oculto guarda
-                // os ids separados por virgula ("3,7,12").
-                const selecionados = new Set(String(filtroSetorInput.value || '').split(',').filter(Boolean));
+    
                 data.maquinas.forEach(maquina => {
-                    const percentual = Number(maquina.percentual) || 0;
                     const button = document.createElement("button");
                     button.type = "button";
-                    button.classList.add("setor-btn", classeFaixaSetor(percentual));
+                    button.classList.add("btn", "btn-outline-primary", "setor-btn");
                     button.dataset.setor = maquina.maquina__id;
-                    if (selecionados.has(String(maquina.maquina__id))) {
-                        button.classList.add("selecionado");
+                    if (String(maquina.maquina__id) === String(filtroSetorInput.value)) {
+                        button.classList.replace("btn-outline-primary", "btn-primary");
                     }
+                    // Cartão: nome + % da carga feita na célula + barra de progresso,
+                    // com triângulo de alerta se a célula tem ordem interrompida na carga
+                    const percentual = Number(maquina.percentual) || 0;
+                    const interrompidas = Number(maquina.interrompidas) || 0;
+                    const textoInterrompidas = `${interrompidas} ${interrompidas === 1 ? 'ordem interrompida' : 'ordens interrompidas'}`;
                     button.innerHTML = `
-                        <span class="setor-check"><i class="fas fa-check"></i></span>
-                        <span class="setor-corpo">
-                            <span class="setor-btn-topo">
+                        <span class="setor-btn-topo">
+                            <span class="setor-btn-nome-wrap">
+                                ${interrompidas ? `<i class="fas fa-triangle-exclamation setor-btn-alerta" title="${textoInterrompidas}"></i>` : ''}
                                 <span class="setor-btn-nome"></span>
-                                <span class="setor-btn-pct">${percentual}%</span>
                             </span>
-                            <span class="setor-btn-barra"><span style="width: ${percentual}%"></span></span>
+                            <span class="setor-btn-pct">${percentual}%</span>
                         </span>
+                        <span class="setor-btn-barra"><span style="width: ${percentual}%"></span></span>
                     `;
                     button.querySelector(".setor-btn-nome").textContent = maquina.maquina__nome;
-                    button.title = `${maquina.maquina__nome}: ${percentual}% produzido do programado`;
+                    button.title = `${maquina.maquina__nome}: ${percentual}% da carga feito`
+                        + (interrompidas ? ` — ${textoInterrompidas}` : '');
 
+                    // Evento de clique para selecionar o setor
                     button.addEventListener("click", function () {
-                        this.classList.toggle("selecionado");
-                        filtroSetorInput.value = Array.from(
-                            document.querySelectorAll(".setor-btn.selecionado")
-                        ).map(btn => btn.dataset.setor).join(",");
-                        atualizarResumoSetores();
+                        // Remover seleção de outros botões
+                        document.querySelectorAll(".setor-btn").forEach(btn => {
+                            btn.classList.remove("btn-primary");
+                            btn.classList.add("btn-outline-primary");
+                        });
+    
+                        // Adicionar a seleção ao botão clicado
+                        this.classList.remove("btn-outline-primary");
+                        this.classList.add("btn-primary");
+    
+                        // Definir valor do setor no campo oculto
+                        filtroSetorInput.value = this.dataset.setor;
                     });
-
+    
                     setorContainer.appendChild(button);
                 });
-                atualizarResumoSetores();
 
                 document.getElementById('data-entrega-info').textContent = data.data_programacao;
                 document.getElementById('filtro-data-carga').textContent = data.data_carga;
@@ -184,22 +184,6 @@ function formatarDataBR(valor) {
     if (!valor) return '';
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(valor));
     return m ? `${m[3]}/${m[2]}/${m[1]}` : valor;
-}
-
-// Faixas do filtro de setor (legenda na tela): >= 90 verde, 70-89 azul, 40-69 laranja, < 40 vermelho
-function classeFaixaSetor(percentual) {
-    if (percentual >= 90) return "faixa-verde";
-    if (percentual >= 70) return "faixa-azul";
-    if (percentual >= 40) return "faixa-laranja";
-    return "faixa-vermelho";
-}
-
-function atualizarResumoSetores() {
-    const total = document.querySelectorAll(".setor-btn").length;
-    const marcados = document.querySelectorAll(".setor-btn.selecionado").length;
-    document.getElementById("resumo-setores").textContent = marcados
-        ? `${marcados} de ${total} setores selecionados`
-        : `Todos os ${total} setores`;
 }
 
 function truncateText(text, maxLength) {
@@ -1441,14 +1425,12 @@ export function resetarCardsInicial(filtros = {}) {
 
     // Obtém os filtros atualizados
     const filtroDataCarga = document.getElementById('filtro-data-carga');
-    const filtroDataCargaFim = document.getElementById('filtro-data-carga-fim');
     const filtroSetor = document.getElementById('filtro-setor');
     const filtroDataProgramada = document.getElementById('filtro-data-programada');
     const filtroStatus = document.getElementById('filtro-status');
 
     const currentFiltros = {
         data_carga: filtroDataCarga.value,
-        data_carga_fim: filtroDataCargaFim.value,
         setor: filtroSetor.value,
         data_programada: filtroDataProgramada.value,
         status: filtroStatus.value,
@@ -1869,49 +1851,67 @@ async function handleFormSubmit(event) {
 }
 
 function selecionarSetor() {
-    // A selecao dos cartoes de setor fica no loadOrdens (eles sao recriados a cada busca)
+    const setorButtons = document.querySelectorAll(".setor-btn");
+    const filtroSetorInput = document.getElementById("filtro-setor");
     const limparFiltroBtn = document.getElementById("limpar-filtro");
+    const filtroDataCarga = document.getElementById('filtro-data-carga');
+    const filtroSetor = document.getElementById('filtro-setor');
 
-    // "Limpar filtros": tira setores, status, data programada e o "Até";
-    // mantém a data inicial da carga
+    // Captura os valores atualizados dos filtros
+    const filtros = {
+        data_carga: filtroDataCarga.value,
+        setor: filtroSetor.value
+    };
+    setorButtons.forEach(button => {
+        button.addEventListener("click", function () {
+            // Remove a seleção de todos os botões
+            setorButtons.forEach(btn => {
+                btn.classList.remove("btn-primary");
+                btn.classList.add("btn-outline-primary");
+            });
+
+            // Ativa o botão clicado
+            this.classList.remove("btn-outline-primary");
+            this.classList.add("btn-primary");
+
+            // Atualiza o input hidden
+            filtroSetorInput.value = this.dataset.setor;
+            console.log("Setor selecionado:", filtroSetorInput.value);
+        });
+    });
+
+    // **Evento para limpar o filtro**
     limparFiltroBtn.addEventListener("click", function () {
-        document.querySelectorAll(".setor-btn.selecionado").forEach(btn => btn.classList.remove("selecionado"));
-        document.getElementById("filtro-setor").value = "";
-        document.getElementById("filtro-status").value = "";
-        document.getElementById("filtro-data-programada").value = "";
-        document.getElementById("filtro-data-carga-fim").value = "";
-        atualizarResumoSetores();
+        // Remove a seleção de todos os botões
+        setorButtons.forEach(btn => {
+            btn.classList.remove("btn-primary");
+            btn.classList.add("btn-outline-primary");
+        });
 
-        const filtros = {
-            data_carga: document.getElementById('filtro-data-carga').value,
-            setor: "",
-        };
+        // Resetar o campo oculto
+        filtroSetorInput.value = "";
+
         resetarCardsInicial(filtros);
         carregarOrdensIniciadas(filtros);
         carregarOrdensInterrompidas(filtros);
+        
     });
 }
 
 function salvarFiltros() {
     const filtroDataCarga = document.getElementById("filtro-data-carga");
-    const filtroDataCargaFim = document.getElementById("filtro-data-carga-fim");
     const filtroSetor = document.getElementById("filtro-setor");
 
     localStorage.setItem("filtroDataCarga", filtroDataCarga.value);
-    localStorage.setItem("filtroDataCargaFim", filtroDataCargaFim.value);
     localStorage.setItem("filtroSetor", filtroSetor.value);
 }
 
 function restaurarFiltros() {
     const filtroDataCarga = document.getElementById("filtro-data-carga");
-    const filtroDataCargaFim = document.getElementById("filtro-data-carga-fim");
     const filtroSetor = document.getElementById("filtro-setor");
 
     if (localStorage.getItem("filtroDataCarga")) {
         filtroDataCarga.value = localStorage.getItem("filtroDataCarga");
-    }
-    if (localStorage.getItem("filtroDataCargaFim")) {
-        filtroDataCargaFim.value = localStorage.getItem("filtroDataCargaFim");
     }
     if (localStorage.getItem("filtroSetor")) {
         filtroSetor.value = localStorage.getItem("filtroSetor");
@@ -1942,7 +1942,6 @@ document.addEventListener('DOMContentLoaded', () => {
     btnLimpar.addEventListener("click", function () {
         // localStorage.removeItem("filtroDataCarga");
         localStorage.removeItem("filtroSetor");
-        localStorage.removeItem("filtroDataCargaFim");
 
         // document.getElementById("filtro-data-carga").value = "";
         document.getElementById("filtro-setor").value = "";
