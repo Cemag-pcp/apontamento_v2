@@ -1,5 +1,13 @@
 import { confirmarInicioOrdem } from './apontamento-utils.js';
 
+// "2026-11-06" (ou "2026-11-06T...") -> "06/11/2026". Por texto, sem new Date(),
+// pra uma data pura nao voltar um dia pelo fuso. Outros formatos voltam como vieram.
+function formatarDataBR(valor) {
+    if (!valor) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(valor));
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : valor;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Pega a string de parâmetros da URL atual
     const params = new URLSearchParams(window.location.search);
@@ -96,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                         <div class="card-body bg-white p-3">
                             <p class="card-text mb-3">
-                                <strong>Data Carga:</strong> ${ordem.data_carga}
+                                <strong>Data Carga:</strong> ${formatarDataBR(ordem.data_carga)}
                             </p>
                             <p class="card-text mb-3">
                                 <strong>Quantidade a fazer:</strong> ${ordem.qtd_planejada}
@@ -372,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                     <div class="col-12 col-md-auto mb-2 mb-md-0">
                                         <strong class="me-2">Data Carga:</strong>
-                                        <span class="text-dark me-3">${ordem.data_carga}</span>
+                                        <span class="text-dark me-3">${formatarDataBR(ordem.data_carga)}</span>
                                     </div>
                                     <div class="col-12 col-md-auto mb-2 mb-md-0">
                                         <strong class="me-2">Qt. Restante:</strong>
