@@ -28,6 +28,9 @@ urlpatterns = [
     path('api/banhos-ezinger/', pintura.listar_analises_banho_ezinger, name='listar-banhos-ezinger'),
     path('api/banhos-ezinger/salvar/', pintura.salvar_analise_banho_ezinger, name='salvar-banhos-ezinger'),
     path('api/banhos-ezinger/registrar-adicao/', pintura.registrar_adicao_banho_ezinger, name='registrar-adicao-banhos-ezinger'),
+    path('api/registro-limpeza-pintura/', pintura.listar_registros_limpeza_pintura, name='listar-registro-limpeza-pintura'),
+    path('api/registro-limpeza-pintura/salvar/', pintura.salvar_registro_limpeza_pintura, name='salvar-registro-limpeza-pintura'),
+    path('api/registro-limpeza-pintura/pecas/', pintura.pecas_registro_limpeza_pintura, name='pecas-registro-limpeza-pintura'),
 
     path('api/historico-pintura/<int:id>', pintura.get_historico_pintura, name='historico-pintura'),
     path('api/historico-causas-pintura/<int:id>', pintura.get_historico_causas_pintura, name='historico-causas-pintura'),
@@ -129,6 +132,7 @@ urlpatterns += [
     path('estamparia/', estamparia.inspecao_estamparia, name='inspecao-estamparia'),
     path('pintura/', pintura.inspecao_pintura, name='inspecao-pintura'),
     path('banhos-ezinger/', pintura.inspecao_banhos_ezinger, name='inspecao-banhos-ezinger'),
+    path('registro-limpeza-pintura/', pintura.registro_limpeza_pintura, name='registro-limpeza-pintura'),
     path('verificacao-funcional-pintura/', verificacao_funcional.verificacao_funcional_pintura, name='verificacao-funcional-pintura'),
     path('recebimento/', recebimento.inspecao_recebimento, name='inspecao-recebimento'),
     path('tubos-cilindros/', estanqueidade.inspecao_tubos_cilindros, name='inspecao-tubos-cilindros'),

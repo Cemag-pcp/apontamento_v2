@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from core.models import Profile
@@ -449,3 +450,25 @@ class ArquivoCausaEstanqueidade(models.Model):
         blank=True,
         storage=S3Boto3Storage(),
     )
+
+
+class RegistroLimpezaPintura(models.Model):
+    """Inspeção de limpeza de uma peça antes da pintura (Inspeções > Pintura >
+    Registro de limpeza). Sempre 1 peça por registro."""
+
+    PROCESSO_CHOICES = (
+        ("deltec", "Deltec"),
+        ("manual", "Manual"),
+    )
+
+    inspetor = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True)
+    data = models.DateTimeField(default=timezone.now)
+    processo = models.CharField(max_length=10, choices=PROCESSO_CHOICES)
+    # peça escolhida das peças da pintura (finalizadas ou não)
+    peca = models.CharField(max_length=255)
+    quantidade = models.PositiveIntegerField(default=1)
+    conforme = models.BooleanField()
+    registrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)

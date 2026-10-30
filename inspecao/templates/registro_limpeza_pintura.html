@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %} <title>Registro de Limpeza - Pintura</title> {% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="/static/css/inspecao.css">
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 mb-4">
+    <div>
+        <h2 class="my-0">Registro de Limpeza - Pintura</h2>
+        <p class="text-muted mb-0 mt-2">Inspeção da limpeza das peças antes da pintura.</p>
+    </div>
+    <button class="btn btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#modal-registro-limpeza">
+        <i class="bi bi-plus-lg"></i> Registrar limpeza
+    </button>
+</div>
+
+<section class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <h5 class="mb-0">Histórico</h5>
+            <div class="d-flex align-items-center gap-2">
+                <span id="qtd-registros-limpeza" class="rounded-pill py-1 px-2" style="background-color: #00940c; color: #fafafa; font-weight: 600; font-size: 0.75rem;"></span>
+                <button class="btn btn-white" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-filtrar-limpeza" aria-controls="offcanvas-filtrar-limpeza">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Inspetor</th>
+                        <th>Processo</th>
+                        <th>Material</th>
+                        <th class="text-center">Qtd.</th>
+                        <th class="text-center">Limpeza</th>
+                    </tr>
+                </thead>
+                <tbody id="registros-limpeza-body">
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">Carregando registros...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="paginacao-registros-limpeza" class="mt-3"></div>
+    </div>
+</section>
+
+<!-- Filtros (puxado da direita, como nas outras telas de inspeção) -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-filtrar-limpeza" aria-labelledby="offcanvas-filtrar-limpeza-label" style="width: 320px;">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="offcanvas-filtrar-limpeza-label">Filtrar registros</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+    </div>
+    <form id="form-filtrar-limpeza" class="offcanvas-body">
+        <input type="text" class="form-control mb-3" id="filtro-limpeza-pesquisar" placeholder="Pesquisar peça...">
+
+        <h6>Processo pintura</h6>
+        <select class="form-select mb-3" id="filtro-limpeza-processo">
+            <option value="">Todos</option>
+            {% for valor, nome in processos %}
+                <option value="{{ valor }}">{{ nome }}</option>
+            {% endfor %}
+        </select>
+
+        <h6>Limpeza</h6>
+        <select class="form-select mb-3" id="filtro-limpeza-resultado">
+            <option value="">Todos</option>
+            <option value="conforme">Conforme</option>
+            <option value="nao_conforme">Não conforme</option>
+        </select>
+
+        <h6>Data</h6>
+        <div class="d-flex flex-column gap-2 mb-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <label for="filtro-limpeza-data-inicio" class="form-label me-2 mb-0">Início:</label>
+                <input type="date" id="filtro-limpeza-data-inicio" class="form-control form-control-sm" style="width: fit-content;">
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <label for="filtro-limpeza-data-fim" class="form-label me-2 mb-0">Fim:</label>
+                <input type="date" id="filtro-limpeza-data-fim" class="form-control form-control-sm" style="width: fit-content;">
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between mt-3">
+            <button id="btn-limpar-filtro-limpeza" type="button" class="btn btn-outline-secondary">Limpar</button>
+            <button id="btn-filtrar-limpeza" type="submit" class="btn btn-dark" data-bs-dismiss="offcanvas">Filtrar</button>
+        </div>
+    </form>
+</div>
+
+<!-- Modal: novo registro de limpeza -->
+<div class="modal fade" data-bs-backdrop="static" id="modal-registro-limpeza" tabindex="-1" aria-labelledby="modal-registro-limpeza-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modal-registro-limpeza-label">Registrar limpeza</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="form-registro-limpeza">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="limpeza-inspetor">Inspetor</label>
+                        <select class="form-select" name="inspetor" id="limpeza-inspetor" required>
+                            <option value="" {% if not inspetor_logado %}selected{% endif %} disabled>Selecione o inspetor</option>
+                            {% for inspetor in inspetores %}
+                                <option value="{{ inspetor.id }}" {% if inspetor.id == inspetor_logado %}selected{% endif %}>{{ inspetor.nome_usuario }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="limpeza-data">Data</label>
+                        <input class="form-control" type="datetime-local" name="data" id="limpeza-data" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label d-block">Processo pintura</label>
+                        <div class="btn-group w-100" role="group" aria-label="Processo pintura">
+                            {% for valor, nome in processos %}
+                                <input type="radio" class="btn-check" name="processo" id="limpeza-processo-{{ valor }}" value="{{ valor }}" autocomplete="off" required>
+                                <label class="btn btn-outline-dark" for="limpeza-processo-{{ valor }}">{{ nome }}</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="limpeza-peca">Material</label>
+                        <select class="form-select" name="peca" id="limpeza-peca" required></select>
+                        <div class="form-text">Peças da pintura (finalizadas ou não). Digite para buscar.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="limpeza-quantidade">Quantidade</label>
+                        <input class="form-control" type="number" id="limpeza-quantidade" value="1" readonly>
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label d-block">Limpeza</label>
+                        <div class="btn-group w-100" role="group" aria-label="Limpeza">
+                            <input type="radio" class="btn-check" name="limpeza" id="limpeza-conforme" value="conforme" autocomplete="off" required>
+                            <label class="btn btn-outline-success" for="limpeza-conforme"><i class="bi bi-check-lg"></i> Conforme</label>
+                            <input type="radio" class="btn-check" name="limpeza" id="limpeza-nao-conforme" value="nao_conforme" autocomplete="off">
+                            <label class="btn btn-outline-danger" for="limpeza-nao-conforme"><i class="bi bi-x-lg"></i> Não conforme</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-dark" id="btn-salvar-limpeza">
+                        <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/pintura/registro-limpeza.js' %}"></script>
+{% endblock %}

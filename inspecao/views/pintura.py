@@ -1,13 +1,14 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Q, Max
+from django.db.models import Q, Max, F
 from django.db import transaction
 from django.utils import timezone
 from django.db import connection
 
-from apontamento_pintura.models import Retrabalho
+from apontamento_pintura.models import Retrabalho, PecasOrdem
 from ..models import (
+    RegistroLimpezaPintura,
     Inspecao,
     DadosExecucaoInspecao,
     Reinspecao,
@@ -143,6 +144,135 @@ def inspecao_pintura(request):
 
 def inspecao_banhos_ezinger(request):
     return render(request, "inspecao_banhos_ezinger.html")
+
+
+def registro_limpeza_pintura(request):
+    users = Profile.objects.filter(
+        tipo_acesso="inspetor", permissoes__nome="inspecao/pintura"
+    ).select_related("user")
+    lista_inspetores = [
+        {"nome_usuario": user.user.username, "id": user.id} for user in users
+    ]
+
+    # inspetor logado já vem selecionado no modal
+    perfil = Profile.objects.filter(user=request.user).first() if request.user.is_authenticated else None
+    inspetor_logado = perfil.id if perfil and any(i["id"] == perfil.id for i in lista_inspetores) else None
+
+    return render(
+        request,
+        "registro_limpeza_pintura.html",
+        {
+            "inspetores": lista_inspetores,
+            "inspetor_logado": inspetor_logado,
+            "processos": RegistroLimpezaPintura.PROCESSO_CHOICES,
+        },
+    )
+
+
+def pecas_registro_limpeza_pintura(request):
+    """Peças da pintura (finalizadas ou não) para o campo Material, as mais
+    recentes primeiro. Formato do select2: {"results": [{"id", "text"}]}."""
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    pecas = PecasOrdem.objects.all()
+    termo = request.GET.get("q", "").strip()
+    if termo:
+        pecas = pecas.filter(peca__icontains=termo)
+
+    pecas = (
+        pecas.values("peca")
+        .annotate(ultima=Max("data"))
+        .order_by(F("ultima").desc(nulls_last=True))[:30]
+    )
+    return JsonResponse({"results": [{"id": p["peca"], "text": p["peca"]} for p in pecas]})
+
+
+def listar_registros_limpeza_pintura(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    registros = RegistroLimpezaPintura.objects.select_related("inspetor__user").order_by("-data", "-id")
+
+    pesquisa = request.GET.get("pesquisar", "").strip()
+    processo = request.GET.get("processo", "")
+    resultado = request.GET.get("resultado", "")
+    data_inicio = request.GET.get("data_inicio")
+    data_fim = request.GET.get("data_fim")
+
+    if pesquisa:
+        registros = registros.filter(peca__icontains=pesquisa)
+    if processo:
+        registros = registros.filter(processo=processo)
+    if resultado in ("conforme", "nao_conforme"):
+        registros = registros.filter(conforme=resultado == "conforme")
+    if data_inicio:
+        registros = registros.filter(data__date__gte=data_inicio)
+    if data_fim:
+        registros = registros.filter(data__date__lte=data_fim)
+
+    paginador = Paginator(registros, 20)
+    pagina_obj = paginador.get_page(request.GET.get("pagina", 1))
+
+    dados = [
+        {
+            "id": registro.id,
+            "data": timezone.localtime(registro.data).strftime("%d/%m/%Y %H:%M"),
+            "inspetor": registro.inspetor.user.username if registro.inspetor and registro.inspetor.user else "-",
+            "processo": registro.get_processo_display(),
+            "peca": registro.peca,
+            "quantidade": registro.quantidade,
+            "conforme": registro.conforme,
+        }
+        for registro in pagina_obj
+    ]
+
+    return JsonResponse(
+        {
+            "dados": dados,
+            "total_filtrado": paginador.count,
+            "pagina_atual": pagina_obj.number,
+            "total_paginas": paginador.num_pages,
+        },
+        status=200,
+    )
+
+
+def salvar_registro_limpeza_pintura(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    inspetor = Profile.objects.filter(pk=request.POST.get("inspetor") or None).first()
+    if not inspetor:
+        return JsonResponse({"error": "Selecione o inspetor."}, status=400)
+
+    try:
+        data = timezone.make_aware(datetime.fromisoformat(request.POST.get("data", "")))
+    except ValueError:
+        return JsonResponse({"error": "Informe uma data válida."}, status=400)
+
+    processo = request.POST.get("processo")
+    if processo not in dict(RegistroLimpezaPintura.PROCESSO_CHOICES):
+        return JsonResponse({"error": "Selecione o processo de pintura."}, status=400)
+
+    peca = request.POST.get("peca", "").strip()
+    if not peca or not PecasOrdem.objects.filter(peca=peca).exists():
+        return JsonResponse({"error": "Selecione uma peça da pintura."}, status=400)
+
+    limpeza = request.POST.get("limpeza")
+    if limpeza not in ("conforme", "nao_conforme"):
+        return JsonResponse({"error": "Informe se a limpeza está conforme ou não conforme."}, status=400)
+
+    registro = RegistroLimpezaPintura.objects.create(
+        inspetor=inspetor,
+        data=data,
+        processo=processo,
+        peca=peca,
+        quantidade=1,  # sempre 1 peça por registro
+        conforme=limpeza == "conforme",
+        registrado_por=request.user if request.user.is_authenticated else None,
+    )
+    return JsonResponse({"success": True, "id": registro.id}, status=201)
 
 
 def listar_analises_banho_ezinger(request):
