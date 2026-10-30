@@ -464,8 +464,16 @@ class RegistroLimpezaPintura(models.Model):
     inspetor = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True)
     data = models.DateTimeField(default=timezone.now)
     processo = models.CharField(max_length=10, choices=PROCESSO_CHOICES)
-    # peça escolhida das peças da pintura (finalizadas ou não)
+    # peça escolhida das peças da pintura (finalizadas ou não), ligada à ordem
+    # da pintura em que está programada. Cor e data de carga ficam copiadas da
+    # ordem no momento do registro (histórico não muda se a ordem mudar)
+    ordem = models.ForeignKey(
+        "core.Ordem", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="registros_limpeza_pintura",
+    )
     peca = models.CharField(max_length=255)
+    cor = models.CharField(max_length=50, null=True, blank=True)
+    data_carga = models.DateField(null=True, blank=True)
     quantidade = models.PositiveIntegerField(default=1)
     conforme = models.BooleanField()
     registrado_por = models.ForeignKey(

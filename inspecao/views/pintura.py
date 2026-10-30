@@ -170,8 +170,9 @@ def registro_limpeza_pintura(request):
 
 
 def pecas_registro_limpeza_pintura(request):
-    """Peças da pintura (finalizadas ou não) para o campo Material, as mais
-    recentes primeiro. Formato do select2: {"results": [{"id", "text"}]}."""
+    """Peças da pintura (já pintadas ou não) para o campo Material: uma opção
+    por peça + ordem da pintura (com a cor e a data de carga da ordem), as
+    cargas mais recentes primeiro. Formato do select2: {"results": [{"id", "text", ...}]}."""
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
@@ -181,18 +182,33 @@ def pecas_registro_limpeza_pintura(request):
         pecas = pecas.filter(peca__icontains=termo)
 
     pecas = (
-        pecas.values("peca")
+        pecas.values("peca", "ordem_id", "ordem__ordem", "ordem__cor", "ordem__data_carga")
         .annotate(ultima=Max("data"))
-        .order_by(F("ultima").desc(nulls_last=True))[:30]
+        .order_by(
+            F("ordem__data_carga").desc(nulls_last=True),
+            F("ultima").desc(nulls_last=True),
+        )[:30]
     )
-    return JsonResponse({"results": [{"id": p["peca"], "text": p["peca"]} for p in pecas]})
+
+    resultados = []
+    for p in pecas:
+        data_carga = p["ordem__data_carga"]
+        resultados.append({
+            "id": f'{p["ordem_id"]}|{p["peca"]}',
+            "text": p["peca"],
+            "peca": p["peca"],
+            "ordem": p["ordem__ordem"],
+            "cor": p["ordem__cor"] or "",
+            "data_carga_br": data_carga.strftime("%d/%m/%Y") if data_carga else "",
+        })
+    return JsonResponse({"results": resultados})
 
 
 def listar_registros_limpeza_pintura(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    registros = RegistroLimpezaPintura.objects.select_related("inspetor__user").order_by("-data", "-id")
+    registros = RegistroLimpezaPintura.objects.select_related("inspetor__user", "ordem").order_by("-data", "-id")
 
     pesquisa = request.GET.get("pesquisar", "").strip()
     processo = request.GET.get("processo", "")
@@ -221,6 +237,9 @@ def listar_registros_limpeza_pintura(request):
             "inspetor": registro.inspetor.user.username if registro.inspetor and registro.inspetor.user else "-",
             "processo": registro.get_processo_display(),
             "peca": registro.peca,
+            "ordem": registro.ordem.ordem if registro.ordem else "-",
+            "cor": registro.cor or "-",
+            "data_carga": registro.data_carga.strftime("%d/%m/%Y") if registro.data_carga else "-",
             "quantidade": registro.quantidade,
             "conforme": registro.conforme,
         }
@@ -255,9 +274,17 @@ def salvar_registro_limpeza_pintura(request):
     if processo not in dict(RegistroLimpezaPintura.PROCESSO_CHOICES):
         return JsonResponse({"error": "Selecione o processo de pintura."}, status=400)
 
-    peca = request.POST.get("peca", "").strip()
-    if not peca or not PecasOrdem.objects.filter(peca=peca).exists():
+    # Material vem como "<id da ordem>|<peça>" (opção do select2)
+    ordem_id, _, peca = request.POST.get("peca", "").partition("|")
+    peca = peca.strip()
+    item = (
+        PecasOrdem.objects.select_related("ordem")
+        .filter(ordem_id=ordem_id if ordem_id.isdigit() else None, peca=peca)
+        .first()
+    )
+    if not peca or not item:
         return JsonResponse({"error": "Selecione uma peça da pintura."}, status=400)
+    ordem = item.ordem
 
     limpeza = request.POST.get("limpeza")
     if limpeza not in ("conforme", "nao_conforme"):
@@ -267,7 +294,10 @@ def salvar_registro_limpeza_pintura(request):
         inspetor=inspetor,
         data=data,
         processo=processo,
+        ordem=ordem,
         peca=peca,
+        cor=ordem.cor,
+        data_carga=ordem.data_carga,
         quantidade=1,  # sempre 1 peça por registro
         conforme=limpeza == "conforme",
         registrado_por=request.user if request.user.is_authenticated else None,
