@@ -20,12 +20,45 @@ function agoraLocalLimpeza() {
     return agora.toISOString().slice(0, 16);
 }
 
-// Material: peças da pintura (finalizadas ou não), buscadas no servidor
+// Fundo do badge na cor da peça (tons claros para o texto preto ficar legível)
+const FUNDO_COR_LIMPEZA = {
+    amarelo: "#ffd84d",
+    azul: "#7fb2ff",
+    cinza: "#c8c8c8",
+    laranja: "#ffaa55",
+    verde: "#7ed69a",
+    vermelho: "#ff8080",
+};
+
+// Cor e data de carga em que a peça está programada, ao lado do nome
+function detalhesPecaLimpeza(opcao) {
+    const cor = opcao.cor ? escaparHtmlLimpeza(opcao.cor) : "Sem cor";
+    const fundo = FUNDO_COR_LIMPEZA[(opcao.cor || "").trim().toLowerCase()] || "#f8f9fa";
+    const carga = opcao.data_carga_br ? `Carga ${escaparHtmlLimpeza(opcao.data_carga_br)}` : "Sem data de carga";
+    const ordem = opcao.ordem ? `<span class="badge bg-light text-dark border">Ordem ${escaparHtmlLimpeza(String(opcao.ordem))}</span>` : "";
+    return `${ordem}
+            <span class="badge text-dark border" style="background-color: ${fundo};">${cor}</span>
+            <span class="badge bg-light text-dark border"><i class="bi bi-calendar-event"></i> ${carga}</span>`;
+}
+
+// Material: peças da pintura (já pintadas ou não), uma opção por peça + cor
+// + data de carga, buscadas no servidor
 $("#limpeza-peca").select2({
     theme: "bootstrap-5",
     width: "100%",
     dropdownParent: $(modalRegistroLimpeza),
     placeholder: "Selecione a peça",
+    templateResult: (opcao) => {
+        if (!opcao.peca) return opcao.text; // "Buscando..." etc.
+        return $(`<div>
+            <div class="fw-semibold">${escaparHtmlLimpeza(opcao.peca)}</div>
+            <div class="d-flex gap-1 mt-1 small">${detalhesPecaLimpeza(opcao)}</div>
+        </div>`);
+    },
+    templateSelection: (opcao) => {
+        if (!opcao.peca) return opcao.text;
+        return $(`<span>${escaparHtmlLimpeza(opcao.peca)} ${detalhesPecaLimpeza(opcao)}</span>`);
+    },
     language: {
         inputTooShort: () => "Digite para buscar",
         noResults: () => "Nenhuma peça encontrada",
@@ -97,7 +130,7 @@ function buscarRegistrosLimpeza(pagina) {
     const paginacao = document.getElementById("paginacao-registros-limpeza");
     const qtd = document.getElementById("qtd-registros-limpeza");
 
-    corpo.innerHTML = `<tr><td colspan="6" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>`;
+    corpo.innerHTML = `<tr><td colspan="9" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>`;
     paginacao.innerHTML = "";
 
     const params = new URLSearchParams({ pagina });
@@ -119,7 +152,7 @@ function buscarRegistrosLimpeza(pagina) {
             qtd.textContent = `${resposta.total_filtrado} registros`;
 
             if (resposta.dados.length === 0) {
-                corpo.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Nenhum registro encontrado.</td></tr>`;
+                corpo.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">Nenhum registro encontrado.</td></tr>`;
                 return;
             }
 
@@ -129,6 +162,9 @@ function buscarRegistrosLimpeza(pagina) {
                     <td>${escaparHtmlLimpeza(registro.inspetor)}</td>
                     <td>${escaparHtmlLimpeza(registro.processo)}</td>
                     <td>${escaparHtmlLimpeza(registro.peca)}</td>
+                    <td>${escaparHtmlLimpeza(String(registro.ordem))}</td>
+                    <td>${escaparHtmlLimpeza(registro.cor)}</td>
+                    <td class="text-nowrap">${escaparHtmlLimpeza(registro.data_carga)}</td>
                     <td class="text-center">${registro.quantidade}</td>
                     <td class="text-center">${registro.conforme
                         ? '<span class="badge bg-success">Conforme</span>'
@@ -141,7 +177,7 @@ function buscarRegistrosLimpeza(pagina) {
         })
         .catch((error) => {
             console.error(error);
-            corpo.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Erro ao carregar os registros.</td></tr>`;
+            corpo.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Erro ao carregar os registros.</td></tr>`;
         });
 }
 
