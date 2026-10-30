@@ -1,5 +1,5 @@
 <div class="modal fade" id="modal-inspecionar-pintura" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="inspecionar-pinturaLabel">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title title" id="inspecionar-pinturaLabel">Inspecionar Pintura</h5>
@@ -7,72 +7,58 @@
         </div>
         <form id="form-inspecao">
           <div class="modal-body p-4" style="max-height: 70vh;overflow-y: auto;">
-            <div class="row">
-                <input type="hidden" name="id-inspecao-pintura" id="id-inspecao-pintura" class="form-control">
-                <div class="col-sm-6 mb-4">
-                    <label class="label-modal" for="data-finalizada-inspecao-pintura">Data Finalizada:</label>
-                    <input type="text" name="data-finalizada-inspecao-pintura" id="data-finalizada-inspecao-pintura" class="form-control" disabled>
-                </div>
-                <div class="col-sm-6 mb-4">
-                    <label class="label-modal" for="data-inspecao-pintura">Data Inspeção:</label>
-                    <input type="datetime-local" name="data-inspecao-pintura" id="data-inspecao-pintura" class="form-control" required>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-sm-8 mb-4">
-                    <label class="label-modal" for="peca-inspecao-pintura">Conjuntos:</label>
+            <input type="hidden" name="id-inspecao-pintura" id="id-inspecao-pintura" class="form-control">
+
+            <div class="row g-2 mb-2">
+                <div class="col-12 col-md-5">
+                    <label class="label-modal-sm" for="peca-inspecao-pintura">Conjunto</label>
                     <input type="text" name="peca-inspecao-pintura" id="peca-inspecao-pintura"
-                        class="form-control" disabled>
+                        class="form-control form-control-sm campo-readonly-compacto" disabled>
                 </div>
-                <div class="col-sm-4 mb-4">
-                    <label class="label-modal" for="cor-inspecao-pintura">Cor - Tipo:</label>
+                <div class="col-6 col-md-3">
+                    <label class="label-modal-sm" for="cor-inspecao-pintura">Cor - Tipo</label>
                     <input type="text" name="cor-inspecao-pintura" id="cor-inspecao-pintura"
-                        class="form-control" disabled>
+                        class="form-control form-control-sm campo-readonly-compacto" disabled>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="label-modal-sm" for="data-finalizada-inspecao-pintura">Data Finalizada</label>
+                    <input type="text" name="data-finalizada-inspecao-pintura" id="data-finalizada-inspecao-pintura" class="form-control form-control-sm campo-readonly-compacto" disabled>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="label-modal-sm">Qtd. Produzida</label>
+                    <input id="qtd-produzida-pintura" type="number" value=""
+                        class="form-control form-control-sm campo-readonly-compacto" disabled>
                 </div>
             </div>
-            <div class="row">
-                <div class="col-sm-4 mb-4">
-                    <label class="label-modal">Quantidade Inspecionada:</label>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-3">
+                    <label class="label-modal-sm" for="data-inspecao-pintura">Data Inspeção</label>
+                    <input type="datetime-local" name="data-inspecao-pintura" id="data-inspecao-pintura" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="label-modal-sm">Qtd. Inspecionada</label>
+                    <!-- Pintura: inspeção 100%, sempre igual à quantidade produzida -->
                     <input id="qtd-inspecao-pintura" type="number" name="qtd-inspecao-pintura" value=""
-                        class="form-control" disabled>
+                        class="form-control form-control-sm campo-readonly-compacto" readonly tabindex="-1">
+                    <div class="form-text">Inspeção 100% (obrigatória)</div>
                 </div>
-                <div class="col-sm-4 mb-4">
-                    <label class="label-modal">N° total de conformidades:</label>
+                <div class="col-6 col-md-3">
+                    <label class="label-modal-sm">Nº conformes</label>
                     <input type="number" id="conformidade-inspecao-pintura" min="0" name="conformidade-inspecao-pintura" value=""
-                        class="form-control" required>
+                        class="form-control form-control-sm campo-readonly-compacto" disabled>
                 </div>
-                <div class="col-sm-4 mb-4">
-                    <label class="label-modal">N° total de não conformidades:</label>
+                <div class="col-6 col-md-3">
+                    <label class="label-modal-sm">Nº não conformes</label>
                     <input type="number" id="nao-conformidade-inspecao-pintura" name="nao-conformidade-inspecao-pintura" value=""
-                        class="form-control" disabled>
+                        class="form-control form-control-sm campo-readonly-compacto" disabled>
                 </div>
             </div>
             <div id="containerInspecao">
-              <div class="row mb-3 selectContainerInspecao" style="border: 1px solid; border-radius: 10px; padding: 5px; border-color: #ced4da;">
-                <span class="label-modal text-end"> 1ª Causa</span>
-                <div class="col-sm-6 mb-4">
-                  <label class="label-modal">Causas: <small>selecione mais de uma</small></label>
-                  <select class="form-control select2" name="causas_1" style="font-size: 14px;" multiple required>
-                    {% for causa in causas %}
-                      <option value="{{causa.id}}">{{causa.nome}}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div class="col-sm-6 mb-4">
-                    <label class="label-modal">Quantidade:</label>
-                    <input type="number" style="font-size: 14px;" min="1" class="form-control" required>
-                </div>
-                <div class="col-sm-12 mb-4">
-                    <label class="label-modal">Imagens (obrigatória):<span class="text-danger"> *</span></label>
-                    <input class="form-control" type="file" name="imagens_1" accept="image/*" multiple>
-                    <div class="invalid-feedback">Anexe ao menos uma foto desta não conformidade.</div>
-                </div>
-              </div> 
+                <label class="label-modal d-block mb-2">Checklist por unidade inspecionada:</label>
+                <div id="unidades-checklist-pintura"></div>
             </div>
-            <div id="addRemoveContainer" class="col-sm-12" style="display: flex; justify-content: space-between; align-items: center;">
-              <button type="button" class="btn btn-white" id="removeButtonPintura" style="font-size: 20px;"><i class="bi bi-dash-lg"></i></button>
-              <button type="button" class="btn btn-white" id="addButtonPintura" style="font-size: 20px;"><i class="bi bi-plus-lg"></i></button>
-            </div>
+            <script type="application/json" id="causas-pintura-data">{{ causas_checklist_json|safe }}</script>
             <hr>
             <div class="row">
                 <div class="col-sm-6 mb-4">
@@ -88,13 +74,21 @@
                         {% endif %}
                     </select>
                 </div>
-            </div>    
-          </div>                
-          <div class="modal-footer">
-            <button id="submit-inspecionar-pintura" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
-              <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
-              <span role="status">Enviar inspeção</span>
-            </button>
+            </div>
+          </div>
+          <div class="modal-footer justify-content-between">
+            <small class="text-muted" id="rascunho-pintura-info"></small>
+            <div class="d-flex gap-2">
+              <!-- lote que chega em partes: guarda o checklist e as fotos no servidor -->
+              <button id="salvar-parcial-pintura" type="button" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+                <span role="status">Salvar parcial</span>
+              </button>
+              <button id="submit-inspecionar-pintura" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+                <span role="status">Enviar inspeção</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

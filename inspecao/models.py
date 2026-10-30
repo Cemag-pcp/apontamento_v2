@@ -452,6 +452,28 @@ class ArquivoCausaEstanqueidade(models.Model):
     )
 
 
+class RascunhoInspecao(models.Model):
+    """Inspeção salva parcialmente ("Salvar parcial") no servidor: na pintura o
+    lote pode chegar aos poucos, e o inspetor continua de qualquer aparelho.
+    `dados` guarda as respostas do checklist; as fotos ficam em
+    RascunhoInspecaoFoto. Some quando a inspeção é enviada."""
+
+    inspecao = models.OneToOneField(Inspecao, on_delete=models.CASCADE, related_name="rascunho")
+    dados = models.JSONField(default=dict)
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+
+class RascunhoInspecaoFoto(models.Model):
+    """Foto de não conformidade já tirada no rascunho. Mesmo storage/pasta do
+    ArquivoCausa: no envio final o arquivo é reaproveitado, sem novo upload."""
+
+    rascunho = models.ForeignKey(RascunhoInspecao, on_delete=models.CASCADE, related_name="fotos")
+    # item do checklist: "<unidade>-<id da causa>" ou "<unidade>-outros"
+    chave = models.CharField(max_length=60)
+    arquivo = models.ImageField(upload_to="causas_nao_conformidade/", storage=S3Boto3Storage())
+
+
 class RegistroLimpezaPintura(models.Model):
     """Inspeção de limpeza de uma peça antes da pintura (Inspeções > Pintura >
     Registro de limpeza). Sempre 1 peça por registro."""

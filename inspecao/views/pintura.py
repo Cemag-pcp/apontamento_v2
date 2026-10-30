@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Q, Max, F
@@ -17,12 +17,16 @@ from ..models import (
     ArquivoCausa,
     ArquivoConformidade,
     AnaliseBanhoEzinger,
+    RascunhoInspecao,
+    RascunhoInspecaoFoto,
 )
 from core.models import Profile
 
 from datetime import datetime, timedelta
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import json
+import unicodedata
 
 from storages.backends.s3boto3 import S3Boto3Storage
 
@@ -103,6 +107,40 @@ def _calcular_analise_banho(amostras_desengraxante, amostras_fosfatizante):
     }
 
 
+# Causas fixas do checklist da inspeção de pintura, nesta ordem. Achadas pelo
+# nome (sem diferenciar maiúsculas): os ids mudam entre bancos.
+CAUSAS_CHECKLIST_PINTURA = [
+    "Brilho",
+    "Camada Baixa",
+    "Olho de Peixe",
+    "Contaminação",
+    "Casca de Laranja",
+    "Escorrimento",
+    "Marcação por Óleo ou Água",
+]
+
+# Unificadas em "Marcação por Óleo ou Água": ficam fora do "Outros"
+CAUSAS_FORA_CHECKLIST_PINTURA = ["Marcação por Óleo", "Marcação por Água"]
+
+
+def _causas_checklist_pintura(list_causas):
+    """{"principais": as causas fixas do checklist, "outros": todas as demais
+    da pintura (item "Outros", em que o inspetor escolhe uma ou mais)}."""
+    por_nome = {c["nome"].strip().casefold(): c for c in list_causas}
+    principais = [
+        por_nome[nome.casefold()] for nome in CAUSAS_CHECKLIST_PINTURA if nome.casefold() in por_nome
+    ]
+    ids_principais = {c["id"] for c in principais}
+    fora = {nome.casefold() for nome in CAUSAS_FORA_CHECKLIST_PINTURA}
+    outros = sorted(
+        (c for c in list_causas
+         if c["id"] not in ids_principais and c["nome"].strip().casefold() not in fora),
+        # ordem alfabética ignorando acento ("Água" junto do "A")
+        key=lambda c: unicodedata.normalize("NFKD", c["nome"]).encode("ascii", "ignore").decode().casefold(),
+    )
+    return {"principais": principais, "outros": outros}
+
+
 def inspecao_pintura(request):
 
     users = Profile.objects.filter(
@@ -136,6 +174,8 @@ def inspecao_pintura(request):
             "inspetor_logado": inspetor_logado,
             "inspetores": lista_inspetores,
             "causas": list_causas,
+            # checklist OK / Ñ OK por unidade no modal de inspeção (como na montagem)
+            "causas_checklist_json": json.dumps(_causas_checklist_pintura(list_causas), ensure_ascii=False),
             "cores": cores,
             "tipos_tinta": tipos_tinta,
         },
@@ -575,6 +615,13 @@ def get_itens_inspecao_pintura(request):
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
+    # Inspeções com "Salvar parcial" no servidor (selo "Parcial" no card)
+    ids_com_rascunho = set(
+        RascunhoInspecao.objects.filter(
+            inspecao__in=[data.id for data in pagina_obj]
+        ).values_list("inspecao_id", flat=True)
+    )
+
     dados = []
     for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
@@ -596,6 +643,7 @@ def get_itens_inspecao_pintura(request):
             "qtd_apontada": data.pecas_ordem_pintura.qtd_boa,
             "tipo": data.pecas_ordem_pintura.tipo,
             "operador": matricula_nome_operador,
+            "parcial": data.id in ids_com_rascunho,
         }
 
         dados.append(item)
@@ -1104,11 +1152,12 @@ def get_imagens_causas_conformidades_pintura(request, id, num_execucao):
 
     return JsonResponse({'imagens': imagens})
 
-def _erro_foto_obrigatoria_pintura(request, campo_nao_conformidade, nome_causas, nome_imagens):
+def _erro_foto_obrigatoria_pintura(request, campo_nao_conformidade, nome_causas, nome_imagens, nome_fotos_rascunho=None):
     """Toda nao conformidade da pintura exige foto: cada bloco de causa
     precisa de ao menos uma imagem. nome_causas/nome_imagens recebem o
-    indice do bloco (ex: "causas_{}" / "imagens_{}"). Devolve a mensagem de
-    erro ou None."""
+    indice do bloco (ex: "causas_{}" / "imagens_{}"). nome_fotos_rascunho:
+    ids de fotos ja salvas no "Salvar parcial", que tambem contam. Devolve a
+    mensagem de erro ou None."""
     try:
         if int(request.POST.get(campo_nao_conformidade) or 0) <= 0:
             return None
@@ -1118,7 +1167,8 @@ def _erro_foto_obrigatoria_pintura(request, campo_nao_conformidade, nome_causas,
 
     sem_foto = []
     for i in range(1, total + 1):
-        if not request.FILES.getlist(nome_imagens.format(i)):
+        fotos_rascunho = request.POST.getlist(nome_fotos_rascunho.format(i)) if nome_fotos_rascunho else []
+        if not request.FILES.getlist(nome_imagens.format(i)) and not fotos_rascunho:
             nomes = Causas.objects.filter(
                 id__in=request.POST.getlist(nome_causas.format(i))
             ).values_list("nome", flat=True)
@@ -1138,9 +1188,10 @@ def envio_inspecao_pintura(request):
     if DadosExecucaoInspecao.objects.filter(inspecao__pk=id_inspecao).exists():
         return JsonResponse({"error": "Item já inspecionado."}, status=400)
 
-    # o campo de arquivo do formulario (imagens_N) e o que o backend grava
+    # o campo de arquivo do formulario (imagens_N) e o que o backend grava;
+    # fotos_rascunho_N = fotos ja salvas no "Salvar parcial"
     erro_foto = _erro_foto_obrigatoria_pintura(
-        request, "nao-conformidade-inspecao-pintura", "causas_{}", "imagens_{}"
+        request, "nao-conformidade-inspecao-pintura", "causas_{}", "imagens_{}", "fotos_rascunho_{}"
     )
     if erro_foto:
         return JsonResponse({"error": erro_foto}, status=400)
@@ -1204,10 +1255,118 @@ def envio_inspecao_pintura(request):
                             arquivo=imagem,
                         )
 
+                    # Fotos ja salvas no "Salvar parcial": reaproveita o arquivo
+                    # (mesmo storage/pasta), sem novo upload
+                    for foto in RascunhoInspecaoFoto.objects.filter(
+                        rascunho__inspecao=inspecao,
+                        id__in=request.POST.getlist(f"fotos_rascunho_{i}"),
+                    ):
+                        ArquivoCausa.objects.create(
+                            causa_nao_conformidade=causa_nao_conformidade,
+                            arquivo=foto.arquivo.name,
+                        )
+
+            # Inspeção enviada: o rascunho deixa de valer. Apaga do storage só
+            # as fotos que não foram para nenhuma não conformidade.
+            usadas = set(
+                ArquivoCausa.objects.filter(
+                    causa_nao_conformidade__dados_execucao=dados_execucao
+                ).values_list("arquivo", flat=True)
+            )
+            fotos_sobrando = [
+                f.arquivo.name for f in RascunhoInspecaoFoto.objects.filter(rascunho__inspecao=inspecao)
+                if f.arquivo.name not in usadas
+            ]
+            RascunhoInspecao.objects.filter(inspecao=inspecao).delete()
+            transaction.on_commit(lambda: _apagar_arquivos_rascunho(fotos_sobrando))
+
         return JsonResponse({"success": True})
 
     except Exception as e:
         return JsonResponse({"error": e}, status=400)
+
+
+def _apagar_arquivos_rascunho(nomes):
+    """Remove do storage fotos de rascunho que não serão mais usadas."""
+    storage = RascunhoInspecaoFoto._meta.get_field("arquivo").storage
+    for nome in nomes:
+        try:
+            storage.delete(nome)
+        except Exception:
+            pass
+
+
+def _fotos_rascunho_json(rascunho):
+    fotos = []
+    for foto in rascunho.fotos.all().order_by("id"):
+        try:
+            url = foto.arquivo.url
+        except Exception:
+            url = ""
+        fotos.append({"id": foto.id, "chave": foto.chave, "url": url})
+    return fotos
+
+
+def rascunho_inspecao_pintura(request, id):
+    """"Salvar parcial" da inspeção de pintura (lote que chega em partes),
+    guardado no servidor pra continuar de qualquer aparelho.
+      GET    -> respostas do checklist + fotos já salvas
+      POST   -> grava: "dados" (JSON das respostas), fotos novas em
+                "foto__<chave>" e ids em "remover_fotos"
+      DELETE -> descarta o rascunho e as fotos dele"""
+    inspecao = get_object_or_404(Inspecao, pk=id, pecas_ordem_pintura__isnull=False)
+
+    if request.method == "GET":
+        rascunho = RascunhoInspecao.objects.filter(inspecao=inspecao).select_related("usuario").first()
+        if not rascunho:
+            return JsonResponse({"existe": False})
+        return JsonResponse({
+            "existe": True,
+            "dados": rascunho.dados,
+            "fotos": _fotos_rascunho_json(rascunho),
+            "usuario": rascunho.usuario.username if rascunho.usuario else None,
+            "atualizado_em": timezone.localtime(rascunho.atualizado_em).strftime("%d/%m/%Y %H:%M"),
+        })
+
+    if request.method == "POST":
+        if DadosExecucaoInspecao.objects.filter(inspecao=inspecao).exists():
+            return JsonResponse({"error": "Item já inspecionado."}, status=400)
+        try:
+            dados = json.loads(request.POST.get("dados") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Dados do rascunho inválidos."}, status=400)
+
+        arquivos_removidos = []
+        with transaction.atomic():
+            rascunho, _ = RascunhoInspecao.objects.update_or_create(
+                inspecao=inspecao,
+                defaults={
+                    "dados": dados,
+                    "usuario": request.user if request.user.is_authenticated else None,
+                },
+            )
+            remover = rascunho.fotos.filter(id__in=request.POST.getlist("remover_fotos"))
+            arquivos_removidos = [f.arquivo.name for f in remover]
+            remover.delete()
+            for campo in request.FILES:
+                if not campo.startswith("foto__"):
+                    continue
+                chave = campo[len("foto__"):][:60]
+                for arquivo in request.FILES.getlist(campo):
+                    RascunhoInspecaoFoto.objects.create(rascunho=rascunho, chave=chave, arquivo=arquivo)
+            transaction.on_commit(lambda: _apagar_arquivos_rascunho(arquivos_removidos))
+
+        return JsonResponse({"success": True, "fotos": _fotos_rascunho_json(rascunho)})
+
+    if request.method == "DELETE":
+        rascunho = RascunhoInspecao.objects.filter(inspecao=inspecao).first()
+        if rascunho:
+            nomes = [f.arquivo.name for f in rascunho.fotos.all()]
+            rascunho.delete()
+            _apagar_arquivos_rascunho(nomes)
+        return JsonResponse({"success": True})
+
+    return JsonResponse({"error": "Método não permitido"}, status=405)
 
 
 def envio_reinspecao_pintura(request):
