@@ -30,6 +30,22 @@ document.addEventListener("change", (event) => {
     }
 });
 
+// Foto comprimida (>2MB comprime de novo); se falhar, vai a original
+async function comprimirImagemPintura(file, indice) {
+    try {
+        let comprimida = await compressImage(file);
+        if (comprimida.size > 2 * 1024 * 1024) {
+            comprimida = await compressImage(file, 800, 800, 0.5);
+        }
+        return new File([comprimida], `img_${Date.now()}_${indice}.jpg`, { type: comprimida.type });
+    } catch (error) {
+        console.error("Erro ao comprimir imagem:", error);
+        return file;
+    }
+}
+
+// Envio do checklist OK / Ñ OK (modal-inspecionar.js), no formato que o
+// backend ja recebe: um bloco por causa (causas_N, quantidade_N, imagens_N)
 document.getElementById("form-inspecao").addEventListener("submit", async function (event) {
     event.preventDefault();
 
@@ -39,87 +55,92 @@ document.getElementById("form-inspecao").addEventListener("submit", async functi
     buttonInspecionarPintura.disabled = true;
     buttonInspecionarPintura.querySelector(".spinner-border").style.display = "flex";
 
-    // Criar FormData e adicionar dados básicos
+    function cancelarEnvio(mensagem, html) {
+        Swal.fire({ icon: 'error', title: mensagem, html });
+        buttonInspecionarPintura.disabled = false;
+        buttonInspecionarPintura.querySelector(".spinner-border").style.display = "none";
+    }
+
     const formData = new FormData(this);
-    const naoConformidade = document.getElementById("nao-conformidade-inspecao-pintura").value;
-    formData.append("nao-conformidade-inspecao-pintura", naoConformidade);
 
-    let totalQuantidadeInput = 0;
-    const selectContainerInspecao = document.querySelectorAll(".selectContainerInspecao");
+    const qtdProduzida = document.getElementById("qtd-produzida-pintura").value;
+    const qtdInspecionada = document.getElementById("qtd-inspecao-pintura").value;
 
-    if (parseFloat(naoConformidade) > 0) {
-        const semFoto = validarImagensNaoConformidadePintura(selectContainerInspecao);
-        if (semFoto.length > 0) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Foto obrigatória na não conformidade',
-                html: 'Anexe ao menos uma foto em:<br>' + semFoto.join('<br>'),
-            });
-            buttonInspecionarPintura.disabled = false;
-            buttonInspecionarPintura.querySelector(".spinner-border").style.display = "none";
-            return;
+    if (qtdInspecionada === "" || parseInt(qtdInspecionada, 10) < 1) {
+        cancelarEnvio('Informe a quantidade inspecionada (mínimo 1).');
+        return;
+    }
+    if (parseFloat(qtdInspecionada) > parseFloat(qtdProduzida)) {
+        cancelarEnvio('Quantidade Inspecionada não pode ser maior que a quantidade Produzida');
+        return;
+    }
+
+    const containerChecklist = document.getElementById("unidades-checklist-pintura");
+    const cardsUnidades = containerChecklist.querySelectorAll(".unidade-checklist-card");
+    const totalCausas = totalItensChecklistPintura();
+
+    if (cardsUnidades.length !== parseInt(qtdInspecionada, 10)) {
+        cancelarEnvio('Erro ao montar o checklist das unidades. Reabra o modal e tente novamente.');
+        return;
+    }
+
+    const existeUnidadeIncompleta = Array.from(cardsUnidades).some((card) => {
+        const respondidos = card.querySelectorAll('.causa-status-ok:checked, .causa-status-nok:checked').length;
+        return respondidos < totalCausas;
+    });
+    if (existeUnidadeIncompleta) {
+        cancelarEnvio('Complete o checklist de todas as unidades inspecionadas antes de enviar.');
+        return;
+    }
+
+    const outrosSemCausa = validarOutrosChecklistPintura(containerChecklist);
+    if (outrosSemCausa.length > 0) {
+        cancelarEnvio('Escolha a causa em "Outros"', 'Selecione ao menos uma causa em:<br>' + outrosSemCausa.join('<br>'));
+        return;
+    }
+
+    const semFoto = validarImagensChecklistPintura(containerChecklist);
+    if (semFoto.length > 0) {
+        cancelarEnvio('Foto obrigatória na não conformidade', 'Anexe ao menos uma foto em:<br>' + semFoto.join('<br>'));
+        return;
+    }
+
+    // Cada causa fixa marcada como "Ñ OK" vira um bloco (soma as unidades e
+    // junta as fotos). "Outros" vira um bloco com as causas escolhidas,
+    // somando as unidades que escolheram a mesma combinação.
+    const causasAgregadas = new Map();
+    containerChecklist.querySelectorAll(".causa-status-nok:checked").forEach((radio) => {
+        const item = radio.closest(".checklist-causa-item");
+        const causasIds = item.dataset.outros
+            ? Array.from(item.querySelectorAll(".outros-causa-check:checked")).map((c) => c.value).sort()
+            : [radio.getAttribute("data-causa-id")];
+        const chave = causasIds.join(",");
+        if (!causasAgregadas.has(chave)) {
+            causasAgregadas.set(chave, { causasIds, quantidade: 0, imagens: [], fotosRascunho: [] });
+        }
+        const entrada = causasAgregadas.get(chave);
+        entrada.quantidade += 1;
+        entrada.imagens.push(...Array.from(item.querySelector(".causa-imagens").files));
+        // fotos já salvas no "Salvar parcial" (o servidor reaproveita o arquivo)
+        entrada.fotosRascunho.push(...fotosSalvasDoItemPintura(item).map((foto) => foto.id));
+    });
+
+    let totalBlocos = 0;
+    for (const entrada of causasAgregadas.values()) {
+        totalBlocos += 1;
+        entrada.causasIds.forEach((causaId) => formData.append(`causas_${totalBlocos}`, causaId));
+        entrada.fotosRascunho.forEach((id) => formData.append(`fotos_rascunho_${totalBlocos}`, id));
+        formData.append(`quantidade_${totalBlocos}`, entrada.quantidade);
+        for (let i = 0; i < entrada.imagens.length; i++) {
+            formData.append(`imagens_${totalBlocos}`, await comprimirImagemPintura(entrada.imagens[i], i));
         }
     }
 
-    // Processar causas, quantidades e imagens
-    for (const container of selectContainerInspecao) {
-        const index = Array.from(selectContainerInspecao).indexOf(container) + 1;
-        const causaSelect = container.querySelector('select');
-        const quantidadeInput = container.querySelector('input[type="number"]');
-        const imagensInput = container.querySelector('input[type="file"]');
-        
-        totalQuantidadeInput += parseFloat(quantidadeInput.value);
-
-        // Adicionar causas selecionadas
-        Array.from(causaSelect.selectedOptions).forEach((option, i) => {
-            formData.append(`causas_${index}[${i}]`, option.value);
-        });
-
-        // Adicionar quantidade
-        formData.append(`quantidade_${index}`, quantidadeInput.value);
-
-        // Processar imagens (com compressão)
-        const imageFiles = Array.from(imagensInput.files);
-        for (let i = 0; i < imageFiles.length; i++) {
-            try {
-                let compressedFile = await compressImage(imageFiles[i]);
-                
-                // Verifica se ainda está grande (>2MB) e recompressa se necessário
-                if (compressedFile.size > 2 * 1024 * 1024) {
-                    compressedFile = await compressImage(imageFiles[i], 800, 800, 0.5);
-                    console.warn(`Imagem ${imageFiles[i].name} comprimida novamente para ${Math.round(compressedFile.size / 1024)}KB`);
-                }
-                
-                formData.append(`imagens_${index}[${i}]`, compressedFile, `img_${Date.now()}_${i}.jpg`);
-            } catch (error) {
-                console.error("Erro ao comprimir imagem:", error);
-                // Fallback: envia a imagem original se a compressão falhar
-                formData.append(`imagens_${index}[${i}]`, imageFiles[i]);
-            }
-        }
-    }
-
-    // Validação de não conformidade
-    const naoConformidadeNum = parseFloat(naoConformidade);
-    if (naoConformidadeNum !== 0) {
-        const erroMensagem = naoConformidadeNum > 0 && totalQuantidadeInput !== naoConformidadeNum
-            ? 'Verifique se a soma dos campos de "Quantidade" está igual ao valor de "N° total de não conformidades"'
-            : naoConformidadeNum < 0
-            ? 'Verifique se o "N° total de conformidades" está com o valor correto'
-            : null;
-    
-        if (erroMensagem) {
-            Swal.fire({
-                icon: 'error',
-                title: erroMensagem,
-            });
-            buttonInspecionarPintura.disabled = false;
-            buttonInspecionarPintura.querySelector(".spinner-border").style.display = "none";
-            return;
-        }
-    }
-
-    formData.append("quantidade-total-causas", selectContainerInspecao.length);
+    formData.append("quantidade-total-causas", totalBlocos);
+    // Conformes / não conformes são calculados pelo checklist (campos
+    // desabilitados não entram sozinhos no FormData)
+    formData.append("conformidade-inspecao-pintura", document.getElementById("conformidade-inspecao-pintura").value);
+    formData.append("nao-conformidade-inspecao-pintura", document.getElementById("nao-conformidade-inspecao-pintura").value);
 
     // Envio para o backend
     fetch("/inspecao/api/envio-inspecao-pintura/", {
@@ -136,6 +157,9 @@ document.getElementById("form-inspecao").addEventListener("submit", async functi
         return response.json();
     })
     .then(data => {
+        // o servidor apagou o rascunho junto com o envio
+        RASCUNHO_PINTURA.fotos = [];
+        RASCUNHO_PINTURA.removidas = new Set();
         if (modalInstance) modalInstance.hide();
         Swal.fire({
             toast: true,
