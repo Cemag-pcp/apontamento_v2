@@ -497,8 +497,42 @@ class RegistroLimpezaPintura(models.Model):
     cor = models.CharField(max_length=50, null=True, blank=True)
     data_carga = models.DateField(null=True, blank=True)
     quantidade = models.PositiveIntegerField(default=1)
-    conforme = models.BooleanField()
+    # resultado da primeira inspeção (vazio enquanto não respondida, no parcial)
+    conforme = models.BooleanField(null=True, blank=True)
+    # False = salvo parcialmente ("Em andamento"), continua depois
+    finalizado = models.BooleanField(default=False)
+    # resumo das etapas (RegistroLimpezaPinturaEtapa), para análise:
+    # resultado da última etapa (ao finalizar) e quantas reinspeções houve
+    conforme_final = models.BooleanField(null=True, blank=True)
+    total_reinspecoes = models.PositiveSmallIntegerField(default=0)
     registrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
     criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+
+class RegistroLimpezaPinturaEtapa(models.Model):
+    """Cada rodada do registro de limpeza: 0 = inspeção, 1, 2... =
+    reinspeções. Não conforme pede a foto dos trapos e se volta para nova
+    limpeza (Sim = próxima reinspeção); a reinspeção conforme pede a foto dos
+    trapos conformes e encerra."""
+
+    registro = models.ForeignKey(
+        RegistroLimpezaPintura, on_delete=models.CASCADE, related_name="etapas"
+    )
+    numero = models.PositiveSmallIntegerField()
+    conforme = models.BooleanField(null=True, blank=True)
+    imagem = models.ImageField(
+        upload_to="registro_limpeza_pintura/", null=True, blank=True, storage=S3Boto3Storage()
+    )
+    # só na não conformidade: Sim = direcionada para nova limpeza
+    nova_limpeza = models.BooleanField(null=True, blank=True)
+    # quem respondeu a etapa e quando (a reinspeção pode ser outro dia)
+    inspetor = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["numero"]
+        unique_together = [("registro", "numero")]

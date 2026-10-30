@@ -45,11 +45,12 @@
                         <th>Data carga</th>
                         <th class="text-center">Qtd.</th>
                         <th class="text-center">Limpeza</th>
+                        <th class="text-center">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="registros-limpeza-body">
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">Carregando registros...</td>
+                        <td colspan="10" class="text-center text-muted py-4">Carregando registros...</td>
                     </tr>
                 </tbody>
             </table>
@@ -76,8 +77,22 @@
             {% endfor %}
         </select>
 
-        <h6>Limpeza</h6>
+        <h6>Limpeza (1ª inspeção)</h6>
         <select class="form-select mb-3" id="filtro-limpeza-resultado">
+            <option value="">Todos</option>
+            <option value="conforme">Conforme</option>
+            <option value="nao_conforme">Não conforme</option>
+        </select>
+
+        <h6>Situação</h6>
+        <select class="form-select mb-3" id="filtro-limpeza-situacao">
+            <option value="">Todas</option>
+            <option value="andamento">Em andamento (salvo parcial)</option>
+            <option value="finalizado">Finalizado</option>
+        </select>
+
+        <h6>Resultado final</h6>
+        <select class="form-select mb-3" id="filtro-limpeza-final">
             <option value="">Todos</option>
             <option value="conforme">Conforme</option>
             <option value="nao_conforme">Não conforme</option>
@@ -112,6 +127,8 @@
             </div>
             <form id="form-registro-limpeza">
                 {% csrf_token %}
+                <!-- preenchido ao continuar um registro salvo parcialmente -->
+                <input type="hidden" name="registro_id" id="limpeza-registro-id">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label" for="limpeza-inspetor">Inspetor</label>
@@ -158,12 +175,21 @@
                             <label class="btn btn-outline-danger" for="limpeza-nao-conforme"><i class="bi bi-x-lg"></i> Não conforme</label>
                         </div>
                     </div>
+
+                    <!-- Etapas da não conformidade (registro-limpeza.js): foto dos trapos,
+                         nova limpeza e reinspeções, repetindo até ficar conforme -->
+                    <div id="limpeza-etapas"></div>
                 </div>
                 <div class="modal-footer">
+                    <small class="text-muted me-auto" id="limpeza-info-parcial"></small>
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-outline-dark" id="btn-salvar-parcial-limpeza" title="Grava o que já foi respondido para continuar depois">
+                        <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
+                        Salvar parcial
+                    </button>
                     <button type="submit" class="btn btn-dark" id="btn-salvar-limpeza">
                         <span class="spinner-border spinner-border-sm d-none" aria-hidden="true"></span>
-                        Salvar
+                        Finalizar
                     </button>
                 </div>
             </form>

@@ -9,6 +9,7 @@ from django.db import connection
 from apontamento_pintura.models import Retrabalho, PecasOrdem
 from ..models import (
     RegistroLimpezaPintura,
+    RegistroLimpezaPinturaEtapa,
     Inspecao,
     DadosExecucaoInspecao,
     Reinspecao,
@@ -244,15 +245,67 @@ def pecas_registro_limpeza_pintura(request):
     return JsonResponse({"results": resultados})
 
 
+def _registro_limpeza_json(registro):
+    """Registro de limpeza com as etapas, para o histórico e para continuar
+    um registro salvo parcialmente."""
+    def quem(perfil):
+        return perfil.user.username if perfil and perfil.user else "-"
+
+    return {
+        "id": registro.id,
+        "data": timezone.localtime(registro.data).strftime("%d/%m/%Y %H:%M"),
+        "data_iso": timezone.localtime(registro.data).strftime("%Y-%m-%dT%H:%M"),
+        "inspetor": quem(registro.inspetor),
+        "inspetor_id": registro.inspetor_id,
+        "processo": registro.get_processo_display(),
+        "processo_valor": registro.processo,
+        "peca": registro.peca,
+        "ordem": registro.ordem.ordem if registro.ordem else "-",
+        # opção do campo Material (mesmo formato de pecas_registro_limpeza_pintura)
+        "material": {
+            "id": f"{registro.ordem_id}|{registro.peca}",
+            "text": registro.peca,
+            "peca": registro.peca,
+            "ordem": registro.ordem.ordem if registro.ordem else None,
+            "cor": registro.cor or "",
+            "data_carga_br": registro.data_carga.strftime("%d/%m/%Y") if registro.data_carga else "",
+        } if registro.ordem_id else None,
+        "cor": registro.cor or "-",
+        "data_carga": registro.data_carga.strftime("%d/%m/%Y") if registro.data_carga else "-",
+        "quantidade": registro.quantidade,
+        "conforme": registro.conforme,
+        "finalizado": registro.finalizado,
+        "conforme_final": registro.conforme_final,
+        "total_reinspecoes": registro.total_reinspecoes,
+        "etapas": [
+            {
+                "numero": etapa.numero,
+                "conforme": etapa.conforme,
+                "imagem": etapa.imagem.url if etapa.imagem else None,
+                "nova_limpeza": etapa.nova_limpeza,
+                "inspetor": quem(etapa.inspetor),
+                "data": timezone.localtime(etapa.atualizado_em).strftime("%d/%m/%Y %H:%M"),
+            }
+            for etapa in registro.etapas.all()
+        ],
+    }
+
+
 def listar_registros_limpeza_pintura(request):
     if request.method != "GET":
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    registros = RegistroLimpezaPintura.objects.select_related("inspetor__user", "ordem").order_by("-data", "-id")
+    registros = (
+        RegistroLimpezaPintura.objects.select_related("inspetor__user", "ordem")
+        .prefetch_related("etapas__inspetor__user")
+        .order_by("-data", "-id")
+    )
 
     pesquisa = request.GET.get("pesquisar", "").strip()
     processo = request.GET.get("processo", "")
     resultado = request.GET.get("resultado", "")
+    final = request.GET.get("final", "")
+    situacao = request.GET.get("situacao", "")
     data_inicio = request.GET.get("data_inicio")
     data_fim = request.GET.get("data_fim")
 
@@ -262,6 +315,10 @@ def listar_registros_limpeza_pintura(request):
         registros = registros.filter(processo=processo)
     if resultado in ("conforme", "nao_conforme"):
         registros = registros.filter(conforme=resultado == "conforme")
+    if final in ("conforme", "nao_conforme"):
+        registros = registros.filter(conforme_final=final == "conforme")
+    if situacao in ("andamento", "finalizado"):
+        registros = registros.filter(finalizado=situacao == "finalizado")
     if data_inicio:
         registros = registros.filter(data__date__gte=data_inicio)
     if data_fim:
@@ -270,25 +327,9 @@ def listar_registros_limpeza_pintura(request):
     paginador = Paginator(registros, 20)
     pagina_obj = paginador.get_page(request.GET.get("pagina", 1))
 
-    dados = [
-        {
-            "id": registro.id,
-            "data": timezone.localtime(registro.data).strftime("%d/%m/%Y %H:%M"),
-            "inspetor": registro.inspetor.user.username if registro.inspetor and registro.inspetor.user else "-",
-            "processo": registro.get_processo_display(),
-            "peca": registro.peca,
-            "ordem": registro.ordem.ordem if registro.ordem else "-",
-            "cor": registro.cor or "-",
-            "data_carga": registro.data_carga.strftime("%d/%m/%Y") if registro.data_carga else "-",
-            "quantidade": registro.quantidade,
-            "conforme": registro.conforme,
-        }
-        for registro in pagina_obj
-    ]
-
     return JsonResponse(
         {
-            "dados": dados,
+            "dados": [_registro_limpeza_json(registro) for registro in pagina_obj],
             "total_filtrado": paginador.count,
             "pagina_atual": pagina_obj.number,
             "total_paginas": paginador.num_pages,
@@ -297,9 +338,26 @@ def listar_registros_limpeza_pintura(request):
     )
 
 
+def detalhe_registro_limpeza_pintura(request, id):
+    if request.method != "GET":
+        return JsonResponse({"error": "Método não permitido"}, status=405)
+    registro = get_object_or_404(
+        RegistroLimpezaPintura.objects.select_related("inspetor__user", "ordem")
+        .prefetch_related("etapas__inspetor__user"),
+        pk=id,
+    )
+    return JsonResponse(_registro_limpeza_json(registro))
+
+
 def salvar_registro_limpeza_pintura(request):
+    """Salva o registro de limpeza. "parcial" = 1 grava o que já foi
+    respondido (fica "Em andamento"); sem ele o fluxo tem de estar completo.
+    "registro_id" continua um registro salvo parcialmente: as fotos já
+    salvas valem se a etapa não mandar outra."""
     if request.method != "POST":
         return JsonResponse({"error": "Método não permitido"}, status=405)
+
+    parcial = request.POST.get("parcial") == "1"
 
     inspetor = Profile.objects.filter(pk=request.POST.get("inspetor") or None).first()
     if not inspetor:
@@ -326,23 +384,139 @@ def salvar_registro_limpeza_pintura(request):
         return JsonResponse({"error": "Selecione uma peça da pintura."}, status=400)
     ordem = item.ordem
 
-    limpeza = request.POST.get("limpeza")
-    if limpeza not in ("conforme", "nao_conforme"):
-        return JsonResponse({"error": "Informe se a limpeza está conforme ou não conforme."}, status=400)
+    arquivos_apagar = []
+    with transaction.atomic():
+        registro = None
+        registro_id = request.POST.get("registro_id")
+        if registro_id:
+            registro = (
+                RegistroLimpezaPintura.objects.select_for_update()
+                .filter(pk=registro_id if registro_id.isdigit() else None)
+                .first()
+            )
+            if not registro:
+                return JsonResponse({"error": "Registro não encontrado."}, status=404)
+            if registro.finalizado:
+                return JsonResponse({"error": "Este registro já foi finalizado."}, status=400)
 
-    registro = RegistroLimpezaPintura.objects.create(
-        inspetor=inspetor,
-        data=data,
-        processo=processo,
-        ordem=ordem,
-        peca=peca,
-        cor=ordem.cor,
-        data_carga=ordem.data_carga,
-        quantidade=1,  # sempre 1 peça por registro
-        conforme=limpeza == "conforme",
-        registrado_por=request.user if request.user.is_authenticated else None,
+        existentes = {etapa.numero: etapa for etapa in registro.etapas.all()} if registro else {}
+        etapas, erro = _etapas_registro_limpeza(
+            request, parcial, {n for n, etapa in existentes.items() if etapa.imagem}
+        )
+        if erro:
+            return JsonResponse({"error": erro}, status=400)
+
+        if not registro:
+            registro = RegistroLimpezaPintura(
+                registrado_por=request.user if request.user.is_authenticated else None,
+            )
+        registro.inspetor = inspetor
+        registro.data = data
+        registro.processo = processo
+        registro.ordem = ordem
+        registro.peca = peca
+        registro.cor = ordem.cor
+        registro.data_carga = ordem.data_carga
+        registro.quantidade = 1  # sempre 1 peça por registro
+        registro.conforme = etapas[0]["conforme"] if etapas else None
+        registro.finalizado = not parcial
+        registro.conforme_final = etapas[-1]["conforme"] if not parcial else None
+        registro.total_reinspecoes = max(len(etapas) - 1, 0)
+        registro.save()
+
+        # Atualiza as etapas no lugar (guarda quem respondeu e quando);
+        # as que sobraram de uma versão anterior do fluxo são apagadas
+        for numero, dados in enumerate(etapas):
+            etapa = existentes.pop(numero, None)
+            if etapa is None:
+                etapa = RegistroLimpezaPinturaEtapa(registro=registro, numero=numero, inspetor=inspetor)
+            elif (etapa.conforme, etapa.nova_limpeza) != (dados["conforme"], dados["nova_limpeza"]) or dados["imagem"]:
+                etapa.inspetor = inspetor
+            etapa.conforme = dados["conforme"]
+            etapa.nova_limpeza = dados["nova_limpeza"]
+            if dados["imagem"] or dados["sem_imagem"]:
+                if etapa.imagem:
+                    arquivos_apagar.append(etapa.imagem.name)
+                etapa.imagem = dados["imagem"]
+            etapa.save()
+        for sobra in existentes.values():
+            if sobra.imagem:
+                arquivos_apagar.append(sobra.imagem.name)
+            sobra.delete()
+
+        if arquivos_apagar:
+            transaction.on_commit(lambda: _apagar_arquivos_limpeza(arquivos_apagar))
+
+    return JsonResponse(
+        {"success": True, "id": registro.id, "finalizado": registro.finalizado},
+        status=201 if not registro_id else 200,
     )
-    return JsonResponse({"success": True, "id": registro.id}, status=201)
+
+
+def _apagar_arquivos_limpeza(nomes):
+    storage = RegistroLimpezaPinturaEtapa._meta.get_field("imagem").storage
+    for nome in nomes:
+        try:
+            storage.delete(nome)
+        except Exception:
+            pass
+
+
+MAX_REINSPECOES_LIMPEZA = 50
+
+
+def _etapas_registro_limpeza(request, parcial, etapas_com_foto_salva):
+    """Lê as etapas do fluxo de limpeza, em ordem, até a última:
+    etapa 0 = inspeção ("limpeza"), 1, 2... = reinspeções ("etapa_<n>_resultado").
+    Não conforme pede "etapa_<n>_imagem" (trapos não conformes) e
+    "etapa_<n>_nova_limpeza" (sim = segue para a próxima reinspeção);
+    reinspeção conforme pede "etapa_<n>_imagem" (trapos conformes) e encerra.
+    Foto já salva (etapas_com_foto_salva) conta. No parcial, para onde o
+    fluxo ainda não foi respondido, sem acusar o que falta.
+    Devolve (etapas, erro)."""
+    etapas = []
+    numero = 0
+    while True:
+        rotulo = "a limpeza" if numero == 0 else f"a {numero}ª reinspeção da limpeza"
+        resultado = request.POST.get("limpeza" if numero == 0 else f"etapa_{numero}_resultado")
+        if resultado not in ("conforme", "nao_conforme"):
+            if parcial:
+                return etapas, None
+            return None, f"Informe se {rotulo} está conforme ou não conforme."
+        conforme = resultado == "conforme"
+        imagem = request.FILES.get(f"etapa_{numero}_imagem")
+        tem_foto = bool(imagem) or numero in etapas_com_foto_salva
+        # a inspeção conforme não tem foto: descarta alguma que tenha ficado
+        etapa = {"conforme": conforme, "imagem": imagem, "nova_limpeza": None,
+                 "sem_imagem": conforme and numero == 0}
+
+        if conforme:
+            if numero > 0 and not tem_foto and not parcial:
+                return None, f"Anexe a foto dos trapos conformes na {numero}ª reinspeção."
+            if numero == 0:
+                etapa["imagem"] = None
+            etapas.append(etapa)
+            return etapas, None
+
+        if not tem_foto and not parcial:
+            return None, (
+                "Anexe a foto dos trapos não conformes."
+                if numero == 0 else f"Anexe a foto dos trapos não conformes na {numero}ª reinspeção."
+            )
+        nova_limpeza = request.POST.get(f"etapa_{numero}_nova_limpeza")
+        if nova_limpeza not in ("sim", "nao"):
+            if parcial:
+                etapas.append(etapa)
+                return etapas, None
+            return None, "Informe se direciona para nova limpeza."
+        etapa["nova_limpeza"] = nova_limpeza == "sim"
+        etapas.append(etapa)
+        if not etapa["nova_limpeza"]:
+            return etapas, None
+
+        numero += 1
+        if numero > MAX_REINSPECOES_LIMPEZA:
+            return None, f"Limite de {MAX_REINSPECOES_LIMPEZA} reinspeções atingido."
 
 
 def listar_analises_banho_ezinger(request):

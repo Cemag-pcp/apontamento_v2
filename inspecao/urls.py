@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/registro-limpeza-pintura/', pintura.listar_registros_limpeza_pintura, name='listar-registro-limpeza-pintura'),
     path('api/registro-limpeza-pintura/salvar/', pintura.salvar_registro_limpeza_pintura, name='salvar-registro-limpeza-pintura'),
     path('api/registro-limpeza-pintura/pecas/', pintura.pecas_registro_limpeza_pintura, name='pecas-registro-limpeza-pintura'),
+    path('api/registro-limpeza-pintura/<int:id>/', pintura.detalhe_registro_limpeza_pintura, name='detalhe-registro-limpeza-pintura'),
 
     path('api/historico-pintura/<int:id>', pintura.get_historico_pintura, name='historico-pintura'),
     path('api/historico-causas-pintura/<int:id>', pintura.get_historico_causas_pintura, name='historico-causas-pintura'),
