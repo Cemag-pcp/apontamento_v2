@@ -434,6 +434,44 @@ def retirar_ordem_prioridade(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'JSON invalido.'}, status=400)
 
+def _ordens_interrompidas_mesma_peca(ordem):
+    """Ordens interrompidas da usinagem com alguma peça da `ordem`, a mais
+    recente primeiro (para a trava ao iniciar uma ordem nova)."""
+    pecas_ids = PecasOrdem.objects.filter(ordem=ordem).values_list('peca_id', flat=True)
+    interrompidas = (
+        Ordem.objects.filter(
+            grupo_maquina='usinagem',
+            status_atual='interrompida',
+            excluida=False,
+            ordem_pecas_usinagem__peca_id__in=pecas_ids,
+        )
+        .exclude(pk=ordem.pk)
+        .select_related('maquina')
+        .distinct()
+        .order_by('-ultima_atualizacao')
+    )
+
+    resultado = []
+    for interrompida in interrompidas:
+        ultimo = (
+            interrompida.processos.filter(motivo_interrupcao__isnull=False)
+            .select_related('motivo_interrupcao')
+            .order_by('-data_inicio')
+            .first()
+        )
+        peca = interrompida.ordem_pecas_usinagem.select_related('peca').order_by('id').first()
+        resultado.append({
+            'id': interrompida.id,
+            'ordem': interrompida.ordem,
+            'maquina': interrompida.maquina.nome if interrompida.maquina else None,
+            'maquina_id': interrompida.maquina_id,
+            'motivo': ultimo.motivo_interrupcao.nome if ultimo else None,
+            'peca': f'{peca.peca.codigo} - {peca.peca.descricao}' if peca else '',
+            'interrompida_em': localtime(ultimo.data_inicio).strftime('%d/%m/%Y %H:%M') if ultimo else '',
+        })
+    return resultado
+
+
 def atualizar_status_ordem(request):
     if request.method == 'PATCH':
         try:
@@ -453,6 +491,16 @@ def atualizar_status_ordem(request):
 
                 # Obtém a ordem
                 ordem = Ordem.objects.get(pk=ordem_id)
+
+                # Trava: não inicia uma ordem nova se a mesma peça está numa
+                # ordem interrompida; a tela pergunta se reinicia aquela.
+                if status == 'iniciada' and ordem.status_atual == 'aguardando_iniciar':
+                    interrompidas = _ordens_interrompidas_mesma_peca(ordem)
+                    if interrompidas:
+                        return JsonResponse({
+                            'error': 'Já existe ordem interrompida com esta peça.',
+                            'interrompidas': interrompidas,
+                        }, status=409)
 
                 if status == 'iniciada' and maquina_nome:
                     ordem_em_andamento = Ordem.objects.filter(
