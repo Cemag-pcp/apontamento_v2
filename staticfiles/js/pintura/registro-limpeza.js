@@ -46,7 +46,9 @@ function detalhesPecaLimpeza(opcao) {
 $("#limpeza-peca").select2({
     theme: "bootstrap-5",
     width: "100%",
-    dropdownParent: $(modalRegistroLimpeza),
+    // dentro do .modal-content: no celular/tablet o .modal-dialog (z-index
+    // 1065) cobria a lista anexada direto no .modal e ela não aparecia
+    dropdownParent: $(modalRegistroLimpeza).find(".modal-content"),
     placeholder: "Selecione a peça",
     templateResult: (opcao) => {
         if (!opcao.peca) return opcao.text; // "Buscando..." etc.
