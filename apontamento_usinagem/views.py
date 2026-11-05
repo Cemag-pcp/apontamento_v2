@@ -1421,7 +1421,9 @@ def api_ordens_finalizadas(request):
                 p.codigo AS peca,
                 p.descricao AS descricao,
                 ope.qtd_planejada AS total_planejada,
-                ope.qtd_boa - ope.qtd_morta as total_produzido,
+                -- qtd_boa já é só as boas (a tela pede "Qt. peças boas" e
+                -- "Qt. mortas" separadas): não descontar as mortas de novo
+                ope.qtd_boa as total_produzido,
                 TO_CHAR(o.data_programacao, 'DD/MM/YYYY HH24:MI') AS data_programacao,
                 TO_CHAR(o.ultima_atualizacao AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS data_finalizacao,
                 CONCAT(f.matricula, ' - ', f.nome) AS operador,
