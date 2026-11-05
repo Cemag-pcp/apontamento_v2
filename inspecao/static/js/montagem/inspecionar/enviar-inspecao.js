@@ -70,11 +70,13 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
         const imagensInput = item.querySelector(".causa-imagens");
 
         if (!causasAgregadas.has(causaId)) {
-            causasAgregadas.set(causaId, { quantidade: 0, imagens: [] });
+            causasAgregadas.set(causaId, { quantidade: 0, imagens: [], fotosRascunho: [] });
         }
         const entrada = causasAgregadas.get(causaId);
         entrada.quantidade += 1;
         entrada.imagens.push(...Array.from(imagensInput.files));
+        // fotos já salvas no "Salvar parcial" (o servidor reaproveita o arquivo)
+        entrada.fotosRascunho.push(...fotosSalvasDoItemMontagem(item).map((foto) => foto.id));
     });
 
     let totalBlocos = 0;
@@ -85,6 +87,7 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
         entrada.imagens.forEach((file) => {
             formData.append(`imagens_${totalBlocos}`, file);
         });
+        entrada.fotosRascunho.forEach((id) => formData.append(`fotos_rascunho_${totalBlocos}`, id));
     });
 
     formData.append("quantidade-total-causas", totalBlocos);
@@ -110,6 +113,9 @@ document.getElementById("form-inspecao").addEventListener("submit", function (ev
         });
     })
     .then(data => {
+        // o servidor apagou o rascunho junto com o envio
+        RASCUNHO_MONTAGEM.fotos = [];
+        RASCUNHO_MONTAGEM.removidas = new Set();
         if (modalInstance) {
             modalInstance.hide();
         }

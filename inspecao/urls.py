@@ -81,6 +81,7 @@ urlpatterns = [
 
     path('api/envio-inspecao-montagem/', montagem.envio_inspecao_montagem, name='envio-inspecao-montagem'),
     path('api/envio-reinspecao-montagem/', montagem.envio_reinspecao_montagem, name='envio-reinspecao-montagem'),
+    path('api/rascunho-inspecao-montagem/<int:id>/', montagem.rascunho_inspecao_montagem, name='rascunho-inspecao-montagem'),
 
     path('api/itens-reinspecao-tubos-cilindros/', estanqueidade.get_itens_reinspecao_tubos_cilindros, name='itens-reinspecao-tubos-cilindros'),
     path('api/itens-inspecionados-tubos-cilindros/', estanqueidade.get_itens_inspecionados_tubos_cilindros, name='itens-inspecionados-tubos-cilindros'),

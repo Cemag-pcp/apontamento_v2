@@ -74,11 +74,19 @@
                 </div>
             </div>    
           </div>                
-          <div class="modal-footer">
-            <button id="submit-inspecionar-montagem" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
-              <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
-              <span role="status">Enviar inspeção</span>
-            </button>
+          <div class="modal-footer justify-content-between">
+            <small class="text-muted" id="rascunho-montagem-info"></small>
+            <div class="d-flex gap-2">
+              <!-- guarda o checklist e as fotos no servidor para continuar depois -->
+              <button id="salvar-parcial-montagem" type="button" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+                <span role="status">Salvar parcial</span>
+              </button>
+              <button id="submit-inspecionar-montagem" type="submit" class="btn btn-dark d-flex align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true" style="display: none;"></span>
+                <span role="status">Enviar inspeção</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

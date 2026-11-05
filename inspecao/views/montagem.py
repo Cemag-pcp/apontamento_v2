@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import (
@@ -17,6 +17,12 @@ from ..models import (
     Causas,
     CausasNaoConformidade,
     ArquivoCausa,
+)
+from .rascunho import (
+    anexar_fotos_rascunho,
+    encerrar_rascunho,
+    ids_com_rascunho,
+    responder_rascunho,
 )
 from core.models import Profile, Maquina
 
@@ -213,6 +219,9 @@ def get_itens_inspecao_montagem(request):
     paginador = Paginator(datas, itens_por_pagina)
     pagina_obj = paginador.get_page(pagina)
 
+    # Inspeções com "Salvar parcial" no servidor (selo "Parcial" no card)
+    com_rascunho = ids_com_rascunho([data.id for data in pagina_obj])
+
     dados = []
     for data in pagina_obj:
         data_ajustada = data.data_inspecao - timedelta(hours=3)
@@ -223,6 +232,7 @@ def get_itens_inspecao_montagem(request):
 
         item = {
             "id": data.id,
+            "parcial": data.id in com_rascunho,
             "data": data_ajustada.strftime("%d/%m/%Y %H:%M:%S"),
             "data_carga": (
                 data.pecas_ordem_montagem.ordem.data_carga.strftime("%d/%m/%Y")
@@ -665,10 +675,11 @@ def get_historico_causas_montagem(request, id):
     return JsonResponse({"causas": causas_list}, status=200)
 
 
-def _erro_foto_obrigatoria_montagem(request, prefixo_causas, prefixo_quantidade, prefixo_imagens):
+def _erro_foto_obrigatoria_montagem(request, prefixo_causas, prefixo_quantidade, prefixo_imagens, prefixo_fotos_rascunho=None):
     """Toda nao conformidade da montagem exige foto: cada causa enviada
     precisa de ao menos uma imagem por unidade que falhou (a tela agrega as
-    unidades por causa). Devolve a mensagem de erro ou None."""
+    unidades por causa). Fotos ja salvas no "Salvar parcial"
+    (prefixo_fotos_rascunho) contam. Devolve a mensagem de erro ou None."""
     try:
         total = int(request.POST.get("quantidade-total-causas") or 0)
     except ValueError:
@@ -680,7 +691,10 @@ def _erro_foto_obrigatoria_montagem(request, prefixo_causas, prefixo_quantidade,
             quantidade = int(request.POST.get(f"{prefixo_quantidade}{i}") or 0)
         except ValueError:
             quantidade = 0
-        if len(request.FILES.getlist(f"{prefixo_imagens}{i}")) < max(quantidade, 1):
+        fotos = len(request.FILES.getlist(f"{prefixo_imagens}{i}"))
+        if prefixo_fotos_rascunho:
+            fotos += len(request.POST.getlist(f"{prefixo_fotos_rascunho}{i}"))
+        if fotos < max(quantidade, 1):
             nomes = Causas.objects.filter(
                 id__in=request.POST.getlist(f"{prefixo_causas}{i}")
             ).values_list("nome", flat=True)
@@ -700,7 +714,8 @@ def envio_inspecao_montagem(request):
     if DadosExecucaoInspecao.objects.filter(inspecao__pk=id_inspecao).exists():
         return JsonResponse({"error": "Item já inspecionado."}, status=400)
 
-    erro_foto = _erro_foto_obrigatoria_montagem(request, "causas_", "quantidade_", "imagens_")
+    # fotos_rascunho_N = fotos ja salvas no "Salvar parcial"
+    erro_foto = _erro_foto_obrigatoria_montagem(request, "causas_", "quantidade_", "imagens_", "fotos_rascunho_")
     if erro_foto:
         return JsonResponse({"error": erro_foto}, status=400)
 
@@ -761,10 +776,24 @@ def envio_inspecao_montagem(request):
                             arquivo=imagem,
                         )
 
+                    # Fotos ja salvas no "Salvar parcial": reaproveita o arquivo
+                    anexar_fotos_rascunho(
+                        inspecao, causa_nao_conformidade, request.POST.getlist(f"fotos_rascunho_{i}")
+                    )
+
+            encerrar_rascunho(inspecao, dados_execucao)
+
         return JsonResponse({"success": True})
 
     except Exception as e:
         return JsonResponse({"error": "Erro"}, status=400)
+
+
+def rascunho_inspecao_montagem(request, id):
+    """"Salvar parcial" da inspeção de montagem, guardado no servidor pra
+    continuar de qualquer aparelho."""
+    inspecao = get_object_or_404(Inspecao, pk=id, pecas_ordem_montagem__isnull=False)
+    return responder_rascunho(request, inspecao)
 
 
 def envio_reinspecao_montagem(request):

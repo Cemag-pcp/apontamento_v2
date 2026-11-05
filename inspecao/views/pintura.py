@@ -18,8 +18,12 @@ from ..models import (
     ArquivoCausa,
     ArquivoConformidade,
     AnaliseBanhoEzinger,
-    RascunhoInspecao,
-    RascunhoInspecaoFoto,
+)
+from .rascunho import (
+    anexar_fotos_rascunho,
+    encerrar_rascunho,
+    ids_com_rascunho,
+    responder_rascunho,
 )
 from core.models import Profile
 
@@ -790,11 +794,7 @@ def get_itens_inspecao_pintura(request):
     pagina_obj = paginador.get_page(pagina)
 
     # Inspeções com "Salvar parcial" no servidor (selo "Parcial" no card)
-    ids_com_rascunho = set(
-        RascunhoInspecao.objects.filter(
-            inspecao__in=[data.id for data in pagina_obj]
-        ).values_list("inspecao_id", flat=True)
-    )
+    com_rascunho = ids_com_rascunho([data.id for data in pagina_obj])
 
     dados = []
     for data in pagina_obj:
@@ -817,7 +817,7 @@ def get_itens_inspecao_pintura(request):
             "qtd_apontada": data.pecas_ordem_pintura.qtd_boa,
             "tipo": data.pecas_ordem_pintura.tipo,
             "operador": matricula_nome_operador,
-            "parcial": data.id in ids_com_rascunho,
+            "parcial": data.id in com_rascunho,
         }
 
         dados.append(item)
@@ -1431,28 +1431,11 @@ def envio_inspecao_pintura(request):
 
                     # Fotos ja salvas no "Salvar parcial": reaproveita o arquivo
                     # (mesmo storage/pasta), sem novo upload
-                    for foto in RascunhoInspecaoFoto.objects.filter(
-                        rascunho__inspecao=inspecao,
-                        id__in=request.POST.getlist(f"fotos_rascunho_{i}"),
-                    ):
-                        ArquivoCausa.objects.create(
-                            causa_nao_conformidade=causa_nao_conformidade,
-                            arquivo=foto.arquivo.name,
-                        )
+                    anexar_fotos_rascunho(
+                        inspecao, causa_nao_conformidade, request.POST.getlist(f"fotos_rascunho_{i}")
+                    )
 
-            # Inspeção enviada: o rascunho deixa de valer. Apaga do storage só
-            # as fotos que não foram para nenhuma não conformidade.
-            usadas = set(
-                ArquivoCausa.objects.filter(
-                    causa_nao_conformidade__dados_execucao=dados_execucao
-                ).values_list("arquivo", flat=True)
-            )
-            fotos_sobrando = [
-                f.arquivo.name for f in RascunhoInspecaoFoto.objects.filter(rascunho__inspecao=inspecao)
-                if f.arquivo.name not in usadas
-            ]
-            RascunhoInspecao.objects.filter(inspecao=inspecao).delete()
-            transaction.on_commit(lambda: _apagar_arquivos_rascunho(fotos_sobrando))
+            encerrar_rascunho(inspecao, dados_execucao)
 
         return JsonResponse({"success": True})
 
@@ -1460,87 +1443,11 @@ def envio_inspecao_pintura(request):
         return JsonResponse({"error": e}, status=400)
 
 
-def _apagar_arquivos_rascunho(nomes):
-    """Remove do storage fotos de rascunho que não serão mais usadas."""
-    storage = RascunhoInspecaoFoto._meta.get_field("arquivo").storage
-    for nome in nomes:
-        try:
-            storage.delete(nome)
-        except Exception:
-            pass
-
-
-def _fotos_rascunho_json(rascunho):
-    fotos = []
-    for foto in rascunho.fotos.all().order_by("id"):
-        try:
-            url = foto.arquivo.url
-        except Exception:
-            url = ""
-        fotos.append({"id": foto.id, "chave": foto.chave, "url": url})
-    return fotos
-
-
 def rascunho_inspecao_pintura(request, id):
     """"Salvar parcial" da inspeção de pintura (lote que chega em partes),
-    guardado no servidor pra continuar de qualquer aparelho.
-      GET    -> respostas do checklist + fotos já salvas
-      POST   -> grava: "dados" (JSON das respostas), fotos novas em
-                "foto__<chave>" e ids em "remover_fotos"
-      DELETE -> descarta o rascunho e as fotos dele"""
+    guardado no servidor pra continuar de qualquer aparelho."""
     inspecao = get_object_or_404(Inspecao, pk=id, pecas_ordem_pintura__isnull=False)
-
-    if request.method == "GET":
-        rascunho = RascunhoInspecao.objects.filter(inspecao=inspecao).select_related("usuario").first()
-        if not rascunho:
-            return JsonResponse({"existe": False})
-        return JsonResponse({
-            "existe": True,
-            "dados": rascunho.dados,
-            "fotos": _fotos_rascunho_json(rascunho),
-            "usuario": rascunho.usuario.username if rascunho.usuario else None,
-            "atualizado_em": timezone.localtime(rascunho.atualizado_em).strftime("%d/%m/%Y %H:%M"),
-        })
-
-    if request.method == "POST":
-        if DadosExecucaoInspecao.objects.filter(inspecao=inspecao).exists():
-            return JsonResponse({"error": "Item já inspecionado."}, status=400)
-        try:
-            dados = json.loads(request.POST.get("dados") or "{}")
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Dados do rascunho inválidos."}, status=400)
-
-        arquivos_removidos = []
-        with transaction.atomic():
-            rascunho, _ = RascunhoInspecao.objects.update_or_create(
-                inspecao=inspecao,
-                defaults={
-                    "dados": dados,
-                    "usuario": request.user if request.user.is_authenticated else None,
-                },
-            )
-            remover = rascunho.fotos.filter(id__in=request.POST.getlist("remover_fotos"))
-            arquivos_removidos = [f.arquivo.name for f in remover]
-            remover.delete()
-            for campo in request.FILES:
-                if not campo.startswith("foto__"):
-                    continue
-                chave = campo[len("foto__"):][:60]
-                for arquivo in request.FILES.getlist(campo):
-                    RascunhoInspecaoFoto.objects.create(rascunho=rascunho, chave=chave, arquivo=arquivo)
-            transaction.on_commit(lambda: _apagar_arquivos_rascunho(arquivos_removidos))
-
-        return JsonResponse({"success": True, "fotos": _fotos_rascunho_json(rascunho)})
-
-    if request.method == "DELETE":
-        rascunho = RascunhoInspecao.objects.filter(inspecao=inspecao).first()
-        if rascunho:
-            nomes = [f.arquivo.name for f in rascunho.fotos.all()]
-            rascunho.delete()
-            _apagar_arquivos_rascunho(nomes)
-        return JsonResponse({"success": True})
-
-    return JsonResponse({"error": "Método não permitido"}, status=405)
+    return responder_rascunho(request, inspecao)
 
 
 def envio_reinspecao_pintura(request):
