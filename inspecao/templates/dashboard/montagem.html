@@ -119,8 +119,9 @@
     <!-- Montagem -->
     <div class="col-md-4">
         <div class="card h-100">
-            <div class="card-header ch-blue">
-                Dados de Inspeção
+            <div class="card-header d-flex justify-content-between align-items-center ch-blue">
+                <span>Dados de Inspeção</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-montagem" data-nome-csv="montagem_inspecao_montagem" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="px-3 pt-3 pb-1">
@@ -146,8 +147,9 @@
     <!-- Tanque -->
     <div class="col-md-4">
         <div class="card h-100">
-            <div class="card-header ch-blue">
-                Dados de Inspeção
+            <div class="card-header d-flex justify-content-between align-items-center ch-blue">
+                <span>Dados de Inspeção</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-tanque" data-nome-csv="montagem_inspecao_tanque" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="px-3 pt-3 pb-1">
@@ -173,8 +175,9 @@
     <!-- Tubos e Cilindros -->
     <div class="col-md-4">
         <div class="card h-100">
-            <div class="card-header ch-blue">
-                Dados de Inspeção
+            <div class="card-header d-flex justify-content-between align-items-center ch-blue">
+                <span>Dados de Inspeção</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-tubos" data-nome-csv="montagem_inspecao_tubos" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="px-3 pt-3 pb-1">
@@ -204,8 +207,9 @@
     <!-- Causas Montagem -->
     <div class="col-md-4">
         <div class="card h-100">
-            <div class="card-header ch-orange">
-                Causas de Não Conformidades
+            <div class="card-header d-flex justify-content-between align-items-center ch-orange">
+                <span>Causas de Não Conformidades</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-causas-montagem" data-nome-csv="montagem_causas_montagem" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="px-3 pt-3 pb-1">
@@ -230,8 +234,9 @@
     <!-- Causas Tanque -->
     <div class="col-md-4">
         <div class="card h-100">
-            <div class="card-header ch-orange">
-                Causas de Não Conformidades
+            <div class="card-header d-flex justify-content-between align-items-center ch-orange">
+                <span>Causas de Não Conformidades</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-causas-tanque" data-nome-csv="montagem_causas_tanque" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="px-3 pt-3 pb-1">
@@ -256,8 +261,9 @@
     <!-- Causas Tubos -->
     <div class="col-md-4">
         <div class="card h-100">
-            <div class="card-header ch-orange">
-                Causas de Não Conformidades
+            <div class="card-header d-flex justify-content-between align-items-center ch-orange">
+                <span>Causas de Não Conformidades</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-causas-tubos" data-nome-csv="montagem_causas_tubos" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="px-3 pt-3 pb-1">
@@ -325,4 +331,5 @@
 
 {% block scripts %}
     <script src="{% static 'js/dashboard/dash-montagem.js' %}"></script>
+    <script src="{% static 'js/dashboard/exportar-csv.js' %}"></script>
 {% endblock %}

@@ -121,8 +121,9 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header ch-blue">
-                Dados de Produção e Inspeção
+            <div class="card-header d-flex justify-content-between align-items-center ch-blue">
+                <span>Dados de Produção e Inspeção</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-producao" data-nome-csv="estamparia_producao" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -157,8 +158,9 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header ch-orange">
-                Causas de Não Conformidades
+            <div class="card-header d-flex justify-content-between align-items-center ch-orange">
+                <span>Causas de Não Conformidades</span>
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-exportar-csv="table-causas" data-nome-csv="estamparia_causas" title="Baixar esta tabela em CSV"><i class="bi bi-download"></i> CSV</button>
             </div>
             <div class="card-body p-0">
                 <div class="table-container">
@@ -249,4 +251,5 @@
 
 {% block scripts %}
     <script src="{% static 'js/dashboard/dash-estamparia.js' %}"></script>
+    <script src="{% static 'js/dashboard/exportar-csv.js' %}"></script>
 {% endblock %}
