@@ -31,7 +31,6 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
-import unicodedata
 
 from storages.backends.s3boto3 import S3Boto3Storage
 
@@ -112,38 +111,52 @@ def _calcular_analise_banho(amostras_desengraxante, amostras_fosfatizante):
     }
 
 
-# Causas fixas do checklist da inspeção de pintura, nesta ordem. Achadas pelo
-# nome (sem diferenciar maiúsculas): os ids mudam entre bancos.
-CAUSAS_CHECKLIST_PINTURA = [
-    "Brilho",
-    "Camada Baixa",
-    "Olho de Peixe",
-    "Contaminação",
-    "Casca de Laranja",
-    "Escorrimento",
-    "Marcação por Óleo ou Água",
+# Checklist da inspeção de pintura: 3 grupos (OK / Ñ OK por unidade); no
+# Ñ OK o inspetor escolhe uma ou mais falhas do grupo. Cada falha é
+# (nome exibido, nome da causa no cadastro): a causa é achada pelo nome
+# (sem diferenciar maiúsculas), porque os ids mudam entre bancos. Só o nome
+# exibido muda; o que fica gravado continua sendo a causa do cadastro.
+# As demais causas da pintura (antigo item "Outros") saem do formulário, mas
+# continuam no cadastro e no histórico.
+GRUPOS_CHECKLIST_PINTURA = [
+    ("Brilho e Tonalidade", [
+        ("Peça fosca", "Brilho"),
+        ("Cor errada", "Cor errada"),
+        ("Tonalidade divergente", "Tonalidade"),
+    ]),
+    ("Aplicação, cobertura e aderência de tinta", [
+        ("Camada baixa", "Camada Baixa"),
+        ("Casca de laranja", "Casca de Laranja"),
+        ("Escorrimento", "Escorrimento"),
+        ("Olho de peixe", "Olho de Peixe"),
+        ("Desplacamento", "Desplacamento"),
+    ]),
+    ("Acabamento final da peça", [
+        ("Contaminação", "Contaminação"),
+        ("Marcação na peça", "Marcação de Peça"),
+        ("Corrosão na chapa", "Corrosão"),
+        ("Empoeiramento", "Empoeiramento"),
+        ("Marcação por óleo ou água", "Marcação por Óleo ou Água"),
+        ("Amassado", "Amassando"),
+        ("Respingo de solda", "Respingo de Solda"),
+    ]),
 ]
-
-# Unificadas em "Marcação por Óleo ou Água": ficam fora do "Outros"
-CAUSAS_FORA_CHECKLIST_PINTURA = ["Marcação por Óleo", "Marcação por Água"]
 
 
 def _causas_checklist_pintura(list_causas):
-    """{"principais": as causas fixas do checklist, "outros": todas as demais
-    da pintura (item "Outros", em que o inspetor escolhe uma ou mais)}."""
+    """{"grupos": [{"nome", "causas": [{"id", "nome"}]}]} com o nome de
+    exibição de cada falha. Falha sem causa no cadastro fica de fora."""
     por_nome = {c["nome"].strip().casefold(): c for c in list_causas}
-    principais = [
-        por_nome[nome.casefold()] for nome in CAUSAS_CHECKLIST_PINTURA if nome.casefold() in por_nome
-    ]
-    ids_principais = {c["id"] for c in principais}
-    fora = {nome.casefold() for nome in CAUSAS_FORA_CHECKLIST_PINTURA}
-    outros = sorted(
-        (c for c in list_causas
-         if c["id"] not in ids_principais and c["nome"].strip().casefold() not in fora),
-        # ordem alfabética ignorando acento ("Água" junto do "A")
-        key=lambda c: unicodedata.normalize("NFKD", c["nome"]).encode("ascii", "ignore").decode().casefold(),
-    )
-    return {"principais": principais, "outros": outros}
+    grupos = []
+    for nome_grupo, falhas in GRUPOS_CHECKLIST_PINTURA:
+        causas = [
+            {"id": por_nome[cadastro.casefold()]["id"], "nome": exibido}
+            for exibido, cadastro in falhas
+            if cadastro.casefold() in por_nome
+        ]
+        if causas:
+            grupos.append({"nome": nome_grupo, "causas": causas})
+    return {"grupos": grupos}
 
 
 def inspecao_pintura(request):

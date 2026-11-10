@@ -190,6 +190,13 @@
         .checklist-causa-item:has(.causa-status-ok:checked) { background: #f0fdf4; }
         .checklist-causa-header { margin-bottom: 0; gap: .75rem; }
         .checklist-causa-label { font-weight: 500; }
+        .checklist-falhas-grupo { margin-top: .45rem; }
+        .checklist-falhas-grupo .outros-causas-lista {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            column-gap: 1rem;
+        }
+        .checklist-falhas-grupo .form-check-input:disabled ~ .form-check-label { opacity: .55; }
         .checklist-causa-detalhes {
             margin-top: .6rem;
             padding-top: .6rem;
