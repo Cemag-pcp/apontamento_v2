@@ -1,21 +1,20 @@
 // Modal "Inspecionar Pintura": checklist OK / Ñ OK por unidade inspecionada,
 // no mesmo formato da inspeção da montagem (inspecao/static/js/montagem/inspecionar).
-// Itens do checklist: as causas fixas (CAUSAS_PINTURA) + "Outros", em que o
-// inspetor escolhe uma ou mais das demais causas (OUTRAS_CAUSAS_PINTURA).
-let CAUSAS_PINTURA = [];
-let OUTRAS_CAUSAS_PINTURA = [];
+// Itens do checklist: 3 grupos (GRUPOS_PINTURA). Cada grupo lista as
+// principais falhas, sempre à mostra mas só habilitadas quando o grupo é
+// marcado "Ñ OK"; aí o inspetor escolhe uma ou mais e anexa a foto.
+let GRUPOS_PINTURA = [];
 try {
     const elCausas = document.getElementById("causas-pintura-data");
     const dadosCausas = elCausas ? JSON.parse(elCausas.textContent) : {};
-    CAUSAS_PINTURA = dadosCausas.principais || [];
-    OUTRAS_CAUSAS_PINTURA = dadosCausas.outros || [];
+    GRUPOS_PINTURA = dadosCausas.grupos || [];
 } catch (e) {
     console.error("Erro ao carregar causas de pintura:", e);
 }
 
-// Respostas exigidas por unidade: cada causa fixa + o item "Outros"
+// Respostas exigidas por unidade: uma por grupo
 function totalItensChecklistPintura() {
-    return CAUSAS_PINTURA.length + (OUTRAS_CAUSAS_PINTURA.length ? 1 : 0);
+    return GRUPOS_PINTURA.length;
 }
 
 function escaparHtmlPintura(texto) {
@@ -25,19 +24,30 @@ function escaparHtmlPintura(texto) {
 }
 
 function construirChecklistUnidadePintura(indiceUnidade) {
-    const itensCausas = CAUSAS_PINTURA.map((causa) => {
-        const nome = escaparHtmlPintura(causa.nome);
+    const itensGrupos = GRUPOS_PINTURA.map((grupo, indiceGrupo) => {
+        const nomeGrupo = escaparHtmlPintura(grupo.nome);
+        const chave = `${indiceUnidade}-g${indiceGrupo + 1}`;
+        const falhas = grupo.causas.map((causa) => `
+            <div class="form-check">
+                <input class="form-check-input outros-causa-check" type="checkbox" value="${causa.id}" data-causa-nome="${escaparHtmlPintura(causa.nome)}" id="falha-pintura-${chave}-${causa.id}" disabled>
+                <label class="form-check-label small" for="falha-pintura-${chave}-${causa.id}">${escaparHtmlPintura(causa.nome)}</label>
+            </div>`).join("");
         return `
-        <div class="checklist-causa-item" data-causa-nome="${nome}" data-chave="${indiceUnidade}-${causa.id}">
+        <div class="checklist-causa-item" data-grupo="1" data-causa-nome="${nomeGrupo}" data-chave="${chave}">
             <div class="d-flex justify-content-between align-items-center checklist-causa-header">
-                <span class="checklist-causa-label">${nome}</span>
+                <span class="checklist-causa-label">${nomeGrupo}</span>
                 <div class="btn-group btn-group-sm" role="group">
-                    <input type="radio" class="btn-check causa-status-ok" name="status-causa-pintura-${indiceUnidade}-${causa.id}" id="ok-causa-pintura-${indiceUnidade}-${causa.id}" value="ok" autocomplete="off">
-                    <label class="btn btn-outline-success" for="ok-causa-pintura-${indiceUnidade}-${causa.id}" title="OK">OK</label>
+                    <input type="radio" class="btn-check causa-status-ok" name="status-causa-pintura-${chave}" id="ok-causa-pintura-${chave}" value="ok" autocomplete="off">
+                    <label class="btn btn-outline-success" for="ok-causa-pintura-${chave}" title="OK">OK</label>
 
-                    <input type="radio" class="btn-check causa-status-nok" name="status-causa-pintura-${indiceUnidade}-${causa.id}" id="nok-causa-pintura-${indiceUnidade}-${causa.id}" value="${causa.id}" data-causa-id="${causa.id}" data-causa-nome="${nome}" autocomplete="off">
-                    <label class="btn btn-outline-danger" for="nok-causa-pintura-${indiceUnidade}-${causa.id}" title="Não OK" aria-label="Não OK">Ñ OK</label>
+                    <input type="radio" class="btn-check causa-status-nok" name="status-causa-pintura-${chave}" id="nok-causa-pintura-${chave}" value="nok" data-causa-nome="${nomeGrupo}" autocomplete="off">
+                    <label class="btn btn-outline-danger" for="nok-causa-pintura-${chave}" title="Não OK" aria-label="Não OK">Ñ OK</label>
                 </div>
+            </div>
+            <div class="checklist-falhas-grupo">
+                <span class="label-modal-sm">Principais falhas a serem observadas:</span>
+                <div class="outros-causas-lista">${falhas}</div>
+                <div class="text-danger small outros-causas-erro" style="display:none;">Selecione ao menos uma falha.</div>
             </div>
             <div class="checklist-causa-detalhes" style="display:none;">
                 <label class="label-modal">Imagem (obrigatória):<span class="text-danger"> *</span></label>
@@ -48,35 +58,6 @@ function construirChecklistUnidadePintura(indiceUnidade) {
         </div>`;
     }).join("");
 
-    // "Outros": Ñ OK abre a lista das demais causas (uma ou mais) + foto obrigatória
-    const opcoesOutros = OUTRAS_CAUSAS_PINTURA.map((causa) => `
-        <div class="form-check form-check-inline me-3">
-            <input class="form-check-input outros-causa-check" type="checkbox" value="${causa.id}" data-causa-nome="${escaparHtmlPintura(causa.nome)}" id="outros-pintura-${indiceUnidade}-${causa.id}">
-            <label class="form-check-label small" for="outros-pintura-${indiceUnidade}-${causa.id}">${escaparHtmlPintura(causa.nome)}</label>
-        </div>`).join("");
-    const itemOutros = OUTRAS_CAUSAS_PINTURA.length ? `
-        <div class="checklist-causa-item" data-outros="1" data-causa-nome="Outros" data-chave="${indiceUnidade}-outros">
-            <div class="d-flex justify-content-between align-items-center checklist-causa-header">
-                <span class="checklist-causa-label">Outros</span>
-                <div class="btn-group btn-group-sm" role="group">
-                    <input type="radio" class="btn-check causa-status-ok" name="status-causa-pintura-${indiceUnidade}-outros" id="ok-causa-pintura-${indiceUnidade}-outros" value="ok" autocomplete="off">
-                    <label class="btn btn-outline-success" for="ok-causa-pintura-${indiceUnidade}-outros" title="OK">OK</label>
-
-                    <input type="radio" class="btn-check causa-status-nok" name="status-causa-pintura-${indiceUnidade}-outros" id="nok-causa-pintura-${indiceUnidade}-outros" value="outros" data-causa-nome="Outros" autocomplete="off">
-                    <label class="btn btn-outline-danger" for="nok-causa-pintura-${indiceUnidade}-outros" title="Não OK" aria-label="Não OK">Ñ OK</label>
-                </div>
-            </div>
-            <div class="checklist-causa-detalhes" style="display:none;">
-                <label class="label-modal">Quais causas?<span class="text-danger"> *</span></label>
-                <div class="outros-causas-lista mb-2">${opcoesOutros}</div>
-                <div class="text-danger small outros-causas-erro" style="display:none;">Selecione ao menos uma causa.</div>
-                <label class="label-modal">Imagem (obrigatória):<span class="text-danger"> *</span></label>
-                <div class="fotos-salvas small mb-1"></div>
-                <input class="form-control form-control-sm causa-imagens" type="file" accept="image/*" multiple>
-                <div class="invalid-feedback">Anexe ao menos uma foto desta não conformidade.</div>
-            </div>
-        </div>` : "";
-
     return `
         <div class="unidade-checklist-card" data-unidade="${indiceUnidade}">
             <div class="unidade-checklist-header" data-bs-toggle="collapse" data-bs-target="#unidade-checklist-pintura-body-${indiceUnidade}">
@@ -85,12 +66,16 @@ function construirChecklistUnidadePintura(indiceUnidade) {
             </div>
             <div class="collapse" id="unidade-checklist-pintura-body-${indiceUnidade}">
                 <div class="checklist-causas-montagem">
-                    ${itensCausas}
-                    ${itemOutros}
+                    ${itensGrupos}
                 </div>
             </div>
         </div>
     `;
+}
+
+// Falhas do grupo: habilitadas só com o grupo em "Ñ OK"
+function habilitarFalhasGrupoPintura(item, habilitar) {
+    item.querySelectorAll(".outros-causa-check").forEach((check) => { check.disabled = !habilitar; });
 }
 
 function renderizarUnidadesChecklistPintura(quantidade) {
@@ -108,13 +93,14 @@ function alternarDetalhesCausaPintura(radio) {
     const detalhes = item.querySelector(".checklist-causa-detalhes");
     const marcadoComoNaoOk = item.querySelector(".causa-status-nok").checked;
 
+    habilitarFalhasGrupoPintura(item, marcadoComoNaoOk);
     if (marcadoComoNaoOk) {
         detalhes.style.display = "block";
     } else {
         detalhes.style.display = "none";
         item.querySelector(".causa-imagens").value = "";
         item.querySelector(".causa-imagens").classList.remove("is-invalid");
-        // "Outros" voltou para OK: desmarca as causas escolhidas
+        // grupo voltou para OK: desmarca as falhas escolhidas
         item.querySelectorAll(".outros-causa-check").forEach((check) => { check.checked = false; });
         const erro = item.querySelector(".outros-causas-erro");
         if (erro) erro.style.display = "none";
@@ -182,6 +168,7 @@ function aplicarRascunhoPintura(dados, fotos) {
         const radio = item.querySelector(resposta.status === "ok" ? ".causa-status-ok" : ".causa-status-nok");
         radio.checked = true;
         item.querySelector(".checklist-causa-detalhes").style.display = resposta.status === "nok" ? "block" : "none";
+        habilitarFalhasGrupoPintura(item, resposta.status === "nok");
         (resposta.causas || []).forEach((id) => {
             const check = item.querySelector(`.outros-causa-check[value="${id}"]`);
             if (check) check.checked = true;
@@ -252,19 +239,19 @@ async function salvarParcialPintura() {
     }
 }
 
-// "Outros" marcado como Ñ OK precisa de ao menos uma causa escolhida.
-// Devolve a lista "Unidade N" pra mensagem de erro e abre a primeira.
+// Grupo marcado como Ñ OK precisa de ao menos uma falha escolhida.
+// Devolve a lista "Unidade N: Grupo" pra mensagem de erro e abre a primeira.
 function validarOutrosChecklistPintura(container) {
     const pendencias = [];
     let primeiro = null;
-    container.querySelectorAll('.checklist-causa-item[data-outros="1"]').forEach((item) => {
+    container.querySelectorAll('.checklist-causa-item[data-grupo="1"]').forEach((item) => {
         const erro = item.querySelector(".outros-causas-erro");
         const nok = item.querySelector(".causa-status-nok").checked;
         const escolhidas = item.querySelectorAll(".outros-causa-check:checked").length;
         const faltando = nok && escolhidas === 0;
         erro.style.display = faltando ? "block" : "none";
         if (faltando) {
-            pendencias.push(`Unidade ${item.closest(".unidade-checklist-card").dataset.unidade}: Outros`);
+            pendencias.push(`Unidade ${item.closest(".unidade-checklist-card").dataset.unidade}: ${item.dataset.causaNome}`);
             if (!primeiro) primeiro = item;
         }
     });
@@ -393,7 +380,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target.classList.contains("causa-imagens") && event.target.files.length > 0) {
             event.target.classList.remove("is-invalid");
         }
-        // Ao escolher uma causa em "Outros", tira o aviso
+        // Ao escolher uma falha do grupo, tira o aviso
         if (event.target.classList.contains("outros-causa-check") && event.target.checked) {
             const erro = event.target.closest(".checklist-causa-item").querySelector(".outros-causas-erro");
             if (erro) erro.style.display = "none";

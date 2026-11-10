@@ -95,7 +95,7 @@ document.getElementById("form-inspecao").addEventListener("submit", async functi
 
     const outrosSemCausa = validarOutrosChecklistPintura(containerChecklist);
     if (outrosSemCausa.length > 0) {
-        cancelarEnvio('Escolha a causa em "Outros"', 'Selecione ao menos uma causa em:<br>' + outrosSemCausa.join('<br>'));
+        cancelarEnvio('Escolha a falha', 'Selecione ao menos uma falha em:<br>' + outrosSemCausa.join('<br>'));
         return;
     }
 
@@ -105,15 +105,12 @@ document.getElementById("form-inspecao").addEventListener("submit", async functi
         return;
     }
 
-    // Cada causa fixa marcada como "Ñ OK" vira um bloco (soma as unidades e
-    // junta as fotos). "Outros" vira um bloco com as causas escolhidas,
-    // somando as unidades que escolheram a mesma combinação.
+    // Cada grupo marcado como "Ñ OK" vira um bloco com as falhas escolhidas,
+    // somando as unidades que escolheram a mesma combinação (e juntando as fotos).
     const causasAgregadas = new Map();
     containerChecklist.querySelectorAll(".causa-status-nok:checked").forEach((radio) => {
         const item = radio.closest(".checklist-causa-item");
-        const causasIds = item.dataset.outros
-            ? Array.from(item.querySelectorAll(".outros-causa-check:checked")).map((c) => c.value).sort()
-            : [radio.getAttribute("data-causa-id")];
+        const causasIds = Array.from(item.querySelectorAll(".outros-causa-check:checked")).map((c) => c.value).sort();
         const chave = causasIds.join(",");
         if (!causasAgregadas.has(chave)) {
             causasAgregadas.set(chave, { causasIds, quantidade: 0, imagens: [], fotosRascunho: [] });
