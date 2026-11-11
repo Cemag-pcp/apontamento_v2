@@ -1,0 +1,426 @@
+<div class="modal fade" id="modal-importar-contagem" tabindex="-1" aria-labelledby="titulo-modal-importar-contagem" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="titulo-modal-importar-contagem"><i class="bi bi-upload"></i> Importar lista de contagem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="form-importar-contagem" novalidate>
+                <div class="modal-body">
+                    <label for="arquivo-contagem" class="form-label mb-1">Planilha (.xlsx, .xls ou .csv)</label>
+                    <div class="input-group">
+                        <input type="file" class="form-control" id="arquivo-contagem" accept=".xlsx,.xlsm,.xls,.csv" required>
+                        <button type="button" class="btn btn-outline-secondary" id="baixar-modelo-contagem">
+                            <i class="bi bi-download"></i> Baixar modelo
+                        </button>
+                    </div>
+                    <div class="form-text">
+                        Colunas: <strong>Setor | Célula | Código | Descrição</strong>. Cada setor + célula novo entra no Cadastro como
+                        <span class="badge bg-warning text-dark">Pendente</span>, faltando só o responsável.
+                        Itens que já estão na lista têm a descrição atualizada; nada é apagado. Se alguma linha tiver erro, nada é importado.
+                    </div>
+                    <div class="alert alert-info py-2 small mt-3 mb-0 d-none" id="aviso-lista-existente"></div>
+                    <div id="resultado-importacao-contagem" class="mt-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="botao-importar-contagem">
+                        <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true"></span>
+                        <i class="bi bi-upload"></i> Importar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .barra-selecao {
+        display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem;
+        padding: .5rem 1rem; background: #fff8e1; border-bottom: 1px solid #ffe08a;
+        position: sticky; top: 56px; z-index: 5;
+    }
+    .barra-selecao.d-none { display: none !important; }
+</style>
+
+<div class="card">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span class="fw-semibold">
+            Itens <span class="badge bg-secondary" id="total-itens-contagem">0</span>
+            <span class="badge bg-success" id="total-contados-contagem"></span>
+            <span class="badge bg-info text-dark" id="total-fora-contagem"></span>
+            <span class="badge bg-warning text-dark" id="total-recontagem-contagem"></span>
+        </span>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <select class="form-select form-select-sm" id="filtro-setor-contagem" style="max-width: 200px;">
+                <option value="">Todos os setores</option>
+            </select>
+            <select class="form-select form-select-sm" id="filtro-situacao-contagem" style="max-width: 200px;">
+                <option value="">Todos</option>
+                <option value="contados">Contados</option>
+                <option value="faltam">Faltam contar</option>
+                <option value="fora">Fora da lista</option>
+                <option value="recontar">Recontagem pendente</option>
+                <option value="recontados">Recontados</option>
+                <option value="divergentes">Recontagem divergente</option>
+            </select>
+            <input type="search" class="form-control form-control-sm" id="busca-contagem" placeholder="Buscar célula, código ou descrição" style="max-width: 280px;">
+            <button type="button" class="btn btn-sm btn-outline-danger" id="limpar-contagem" title="Apagar a lista de contagem">
+                <i class="bi bi-trash"></i> Limpar lista
+            </button>
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modal-importar-contagem">
+                <i class="bi bi-upload"></i> Importar planilha
+            </button>
+        </div>
+    </div>
+    <!-- Ações nos itens marcados -->
+    <div class="barra-selecao d-none" id="barra-selecao-contagem">
+        <span class="fw-semibold" id="texto-selecao-contagem"></span>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-warning" id="habilitar-recontagem">
+                <i class="bi bi-arrow-repeat"></i> Habilitar recontagem
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary bg-white" id="cancelar-recontagem">
+                <i class="bi bi-x-circle"></i> Cancelar recontagem
+            </button>
+            <button type="button" class="btn btn-sm btn-link" id="limpar-selecao-contagem">Limpar seleção</button>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 1%;">
+                        <input class="form-check-input" type="checkbox" id="marcar-todos-contagem" title="Marcar todos os itens filtrados" aria-label="Marcar todos os itens filtrados">
+                    </th>
+                    <th>Setor</th>
+                    <th>Célula</th>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th class="text-end">Contagem</th>
+                    <th class="text-nowrap">Contado em</th>
+                    <th class="text-end">Recontagem</th>
+                    <th class="text-nowrap">Recontado em</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-itens-contagem"></tbody>
+        </table>
+    </div>
+    <div class="card-footer small text-muted d-none" id="aviso-limite-contagem"></div>
+</div>
+
+{{ itens|json_script:"dados-itens-contagem" }}
+<script>
+(() => {
+    const URL_IMPORTAR = "{% url 'inventario:importar_contagem' inventario.id %}";
+    const URL_LIMPAR = "{% url 'inventario:limpar_contagem' inventario.id %}";
+    const URL_RECONTAGEM = "{% url 'inventario:alterar_recontagem' inventario.id %}";
+    const URL_CADASTRO = "{% url 'inventario:home' %}?id={{ inventario.id }}&aba=cadastro";
+    const LIMITE_LINHAS = 500;
+    const csrf = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+    let itens = JSON.parse(document.getElementById("dados-itens-contagem").textContent);
+
+    const form = document.getElementById("form-importar-contagem");
+    const arquivo = document.getElementById("arquivo-contagem");
+    const botao = document.getElementById("botao-importar-contagem");
+    const resultado = document.getElementById("resultado-importacao-contagem");
+    const corpo = document.getElementById("tabela-itens-contagem");
+    const busca = document.getElementById("busca-contagem");
+    const filtroSetor = document.getElementById("filtro-setor-contagem");
+    const filtroSituacao = document.getElementById("filtro-situacao-contagem");
+    const aviso = document.getElementById("aviso-limite-contagem");
+
+    const escapar = (texto) => {
+        const div = document.createElement("div");
+        div.textContent = texto ?? "";
+        return div.innerHTML;
+    };
+    const normalizar = (texto) => (texto || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const formatar = (q) => Number(q).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+
+    // situação da recontagem de cada item
+    const recontarPendente = (i) => i.recontagem_habilitada && i.recontagem === null;
+    const recontado = (i) => i.recontagem_habilitada && i.recontagem !== null;
+    const divergente = (i) => recontado(i) && Number(i.recontagem) !== Number(i.quantidade);
+    const FILTROS = {
+        contados: (i) => !i.fora_da_lista && i.quantidade !== null,
+        faltam: (i) => !i.fora_da_lista && i.quantidade === null,
+        fora: (i) => i.fora_da_lista,
+        recontar: recontarPendente,
+        recontados: recontado,
+        divergentes: divergente,
+    };
+
+    const selecionados = new Set();
+    let visiveisAtuais = [];
+    const barraSelecao = document.getElementById("barra-selecao-contagem");
+    const marcarTodos = document.getElementById("marcar-todos-contagem");
+
+    function atualizarSelecao() {
+        // tira da seleção o que sumiu da lista (ex.: depois de limpar)
+        const existentes = new Set(itens.map((i) => i.id));
+        [...selecionados].forEach((id) => { if (!existentes.has(id)) selecionados.delete(id); });
+        const n = selecionados.size;
+        barraSelecao.classList.toggle("d-none", n === 0);
+        document.getElementById("texto-selecao-contagem").textContent = `${n} ite${n === 1 ? "m marcado" : "ns marcados"}`;
+        const marcadosVisiveis = visiveisAtuais.filter((i) => selecionados.has(i.id)).length;
+        marcarTodos.checked = visiveisAtuais.length > 0 && marcadosVisiveis === visiveisAtuais.length;
+        marcarTodos.indeterminate = marcadosVisiveis > 0 && marcadosVisiveis < visiveisAtuais.length;
+    }
+
+    function colunaRecontagem(i) {
+        if (recontarPendente(i)) return '<span class="badge bg-warning text-dark"><i class="bi bi-arrow-repeat"></i> Aguardando</span>';
+        if (!recontado(i)) return '<span class="text-muted">—</span>';
+        if (!divergente(i)) return `<span class="fw-semibold">${formatar(i.recontagem)}</span> <i class="bi bi-check-circle-fill text-success" title="Igual à contagem"></i>`;
+        const diferenca = Number(i.recontagem) - Number(i.quantidade);
+        return `<span class="fw-semibold">${formatar(i.recontagem)}</span>
+            <span class="badge bg-danger" title="Diferença em relação à contagem">
+                <i class="bi bi-exclamation-triangle"></i> ${diferenca > 0 ? "+" : ""}${formatar(diferenca)}</span>`;
+    }
+
+    function atualizarSetores() {
+        const atual = filtroSetor.value;
+        const setores = [...new Set(itens.map((i) => i.setor))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+        filtroSetor.innerHTML = '<option value="">Todos os setores</option>' +
+            setores.map((s) => `<option value="${escapar(s)}">${escapar(s)}</option>`).join("");
+        filtroSetor.value = setores.includes(atual) ? atual : "";
+    }
+
+    function renderizar() {
+        const termo = normalizar(busca.value.trim());
+        const setor = filtroSetor.value;
+        const situacao = filtroSituacao.value;
+        const visiveis = itens.filter((i) =>
+            (!setor || i.setor === setor) &&
+            (!situacao || FILTROS[situacao](i)) &&
+            (!termo || normalizar(`${i.setor} ${i.celula} ${i.codigo} ${i.descricao} ${i.observacao}`).includes(termo)));
+        visiveisAtuais = visiveis;
+        const pendentesRecontagem = itens.filter(recontarPendente).length;
+        document.getElementById("total-recontagem-contagem").textContent = pendentesRecontagem ? `${pendentesRecontagem} para recontar` : "";
+        // contadores só da lista importada; lotes fora da lista à parte
+        const daLista = itens.filter((i) => !i.fora_da_lista);
+        const fora = itens.length - daLista.length;
+        document.getElementById("total-itens-contagem").textContent = daLista.length;
+        const contados = daLista.filter((i) => i.quantidade !== null).length;
+        document.getElementById("total-contados-contagem").textContent = daLista.length ? `${contados} contado${contados === 1 ? "" : "s"}` : "";
+        document.getElementById("total-fora-contagem").textContent = fora ? `${fora} fora da lista` : "";
+
+        if (visiveis.length === 0) {
+            corpo.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">${itens.length ? "Nenhum item encontrado." : "Nenhuma lista importada ainda."}</td></tr>`;
+            aviso.classList.add("d-none");
+            atualizarSelecao();
+            return;
+        }
+        // listas grandes: mostra só o começo; a busca/filtro acha o resto
+        corpo.innerHTML = visiveis.slice(0, LIMITE_LINHAS).map((i) => `
+            <tr class="${selecionados.has(i.id) ? "table-active" : i.fora_da_lista ? "table-info" : ""}">
+                <td><input class="form-check-input marcar-item" type="checkbox" data-id="${i.id}" ${selecionados.has(i.id) ? "checked" : ""} aria-label="Marcar ${escapar(i.codigo)}"></td>
+                <td>${escapar(i.setor)}</td>
+                <td>${i.fora_da_lista
+                    ? `<span class="badge bg-info text-dark">Fora da lista</span>
+                       ${i.foto ? `<a href="${escapar(i.foto)}" target="_blank" rel="noopener" class="ms-1 small" title="Ver foto"><i class="bi bi-camera"></i> foto</a>` : ""}
+                       <div class="small text-muted"><i class="bi bi-geo-alt"></i> ${escapar(i.observacao)}</div>`
+                    : escapar(i.celula)}</td>
+                <td class="text-nowrap">${escapar(i.codigo)}</td>
+                <td>${escapar(i.descricao)}</td>
+                <td class="text-end fw-semibold">${i.quantidade !== null ? formatar(i.quantidade) : '<span class="text-muted fw-normal">—</span>'}</td>
+                <td class="small text-muted text-nowrap">${escapar(i.contado_em)}</td>
+                <td class="text-end text-nowrap">${colunaRecontagem(i)}</td>
+                <td class="small text-muted text-nowrap">${escapar(i.recontado_em)}</td>
+            </tr>`).join("");
+        atualizarSelecao();
+        const cortou = visiveis.length > LIMITE_LINHAS;
+        aviso.textContent = cortou ? `Mostrando ${LIMITE_LINHAS} de ${visiveis.length} itens. Use a busca ou o filtro de setor para achar os demais.` : "";
+        aviso.classList.toggle("d-none", !cortou);
+    }
+
+    function mostrarResultado(dados) {
+        const pendentes = dados.celulas_pendentes
+            ? `<li><strong>${dados.celulas_pendentes}</strong> setor + célula novo${dados.celulas_pendentes === 1 ? "" : "s"} no Cadastro, pendente${dados.celulas_pendentes === 1 ? "" : "s"} de responsável. <a href="${URL_CADASTRO}">Definir responsáveis</a></li>`
+            : "";
+        Swal.fire({
+            icon: "success",
+            title: `Planilha importada: ${dados.linhas} linha${dados.linhas === 1 ? "" : "s"}`,
+            html: `
+                <ul class="text-start mb-0">
+                    <li><strong>${dados.criados}</strong> ite${dados.criados === 1 ? "m novo" : "ns novos"}</li>
+                    ${dados.atualizados ? `<li><strong>${dados.atualizados}</strong> com descrição atualizada</li>` : ""}
+                    ${dados.sem_alteracao ? `<li><strong>${dados.sem_alteracao}</strong> já estava${dados.sem_alteracao === 1 ? "" : "m"} na lista sem mudança</li>` : ""}
+                    ${pendentes}
+                </ul>`,
+        });
+    }
+
+    // o bootstrap.js do base.html carrega depois deste script: pega na hora de usar
+    const elementoModal = document.getElementById("modal-importar-contagem");
+    const modal = () => bootstrap.Modal.getOrCreateInstance(elementoModal);
+    const avisoListaExistente = document.getElementById("aviso-lista-existente");
+    elementoModal.addEventListener("show.bs.modal", () => {
+        form.reset();
+        arquivo.classList.remove("is-invalid");
+        resultado.innerHTML = "";
+        avisoListaExistente.textContent = itens.length
+            ? `A lista já tem ${itens.length} itens. Os novos serão somados e os repetidos terão a descrição atualizada.`
+            : "";
+        avisoListaExistente.classList.toggle("d-none", !itens.length);
+    });
+
+    function mostrarErro(mensagem, detalhes = []) {
+        resultado.innerHTML = `
+            <div class="alert alert-danger mb-0">
+                <div class="fw-semibold"><i class="bi bi-exclamation-triangle"></i> ${escapar(mensagem)}</div>
+                ${detalhes.length ? `<ul class="mb-0 mt-1 small">${detalhes.map((d) => `<li>${escapar(d)}</li>`).join("")}</ul>` : ""}
+            </div>`;
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!arquivo.files.length) {
+            arquivo.classList.add("is-invalid");
+            return;
+        }
+        const dadosForm = new FormData();
+        dadosForm.append("arquivo", arquivo.files[0]);
+        botao.disabled = true;
+        botao.querySelector(".spinner-border").classList.remove("d-none");
+        resultado.innerHTML = "";
+        try {
+            const resposta = await fetch(URL_IMPORTAR, { method: "POST", headers: { "X-CSRFToken": csrf() }, body: dadosForm });
+            const dados = await resposta.json().catch(() => ({}));
+            if (!resposta.ok) {
+                mostrarErro(dados.error || "Não foi possível importar a planilha.", dados.detalhes || []);
+                return;
+            }
+            itens = dados.itens;
+            atualizarSetores();
+            renderizar();
+            modal().hide();
+            mostrarResultado(dados);
+        } catch (erro) {
+            mostrarErro("Falha de conexão ao enviar a planilha.");
+        } finally {
+            botao.disabled = false;
+            botao.querySelector(".spinner-border").classList.add("d-none");
+        }
+    });
+
+    arquivo.addEventListener("change", () => arquivo.classList.remove("is-invalid"));
+    busca.addEventListener("input", renderizar);
+    filtroSetor.addEventListener("change", renderizar);
+    filtroSituacao.addEventListener("change", renderizar);
+
+    // ---------- Seleção e recontagem ----------
+    corpo.addEventListener("change", (event) => {
+        const caixa = event.target.closest(".marcar-item");
+        if (!caixa) return;
+        const id = Number(caixa.dataset.id);
+        if (caixa.checked) selecionados.add(id); else selecionados.delete(id);
+        caixa.closest("tr").classList.toggle("table-active", caixa.checked);
+        atualizarSelecao();
+    });
+    // marca/desmarca todos os itens do filtro atual (inclusive os que passam do limite da tela)
+    marcarTodos.addEventListener("change", () => {
+        visiveisAtuais.forEach((i) => (marcarTodos.checked ? selecionados.add(i.id) : selecionados.delete(i.id)));
+        renderizar();
+    });
+    document.getElementById("limpar-selecao-contagem").addEventListener("click", () => {
+        selecionados.clear();
+        renderizar();
+    });
+
+    async function alterarRecontagem(habilitar) {
+        const marcados = itens.filter((i) => selecionados.has(i.id));
+        const validos = habilitar ? marcados.filter((i) => i.quantidade !== null) : marcados.filter((i) => i.recontagem_habilitada);
+        const ignorados = marcados.length - validos.length;
+        if (!validos.length) {
+            Swal.fire({
+                icon: "info",
+                title: habilitar ? "Nenhum item contado" : "Nenhum item em recontagem",
+                text: habilitar
+                    ? "A recontagem só pode ser habilitada em itens que já foram contados."
+                    : "Nenhum dos itens marcados está em recontagem.",
+            });
+            return;
+        }
+        const jaRecontados = habilitar ? validos.filter(recontado).length : validos.filter((i) => i.recontagem !== null).length;
+        const detalhes = [
+            habilitar
+                ? "Os itens voltam para a lista do link de contagem como <strong>Recontagem</strong>. A primeira contagem fica guardada e não aparece para quem reconta."
+                : "Os itens saem da recontagem. A primeira contagem continua.",
+            jaRecontados ? `<strong>${jaRecontados}</strong> já ${jaRecontados === 1 ? "tem recontagem, que será apagada" : "têm recontagem, que será apagada"}${habilitar ? " para recontar de novo" : ""}.` : "",
+            ignorados ? `${ignorados} marcado${ignorados === 1 ? "" : "s"} ${habilitar ? "sem contagem" : "fora da recontagem"} ${ignorados === 1 ? "será ignorado" : "serão ignorados"}.` : "",
+        ].filter(Boolean).map((t) => `<p class="mb-2">${t}</p>`).join("");
+
+        const confirmacao = await Swal.fire({
+            icon: habilitar ? "question" : "warning",
+            title: `${habilitar ? "Habilitar" : "Cancelar"} recontagem de ${validos.length} ite${validos.length === 1 ? "m" : "ns"}?`,
+            html: detalhes,
+            showCancelButton: true,
+            confirmButtonText: habilitar ? "Habilitar recontagem" : "Cancelar recontagem",
+            cancelButtonText: "Voltar",
+            confirmButtonColor: habilitar ? "#ffc107" : "#6c757d",
+        });
+        if (!confirmacao.isConfirmed) return;
+
+        try {
+            const resposta = await fetch(URL_RECONTAGEM, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+                body: JSON.stringify({ ids: validos.map((i) => i.id), habilitar }),
+            });
+            const dados = await resposta.json().catch(() => ({}));
+            if (!resposta.ok) throw new Error(dados.error || "Não foi possível alterar a recontagem.");
+            const porId = new Map(dados.itens.map((i) => [i.id, i]));
+            itens = itens.map((i) => porId.get(i.id) || i);
+            selecionados.clear();
+            renderizar();
+            Swal.fire({
+                toast: true, position: "bottom-end", icon: "success", showConfirmButton: false, timer: 2500,
+                title: `Recontagem ${habilitar ? "habilitada" : "cancelada"} em ${dados.alterados} ite${dados.alterados === 1 ? "m" : "ns"}`,
+            });
+        } catch (erro) {
+            Swal.fire({ icon: "error", title: "Erro", text: erro.message });
+        }
+    }
+    document.getElementById("habilitar-recontagem").addEventListener("click", () => alterarRecontagem(true));
+    document.getElementById("cancelar-recontagem").addEventListener("click", () => alterarRecontagem(false));
+
+    document.getElementById("baixar-modelo-contagem").addEventListener("click", () => {
+        // ";" e BOM para o Excel em português abrir já separado e com acentos
+        const conteudo = "﻿Setor;Célula;Código;Descrição\r\nMontagem;Chassi;123456;Exemplo de peça\r\n";
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([conteudo], { type: "text/csv;charset=utf-8" }));
+        link.download = "modelo_lista_contagem.csv";
+        link.click();
+        URL.revokeObjectURL(link.href);
+    });
+
+    document.getElementById("limpar-contagem").addEventListener("click", async () => {
+        if (!itens.length) return;
+        const confirmacao = await Swal.fire({
+            icon: "warning",
+            title: "Apagar a lista de contagem?",
+            text: `Os ${itens.length} itens deste inventário serão apagados, junto com as quantidades já contadas. Os cadastros de setor, célula e responsável continuam.`,
+            showCancelButton: true,
+            confirmButtonText: "Apagar",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: "#dc3545",
+        });
+        if (!confirmacao.isConfirmed) return;
+        try {
+            const resposta = await fetch(URL_LIMPAR, { method: "POST", headers: { "X-CSRFToken": csrf() } });
+            const dados = await resposta.json().catch(() => ({}));
+            if (!resposta.ok) throw new Error(dados.error || "Não foi possível apagar a lista.");
+            itens = [];
+            atualizarSetores();
+            renderizar();
+        } catch (erro) {
+            Swal.fire({ icon: "error", title: "Erro", text: erro.message });
+        }
+    });
+
+    atualizarSetores();
+    renderizar();
+})();
+</script>

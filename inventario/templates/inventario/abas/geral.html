@@ -1,0 +1,250 @@
+<div class="row g-3">
+    <div class="col-12 col-xl-8">
+        <div class="card h-100">
+            <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-phone"></i> Link da contagem</span>
+                {% if inventario.aberto %}
+                <span class="badge bg-success">Recebendo contagens</span>
+                {% else %}
+                <span class="badge bg-secondary">Encerrado</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-12 col-md-auto text-center">
+                        <div class="qrcode-contagem mx-auto" title="Aponte a câmera do celular">{{ qrcode_contagem|safe }}</div>
+                    </div>
+                    <div class="col">
+                        <p class="text-muted small mb-2">
+                            Link público, sem login: qualquer pessoa com ele escolhe o setor, busca a peça e lança a quantidade.
+                            Só aceita contagens enquanto o inventário estiver <strong>aberto</strong>.
+                        </p>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control" id="link-contagem" value="{{ link_contagem }}" readonly>
+                            <button type="button" class="btn btn-outline-primary" id="copiar-link-contagem" title="Copiar link">
+                                <i class="bi bi-clipboard"></i> <span class="d-none d-sm-inline">Copiar</span>
+                            </button>
+                            <a href="{{ link_contagem }}" target="_blank" rel="noopener" class="btn btn-outline-secondary" title="Abrir em nova aba">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </div>
+                        <div class="small">
+                            <strong>{{ total_contados }}</strong> de <strong>{{ total_itens }}</strong> ite{{ total_itens|pluralize:"m,ns" }} contado{{ total_itens|pluralize }}
+                            {% if total_fora_da_lista %}
+                            · <span class="badge bg-info text-dark">{{ total_fora_da_lista }} lote{{ total_fora_da_lista|pluralize }} fora da lista</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-4">
+        <div class="d-grid gap-3 h-100">
+            <a href="{% url 'inventario:home' %}?id={{ inventario.id }}&aba=cadastro" class="card text-decoration-none text-reset">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <i class="bi bi-person-lines-fill fs-2 text-primary"></i>
+                    <div>
+                        <div class="fw-semibold">Cadastro</div>
+                        <div class="small text-muted">Setor, célula e responsável · {{ total_cadastros }} cadastro{{ total_cadastros|pluralize }}</div>
+                        {% if total_pendentes %}
+                        <span class="badge bg-warning text-dark mt-1">{{ total_pendentes }} pendente{{ total_pendentes|pluralize }} de responsável</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </a>
+            <a href="{% url 'inventario:home' %}?id={{ inventario.id }}&aba=contagem" class="card text-decoration-none text-reset">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <i class="bi bi-list-check fs-2 text-primary"></i>
+                    <div>
+                        <div class="fw-semibold">Lista de contagem</div>
+                        <div class="small text-muted">Setor, célula, código e descrição · {{ total_itens }} ite{{ total_itens|pluralize:"m,ns" }}</div>
+                    </div>
+                </div>
+            </a>
+            <div class="card">
+                <div class="card-body small text-muted">
+                    Criado em {{ inventario.criado_em|date:"d/m/Y H:i" }}{% if inventario.criado_por %} por {{ inventario.criado_por.username }}{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if progresso.total or progresso.fora %}
+<div class="painel-contagem mt-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <h5 class="mb-0">Andamento da contagem</h5>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="location.reload()" title="Recarregar os números">
+            <i class="bi bi-arrow-clockwise"></i> Atualizar <span class="text-muted">· {% now "H:i" %}</span>
+        </button>
+    </div>
+
+    <!-- Indicadores -->
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3">
+            <div class="card h-100"><div class="card-body">
+                <div class="indicador-rotulo">Contado</div>
+                <div class="indicador-hero">{{ progresso.pct }}%</div>
+                <div class="medidor mt-2" role="img" aria-label="{{ progresso.pct }}% contado"><div class="medidor-preenchido" style="width: {{ progresso.pct }}%"></div></div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card h-100"><div class="card-body">
+                <div class="indicador-rotulo">Itens contados</div>
+                <div class="indicador-valor">{{ progresso.contados }} <span class="indicador-de">de {{ progresso.total }}</span></div>
+                <div class="indicador-nota">faltam {{ progresso.faltam }}</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card h-100"><div class="card-body">
+                <div class="indicador-rotulo">Células concluídas</div>
+                <div class="indicador-valor">{{ progresso.celulas_completas }} <span class="indicador-de">de {{ progresso.celulas_total }}</span></div>
+                <div class="indicador-nota">todos os itens contados</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card h-100"><div class="card-body">
+                <div class="indicador-rotulo">Fora da lista</div>
+                <div class="indicador-valor">{{ progresso.fora }}</div>
+                <div class="indicador-nota">lote{{ progresso.fora|pluralize }} achado{{ progresso.fora|pluralize }} na contagem</div>
+            </div></div>
+        </div>
+    </div>
+
+    <!-- Por setor -->
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">Por setor <span class="text-muted fw-normal small">· itens contados de cada setor</span></div>
+        <div class="card-body">
+            <div class="lista-medidores">
+                {% for setor in progresso.setores %}
+                <div class="medidor-linha" tabindex="0"
+                     data-dica="{{ setor.nome }}: {{ setor.contados }} de {{ setor.total }} contados ({{ setor.pct }}%) · faltam {{ setor.faltam }}{% if setor.fora %} · {{ setor.fora }} fora da lista{% endif %}">
+                    <div class="medidor-nome">{{ setor.nome }}</div>
+                    <div class="medidor"><div class="medidor-preenchido" style="width: {{ setor.pct }}%"></div></div>
+                    <div class="medidor-valor">
+                        {% if setor.total and not setor.faltam %}<i class="bi bi-check-circle-fill text-success" aria-label="concluído"></i>{% endif %}
+                        <strong>{{ setor.pct }}%</strong> <span class="text-muted">{{ setor.contados }}/{{ setor.total }}</span>
+                        {% if setor.fora %}<span class="badge bg-info text-dark ms-1" title="Lotes fora da lista">+{{ setor.fora }}</span>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Por célula -->
+    <div class="d-flex align-items-baseline gap-2 mb-2">
+        <h6 class="mb-0">Por célula</h6>
+        <span class="small text-muted">as mais atrasadas primeiro</span>
+    </div>
+    <div class="row g-3">
+        {% for setor in progresso.setores %}
+        <div class="col-12 col-md-6 col-xxl-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">{{ setor.nome }}</span>
+                    <span class="small text-muted">{{ setor.pct }}% · {{ setor.celulas|length }} célula{{ setor.celulas|length|pluralize }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="lista-medidores">
+                        {% for celula in setor.celulas %}
+                        <div class="medidor-linha" tabindex="0"
+                             data-dica="{{ setor.nome }} · {{ celula.nome }}: {{ celula.contados }} de {{ celula.total }} contados ({{ celula.pct }}%) · faltam {{ celula.faltam }}">
+                            <div class="medidor-nome">{{ celula.nome }}</div>
+                            <div class="medidor"><div class="medidor-preenchido" style="width: {{ celula.pct }}%"></div></div>
+                            <div class="medidor-valor">
+                                {% if celula.total and not celula.faltam %}<i class="bi bi-check-circle-fill text-success" aria-label="concluída"></i>{% endif %}
+                                <strong>{{ celula.pct }}%</strong> <span class="text-muted">{{ celula.contados }}/{{ celula.total }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<div class="dica-medidor" id="dica-medidor" role="tooltip"></div>
+{% endif %}
+
+<style>
+    .qrcode-contagem { width: 180px; }
+    .qrcode-contagem svg { width: 100%; height: auto; display: block; }
+
+    /* Gráficos de andamento: lista de medidores (nome | barra | número) */
+    .painel-contagem {
+        --medidor-trilho: #cde2fb;      /* azul 100: o que falta */
+        --medidor-preenchido: #2a78d6;  /* azul 450: o que foi contado */
+        --tinta-primaria: #0b0b0b;
+        --tinta-secundaria: #52514e;
+        --tinta-apagada: #898781;
+    }
+    .painel-contagem .indicador-rotulo { font-size: .8rem; color: var(--tinta-secundaria); }
+    .painel-contagem .indicador-hero { font-size: 3rem; font-weight: 600; line-height: 1.05; color: var(--tinta-primaria); }
+    .painel-contagem .indicador-valor { font-size: 1.9rem; font-weight: 600; line-height: 1.2; color: var(--tinta-primaria); }
+    .painel-contagem .indicador-de { font-size: 1rem; font-weight: 400; color: var(--tinta-secundaria); }
+    .painel-contagem .indicador-nota { font-size: .8rem; color: var(--tinta-apagada); }
+    .painel-contagem .medidor { height: 10px; border-radius: 4px; background: var(--medidor-trilho); overflow: hidden; }
+    .painel-contagem .medidor-preenchido { height: 100%; border-radius: 4px; background: var(--medidor-preenchido); }
+    .painel-contagem .lista-medidores { display: grid; gap: .55rem; }
+    .painel-contagem .medidor-linha {
+        display: grid; grid-template-columns: minmax(90px, 170px) 1fr auto; align-items: center; gap: .75rem;
+        padding: .15rem .25rem; border-radius: 4px; outline: none;
+    }
+    .painel-contagem .medidor-linha:hover, .painel-contagem .medidor-linha:focus-visible { background: #f1f5f9; }
+    .painel-contagem .medidor-nome { color: var(--tinta-primaria); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .painel-contagem .medidor-valor { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; min-width: 7.5rem; color: var(--tinta-primaria); }
+    /* tela estreita: a barra desce para baixo do nome */
+    @media (max-width: 575.98px) {
+        .painel-contagem .medidor-linha { grid-template-columns: 1fr auto; row-gap: .25rem; }
+        .painel-contagem .medidor-linha .medidor { grid-column: 1 / -1; grid-row: 2; }
+        .painel-contagem .medidor-valor { min-width: 0; }
+    }
+    .dica-medidor {
+        position: fixed; z-index: 1080; pointer-events: none; display: none; max-width: 320px;
+        background: #0b0b0b; color: #fff; font-size: .82rem; padding: .4rem .6rem; border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
+    }
+</style>
+<script>
+(() => {
+    // dica ao passar o mouse (ou focar pelo teclado) em cada linha do gráfico
+    const dica = document.getElementById("dica-medidor");
+    if (!dica) return;
+    const mostrar = (linha, x, y) => {
+        dica.textContent = linha.dataset.dica;
+        dica.style.display = "block";
+        const largura = dica.offsetWidth;
+        dica.style.left = `${Math.min(x + 14, window.innerWidth - largura - 8)}px`;
+        dica.style.top = `${y + 16}px`;
+    };
+    document.querySelectorAll(".medidor-linha").forEach((linha) => {
+        linha.addEventListener("mousemove", (e) => mostrar(linha, e.clientX, e.clientY));
+        linha.addEventListener("mouseleave", () => { dica.style.display = "none"; });
+        linha.addEventListener("focus", () => {
+            const r = linha.getBoundingClientRect();
+            mostrar(linha, r.left + r.width / 2, r.bottom - 8);
+        });
+        linha.addEventListener("blur", () => { dica.style.display = "none"; });
+    });
+})();
+</script>
+<script>
+(() => {
+    const botao = document.getElementById("copiar-link-contagem");
+    const campo = document.getElementById("link-contagem");
+    botao.addEventListener("click", async () => {
+        try {
+            await navigator.clipboard.writeText(campo.value);
+        } catch {
+            // http sem https não libera a área de transferência: copia pelo campo
+            campo.select();
+            document.execCommand("copy");
+        }
+        botao.innerHTML = '<i class="bi bi-check-lg"></i> <span class="d-none d-sm-inline">Copiado</span>';
+        setTimeout(() => { botao.innerHTML = '<i class="bi bi-clipboard"></i> <span class="d-none d-sm-inline">Copiar</span>'; }, 2000);
+    });
+})();
+</script>

@@ -64,5 +64,6 @@ urlpatterns = [
     path('comercial/', include('comercial.urls')),
     path('reuniao/', include('reuniao.urls')),
     path('assistente/', include('assistente_ia.urls')),
+    path('inventario/', include('inventario.urls')),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

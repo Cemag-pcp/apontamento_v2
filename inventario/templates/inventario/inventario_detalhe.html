@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}
+    <title>{{ inventario.nome }}</title>
+{% endblock %}
+
+{% block links %}
+<style>
+    .inventario-menu .nav-link { color: #475569; font-weight: 500; }
+    .inventario-menu .nav-link.active { color: #0d6efd; font-weight: 600; }
+    .inventario-menu .nav-link i { margin-right: .35rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+            <li class="breadcrumb-item"><a href="{% url 'inventario:home' %}">Inventários</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ inventario.nome }}</li>
+        </ol>
+    </nav>
+
+    <div class="card mb-3">
+        <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-2 pb-0">
+            <div class="mb-2">
+                <h4 class="mb-1">
+                    <i class="bi bi-clipboard-data"></i> {{ inventario.nome }}
+                    <span class="badge align-middle fs-6 {% if inventario.status == 'aberto' %}bg-success{% else %}bg-secondary{% endif %}">{{ inventario.get_status_display }}</span>
+                </h4>
+                {% if inventario.descricao %}
+                <p class="mb-1 text-muted">{{ inventario.descricao }}</p>
+                {% endif %}
+            </div>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                {% if inventario.aberto %}
+                <button type="button" class="btn btn-outline-danger" id="alterar-status-inventario" data-status="finalizado">
+                    <i class="bi bi-lock"></i> Finalizar inventário
+                </button>
+                {% else %}
+                <button type="button" class="btn btn-outline-success" id="alterar-status-inventario" data-status="aberto">
+                    <i class="bi bi-unlock"></i> Reabrir inventário
+                </button>
+                {% endif %}
+                <a href="{% url 'inventario:home' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Inventários
+                </a>
+            </div>
+        </div>
+        <!-- Menu de dentro do inventário -->
+        <div class="card-footer bg-white pb-0 border-top-0">
+            <ul class="nav nav-tabs card-header-tabs inventario-menu">
+                {% for chave, rotulo, icone in abas %}
+                <li class="nav-item">
+                    <a class="nav-link {% if chave == aba %}active{% endif %}" {% if chave == aba %}aria-current="page"{% endif %}
+                       href="{% url 'inventario:home' %}?id={{ inventario.id }}&aba={{ chave }}">
+                        <i class="bi {{ icone }}"></i>{{ rotulo }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    {% include template_aba %}
+</div>
+
+<script>
+(() => {
+    const botao = document.getElementById("alterar-status-inventario");
+    botao.addEventListener("click", async () => {
+        const finalizar = botao.dataset.status === "finalizado";
+        const confirmacao = await Swal.fire({
+            icon: finalizar ? "warning" : "question",
+            title: finalizar ? "Finalizar inventário?" : "Reabrir inventário?",
+            text: finalizar
+                ? "O link de contagem para de aceitar lançamentos. Dá para reabrir depois."
+                : "O link de contagem volta a aceitar lançamentos.",
+            showCancelButton: true,
+            confirmButtonText: finalizar ? "Finalizar" : "Reabrir",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: finalizar ? "#dc3545" : "#198754",
+        });
+        if (!confirmacao.isConfirmed) return;
+        botao.disabled = true;
+        try {
+            const resposta = await fetch("{% url 'inventario:alterar_status' inventario.id %}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value },
+                body: JSON.stringify({ status: botao.dataset.status }),
+            });
+            const dados = await resposta.json().catch(() => ({}));
+            if (!resposta.ok) throw new Error(dados.error || "Não foi possível alterar o status.");
+            location.reload();
+        } catch (erro) {
+            botao.disabled = false;
+            Swal.fire({ icon: "error", title: "Erro", text: erro.message });
+        }
+    });
+})();
+</script>
+{% endblock %}

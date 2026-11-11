@@ -1,0 +1,656 @@
+{% load static %}<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Contagem · {{ inventario.nome }}</title>
+    <link rel="icon" href="{% static 'favicon.ico' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        :root { --topo: #0d6efd; }
+        body { background: #f1f5f9; padding-bottom: env(safe-area-inset-bottom); -webkit-tap-highlight-color: transparent; }
+        .topo { background: var(--topo); color: #fff; position: sticky; top: 0; z-index: 1020; padding-top: env(safe-area-inset-top); }
+        .topo .btn-topo { color: #fff; font-size: 1.4rem; padding: .25rem .5rem; border: 0; background: none; }
+        .conteudo { max-width: 900px; margin: 0 auto; }
+        /* inputs com 16px+ para o iPhone não dar zoom ao focar */
+        .form-control, .form-select { font-size: 1.05rem; }
+        .busca { position: sticky; z-index: 1010; background: #f1f5f9; }
+        .setor-card { border: 0; border-radius: .9rem; box-shadow: 0 1px 3px rgba(15, 23, 42, .12); text-align: left; width: 100%; background: #fff; padding: 1rem 1.1rem; }
+        .setor-card:active { transform: scale(.99); background: #f8fafc; }
+        .setor-card .progress { height: .5rem; }
+        .chips { display: flex; gap: .5rem; overflow-x: auto; padding-bottom: .25rem; scrollbar-width: none; }
+        .chips::-webkit-scrollbar { display: none; }
+        .chips .btn { white-space: nowrap; border-radius: 2rem; }
+        .item { border: 0; border-radius: .75rem; background: #fff; width: 100%; text-align: left; padding: .8rem .9rem; box-shadow: 0 1px 2px rgba(15, 23, 42, .08); display: flex; align-items: center; gap: .75rem; }
+        .item:active { background: #f8fafc; }
+        .item.contado { border-left: 5px solid #198754; }
+        .item .codigo { font-weight: 700; font-size: 1.05rem; letter-spacing: .02em; }
+        .item .desc { color: #334155; line-height: 1.25; }
+        .item .qtd { min-width: 4.5rem; text-align: right; }
+        .item .qtd .valor { font-weight: 700; font-size: 1.15rem; color: #198754; }
+        .offcanvas-bottom.folha { height: auto; max-height: 92vh; border-radius: 1rem 1rem 0 0; }
+        .entrada-qtd { font-size: 2rem !important; font-weight: 700; text-align: center; height: 4rem; }
+        .btn-grande { padding: .85rem; font-size: 1.15rem; font-weight: 600; }
+        .vazio { color: #64748b; text-align: center; padding: 2.5rem 1rem; }
+        .item.fora { border-left: 5px solid #0dcaf0; }
+        .item.recontagem { border-left: 5px solid #ffc107; }
+        .botao-fora { position: fixed; right: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom)); z-index: 1030; border-radius: 2rem; padding: .75rem 1.1rem; font-weight: 600; box-shadow: 0 4px 12px rgba(15, 23, 42, .25); }
+        #tela-itens { padding-bottom: 5rem; }
+        .toast-container { bottom: 4.5rem !important; }
+        .previa-foto { position: relative; }
+        .previa-foto img { width: 100%; max-height: 220px; object-fit: contain; background: #e2e8f0; border-radius: .6rem; display: block; }
+        .previa-foto button { position: absolute; top: .4rem; right: .4rem; border-radius: 50%; }
+        .foto-item { width: 100%; max-height: 260px; object-fit: contain; background: #e2e8f0; border-radius: .6rem; }
+        @media (min-width: 768px) {
+            /* tablet/desktop: folha centralizada em vez de ocupar a largura toda */
+            .offcanvas-bottom.folha { left: calc(50% - 320px); right: calc(50% - 320px); }
+        }
+        @media (min-width: 768px) {
+            .lista-itens { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+            .lista-setores { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+        }
+    </style>
+</head>
+<body>
+    <header class="topo shadow-sm">
+        <div class="conteudo d-flex align-items-center gap-1 px-2 py-2">
+            <button type="button" class="btn-topo d-none" id="botao-voltar" aria-label="Voltar aos setores"><i class="bi bi-arrow-left"></i></button>
+            <div class="flex-grow-1 px-1 text-truncate">
+                <div class="small opacity-75 text-truncate">{{ inventario.nome }}</div>
+                <div class="fw-semibold fs-5 text-truncate" id="titulo-tela">Contagem</div>
+            </div>
+            <button type="button" class="btn-topo d-none" id="botao-atualizar" aria-label="Atualizar lista"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+    </header>
+
+    <main class="conteudo px-3 pb-4">
+        {% if not inventario.aberto %}
+        <div class="vazio">
+            <i class="bi bi-lock fs-1 d-block mb-2"></i>
+            <div class="fs-5 fw-semibold">Contagem encerrada</div>
+            <div>Este inventário foi finalizado.</div>
+        </div>
+        {% else %}
+
+        <!-- Tela 1: escolher o setor -->
+        <section id="tela-setores" class="pt-3">
+            <p class="text-muted mb-3">Escolha o setor que você vai contar.</p>
+            <div class="lista-setores d-grid gap-2" id="lista-setores"></div>
+        </section>
+
+        <!-- Tela 2: itens do setor -->
+        <section id="tela-itens" class="d-none">
+            <div class="busca pt-3 pb-2" id="barra-busca">
+                <div class="input-group input-group-lg mb-2">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input type="search" class="form-control" id="busca" placeholder="Código ou descrição" autocomplete="off" enterkeyhint="search">
+                </div>
+                <div class="chips mb-2" id="chips-celulas"></div>
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <span class="small fw-semibold text-muted" id="rotulo-lista">Faltam contar</span>
+                    <span class="small text-muted text-end" id="progresso-setor"></span>
+                </div>
+            </div>
+            <div class="lista-itens d-grid gap-2" id="lista-itens"></div>
+            <div class="small text-muted text-center mt-3 d-none" id="aviso-limite"></div>
+            <button type="button" class="btn btn-info botao-fora" id="abrir-fora-da-lista">
+                <i class="bi bi-plus-lg"></i> Peça fora da lista
+            </button>
+        </section>
+        {% endif %}
+    </main>
+
+    <!-- Folha de baixo para lançar a quantidade -->
+    <div class="offcanvas offcanvas-bottom folha" tabindex="-1" id="folha-contagem" aria-labelledby="folha-codigo">
+        <div class="offcanvas-header pb-1">
+            <div class="me-2">
+                <div class="small text-muted" id="folha-celula"></div>
+                <h5 class="offcanvas-title mb-0" id="folha-codigo"></h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+        </div>
+        <div class="offcanvas-body pt-1">
+            <div class="mb-3" id="folha-descricao"></div>
+            <a class="d-none mb-3" id="folha-foto-link" target="_blank" rel="noopener"><img class="foto-item" id="folha-foto" alt="Foto do lote"></a>
+            <form id="form-contagem" novalidate>
+                <div class="alert alert-warning py-2 small d-none" id="folha-aviso-recontagem">
+                    <i class="bi bi-arrow-repeat"></i> <strong>Recontagem.</strong> Conte de novo e digite o que encontrar agora.
+                </div>
+                <label for="entrada-quantidade" class="form-label fw-semibold" id="folha-titulo-qtd">Quantidade encontrada</label>
+                <input type="text" class="form-control entrada-qtd mb-2" id="entrada-quantidade" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0">
+                <div class="alert alert-secondary py-2 small d-none" id="folha-anterior"></div>
+                <div class="text-danger small mb-2 d-none" id="folha-erro"></div>
+                <button type="submit" class="btn btn-success w-100 btn-grande" id="botao-salvar">
+                    <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true"></span>
+                    <i class="bi bi-check-lg"></i> <span id="texto-botao-salvar">Salvar contagem</span>
+                </button>
+                <button type="button" class="btn btn-link text-danger w-100 mt-1 d-none" id="botao-apagar">Apagar contagem deste item</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Folha para peça fora da lista -->
+    <div class="offcanvas offcanvas-bottom folha" tabindex="-1" id="folha-fora" aria-labelledby="titulo-fora">
+        <div class="offcanvas-header pb-1">
+            <div class="me-2">
+                <div class="small text-muted" id="fora-setor"></div>
+                <h5 class="offcanvas-title mb-0" id="titulo-fora">Peça fora da lista</h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+        </div>
+        <div class="offcanvas-body pt-1">
+            <p class="small text-muted mb-2">Achou uma peça ou lote que não está na lista? Informe o código, onde está e quanto tem.</p>
+            <form id="form-fora" novalidate>
+                <div class="mb-2">
+                    <label for="fora-codigo" class="form-label fw-semibold mb-1">Código da peça</label>
+                    <input type="text" class="form-control form-control-lg" id="fora-codigo" maxlength="60" autocomplete="off" autocapitalize="characters" enterkeyhint="next" placeholder="Ex.: 123456">
+                </div>
+                <div class="alert alert-warning py-2 small d-none" id="fora-aviso-lista"></div>
+                <div class="mb-2">
+                    <label for="fora-observacao" class="form-label fw-semibold mb-1">Onde está</label>
+                    <input type="text" class="form-control form-control-lg" id="fora-observacao" maxlength="255" autocomplete="off" enterkeyhint="next" placeholder="Ex.: pátio, ao lado da cabine 2">
+                </div>
+                <label for="fora-quantidade" class="form-label fw-semibold mb-1">Quantidade encontrada</label>
+                <input type="text" class="form-control entrada-qtd mb-2" id="fora-quantidade" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold mb-1" for="fora-foto">Foto <span class="text-muted fw-normal">(opcional)</span></label>
+                    <!-- sem "capture": o celular deixa escolher entre câmera e galeria -->
+                    <input type="file" class="d-none" id="fora-foto" accept="image/*">
+                    <button type="button" class="btn btn-outline-secondary w-100 py-2" id="fora-escolher-foto">
+                        <i class="bi bi-camera"></i> Adicionar foto
+                    </button>
+                    <div class="previa-foto d-none mt-2" id="fora-previa">
+                        <img alt="Prévia da foto" id="fora-previa-img">
+                        <button type="button" class="btn btn-sm btn-light shadow-sm" id="fora-remover-foto" aria-label="Remover foto"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                </div>
+                <div class="text-danger small mb-2 d-none" id="fora-erro"></div>
+                <button type="submit" class="btn btn-info w-100 btn-grande" id="botao-salvar-fora">
+                    <span class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true"></span>
+                    <i class="bi bi-check-lg"></i> Registrar peça
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 1090;">
+        <div class="toast align-items-center border-0" id="toast" role="status" aria-live="polite" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body fw-semibold" id="toast-texto"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+            </div>
+        </div>
+    </div>
+
+    {% csrf_token %}
+    {{ setores|json_script:"dados-setores" }}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    {% if inventario.aberto %}
+    <script>
+    (() => {
+        const URL_ITENS = "{% url 'inventario:contagem_publica_itens' inventario.token_contagem %}";
+        const URL_REGISTRAR = "{% url 'inventario:contagem_publica_registrar' inventario.token_contagem 0 %}";
+        const URL_FORA = "{% url 'inventario:contagem_publica_fora_da_lista' inventario.token_contagem %}";        const LIMITE = 150;
+        const csrf = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+        const setores = JSON.parse(document.getElementById("dados-setores").textContent);
+        let setorAtual = null;
+        let itens = [];
+        let celulaAtual = "";
+        let itemAberto = null;
+
+        const $ = (id) => document.getElementById(id);
+        const telaSetores = $("tela-setores");
+        const telaItens = $("tela-itens");
+        const busca = $("busca");
+        const folha = new bootstrap.Offcanvas($("folha-contagem"));
+        const toast = new bootstrap.Toast($("toast"), { delay: 2200 });
+        const entrada = $("entrada-quantidade");
+
+        const escapar = (texto) => {
+            const div = document.createElement("div");
+            div.textContent = texto ?? "";
+            return div.innerHTML;
+        };
+        const normalizar = (texto) => (texto || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+        const formatarQtd = (q) => Number(q).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+
+        function avisar(texto, tipo = "success") {
+            $("toast").className = `toast align-items-center border-0 text-bg-${tipo}`;
+            $("toast-texto").textContent = texto;
+            toast.show();
+        }
+
+        // ---------- Tela de setores ----------
+        function renderizarSetores() {
+            if (!setores.length) {
+                $("lista-setores").innerHTML = '<div class="vazio">Nenhuma lista de contagem foi importada ainda.</div>';
+                return;
+            }
+            $("lista-setores").innerHTML = setores.map((s, i) => {
+                const pct = s.total ? Math.round((s.contados / s.total) * 100) : 0;
+                const completo = s.total && s.contados === s.total && !s.recontar;
+                return `
+                <button type="button" class="setor-card" data-indice="${i}">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fs-5 fw-semibold">${escapar(s.setor)}</span>
+                        ${completo ? '<i class="bi bi-check-circle-fill text-success fs-4"></i>' : '<i class="bi bi-chevron-right text-muted"></i>'}
+                    </div>
+                    <div class="progress mb-1"><div class="progress-bar ${completo ? "bg-success" : ""}" style="width: ${pct}%"></div></div>
+                    <div class="small text-muted">${s.contados} de ${s.total} contados
+                        ${s.recontar ? `<span class="badge bg-warning text-dark ms-1"><i class="bi bi-arrow-repeat"></i> ${s.recontar} para recontar</span>` : ""}</div>
+                </button>`;
+            }).join("");
+        }
+
+        $("lista-setores").addEventListener("click", (event) => {
+            const card = event.target.closest(".setor-card");
+            if (card) abrirSetor(setores[Number(card.dataset.indice)].setor);
+        });
+
+        // ---------- Tela de itens ----------
+        async function carregarItens() {
+            $("lista-itens").innerHTML = '<div class="vazio"><div class="spinner-border text-primary"></div></div>';
+            try {
+                const resposta = await fetch(`${URL_ITENS}?setor=${encodeURIComponent(setorAtual)}`, { cache: "no-store" });
+                const dados = await resposta.json().catch(() => ({}));
+                if (!resposta.ok) throw new Error(dados.error || "Não foi possível carregar os itens.");
+                itens = dados.itens;
+                atualizarResumoSetor();
+                renderizarCelulas();
+                renderizarItens();
+            } catch (erro) {
+                $("lista-itens").innerHTML = `<div class="vazio"><i class="bi bi-wifi-off fs-1 d-block mb-2"></i>${escapar(erro.message)}<br>
+                    <button type="button" class="btn btn-primary mt-3" id="tentar-de-novo">Tentar de novo</button></div>`;
+                $("tentar-de-novo").addEventListener("click", carregarItens);
+            }
+        }
+
+        function abrirSetor(setor, empilhar = true) {
+            setorAtual = setor;
+            celulaAtual = "";
+            busca.value = "";
+            $("titulo-tela").textContent = setor;
+            $("botao-voltar").classList.remove("d-none");
+            $("botao-atualizar").classList.remove("d-none");
+            telaSetores.classList.add("d-none");
+            telaItens.classList.remove("d-none");
+            $("barra-busca").style.top = `${document.querySelector(".topo").offsetHeight}px`;
+            window.scrollTo(0, 0);
+            // o botão voltar do celular volta para os setores
+            if (empilhar) history.pushState({ setor }, "", `#${encodeURIComponent(setor)}`);
+            carregarItens();
+        }
+
+        function voltarSetores() {
+            setorAtual = null;
+            $("titulo-tela").textContent = "Contagem";
+            $("botao-voltar").classList.add("d-none");
+            $("botao-atualizar").classList.add("d-none");
+            telaItens.classList.add("d-none");
+            telaSetores.classList.remove("d-none");
+            renderizarSetores();
+        }
+
+        // Recontagem: o item volta para "faltam" e o valor lançado vai para a
+        // recontagem (a primeira contagem nem chega aqui, para não influenciar).
+        const emRecontagem = (i) => i.recontagem_habilitada;
+        const valorAtual = (i) => (emRecontagem(i) ? i.recontagem : i.quantidade);
+        const horaAtual = (i) => (emRecontagem(i) ? i.recontado_em : i.contado_em);
+        const pendente = (i) => valorAtual(i) === null;
+
+        function atualizarResumoSetor() {
+            // progresso só da lista (primeira contagem); lotes fora da lista são extras
+            const daLista = itens.filter((i) => !i.fora_da_lista);
+            const contados = daLista.filter((i) => emRecontagem(i) || i.quantidade !== null).length;
+            const fora = itens.length - daLista.length;
+            const recontar = itens.filter((i) => emRecontagem(i) && pendente(i)).length;
+            $("progresso-setor").innerHTML = `<strong>${contados}/${daLista.length}</strong> contados`
+                + (recontar ? `<br><span style="color: #b45309;">${recontar} para recontar</span>` : "")
+                + (fora ? `<br><span style="color: #087990;">+${fora} fora da lista</span>` : "");
+            const setor = setores.find((s) => s.setor === setorAtual);
+            if (setor) { setor.total = daLista.length; setor.contados = contados; setor.recontar = recontar; }
+        }
+
+        function renderizarCelulas() {
+            const celulas = [...new Set(itens.filter((i) => !i.fora_da_lista).map((i) => i.celula))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+            const chip = (valor, rotulo) =>
+                `<button type="button" class="btn btn-sm ${celulaAtual === valor ? "btn-primary" : "btn-outline-secondary bg-white"}" data-celula="${escapar(valor)}">${escapar(rotulo)}</button>`;
+            $("chips-celulas").innerHTML = celulas.length > 1
+                ? chip("", "Todas") + celulas.map((c) => chip(c, c)).join("")
+                : "";
+        }
+
+        // com célula escolhida, os lotes fora da lista (sem célula) só aparecem em "Todas"
+        const naCelula = (i) => !celulaAtual || (!i.fora_da_lista && i.celula === celulaAtual);
+        const localDoItem = (i) => (i.fora_da_lista ? `Fora da lista · ${i.observacao}` : i.celula);
+
+        function renderizarItens() {
+            const termo = normalizar(busca.value.trim());
+            $("rotulo-lista").textContent = termo ? "Resultado da busca" : "Faltam contar";
+            // sem busca: só o que falta contar. Na busca entram também os já
+            // contados, para corrigir e não registrar de novo como fora da lista.
+            let visiveis = itens.filter((i) =>
+                naCelula(i) &&
+                (termo ? normalizar(`${i.codigo} ${i.descricao} ${i.celula} ${i.observacao}`).includes(termo) : pendente(i)));
+            // código igual ao digitado aparece primeiro
+            if (termo) {
+                const exato = (i) => (normalizar(i.codigo) === termo ? 0 : normalizar(i.codigo).startsWith(termo) ? 1 : 2);
+                visiveis = visiveis.sort((a, b) => exato(a) - exato(b));
+            }
+
+            if (!visiveis.length) {
+                const mensagem = termo
+                    ? `Nenhuma peça encontrada.<br><button type="button" class="btn btn-info mt-3" id="fora-da-busca">
+                        <i class="bi bi-plus-lg"></i> Registrar "${escapar(busca.value.trim())}" fora da lista</button>`
+                    : '<i class="bi bi-check2-all fs-1 d-block mb-2 text-success"></i>Tudo contado por aqui!<div class="small mt-1">Para corrigir uma contagem, busque a peça.</div>';
+                $("lista-itens").innerHTML = `<div class="vazio">${mensagem}</div>`;
+                $("aviso-limite").classList.add("d-none");
+                const botaoFora = $("fora-da-busca");
+                if (botaoFora) botaoFora.addEventListener("click", () => abrirFora(busca.value.trim()));
+                return;
+            }
+            $("lista-itens").innerHTML = visiveis.slice(0, LIMITE).map((i) => `
+                <button type="button" class="item ${emRecontagem(i) ? "recontagem" : i.fora_da_lista ? "fora" : !pendente(i) ? "contado" : ""}" data-id="${i.id}">
+                    <div class="flex-grow-1 overflow-hidden">
+                        <div class="codigo">${escapar(i.codigo)}
+                            ${emRecontagem(i) ? '<span class="badge bg-warning text-dark align-middle">Recontagem</span>' : ""}
+                            ${i.fora_da_lista ? '<span class="badge bg-info text-dark align-middle">Fora da lista</span>' : ""}
+                            ${i.foto ? '<i class="bi bi-camera text-muted" title="Tem foto"></i>' : ""}</div>
+                        <div class="desc">${escapar(i.descricao) || '<span class="text-muted">Sem descrição</span>'}</div>
+                        <div class="small text-muted">${i.fora_da_lista ? `<i class="bi bi-geo-alt"></i> ${escapar(i.observacao)}` : escapar(i.celula)}</div>
+                    </div>
+                    <div class="qtd">
+                        ${!pendente(i)
+                            ? `<div class="valor">${formatarQtd(valorAtual(i))}</div><div class="small text-muted">${escapar(horaAtual(i).slice(11))}</div>`
+                            : emRecontagem(i)
+                            ? '<span class="btn btn-warning btn-sm">Recontar</span>'
+                            : '<span class="btn btn-outline-primary btn-sm">Contar</span>'}
+                    </div>
+                </button>`).join("");
+            const cortou = visiveis.length > LIMITE;
+            $("aviso-limite").textContent = cortou ? `Mostrando ${LIMITE} de ${visiveis.length}. Digite o código ou a descrição para achar a peça.` : "";
+            $("aviso-limite").classList.toggle("d-none", !cortou);
+        }
+
+        $("chips-celulas").addEventListener("click", (event) => {
+            const botao = event.target.closest("[data-celula]");
+            if (!botao) return;
+            celulaAtual = botao.dataset.celula;
+            renderizarCelulas();
+            renderizarItens();
+        });
+        busca.addEventListener("input", renderizarItens);
+        $("botao-voltar").addEventListener("click", () => history.back());
+        $("botao-atualizar").addEventListener("click", carregarItens);
+        window.addEventListener("popstate", () => {
+            folha.hide();
+            const setor = decodeURIComponent(location.hash.slice(1));
+            if (setor && setores.some((s) => s.setor === setor)) abrirSetor(setor, false);
+            else voltarSetores();
+        });
+
+        // ---------- Lançar a quantidade ----------
+        function mostrarErroFolha(texto) {
+            $("folha-erro").textContent = texto || "";
+            $("folha-erro").classList.toggle("d-none", !texto);
+        }
+
+        $("lista-itens").addEventListener("click", (event) => {
+            const botao = event.target.closest(".item");
+            if (!botao) return;
+            itemAberto = itens.find((i) => String(i.id) === botao.dataset.id);
+            if (!itemAberto) return;
+            $("folha-codigo").textContent = itemAberto.codigo;
+            $("folha-celula").textContent = `${itemAberto.setor} · ${localDoItem(itemAberto)}`;
+            $("folha-descricao").textContent = itemAberto.descricao || "Sem descrição";
+            $("botao-apagar").textContent = itemAberto.fora_da_lista ? "Apagar este lote fora da lista" : "Apagar contagem deste item";
+            $("folha-foto-link").classList.toggle("d-none", !itemAberto.foto);
+            $("folha-foto-link").classList.toggle("d-block", !!itemAberto.foto);
+            if (itemAberto.foto) {
+                $("folha-foto-link").href = itemAberto.foto;
+                $("folha-foto").src = itemAberto.foto;
+            } else {
+                $("folha-foto").removeAttribute("src");
+            }
+            const recontagem = emRecontagem(itemAberto);
+            const contado = !pendente(itemAberto);
+            entrada.value = "";
+            $("folha-titulo-qtd").textContent = recontagem ? "Recontagem: quantidade encontrada" : "Quantidade encontrada";
+            $("folha-aviso-recontagem").classList.toggle("d-none", !recontagem);
+            $("texto-botao-salvar").textContent = recontagem ? "Salvar recontagem" : "Salvar contagem";
+            if (recontagem) $("botao-apagar").textContent = "Apagar recontagem deste item";
+            $("folha-anterior").innerHTML = contado
+                ? `Já ${recontagem ? "recontado" : "contado"}: <strong>${formatarQtd(valorAtual(itemAberto))}</strong> em ${escapar(horaAtual(itemAberto))}. Salvar substitui este valor.`
+                : "";
+            $("folha-anterior").classList.toggle("d-none", !contado);
+            $("botao-apagar").classList.toggle("d-none", !contado);
+            mostrarErroFolha("");
+            folha.show();
+        });
+        $("folha-contagem").addEventListener("shown.bs.offcanvas", () => entrada.focus());
+        entrada.addEventListener("input", () => mostrarErroFolha(""));
+
+        async function registrar(quantidade) {
+            const botao = $("botao-salvar");
+            botao.disabled = true;
+            botao.querySelector(".spinner-border").classList.remove("d-none");
+            try {
+                const resposta = await fetch(URL_REGISTRAR.replace(/\/0\/$/, `/${itemAberto.id}/`), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+                    body: JSON.stringify({ quantidade }),
+                });
+                const dados = await resposta.json().catch(() => ({}));
+                if (!resposta.ok) throw new Error(dados.error || "Não foi possível salvar. Verifique a conexão e tente de novo.");
+
+                if (dados.removido) {
+                    itens = itens.filter((i) => i.id !== itemAberto.id);
+                    renderizarCelulas();
+                } else {
+                    Object.assign(itemAberto, dados.item);
+                }
+                atualizarResumoSetor();
+                folha.hide();
+                avisar(dados.removido
+                    ? `${itemAberto.codigo}: lote apagado`
+                    : quantidade === null
+                    ? `${itemAberto.codigo}: ${emRecontagem(itemAberto) ? "recontagem" : "contagem"} apagada`
+                    : `${itemAberto.codigo}: ${formatarQtd(valorAtual(itemAberto))} ${emRecontagem(itemAberto) ? "recontado" : "registrado"}`, quantidade === null ? "secondary" : "success");
+                // depois de buscar uma peça, já deixa pronto para a próxima
+                if (busca.value) {
+                    busca.value = "";
+                    renderizarItens();
+                    busca.focus();
+                } else {
+                    renderizarItens();
+                }
+            } catch (erro) {
+                mostrarErroFolha(erro.message === "Failed to fetch" ? "Sem conexão. Tente de novo." : erro.message);
+            } finally {
+                botao.disabled = false;
+                botao.querySelector(".spinner-border").classList.add("d-none");
+            }
+        }
+
+        $("form-contagem").addEventListener("submit", (event) => {
+            event.preventDefault();
+            const valor = entrada.value.trim();
+            if (!valor) {
+                mostrarErroFolha("Digite a quantidade encontrada (0 se não encontrou nenhuma).");
+                entrada.focus();
+                return;
+            }
+            // sem separador de milhar: "1.234" seria ambíguo
+            if (!/^\d+([.,]\d{1,3})?$/.test(valor)) {
+                mostrarErroFolha("Use só números, sem ponto de milhar. Ex.: 1234 ou 12,5 (até 3 casas).");
+                return;
+            }
+            registrar(valor);
+        });
+        $("botao-apagar").addEventListener("click", () => {
+            const pergunta = itemAberto.fora_da_lista
+                ? `Apagar o lote ${itemAberto.codigo} (${itemAberto.observacao})?`
+                : `Apagar a contagem do item ${itemAberto.codigo}?`;
+            if (confirm(pergunta)) registrar(null);
+        });
+
+        // ---------- Peça fora da lista ----------
+        const folhaFora = new bootstrap.Offcanvas($("folha-fora"));
+        const foraCodigo = $("fora-codigo");
+        const foraObs = $("fora-observacao");
+        const foraQtd = $("fora-quantidade");
+        const QTD_VALIDA = /^\d+([.,]\d{1,3})?$/;
+
+        function mostrarErroFora(texto) {
+            $("fora-erro").textContent = texto || "";
+            $("fora-erro").classList.toggle("d-none", !texto);
+        }
+
+        // ---- foto opcional: reduzida no aparelho antes de enviar ----
+        const FOTO_LADO_MAXIMO = 1600;
+        let fotoFora = null;  // Blob pronto para enviar
+
+        function reduzirFoto(arquivo) {
+            return new Promise((resolve) => {
+                const url = URL.createObjectURL(arquivo);
+                const img = new Image();
+                img.onload = () => {
+                    const escala = Math.min(1, FOTO_LADO_MAXIMO / Math.max(img.naturalWidth, img.naturalHeight));
+                    const canvas = document.createElement("canvas");
+                    canvas.width = Math.round(img.naturalWidth * escala);
+                    canvas.height = Math.round(img.naturalHeight * escala);
+                    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    canvas.toBlob((blob) => resolve(blob || arquivo), "image/jpeg", 0.82);
+                };
+                // formato que o navegador não desenha: manda o original
+                img.onerror = () => { URL.revokeObjectURL(url); resolve(arquivo); };
+                img.src = url;
+            });
+        }
+
+        function limparFoto() {
+            fotoFora = null;
+            $("fora-foto").value = "";
+            const previa = $("fora-previa-img");
+            if (previa.src) URL.revokeObjectURL(previa.src);
+            previa.removeAttribute("src");
+            $("fora-previa").classList.add("d-none");
+            $("fora-escolher-foto").classList.remove("d-none");
+        }
+
+        $("fora-escolher-foto").addEventListener("click", () => $("fora-foto").click());
+        $("fora-remover-foto").addEventListener("click", limparFoto);
+        $("fora-foto").addEventListener("change", async () => {
+            const arquivo = $("fora-foto").files[0];
+            if (!arquivo) return;
+            const botao = $("fora-escolher-foto");
+            botao.disabled = true;
+            botao.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Preparando foto...';
+            fotoFora = await reduzirFoto(arquivo);
+            botao.disabled = false;
+            botao.innerHTML = '<i class="bi bi-camera"></i> Adicionar foto';
+            $("fora-previa-img").src = URL.createObjectURL(fotoFora);
+            $("fora-previa").classList.remove("d-none");
+            botao.classList.add("d-none");
+            mostrarErroFora("");
+        });
+
+        function abrirFora(codigo = "") {
+            $("form-fora").reset();
+            limparFoto();
+            foraCodigo.value = codigo;
+            $("fora-setor").textContent = setorAtual;
+            mostrarErroFora("");
+            avisarSeEstaNaLista();
+            folhaFora.show();
+        }
+
+        // se o código já está na lista do setor, oferece contar por lá
+        function avisarSeEstaNaLista() {
+            const codigo = normalizar(foraCodigo.value.trim());
+            const naLista = codigo && itens.find((i) => !i.fora_da_lista && normalizar(i.codigo) === codigo);
+            const aviso = $("fora-aviso-lista");
+            aviso.classList.toggle("d-none", !naLista);
+            if (!naLista) return;
+            aviso.innerHTML = `Esta peça está na lista (${escapar(naLista.celula)}).
+                <button type="button" class="btn btn-sm btn-warning ms-1" id="contar-na-lista">Contar na lista</button>
+                <div class="mt-1">Se for outro lote em outro lugar, pode registrar aqui mesmo.</div>`;
+            $("contar-na-lista").addEventListener("click", () => {
+                folhaFora.hide();
+                $("folha-fora").addEventListener("hidden.bs.offcanvas", () => {
+                    // mostra a peça na lista e abre a contagem dela
+                    busca.value = naLista.codigo;
+                    celulaAtual = "";
+                    renderizarCelulas();
+                    renderizarItens();
+                    document.querySelector(`.item[data-id="${naLista.id}"]`)?.click();
+                }, { once: true });
+            });
+        }
+
+        $("abrir-fora-da-lista").addEventListener("click", () => abrirFora(busca.value.trim()));
+        $("folha-fora").addEventListener("shown.bs.offcanvas", () => (foraCodigo.value ? foraObs : foraCodigo).focus());
+        foraCodigo.addEventListener("input", () => { mostrarErroFora(""); avisarSeEstaNaLista(); });
+        [foraObs, foraQtd].forEach((campo) => campo.addEventListener("input", () => mostrarErroFora("")));
+        // "próximo" no teclado do celular pula para o campo seguinte
+        foraCodigo.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); foraObs.focus(); } });
+        foraObs.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); foraQtd.focus(); } });
+
+        $("form-fora").addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const codigo = foraCodigo.value.trim();
+            const observacao = foraObs.value.trim();
+            const quantidade = foraQtd.value.trim();
+            if (!codigo) { mostrarErroFora("Digite o código da peça."); foraCodigo.focus(); return; }
+            if (!observacao) { mostrarErroFora("Diga onde a peça está."); foraObs.focus(); return; }
+            if (!quantidade) { mostrarErroFora("Digite a quantidade encontrada."); foraQtd.focus(); return; }
+            if (!QTD_VALIDA.test(quantidade)) { mostrarErroFora("Use só números, sem ponto de milhar. Ex.: 1234 ou 12,5."); foraQtd.focus(); return; }
+
+            const botao = $("botao-salvar-fora");
+            botao.disabled = true;
+            botao.querySelector(".spinner-border").classList.remove("d-none");
+            try {
+                const corpo = new FormData();
+                corpo.append("setor", setorAtual);
+                corpo.append("codigo", codigo);
+                corpo.append("observacao", observacao);
+                corpo.append("quantidade", quantidade);
+                if (fotoFora) corpo.append("foto", fotoFora, "foto.jpg");
+                const resposta = await fetch(URL_FORA, { method: "POST", headers: { "X-CSRFToken": csrf() }, body: corpo });
+                const dados = await resposta.json().catch(() => ({}));
+                if (!resposta.ok) throw new Error(dados.error || "Não foi possível registrar. Verifique a conexão e tente de novo.");
+                itens.push(dados.item);
+                atualizarResumoSetor();
+                renderizarCelulas();
+                busca.value = "";
+                renderizarItens();
+                folhaFora.hide();
+                limparFoto();
+                avisar(`${dados.item.codigo}: ${formatarQtd(dados.item.quantidade)} registrado fora da lista`, "info");
+            } catch (erro) {
+                mostrarErroFora(erro.message === "Failed to fetch" ? "Sem conexão. Tente de novo." : erro.message);
+            } finally {
+                botao.disabled = false;
+                botao.querySelector(".spinner-border").classList.add("d-none");
+            }
+        });
+
+        // abre direto no setor do link (ex.: depois de recarregar a página)
+        const setorDoLink = decodeURIComponent(location.hash.slice(1));
+        if (setorDoLink && setores.some((s) => s.setor === setorDoLink)) {
+            history.replaceState({}, "", location.pathname);
+            renderizarSetores();
+            abrirSetor(setorDoLink);
+        } else {
+            renderizarSetores();
+        }
+    })();
+    </script>
+    {% endif %}
+</body>
+</html>
