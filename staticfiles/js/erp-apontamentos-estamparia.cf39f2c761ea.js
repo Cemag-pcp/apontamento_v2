@@ -1,7 +1,16 @@
+import {
+    abrirResolverAguardandoErp,
+    avisarSeAguardandoErp,
+    badgeAguardandoErp,
+    botaoAguardandoErp,
+    estaAguardandoErp,
+} from './erp-aguardando-confirmacao.js';
+
 const configEl = document.getElementById('erpApontamentosConfig');
 const apiUrl = configEl?.dataset?.apiUrl;
 const apontarUrlTemplate = configEl?.dataset?.apontarUrlTemplate;
 const csrfToken = configEl?.dataset?.csrfToken;
+const resolverUrlTemplate = configEl?.dataset?.resolverUrlTemplate;
 
 const form = document.getElementById('erpFiltrosForm');
 const tbody = document.getElementById('erpTabelaApontamentos');
@@ -66,7 +75,7 @@ function badgeApontado(value) {
 }
 
 function renderActionButton(row) {
-    const primaryButton = (row.ordem_ja_apontada || row.apontado) ? `
+    const primaryButton = estaAguardandoErp(row) ? botaoAguardandoErp(escapeAttrJson(row)) : (row.ordem_ja_apontada || row.apontado) ? `
         <button type="button"
                 class="btn btn-sm btn-outline-secondary btn-erp-detalhes"
                 title="Ver detalhes do apontamento"
@@ -114,7 +123,7 @@ function renderRows(rows) {
             <td>${escapeHtml(row.operador || '-')}</td>
             <td class="text-end">${formatNumber(row.qtd_boa)}</td>
             <td class="text-end">${formatNumber(row.qtd_morta)}</td>
-            <td>${badgeApontado(row.apontado)}</td>
+            <td>${estaAguardandoErp(row) ? badgeAguardandoErp() : badgeApontado(row.apontado)}</td>
             <td>${escapeHtml(row.chave_apontamento || '-')}</td>
             <td>${escapeHtml(row.resp_apontamento || row.resp_apontamento_username || '-')}</td>
             <td>${escapeHtml(row.data_producao || '-')}</td>
@@ -230,6 +239,24 @@ function bindRowActionButtons() {
             try {
                 const row = JSON.parse(raw);
                 openDetailsModal(row);
+            } catch (error) {
+                console.error(error);
+            }
+        });
+    });
+
+    tbody.querySelectorAll('.btn-erp-aguardando').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const raw = btn.getAttribute('data-row');
+            if (!raw) return;
+            try {
+                const row = JSON.parse(raw);
+                abrirResolverAguardandoErp(row, {
+                    resolverUrlTemplate,
+                    csrfToken,
+                    descricao: `Ordem ${row.ordem || '-'} | Peça ${row.peca_codigo || '-'} | Qtd. boa ${formatNumber(row.qtd_boa)}`,
+                    onResolvido: () => loadPage(state.page || 1),
+                });
             } catch (error) {
                 console.error(error);
             }
@@ -403,6 +430,12 @@ async function confirmarApontamentoSelecionado(tipoApontamento = 'manual') {
 
         const payload = await response.json();
         if (!response.ok || payload.status !== 'success') {
+            // ERP demorou (pode ter gravado) ou item já aguardando confirmação: aviso, não erro
+            if (avisarSeAguardandoErp(payload)) {
+                pendingApontamentoIds.delete(selectedId);
+                await loadPage(state.page || 1);
+                return;
+            }
             if (response.status === 409 && payload?.already_apontado) {
                 const detalhes = payload.detalhes || {};
                 openDetailsModal({
