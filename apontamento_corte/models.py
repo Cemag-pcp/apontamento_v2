@@ -24,6 +24,9 @@ class PecasOrdem(models.Model):
     apontado = models.BooleanField(default=False)
     tipo_apontamento = models.CharField(max_length=20, null=True, blank=True)
     erro_apontamento = models.TextField(null=True, blank=True)
+    # O ERP demorou a responder: o apontamento pode ter entrado lá. Fica
+    # bloqueado até alguém conferir (ver core/erp_apontamento.py).
+    aguardando_confirmacao_erp = models.BooleanField(default=False)
 
     # unique constraint de peça e ordem, para evitar duplicidade
     class Meta:

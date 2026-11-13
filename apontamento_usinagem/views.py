@@ -33,6 +33,14 @@ from datetime import date
 
 from core.utils import notificar_ordem
 from core.permissoes import tem_subacesso
+from core.erp_apontamento import (
+    TIMEOUT_ERP_APONTAMENTO,
+    marcar_aguardando_confirmacao_erp,
+    resolver_aguardando_erp,
+    resposta_aguardando_erp,
+    resposta_incerta,
+    resposta_item_bloqueado,
+)
 
 # Sub-acesso da tela /usinagem/ (ver core/permissoes.py e a migracao de sub-acessos)
 SUBACESSO_PLANEJAR = 'usinagem#planejar'
@@ -92,7 +100,7 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
                 .filter(pk=item_id, ordem__grupo_maquina='usinagem')
                 .first()
             )
-            if not item or item.apontado:
+            if not item or item.apontado or item.aguardando_confirmacao_erp:
                 return
 
             user_ref = user if getattr(user, 'is_authenticated', False) else None
@@ -133,16 +141,20 @@ def _apontar_item_erp_usinagem_silencioso(item_id, user=None):
                         "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
                 else:
                     response_integracao = requests.post(
                         "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
             except requests.RequestException as exc:
+                if resposta_incerta(exc):
+                    # pode ter entrado no ERP: bloqueia até alguém conferir
+                    marcar_aguardando_confirmacao_erp(item, user_ref, exc)
+                    return
                 item.erro_apontamento = str(exc)[:2000]
                 item.tipo_apontamento = 'api'
                 item.resp_apontamento = user_ref
@@ -1117,6 +1129,8 @@ def api_erp_apontamentos_usinagem(request):
         queryset = queryset.filter(apontado=True)
     elif filtros['apontado'] == 'false':
         queryset = queryset.filter(apontado=False)
+    elif filtros['apontado'] == 'aguardando':
+        queryset = queryset.filter(aguardando_confirmacao_erp=True)
 
     data_apontamento_inicio = parse_date(filtros['data_apontamento_inicio']) if filtros['data_apontamento_inicio'] else None
     data_apontamento_fim = parse_date(filtros['data_apontamento_fim']) if filtros['data_apontamento_fim'] else None
@@ -1157,6 +1171,7 @@ def api_erp_apontamentos_usinagem(request):
             'tipo_apontamento': item.tipo_apontamento or '',
             'chave_apontamento': item.chave_apontamento or '',
             'erro_apontamento': item.erro_apontamento or '',
+            'aguardando_confirmacao_erp': item.aguardando_confirmacao_erp,
             'resp_apontamento': nome_resp,
             'resp_apontamento_username': resp.username if resp else '',
             'data_producao': localtime(item.data).strftime('%d/%m/%Y %H:%M') if item.data else '',
@@ -1238,6 +1253,12 @@ def api_erp_apontar_item_usinagem(request, pk):
                 status=409
             )
 
+        # a ordem é apontada uma vez só: outro item dela aguardando confirmação também bloqueia
+        if item.aguardando_confirmacao_erp or PecasOrdem.objects.filter(
+            ordem_id=item.ordem_id, aguardando_confirmacao_erp=True
+        ).exists():
+            return resposta_item_bloqueado()
+
         if tipo_apontamento == 'api' and (item.qtd_morta or 0) > 0:
             msg_qtd_morta = (
                 'Apontamento via API bloqueado automaticamente: item com qtd_morta > 0. '
@@ -1275,16 +1296,19 @@ def api_erp_apontar_item_usinagem(request, pk):
                         "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
                 else:
                     response_integracao = requests.post(
                         "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
             except requests.RequestException as exc:
+                if resposta_incerta(exc):
+                    marcar_aguardando_confirmacao_erp(item, request.user, exc)
+                    return resposta_aguardando_erp(payload_integracao)
                 return JsonResponse(
                     {
                         'status': 'error',
@@ -1504,3 +1528,14 @@ def retornar_processo(request):
             {'status': 'error', 'message': str(e)}, 
             status=500
         )
+
+
+@login_required
+@require_POST
+def api_erp_resolver_aguardando_usinagem(request, pk):
+    """Confirmar que entrou no ERP / liberar para reenviar (ver core/erp_apontamento.py)."""
+    return resolver_aguardando_erp(
+        request,
+        PecasOrdem.objects.filter(ordem__grupo_maquina='usinagem'),
+        pk,
+    )

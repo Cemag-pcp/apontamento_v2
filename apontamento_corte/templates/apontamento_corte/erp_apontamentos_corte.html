@@ -92,6 +92,7 @@
                     <select class="form-select" id="filtroApontado" name="apontado">
                         <option value="nao" selected>Nao</option>
                         <option value="sim">Sim</option>
+                        <option value="aguardando">Aguardando confirmação no ERP</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -178,6 +179,7 @@
      data-transferir-url-template="/corte/api/erp/apontamentos/0/transferir/"
      data-apontar-url-template="/corte/api/erp/apontamentos/0/apontar/"
      data-apontar-bloco-url="/corte/api/erp/apontamentos/apontar-bloco/"
+     data-resolver-url-template="{% url 'corte:api_erp_resolver_aguardando_corte' 0 %}"
      data-csrf-token="{{ csrf_token }}">
 </div>
 

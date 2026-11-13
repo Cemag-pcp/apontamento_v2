@@ -24,6 +24,15 @@ import traceback
 
 from .models import PecasOrdem, ConjuntosInspecionados, TaktCelulaExcluida
 from core.utils import carregar_planilha_base_geral
+from core.erp_apontamento import (
+    MENSAGEM_AGUARDANDO_ERP,
+    TIMEOUT_ERP_APONTAMENTO,
+    marcar_aguardando_confirmacao_erp,
+    resolver_aguardando_erp,
+    resposta_aguardando_erp,
+    resposta_incerta,
+    resposta_item_bloqueado,
+)
 from core.whatsapp import enviar_falta_de_peca, destinatarios_falta_de_peca
 from core.models import SolicitacaoPeca, Ordem, OrdemProcesso, MaquinaParada, MotivoInterrupcao, MotivoMaquinaParada, Profile, PecasFaltantes
 from cadastro.models import Operador, Maquina, Pecas, Conjuntos, CarretasExplodidas, PecasEstanqueidade
@@ -209,16 +218,25 @@ def _apontar_item_via_api_erp_montagem(item, user):
                 "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                 json=payload_integracao,
                 auth=("luan araujo", "luanaraujo7"),
-                timeout=(5, 20),
+                timeout=TIMEOUT_ERP_APONTAMENTO,
             )
         else:
             response_integracao = requests.post(
                 "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                 json=payload_integracao,
                 auth=("luan araujo", "luanaraujo7"),
-                timeout=(5, 20),
+                timeout=TIMEOUT_ERP_APONTAMENTO,
             )
     except requests.RequestException as exc:
+        if resposta_incerta(exc):
+            # pode ter entrado no ERP: bloqueia até alguém conferir
+            marcar_aguardando_confirmacao_erp(item, user, exc)
+            return {
+                'payload_enviado': payload_integracao,
+                'retorno_api': None,
+                'chave_apontamento': '',
+                'erro_apontamento': MENSAGEM_AGUARDANDO_ERP,
+            }
         return _registrar_erro(f'Falha de comunicacao com API ERP: {exc}')
 
     try:
@@ -2511,6 +2529,8 @@ def api_erp_apontamentos_montagem(request):
         queryset = queryset.filter(apontado=True)
     elif filtros['apontado'] == 'false':
         queryset = queryset.filter(apontado=False)
+    elif filtros['apontado'] == 'aguardando':
+        queryset = queryset.filter(aguardando_confirmacao_erp=True)
 
     data_apontamento_inicio = parse_date(filtros['data_apontamento_inicio']) if filtros['data_apontamento_inicio'] else None
     data_apontamento_fim = parse_date(filtros['data_apontamento_fim']) if filtros['data_apontamento_fim'] else None
@@ -2552,6 +2572,7 @@ def api_erp_apontamentos_montagem(request):
             'tipo_apontamento': item.tipo_apontamento or '',
             'chave_apontamento': item.chave_apontamento or '',
             'erro_apontamento': item.erro_apontamento or '',
+            'aguardando_confirmacao_erp': item.aguardando_confirmacao_erp,
             'resp_apontamento': _nome_responsavel_apontamento(resp),
             'resp_apontamento_username': resp.username if resp else '',
             'data_producao': localtime(item.data_producao_real).strftime('%d/%m/%Y %H:%M') if item.data_producao_real else '',
@@ -2638,6 +2659,9 @@ def api_erp_apontar_item_montagem(request, pk):
                 status=409
             )
 
+        if item.aguardando_confirmacao_erp:
+            return resposta_item_bloqueado()
+
         payload_integracao = None
         if tipo_apontamento == 'api':
             payload_integracao = _payload_apontamento_erp_montagem(item)
@@ -2672,16 +2696,19 @@ def api_erp_apontar_item_montagem(request, pk):
                         "https://hcemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
                 else:
                     response_integracao = requests.post(
                         "https://cemag.innovaro.com.br/api/integracao/v1/producao/apontar",
                         json=payload_integracao,
                         auth=("luan araujo", "luanaraujo7"),
-                        timeout=(5, 20),
+                        timeout=TIMEOUT_ERP_APONTAMENTO,
                     )
             except requests.RequestException as exc:
+                if resposta_incerta(exc):
+                    marcar_aguardando_confirmacao_erp(item, request.user, exc)
+                    return resposta_aguardando_erp(payload_integracao)
                 return JsonResponse(
                     {
                         'status': 'error',
@@ -3421,3 +3448,14 @@ def api_ocupacao_celula_montagem(request):
     resultado['data'] = dia.strftime('%d/%m/%Y')
 
     return JsonResponse(resultado)
+
+
+@login_required
+@require_POST
+def api_erp_resolver_aguardando_montagem(request, pk):
+    """Confirmar que entrou no ERP / liberar para reenviar (ver core/erp_apontamento.py)."""
+    return resolver_aguardando_erp(
+        request,
+        PecasOrdem.objects.filter(ordem__grupo_maquina='montagem'),
+        pk,
+    )

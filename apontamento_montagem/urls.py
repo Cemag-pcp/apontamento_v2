@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/apontamento-qrcode/', views.api_apontamento_qrcode, name='api_apontamento_qrcode'),
     path('api/erp/apontamentos/', views.api_erp_apontamentos_montagem, name='api_erp_apontamentos_montagem'),
     path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_montagem, name='api_erp_apontar_item_montagem'),
+    path('api/erp/apontamentos/<int:pk>/resolver-erp/', views.api_erp_resolver_aguardando_montagem, name='api_erp_resolver_aguardando_montagem'),
     path('api/historico/', views.api_historico_montagem, name='api_historico_montagem'),
     path('api/historico-paradas/', views.api_historico_paradas_montagem, name='api_historico_paradas_montagem'),
     path('api/ocupacao-celula/', views.api_ocupacao_celula_montagem, name='api_ocupacao_celula_montagem'),

@@ -52,6 +52,7 @@ urlpatterns = [
     path('api/erp/apontamentos/apontar-bloco/', views.api_erp_apontar_itens_corte_bloco, name='api_erp_apontar_itens_corte_bloco'),
     path('api/erp/apontamentos/<int:pk>/transferir/', views.api_erp_transferir_chapa_corte, name='api_erp_transferir_chapa_corte'),
     path('api/erp/apontamentos/<int:pk>/apontar/', views.api_erp_apontar_item_corte, name='api_erp_apontar_item_corte'),
+    path('api/erp/apontamentos/<int:pk>/resolver-erp/', views.api_erp_resolver_aguardando_corte, name='api_erp_resolver_aguardando_corte'),
 ]
 
 # dashboard
