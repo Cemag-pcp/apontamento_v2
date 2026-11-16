@@ -1,34 +1,68 @@
-let CAUSAS_MONTAGEM = [];
+// Checklist OK / Ñ OK por unidade, em 3 grupos (GRUPOS_MONTAGEM, vem de
+// GRUPOS_CHECKLIST_MONTAGEM em inspecao/views/montagem.py), no mesmo formato
+// da pintura: cada grupo lista as principais falhas, sempre à mostra mas só
+// habilitadas quando o grupo é marcado "Ñ OK"; aí o inspetor escolhe uma ou
+// mais e anexa a foto. Usado também pela reinspeção (modal-reinspecionar.js).
+let GRUPOS_MONTAGEM = [];
 try {
     const elCausas = document.getElementById("causas-montagem-data");
-    CAUSAS_MONTAGEM = elCausas ? JSON.parse(elCausas.textContent) : [];
+    const dadosCausas = elCausas ? JSON.parse(elCausas.textContent) : {};
+    GRUPOS_MONTAGEM = dadosCausas.grupos || [];
 } catch (e) {
     console.error("Erro ao carregar causas de montagem:", e);
-    CAUSAS_MONTAGEM = [];
 }
 
-function construirChecklistUnidadeMontagem(indiceUnidade) {
-    const itensCausas = CAUSAS_MONTAGEM.map((causa) => `
-        <div class="checklist-causa-item" data-causa-nome="${causa.nome}" data-chave="${indiceUnidade}-${causa.id}">
-            <div class="d-flex justify-content-between align-items-center checklist-causa-header">
-                <span class="checklist-causa-label">${causa.nome}</span>
-                <div class="btn-group btn-group-sm" role="group">
-                    <input type="radio" class="btn-check causa-status-ok" name="status-causa-${indiceUnidade}-${causa.id}" id="ok-causa-${indiceUnidade}-${causa.id}" value="ok" autocomplete="off">
-                    <label class="btn btn-outline-success" for="ok-causa-${indiceUnidade}-${causa.id}" title="OK">OK</label>
+// Respostas exigidas por unidade: uma por grupo
+function totalItensChecklistMontagem() {
+    return GRUPOS_MONTAGEM.length;
+}
 
-                    <input type="radio" class="btn-check causa-status-nok" name="status-causa-${indiceUnidade}-${causa.id}" id="nok-causa-${indiceUnidade}-${causa.id}" value="${causa.id}" data-causa-id="${causa.id}" data-causa-nome="${causa.nome}" autocomplete="off">
-                    <label class="btn btn-outline-danger" for="nok-causa-${indiceUnidade}-${causa.id}" title="Não OK" aria-label="Não OK">Ñ OK</label>
+function escaparHtmlMontagem(texto) {
+    const div = document.createElement("div");
+    div.textContent = texto ?? "";
+    return div.innerHTML;
+}
+
+// prefixo separa os ids da inspeção ("insp") e da reinspeção ("reinsp");
+// comChave = itens com data-chave (só a inspeção tem "Salvar parcial")
+function construirGruposChecklistMontagem(indiceUnidade, prefixo, comChave) {
+    return GRUPOS_MONTAGEM.map((grupo, indiceGrupo) => {
+        const nomeGrupo = escaparHtmlMontagem(grupo.nome);
+        const chave = `${indiceUnidade}-g${indiceGrupo + 1}`;
+        const id = `${prefixo}-${chave}`;
+        const falhas = grupo.causas.map((causa) => `
+            <div class="form-check">
+                <input class="form-check-input outros-causa-check" type="checkbox" value="${causa.id}" data-causa-nome="${escaparHtmlMontagem(causa.nome)}" id="falha-montagem-${id}-${causa.id}" disabled>
+                <label class="form-check-label small" for="falha-montagem-${id}-${causa.id}">${escaparHtmlMontagem(causa.nome)}</label>
+            </div>`).join("");
+        return `
+        <div class="checklist-causa-item" data-grupo="1" data-causa-nome="${nomeGrupo}"${comChave ? ` data-chave="${chave}"` : ""}>
+            <div class="d-flex justify-content-between align-items-center checklist-causa-header">
+                <span class="checklist-causa-label">${nomeGrupo}</span>
+                <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check causa-status-ok" name="status-causa-${id}" id="ok-causa-${id}" value="ok" autocomplete="off">
+                    <label class="btn btn-outline-success" for="ok-causa-${id}" title="OK">OK</label>
+
+                    <input type="radio" class="btn-check causa-status-nok" name="status-causa-${id}" id="nok-causa-${id}" value="nok" data-causa-nome="${nomeGrupo}" autocomplete="off">
+                    <label class="btn btn-outline-danger" for="nok-causa-${id}" title="Não OK" aria-label="Não OK">Ñ OK</label>
                 </div>
+            </div>
+            <div class="checklist-falhas-grupo">
+                <span class="label-modal-sm">Principais falhas a serem observadas:</span>
+                <div class="outros-causas-lista">${falhas}</div>
+                <div class="text-danger small outros-causas-erro" style="display:none;">Selecione ao menos uma falha.</div>
             </div>
             <div class="checklist-causa-detalhes" style="display:none;">
                 <label class="label-modal">Imagem (obrigatória):<span class="text-danger"> *</span></label>
-                <div class="fotos-salvas small mb-1"></div>
+                ${comChave ? '<div class="fotos-salvas small mb-1"></div>' : ""}
                 <input class="form-control form-control-sm causa-imagens" type="file" accept="image/*" multiple>
                 <div class="invalid-feedback">Anexe ao menos uma foto desta não conformidade.</div>
             </div>
-        </div>
-    `).join("");
+        </div>`;
+    }).join("");
+}
 
+function construirChecklistUnidadeMontagem(indiceUnidade) {
     return `
         <div class="unidade-checklist-card" data-unidade="${indiceUnidade}">
             <div class="unidade-checklist-header" data-bs-toggle="collapse" data-bs-target="#unidade-checklist-body-${indiceUnidade}">
@@ -37,11 +71,71 @@ function construirChecklistUnidadeMontagem(indiceUnidade) {
             </div>
             <div class="collapse" id="unidade-checklist-body-${indiceUnidade}">
                 <div class="checklist-causas-montagem">
-                    ${itensCausas}
+                    ${construirGruposChecklistMontagem(indiceUnidade, "insp", true)}
                 </div>
             </div>
         </div>
     `;
+}
+
+// Falhas do grupo: habilitadas só com o grupo em "Ñ OK"
+function habilitarFalhasGrupoMontagem(item, habilitar) {
+    item.querySelectorAll(".outros-causa-check").forEach((check) => { check.disabled = !habilitar; });
+}
+
+// Grupo em "Ñ OK" precisa de ao menos uma falha escolhida. Usada na inspeção
+// e na reinspeção; devolve "Unidade N: Grupo" para a mensagem de erro.
+function validarFalhasChecklistMontagem(container) {
+    const pendencias = [];
+    let primeiro = null;
+    container.querySelectorAll('.checklist-causa-item[data-grupo="1"]').forEach((item) => {
+        const erro = item.querySelector(".outros-causas-erro");
+        const nok = item.querySelector(".causa-status-nok").checked;
+        const faltando = nok && item.querySelectorAll(".outros-causa-check:checked").length === 0;
+        erro.style.display = faltando ? "block" : "none";
+        if (faltando) {
+            pendencias.push(`Unidade ${item.closest(".unidade-checklist-card").dataset.unidade}: ${item.dataset.causaNome}`);
+            if (!primeiro) primeiro = item;
+        }
+    });
+    if (primeiro) {
+        const corpo = primeiro.closest(".collapse");
+        if (corpo) bootstrap.Collapse.getOrCreateInstance(corpo, { toggle: false }).show();
+        primeiro.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    return pendencias;
+}
+
+// Junta os grupos "Ñ OK" de todas as unidades: cada combinação de falhas vira
+// um bloco (causas_N com várias causas, como o backend já recebe), somando as
+// unidades e juntando as fotos.
+function agregarNaoConformidadesMontagem(container) {
+    const blocos = new Map();
+    container.querySelectorAll(".causa-status-nok:checked").forEach((radio) => {
+        const item = radio.closest(".checklist-causa-item");
+        const causasIds = Array.from(item.querySelectorAll(".outros-causa-check:checked")).map((c) => c.value).sort();
+        const chave = causasIds.join(",");
+        if (!blocos.has(chave)) blocos.set(chave, { causasIds, quantidade: 0, imagens: [], fotosRascunho: [] });
+        const bloco = blocos.get(chave);
+        bloco.quantidade += 1;
+        bloco.imagens.push(...Array.from(item.querySelector(".causa-imagens").files));
+        bloco.fotosRascunho.push(...fotosSalvasDoItemMontagem(item).map((foto) => foto.id));
+    });
+    return Array.from(blocos.values());
+}
+
+// mostra/oculta foto e falhas conforme OK / Ñ OK (inspeção e reinspeção)
+function aplicarStatusGrupoMontagem(item, naoOk) {
+    habilitarFalhasGrupoMontagem(item, naoOk);
+    item.querySelector(".checklist-causa-detalhes").style.display = naoOk ? "block" : "none";
+    if (naoOk) return;
+    const imagens = item.querySelector(".causa-imagens");
+    imagens.value = "";
+    imagens.classList.remove("is-invalid");
+    // grupo voltou para OK: desmarca as falhas escolhidas
+    item.querySelectorAll(".outros-causa-check").forEach((check) => { check.checked = false; });
+    const erro = item.querySelector(".outros-causas-erro");
+    if (erro) erro.style.display = "none";
 }
 
 // Muda a quantidade de unidades sem perder o que já foi respondido nelas
@@ -67,15 +161,10 @@ function renderizarUnidadesChecklistMontagem(quantidade) {
 
 function alternarDetalhesCausaMontagem(radio) {
     const item = radio.closest(".checklist-causa-item");
-    const detalhes = item.querySelector(".checklist-causa-detalhes");
     const marcadoComoNaoOk = item.querySelector(".causa-status-nok").checked;
 
-    if (marcadoComoNaoOk) {
-        detalhes.style.display = "block";
-    } else {
-        detalhes.style.display = "none";
-        item.querySelector(".causa-imagens").value = "";
-        item.querySelector(".causa-imagens").classList.remove("is-invalid");
+    aplicarStatusGrupoMontagem(item, marcadoComoNaoOk);
+    if (!marcadoComoNaoOk) {
         // fotos já salvas deste item deixam de valer (somem no próximo salvar/enviar)
         fotosSalvasDoItemMontagem(item).forEach((foto) => RASCUNHO_MONTAGEM.removidas.add(String(foto.id)));
         renderizarFotosSalvasMontagem();
@@ -118,7 +207,10 @@ function coletarDadosRascunhoMontagem() {
         const ok = item.querySelector(".causa-status-ok").checked;
         const nok = item.querySelector(".causa-status-nok").checked;
         if (!ok && !nok) return;
-        itens[item.dataset.chave] = { status: ok ? "ok" : "nok" };
+        itens[item.dataset.chave] = {
+            status: ok ? "ok" : "nok",
+            causas: Array.from(item.querySelectorAll(".outros-causa-check:checked")).map((c) => c.value),
+        };
     });
     return {
         data_inspecao: document.getElementById("data-inspecao-montagem").value,
@@ -146,7 +238,11 @@ function aplicarRascunhoMontagem(dados, fotos) {
         const item = document.querySelector(`#unidades-checklist-montagem .checklist-causa-item[data-chave="${chave}"]`);
         if (!item) return;
         item.querySelector(resposta.status === "ok" ? ".causa-status-ok" : ".causa-status-nok").checked = true;
-        item.querySelector(".checklist-causa-detalhes").style.display = resposta.status === "nok" ? "block" : "none";
+        aplicarStatusGrupoMontagem(item, resposta.status === "nok");
+        (resposta.causas || []).forEach((id) => {
+            const check = item.querySelector(`.outros-causa-check[value="${id}"]`);
+            if (check) check.checked = true;
+        });
     });
     renderizarFotosSalvasMontagem();
     atualizarContadoresConformidadeMontagem();
@@ -284,7 +380,7 @@ function limitarQtdInspecaoMontagem(valor) {
 }
 
 function atualizarContadoresConformidadeMontagem() {
-    const totalCausas = CAUSAS_MONTAGEM.length;
+    const totalCausas = totalItensChecklistMontagem();
     // so as unidades deste modal: o de reinspecao (mesma pagina) tambem tem
     // .unidade-checklist-card e entrava na conta
     const cards = document.querySelectorAll("#unidades-checklist-montagem .unidade-checklist-card");
@@ -382,6 +478,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target.classList.contains("causa-status-ok") || event.target.classList.contains("causa-status-nok")) {
             alternarDetalhesCausaMontagem(event.target);
             atualizarContadoresConformidadeMontagem();
+        }
+        if (event.target.classList.contains("outros-causa-check")) {
+            const erro = event.target.closest(".checklist-causa-item").querySelector(".outros-causas-erro");
+            if (erro) erro.style.display = "none";
         }
     });
 })

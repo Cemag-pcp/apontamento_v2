@@ -19,7 +19,7 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
     const qtdReinspecao = document.getElementById("qtd-reinspecao-montagem").value;
 
     const cardsUnidades = document.querySelectorAll("#unidades-checklist-reinspecao-montagem .unidade-checklist-card");
-    const totalCausas = CAUSAS_MONTAGEM.length;
+    const totalCausas = totalItensChecklistMontagem();
 
     if (cardsUnidades.length !== parseInt(qtdReinspecao, 10)) {
         cancelarEnvio('Erro ao montar o checklist das unidades. Reabra o modal e tente novamente.');
@@ -36,7 +36,19 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
         return;
     }
 
-    // validarImagensNaoConformidadeMontagem vem de modal-inspecionar.js
+    // validarFalhasChecklistMontagem / validarImagensNaoConformidadeMontagem vêm de modal-inspecionar.js
+    const semFalha = validarFalhasChecklistMontagem(document.getElementById("unidades-checklist-reinspecao-montagem"));
+    if (semFalha.length > 0) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Escolha a falha',
+            html: 'Selecione ao menos uma falha em:<br>' + semFalha.join('<br>'),
+        });
+        buttonInspecionarMontagem.disabled = false;
+        buttonInspecionarMontagem.querySelector(".spinner-border").style.display = "none";
+        return;
+    }
+
     const semFoto = validarImagensNaoConformidadeMontagem(document.getElementById("unidades-checklist-reinspecao-montagem"));
     if (semFoto.length > 0) {
         Swal.fire({
@@ -49,32 +61,14 @@ document.getElementById("form-reinspecao").addEventListener("submit", function (
         return;
     }
 
-    // Agrega as causas marcadas como "Ñ OK" em todas as unidades: cada
-    // causa vira um "bloco" (mesmo formato que o backend ja espera via
-    // request.POST.getlist(f"causas_reinspecao_{i}")), somando quantas
-    // unidades falharam por aquela causa e juntando as imagens de todas elas.
-    const causasAgregadas = new Map();
-    document.querySelectorAll("#unidades-checklist-reinspecao-montagem .causa-status-nok:checked").forEach((radio) => {
-        const causaId = radio.getAttribute("data-causa-id");
-        const item = radio.closest(".checklist-causa-item");
-        const imagensInput = item.querySelector(".causa-imagens");
-
-        if (!causasAgregadas.has(causaId)) {
-            causasAgregadas.set(causaId, { quantidade: 0, imagens: [] });
-        }
-        const entrada = causasAgregadas.get(causaId);
-        entrada.quantidade += 1;
-        entrada.imagens.push(...Array.from(imagensInput.files));
-    });
-
+    // Cada grupo "Ñ OK" vira um bloco com as falhas escolhidas (agregarNaoConformidadesMontagem)
+    const blocos = agregarNaoConformidadesMontagem(document.getElementById("unidades-checklist-reinspecao-montagem"));
     let totalBlocos = 0;
-    causasAgregadas.forEach((entrada, causaId) => {
+    blocos.forEach((bloco) => {
         totalBlocos += 1;
-        formData.append(`causas_reinspecao_${totalBlocos}`, causaId);
-        formData.append(`quantidade_reinspecao_${totalBlocos}`, entrada.quantidade);
-        entrada.imagens.forEach((file) => {
-            formData.append(`imagens_reinspecao_${totalBlocos}`, file);
-        });
+        bloco.causasIds.forEach((causaId) => formData.append(`causas_reinspecao_${totalBlocos}`, causaId));
+        formData.append(`quantidade_reinspecao_${totalBlocos}`, bloco.quantidade);
+        bloco.imagens.forEach((file) => formData.append(`imagens_reinspecao_${totalBlocos}`, file));
     });
 
     formData.append("quantidade-total-causas", totalBlocos);

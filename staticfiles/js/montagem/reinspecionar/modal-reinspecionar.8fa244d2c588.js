@@ -1,24 +1,6 @@
+// Mesmo checklist em 3 grupos da inspeção (construirGruposChecklistMontagem
+// e demais funções vêm de inspecionar/modal-inspecionar.js)
 function construirChecklistUnidadeReinspecaoMontagem(indiceUnidade) {
-    const itensCausas = CAUSAS_MONTAGEM.map((causa) => `
-        <div class="checklist-causa-item" data-causa-nome="${causa.nome}">
-            <div class="d-flex justify-content-between align-items-center checklist-causa-header">
-                <span class="checklist-causa-label">${causa.nome}</span>
-                <div class="btn-group btn-group-sm" role="group">
-                    <input type="radio" class="btn-check causa-status-ok" name="status-causa-reinsp-${indiceUnidade}-${causa.id}" id="ok-causa-reinsp-${indiceUnidade}-${causa.id}" value="ok" autocomplete="off">
-                    <label class="btn btn-outline-success" for="ok-causa-reinsp-${indiceUnidade}-${causa.id}" title="OK">OK</label>
-
-                    <input type="radio" class="btn-check causa-status-nok" name="status-causa-reinsp-${indiceUnidade}-${causa.id}" id="nok-causa-reinsp-${indiceUnidade}-${causa.id}" value="${causa.id}" data-causa-id="${causa.id}" data-causa-nome="${causa.nome}" autocomplete="off">
-                    <label class="btn btn-outline-danger" for="nok-causa-reinsp-${indiceUnidade}-${causa.id}" title="Não OK" aria-label="Não OK">Ñ OK</label>
-                </div>
-            </div>
-            <div class="checklist-causa-detalhes" style="display:none;">
-                <label class="label-modal">Imagem (obrigatória):<span class="text-danger"> *</span></label>
-                <input class="form-control form-control-sm causa-imagens" type="file" accept="image/*" multiple>
-                <div class="invalid-feedback">Anexe ao menos uma foto desta não conformidade.</div>
-            </div>
-        </div>
-    `).join("");
-
     return `
         <div class="unidade-checklist-card" data-unidade="${indiceUnidade}">
             <div class="unidade-checklist-header" data-bs-toggle="collapse" data-bs-target="#unidade-checklist-reinsp-body-${indiceUnidade}">
@@ -27,7 +9,7 @@ function construirChecklistUnidadeReinspecaoMontagem(indiceUnidade) {
             </div>
             <div class="collapse" id="unidade-checklist-reinsp-body-${indiceUnidade}">
                 <div class="checklist-causas-montagem">
-                    ${itensCausas}
+                    ${construirGruposChecklistMontagem(indiceUnidade, "reinsp", false)}
                 </div>
             </div>
         </div>
@@ -46,20 +28,11 @@ function renderizarUnidadesChecklistReinspecaoMontagem(quantidade) {
 
 function alternarDetalhesCausaReinspecaoMontagem(radio) {
     const item = radio.closest(".checklist-causa-item");
-    const detalhes = item.querySelector(".checklist-causa-detalhes");
-    const marcadoComoNaoOk = item.querySelector(".causa-status-nok").checked;
-
-    if (marcadoComoNaoOk) {
-        detalhes.style.display = "block";
-    } else {
-        detalhes.style.display = "none";
-        item.querySelector(".causa-imagens").value = "";
-        item.querySelector(".causa-imagens").classList.remove("is-invalid");
-    }
+    aplicarStatusGrupoMontagem(item, item.querySelector(".causa-status-nok").checked);
 }
 
 function atualizarContadoresConformidadeReinspecaoMontagem() {
-    const totalCausas = CAUSAS_MONTAGEM.length;
+    const totalCausas = totalItensChecklistMontagem();
     const cards = document.querySelectorAll("#unidades-checklist-reinspecao-montagem .unidade-checklist-card");
     let conformes = 0;
     let naoConformes = 0;
@@ -115,6 +88,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (event.target.classList.contains("causa-status-ok") || event.target.classList.contains("causa-status-nok")) {
             alternarDetalhesCausaReinspecaoMontagem(event.target);
             atualizarContadoresConformidadeReinspecaoMontagem();
+        }
+        if (event.target.classList.contains("outros-causa-check")) {
+            const erro = event.target.closest(".checklist-causa-item").querySelector(".outros-causas-erro");
+            if (erro) erro.style.display = "none";
         }
     });
 })
