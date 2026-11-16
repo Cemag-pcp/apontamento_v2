@@ -28,6 +28,7 @@ from core.models import Profile, Maquina
 
 
 from datetime import datetime, timedelta
+import unicodedata
 from collections import defaultdict
 import json
 
@@ -35,6 +36,59 @@ import json
 # mostra so os registros dos ultimos DIAS_PADRAO_LISTA dias. Qualquer filtro
 # (data, maquina, pesquisa, inspetor) busca em todo o historico.
 DIAS_PADRAO_LISTA = 30
+
+# Checklist da inspeção/reinspeção de montagem: 3 grupos OK / Ñ OK, cada um
+# com as principais falhas (que são causas do cadastro, setor "montagem").
+# A causa é achada pelo nome sem diferenciar maiúsculas, acento e plural
+# ("Trincas" = "Trinca"). Causa ativa fora daqui (ex.: "Aspecto visual da
+# solda") sai do checklist, mas o histórico dela continua.
+# A migração inspecao/0060 cadastra as que não existiam.
+GRUPOS_CHECKLIST_MONTAGEM = [
+    ("Preparação, Montagem e Dimensional", [
+        "Folgas",
+        "Desalinhamentos",
+        "Falta de peças",
+    ]),
+    ("Descontinuidades e Defeitos de Fusão", [
+        "Falta de fusão",
+        "Trincas",
+        "Porosidade",
+        "Mordedura",
+        "Perfuração",
+    ]),
+    ("Acabamento e Aspecto Visual", [
+        "Respingo de solda",
+        "Falta de solda",
+        "Sobreposição",
+        "Cratera aberta",
+    ]),
+]
+
+
+def normalizar_nome_causa(nome):
+    """"Falta de Peças" -> "falta de peca": sem acento, minúsculo e sem o
+    "s" do plural, para casar nomes escritos de jeito um pouco diferente."""
+    texto = unicodedata.normalize("NFKD", str(nome or "")).encode("ascii", "ignore").decode()
+    palavras = texto.casefold().split()
+    return " ".join(p[:-1] if len(p) > 3 and p.endswith("s") else p for p in palavras)
+
+
+def _causas_checklist_montagem(causas):
+    """{"grupos": [{"nome", "causas": [{"id", "nome"}]}]} com o nome de
+    exibição de cada falha. Falha sem causa no cadastro fica de fora."""
+    por_nome = {}
+    for causa in sorted(causas, key=lambda c: c.id):
+        por_nome.setdefault(normalizar_nome_causa(causa.nome), causa)
+    grupos = []
+    for nome_grupo, falhas in GRUPOS_CHECKLIST_MONTAGEM:
+        itens = [
+            {"id": por_nome[normalizar_nome_causa(falha)].id, "nome": falha}
+            for falha in falhas
+            if normalizar_nome_causa(falha) in por_nome
+        ]
+        if itens:
+            grupos.append({"nome": nome_grupo, "causas": itens})
+    return {"grupos": grupos}
 
 
 def inspecao_montagem(request):
@@ -73,7 +127,8 @@ def inspecao_montagem(request):
             "inspetor_logado": inspetor_logado,
             "inspetores": lista_inspetores,
             "causas": list_causas,
-            "causas_json": json.dumps(list_causas, ensure_ascii=False),
+            # checklist em 3 grupos (inspeção e reinspeção)
+            "causas_json": json.dumps(_causas_checklist_montagem(causas), ensure_ascii=False),
             "maquinas": maquinas,
         },
     )
