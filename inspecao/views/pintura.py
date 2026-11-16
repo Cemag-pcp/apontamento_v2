@@ -10,6 +10,7 @@ from apontamento_pintura.models import Retrabalho, PecasOrdem
 from ..models import (
     RegistroLimpezaPintura,
     RegistroLimpezaPinturaEtapa,
+    RegistroLimpezaPinturaMaterial,
     Inspecao,
     DadosExecucaoInspecao,
     Reinspecao,
@@ -268,6 +269,22 @@ def _registro_limpeza_json(registro):
     def quem(perfil):
         return perfil.user.username if perfil and perfil.user else "-"
 
+    def opcao(material):
+        # opção do campo Material (mesmo formato de pecas_registro_limpeza_pintura)
+        return {
+            "id": f"{material.ordem_id}|{material.peca}",
+            "text": material.peca,
+            "peca": material.peca,
+            "ordem": material.ordem.ordem if material.ordem else None,
+            "cor": material.cor or "",
+            "data_carga_br": material.data_carga.strftime("%d/%m/%Y") if material.data_carga else "",
+        }
+
+    def unicos(valores):
+        return list(dict.fromkeys(v for v in valores if v))
+
+    materiais = list(registro.materiais.all())
+
     return {
         "id": registro.id,
         "data": timezone.localtime(registro.data).strftime("%d/%m/%Y %H:%M"),
@@ -276,19 +293,15 @@ def _registro_limpeza_json(registro):
         "inspetor_id": registro.inspetor_id,
         "processo": registro.get_processo_display(),
         "processo_valor": registro.processo,
-        "peca": registro.peca,
-        "ordem": registro.ordem.ordem if registro.ordem else "-",
-        # opção do campo Material (mesmo formato de pecas_registro_limpeza_pintura)
-        "material": {
-            "id": f"{registro.ordem_id}|{registro.peca}",
-            "text": registro.peca,
-            "peca": registro.peca,
-            "ordem": registro.ordem.ordem if registro.ordem else None,
-            "cor": registro.cor or "",
-            "data_carga_br": registro.data_carga.strftime("%d/%m/%Y") if registro.data_carga else "",
-        } if registro.ordem_id else None,
-        "cor": registro.cor or "-",
-        "data_carga": registro.data_carga.strftime("%d/%m/%Y") if registro.data_carga else "-",
+        # um ou mais materiais: a lista mostra todos
+        "materiais": [opcao(m) for m in materiais if m.ordem_id],
+        "pecas": [m.peca for m in materiais],
+        "peca": "; ".join(m.peca for m in materiais) or registro.peca,
+        "ordem": ", ".join(unicos(str(m.ordem.ordem) for m in materiais if m.ordem)) or "-",
+        "cor": ", ".join(unicos(m.cor for m in materiais)) or "-",
+        "data_carga": ", ".join(unicos(
+            m.data_carga.strftime("%d/%m/%Y") for m in materiais if m.data_carga
+        )) or "-",
         "quantidade": registro.quantidade,
         "conforme": registro.conforme,
         "finalizado": registro.finalizado,
@@ -314,7 +327,7 @@ def listar_registros_limpeza_pintura(request):
 
     registros = (
         RegistroLimpezaPintura.objects.select_related("inspetor__user", "ordem")
-        .prefetch_related("etapas__inspetor__user")
+        .prefetch_related("etapas__inspetor__user", "materiais__ordem")
         .order_by("-data", "-id")
     )
 
@@ -327,7 +340,9 @@ def listar_registros_limpeza_pintura(request):
     data_fim = request.GET.get("data_fim")
 
     if pesquisa:
-        registros = registros.filter(peca__icontains=pesquisa)
+        registros = registros.filter(
+            Q(peca__icontains=pesquisa) | Q(materiais__peca__icontains=pesquisa)
+        ).distinct()
     if processo:
         registros = registros.filter(processo=processo)
     if resultado in ("conforme", "nao_conforme"):
@@ -360,7 +375,7 @@ def detalhe_registro_limpeza_pintura(request, id):
         return JsonResponse({"error": "Método não permitido"}, status=405)
     registro = get_object_or_404(
         RegistroLimpezaPintura.objects.select_related("inspetor__user", "ordem")
-        .prefetch_related("etapas__inspetor__user"),
+        .prefetch_related("etapas__inspetor__user", "materiais__ordem"),
         pk=id,
     )
     return JsonResponse(_registro_limpeza_json(registro))
@@ -389,17 +404,26 @@ def salvar_registro_limpeza_pintura(request):
     if processo not in dict(RegistroLimpezaPintura.PROCESSO_CHOICES):
         return JsonResponse({"error": "Selecione o processo de pintura."}, status=400)
 
-    # Material vem como "<id da ordem>|<peça>" (opção do select2)
-    ordem_id, _, peca = request.POST.get("peca", "").partition("|")
-    peca = peca.strip()
-    item = (
-        PecasOrdem.objects.select_related("ordem")
-        .filter(ordem_id=ordem_id if ordem_id.isdigit() else None, peca=peca)
-        .first()
-    )
-    if not peca or not item:
-        return JsonResponse({"error": "Selecione uma peça da pintura."}, status=400)
-    ordem = item.ordem
+    # Material: um ou mais, cada um "<id da ordem>|<peça>" (opção do select2)
+    materiais = []
+    vistos = set()
+    for valor in request.POST.getlist("peca"):
+        ordem_id, _, peca = valor.partition("|")
+        peca = peca.strip()
+        if not peca or (ordem_id, peca) in vistos:
+            continue
+        item = (
+            PecasOrdem.objects.select_related("ordem")
+            .filter(ordem_id=ordem_id if ordem_id.isdigit() else None, peca=peca)
+            .first()
+        )
+        if not item:
+            return JsonResponse({"error": f'Peça "{peca}" não encontrada na pintura.'}, status=400)
+        vistos.add((ordem_id, peca))
+        materiais.append((item.ordem, peca))
+    if not materiais:
+        return JsonResponse({"error": "Selecione ao menos uma peça da pintura."}, status=400)
+    ordem, peca = materiais[0]
 
     arquivos_apagar = []
     with transaction.atomic():
@@ -434,12 +458,22 @@ def salvar_registro_limpeza_pintura(request):
         registro.peca = peca
         registro.cor = ordem.cor
         registro.data_carga = ordem.data_carga
-        registro.quantidade = 1  # sempre 1 peça por registro
+        registro.quantidade = len(materiais)  # nº de materiais do registro
         registro.conforme = etapas[0]["conforme"] if etapas else None
         registro.finalizado = not parcial
         registro.conforme_final = etapas[-1]["conforme"] if not parcial else None
         registro.total_reinspecoes = max(len(etapas) - 1, 0)
         registro.save()
+
+        # materiais: substitui pela lista atual (ordem da escolha)
+        registro.materiais.all().delete()
+        RegistroLimpezaPinturaMaterial.objects.bulk_create([
+            RegistroLimpezaPinturaMaterial(
+                registro=registro, ordem=ordem_m, peca=peca_m,
+                cor=ordem_m.cor, data_carga=ordem_m.data_carga, posicao=posicao,
+            )
+            for posicao, (ordem_m, peca_m) in enumerate(materiais)
+        ])
 
         # Atualiza as etapas no lugar (guarda quem respondeu e quando);
         # as que sobraram de uma versão anterior do fluxo são apagadas

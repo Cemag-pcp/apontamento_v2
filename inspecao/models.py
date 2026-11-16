@@ -475,8 +475,10 @@ class RascunhoInspecaoFoto(models.Model):
 
 
 class RegistroLimpezaPintura(models.Model):
-    """Inspeção de limpeza de uma peça antes da pintura (Inspeções > Pintura >
-    Registro de limpeza). Sempre 1 peça por registro."""
+    """Inspeção de limpeza antes da pintura (Inspeções > Pintura > Registro de
+    limpeza). Um registro vale para um ou mais materiais (peças), em
+    RegistroLimpezaPinturaMaterial; ordem/peca/cor/data_carga daqui guardam o
+    primeiro material (compatibilidade) e quantidade = nº de materiais."""
 
     PROCESSO_CHOICES = (
         ("deltec", "Deltec"),
@@ -510,6 +512,26 @@ class RegistroLimpezaPintura(models.Model):
     )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
+
+
+class RegistroLimpezaPinturaMaterial(models.Model):
+    """Material (peça + ordem da pintura) de um registro de limpeza. Cor e
+    data de carga copiadas da ordem no momento do registro."""
+
+    registro = models.ForeignKey(
+        RegistroLimpezaPintura, on_delete=models.CASCADE, related_name="materiais"
+    )
+    ordem = models.ForeignKey(
+        "core.Ordem", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="materiais_limpeza_pintura",
+    )
+    peca = models.CharField(max_length=255)
+    cor = models.CharField(max_length=50, null=True, blank=True)
+    data_carga = models.DateField(null=True, blank=True)
+    posicao = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["posicao", "id"]
 
 
 class RegistroLimpezaPinturaEtapa(models.Model):

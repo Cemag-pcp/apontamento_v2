@@ -42,14 +42,17 @@ function detalhesPecaLimpeza(opcao) {
 }
 
 // Material: peças da pintura (já pintadas ou não), uma opção por peça + cor
-// + data de carga, buscadas no servidor
+// + data de carga, buscadas no servidor. Pode escolher mais de uma: o
+// registro vale para todas e a Quantidade é o número de materiais.
 $("#limpeza-peca").select2({
     theme: "bootstrap-5",
     width: "100%",
+    multiple: true,
+    closeOnSelect: false,
     // dentro do .modal-content: no celular/tablet o .modal-dialog (z-index
     // 1065) cobria a lista anexada direto no .modal e ela não aparecia
     dropdownParent: $(modalRegistroLimpeza).find(".modal-content"),
-    placeholder: "Selecione a peça",
+    placeholder: "Selecione uma ou mais peças",
     templateResult: (opcao) => {
         if (!opcao.peca) return opcao.text; // "Buscando..." etc.
         return $(`<div>
@@ -59,7 +62,8 @@ $("#limpeza-peca").select2({
     },
     templateSelection: (opcao) => {
         if (!opcao.peca) return opcao.text;
-        return $(`<span>${escaparHtmlLimpeza(opcao.peca)} ${detalhesPecaLimpeza(opcao)}</span>`);
+        const ordem = opcao.ordem ? ` <small class="text-muted">(ordem ${escaparHtmlLimpeza(String(opcao.ordem))})</small>` : "";
+        return $(`<span>${escaparHtmlLimpeza(opcao.peca)}${ordem}</span>`);
     },
     language: {
         inputTooShort: () => "Digite para buscar",
@@ -73,6 +77,12 @@ $("#limpeza-peca").select2({
         data: (params) => ({ q: params.term || "" }),
         processResults: (data) => data,
     },
+});
+
+// Quantidade = número de materiais escolhidos
+$("#limpeza-peca").on("change", () => {
+    const escolhidos = $("#limpeza-peca").val() || [];
+    document.getElementById("limpeza-quantidade").value = Math.max(escolhidos.length, 1);
 });
 
 // ------------------------------------------------- etapas da não conformidade
@@ -253,9 +263,9 @@ function preencherRegistroLimpeza(registro) {
     if (!inspetor.value && registro.inspetor_id) inspetor.value = registro.inspetor_id;
     document.getElementById("limpeza-data").value = registro.data_iso;
     marcarRadioLimpeza("processo", registro.processo_valor);
-    if (registro.material) {
-        $("#limpeza-peca").select2("trigger", "select", { data: registro.material });
-    }
+    (registro.materiais || []).forEach((material) => {
+        $("#limpeza-peca").select2("trigger", "select", { data: material });
+    });
 
     registro.etapas.forEach((etapa) => {
         const numero = etapa.numero;
@@ -296,7 +306,7 @@ async function enviarRegistroLimpeza(parcial) {
             return;
         }
     } else if (!document.getElementById("limpeza-peca").value) {
-        Swal.fire({ icon: "error", title: "Selecione o material (peça)." });
+        Swal.fire({ icon: "error", title: "Selecione ao menos um material (peça)." });
         return;
     }
 
@@ -437,7 +447,7 @@ function buscarRegistrosLimpeza(pagina) {
                     <td class="text-nowrap">${escaparHtmlLimpeza(registro.data)}</td>
                     <td>${escaparHtmlLimpeza(registro.inspetor)}</td>
                     <td>${escaparHtmlLimpeza(registro.processo)}</td>
-                    <td>${escaparHtmlLimpeza(registro.peca)}</td>
+                    <td>${(registro.pecas && registro.pecas.length ? registro.pecas : [registro.peca]).map(escaparHtmlLimpeza).join("<br>")}</td>
                     <td>${escaparHtmlLimpeza(String(registro.ordem))}</td>
                     <td>${escaparHtmlLimpeza(registro.cor)}</td>
                     <td class="text-nowrap">${escaparHtmlLimpeza(registro.data_carga)}</td>
