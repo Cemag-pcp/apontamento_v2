@@ -13,6 +13,8 @@ class PecasOrdem(models.Model):
     qtd_morta=models.FloatField(default=0)
     qtd_boa=models.FloatField(default=0)
     operador=models.ForeignKey(Operador, on_delete=models.CASCADE, related_name='operador_produzido_montagem', blank=True, null=True)
+    # todos os operadores que produziram o lote (operador guarda o primeiro)
+    operadores = models.ManyToManyField(Operador, related_name='pecas_montagem_produzidas', blank=True)
     data = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     processo_ordem = models.ForeignKey(OrdemProcesso, on_delete=models.CASCADE, related_name='processo_ordem_montagem', blank=True, null=True)
     data_apontamento = models.DateTimeField(null=True, blank=True)

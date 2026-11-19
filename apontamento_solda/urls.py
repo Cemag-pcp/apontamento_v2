@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/ordens/atualizar-status/', views.atualizar_status_ordem, name='atualizar_status_ordem'),
     path('api/ordens-criadas/', views.ordens_criadas, name='ordens_criadas'),
     path('api/ordens-interrompidas/', views.ordens_interrompidas, name='ordens_interrompidas'),
+    path('api/ordens-aguardando-etapa/', views.ordens_aguardando_etapa, name='ordens_aguardando_etapa'),
     path('api/ordens-iniciadas/', views.ordens_iniciadas, name='ordens_iniciadas'),
     path('api/andamento-carga/', views.percentual_concluido_carga, name='percentual_concluido_carga'),
     path('api/listar-operadores/', views.listar_operadores, name='listar_operadores'),
