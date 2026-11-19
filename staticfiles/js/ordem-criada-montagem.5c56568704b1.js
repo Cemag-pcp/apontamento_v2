@@ -1,5 +1,24 @@
+import { confirmarInicioSeProximoProcesso, criarProximoProcesso } from './proximo-processo.js';
+import { adicionarOperador, ativarVariosOperadores, limparOperadores, nomesOperadoresEscolhidos, operadoresEscolhidos } from './operadores-multiplos.js';
 import { confirmarInicioOrdem } from './apontamento-utils.js';
 import { abrirInspecaoCilindro, isCelulaCilindro } from './inspecao-cilindro-montagem.js';
+// "Próximo processo" (como na usinagem): passa a ordem e o próximo operador inicia
+function filtrosAtuaisProximoProcesso() {
+    return {
+        data_carga: document.getElementById('filtro-data-carga')?.value || '',
+        setor: document.getElementById('filtro-setor')?.value || '',
+    };
+}
+const proximoProcesso = criarProximoProcesso({
+    base: '/montagem',
+    container: '.containerAguardandoEtapa',
+    aoAtualizar: () => {
+        const filtros = filtrosAtuaisProximoProcesso();
+        carregarOrdensIniciadas(filtros);
+        proximoProcesso.carregar(filtros);
+    },
+});
+
 
 function mostrarToast(message, type = 'info') {
     Swal.mixin({
@@ -69,6 +88,7 @@ export const loadOrdens = (container, filtros = {}) => {
                     ordens.forEach(ordem => {
                         const linha = document.createElement('tr');
                         linha.dataset.ordemId = ordem.ordem;
+                        linha.dataset.status = ordem.ordem__status_atual;
                         
                         let badgeClass = "";
                         switch (ordem.ordem__status_atual) {
@@ -84,6 +104,9 @@ export const loadOrdens = (container, filtros = {}) => {
                             case "interrompida":
                                 badgeClass = "badge bg-danger"; // Vermelho
                                 break;
+                            case "agua_prox_proc":
+                                badgeClass = "badge bg-prox-processo"; // Lilás
+                                break;
                             default:
                                 badgeClass = "badge bg-secondary"; // Cinza para status desconhecidos
                         }
@@ -95,7 +118,7 @@ export const loadOrdens = (container, filtros = {}) => {
                                 ${truncateText(ordem.peca, 100)}
                                 </a>
                             </td>
-                            <td data-label="Status"><span class="${badgeClass}">${ordem.ordem__status_atual.replace("_", " ")}</span></td>
+                            <td data-label="Status"><span class="${badgeClass}">${ordem.ordem__status_atual === 'agua_prox_proc' ? 'próximo processo' : ordem.ordem__status_atual.replace("_", " ")}</span></td>
                             <td data-label="Qtd. a Fazer">${ordem.restante}</td>
                             <td data-label="Qtd. Feita">${ordem.total_boa}</td>
                             <td data-label="Ação"><button class="btn btn-sm btn-primary btn-start">Iniciar</button></td>
@@ -161,6 +184,12 @@ export const loadOrdens = (container, filtros = {}) => {
                     setorContainer.appendChild(button);
                 });
 
+                // setor salvo (localStorage) que não está mais entre os cartões: esquece
+                if (filtroSetorInput.value && !data.maquinas.some((m) => String(m.maquina__id) === String(filtroSetorInput.value))) {
+                    filtroSetorInput.value = "";
+                    localStorage.removeItem("filtroSetor");
+                }
+
                 document.getElementById('data-entrega-info').textContent = data.data_programacao;
                 document.getElementById('filtro-data-carga').textContent = data.data_carga;
 
@@ -191,7 +220,7 @@ function truncateText(text, maxLength) {
 }
 
 // Usando delegação de eventos para capturar o clique no botão "Iniciar"
-document.addEventListener('click', function(e) {
+document.addEventListener('click', async function(e) {
     if (e.target && e.target.classList.contains('btn-start')) {
         const linha = e.target.closest('tr');
 
@@ -208,6 +237,9 @@ document.addEventListener('click', function(e) {
         }
 
         console.log("Ordem selecionada:", currentOrdemId);
+
+        // ordem em "Próximo Processo": confirma antes de iniciar
+        if (!(await confirmarInicioSeProximoProcesso(linha.dataset.status, currentOrdemId))) return;
 
         // Obtém o modal corretamente
         const modalElement = document.getElementById('confirmModal');
@@ -344,6 +376,7 @@ export function carregarOrdensIniciadas(filtros = {}, silent = false) {
                     <button class="btn btn-success btn-sm btn-finalizar m-2" title="Finalizar">
                         <i class="fa fa-check"></i>
                     </button>
+                    ${proximoProcesso.botaoHtml()}
                 `;
 
                 card.innerHTML = `
@@ -356,7 +389,7 @@ export function carregarOrdensIniciadas(filtros = {}, silent = false) {
                     </span>
     
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center p-3">
-                        <h6 class="card-title mb-0">#${ordem.ordem_id} - ${ordem.maquina}</h6>
+                        <h6 class="card-title mb-0">#${ordem.ordem_id} - ${ordem.maquina}${ordem.paralela ? ' <span class="badge bg-info text-dark" title="Outro operador está fazendo a mesma ordem">paralela</span>' : ''}</h6>
                     </div>
                     <div class="card-body bg-light">
                         <p class="card-text mb-2 small">
@@ -393,7 +426,7 @@ export function carregarOrdensIniciadas(filtros = {}, silent = false) {
                 // Adiciona evento ao botão "Finalizar", se existir
                 if (buttonFinalizar) {
                     buttonFinalizar.addEventListener('click', () => {
-                        mostrarModalFinalizar(ordem.ordem_id, ordem.maquina, ordem.qtd_restante, ordem.pecas);
+                        mostrarModalFinalizar(ordem.ordem_id, ordem.maquina, ordem.qtd_restante, ordem.pecas, ordem.operadores_lote);
                     });
                 }
 
@@ -403,6 +436,7 @@ export function carregarOrdensIniciadas(filtros = {}, silent = false) {
                     });
                 }
 
+                proximoProcesso.ligarBotao(card, ordem);
                 container.appendChild(card);
 
                 iniciarContador(ordem.ordem_id, ordem.ultima_atualizacao)
@@ -413,6 +447,7 @@ export function carregarOrdensIniciadas(filtros = {}, silent = false) {
 };
 
 export function carregarOrdensInterrompidas(filtros = {}) {
+    proximoProcesso.carregar(filtros);
     const container = document.querySelector('.containerInterrompido');
     container.innerHTML = `
     <div class="spinner-border text-dark" role="status">
@@ -498,7 +533,7 @@ export function carregarOrdensInterrompidas(filtros = {}) {
                     Carregando...
                 </span>
                 <div class="card-header ${headerClass} text-white d-flex justify-content-between align-items-center p-3">
-                    <h6 class="card-title mb-0">#${ordem.ordem_id} - ${ordem.maquina}</h6>
+                    <h6 class="card-title mb-0">#${ordem.ordem_id} - ${ordem.maquina}${ordem.paralela ? ' <span class="badge bg-info text-dark" title="Outro operador está fazendo a mesma ordem">paralela</span>' : ''}</h6>
                 </div>
                 <div class="card-body bg-light">
                     <p class="card-text mb-2 small">
@@ -915,8 +950,11 @@ function finalizarInterrupcao(ordemId, motivoInterrupcaoSelect, pecasDisponiveis
 }
 
 // Modal para "Finalizar"
-function mostrarModalFinalizar(ordemId, maquina, max_itens, pecas) {
+function mostrarModalFinalizar(ordemId, maquina, max_itens, pecas, operadoresLote = []) {
     const modalElement = document.getElementById('finalizarModal');
+    limparOperadores('operadoresFinaisEscolhidos');
+    // quem iniciou o próximo processo já vem marcado (dá para tirar)
+    (operadoresLote || []).forEach((op) => adicionarOperador('operadoresFinaisEscolhidos', op.id, op.nome));
     const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
     // Peça da ordem: exibida na inspeção da célula CILINDRO
     modalElement.dataset.peca = Array.isArray(pecas) ? (pecas[0] || '') : (pecas || '');
@@ -1033,11 +1071,6 @@ function desviarParaInspecaoCilindro(payload, onSucesso) {
     const maquina = document.getElementById('labelOperadores').getAttribute('data-maquina');
     if (!isCelulaCilindro(maquina)) return false;
 
-    const operadorFinal = document.getElementById('operadorFinal');
-    const selectAtivo = operadorFinal.getAttribute('data-active') === 'true'
-        ? operadorFinal
-        : document.getElementById('todosOperadorFinal');
-    const opcao = selectAtivo.options[selectAtivo.selectedIndex];
 
     bootstrap.Modal.getInstance(modalElement)?.hide();
     bootstrap.Modal.getInstance(document.getElementById('modalFinalizarParcial'))?.hide();
@@ -1045,7 +1078,7 @@ function desviarParaInspecaoCilindro(payload, onSucesso) {
     abrirInspecaoCilindro({
         apontamento: payload,
         peca: modalElement.dataset.peca,
-        operador: opcao ? opcao.text : '',
+        operador: nomesOperadoresEscolhidos('operadoresFinaisEscolhidos').join(', '),
         onVoltar: () => bootstrap.Modal.getOrCreateInstance(modalElement).show(),
         onSucesso,
     });
@@ -1082,33 +1115,13 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
         return;
     }
 
-    // Determinar qual select está ativo e obter o valor do operador
-    let operadorId;
-    if (operadorFinal.style.display !== 'none' && operadorFinal.getAttribute('data-active') === 'true') {
-        if (!operadorFinal.value || operadorFinal.value === "") {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Atenção',
-                text: 'Por favor, selecione um operador da máquina.'
-            });
-            return;
-        }
-        operadorId = operadorFinal.value;
-    } else if (todosOperadorFinal.style.display !== 'none' && todosOperadorFinal.getAttribute('data-active') === 'true') {
-        if (!todosOperadorFinal.value || todosOperadorFinal.value === "") {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Atenção',
-                text: 'Por favor, selecione um operador da lista geral.'
-            });
-            return;
-        }
-        operadorId = todosOperadorFinal.value;
-    } else {
+    // um ou mais operadores (etiquetas em operadoresFinaisEscolhidos)
+    const operadorId = operadoresEscolhidos('operadoresFinaisEscolhidos');
+    if (!operadorId.length) {
         Swal.fire({
             icon: 'warning',
             title: 'Atenção',
-            text: 'Por favor, selecione um operador válido.'
+            text: 'Selecione ao menos um operador.'
         });
         return;
     }
@@ -1126,7 +1139,8 @@ document.getElementById('confirmFinalizar').addEventListener('click', function (
     const payload = {
         status: "finalizada",
         ordem_id: parseInt(ordemId),
-        operador_final: parseInt(operadorId),
+        operador_final: parseInt(operadorId[0]),
+        operadores_final: operadorId.map((id) => parseInt(id)),
         obs_finalizar: obsFinalizar,
         qt_realizada: parseInt(qtRealizada.value)
     };
@@ -1225,33 +1239,13 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
         return;
     }
 
-    // Determinar qual select está ativo e obter o valor do operador
-    let operadorId;
-    if (operadorFinal.style.display !== 'none' && operadorFinal.getAttribute('data-active') === 'true') {
-        if (!operadorFinal.value || operadorFinal.value === "") {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Atenção',
-                text: 'Por favor, selecione um operador da máquina.'
-            });
-            return;
-        }
-        operadorId = operadorFinal.value;
-    } else if (todosOperadorFinal.style.display !== 'none' && todosOperadorFinal.getAttribute('data-active') === 'true') {
-        if (!todosOperadorFinal.value || todosOperadorFinal.value === "") {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Atenção',
-                text: 'Por favor, selecione um operador da lista geral.'
-            });
-            return;
-        }
-        operadorId = todosOperadorFinal.value;
-    } else {
+    // um ou mais operadores (etiquetas em operadoresFinaisEscolhidos)
+    const operadorId = operadoresEscolhidos('operadoresFinaisEscolhidos');
+    if (!operadorId.length) {
         Swal.fire({
             icon: 'warning',
             title: 'Atenção',
-            text: 'Por favor, selecione um operador válido.'
+            text: 'Selecione ao menos um operador.'
         });
         return;
     }
@@ -1269,7 +1263,8 @@ document.getElementById('confirmFinalizarEContinuar').addEventListener('click', 
     const payload = {
         status: "finalizada",
         ordem_id: parseInt(ordemId),
-        operador_final: parseInt(operadorId),
+        operador_final: parseInt(operadorId[0]),
+        operadores_final: operadorId.map((id) => parseInt(id)),
         obs_finalizar: obsFinalizar,
         qt_realizada: parseInt(qtRealizada.value),
         continua: continua
@@ -1977,3 +1972,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mostrarModalPararMaquina();
     });
 });
+
+// selects de operador do modal Finalizar: escolha de um ou mais
+ativarVariosOperadores(['operadorFinal', 'todosOperadorFinal'], 'operadoresFinaisEscolhidos');
+
