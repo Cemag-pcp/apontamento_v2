@@ -220,7 +220,7 @@ class InspecaoRecebimento(models.Model):
     dados = models.JSONField()
     dados_inspecao = models.JSONField(null=True, blank=True)
     resultado = models.CharField(max_length=20, choices=RESULTADO_CHOICES)
-    observacao = models.CharField(max_length=255, null=True, blank=True)
+    observacao = models.TextField(null=True, blank=True)  # junta as observações de todas as unidades: passa de 255
     excluido = models.BooleanField(default=False)
 
     def __str__(self):
