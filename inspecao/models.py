@@ -558,3 +558,103 @@ class RegistroLimpezaPinturaEtapa(models.Model):
     class Meta:
         ordering = ["numero"]
         unique_together = [("registro", "numero")]
+
+
+class ItemGarantia(models.Model):
+    """Peça de reposição em garantia a ser enviada ao cliente: linha da
+    planilha de cargas (RQ AV-002-000, aba "Importar Dados") com a coluna
+    Carga = "GARANTIA". Sincronizada pela tela de inspeção de garantia;
+    continua aqui depois que sai da planilha (faturada)."""
+
+    cod_unico = models.CharField(max_length=80, unique=True)  # COD_UNICO = pedido + código
+    pedido = models.CharField(max_length=30, blank=True, default="")
+    cliente = models.CharField(max_length=120, blank=True, default="")
+    cidade = models.CharField(max_length=120, blank=True, default="")
+    uf = models.CharField(max_length=5, blank=True, default="")
+    codigo = models.CharField(max_length=60, blank=True, default="")
+    descricao = models.TextField(blank=True, default="")
+    classe = models.CharField(max_length=120, blank=True, default="")
+    quantidade = models.FloatField(default=0)
+    numero_serie = models.CharField(max_length=120, blank=True, default="")
+    data_emissao = models.DateField(null=True, blank=True)
+    data_programacao = models.DateField(null=True, blank=True)
+    dados = models.JSONField(default=dict, blank=True)  # linha completa da planilha
+    linha_planilha = models.IntegerField(null=True, blank=True)
+    na_planilha = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Item de garantia"
+        verbose_name_plural = "Itens de garantia"
+
+    def __str__(self):
+        return f"{self.pedido} - {self.codigo} ({self.cliente})"
+
+
+class InspecaoGarantia(models.Model):
+    """Cada inspeção de um item de garantia. Reprovado volta para
+    reinspeção, quantas vezes for preciso, até ser aprovado: `numero` é a
+    ordem da inspeção no item (1ª, 2ª, ...)."""
+
+    item = models.ForeignKey(ItemGarantia, on_delete=models.CASCADE, related_name="inspecoes")
+    numero = models.PositiveIntegerField()
+    data_inspecao = models.DateField()
+    # chamado de garantia no Ploomes (Funil de Chamados) vinculado à inspeção
+    numero_garantia = models.CharField(max_length=60)  # Id do chamado (negociação) no Ploomes
+    garantia_titulo = models.CharField(max_length=255, blank=True, default="")
+    garantia_etapa = models.CharField(max_length=120, blank=True, default="")
+    garantia_dados = models.JSONField(default=dict, blank=True)  # seções do chamado no momento da inspeção
+    verificado = models.TextField()  # o que foi verificado na inspeção
+    aprovado = models.BooleanField()
+    inspetor = models.ForeignKey(
+        Profile, on_delete=models.SET_NULL, null=True, blank=True, related_name="inspecoes_garantia"
+    )
+    registrado_por = models.ForeignKey(
+        Profile, on_delete=models.SET_NULL, null=True, blank=True, related_name="inspecoes_garantia_registradas"
+    )
+    registrado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Inspeção de garantia"
+        verbose_name_plural = "Inspeções de garantia"
+        ordering = ["item", "numero"]
+        constraints = [
+            models.UniqueConstraint(fields=["item", "numero"], name="unique_inspecao_garantia_numero"),
+        ]
+
+    @property
+    def link_ploomes(self):
+        return f"https://app10.ploomes.com/deal/{self.numero_garantia}" if self.numero_garantia.isdigit() else ""
+
+    def __str__(self):
+        return f"{self.item} - {self.numero}ª inspeção ({'aprovado' if self.aprovado else 'reprovado'})"
+
+
+class FotoInspecaoGarantia(models.Model):
+    inspecao = models.ForeignKey(InspecaoGarantia, on_delete=models.CASCADE, related_name="fotos")
+    arquivo = models.ImageField(upload_to="inspecao_garantia/", storage=S3Boto3Storage())
+
+
+class SincronizacaoGarantia(models.Model):
+    """Registro de cada leitura bem-sucedida da planilha de garantia, pela
+    tela ou pelo agendamento diário: a tela mostra a última ao usuário."""
+
+    ORIGEM_CHOICES = (
+        ("tela", "Tela"),
+        ("agendamento", "Agendamento diário"),
+    )
+
+    data = models.DateTimeField(auto_now_add=True, db_index=True)
+    origem = models.CharField(max_length=20, choices=ORIGEM_CHOICES, default="tela")
+    itens_na_planilha = models.IntegerField(default=0)
+    novos = models.IntegerField(default=0)
+    atualizados = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Sincronização de garantia"
+        verbose_name_plural = "Sincronizações de garantia"
+
+    def __str__(self):
+        from django.utils import timezone
+        return f"{timezone.localtime(self.data):%d/%m/%Y %H:%M} ({self.get_origem_display()})"

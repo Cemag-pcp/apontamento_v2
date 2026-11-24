@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}<title>Inspeção de Garantia</title>{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" href="{% static 'css/select2.css' %}">
+<style>
+.chamado-opcao .titulo { font-weight: 600; }
+.chamado-opcao .info { font-size: .78rem; color: #64748b; }
+.chamado-opcao .pecas { font-size: .78rem; color: #334155; white-space: normal; }
+.select2-results__option--highlighted .chamado-opcao .info,
+.select2-results__option--highlighted .chamado-opcao .pecas { color: #e2e8f0; }
+.select2-container .select2-selection--single { min-height: 38px; }
+.link-ploomes { font-size: .8rem; }
+.chamado-invalido + .select2-container .select2-selection { border-color: #dc3545 !important; }
+.painel-chamado { border: 1px solid #c7d2fe; background: #f8faff; border-radius: 10px; padding: .75rem .9rem; }
+.painel-chamado .cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.painel-chamado .cabecalho strong { color: #1e293b; }
+.secao-chamado { margin-top: .6rem; }
+.secao-chamado .titulo-secao { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #4f46e5; border-bottom: 1px solid #e0e7ff; padding-bottom: .2rem; margin-bottom: .35rem; }
+.secao-chamado .campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .35rem 1rem; }
+.secao-chamado .campo.largo { grid-column: 1 / -1; }
+.secao-chamado .rotulo { font-size: .7rem; color: #64748b; }
+.secao-chamado .valor { font-size: .85rem; color: #0f172a; overflow-wrap: anywhere; white-space: pre-wrap; }
+.garantia-page { padding-top: 1.25rem; }
+.garantia-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.garantia-header h1 { font-size: 1.5rem; margin: 0; color: #0f172a; }
+.garantia-header p { margin: .25rem 0 0; color: #64748b; font-size: .9rem; }
+.garantia-sync { font-size: .78rem; color: #64748b; }
+.garantia-sync-box { display: flex; align-items: center; gap: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: .6rem .9rem; }
+.garantia-sync-rotulo { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #64748b; }
+.garantia-sync-data { font-size: 1rem; font-weight: 700; color: #0f172a; }
+.garantia-filtros { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: .75rem; margin-bottom: 1rem; }
+.garantia-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1rem; }
+.garantia-card { background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; border-radius: 10px; padding: 1rem; display: flex; flex-direction: column; gap: .35rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.garantia-card.fora { border-left-color: #94a3b8; }
+.garantia-card.aprovado { border-left-color: #10b981; }
+.garantia-card.reinspecao { border-left-color: #ef4444; }
+.garantia-card .codigo { font-weight: 700; color: #0f172a; }
+.garantia-card .badges { display: flex; flex-wrap: wrap; gap: .3rem; justify-content: flex-end; }
+.garantia-card .descricao { font-size: .9rem; color: #1e293b; overflow-wrap: anywhere; }
+.garantia-card .meta { font-size: .8rem; color: #64748b; }
+.garantia-card .ultima { font-size: .8rem; background: #f8fafc; border-radius: 6px; padding: .35rem .5rem; color: #334155; }
+.garantia-card .rodape { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: .5rem; gap: .5rem; }
+.garantia-vazio { text-align: center; color: #64748b; padding: 2.5rem 1rem; grid-column: 1 / -1; }
+.badge-numero { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; }
+.historico-inspecao { border: 1px solid #e2e8f0; border-left: 4px solid #10b981; border-radius: 8px; padding: .75rem; margin-bottom: .75rem; }
+.historico-inspecao.reprovado { border-left-color: #ef4444; }
+.historico-inspecao .verificado { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; }
+.detalhe-fotos img { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0; margin: .35rem .35rem 0 0; }
+.aviso-reinspecao { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="garantia-page">
+    <div class="garantia-header">
+        <div>
+            <h1><i class="bi bi-shield-check me-2"></i>Inspeção de Item de Garantia</h1>
+        </div>
+        <div class="garantia-sync-box">
+            <div>
+                <div class="garantia-sync-rotulo">Última atualização da planilha</div>
+                <div class="garantia-sync-data" id="garantia-sync-data">—</div>
+                <div class="garantia-sync" id="garantia-sync"></div>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btn-atualizar-planilha" title="Ler a planilha de cargas agora">
+                <i class="bi bi-arrow-repeat me-1"></i>Atualizar agora
+            </button>
+        </div>
+    </div>
+
+    <div class="alert alert-warning d-none" id="garantia-erro-sync"></div>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link active" data-aba="pendente" type="button">A inspecionar <span class="badge bg-primary ms-1" data-contador="pendente"></span></button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-aba="reinspecao" type="button">Reinspeção <span class="badge bg-danger ms-1" data-contador="reinspecao"></span></button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-aba="aprovado" type="button">Aprovados <span class="badge bg-success ms-1" data-contador="aprovado"></span></button>
+        </li>
+    </ul>
+
+    <form class="garantia-filtros row g-2 align-items-end" id="garantia-filtros">
+        <div class="col-12 col-md-5">
+            <label class="form-label small mb-1" for="filtro-pesquisa">Pesquisar</label>
+            <input type="search" class="form-control form-control-sm" id="filtro-pesquisa" placeholder="Pedido, código, descrição, cliente, cidade ou nº da garantia">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-1" for="filtro-data-inicio" id="label-data-inicio">Programação de</label>
+            <input type="date" class="form-control form-control-sm" id="filtro-data-inicio">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-1" for="filtro-data-fim">até</label>
+            <input type="date" class="form-control form-control-sm" id="filtro-data-fim">
+        </div>
+        <div class="col-12 col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-search me-1"></i>Filtrar</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-limpar-filtros">Limpar</button>
+        </div>
+    </form>
+
+    <div id="garantia-lista" class="garantia-grid"></div>
+    <nav class="d-flex justify-content-center mt-3" id="garantia-paginacao"></nav>
+</div>
+
+<!-- Modal: inspecionar / reinspecionar -->
+<div class="modal fade" id="modal-inspecionar-garantia" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <form class="modal-content" id="form-inspecionar-garantia" novalidate>
+            <div class="modal-header">
+                <h5 class="modal-title" id="inspecionar-titulo">Inspecionar item de garantia</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3" id="inspecionar-resumo"></div>
+                <div class="aviso-reinspecao mb-3 d-none" id="inspecionar-aviso"></div>
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold" for="garantia-numero">Chamado de garantia <span class="text-danger">*</span> <span class="badge bg-light text-dark border fw-normal">Ploomes</span></label>
+                        <select class="form-select" id="garantia-numero" required></select>
+                        <div class="text-danger small mt-1 d-none" id="garantia-numero-erro">Escolha o chamado de garantia do Ploomes.</div>
+                        <div class="form-text" id="garantia-numero-ajuda">Ao abrir, aparecem os chamados do Funil de Chamados com a peça deste item. Digite o nº do chamado ou o cliente para buscar outros.</div>
+                        <div id="painel-chamado" class="painel-chamado d-none mt-2"></div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold" for="garantia-data">Data da inspeção <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="garantia-data" max="{{ hoje }}" required>
+                        <div class="invalid-feedback">Informe a data da inspeção.</div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold" for="garantia-inspetor">Inspecionado por</label>
+                        <input type="text" class="form-control" id="garantia-inspetor" value="{{ inspetor_nome }}" readonly disabled
+                               title="A inspeção fica registrada no nome de quem está logado">
+                        <div class="form-text">Usuário logado.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold" for="garantia-verificado">O que foi verificado</label>
+                        <textarea class="form-control" id="garantia-verificado" rows="4" required
+                                  placeholder="Ex.: conferência visual, pintura, medidas, funcionamento, identificação, embalagem..."></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold d-block">Resultado</label>
+                        <div class="btn-group" role="group" aria-label="Resultado">
+                            <input type="radio" class="btn-check" name="aprovado" id="aprovado-sim" value="sim" autocomplete="off">
+                            <label class="btn btn-outline-success" for="aprovado-sim"><i class="bi bi-check-circle me-1"></i>Aprovado</label>
+                            <input type="radio" class="btn-check" name="aprovado" id="aprovado-nao" value="nao" autocomplete="off">
+                            <label class="btn btn-outline-danger" for="aprovado-nao"><i class="bi bi-x-circle me-1"></i>Reprovado</label>
+                        </div>
+                        <div class="form-text">Reprovado volta para "Reinspeção" até ser aprovado.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold" for="garantia-fotos">Fotos <span class="text-muted fw-normal">(opcional)</span></label>
+                        <input type="file" class="form-control" id="garantia-fotos" accept="image/*" multiple>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="btn-salvar-inspecao"><i class="bi bi-check2-circle me-1"></i>Salvar inspeção</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: histórico -->
+<div class="modal fade" id="modal-detalhes-garantia" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Inspeções do item de garantia</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body" id="detalhes-garantia-corpo"></div>
+            <div class="modal-footer">
+                {% if pode_desfazer %}
+                <button type="button" class="btn btn-outline-danger me-auto" id="btn-desfazer-inspecao"><i class="bi bi-arrow-counterclockwise me-1"></i>Desfazer última inspeção</button>
+                {% endif %}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.GARANTIA = { hoje: "{{ hoje }}" };
+</script>
+<script type="module" src="{% static 'js/garantia/inspecao-garantia.js' %}"></script>
+{% endblock %}

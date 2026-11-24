@@ -1,0 +1,57 @@
+name: Sincronizar itens de garantia
+
+on:
+  schedule:
+    # 06:00 UTC = 03:00 America/Sao_Paulo (UTC-3, sem horario de verao).
+    # O GitHub pode atrasar execucoes agendadas em alguns minutos.
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Sincronizar itens de garantia da planilha de cargas
+        run: python manage.py sincronizar_itens_garantia
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_STORAGE_BUCKET_NAME: ${{ secrets.AWS_STORAGE_BUCKET_NAME }}
+          AWS_S3_REGION_NAME: ${{ secrets.AWS_S3_REGION_NAME }}
+
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          BASE_TESTE: ${{ secrets.BASE_TESTE }}
+          BASE_PROD: ${{ secrets.BASE_PROD }}
+
+          # conta de serviço do Google (core.utils.get_google_credentials le em minusculas)
+          type: ${{ secrets.TYPE }}
+          project_id: ${{ secrets.PROJECT_ID }}
+          private_key_id: ${{ secrets.PRIVATE_KEY_ID }}
+          private_key: ${{ secrets.PRIVATE_KEY }}
+          client_email: ${{ secrets.CLIENT_EMAIL }}
+          client_id: ${{ secrets.CLIENT_ID }}
+          auth_uri: ${{ secrets.AUTH_URI }}
+          token_uri: ${{ secrets.TOKEN_URI }}
+          auth_provider_x509_cert_url: ${{ secrets.AUTH_PROVIDER_X509_CERT_URL }}
+          client_x509_cert_url: ${{ secrets.CLIENT_X509_CERT_URL }}
+          universe_domain: ${{ secrets.UNIVERSE_DOMAIN }}
+
+          DEBUG: "False"
+          DJANGO_ENV: "prod"
