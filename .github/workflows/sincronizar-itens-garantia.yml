@@ -39,6 +39,7 @@ jobs:
           DB_PORT: ${{ secrets.DB_PORT }}
           BASE_TESTE: ${{ secrets.BASE_TESTE }}
           BASE_PROD: ${{ secrets.BASE_PROD }}
+          RPA_API_KEY: ${{ secrets.RPA_API_KEY }}  # obrigatória nas settings
 
           # conta de serviço do Google (core.utils.get_google_credentials le em minusculas)
           type: ${{ secrets.TYPE }}
