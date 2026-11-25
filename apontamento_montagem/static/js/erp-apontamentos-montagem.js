@@ -206,7 +206,7 @@ function renderRows(rows) {
             <td>${estaAguardandoErp(row) ? badgeAguardandoErp() : badgeApontado(row.apontado)}</td>
             <td>${escapeHtml(chaveApontamentoExibida(row) || '-')}</td>
             <td>${escapeHtml(row.resp_apontamento || row.resp_apontamento_username || '-')}</td>
-            <td>${escapeHtml(row.data_inicio_ordem || '-')}</td>
+            <td>${escapeHtml(row.data_carga || '-')}</td>
             <td>${escapeHtml(row.data_producao || '-')}</td>
             <td>${escapeHtml(row.data_apontamento || '-')}</td>
             <td>${escapeHtml(row.obs_operador || '-')}</td>
